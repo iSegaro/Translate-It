@@ -112,55 +112,52 @@ function setCursorToEnd(field) {
 }
 
 /** Persian
- * به‌روزرسانی فیلدهای ویرایش‌پذیر با متن ترجمه شده
- * @param {HTMLElement} element - المان ورودی یا contentEditable
- * @param {string} translatedText - متن ترجمه شده
- *
- * نکته مهم: وقفه‌ها (delays) در این تابع نقش حیاتی دارند. این وقفه‌ها به مرورگر زمان می‌دهند
- * تا عملیات قبلی را کامل کند و از تداخل دستورات جلوگیری می‌کند. تغییر جای وقفه‌ها یا حذف آن‌ها
- * می‌تواند باعث شود اسکریپت به درستی کار نکند، به‌ویژه در پلتفرم‌هایی مانند واتساپ که از
- * سیستم‌های پیچیده‌تری برای مدیریت محتوای ویرایش‌پذیر استفاده می‌کنند.
- *
- * دلیل استفاده از وقفه‌ها:
- * 1. مرورگر نیاز به زمان دارد تا عملیات focus و select را کامل کند.
- * 2. بدون وقفه، ممکن است دستورات paste قبل از آماده‌سازی کامل المان اجرا شوند.
- * 3. در پلتفرم‌هایی مانند واتساپ، وقفه‌ها به سیستم اجازه می‌دهند تا state داخلی خود را به‌روزرسانی کند.
- *
- * تغییر جای وقفه‌ها یا کاهش زمان آن‌ها ممکن است باعث شود:
- * - متن به درستی paste نشود.
- * - focus از المان خارج شود.
- * - state داخلی پلتفرم‌هایی مانند واتساپ به‌هم بریزد.
+ * به‌روزرسانی فیلدهای ویرایش‌پذیر با متن ترجمه‌شده.
+ * این تابع برای جایگزینی متن در المان‌های input و contentEditable استفاده می‌شود.
+ * تاخیرهای موجود در تابع بسیار مهم هستند و نباید حذف یا تغییر داده شوند.
+ * این تاخیرها به مرورگر کمک می‌کنند تا عملیات قبلی (مانند focus و select) را کامل کند.
+ * حذف یا جابجایی این تاخیرها ممکن است باعث اختلال در کارکرد صحیح تابع شود.
  */
 
 /** ENGLISH
- * Update editable fields (contentEditable or input) with the translated text.
+ * Updates editable fields (input or contentEditable) with the translated text.
  *
- * Note: Delays in this function are critical to ensure the browser completes
- * previous operations (such as focus and selection) before pasting the text.
- * This is especially important on platforms like WhatsApp that use complex internal
- * state management for editable content.
+ * Critical Note: Delays in this function are necessary to allow the browser
+ * to properly complete prior operations (like focus and selection) before pasting text.
+ * This is crucial for platforms like WhatsApp that rely on internal state management.
  *
- * Delays help to:
- * 1. Allow the browser to complete focus and selection operations.
- * 2. Ensure paste events occur after the element is fully prepared.
- * 3. Allow internal state updates on platforms like WhatsApp.
+ * Why delays matter:
+ * 1. Ensures focus and selection actions complete before pasting.
+ * 2. Prevents paste events from firing prematurely.
+ * 3. Supports internal state updates on platforms like WhatsApp.
  *
- * Modifying or reducing these delays might cause the text not to paste correctly,
- * lose focus, or disrupt internal state updates.
+ * Removing or altering these delays may cause:
+ * - Text to fail when pasting.
+ * - Focus to be lost.
+ * - Internal state issues on platforms like WhatsApp.
  */
 async function updateEditableField(element, translatedText) {
+  // Handle Telegram message field by directly replacing innerHTML
+  if (element.id === "editable-message-text") {
+    element.innerHTML = translatedText.replace(/\n/g, "<br>");
+    const isRtl = RTL_REGEX.test(translatedText);
+    element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    setCursorToEnd(element);
+    return;
+  }
+
   const isWhatsApp = element.closest('[aria-label="Type a message"]');
 
   if (isWhatsApp) {
     console.info("WhatsApp detected");
+
     // Focus and select all content
     element.focus({ preventScroll: true });
     await delay(100);
     document.execCommand("selectAll");
-
     await delay(100);
 
-    // Create paste event with translated text
+    // Prepare paste event with translated text
     const dt = new DataTransfer();
     dt.setData("text/plain", translatedText);
     const pasteEvent = new ClipboardEvent("paste", {
@@ -169,19 +166,20 @@ async function updateEditableField(element, translatedText) {
       cancelable: true,
     });
 
-    // Execute replacement of text
+    // Trigger paste event
     element.dispatchEvent(pasteEvent);
 
-    // Force update of React state
+    // Ensure React state updates
     await delay(50);
     element.dispatchEvent(new InputEvent("input", { bubbles: true }));
   } else {
-    // Existing logic for other editors
+    // Handle other editable fields
     clearEditableField(element);
     await delay(50);
     pasteTextToEditableField(element, translatedText);
   }
 
+  // Move cursor to the end after updating content
   setCursorToEnd(element);
 }
 
