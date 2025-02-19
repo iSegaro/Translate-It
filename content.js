@@ -8,7 +8,7 @@
  *
  * در محیط توسعه و دیباگ، با تنظیم به true از ترجمه فرضی استفاده می‌شود و درخواست‌ها به API گوگل ارسال نمی‌شوند.
  */
-const USE_MOCK = false;
+// CONFIG.USE_MOCK = true;
 
 // Regex patterns to detect Persian characters and RTL content
 const PERSIAN_REGEX =
@@ -137,6 +137,15 @@ function setCursorToEnd(field) {
  * - Internal state issues on platforms like WhatsApp.
  */
 async function updateEditableField(element, translatedText) {
+  // Special handling for chat.openai.com field (id "prompt-textarea")
+  if (element.id === "prompt-textarea") {
+    element.innerHTML = translatedText.replace(/\n/g, "<br>");
+    const isRtl = RTL_REGEX.test(translatedText);
+    element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    setCursorToEnd(element);
+    return;
+  }
+
   // Handle Telegram message field by directly replacing innerHTML
   if (element.id === "editable-message-text") {
     element.innerHTML = translatedText.replace(/\n/g, "<br>");
@@ -191,18 +200,16 @@ async function updateEditableField(element, translatedText) {
 async function translateText(text) {
   if (!text || text.length < 2) return text;
 
-  if (USE_MOCK) {
+  if (CONFIG.USE_MOCK) {
     const isPersian = PERSIAN_REGEX.test(text);
     const prompt = isPersian
-      ? "This is a mock translation to English."
-      : "این یک ترجمه فرضی به فارسی است.";
+      ? CONFIG.DEBUG_TRANSLATED_ENGLISH
+      : CONFIG.DEBUG_TRANSLATED_PERSIAN;
     return `${prompt} [${text}]`;
   }
 
   const isPersian = PERSIAN_REGEX.test(text);
-  const prompt = isPersian
-    ? "Translate this text to English and just show output:"
-    : "Translate this text to Persian and just show output: ";
+  const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
   try {
     const response = await fetch(`${CONFIG.API_URL}?key=${CONFIG.API_KEY}`, {
       method: "POST",
@@ -264,6 +271,7 @@ async function updateElementWithTranslation(element, translatedText) {
 // ==============================
 function createTranslateIcon(target) {
   const translateIcon = document.createElement("button");
+  translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
   Object.assign(translateIcon.style, {
     position: "absolute",
     background: "white",
@@ -272,10 +280,11 @@ function createTranslateIcon(target) {
     padding: "2px 5px",
     fontSize: "12px",
     cursor: "pointer",
-    zIndex: "1000",
+    zIndex: "9999999999",
+    pointerEvents: "auto",
   });
-  translateIcon.innerText = "🌐";
-  translateIcon.title = "Translate Text";
+  translateIcon.innerText = CONFIG.TRANSLATION_ICON;
+  translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
   const rect = target.getBoundingClientRect();
   translateIcon.style.top = `${window.scrollY + rect.top - 5}px`;
   translateIcon.style.left = `${window.scrollX + rect.left + rect.width + 5}px`;
@@ -288,13 +297,15 @@ function createTranslateIcon(target) {
 
 // Handle click events to trigger translation
 async function handleClick(event) {
+  if (event.target.closest(".translate-icon")) return; // Prevent document-level click handling when clicking on the translate icon
+
   const target = event.target;
   // If selection mode is active, process the highlighted element
   if (state.selectionActive) {
     state.selectionActive = false;
     if (!state.highlightedElement) return;
-    state.highlightedElement.style.outline = "2px solid blue";
-    const textToTranslate = state.highlightedElement.innerText.trim();
+    state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
+    const textToTranslate = state.highlightedElement?.innerText?.trim();
     if (!textToTranslate) return;
     const translatedText = await translateText(textToTranslate);
     if (translatedText) {
@@ -400,6 +411,9 @@ document.addEventListener("keydown", async (event) => {
   // Escape key clears selection and icons
   if (event.key === "Escape") {
     cleanup();
+
+    // Deactive Selection Mode
+    state.selectionActive = false;
   }
 
   // Ctrl+/ triggers translation using the highlighted or active element
