@@ -158,8 +158,6 @@ async function updateEditableField(element, translatedText) {
   const isWhatsApp = element.closest('[aria-label="Type a message"]');
 
   if (isWhatsApp) {
-    console.info("WhatsApp detected");
-
     // Focus and select all content
     element.focus({ preventScroll: true });
     await delay(100);
