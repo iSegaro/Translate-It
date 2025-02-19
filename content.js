@@ -305,7 +305,7 @@ async function handleClick(event) {
     state.selectionActive = false;
     if (!state.highlightedElement) return;
     state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
-    const textToTranslate = state.highlightedElement.innerText.trim();
+    const textToTranslate = state.highlightedElement?.innerText?.trim();
     if (!textToTranslate) return;
     const translatedText = await translateText(textToTranslate);
     if (translatedText) {
