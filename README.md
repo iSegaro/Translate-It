@@ -114,6 +114,12 @@ Watch this [video guide](https://www.youtube.com/watch?v=o-eyHCP5XwY&t=0) for a 
 
 ---
 
+## 🌱 Donate
+
+If you find this project helpful and want to support its development, consider making a donation:
+
+**Wallet Address:** `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`
+
 ## Contributing
 
 Contributions are welcome! If you have improvements or fixes, please fork the repository and open a pull request. For significant changes, consider opening an issue first to discuss your ideas.
@@ -123,3 +129,5 @@ Contributions are welcome! If you have improvements or fixes, please fork the re
 ## License
 
 This project is licensed under the MIT License.
+
+---
