@@ -137,6 +137,15 @@ function setCursorToEnd(field) {
  * - Internal state issues on platforms like WhatsApp.
  */
 async function updateEditableField(element, translatedText) {
+  // Special handling for chat.openai.com field (id "prompt-textarea")
+  if (element.id === "prompt-textarea") {
+    element.innerHTML = translatedText.replace(/\n/g, "<br>");
+    const isRtl = RTL_REGEX.test(translatedText);
+    element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    setCursorToEnd(element);
+    return;
+  }
+
   // Handle Telegram message field by directly replacing innerHTML
   if (element.id === "editable-message-text") {
     element.innerHTML = translatedText.replace(/\n/g, "<br>");
@@ -262,6 +271,7 @@ async function updateElementWithTranslation(element, translatedText) {
 // ==============================
 function createTranslateIcon(target) {
   const translateIcon = document.createElement("button");
+  translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
   Object.assign(translateIcon.style, {
     position: "absolute",
     background: "white",
@@ -270,7 +280,8 @@ function createTranslateIcon(target) {
     padding: "2px 5px",
     fontSize: "12px",
     cursor: "pointer",
-    zIndex: "999999999",
+    zIndex: "9999999999",
+    pointerEvents: "auto",
   });
   translateIcon.innerText = CONFIG.TRANSLATION_ICON;
   translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
@@ -286,6 +297,8 @@ function createTranslateIcon(target) {
 
 // Handle click events to trigger translation
 async function handleClick(event) {
+  if (event.target.closest(".translate-icon")) return; // Prevent document-level click handling when clicking on the translate icon
+
   const target = event.target;
   // If selection mode is active, process the highlighted element
   if (state.selectionActive) {
