@@ -400,6 +400,9 @@ document.addEventListener("keydown", async (event) => {
   // Escape key clears selection and icons
   if (event.key === "Escape") {
     cleanup();
+
+    // Deactive Selection Mode
+    state.selectionActive = false;
   }
 
   // Ctrl+/ triggers translation using the highlighted or active element
