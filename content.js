@@ -8,7 +8,7 @@
  *
  * در محیط توسعه و دیباگ، با تنظیم به true از ترجمه فرضی استفاده می‌شود و درخواست‌ها به API گوگل ارسال نمی‌شوند.
  */
-const USE_MOCK = false;
+// CONFIG.USE_MOCK = true;
 
 // Regex patterns to detect Persian characters and RTL content
 const PERSIAN_REGEX =
@@ -191,18 +191,16 @@ async function updateEditableField(element, translatedText) {
 async function translateText(text) {
   if (!text || text.length < 2) return text;
 
-  if (USE_MOCK) {
+  if (CONFIG.USE_MOCK) {
     const isPersian = PERSIAN_REGEX.test(text);
     const prompt = isPersian
-      ? "This is a mock translation to English."
-      : "این یک ترجمه فرضی به فارسی است.";
+      ? CONFIG.DEBUG_TRANSLATED_ENGLISH
+      : CONFIG.DEBUG_TRANSLATED_PERSIAN;
     return `${prompt} [${text}]`;
   }
 
   const isPersian = PERSIAN_REGEX.test(text);
-  const prompt = isPersian
-    ? "Translate this text to English and just show output:"
-    : "Translate this text to Persian and just show output: ";
+  const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
   try {
     const response = await fetch(`${CONFIG.API_URL}?key=${CONFIG.API_KEY}`, {
       method: "POST",
@@ -272,10 +270,10 @@ function createTranslateIcon(target) {
     padding: "2px 5px",
     fontSize: "12px",
     cursor: "pointer",
-    zIndex: "1000",
+    zIndex: "999999999",
   });
-  translateIcon.innerText = "🌐";
-  translateIcon.title = "Translate Text";
+  translateIcon.innerText = CONFIG.TRANSLATION_ICON;
+  translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
   const rect = target.getBoundingClientRect();
   translateIcon.style.top = `${window.scrollY + rect.top - 5}px`;
   translateIcon.style.left = `${window.scrollX + rect.left + rect.width + 5}px`;
@@ -293,7 +291,7 @@ async function handleClick(event) {
   if (state.selectionActive) {
     state.selectionActive = false;
     if (!state.highlightedElement) return;
-    state.highlightedElement.style.outline = "2px solid blue";
+    state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
     const textToTranslate = state.highlightedElement.innerText.trim();
     if (!textToTranslate) return;
     const translatedText = await translateText(textToTranslate);
