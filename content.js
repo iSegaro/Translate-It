@@ -50,6 +50,90 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/* ===================== Notification Functions ====================== */
+
+/**
+ * Create a container for notifications if one doesn't already exist.
+ */
+function getNotificationContainer() {
+  let container = document.getElementById("translation-notifications");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "translation-notifications";
+    Object.assign(container.style, {
+      position: "fixed",
+      top: "20px",
+      right: "20px",
+      zIndex: "10000000000",
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+    });
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+/**
+ * Fade-out effect for notification dismissal
+ */
+function fadeOut(element, callback) {
+  element.style.transition = "opacity 0.5s";
+  element.style.opacity = "0";
+  setTimeout(() => {
+    if (element.parentNode) element.remove();
+    if (callback) callback();
+  }, 500);
+}
+
+/**
+ * Displays a notification with the given text, type, and autoDismiss settings.
+ * type can be "status" (translating), "error", or "success".
+ * If autoDismiss=true, the notification will fade out after the specified time (in milliseconds).
+ */
+function showNotification(message, type, autoDismiss = false, duration = 3000) {
+  const container = getNotificationContainer();
+  const notification = document.createElement("div");
+  let icon = "";
+  if (type === "error") icon = CONFIG.ICON_ERROR;
+  else if (type === "success") icon = CONFIG.ICON_SECCESS;
+  else if (type === "status") icon = CONFIG.ICON_STATUS;
+
+  Object.assign(notification.style, {
+    background:
+      type === "error"
+        ? "rgba(255,0,0,0.8)"
+        : type === "success"
+        ? "rgba(0,128,0,0.8)"
+        : "rgba(0,0,0,0.7)",
+    color: "#fff",
+    padding: "8px 12px",
+    borderRadius: "4px",
+    fontSize: "14px",
+    cursor: "pointer",
+    opacity: "1",
+  });
+  notification.innerText = icon + message;
+
+  // در صورت کلیک روی اعلان، به صورت fade خارج شود
+  notification.addEventListener("click", () => {
+    fadeOut(notification);
+  });
+
+  container.appendChild(notification);
+
+  if (autoDismiss) {
+    setTimeout(() => {
+      if (notification.parentNode) {
+        fadeOut(notification);
+      }
+    }, duration);
+  }
+  return notification;
+}
+
+/* =================================================================== */
+
 // Observe changes to an element and update its text if needed
 function observeChanges(element, translatedText) {
   // Disconnect existing observer if any
@@ -257,7 +341,7 @@ async function translateText(text) {
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
   } catch (error) {
     console.error("Translation failed:", error);
-    return text;
+    throw error;
   }
 }
 
@@ -297,7 +381,6 @@ async function updateElementWithTranslation(element, translatedText) {
 function createTranslateIcon(target) {
   const translateIcon = document.createElement("button");
   translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
-  translateIcon.classList.add("translate-icon");
   Object.assign(translateIcon.style, {
     position: "absolute",
     background: "white",
@@ -309,7 +392,7 @@ function createTranslateIcon(target) {
     zIndex: "9999999999",
     pointerEvents: "auto",
   });
-  translateIcon.innerText = CONFIG.TRANSLATION_ICON;
+  translateIcon.innerText = CONFIG.ICON_TRANSLATION;
   translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
   const rect = target.getBoundingClientRect();
   translateIcon.style.top = `${window.scrollY + rect.top - 5}px`;
@@ -376,6 +459,8 @@ async function triggerTranslationOnTarget(target) {
   if (!target) return;
   const textToTranslate = extractText(target);
   if (!textToTranslate) return;
+  // Displaying translation status (without autoDismiss)
+  const statusNotification = showNotification("در حال ترجمه...", "status");
   try {
     const translatedText = await translateText(textToTranslate);
     if (!translatedText) return;
@@ -397,6 +482,18 @@ async function triggerTranslationOnTarget(target) {
     }
   } catch (error) {
     console.error("Translation failed:", error);
+    // Displaying error notification with autoDismiss after 3 seconds
+    showNotification(
+      "Translation failed: " + error.message,
+      "error",
+      true,
+      3000
+    );
+  } finally {
+    // Remove translation status
+    if (statusNotification && statusNotification.parentNode) {
+      fadeOut(statusNotification);
+    }
   }
 }
 
