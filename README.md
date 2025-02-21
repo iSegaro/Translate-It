@@ -114,20 +114,31 @@ Watch this [video guide](https://www.youtube.com/watch?v=o-eyHCP5XwY&t=0) for a 
 
 ---
 
-## 🌱 Donate
+## 🌱 Support
 
-If you find this project helpful and want to support its development, consider making a donation:
+If you enjoy using Gemini Translate, consider supporting its development in one of these simple ways:
 
-**Wallet Address:** `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`
+### ☕ Donate
 
-## Contributing
+**Note:** These donation links do not belong to [**iSegaro**](https://x.com/iSegar0/). The project is supported by them, but donations go to:
+[Mohammad](https://github.com/amm1rr/) | [Twitter (X)](https://x.com/M_Khani65/)
 
-Contributions are welcome! If you have improvements or fixes, please fork the repository and open a pull request. For significant changes, consider opening an issue first to discuss your ideas.
+- **PayPal:**  
+  [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)
+- **Crypto Wallet:**  
+  `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`
+
+### ✅ Contribute
+
+- ⭐ **Star the repository** on GitHub
+- 🐛 **Report issues** on the [issue page](https://github.com/iSegaro/Gemini-Translate/issues)
+- 💻 **Contribute code** – clone the repo and submit a pull request
+
+Thank you for your support!
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.
-
----
+This project is licensed under the MIT License.<br>
+Feel free to make the world a better place!
