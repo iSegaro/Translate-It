@@ -10,8 +10,6 @@ const CONFIG = {
   PROMPT_PERSIAN:
     "لطفاً متن زیر را به فارسی ترجمه کنید، ساختار جمله (مانند خطوط جدید) را حفظ کرده و فقط خروجی را نمایش دهید:",
   HIGHLIGHT_STYLE: "2px solid red",
-  TRANSLATION_ICON: "🌐",
-  TRANSLATION_ICON_TITLE: "Translate Text",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
   DEBUG_TRANSLATED_ENGLISH_With_NewLine:
@@ -19,4 +17,9 @@ const CONFIG = {
   DEBUG_TRANSLATED_PERSIAN_With_NewLine:
     "این یک ترجمه آزمایشی \nبرای ترجمه به فارسی \nبا خطوط جدید است.",
   HIGHTLIH_NEW_ELEMETN_RED: "2px solid red",
+  TRANSLATION_ICON_TITLE: "Translate Text",
+  ICON_TRANSLATION: "🌐",
+  ICON_ERROR: "❌ ",
+  ICON_SECCESS: "✅ ",
+  ICON_STATUS: "🔄 ",
 };
