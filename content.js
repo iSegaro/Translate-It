@@ -137,11 +137,11 @@ function setCursorToEnd(field) {
  * - Internal state issues on platforms like WhatsApp.
  */
 async function updateEditableField(element, translatedText) {
-  // Special handling for chat.openai.com field (id "prompt-textarea")
+  // Special handling for chat.openai field
   if (element.id === "prompt-textarea") {
+    // Replace newline characters with <br> tags
     element.innerHTML = translatedText.replace(/\n/g, "<br>");
-    const isRtl = RTL_REGEX.test(translatedText);
-    element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    element.setAttribute("dir", RTL_REGEX.test(translatedText) ? "rtl" : "ltr");
     setCursorToEnd(element);
     return;
   }
@@ -149,8 +149,7 @@ async function updateEditableField(element, translatedText) {
   // Handle Telegram message field by directly replacing innerHTML
   if (element.id === "editable-message-text") {
     element.innerHTML = translatedText.replace(/\n/g, "<br>");
-    const isRtl = RTL_REGEX.test(translatedText);
-    element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    element.setAttribute("dir", RTL_REGEX.test(translatedText) ? "rtl" : "ltr");
     setCursorToEnd(element);
     return;
   }
@@ -298,6 +297,7 @@ async function updateElementWithTranslation(element, translatedText) {
 function createTranslateIcon(target) {
   const translateIcon = document.createElement("button");
   translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
+  translateIcon.classList.add("translate-icon");
   Object.assign(translateIcon.style, {
     position: "absolute",
     background: "white",
@@ -322,6 +322,16 @@ function createTranslateIcon(target) {
 // ==============================
 function extractText(target) {
   let text;
+  // Special handling for chat.openai's multiline editor
+  const promptContainer = target.closest("#prompt-textarea");
+  if (promptContainer) {
+    text = Array.from(promptContainer.querySelectorAll("p"))
+      .map((p) => p.textContent.trim())
+      .join("\n")
+      .trim();
+    return text;
+  }
+
   const isDraftJs = target.closest(".DraftEditor-root") !== null;
   const isWhatsApp = target.closest(".selectable-text.copyable-text") !== null;
   if (isDraftJs) {
@@ -346,9 +356,9 @@ function extractText(target) {
       });
       text = text.trim();
     } else {
-      container = target.closest('[contenteditable="true"]');
-      if (container) {
-        const spanElement = container.querySelector(
+      let fallbackContainer = target.closest('[contenteditable="true"]');
+      if (fallbackContainer) {
+        const spanElement = fallbackContainer.querySelector(
           'span[data-lexical-text="true"]'
         );
         if (spanElement) {
@@ -372,10 +382,13 @@ async function triggerTranslationOnTarget(target) {
     const isWhatsApp =
       target.closest(".selectable-text.copyable-text") !== null;
     if (isWhatsApp) {
-      target.closest('[contenteditable="true"]') ||
+      const container =
+        target.closest('[contenteditable="true"]') ||
         target.closest(".lexical-rich-text-input");
       if (container) {
         await updateEditableField(container, translatedText);
+      } else {
+        await updateEditableField(target, translatedText);
       }
     } else if (target.isContentEditable) {
       await updateEditableField(target, translatedText);
