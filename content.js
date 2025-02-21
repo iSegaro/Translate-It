@@ -200,9 +200,37 @@ async function translateText(text) {
 
   if (CONFIG.USE_MOCK) {
     const isPersian = PERSIAN_REGEX.test(text);
+
+    // 1. Check for explicit newline characters:
+    const hasExplicitNewline = /[\r\n]+/.test(text);
+
+    // 2. Check for HTML line breaks (<br> or <p>):
+    const hasHtmlNewline = /<br\s*\/?>|<p\s*\/?>/i.test(text);
+
+    // 3. Check for multiple spaces that might indicate a soft return (especially in contenteditable):
+    // Adjust the number of spaces to consider (e.g., 2, 3, or more)
+    const hasSoftReturn = /\s{2,}/.test(text); // Two or more spaces
+
+    // 4. Check for newline characters after normalizing the text
+    const normalizedText = text
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/&nbsp;/gi, " "); // Replace <br> with \n and &nbsp; with space
+    const hasNormalizedNewline = /[\r\n]+/.test(normalizedText);
+
+    const hasNewLine =
+      hasExplicitNewline ||
+      hasHtmlNewline ||
+      hasSoftReturn ||
+      hasNormalizedNewline;
+
     const prompt = isPersian
-      ? CONFIG.DEBUG_TRANSLATED_ENGLISH
+      ? hasNewLine
+        ? CONFIG.DEBUG_TRANSLATED_ENGLISH_With_NewLine
+        : CONFIG.DEBUG_TRANSLATED_ENGLISH
+      : hasNewLine
+      ? CONFIG.DEBUG_TRANSLATED_PERSIAN_With_NewLine
       : CONFIG.DEBUG_TRANSLATED_PERSIAN;
+
     return `${prompt} [${text}]`;
   }
 
@@ -306,6 +334,7 @@ async function handleClick(event) {
     const textToTranslate = state.highlightedElement?.innerText?.trim();
     if (!textToTranslate) return;
     const translatedText = await translateText(textToTranslate);
+    console.info("Translated text:", translatedText);
     if (translatedText) {
       await updateElementWithTranslation(
         state.highlightedElement,
@@ -436,14 +465,21 @@ document.addEventListener("keydown", async (event) => {
           .trim();
       }
     } else if (isWhatsApp) {
-      const container = target.closest('[contenteditable="true"]');
+      const container = target.closest(".lexical-rich-text-input");
       if (container) {
-        const spanElement = container.querySelector(
-          'span[data-lexical-text="true"]'
-        );
-        if (spanElement) {
-          textToTranslate = spanElement.textContent.trim();
-        }
+        textToTranslate = "";
+        const paragraphs = container.querySelectorAll("p.selectable-text");
+        paragraphs.forEach((p) => {
+          const spans = p.querySelectorAll('span[data-lexical-text="true"]');
+          spans.forEach((span) => {
+            const text = span.textContent.trim();
+            if (text) {
+              textToTranslate += text;
+            }
+          });
+          textToTranslate += "\n";
+        });
+        textToTranslate = textToTranslate.trim();
       }
     } else {
       textToTranslate = target.value || target.innerText.trim();
