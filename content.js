@@ -31,6 +31,15 @@ function debounce(func, delay) {
   };
 }
 
+// Context health check
+function isExtensionContextValid() {
+  try {
+    return !!chrome.runtime?.id;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Cleanup function to reset state and remove highlights/icons
 function cleanup() {
   if (state.highlightedElement) {
@@ -120,6 +129,8 @@ function showNotification(message, type, autoDismiss = false, duration = 3000) {
   if (type === "error") icon = CONFIG.ICON_ERROR;
   else if (type === "success") icon = CONFIG.ICON_SECCESS;
   else if (type === "status") icon = CONFIG.ICON_STATUS;
+  else if (type === "warning") icon = CONFIG.ICON_WARNING;
+  else if (type === "info") icon = CONFIG.ICON_INFO;
 
   Object.assign(notification.style, {
     background:
@@ -358,46 +369,51 @@ async function updateEditableField(element, translatedText) {
 
 // Translate the given text using mock or API call
 async function translateText(text) {
-  if (!text || text.length < 2) return text;
-
-  if (CONFIG.USE_MOCK) {
-    const isPersian = PERSIAN_REGEX.test(text);
-
-    // 1. Check for explicit newline characters:
-    const hasExplicitNewline = /[\r\n]+/.test(text);
-
-    // 2. Check for HTML line breaks (<br> or <p>):
-    const hasHtmlNewline = /<br\s*\/?>|<p\s*\/?>/i.test(text);
-
-    // 3. Check for multiple spaces that might indicate a soft return (especially in contenteditable):
-    const hasSoftReturn = /\s{2,}/.test(text);
-
-    // 4. Check for newline characters after normalizing the text
-    const normalizedText = text
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/&nbsp;/gi, " ");
-    const hasNormalizedNewline = /[\r\n]+/.test(normalizedText);
-
-    const hasNewLine =
-      hasExplicitNewline ||
-      hasHtmlNewline ||
-      hasSoftReturn ||
-      hasNormalizedNewline;
-
-    const prompt = isPersian
-      ? hasNewLine
-        ? CONFIG.DEBUG_TRANSLATED_ENGLISH_With_NewLine
-        : CONFIG.DEBUG_TRANSLATED_ENGLISH
-      : hasNewLine
-      ? CONFIG.DEBUG_TRANSLATED_PERSIAN_With_NewLine
-      : CONFIG.DEBUG_TRANSLATED_PERSIAN;
-
-    return `${prompt} [${text}]`;
-  }
-
-  const isPersian = PERSIAN_REGEX.test(text);
-  const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
   try {
+    if (!isExtensionContextValid()) {
+      throw new Error("EXTENSION_RELOADED");
+    }
+
+    if (!text || text.length < 2) return text;
+
+    if (CONFIG.USE_MOCK) {
+      const isPersian = PERSIAN_REGEX.test(text);
+
+      // 1. Check for explicit newline characters:
+      const hasExplicitNewline = /[\r\n]+/.test(text);
+
+      // 2. Check for HTML line breaks (<br> or <p>):
+      const hasHtmlNewline = /<br\s*\/?>|<p\s*\/?>/i.test(text);
+
+      // 3. Check for multiple spaces that might indicate a soft return (especially in contenteditable):
+      const hasSoftReturn = /\s{2,}/.test(text);
+
+      // 4. Check for newline characters after normalizing the text
+      const normalizedText = text
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/&nbsp;/gi, " ");
+      const hasNormalizedNewline = /[\r\n]+/.test(normalizedText);
+
+      const hasNewLine =
+        hasExplicitNewline ||
+        hasHtmlNewline ||
+        hasSoftReturn ||
+        hasNormalizedNewline;
+
+      const prompt = isPersian
+        ? hasNewLine
+          ? CONFIG.DEBUG_TRANSLATED_ENGLISH_With_NewLine
+          : CONFIG.DEBUG_TRANSLATED_ENGLISH
+        : hasNewLine
+        ? CONFIG.DEBUG_TRANSLATED_PERSIAN_With_NewLine
+        : CONFIG.DEBUG_TRANSLATED_PERSIAN;
+
+      return `${prompt} [${text}]`;
+    }
+
+    const isPersian = PERSIAN_REGEX.test(text);
+    const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
+
     // Dynamically retrieving the API_KEY from chrome.storage
     const apiKey = await getApiKeyAsync();
     const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
@@ -418,7 +434,23 @@ async function translateText(text) {
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
   } catch (error) {
-    console.error("Translation failed:", error);
+    if (error.message === "EXTENSION_RELOADED") {
+      showNotification(
+        "Please refresh the page (Ctrl+R)",
+        "warning",
+        true,
+        5000
+      );
+    } else {
+      // console.error("Translation error:", error);
+      showNotification(
+        error.message.includes("API")
+          ? error.message
+          : "Error connecting to the translation service",
+        "error",
+        true
+      );
+    }
     throw error;
   }
 }
@@ -644,7 +676,7 @@ async function handleTranslateEvent(event) {
           3000
         );
       } finally {
-        if (statusNotification && statusNotification.parentNode) {
+        if (statusNotification?.parentNode) {
           fadeOut(statusNotification);
         }
       }
@@ -674,7 +706,7 @@ async function handleTranslateEvent(event) {
           } else {
             showNotification(
               "شی انتخاب شده متنی نیست؛ جایگزینی انجام نمی‌شود.",
-              "error",
+              "warning",
               true,
               3000
             );
@@ -689,7 +721,7 @@ async function handleTranslateEvent(event) {
           3000
         );
       } finally {
-        if (statusNotification && statusNotification.parentNode) {
+        if (statusNotification?.parentNode) {
           fadeOut(statusNotification);
         }
       }
@@ -726,7 +758,7 @@ async function handleTranslateEvent(event) {
         3000
       );
     } finally {
-      if (statusNotification && statusNotification.parentNode) {
+      if (statusNotification?.parentNode) {
         fadeOut(statusNotification);
       }
     }
@@ -768,21 +800,21 @@ async function handleTranslateEvent(event) {
     state.activeTranslateIcon = iconContainer;
 
     const iconClickHandler = async (event) => {
-      // Completely prevent event propagation
       event.stopPropagation();
       event.preventDefault();
 
       // Remove icon with delay
       setTimeout(() => iconContainer.remove(), 50);
 
+      let statusNotification;
+
       try {
         const text = extractText(currentTarget);
         if (!text) return;
 
-        const notification = showNotification("در حال ترجمه...", "status");
+        statusNotification = showNotification("در حال ترجمه...", "status");
         const translated = await translateText(text);
 
-        // Apply changes by checking element existence
         if (document.body.contains(currentTarget)) {
           if (currentTarget.isContentEditable) {
             currentTarget.innerHTML = "";
@@ -790,7 +822,6 @@ async function handleTranslateEvent(event) {
             await updateEditableField(currentTarget, translated);
           } else {
             currentTarget.value = translated;
-
             // Add this line for specific fields like React
             currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
           }
@@ -799,11 +830,15 @@ async function handleTranslateEvent(event) {
             ? "rtl"
             : "ltr";
         }
-
-        fadeOut(notification);
       } catch (error) {
-        console.error("خطای ترجمه:", error);
-        showNotification(`خطا: ${error.message}`, "error", true);
+        // console.error("خطای ترجمه:", error);
+        if (!error.message.includes("API")) {
+          showNotification("خطا در ارتباط با سرویس ترجمه", "error", true);
+        }
+      } finally {
+        if (statusNotification?.parentNode) {
+          fadeOut(statusNotification);
+        }
       }
     };
 
@@ -837,5 +872,13 @@ chrome.runtime.onMessage.addListener((message) => {
     if (!state.selectionActive) {
       cleanup();
     }
+  }
+});
+
+// Add handler to detect extension reload
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "EXTENSION_RELOADED") {
+    showNotification("لطفا صفحه را رفرش کنید", "warning", true, 5000);
+    cleanup();
   }
 });
