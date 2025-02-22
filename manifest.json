@@ -3,23 +3,24 @@
   "name": "ترجمه خودکار",
   "version": "0.1",
   "description": "اکستنشن ترجمه متن به فارسی و انگلیسی",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "background": {
     "service_worker": "background.js"
   },
   "icons": {
-	  "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
-    },
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_icon": {
-	  "16": "icon.png",
+      "16": "icon.png",
       "48": "icon.png",
       "128": "icon.png"
     }
   },
+  "options_page": "options.html",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
