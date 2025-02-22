@@ -21,20 +21,44 @@ const CONFIG = {
   ICON_ERROR: "❌ ",
   ICON_SECCESS: "✅ ",
   ICON_STATUS: "🔄 ",
+  ICON_WARNING: "⚠️ ",
+  ICON_INFO: "💠 ",
 };
 
 // Helper function to retrieve the API_KEY from chrome.storage
-function getApiKey(callback) {
-  chrome.storage.sync.get("apiKey", (data) => {
-    callback(data.apiKey || "YOUR_DEFAULT_API_KEY");
-  });
-}
 
-// Promise-based version for async/await
-function getApiKeyAsync() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get("apiKey", (data) => {
-      resolve(data.apiKey || "YOUR_DEFAULT_API_KEY");
-    });
+async function getApiKeyAsync() {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!isExtensionContextValid()) {
+        reject(new Error("Extension context invalid"));
+        return;
+      }
+
+      // Check if chrome.storage exists
+      if (!chrome?.storage?.sync) {
+        throw new Error("Error: The extension has not loaded correctly");
+      }
+
+      chrome.storage.sync.get(["apiKey"], (result) => {
+        if (chrome.runtime.lastError) {
+          reject(
+            new Error(`System error: ${chrome.runtime.lastError.message}`)
+          );
+          return;
+        }
+
+        if (!result.apiKey) {
+          reject(
+            new Error("Please enter the API key in the extension settings")
+          );
+          return;
+        }
+
+        resolve(result.apiKey);
+      });
+    } catch (error) {
+      reject(new Error(`Access error: ${error.message}`));
+    }
   });
 }

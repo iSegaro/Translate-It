@@ -27,7 +27,7 @@ A lightweight browser extension that translates text in text fields (e.g., textb
 
 ## Requirements
 
-- A modern browser that supports extensions (Chrome, Firefox, Edge, etc.)
+- A modern Chromium-based browsers (Chrome, Edge, Brave and etc)
 - Basic knowledge of JavaScript and browser extension development
 - (Optional) A valid API key for translation if not using mock mode
 
@@ -72,9 +72,10 @@ A lightweight browser extension that translates text in text fields (e.g., textb
      - Enable **Developer mode**
      - Click **Load unpacked** and select the project directory
 
-   - **Firefox:**
-     - Open the Add-ons Manager (`about:debugging`)
-     - Click **This Firefox** > **Load Temporary Add-on** and select the `manifest.json` file from your project directory
+   ~~-**Firefox:**~~ (Todo)
+
+   ~~- Open the Add-ons Manager (`about:debugging`)~~
+   ~~- Click **This Firefox** > **Load Temporary Add-on** and select the `manifest.json` file from your project directory~~
 
 ---
 
@@ -112,27 +113,39 @@ Watch this [video guide](https://www.youtube.com/watch?v=o-eyHCP5XwY&t=0) for a 
 - **Keyboard Shortcut:**  
   Press `Ctrl+/` when a text field is active or highlighted. The extension will translate the text and update the field accordingly.
 
+<br>
+
 ---
 
 ## 🌱 Support
 
-If you enjoy using Gemini Translate, consider supporting its development in one of these simple ways:
+If you find Gemini Translate useful, you can support its development in the following ways:
 
-### ☕ Donate
+### ☕ Buy Me a Coffee
 
-**Note:** These donation links do not belong to [**iSegaro**](https://x.com/iSegar0/). The project is supported by them, but donations go to:
-[Mohammad](https://github.com/amm1rr/) | [Twitter (X)](https://x.com/M_Khani65/)
+These donation links do not belong to [**iSegaro**](https://x.com/iSegar0/). The project is supported by them, but donations go to [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-000000?style=flat&logo=x>)](https://x.com/M_Khani65/)
 
-- **PayPal:**  
-  [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)
-- **Crypto Wallet:**  
-  `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`
+<br>
 
-### ✅ Contribute
+- **Crypto Wallets**  
+   🔹 **Ethereum (ETH)** `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`<br>
+  🔸 **Bitcoin (BTC)** `bc1qh4p5nqa97adcnx0vpv2mfzm5q226688vsqwzmj`
+
+<br>
+
+- **PayPal** [![Donate PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)
+
+<br>
+
+---
+
+### Contribute
 
 - ⭐ **Star the repository** on GitHub
 - 🐛 **Report issues** on the [issue page](https://github.com/iSegaro/Gemini-Translate/issues)
 - 💻 **Contribute code** – clone the repo and submit a pull request
+
+<br>
 
 Thank you for your support!
 

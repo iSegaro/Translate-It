@@ -1,4 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // Fetch extension name and version from manifest.json
+  const manifest = chrome.runtime.getManifest();
+  document.getElementById(
+    "NameVersion"
+  ).textContent = `${manifest.name} v${manifest.version}`;
+
   // Retrieve the saved key (if it exists)
   chrome.storage.sync.get("apiKey", (data) => {
     if (data.apiKey) {
