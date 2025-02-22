@@ -27,7 +27,7 @@ A lightweight browser extension that translates text in text fields (e.g., textb
 
 ## Requirements
 
-- A modern browser that supports extensions (Chrome, Firefox, Edge, etc.)
+- A modern Chromium-based browsers (Chrome, Edge, Brave and etc)
 - Basic knowledge of JavaScript and browser extension development
 - (Optional) A valid API key for translation if not using mock mode
 
@@ -72,9 +72,10 @@ A lightweight browser extension that translates text in text fields (e.g., textb
      - Enable **Developer mode**
      - Click **Load unpacked** and select the project directory
 
-   - **Firefox:**
-     - Open the Add-ons Manager (`about:debugging`)
-     - Click **This Firefox** > **Load Temporary Add-on** and select the `manifest.json` file from your project directory
+   ~~-**Firefox:**~~ (Todo)
+
+   ~~- Open the Add-ons Manager (`about:debugging`)~~
+   ~~- Click **This Firefox** > **Load Temporary Add-on** and select the `manifest.json` file from your project directory~~
 
 ---
 
