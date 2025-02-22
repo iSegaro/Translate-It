@@ -1,7 +1,7 @@
 // config.js
 
 const CONFIG = {
-  USE_MOCK: true,
+  USE_MOCK: false,
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   PROMPT_ENGLISH:
