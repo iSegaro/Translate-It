@@ -346,7 +346,7 @@ async function updateEditableField(element, translatedText) {
         element.dispatchEvent(new InputEvent("input", { bubbles: true }));
       }
     } catch (error) {
-      console.error("WhatsApp update error:", error);
+      showNotification(`WhatsApp update error: ${error}`, "error", true, 5000);
     }
   } else {
     // Other platforms
