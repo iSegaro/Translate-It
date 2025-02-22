@@ -209,12 +209,43 @@ function pasteTextToEditableField(field, text) {
 
 // Set cursor to the end of the content in the field
 function setCursorToEnd(field) {
+  if (!document.body.contains(field)) {
+    console.warn("Cannot set cursor - element is detached");
+    return;
+  }
+
   const selection = window.getSelection();
-  const range = document.createRange();
-  range.selectNodeContents(field);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  try {
+    // Create a new range with the element's content
+    const range = document.createRange();
+    const lastChild = field.lastChild || field;
+
+    // Set the range based on the last valid node
+    if (lastChild.nodeType === Node.TEXT_NODE) {
+      range.setStart(lastChild, lastChild.length);
+      range.setEnd(lastChild, lastChild.length);
+    } else {
+      range.selectNodeContents(field);
+      range.collapse(false);
+    }
+
+    // Apply the range with additional checks
+    if (range.startContainer.ownerDocument === document) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  } catch (error) {
+    console.error("Cursor position error:", error);
+  }
+
+  // Apply focus safely
+  if (document.activeElement !== field) {
+    setTimeout(() => {
+      if (document.body.contains(field)) {
+        field.focus({ preventScroll: true });
+      }
+    }, 50);
+  }
 }
 
 /** Persian
@@ -243,58 +274,82 @@ function setCursorToEnd(field) {
  * - Internal state issues on platforms like WhatsApp.
  */
 async function updateEditableField(element, translatedText) {
-  // Special handling for chat.openai field
+  // Special handling for chat.openai
   if (element.id === "prompt-textarea") {
-    // Replace newline characters with <br> tags
-    element.innerHTML = translatedText.replace(/\n/g, "<br>");
-    element.setAttribute("dir", RTL_REGEX.test(translatedText) ? "rtl" : "ltr");
-    setCursorToEnd(element);
+    if (document.body.contains(element)) {
+      element.innerHTML = translatedText.replace(/\n/g, "<br>");
+      element.setAttribute(
+        "dir",
+        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
+      );
+      setCursorToEnd(element);
+    }
     return;
   }
 
-  // Handle Telegram message field by directly replacing innerHTML
+  // Handle Telegram
   if (element.id === "editable-message-text") {
-    element.innerHTML = translatedText.replace(/\n/g, "<br>");
-    element.setAttribute("dir", RTL_REGEX.test(translatedText) ? "rtl" : "ltr");
-    setCursorToEnd(element);
+    if (document.body.contains(element)) {
+      element.innerHTML = translatedText.replace(/\n/g, "<br>");
+      element.setAttribute(
+        "dir",
+        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
+      );
+      setCursorToEnd(element);
+    }
     return;
   }
 
   const isWhatsApp = element.closest('[aria-label="Type a message"]');
 
   if (isWhatsApp) {
-    // Focus and select all content
-    element.focus({ preventScroll: true });
-    await delay(100);
-    document.execCommand("selectAll");
-    await delay(100);
+    try {
+      // Apply focus with element existence check
+      if (document.body.contains(element)) {
+        element.focus({ preventScroll: true });
+        await delay(100);
+      }
 
-    // Prepare paste event with translated text while preserving newlines
-    // Use DataTransfer method to update WhatsApp field
-    const dt = new DataTransfer();
-    dt.setData("text/plain", translatedText);
-    dt.setData("text/html", translatedText.replace(/\n/g, "<br>"));
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      clipboardData: dt,
-      cancelable: true,
-    });
+      // Select content only if element exists
+      if (document.body.contains(element)) {
+        document.execCommand("selectAll");
+        await delay(100);
+      }
 
-    // Trigger paste event
-    element.dispatchEvent(pasteEvent);
+      // Create paste event
+      if (document.body.contains(element)) {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", translatedText);
+        dt.setData("text/html", translatedText.replace(/\n/g, "<br>"));
 
-    // Ensure React state updates
-    await delay(50);
-    element.dispatchEvent(new InputEvent("input", { bubbles: true }));
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          clipboardData: dt,
+          cancelable: true,
+        });
+
+        element.dispatchEvent(pasteEvent);
+        await delay(50);
+
+        // Apply state changes
+        element.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      }
+    } catch (error) {
+      console.error("WhatsApp update error:", error);
+    }
   } else {
-    // Handle other editable fields
-    clearEditableField(element);
-    await delay(50);
-    pasteTextToEditableField(element, translatedText);
+    // Other platforms
+    if (document.body.contains(element)) {
+      clearEditableField(element);
+      await delay(50);
+      pasteTextToEditableField(element, translatedText);
+    }
   }
 
-  // Move cursor to the end after updating content
-  setCursorToEnd(element);
+  // Apply cursor position only if element exists
+  if (document.body.contains(element)) {
+    setCursorToEnd(element);
+  }
 }
 
 // ==============================
