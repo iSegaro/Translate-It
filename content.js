@@ -725,16 +725,19 @@ async function handleTranslateEvent(event) {
         if (!text) return;
 
         const notification = showNotification("در حال ترجمه...", "status");
-
         const translated = await translateText(text);
 
         // Apply changes by checking element existence
         if (document.body.contains(currentTarget)) {
           if (currentTarget.isContentEditable) {
+            currentTarget.innerHTML = "";
+            await delay(10);
             await updateEditableField(currentTarget, translated);
           } else {
             currentTarget.value = translated;
-            currentTarget.dispatchEvent(new Event("input", { bubbles: true }));
+
+            // Add this line for specific fields like React
+            currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
           }
 
           currentTarget.style.direction = RTL_REGEX.test(translated)
