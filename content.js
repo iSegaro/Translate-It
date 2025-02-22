@@ -43,12 +43,34 @@ function cleanup() {
   state.activeTranslateIcon?.remove();
   state.highlightedElement = null;
   state.activeTranslateIcon = null;
+  // Remove all remaining icons
+  document.querySelectorAll(".translation-icon-extension").forEach((icon) => {
+    icon.remove();
+  });
 }
 
 // Helper to introduce a delay
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// Add this new function to handle external clicks on createTranslateIcon
+function setupGlobalClickHandler() {
+  const handleDocumentClick = (event) => {
+    if (
+      state.activeTranslateIcon &&
+      !event.composedPath().includes(state.activeTranslateIcon) &&
+      !event.target.isContentEditable &&
+      event.target.tagName !== "INPUT" &&
+      event.target.tagName !== "TEXTAREA"
+    ) {
+      cleanup();
+    }
+  };
+
+  document.addEventListener("click", handleDocumentClick, { capture: true });
+}
+setupGlobalClickHandler();
 
 /* ===================== Notification Functions ====================== */
 
@@ -115,7 +137,7 @@ function showNotification(message, type, autoDismiss = false, duration = 3000) {
   });
   notification.innerText = icon + message;
 
-  // در صورت کلیک روی اعلان، به صورت fade خارج شود
+  // Fade out on notification click
   notification.addEventListener("click", () => {
     fadeOut(notification);
   });
@@ -293,7 +315,6 @@ async function translateText(text) {
     const hasHtmlNewline = /<br\s*\/?>|<p\s*\/?>/i.test(text);
 
     // 3. Check for multiple spaces that might indicate a soft return (especially in contenteditable):
-    // Adjust the number of spaces to consider (e.g., 2, 3, or more)
     const hasSoftReturn = /\s{2,}/.test(text);
 
     // 4. Check for newline characters after normalizing the text
@@ -322,7 +343,9 @@ async function translateText(text) {
   const isPersian = PERSIAN_REGEX.test(text);
   const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
   try {
-    const response = await fetch(`${CONFIG.API_URL}?key=${CONFIG.API_KEY}`, {
+    // Dynamically retrieving the API_KEY from chrome.storage
+    const apiKey = await getApiKeyAsync();
+    const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -394,9 +417,17 @@ function createTranslateIcon(target) {
   });
   translateIcon.innerText = CONFIG.ICON_TRANSLATION;
   translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
+
+  // Use getBoundingClientRect with scroll adjustments
   const rect = target.getBoundingClientRect();
-  translateIcon.style.top = `${window.scrollY + rect.top - 5}px`;
-  translateIcon.style.left = `${window.scrollX + rect.left + rect.width + 5}px`;
+  translateIcon.style.top = `${rect.top + window.scrollY - 5}px`;
+  translateIcon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
+
+  // Add pointer-events property
+  translateIcon.style.pointerEvents = "auto";
+  // Add a specific class for identification
+  translateIcon.classList.add("translation-icon-extension");
+
   return translateIcon;
 }
 
@@ -455,99 +486,275 @@ function extractText(target) {
   return text;
 }
 
-async function triggerTranslationOnTarget(target) {
-  if (!target) return;
-  const textToTranslate = extractText(target);
-  if (!textToTranslate) return;
-  // Displaying translation status (without autoDismiss)
-  const statusNotification = showNotification("در حال ترجمه...", "status");
-  try {
-    const translatedText = await translateText(textToTranslate);
-    if (!translatedText) return;
-    const isWhatsApp =
-      target.closest(".selectable-text.copyable-text") !== null;
-    if (isWhatsApp) {
-      const container =
-        target.closest('[contenteditable="true"]') ||
-        target.closest(".lexical-rich-text-input");
-      if (container) {
-        await updateEditableField(container, translatedText);
-      } else {
-        await updateEditableField(target, translatedText);
-      }
-    } else if (target.isContentEditable) {
-      await updateEditableField(target, translatedText);
-    } else {
-      target.value = translatedText;
-    }
-  } catch (error) {
-    console.error("Translation failed:", error);
-    // Displaying error notification with autoDismiss after 3 seconds
-    showNotification(
-      "Translation failed: " + error.message,
-      "error",
-      true,
-      3000
-    );
-  } finally {
-    // Remove translation status
-    if (statusNotification && statusNotification.parentNode) {
-      fadeOut(statusNotification);
-    }
-  }
-}
-
 // ==============================
 // Event Handlers: Unified for Click and Keydown
 // ==============================
 async function handleTranslateEvent(event) {
+  // لغو انتخاب در صورت فشردن کلید Escape
   if (event.type === "keydown" && event.key === "Escape") {
-    cleanup();
+    event.stopPropagation();
     state.selectionActive = false;
+    cleanup();
     return;
   }
 
+  // Prevent processing of clicks on the translation icon
+  // if (event.type === "click" && event.target.closest(".translate-icon")) {
+  //   return;
+  // }
+
+  let textToTranslate = "";
+
+  // Support for Ctrl+/ key combination
   if (event.type === "keydown" && event.ctrlKey && event.key === "/") {
-    event.preventDefault();
-    const target = state.highlightedElement || document.activeElement;
-    await triggerTranslationOnTarget(target);
+    event.stopPropagation();
+    const selection = window.getSelection();
+
+    if (selection && !selection.isCollapsed) {
+      textToTranslate = selection.toString().trim();
+    } else {
+      const target = document.activeElement;
+      if (target) {
+        const isDraftJs = target.closest(".DraftEditor-root") !== null;
+        const isWhatsApp =
+          target.closest(".selectable-text.copyable-text") !== null;
+
+        if (isDraftJs) {
+          const tweetTextarea = target.closest(
+            '[data-testid="tweetTextarea_0"]'
+          );
+          if (tweetTextarea) {
+            const textElements =
+              tweetTextarea.querySelectorAll('[data-text="true"]');
+            textToTranslate = Array.from(textElements)
+              .map((el) => el.textContent)
+              .join(" ")
+              .trim();
+          }
+        } else if (isWhatsApp) {
+          const container = target.closest(".lexical-rich-text-input");
+          if (container) {
+            const paragraphs = container.querySelectorAll("p.selectable-text");
+            paragraphs.forEach((p) => {
+              const spans = p.querySelectorAll(
+                'span[data-lexical-text="true"]'
+              );
+              spans.forEach((span) => {
+                const text = span.textContent.trim();
+                if (text) {
+                  textToTranslate += text;
+                }
+              });
+              textToTranslate += "\n";
+            });
+            textToTranslate = textToTranslate.trim();
+          }
+        } else if (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA"
+        ) {
+          textToTranslate = target.value.trim();
+        } else if (target.isContentEditable) {
+          textToTranslate = target.innerText.trim();
+        }
+      }
+    }
+
+    if (textToTranslate) {
+      const statusNotification = showNotification("در حال ترجمه...", "status");
+      try {
+        const translatedText = await translateText(textToTranslate);
+        if (translatedText) {
+          if (selection && !selection.isCollapsed) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(translatedText));
+          } else {
+            const target = document.activeElement;
+            if (target) {
+              if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+                target.value = translatedText;
+              } else if (target.isContentEditable) {
+                await updateEditableField(target, translatedText);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Translation failed:", error);
+        showNotification(
+          "ترجمه با خطا مواجه شد: " + error.message,
+          "error",
+          true,
+          3000
+        );
+      } finally {
+        if (statusNotification && statusNotification.parentNode) {
+          fadeOut(statusNotification);
+        }
+      }
+    }
     return;
   }
 
-  if (event.type === "click") {
-    if (event.target.closest(".translate-icon")) return;
-    const target = event.target;
-    if (state.selectionActive) {
-      state.selectionActive = false;
-      if (!state.highlightedElement) return;
-      state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
-      await triggerTranslationOnTarget(state.highlightedElement);
+  // Check for user text selection while holding Ctrl key
+  const selection = window.getSelection();
+  if (
+    event.ctrlKey &&
+    event.type == "mouseup" &&
+    selection &&
+    !selection.isCollapsed
+  ) {
+    const selectedText = selection.toString().trim();
+    if (selectedText) {
+      const statusNotification = showNotification("در حال ترجمه...", "status");
+      try {
+        const translatedText = await translateText(selectedText);
+        if (translatedText) {
+          const range = selection.getRangeAt(0);
+          // If the selected object is a text node, replace it
+          if (range.commonAncestorContainer.nodeType === Node.TEXT_NODE) {
+            range.deleteContents();
+            range.insertNode(document.createTextNode(translatedText));
+          } else {
+            showNotification(
+              "شی انتخاب شده متنی نیست؛ جایگزینی انجام نمی‌شود.",
+              "error",
+              true,
+              3000
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Translation failed:", error);
+        showNotification(
+          "ترجمه با خطا مواجه شد: " + error.message,
+          "error",
+          true,
+          3000
+        );
+      } finally {
+        if (statusNotification && statusNotification.parentNode) {
+          fadeOut(statusNotification);
+        }
+      }
       return;
     }
+  }
 
-    const isEditable =
-      target.closest(".DraftEditor-root") ||
-      target.closest(".selectable-text.copyable-text") ||
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable;
-
-    if (isEditable) {
-      cleanup();
-      state.highlightedElement = target;
-      const translateIcon = createTranslateIcon(target);
-      document.body.appendChild(translateIcon);
-      state.activeTranslateIcon = translateIcon;
-      let debounceTimeout;
-      translateIcon.addEventListener("click", async () => {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = setTimeout(async () => {
-          await triggerTranslationOnTarget(target);
-        }, 500);
-      });
-    } else {
-      cleanup();
+  // If selection mode is active (e.g., by clicking the icon in selection mode)
+  if (state.selectionActive) {
+    if (event.type === "keydown") {
+      return;
     }
+    event.stopPropagation();
+    state.selectionActive = false;
+    if (!state.highlightedElement) return;
+    state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
+    const textToTranslate = state.highlightedElement.innerText.trim();
+    if (!textToTranslate) return;
+    const statusNotification = showNotification("در حال ترجمه...", "status");
+    try {
+      const translatedText = await translateText(textToTranslate);
+      if (translatedText) {
+        await updateElementWithTranslation(
+          state.highlightedElement,
+          translatedText
+        );
+      }
+    } catch (error) {
+      console.error("Translation failed:", error);
+      showNotification(
+        "ترجمه با خطا مواجه شد: " + error.message,
+        "error",
+        true,
+        3000
+      );
+    } finally {
+      if (statusNotification && statusNotification.parentNode) {
+        fadeOut(statusNotification);
+      }
+    }
+    return;
+  }
+
+  // Further, examine and manage events related to editable elements
+  const target = event.target;
+  const isDraftJs = target.closest(".DraftEditor-root") !== null;
+  const isWhatsApp = target.closest(".selectable-text.copyable-text") !== null;
+  if (
+    isDraftJs ||
+    isWhatsApp ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  ) {
+    // Add this condition to prevent multiple creations
+    if (state.activeTranslateIcon) return;
+
+    cleanup();
+
+    const currentTarget = target;
+
+    const translateIcon = createTranslateIcon(currentTarget);
+
+    Object.assign(translateIcon.style, {
+      transform: "translateZ(100px)", // Solve overlay issue on some websites
+      willChange: "transform", // Optimize rendering
+      boxShadow: "0 2px 5px rgba(0,0,0,0.2)", // Increase visibility
+    });
+
+    // Solve event delegation issue using Shadow DOM
+    const iconContainer = document.createElement("div");
+    iconContainer.attachShadow({ mode: "open" });
+    iconContainer.shadowRoot.appendChild(translateIcon);
+    document.body.appendChild(iconContainer);
+
+    state.activeTranslateIcon = iconContainer;
+
+    const iconClickHandler = async (event) => {
+      // Completely prevent event propagation
+      event.stopPropagation();
+      event.preventDefault();
+
+      // Remove icon with delay
+      setTimeout(() => iconContainer.remove(), 50);
+
+      try {
+        const text = extractText(currentTarget);
+        if (!text) return;
+
+        const notification = showNotification("در حال ترجمه...", "status");
+
+        const translated = await translateText(text);
+
+        // Apply changes by checking element existence
+        if (document.body.contains(currentTarget)) {
+          if (currentTarget.isContentEditable) {
+            await updateEditableField(currentTarget, translated);
+          } else {
+            currentTarget.value = translated;
+            currentTarget.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+
+          currentTarget.style.direction = RTL_REGEX.test(translated)
+            ? "rtl"
+            : "ltr";
+        }
+
+        fadeOut(notification);
+      } catch (error) {
+        console.error("خطای ترجمه:", error);
+        showNotification(`خطا: ${error.message}`, "error", true);
+      }
+    };
+
+    translateIcon.addEventListener("mousedown", (e) => e.stopPropagation());
+    translateIcon.addEventListener("touchstart", (e) => e.stopPropagation());
+    translateIcon.addEventListener("click", iconClickHandler, {
+      capture: true,
+      passive: false,
+    });
   }
 }
 
@@ -561,11 +768,16 @@ document.addEventListener("mouseover", (event) => {
   state.highlightedElement.style.outline = CONFIG.HIGHLIGHT_STYLE;
 });
 
+document.addEventListener("mouseup", handleTranslateEvent);
 document.addEventListener("click", handleTranslateEvent);
 document.addEventListener("keydown", handleTranslateEvent);
 
 chrome.runtime.onMessage.addListener((message) => {
+  document.body.focus();
   if (message.action === "enable_selection") {
-    state.selectionActive = true;
+    state.selectionActive = !state.selectionActive;
+    if (!state.selectionActive) {
+      cleanup();
+    }
   }
 });
