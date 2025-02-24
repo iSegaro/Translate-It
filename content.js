@@ -320,33 +320,38 @@ async function updateEditableField(element, translatedText) {
         element.focus({ preventScroll: true });
         await delay(100);
       }
-
       // Select content only if element exists
       if (document.body.contains(element)) {
         document.execCommand("selectAll");
         await delay(100);
       }
-
       // Create paste event
       if (document.body.contains(element)) {
         const dt = new DataTransfer();
         dt.setData("text/plain", translatedText);
         dt.setData("text/html", translatedText.replace(/\n/g, "<br>"));
-
         const pasteEvent = new ClipboardEvent("paste", {
           bubbles: true,
-          clipboardData: dt,
           cancelable: true,
+          clipboardData: dt,
         });
-
         element.dispatchEvent(pasteEvent);
         await delay(50);
-
         // Apply state changes
         element.dispatchEvent(new InputEvent("input", { bubbles: true }));
       }
     } catch (error) {
-      console.error("WhatsApp update error:", error);
+      showNotification(`WhatsApp update error: ${error}`, "error", true, 5000);
+    }
+  } else if (element.closest(".DraftEditor-root")) {
+    // For DraftJs fields: Instead of partial clearing, we replace the entire content with innerHTML
+    if (document.body.contains(element)) {
+      element.innerHTML = translatedText.replace(/\n/g, "<br>");
+      element.setAttribute(
+        "dir",
+        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
+      );
+      setCursorToEnd(element);
     }
   } else {
     // Other platforms
@@ -577,7 +582,7 @@ function extractText(target) {
 // Event Handlers: Unified for Click and Keydown
 // ==============================
 async function handleTranslateEvent(event) {
-  // لغو انتخاب در صورت فشردن کلید Escape
+  // Cancel selection on pressing the Escape key
   if (event.type === "keydown" && event.key === "Escape") {
     event.stopPropagation();
     state.selectionActive = false;
@@ -817,8 +822,11 @@ async function handleTranslateEvent(event) {
 
         if (document.body.contains(currentTarget)) {
           if (currentTarget.isContentEditable) {
-            currentTarget.innerHTML = "";
-            await delay(10);
+            // Only clear content if the field is not in a DraftJs environment (Twitter)
+            if (!currentTarget.closest(".DraftEditor-root")) {
+              currentTarget.innerHTML = "";
+              await delay(10);
+            }
             await updateEditableField(currentTarget, translated);
           } else {
             currentTarget.value = translated;
