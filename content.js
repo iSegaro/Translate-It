@@ -38,6 +38,14 @@ const state = {
   originalTexts: {},
 };
 
+function openOptionsPage() {
+  if (chrome.runtime.openOptionsPage) {
+    chrome.runtime.openOptionsPage();
+  } else {
+    window.open(chrome.runtime.getURL("options.html"));
+  }
+}
+
 // ===================================================================
 // Core Translation Handler
 // ===================================================================
@@ -53,8 +61,8 @@ class TranslationHandler {
     this.notifier = new NotificationManager();
     this.elementManager = new ElementManager();
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
-
     this.handleError = this.handleError.bind(this);
+    this.displayedErrors = new Set();
   }
 
   detectPlatform(target) {
@@ -293,18 +301,34 @@ class TranslationHandler {
   handleError(error) {
     let message = "خطای ناشناخته";
     let type = "error";
+    let onClick; // تعریف متغیر onClick
 
     if (error.message.includes("API key")) {
-      message = "کلید API نامعتبر است";
+      message =
+        "کلید API نامعتبر است. برای تنظیم به صفحه extension options مراجعه کنید.";
+      onClick = () => openOptionsPage();
     } else if (error.message === "EXTENSION_RELOADED") {
       message = "لطفا صفحه را رفرش کنید (Ctrl+R)";
+      type = "warning";
+    } else if (error.message.includes("model is overloaded")) {
+      message = "The model is overloaded. Please try again later.";
       type = "warning";
     } else {
       message = "خطای ارتباط با سرویس ترجمه";
       console.error("Translation Error:", error);
     }
 
-    this.notifier.show(message, type, true, 5000);
+    this.processError(message, type, onClick); // ارسال onClick به processError
+  }
+
+  processError(message, type, onClick) {
+    if (this.displayedErrors.has(message)) return;
+
+    this.notifier.show(message, type, true, 5000, onClick); // ارسال onClick به show
+    this.displayedErrors.add(message);
+    setTimeout(() => {
+      this.displayedErrors.delete(message);
+    }, 5000);
   }
 
   /**
@@ -686,20 +710,20 @@ class TwitterStrategy extends PlatformStrategy {
   pasteText(tweetField, text) {
     if (!tweetField) return;
 
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    // تبدیل Line Breakها به <br> مطابق با ساختار Draft.js
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
+    try {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      dt.setData("text/html", text.replace(/\n/g, "<br>"));
 
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
-    tweetField.dispatchEvent(pasteEvent);
-    // console.log(
-    //   "Dispatching paste event for writing translated text (pasteText)"
-    // ); // لاگ برای بررسی نوشتن متن
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      tweetField.dispatchEvent(pasteEvent);
+    } catch (error) {
+      // console.error("Error pasting text:", error); //نیازی به نمایش این خطا نیست
+    }
   }
 
   /**
@@ -916,7 +940,7 @@ class NotificationManager {
    * type can be "status" (translating), "error", or "success".
    * If autoDismiss=true, the notification will fade out after the specified time (in milliseconds).
    */
-  show(message, type, autoDismiss = true, duration = 3000) {
+  show(message, type, autoDismiss = true, duration = 3000, onClick) {
     const notification = document.createElement("div");
     const icon = this.icons[type] || "";
 
@@ -938,7 +962,11 @@ class NotificationManager {
       opacity: "1",
     });
 
-    notification.addEventListener("click", () => this.dismiss(notification));
+    if (onClick) {
+      notification.addEventListener("click", onClick);
+    } else {
+      notification.addEventListener("click", () => this.dismiss(notification));
+    }
 
     this.container.appendChild(notification);
 
@@ -1050,8 +1078,14 @@ class ElementManager {
 // ===================================================================
 // Helper Functions
 // ===================================================================
-function showNotification(message, type, autoDismiss = true, duration = 3000) {
-  notificationManager.show(message, type, autoDismiss, duration);
+function showNotification(
+  message,
+  type,
+  autoDismiss = true,
+  duration = 3000,
+  onClick
+) {
+  notificationManager.show(message, type, autoDismiss, duration, onClick);
 }
 const notificationManager = new NotificationManager();
 
@@ -1118,7 +1152,8 @@ function isExtensionContextValid() {
 async function translateText(text) {
   try {
     if (!isExtensionContextValid()) {
-      throw new Error("EXTENSION_RELOADED");
+      // throw new Error("EXTENSION_RELOADED"); // نیازی به مدیریت خطا در اینجا نمی‌باشد
+      return;
     }
 
     if (!text || text.length < 2) return text;
@@ -1163,6 +1198,18 @@ async function translateText(text) {
 
     // Dynamically retrieving the API_KEY from chrome.storage
     const apiKey = await getApiKeyAsync();
+    if (!apiKey) {
+      CONFIG.USE_MOCK = true;
+      showNotification(
+        "API key is missing, Using MOCK Mode\n(Please set the API key in the extension options)",
+        "warning",
+        true,
+        7500,
+        () => {
+          openOptionsPage();
+        }
+      );
+    }
     const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1188,6 +1235,8 @@ async function translateText(text) {
         true,
         5000
       );
+    } else if (error.message.includes(" API error")) {
+      return;
     } else {
       // console.error("Translation error:", error);
       showNotification(
