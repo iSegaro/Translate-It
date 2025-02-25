@@ -1,12 +1,27 @@
 // content.js
+// ===================================================================
+// Translation Extension - OOP and Strategy Pattern
+// ===================================================================
+
+/**
+ * MAIN ARCHITECTURE:
+ * 1. TranslationHandler: Central controller for event handling
+ * 2. PlatformStrategy: Base class for platform-specific implementations
+ * 3. NotificationManager: Dedicated notification system
+ * 4. ElementManager: DOM element and state management
+ *
+ * DESIGN PRINCIPLES:
+ * - Single Responsibility Principle
+ * - Strategy Pattern for platform-specific logic
+ * - Composition over Inheritance
+ * - Immutable State Management
+ */
 
 /** USE_MOCK
  * Flag to control translation mode.
+ * When true, uses mock translations for development
  *
- * When set to true, the extension uses mock translations instead of sending
- * requests to the Google API. This is useful for development and testing.
- *
- * در محیط توسعه و دیباگ، با تنظیم به true از ترجمه فرضی استفاده می‌شود و درخواست‌ها به API گوگل ارسال نمی‌شوند.
+ * هنگامی که true باشد از ترجمه آزمایشی استفاده می‌شود
  */
 // CONFIG.USE_MOCK = true;
 
@@ -15,208 +30,1030 @@ const PERSIAN_REGEX =
   /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/;
 const RTL_REGEX = /[\u0600-\u06FF]/;
 
-// State management for selection and translation icon
+// Initial state - State management for selection and translation icon
 const state = {
   selectionActive: false,
   highlightedElement: null,
   activeTranslateIcon: null,
+  originalTexts: {},
 };
 
-// Debounce function to limit the rate of function calls
-function debounce(func, delay) {
-  let timeout;
-  return function (...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), delay);
-  };
-}
+// ===================================================================
+// Core Translation Handler
+// ===================================================================
+class TranslationHandler {
+  constructor() {
+    this.strategies = {
+      whatsapp: new WhatsAppStrategy(),
+      twitter: new TwitterStrategy(),
+      chatgpt: new ChatGPTStrategy(),
+      telegram: new TelegramStrategy(),
+      default: new DefaultStrategy(),
+    };
+    this.notifier = new NotificationManager();
+    this.elementManager = new ElementManager();
+    this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
-// Context health check
-function isExtensionContextValid() {
-  try {
-    return !!chrome.runtime?.id;
-  } catch (e) {
-    return false;
+    this.handleError = this.handleError.bind(this);
   }
-}
 
-// Cleanup function to reset state and remove highlights/icons
-function cleanup() {
-  if (state.highlightedElement) {
-    if (state.highlightedElement._observer) {
-      state.highlightedElement._observer.disconnect();
-    }
-    state.highlightedElement.style.outline = "";
-    state.highlightedElement.style.opacity = "1";
+  detectPlatform(target) {
+    if (this.strategies.whatsapp.isWhatsAppElement(target)) return "whatsapp";
+    if (this.strategies.twitter.isTwitterElement(target)) return "twitter";
+    if (this.strategies.telegram.isTelegramElement(target)) return "telegram";
+    if (this.strategies.chatgpt.isChatGPTElement(target)) return "chatgpt";
+    return "default";
   }
-  state.activeTranslateIcon?.remove();
-  state.highlightedElement = null;
-  state.activeTranslateIcon = null;
-  // Remove all remaining icons
-  document.querySelectorAll(".translation-icon-extension").forEach((icon) => {
-    icon.remove();
-  });
-}
 
-// Helper to introduce a delay
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Add this new function to handle external clicks on createTranslateIcon
-function setupGlobalClickHandler() {
-  const handleDocumentClick = (event) => {
-    if (
-      state.activeTranslateIcon &&
-      !event.composedPath().includes(state.activeTranslateIcon) &&
-      !event.target.isContentEditable &&
-      event.target.tagName !== "INPUT" &&
-      event.target.tagName !== "TEXTAREA"
-    ) {
-      cleanup();
-    }
-  };
-
-  document.addEventListener("click", handleDocumentClick, { capture: true });
-}
-setupGlobalClickHandler();
-
-/* ===================== Notification Functions ====================== */
-
-/**
- * Create a container for notifications if one doesn't already exist.
- */
-function getNotificationContainer() {
-  let container = document.getElementById("translation-notifications");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "translation-notifications";
-    Object.assign(container.style, {
-      position: "fixed",
-      top: "20px",
-      right: "20px",
-      zIndex: "10000000000",
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px",
-    });
-    document.body.appendChild(container);
+  handleEditableFocus(element) {
+    this.elementManager.cleanup();
+    const icon = this.elementManager.createTranslateIcon(element);
+    this.setupIconBehavior(icon, element);
+    state.activeTranslateIcon = icon;
   }
-  return container;
-}
 
-/**
- * Fade-out effect for notification dismissal
- */
-function fadeOut(element, callback) {
-  element.style.transition = "opacity 0.5s";
-  element.style.opacity = "0";
-  setTimeout(() => {
-    if (element.parentNode) element.remove();
-    if (callback) callback();
-  }, 500);
-}
-
-/**
- * Displays a notification with the given text, type, and autoDismiss settings.
- * type can be "status" (translating), "error", or "success".
- * If autoDismiss=true, the notification will fade out after the specified time (in milliseconds).
- */
-function showNotification(message, type, autoDismiss = false, duration = 3000) {
-  const container = getNotificationContainer();
-  const notification = document.createElement("div");
-  let icon = "";
-  if (type === "error") icon = CONFIG.ICON_ERROR;
-  else if (type === "success") icon = CONFIG.ICON_SECCESS;
-  else if (type === "status") icon = CONFIG.ICON_STATUS;
-  else if (type === "warning") icon = CONFIG.ICON_WARNING;
-  else if (type === "info") icon = CONFIG.ICON_INFO;
-
-  Object.assign(notification.style, {
-    background:
-      type === "error"
-        ? "rgba(255,0,0,0.8)"
-        : type === "success"
-        ? "rgba(0,128,0,0.8)"
-        : "rgba(0,0,0,0.7)",
-    color: "#fff",
-    padding: "8px 12px",
-    borderRadius: "4px",
-    fontSize: "14px",
-    cursor: "pointer",
-    opacity: "1",
-  });
-  notification.innerText = icon + message;
-
-  // Fade out on notification click
-  notification.addEventListener("click", () => {
-    fadeOut(notification);
-  });
-
-  container.appendChild(notification);
-
-  if (autoDismiss) {
+  handleEditableBlur() {
     setTimeout(() => {
-      if (notification.parentNode) {
-        fadeOut(notification);
+      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
+        this.elementManager.cleanup();
       }
-    }, duration);
+    }, 100);
   }
-  return notification;
-}
 
-/* =================================================================== */
+  /**
+   * Main event handler router
+   * @param {Event} event - DOM event
+   */
+  async handleEvent(event) {
+    try {
+      // console.log("handleTranslateEvent triggered:", event.type, event.ctrlKey);
 
-// Observe changes to an element and update its text if needed
-function observeChanges(element, translatedText) {
-  // Disconnect existing observer if any
-  if (element._observer) {
-    element._observer.disconnect();
-  }
-  const observer = new MutationObserver(() => {
-    if (element.innerText !== translatedText) {
-      element.innerText = translatedText;
+      // if (event.type === "mouseup") {
+      //   console.log("Mouseup event - event.ctrlKey:", event.ctrlKey);
+      // }
+
+      if (this.isEscapeEvent(event)) {
+        this.handleEscape(event);
+        return;
+      }
+
+      // console.log("handleTranslateEvent triggered:", event.type, event.ctrlKey);
+
+      // **Handle click in selection mode**
+      if (state.selectionActive && event.type === "click") {
+        await this.handleSelectionClick(event);
+        return;
+      }
+
+      if (this.isCtrlSlashEvent(event)) {
+        await this.handleCtrlSlash(event);
+        return;
+      }
+
+      // if (this.isCtrlSelectionEvent(event)) {
+      //   await this.handleCtrlSelection(event);
+      //   return;
+      // }
+
+      if (state.selectionActive) {
+        await this.handleSelectionMode(event);
+        return;
+      }
+
+      if (this.isEditableTarget(event.target)) {
+        await this.handleEditableElement(event);
+      }
+    } catch (error) {
+      this.handleError(error);
     }
-  });
-  observer.observe(element, { childList: true, subtree: true });
-  element._observer = observer;
+  }
+
+  /**
+   * Handle click event when selection mode is active
+   * @param {MouseEvent} event
+   */
+  async handleSelectionClick(event) {
+    event.stopPropagation();
+    state.selectionActive = false;
+
+    if (!state.highlightedElement) return;
+
+    const textToTranslate = state.highlightedElement.innerText.trim();
+    if (!textToTranslate) {
+      this.elementManager.cleanup(); // پاک کردن هایلایت و آیکون
+      this.notifier.show("المان انتخاب شده متنی ندارد.", "warning");
+      return;
+    }
+
+    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+    try {
+      const translatedText = await this.processTranslation({
+        // **استفاده از processTranslation**
+        text: textToTranslate,
+        target: state.highlightedElement,
+      });
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.notifier.dismiss(statusNotification);
+      this.elementManager.cleanup(); // پاک کردن هایلایت و آیکون در هر صورت
+    }
+  }
+
+  // Event type handlers
+  // ====================
+
+  /**
+   * Handle Escape key press
+   * @param {KeyboardEvent} event
+   */
+  handleEscape(event) {
+    event.stopPropagation();
+    state.selectionActive = false;
+    this.elementManager.cleanup();
+  }
+
+  /**
+   * Handle Ctrl+/ keyboard shortcut
+   * @param {KeyboardEvent} event
+   */
+  async handleCtrlSlash(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // بررسی فعال بودن ترجمه
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+
+    try {
+      const { selection, activeElement } = this.getSelectionContext();
+      const isTextSelected = !selection.isCollapsed;
+
+      const text = isTextSelected
+        ? selection.toString().trim()
+        : this.extractFromActiveElement(activeElement);
+
+      if (!text) return;
+
+      await this.processTranslation({
+        text,
+        target: isTextSelected ? null : activeElement,
+        selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
+      });
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+  isProcessing = false;
+
+  /**
+   * Handle text selection with Ctrl key
+   * @param {MouseEvent} event
+   */
+  async handleCtrlSelection(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    alert("her");
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+
+    const text = selection.toString().trim();
+    if (!text) return;
+
+    await this.processTranslation({
+      text,
+      selectionRange: selection.getRangeAt(0),
+    });
+  }
+
+  // Core logic
+  // ==========
+
+  /**
+   * Unified translation processing
+   * @param {Object} params
+   */
+  async processTranslation(params) {
+    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+
+    try {
+      const translated = await translateText(params.text);
+
+      if (params.selectionRange) {
+        this.replaceSelectionContent(params.selectionRange, translated);
+      } else if (params.target) {
+        // **ذخیره متن اصلی قبل از ترجمه برای Undo**
+        state.originalTexts[params.target] = params.target.innerText;
+        await this.updateTargetElement(params.target, translated);
+      }
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.notifier.dismiss(statusNotification);
+    }
+  }
+
+  /**
+   * Revert all translations to original texts
+   */
+  revertTranslations() {
+    console.log("Reverting translations..."); // **لاگ برای بررسی فراخوانی**
+    for (const element in state.originalTexts) {
+      if (state.originalTexts.hasOwnProperty(element)) {
+        const originalText = state.originalTexts[element];
+        const elementNode = document.querySelector(`:scope > *`); // Select first child, needs refinement for element selection
+        if (elementNode) {
+          elementNode.innerText = originalText; // Directly set innerText
+          this.elementManager.applyTextDirection(elementNode, originalText); // Apply text direction again
+        }
+      }
+    }
+    state.originalTexts = {}; // پاک کردن حافظه Undo
+    this.elementManager.cleanup(); // پاک کردن هایلایت‌ها و آیکون‌ها
+    this.notifier.show("متن‌ها به حالت اولیه بازگردانده شدند.", "success"); // نمایش اعلان موفقیت
+  }
+
+  /**
+   * Update target element with translated text
+   * @param {HTMLElement} target
+   * @param {string} translated
+   */
+  async updateTargetElement(target, translated) {
+    const platform = this.detectPlatform(target);
+    await this.strategies[platform].updateElement(target, translated);
+    this.elementManager.applyTextDirection(target, translated);
+  }
+
+  /**
+   * مدیریت خطاهای سیستمی و نمایش به کاربر
+   * @param {Error} error - شی خطا
+   */
+  handleError(error) {
+    let message = "خطای ناشناخته";
+    let type = "error";
+
+    if (error.message.includes("API key")) {
+      message = "کلید API نامعتبر است";
+    } else if (error.message === "EXTENSION_RELOADED") {
+      message = "لطفا صفحه را رفرش کنید (Ctrl+R)";
+      type = "warning";
+    } else {
+      message = "خطای ارتباط با سرویس ترجمه";
+      console.error("Translation Error:", error);
+    }
+
+    this.notifier.show(message, type, true, 5000);
+  }
+
+  /**
+   * تشخیص کلیدهای ترکیبی Ctrl+/
+   * @param {KeyboardEvent} event
+   */
+  isCtrlSlashEvent(event) {
+    return (
+      (event.ctrlKey || event.metaKey) && // پشتیبانی از Cmd در مک
+      event.key === "/" &&
+      !event.repeat // جلوگیری از تشخیص چندباره
+    );
+  }
+
+  /**
+   * تشخیص کلید Esc
+   * @param {KeyboardEvent} event
+   */
+  isEscapeEvent(event) {
+    return event.key === "Escape" && !event.repeat;
+  }
+
+  // Todo: در selection.isCollapsed مشکل وجود دارد و نیاز به بررسی بیشتر دارد
+  /**
+   * تشخیص انتخاب متن با Ctrl
+   * @param {MouseEvent} event
+   */
+  isCtrlSelectionEvent(event) {
+    console.log(
+      "isCtrlSelectionEvent:",
+      event.type,
+      event.ctrlKey,
+      window.getSelection().toString()
+    );
+    const selection = window.getSelection();
+    console.log("Selection collapsed:", selection.isCollapsed);
+
+    if (event.type === "selectionchange") {
+      console.log("selectionchange event - event.ctrlKey:", event.ctrlKey); // **لاگ جداگانه برای event.ctrlKey در selectionchange**
+    }
+
+    return (
+      event.ctrlKey &&
+      event.type == "selectionchange" &&
+      selection &&
+      !selection.isCollapsed
+    );
+  }
+
+  /**
+   * تشخیص المان‌های قابل ویرایش
+   * @param {HTMLElement} target
+   */
+  isEditableTarget(target) {
+    return (
+      target?.isContentEditable || // استفاده از عملگر optional chaining برای جلوگیری از خطای null/undefined
+      ["INPUT", "TEXTAREA"].includes(target?.tagName) || // استفاده از عملگر optional chaining
+      (target?.closest && target.closest('[contenteditable="true"]')) // **بررسی وجود target و متد closest قبل از فراخوانی**
+    );
+  }
+
+  /**
+   * دریافت وضعیت فعلی انتخاب و المان فعال
+   */
+  getSelectionContext() {
+    return {
+      selection: window.getSelection(),
+      activeElement: document.activeElement,
+    };
+  }
+
+  /**
+   * جایگزینی محتوای انتخاب شده
+   * @param {Range} range - محدوده انتخاب
+   * @param {string} content - محتوای جایگزین
+   */
+  replaceSelectionContent(range, content) {
+    range.deleteContents();
+    range.insertNode(document.createTextNode(content));
+  }
+
+  /**
+   * استخراج متن از المان فعال
+   * @param {HTMLElement} element
+   */
+  extractFromActiveElement(element) {
+    const platform = this.detectPlatform(element);
+    return this.strategies[platform].extractText(element);
+  }
+
+  /**
+   * پیست محتوا به المان
+   * @param {HTMLElement} element
+   * @param {string} content
+   */
+  pasteContent(element, content) {
+    const platform = this.detectPlatform(element);
+    this.strategies[platform].pasteContent(element, content);
+  }
+
+  /**
+   * مدیریت المان‌های قابل ویرایش
+   * @param {Event} event
+   */
+  async handleEditableElement(event) {
+    event.stopPropagation();
+    const target = event.target;
+
+    if (state.activeTranslateIcon) return;
+    this.elementManager.cleanup();
+
+    const translateIcon = this.elementManager.createTranslateIcon(target);
+    this.setupIconBehavior(translateIcon, target);
+  }
+
+  /**
+   * تنظیم رفتار آیکون ترجمه
+   * @param {HTMLElement} icon
+   * @param {HTMLElement} target
+   */
+  setupIconBehavior(icon, target) {
+    const clickHandler = async (e) => {
+      e.preventDefault();
+      icon.remove();
+
+      const text =
+        this.strategies[this.detectPlatform(target)].extractText(target);
+      if (!text) return;
+
+      const statusNotification = this.notifier.show(
+        "در حال ترجمه...",
+        "status"
+      );
+      try {
+        const translated = await translateText(text);
+        await this.updateTargetElement(target, translated);
+      } finally {
+        this.notifier.dismiss(statusNotification);
+      }
+    };
+
+    icon.addEventListener("click", clickHandler);
+    document.body.appendChild(icon);
+    state.activeTranslateIcon = icon;
+  }
+
+  /**
+   * پردازش ترجمه برای المان‌های قابل ویرایش
+   */
+  async processElementTranslation(element) {
+    const text =
+      this.strategies[this.detectPlatform(element)].extractText(element);
+    if (!text) return;
+
+    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+    try {
+      const translated = await translateText(text);
+      await this.updateTargetElement(element, translated);
+    } finally {
+      this.notifier.dismiss(statusNotification);
+    }
+  }
+
+  getSelectionContext() {
+    return {
+      selection: window.getSelection(),
+      activeElement: document.activeElement,
+    };
+  }
+
+  // استفاده از debounce برای رویدادهای مکرر
+  static debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
 }
 
-// ==============================
-// Helper functions for DataTransfer-based text insertion
-// ==============================
+// ===================================================================
+// Platform Strategies
+// ===================================================================
+class PlatformStrategy {
+  extractText(target) {
+    return target.value || target.innerText.trim();
+  }
 
-// Clear content of an editable field
-function clearEditableField(field) {
-  const selection = window.getSelection();
-  const range = document.createRange();
-  range.selectNodeContents(field);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  async updateElement(element, translated) {
+    // Default implementation
+    element.value = translated;
+    this.applyBaseStyling(element, translated);
+  }
 
-  const dt = new DataTransfer();
-  dt.setData("text/plain", "");
-  const pasteEvent = new ClipboardEvent("paste", {
-    bubbles: true,
-    cancelable: true,
-    clipboardData: dt,
-  });
-  field.dispatchEvent(pasteEvent);
+  /**
+   * اعمال استایل پایه به المان
+   */
+  applyBaseStyling(element, translated) {
+    element.style.direction = RTL_REGEX.test(translated) ? "rtl" : "ltr";
+    element.style.textAlign = RTL_REGEX.test(translated) ? "right" : "left";
+  }
+
+  /**
+   * پیست محتوا به المان (پیاده‌سازی پیش‌فرض)
+   */
+  pasteContent(element, content) {
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.value = content;
+    } else {
+      element.innerHTML = content;
+    }
+  }
+
+  /**
+   * تنظیم جهت متن بر اساس محتوای ترجمه شده
+   * @param {HTMLElement} element
+   * @param {string} translatedText
+   */
+  applyTextDirection(element, translatedText) {
+    const isRtl = RTL_REGEX.test(translatedText);
+    element.style.direction = isRtl ? "rtl" : "ltr";
+    element.style.textAlign = isRtl ? "right" : "left";
+  }
 }
 
-// Paste text into an editable field, converting line breaks to <br> tags
-function pasteTextToEditableField(field, text) {
-  const dt = new DataTransfer();
-  dt.setData("text/plain", text);
-  // Convert line breaks to <br> for preserving structure
-  dt.setData("text/html", text.replace(/\n/g, "<br>"));
-  const pasteEvent = new ClipboardEvent("paste", {
-    bubbles: true,
-    cancelable: true,
-    clipboardData: dt,
-  });
-  field.dispatchEvent(pasteEvent);
+// ===================================================================
+// Default Strategy (برای المان‌های معمولی)
+// ===================================================================
+class DefaultStrategy extends PlatformStrategy {
+  /**
+   * استخراج متن از المان‌های استاندارد
+   * @param {HTMLElement} target - المان هدف
+   * @returns {string} متن استخراج شده
+   */
+  extractText(target) {
+    // برای input/textarea از مقدار مستقیم استفاده می‌کند
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      return target.value.trim();
+    }
+
+    // برای contenteditable از innerText استفاده می‌کند
+    return target.innerText.trim();
+  }
+
+  /**
+   * بروزرسانی المان با متن ترجمه شده
+   * @param {HTMLElement} element - المان هدف
+   * @param {string} translatedText - متن ترجمه شده
+   */
+  async updateElement(element, translatedText) {
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.value = translatedText;
+    } else {
+      element.innerHTML = translatedText;
+    }
+    this.applyTextDirection(element, translatedText);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /**
+   * پاک کردن محتوای المان قابل ویرایش
+   * @param {HTMLElement} element - المان هدف
+   */
+  clearContent(element) {
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.value = "";
+    } else {
+      element.innerHTML = "";
+    }
+  }
+
+  /**
+   * اعمال جهت متن برای استراتژی پیش‌فرض
+   */
+  applyTextDirection(element, translatedText) {
+    const isRtl = RTL_REGEX.test(translatedText);
+
+    // برای input/textarea
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    }
+    // برای سایر المان‌ها
+    else {
+      element.style.direction = isRtl ? "rtl" : "ltr";
+      element.style.textAlign = isRtl ? "right" : "left";
+    }
+  }
 }
+
+// ===================================================================
+// Telegram Strategy (برای پیام‌رسان تلگرام)
+// ===================================================================
+class TelegramStrategy extends PlatformStrategy {
+  /**
+   * شناسایی المان ویرایشگر تلگرام
+   * @param {HTMLElement} target - المان هدف
+   * @returns {boolean}
+   */
+  isTelegramElement(target) {
+    return (
+      target.id === "editable-message-text" || !!target.closest("[data-peer]")
+    );
+  }
+
+  /**
+   * شناسایی المان ویرایشگر تلگرام
+   * @param {HTMLElement} target - المان هدف
+   * @returns {boolean} آیا المان متعلق به تلگرام است؟
+   */
+  isTelegramElement(target) {
+    return (
+      target.id === "editable-message-text" || target.closest("[data-peer]")
+    );
+  }
+
+  extractText(target) {
+    if (!this.isTelegramElement(target)) return super.extractText(target);
+
+    // استخراج متن از ساختار خاص تلگرام
+    return target.innerText.trim();
+  }
+
+  async updateElement(element, translatedText) {
+    if (!this.isTelegramElement(element)) return;
+
+    // جایگزینی مستقیم محتوا با حفظ خطوط
+    element.innerHTML = translatedText.replace(/\n/g, "<br>");
+
+    // تنظیمات خاص تلگرام
+    element.setAttribute("dir", RTL_REGEX.test(translatedText) ? "rtl" : "ltr");
+    setCursorToEnd(element);
+
+    // راه‌اندازی رویدادهای لازم
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+// ===================================================================
+// Twitter (X) Strategy (برای توئیتر)
+// ===================================================================
+class TwitterStrategy extends PlatformStrategy {
+  isTwitterElement(target) {
+    return !!target.closest(
+      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]'
+    );
+  }
+
+  /**
+   * پاک کردن فیلد متنی از طریق ClipboardEvent
+   * @param {HTMLElement} tweetField - فیلد هدف
+   */
+  clearTweetField(tweetField) {
+    if (!tweetField) return;
+
+    // console.log("clearTweetField called on:", tweetField); // لاگ برای بررسی فراخوانی
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(tweetField);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "");
+    const pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dt,
+    });
+    tweetField.dispatchEvent(pasteEvent);
+    // console.log("Dispatching paste event for clearing (clearTweetField)"); // لاگ برای بررسی پاک کردن
+  }
+
+  /**
+   * درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
+   * @param {HTMLElement} tweetField - فیلد هدف
+   * @param {string} text - متن برای پیست کردن
+   */
+  pasteText(tweetField, text) {
+    if (!tweetField) return;
+
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    // تبدیل Line Breakها به <br> مطابق با ساختار Draft.js
+    dt.setData("text/html", text.replace(/\n/g, "<br>"));
+
+    const pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dt,
+    });
+    tweetField.dispatchEvent(pasteEvent);
+    // console.log(
+    //   "Dispatching paste event for writing translated text (pasteText)"
+    // ); // لاگ برای بررسی نوشتن متن
+  }
+
+  /**
+   * قراردادن کرسر در انتهای فیلد متنی (الگوبرداری از userscript)
+   * @param {HTMLElement} tweetField - فیلد هدف
+   */
+  setCursorToEnd(tweetField) {
+    if (!tweetField) return;
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(tweetField);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    // console.log("setCursorToEnd called"); // لاگ برای بررسی عملکرد مکان نما
+  }
+
+  async updateElement(element, translatedText) {
+    const tweetField = element.closest(
+      '[data-testid="tweetTextarea_0"], [role="textbox"]'
+    );
+    if (!tweetField) {
+      console.error("Tweet field element not found in Twitter.");
+      return;
+    }
+
+    tweetField.focus();
+    this.clearTweetField(tweetField);
+    await delay(50);
+
+    this.pasteText(tweetField, translatedText);
+
+    tweetField.style.transition = "background-color 0.5s ease";
+    tweetField.style.backgroundColor = "#d4f8d4";
+    requestAnimationFrame(() => {
+      setTimeout(
+        () => (tweetField.style.backgroundColor = "transparent"),
+        1000
+      );
+    });
+
+    await delay(100);
+    this.setCursorToEnd(tweetField);
+  }
+
+  applyTextDirection(element, translatedText) {
+    const paragraphs = element.querySelectorAll('[data-text="true"]');
+    paragraphs.forEach((p) => {
+      const isRtl = RTL_REGEX.test(p.textContent);
+      p.style.direction = isRtl ? "rtl" : "ltr";
+      p.style.textAlign = isRtl ? "right" : "left";
+    });
+  }
+}
+
+class WhatsAppStrategy extends PlatformStrategy {
+  /**
+   * شناسایی المان ویرایشگر واتس‌اپ
+   * @param {HTMLElement} target - المان هدف
+   * @returns {boolean}
+   */
+  isWhatsAppElement(target) {
+    return !!target.closest('[aria-label="Type a message"]');
+  }
+
+  async updateElement(element, translatedText) {
+    try {
+      const isWhatsApp = this.isWhatsAppElement(element);
+      if (!isWhatsApp) return;
+
+      // اعتبارسنجی وجود المان در DOM
+      if (!document.body.contains(element)) {
+        throw new Error("Element removed from DOM");
+      }
+
+      // اعمال فوکوس با تنظیمات ایمن
+      await this.safeFocus(element);
+
+      // انتخاب تمام محتوا
+      await this.selectAllContent(element);
+
+      // پیست محتوا با شبیه‌سازی کامل
+      await this.simulatePaste(element, translatedText);
+
+      // به روزرسانی state واتس‌اپ
+      this.triggerStateUpdate(element);
+    } catch (error) {
+      this.handleWhatsAppError(error);
+    }
+  }
+
+  async safeFocus(element) {
+    element.focus({ preventScroll: true });
+    await delay(100);
+    return element;
+  }
+
+  async selectAllContent(element) {
+    document.execCommand("selectAll");
+    await delay(100);
+    return element;
+  }
+
+  async simulatePaste(element, text) {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    dt.setData("text/html", text.replace(/\n/g, "<br>"));
+
+    const pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dt,
+    });
+
+    element.dispatchEvent(pasteEvent);
+    await delay(50);
+  }
+
+  triggerStateUpdate(element) {
+    element.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  handleWhatsAppError(error) {
+    this.notifier.show(`خطای واتس‌اپ: ${error.message}`, "error", true, 5000);
+  }
+}
+
+class ReactIntegration {
+  static forceUpdate(element) {
+    if (element?._reactRootContainer) {
+      const root = element._reactRootContainer._internalRoot;
+      if (root) {
+        root.current?.alternate?.updateQueue?.forceUpdate();
+      }
+    }
+  }
+}
+
+class ChatGPTStrategy extends PlatformStrategy {
+  /**
+   * شناسایی المان ویرایشگر ChatGPT
+   * @param {HTMLElement} target - المان هدف
+   * @returns {boolean}
+   */
+  isChatGPTElement(target) {
+    return target.id === "prompt-textarea";
+  }
+
+  extractText(target) {
+    if (target.id === "prompt-textarea") {
+      return Array.from(target.querySelectorAll("p"))
+        .map((p) => p.textContent.trim())
+        .join("\n");
+    }
+    return super.extractText(target);
+  }
+
+  async updateElement(element, translated) {
+    element.innerHTML = translated.replace(/\n/g, "<br>");
+    this.applyBaseStyling(element, translated);
+    setCursorToEnd(element);
+  }
+}
+
+// ===================================================================
+// Support Classes
+// ===================================================================
+class NotificationManager {
+  constructor() {
+    this.container = this.createContainer();
+    this.icons = {
+      error: CONFIG.ICON_ERROR,
+      success: CONFIG.ICON_SUCCESS,
+      status: CONFIG.ICON_STATUS,
+      warning: CONFIG.ICON_WARNING,
+      info: CONFIG.ICON_INFO,
+    };
+  }
+
+  getIcon(type) {
+    return this.icons[type] || "💠"; // ایموجی پیش‌فرض
+  }
+
+  /**
+   * Create a container for notifications if one doesn't already exist.
+   */
+  createContainer() {
+    let container = document.getElementById("translation-notifications");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "translation-notifications";
+      Object.assign(container.style, {
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        zIndex: "10000000000",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      });
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+
+  /**
+   * Displays a notification with the given text, type, and autoDismiss settings.
+   * type can be "status" (translating), "error", or "success".
+   * If autoDismiss=true, the notification will fade out after the specified time (in milliseconds).
+   */
+  show(message, type, autoDismiss = true, duration = 3000) {
+    const notification = document.createElement("div");
+    const icon = this.icons[type] || "";
+
+    notification.innerHTML = `
+      <span class="notification-icon">${icon}</span>
+      <span class="notification-text">${message}</span>
+    `;
+
+    Object.assign(notification.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      background: this.getBackgroundColor(type),
+      color: "#fff",
+      padding: "8px 12px",
+      borderRadius: "4px",
+      fontSize: "14px",
+      cursor: "pointer",
+      opacity: "1",
+    });
+
+    notification.addEventListener("click", () => this.dismiss(notification));
+
+    this.container.appendChild(notification);
+
+    if (autoDismiss) {
+      setTimeout(() => this.dismiss(notification), duration);
+    }
+
+    return notification;
+  }
+
+  getBackgroundColor(type) {
+    const colors = {
+      error: "rgba(255,0,0,0.8)",
+      success: "rgba(0,128,0,0.8)",
+      status: "rgba(0,0,0,0.7)",
+      warning: "rgba(255,165,0,0.8)",
+      info: "rgba(30,144,255,0.8)",
+    };
+    return colors[type] || "rgba(0,0,0,0.7)";
+  }
+
+  dismiss(notification) {
+    fadeOut(notification);
+  }
+}
+
+class ElementManager {
+  // Cleanup function to reset state and remove highlights/icons
+  cleanup() {
+    if (state.highlightedElement) {
+      if (state.highlightedElement._observer) {
+        state.highlightedElement._observer.disconnect();
+      }
+      state.highlightedElement.style.outline = "";
+      state.highlightedElement.style.opacity = "1";
+      state.highlightedElement = null;
+    }
+    state.activeTranslateIcon?.remove();
+    state.activeTranslateIcon = null;
+    // Remove all remaining icons
+    document.querySelectorAll(".translation-icon-extension").forEach((icon) => {
+      icon.remove();
+    });
+  }
+
+  /**
+   * تنظیم جهت متن و تراز بر اساس محتوا
+   * @param {HTMLElement} element - المان هدف
+   * @param {string} text - متن ترجمه شده
+   */
+  applyTextDirection(element, text) {
+    const isRtl = RTL_REGEX.test(text);
+    element.style.direction = isRtl ? "rtl" : "ltr";
+    element.style.textAlign = isRtl ? "right" : "left";
+
+    // برای المان‌های خاص مثل input/textarea
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    }
+  }
+
+  /**
+   * مدیریت وضعیت هایلایت المان‌ها
+   */
+  toggleHighlight(element) {
+    if (state.highlightedElement) {
+      state.highlightedElement.style.outline = "";
+    }
+    state.highlightedElement = element;
+    element.style.outline = "2px solid #ff0000";
+  }
+
+  // ==============================
+  // Create translate icon and position it relative to the target element
+  // ==============================
+  createTranslateIcon(target) {
+    const translateIcon = document.createElement("button");
+    translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
+    Object.assign(translateIcon.style, {
+      position: "absolute",
+      background: "white",
+      border: "1px solid gray",
+      borderRadius: "4px",
+      padding: "2px 5px",
+      fontSize: "12px",
+      cursor: "pointer",
+      zIndex: "9999999999",
+      pointerEvents: "auto",
+    });
+    translateIcon.innerText = CONFIG.ICON_TRANSLATION;
+    translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
+
+    // Use getBoundingClientRect with scroll adjustments
+    const rect = target.getBoundingClientRect();
+    translateIcon.style.top = `${rect.top + window.scrollY - 5}px`;
+    translateIcon.style.left = `${
+      rect.left + window.scrollX + rect.width + 5
+    }px`;
+
+    // Add pointer-events property
+    translateIcon.style.pointerEvents = "auto";
+    // Add a specific class for identification
+    translateIcon.classList.add("translation-icon-extension");
+
+    return translateIcon;
+  }
+}
+
+// ===================================================================
+// Helper Functions
+// ===================================================================
+function showNotification(message, type, autoDismiss = true, duration = 3000) {
+  notificationManager.show(message, type, autoDismiss, duration);
+}
+const notificationManager = new NotificationManager();
 
 // Set cursor to the end of the content in the field
 function setCursorToEnd(field) {
@@ -259,118 +1096,23 @@ function setCursorToEnd(field) {
   }
 }
 
-/** Persian
- * به‌روزرسانی فیلدهای ویرایش‌پذیر با متن ترجمه‌شده.
- * این تابع برای جایگزینی متن در المان‌های input و contentEditable استفاده می‌شود.
- * تاخیرهای موجود در تابع بسیار مهم هستند و نباید حذف یا تغییر داده شوند.
- * این تاخیرها به مرورگر کمک می‌کنند تا عملیات قبلی (مانند focus و select) را کامل کند.
- * حذف یا جابجایی این تاخیرها ممکن است باعث اختلال در کارکرد صحیح تابع شود.
- */
-
-/** ENGLISH
- * Updates editable fields (input or contentEditable) with the translated text.
- *
- * Critical Note: Delays in this function are necessary to allow the browser
- * to properly complete prior operations (like focus and selection) before pasting text.
- * This is crucial for platforms like WhatsApp that rely on internal state management.
- *
- * Why delays matter:
- * 1. Ensures focus and selection actions complete before pasting.
- * 2. Prevents paste events from firing prematurely.
- * 3. Supports internal state updates on platforms like WhatsApp.
- *
- * Removing or altering these delays may cause:
- * - Text to fail when pasting.
- * - Focus to be lost.
- * - Internal state issues on platforms like WhatsApp.
- */
-async function updateEditableField(element, translatedText) {
-  // Special handling for chat.openai
-  if (element.id === "prompt-textarea") {
-    if (document.body.contains(element)) {
-      element.innerHTML = translatedText.replace(/\n/g, "<br>");
-      element.setAttribute(
-        "dir",
-        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
-      );
-      setCursorToEnd(element);
-    }
-    return;
-  }
-
-  // Handle Telegram
-  if (element.id === "editable-message-text") {
-    if (document.body.contains(element)) {
-      element.innerHTML = translatedText.replace(/\n/g, "<br>");
-      element.setAttribute(
-        "dir",
-        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
-      );
-      setCursorToEnd(element);
-    }
-    return;
-  }
-
-  const isWhatsApp = element.closest('[aria-label="Type a message"]');
-
-  if (isWhatsApp) {
-    try {
-      // Apply focus with element existence check
-      if (document.body.contains(element)) {
-        element.focus({ preventScroll: true });
-        await delay(100);
-      }
-      // Select content only if element exists
-      if (document.body.contains(element)) {
-        document.execCommand("selectAll");
-        await delay(100);
-      }
-      // Create paste event
-      if (document.body.contains(element)) {
-        const dt = new DataTransfer();
-        dt.setData("text/plain", translatedText);
-        dt.setData("text/html", translatedText.replace(/\n/g, "<br>"));
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: dt,
-        });
-        element.dispatchEvent(pasteEvent);
-        await delay(50);
-        // Apply state changes
-        element.dispatchEvent(new InputEvent("input", { bubbles: true }));
-      }
-    } catch (error) {
-      showNotification(`WhatsApp update error: ${error}`, "error", true, 5000);
-    }
-  } else if (element.closest(".DraftEditor-root")) {
-    // For DraftJs fields: Instead of partial clearing, we replace the entire content with innerHTML
-    if (document.body.contains(element)) {
-      element.innerHTML = translatedText.replace(/\n/g, "<br>");
-      element.setAttribute(
-        "dir",
-        RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
-      );
-      setCursorToEnd(element);
-    }
-  } else {
-    // Other platforms
-    if (document.body.contains(element)) {
-      clearEditableField(element);
-      await delay(50);
-      pasteTextToEditableField(element, translatedText);
-    }
-  }
-
-  // Apply cursor position only if element exists
-  if (document.body.contains(element)) {
-    setCursorToEnd(element);
-  }
+// Debounce function to limit the rate of function calls
+function debounce(func, delay) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), delay);
+  };
 }
 
-// ==============================
-// Translation functionality
-// ==============================
+// Context health check
+function isExtensionContextValid() {
+  try {
+    return !!chrome.runtime?.id;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Translate the given text using mock or API call
 async function translateText(text) {
@@ -460,433 +1202,135 @@ async function translateText(text) {
   }
 }
 
-// ==============================
-// Update element with translated text
-// ==============================
-
-async function updateElementWithTranslation(element, translatedText) {
-  element.style.opacity = "0.5";
-  try {
-    translatedText = translatedText.trim();
-    const isRtl = RTL_REGEX.test(translatedText);
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.value = translatedText;
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-      // Dispatch input and change events
-      ["input", "change"].forEach((eventType) => {
-        element.dispatchEvent(new Event(eventType, { bubbles: true }));
-      });
-    } else if (element.isContentEditable) {
-      await updateEditableField(element, translatedText);
-    } else {
-      element.innerText = translatedText;
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-      element.style.textAlign = isRtl ? "right" : "left";
-      observeChanges(element, translatedText);
-    }
-  } finally {
-    element.style.opacity = "1";
-    cleanup();
-  }
+// Helper to introduce a delay
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ==============================
-// Create translate icon and position it relative to the target element
-// ==============================
-function createTranslateIcon(target) {
-  const translateIcon = document.createElement("button");
-  translateIcon.classList.add("translate-icon"); // Add a specific class to avoid document click conflicts (on chat.openai.com)
-  Object.assign(translateIcon.style, {
-    position: "absolute",
-    background: "white",
-    border: "1px solid gray",
-    borderRadius: "4px",
-    padding: "2px 5px",
-    fontSize: "12px",
-    cursor: "pointer",
-    zIndex: "9999999999",
-    pointerEvents: "auto",
+// Fade-out effect for notification dismissal
+function fadeOut(element) {
+  element.style.transition = "opacity 0.5s";
+  element.style.opacity = "0";
+  setTimeout(() => element.remove(), 500);
+}
+
+// Retrieve API key from storage
+async function getApiKeyAsync() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(["apiKey"], (result) => {
+      resolve(result.apiKey || "");
+    });
   });
-  translateIcon.innerText = CONFIG.ICON_TRANSLATION;
-  translateIcon.title = CONFIG.TRANSLATION_ICON_TITLE;
-
-  // Use getBoundingClientRect with scroll adjustments
-  const rect = target.getBoundingClientRect();
-  translateIcon.style.top = `${rect.top + window.scrollY - 5}px`;
-  translateIcon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
-
-  // Add pointer-events property
-  translateIcon.style.pointerEvents = "auto";
-  // Add a specific class for identification
-  translateIcon.classList.add("translation-icon-extension");
-
-  return translateIcon;
 }
 
-// ==============================
-// Helper Functions for Unified Translation Trigger
-// ==============================
-function extractText(target) {
-  let text;
-  // Special handling for chat.openai's multiline editor
-  const promptContainer = target.closest("#prompt-textarea");
-  if (promptContainer) {
-    text = Array.from(promptContainer.querySelectorAll("p"))
-      .map((p) => p.textContent.trim())
-      .join("\n")
-      .trim();
-    return text;
-  }
+// بررسی آیا المان قابل ویرایش است
+const isEditable = (element) => {
+  return (
+    element.isContentEditable || ["INPUT", "TEXTAREA"].includes(element.tagName)
+  );
+};
 
-  const isDraftJs = target.closest(".DraftEditor-root") !== null;
-  const isWhatsApp = target.closest(".selectable-text.copyable-text") !== null;
-  if (isDraftJs) {
-    const tweetTextarea = target.closest('[data-testid="tweetTextarea_0"]');
-    if (tweetTextarea) {
-      const textElements = tweetTextarea.querySelectorAll('[data-text="true"]');
-      text = Array.from(textElements)
-        .map((el) => el.textContent)
-        .join(" ")
-        .trim();
-    }
-  } else if (isWhatsApp) {
-    let container = target.closest(".lexical-rich-text-input");
-    if (container) {
-      text = "";
-      const paragraphs = container.querySelectorAll("p.selectable-text");
-      paragraphs.forEach((p) => {
-        const spans = p.querySelectorAll('span[data-lexical-text="true"]');
-        spans.forEach((span) => {
-          text += span.textContent.trim() + "\n";
-        });
-      });
-      text = text.trim();
+// ===================================================================
+// Event Listeners Initialization
+// ===================================================================
+const translationHandler = new TranslationHandler();
+// مدیریت کلیه رویدادهای صفحه
+const setupEventListeners = () => {
+  // Event Delegation برای المان‌های داینامیک
+  document.addEventListener("focus", handleFocus, true);
+  document.addEventListener("blur", handleBlur, true);
+
+  // document.addEventListener("mouseup", (e) =>
+  //   translationHandler.handleEvent(e)
+  // );
+
+  document.addEventListener("selectionchange", (e) => {
+    translationHandler.handleEvent(e);
+  });
+  document.addEventListener("click", (e) => translationHandler.handleEvent(e));
+  document.addEventListener("keydown", (e) =>
+    translationHandler.handleEvent(e)
+  );
+
+  // **رویداد mouseover برای هایلایت در حالت انتخاب**
+  document.addEventListener("mouseover", (event) => {
+    if (!state.selectionActive) return;
+    translationHandler.elementManager.cleanup(); // **پاک کردن هایلایت قبلی**
+    if (event.target.innerText.trim()) {
+      // **بررسی وجود متن در المان**
+      state.highlightedElement = event.target;
+      state.highlightedElement.style.outline = CONFIG.HIGHLIGHT_STYLE;
     } else {
-      let fallbackContainer = target.closest('[contenteditable="true"]');
-      if (fallbackContainer) {
-        const spanElement = fallbackContainer.querySelector(
-          'span[data-lexical-text="true"]'
-        );
-        if (spanElement) {
-          text = spanElement.textContent.trim();
-        }
-      }
+      state.highlightedElement = null; // **اگر متن نبود، المان هایلایت نشود**
     }
-  } else {
-    text = target.value || target.innerText.trim();
+  });
+
+  // **استفاده از رویداد selectionchange به جای mouseup برای Ctrl+Selection:**
+  document.addEventListener("selectionchange", (e) => {
+    translationHandler.handleEvent(e);
+  });
+};
+
+// مدیریت رویداد focus برای المان‌های ویرایشی
+const handleFocus = (e) => {
+  if (isEditable(e.target)) {
+    translationHandler.handleEditableFocus(e.target);
   }
-  return text;
-}
+};
 
-// ==============================
-// Event Handlers: Unified for Click and Keydown
-// ==============================
-async function handleTranslateEvent(event) {
-  // Cancel selection on pressing the Escape key
-  if (event.type === "keydown" && event.key === "Escape") {
-    event.stopPropagation();
-    state.selectionActive = false;
-    cleanup();
-    return;
+// مدیریت رویداد blur برای المان‌های ویرایشی
+const handleBlur = (e) => {
+  if (isEditable(e.target)) {
+    translationHandler.handleEditableBlur(e.target);
   }
+};
 
-  // Prevent processing of clicks on the translation icon
-  // if (event.type === "click" && event.target.closest(".translate-icon")) {
-  //   return;
-  // }
-
-  let textToTranslate = "";
-
-  // Support for Ctrl+/ key combination
-  if (event.type === "keydown" && event.ctrlKey && event.key === "/") {
-    event.stopPropagation();
-    const selection = window.getSelection();
-
-    if (selection && !selection.isCollapsed) {
-      textToTranslate = selection.toString().trim();
-    } else {
-      const target = document.activeElement;
-      if (target) {
-        const isDraftJs = target.closest(".DraftEditor-root") !== null;
-        const isWhatsApp =
-          target.closest(".selectable-text.copyable-text") !== null;
-
-        if (isDraftJs) {
-          const tweetTextarea = target.closest(
-            '[data-testid="tweetTextarea_0"]'
-          );
-          if (tweetTextarea) {
-            const textElements =
-              tweetTextarea.querySelectorAll('[data-text="true"]');
-            textToTranslate = Array.from(textElements)
-              .map((el) => el.textContent)
-              .join(" ")
-              .trim();
-          }
-        } else if (isWhatsApp) {
-          const container = target.closest(".lexical-rich-text-input");
-          if (container) {
-            const paragraphs = container.querySelectorAll("p.selectable-text");
-            paragraphs.forEach((p) => {
-              const spans = p.querySelectorAll(
-                'span[data-lexical-text="true"]'
-              );
-              spans.forEach((span) => {
-                const text = span.textContent.trim();
-                if (text) {
-                  textToTranslate += text;
-                }
-              });
-              textToTranslate += "\n";
-            });
-            textToTranslate = textToTranslate.trim();
-          }
-        } else if (
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA"
-        ) {
-          textToTranslate = target.value.trim();
-        } else if (target.isContentEditable) {
-          textToTranslate = target.innerText.trim();
-        }
-      }
-    }
-
-    if (textToTranslate) {
-      const statusNotification = showNotification("در حال ترجمه...", "status");
-      try {
-        const translatedText = await translateText(textToTranslate);
-        if (translatedText) {
-          if (selection && !selection.isCollapsed) {
-            const range = selection.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(document.createTextNode(translatedText));
-          } else {
-            const target = document.activeElement;
-            if (target) {
-              if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-                target.value = translatedText;
-              } else if (target.isContentEditable) {
-                await updateEditableField(target, translatedText);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Translation failed:", error);
-        showNotification(
-          "ترجمه با خطا مواجه شد: " + error.message,
-          "error",
-          true,
-          3000
-        );
-      } finally {
-        if (statusNotification?.parentNode) {
-          fadeOut(statusNotification);
-        }
-      }
-    }
-    return;
-  }
-
-  // Check for user text selection while holding Ctrl key
-  const selection = window.getSelection();
-  if (
-    event.ctrlKey &&
-    event.type == "mouseup" &&
-    selection &&
-    !selection.isCollapsed
-  ) {
-    const selectedText = selection.toString().trim();
-    if (selectedText) {
-      const statusNotification = showNotification("در حال ترجمه...", "status");
-      try {
-        const translatedText = await translateText(selectedText);
-        if (translatedText) {
-          const range = selection.getRangeAt(0);
-          // If the selected object is a text node, replace it
-          if (range.commonAncestorContainer.nodeType === Node.TEXT_NODE) {
-            range.deleteContents();
-            range.insertNode(document.createTextNode(translatedText));
-          } else {
-            showNotification(
-              "شی انتخاب شده متنی نیست؛ جایگزینی انجام نمی‌شود.",
-              "warning",
-              true,
-              3000
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Translation failed:", error);
-        showNotification(
-          "ترجمه با خطا مواجه شد: " + error.message,
-          "error",
-          true,
-          3000
-        );
-      } finally {
-        if (statusNotification?.parentNode) {
-          fadeOut(statusNotification);
-        }
-      }
-      return;
-    }
-  }
-
-  // If selection mode is active (e.g., by clicking the icon in selection mode)
-  if (state.selectionActive) {
-    if (event.type === "keydown") {
-      return;
-    }
-    event.stopPropagation();
-    state.selectionActive = false;
-    if (!state.highlightedElement) return;
-    state.highlightedElement.style.outline = CONFIG.HIGHTLIH_NEW_ELEMETN_RED;
-    const textToTranslate = state.highlightedElement.innerText.trim();
-    if (!textToTranslate) return;
-    const statusNotification = showNotification("در حال ترجمه...", "status");
-    try {
-      const translatedText = await translateText(textToTranslate);
-      if (translatedText) {
-        await updateElementWithTranslation(
-          state.highlightedElement,
-          translatedText
-        );
-      }
-    } catch (error) {
-      console.error("Translation failed:", error);
-      showNotification(
-        "ترجمه با خطا مواجه شد: " + error.message,
-        "error",
-        true,
-        3000
-      );
-    } finally {
-      if (statusNotification?.parentNode) {
-        fadeOut(statusNotification);
-      }
-    }
-    return;
-  }
-
-  // Further, examine and manage events related to editable elements
-  const target = event.target;
-  const isDraftJs = target.closest(".DraftEditor-root") !== null;
-  const isWhatsApp = target.closest(".selectable-text.copyable-text") !== null;
-  if (
-    isDraftJs ||
-    isWhatsApp ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  ) {
-    // Add this condition to prevent multiple creations
-    if (state.activeTranslateIcon) return;
-
-    cleanup();
-
-    const currentTarget = target;
-
-    const translateIcon = createTranslateIcon(currentTarget);
-
-    Object.assign(translateIcon.style, {
-      transform: "translateZ(100px)", // Solve overlay issue on some websites
-      willChange: "transform", // Optimize rendering
-      boxShadow: "0 2px 5px rgba(0,0,0,0.2)", // Increase visibility
-    });
-
-    // Solve event delegation issue using Shadow DOM
-    const iconContainer = document.createElement("div");
-    iconContainer.attachShadow({ mode: "open" });
-    iconContainer.shadowRoot.appendChild(translateIcon);
-    document.body.appendChild(iconContainer);
-
-    state.activeTranslateIcon = iconContainer;
-
-    const iconClickHandler = async (event) => {
-      event.stopPropagation();
-      event.preventDefault();
-
-      // Remove icon with delay
-      setTimeout(() => iconContainer.remove(), 50);
-
-      let statusNotification;
-
-      try {
-        const text = extractText(currentTarget);
-        if (!text) return;
-
-        statusNotification = showNotification("در حال ترجمه...", "status");
-        const translated = await translateText(text);
-
-        if (document.body.contains(currentTarget)) {
-          if (currentTarget.isContentEditable) {
-            // Only clear content if the field is not in a DraftJs environment (Twitter)
-            if (!currentTarget.closest(".DraftEditor-root")) {
-              currentTarget.innerHTML = "";
-              await delay(10);
-            }
-            await updateEditableField(currentTarget, translated);
-          } else {
-            currentTarget.value = translated;
-            // Add this line for specific fields like React
-            currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-
-          currentTarget.style.direction = RTL_REGEX.test(translated)
-            ? "rtl"
-            : "ltr";
-        }
-      } catch (error) {
-        // console.error("خطای ترجمه:", error);
-        if (!error.message.includes("API")) {
-          showNotification("خطا در ارتباط با سرویس ترجمه", "error", true);
-        }
-      } finally {
-        if (statusNotification?.parentNode) {
-          fadeOut(statusNotification);
-        }
-      }
-    };
-
-    translateIcon.addEventListener("mousedown", (e) => e.stopPropagation());
-    translateIcon.addEventListener("touchstart", (e) => e.stopPropagation());
-    translateIcon.addEventListener("click", iconClickHandler, {
-      capture: true,
-      passive: false,
-    });
-  }
-}
-
-// ------------------------------
-// Global Event Listeners
-// ------------------------------
-document.addEventListener("mouseover", (event) => {
-  if (!state.selectionActive) return;
-  cleanup();
-  state.highlightedElement = event.target;
-  state.highlightedElement.style.outline = CONFIG.HIGHLIGHT_STYLE;
-});
-
-document.addEventListener("mouseup", handleTranslateEvent);
-document.addEventListener("click", handleTranslateEvent);
-document.addEventListener("keydown", handleTranslateEvent);
-
-chrome.runtime.onMessage.addListener((message) => {
+// ===================================================================
+// Extension Message Listener
+// ===================================================================
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   document.body.focus();
   if (message.action === "enable_selection") {
     state.selectionActive = !state.selectionActive;
     if (!state.selectionActive) {
-      cleanup();
+      translationHandler.elementManager.cleanup(); // پاک کردن هایلایت وقتی حالت انتخاب غیرفعال می‌شود
     }
+    translationHandler.notifier.show(
+      state.selectionActive
+        ? "حالت انتخاب فعال شد."
+        : "حالت انتخاب غیرفعال شد.",
+      "info"
+    ); // نمایش اعلان وضعیت حالت انتخاب
+  } else if (message.action === "revert_translation") {
+    // Todo: هنوز کامل نشده است و نیاز به تکمیل دارد
+    // **تشخیص پیام برای Undo**
+    translationHandler.revertTranslations(); // **فراخوانی تابع Undo**
   }
 });
 
-// Add handler to detect extension reload
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === "EXTENSION_RELOADED") {
-    showNotification("لطفا صفحه را رفرش کنید", "warning", true, 5000);
-    cleanup();
-  }
-});
+setupEventListeners();
+
+// ===================================================================
+// Utility Functions and Polyfills
+// ===================================================================
+if (!Element.prototype.closest) {
+  Element.prototype.closest = function (selector) {
+    let el = this;
+    while (el) {
+      if (el.matches(selector)) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  };
+}
+
+// ===================================================================
+// Initialization Checks
+// ===================================================================
+if (isExtensionContextValid()) {
+  console.info("Extension initialized successfully");
+} else {
+  console.error("Extension context lost - please refresh page");
+}
