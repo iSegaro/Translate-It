@@ -143,29 +143,103 @@ class TranslationHandler {
   async handleSelectionClick(event) {
     event.stopPropagation();
     state.selectionActive = false;
-
     if (!state.highlightedElement) return;
 
-    const textToTranslate = state.highlightedElement.innerText.trim();
-    if (!textToTranslate) {
-      this.elementManager.cleanup(); // پاک کردن هایلایت و آیکون
+    // Check if the element has any text content
+    const hasText = this.hasTextContent(state.highlightedElement);
+
+    if (!hasText) {
+      this.elementManager.cleanup();
       this.notifier.show("المان انتخاب شده متنی ندارد.", "warning");
       return;
     }
 
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+
     try {
-      const translatedText = await this.processTranslation({
-        // **استفاده از processTranslation**
-        text: textToTranslate,
-        target: state.highlightedElement,
-      });
+      // Process each text node separately
+      await this.translateTextNodesInElement(state.highlightedElement);
     } catch (error) {
       this.handleError(error);
     } finally {
       this.notifier.dismiss(statusNotification);
-      this.elementManager.cleanup(); // پاک کردن هایلایت و آیکون در هر صورت
+      this.elementManager.cleanup();
     }
+  }
+
+  /**
+   * Check if an element contains any text nodes with content
+   * @param {Element} element - The element to check
+   * @returns {boolean} - True if the element contains text
+   */
+  hasTextContent(element) {
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.textContent.trim()) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Translate all text nodes within an element while preserving structure
+   * @param {Element} element - The element containing text nodes to translate
+   */
+  async translateTextNodesInElement(element) {
+    // Process all text nodes in the element and its children
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.textContent.trim()) {
+        const originalText = node.textContent;
+
+        // Here's the key change: pass the parent element as the target
+        // This way, closest() and other Element methods will work
+        const parentElement = node.parentElement || element;
+
+        const translatedText = await this.processTranslation({
+          text: originalText,
+          target: parentElement, // Use the parent element instead of the text node
+          textNode: node, // Pass the text node as an additional parameter
+        });
+
+        // Replace only the text content of this specific node
+        if (translatedText) {
+          node.textContent = translatedText;
+        }
+      }
+    }
+  }
+
+  /**
+   * Modified to work with existing code by passing parent element but updating text node
+   * @param {Object} params
+   */
+  async processTranslation(params) {
+    // Your existing translation logic here using params.target (which is now an Element)
+    // But when applying the translation, we'll use the textNode from params
+
+    // Example implementation (modify to match your existing function):
+    const translatedText = await translateText(params.text);
+
+    // We don't need to modify params.target.innerText anymore
+    // Just return the translated text for the caller to use
+    return translatedText;
   }
 
   /**
@@ -1317,8 +1391,14 @@ const setupEventListeners = () => {
   document.addEventListener("mouseover", (event) => {
     if (!state.selectionActive) return;
     translationHandler.elementManager.cleanup(); // **پاک کردن هایلایت قبلی**
-    if (event.target.innerText.trim()) {
-      // **بررسی وجود متن در المان**
+
+    // بررسی امن‌تر برای وجود متن در المان
+    const hasText =
+      event.target &&
+      typeof event.target.innerText === "string" &&
+      event.target.innerText.trim() !== "";
+
+    if (hasText) {
       state.highlightedElement = event.target;
       state.highlightedElement.style.outline = CONFIG.HIGHLIGHT_STYLE;
     } else {
