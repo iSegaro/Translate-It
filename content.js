@@ -168,6 +168,29 @@ class TranslationHandler {
     }
   }
 
+  /**
+   * مدیریت حالت انتخاب المان برای ترجمه
+   * @param {Event} event - رویداد دریافتی
+   */
+  async handleSelectionMode(event) {
+    // فقط رویدادهای mouseover و mousemove را پردازش کن
+    if (event.type === "mouseover" || event.type === "mousemove") {
+      // حذف هایلایت قبلی
+      this.elementManager.cleanup();
+
+      // بررسی وجود متن در المان
+      const target = event.target;
+      if (target.innerText.trim()) {
+        // هایلایت المان جدید
+        state.highlightedElement = target;
+        target.style.outline = CONFIG.HIGHLIGHT_STYLE || "2px solid #ff0000";
+        target.style.opacity = "0.9";
+      } else {
+        state.highlightedElement = null;
+      }
+    }
+  }
+
   // Event type handlers
   // ====================
 
@@ -1152,36 +1175,28 @@ function isExtensionContextValid() {
 async function translateText(text) {
   try {
     if (!isExtensionContextValid()) {
-      // throw new Error("EXTENSION_RELOADED"); // نیازی به مدیریت خطا در اینجا نمی‌باشد
-      return;
+      throw new Error("EXTENSION_RELOADED");
     }
-
     if (!text || text.length < 2) return text;
 
     if (CONFIG.USE_MOCK) {
       const isPersian = PERSIAN_REGEX.test(text);
-
       // 1. Check for explicit newline characters:
       const hasExplicitNewline = /[\r\n]+/.test(text);
-
       // 2. Check for HTML line breaks (<br> or <p>):
       const hasHtmlNewline = /<br\s*\/?>|<p\s*\/?>/i.test(text);
-
       // 3. Check for multiple spaces that might indicate a soft return (especially in contenteditable):
       const hasSoftReturn = /\s{2,}/.test(text);
-
       // 4. Check for newline characters after normalizing the text
       const normalizedText = text
         .replace(/<br\s*\/?>/gi, "\n")
         .replace(/&nbsp;/gi, " ");
       const hasNormalizedNewline = /[\r\n]+/.test(normalizedText);
-
       const hasNewLine =
         hasExplicitNewline ||
         hasHtmlNewline ||
         hasSoftReturn ||
         hasNormalizedNewline;
-
       const prompt = isPersian
         ? hasNewLine
           ? CONFIG.DEBUG_TRANSLATED_ENGLISH_With_NewLine
@@ -1189,45 +1204,41 @@ async function translateText(text) {
         : hasNewLine
         ? CONFIG.DEBUG_TRANSLATED_PERSIAN_With_NewLine
         : CONFIG.DEBUG_TRANSLATED_PERSIAN;
-
       return `${prompt} [${text}]`;
     }
 
     const isPersian = PERSIAN_REGEX.test(text);
     const prompt = isPersian ? CONFIG.PROMPT_ENGLISH : CONFIG.PROMPT_PERSIAN;
 
-    // Dynamically retrieving the API_KEY from chrome.storage
-    const apiKey = await getApiKeyAsync();
-    if (!apiKey) {
-      CONFIG.USE_MOCK = true;
-      showNotification(
-        "API key is missing, Using MOCK Mode\n(Please set the API key in the extension options)",
-        "warning",
-        true,
-        7500,
-        () => {
-          openOptionsPage();
-        }
-      );
-    }
-    const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt + text }] }],
-      }),
+    const payload = { promptText: prompt + text };
+    // ارسال پیام به background برای اجرای fetchT ترجمه
+    const result = await chrome.runtime.sendMessage({
+      action: "fetchTranslation",
+      payload,
     });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `Translation API error: ${
-          errorData.error?.message || response.statusText
-        }`
-      );
+
+    if (result.error) {
+      showNotification(result.error, "error", true);
+      return text;
     }
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+
+    const translated = result.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return typeof translated === "string" && translated.trim().length > 0
+      ? translated.trim()
+      : text;
   } catch (error) {
+    // showNotification("Error connecting to the translation service", "error", true);
+    // return text;
+
+    // بررسی خطای مربوط به CORS (مثلاً Failed to fetch)
+    if (error.message.includes("Failed to fetch")) {
+      showNotification(
+        "CORS error: Access to the translation API has been blocked. Please add proper permissions in manifest.json.",
+        "error",
+        true
+      );
+      return text;
+    }
     if (error.message === "EXTENSION_RELOADED") {
       showNotification(
         "Please refresh the page (Ctrl+R)",
@@ -1235,10 +1246,11 @@ async function translateText(text) {
         true,
         5000
       );
-    } else if (error.message.includes(" API error")) {
-      return;
+      throw error;
+    } else if (error.message.includes("API error")) {
+      showNotification(error.message, "error", true);
+      return text;
     } else {
-      // console.error("Translation error:", error);
       showNotification(
         error.message.includes("API")
           ? error.message
@@ -1246,8 +1258,8 @@ async function translateText(text) {
         "error",
         true
       );
+      throw error;
     }
-    throw error;
   }
 }
 
