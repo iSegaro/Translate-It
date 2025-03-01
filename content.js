@@ -154,15 +154,12 @@ class TranslationHandler {
       return;
     }
 
-    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
-
     try {
       // Process each text node separately
       await this.translateTextNodesInElement(state.highlightedElement);
     } catch (error) {
       this.handleError(error);
     } finally {
-      this.notifier.dismiss(statusNotification);
       this.elementManager.cleanup();
     }
   }
