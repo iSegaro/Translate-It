@@ -1,7 +1,11 @@
 // webpack.config.js
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
-const { CleanWebpackPlugin } = require("clean-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
+
+const rimraf = require("rimraf");
+// پاک کردن دستی دایرکتوری dist قبل از build
+rimraf.sync(path.resolve(__dirname, "dist"));
 
 module.exports = {
   entry: {
@@ -36,8 +40,19 @@ module.exports = {
       },
     ],
   },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          compress: {
+            drop_console: true, // حذف console.log در حالت production
+          },
+        },
+      }),
+    ],
+  },
   plugins: [
-    new CleanWebpackPlugin(),
     new CopyPlugin({
       patterns: [
         {
