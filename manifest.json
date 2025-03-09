@@ -3,33 +3,46 @@
   "name": "ترجمه خودکار",
   "version": "0.1",
   "description": "اکستنشن ترجمه متن به فارسی و انگلیسی",
-  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.bundle.js"
+  },
+  "action": {
+    "default_title": "ترجمه خودکار",
+    "default_icon": {
+      "16": "icons/icon.png",
+      "48": "icons/icon.png",
+      "128": "icons/icon.png"
+    }
   },
   "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
-    "128": "icon.png"
+    "16": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
   },
-  "host_permissions": [
-    "*://*/*",
-    "https://generativelanguage.googleapis.com/*"
-  ],
-  "action": {
-    "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
-    },
-    "default_title": "ترجمه خودکار"
+  "options_ui": {
+    "page": "html/options.html",
+    "open_in_tab": true
   },
-  "options_page": "options.html",
   "content_scripts": [
+  {
+    "matches": ["<all_urls>"],
+    "js": ["content.bundle.js"],
+    "all_frames": true,
+    "match_about_blank": true,
+    "run_at": "document_idle"
+  }
+]
+,
+  "web_accessible_resources": [
     {
-      "matches": ["*://*/*"],
-      "js": ["config.js", "content.js"]
+      "resources": ["content.bundle.js"],
+      "matches": ["<all_urls>"],
+      "use_dynamic_url": true
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }
