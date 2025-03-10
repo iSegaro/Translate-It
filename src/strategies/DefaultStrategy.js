@@ -4,8 +4,6 @@ import PlatformStrategy from "./PlatformStrategy";
 export default class DefaultStrategy extends PlatformStrategy {
   /**
    * استخراج متن از المان‌های استاندارد
-   * @param {HTMLElement} target - المان هدف
-   * @returns {string} متن استخراج شده
    */
   extractText(target) {
     if (target.isContentEditable) {
@@ -14,11 +12,6 @@ export default class DefaultStrategy extends PlatformStrategy {
     return target.value || target.textContent.trim();
   }
 
-  /**
-   * بروزرسانی المان با متن ترجمه شده
-   * @param {HTMLElement} element - المان هدف
-   * @param {string} translatedText - متن ترجمه شده
-   */
   async updateElement(element, translatedText) {
     if (element.isContentEditable) {
       element.innerHTML = translatedText;
@@ -30,7 +23,6 @@ export default class DefaultStrategy extends PlatformStrategy {
 
   /**
    * پاک کردن محتوای المان قابل ویرایش
-   * @param {HTMLElement} element - المان هدف
    */
   clearContent(element) {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
