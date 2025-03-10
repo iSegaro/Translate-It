@@ -1,0 +1,8 @@
+/* src/styles/content.css */
+.translation-icon-extension {
+  position: absolute !important;
+  z-index: 2147483647 !important; /* حداکثر z-index */
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: all !important;
+}
