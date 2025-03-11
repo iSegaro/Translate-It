@@ -44,11 +44,22 @@ export function setupEventListeners(translationHandler) {
 
   document.addEventListener("mouseover", (e) => {
     if (!state.selectionActive) return;
-    translationHandler.elementManager.cleanup();
 
-    if (e.target?.innerText?.trim()) {
+    // فقط اگر المنت دارای متنی معتبر باشد
+    if (!e.target?.innerText?.trim()) return;
+
+    // اگر المنت جدید متفاوت از المنت highlight‌شده قبلی است، تغییرات اعمال شود
+    if (state.highlightedElement !== e.target) {
+      // پاک کردن استایل‌های المنت قبلی (در صورت وجود)
+      if (state.highlightedElement) {
+        state.highlightedElement.style.outline = "";
+        state.highlightedElement.style.opacity = "";
+      }
+
+      // اعمال استایل highlight به المنت جدید
       state.highlightedElement = e.target;
       e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
+      e.target.style.opacity = "0.9";
     }
   });
 }
