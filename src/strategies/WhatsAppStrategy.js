@@ -1,33 +1,49 @@
 // src/strategies/WhatsAppStrategy.js
-
 import PlatformStrategy from "./PlatformStrategy";
 import { delay } from "../utils/helpers";
 
 export default class WhatsAppStrategy extends PlatformStrategy {
+  constructor(notifier) {
+    // اضافه کردن notifier به constructor
+    super();
+    this.notifier = notifier;
+  }
+
+  /**
+   * شناسایی المان ویرایشگر واتس‌اپ
+   * @param {HTMLElement} target - المان هدف
+   * @returns {boolean}
+   */
   isWhatsAppElement(target) {
     return !!target.closest('[aria-label="Type a message"]');
   }
 
   async updateElement(element, translatedText) {
-    const isWhatsApp = this.isWhatsAppElement(element);
-    if (!isWhatsApp) return;
+    try {
+      const isWhatsApp = this.isWhatsAppElement(element);
+      if (!isWhatsApp) return;
 
-    // روش خاص واتساپ برای به روزرسانی متن
-    element.focus();
-    document.execCommand("selectAll");
-    document.execCommand("insertText", false, translatedText);
+      // اعتبارسنجی وجود المان در DOM
+      if (!document.body.contains(element)) {
+        throw new Error("Element removed from DOM");
+      }
 
-    // راه‌اندازی رویدادهای واتساپ
-    const inputEvent = new Event("input", { bubbles: true });
-    element.dispatchEvent(inputEvent);
+      // اعمال فوکوس با تنظیمات ایمن
+      await this.safeFocus(element);
 
-    // به روزرسانی UI
-    requestAnimationFrame(() => {
-      element.style.backgroundColor = "#d4f8d4";
-      setTimeout(() => {
-        element.style.backgroundColor = "";
-      }, 1000);
-    });
+      // انتخاب تمام محتوا
+      await this.selectAllContent(element);
+
+      // پیست محتوا با شبیه‌سازی کامل
+      await this.simulatePaste(element, translatedText);
+
+      // به روزرسانی state واتس‌اپ
+      this.triggerStateUpdate(element);
+    } catch (error) {
+      // مدیریت خطا به TranslationHandler منتقل شد
+      console.error("WhatsAppStrategy: updateElement ERROR:", error); // Log error
+      throw error; // پرتاب خطا برای مدیریت در TranslationHandler
+    }
   }
 
   async safeFocus(element) {
@@ -64,9 +80,5 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         composed: true,
       })
     );
-  }
-
-  handleWhatsAppError(error) {
-    this.notifier.show(`خطای واتس‌اپ: ${error.message}`, "error", true, 5000);
   }
 }

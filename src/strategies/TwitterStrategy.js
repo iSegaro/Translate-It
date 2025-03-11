@@ -37,8 +37,6 @@ export default class TwitterStrategy extends PlatformStrategy {
 
   /**
    * درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
-   * @param {HTMLElement} tweetField - فیلد هدف
-   * @param {string} text - متن برای پیست کردن
    */
   pasteText(tweetField, text) {
     if (!tweetField) return;
@@ -55,7 +53,7 @@ export default class TwitterStrategy extends PlatformStrategy {
       });
       tweetField.dispatchEvent(pasteEvent);
     } catch (error) {
-      // console.error("Error pasting text:", error); //نیازی به نمایش این خطا نیست
+      // console.error("Error pasting text:", error); //نیازی به نمایش این خطا نیست، خطاها در TranslationHandler نمایش داده می‌شوند مدیریت می شوند
     }
   }
 

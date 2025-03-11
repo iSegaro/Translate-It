@@ -9,7 +9,7 @@ export const CONFIG = {
   PROMPT_ENGLISH:
     "Please translate the following text into English, preserving the sentence structure (like new lines) and displaying only the output:",
   PROMPT_PERSIAN:
-    "لطفاً متن زیر را به فارسی ترجمه کنید، ساختار جمله (مانند خطوط جدید) را حفظ کرده و فقط خروجی را نمایش دهید:",
+    "متن زیر را به فارسی ترجمه کنید، ساختار جمله (مانند خطوط جدید) را حفظ کرده و فقط خروجی را نمایش دهید:",
   HIGHLIGHT_STYLE: "2px solid red",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",

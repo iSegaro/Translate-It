@@ -4,6 +4,11 @@ import TranslationHandler from "./core/TranslationHandler.js";
 import { setupEventListeners } from "./core/EventRouter.js";
 import { isExtensionContextValid } from "./utils/helpers.js";
 import WhatsAppStrategy from "./strategies/WhatsAppStrategy.js";
+// import ChatGPTStrategy from "./strategies/ChatGPTStrategy.js";
+// import DefaultStrategy from "./strategies/DefaultStrategy.js";
+// import MediumStrategy from "./strategies/MediumStrategy.js";
+// import TelegramStrategy from "./strategies/TelegramStrategy.js";
+// import TwitterStrategy from "./strategies/TwitterStrategy.js";
 
 // تابع برای تزریق CSS به صورت داینامیک
 function injectCSS(filePath) {
