@@ -42,17 +42,14 @@ export const translateText = async (text) => {
         response.status === 401 ||
         errorMessage.toLowerCase().includes("api key")
       ) {
-        // خطای مشخص برای کلید API نامعتبر
         throw new Error(`Invalid API key: ${errorMessage}`);
       } else if (
         response.status === 429 ||
         response.status === 503 ||
         errorMessage.toLowerCase().includes("overloaded")
       ) {
-        // خطای مشخص برای overload سرویس
         throw new Error(`Translation service overloaded: ${errorMessage}`);
       } else {
-        // خطای عمومی برای سایر خطاهای سرویس
         throw new Error(`Translation service error: ${errorMessage}`);
       }
     }
@@ -60,16 +57,23 @@ export const translateText = async (text) => {
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    if (error.message.includes("API key is missing")) {
-      throw new Error("API key is missing"); //  دوباره پرتاب شود تا در لایه بالاتر مدیریت شود
+    // مدیریت اختصاصی خطای "Extension context invalid"
+    if (error.message.includes("Extension context invalid")) {
+      // در صورت امکان، می‌توان محیط اکستنشن را ریستارت کرد:
+      // chrome.runtime.reload();
+      throw new Error(
+        "Extension context invalid. Please refresh the page to continue."
+      );
+    } else if (error.message.includes("API key is missing")) {
+      throw new Error("API key is missing");
     } else if (error.message.startsWith("Invalid API key")) {
-      throw new Error(error.message); // پرتاب خطای Invalid API Key با پیام دقیق
+      throw new Error(error.message);
     } else if (error.message.startsWith("Translation service overloaded")) {
-      throw new Error(error.message); // پرتاب خطای service overloaded با پیام دقیق
+      throw new Error(error.message);
     } else {
       throw new Error(
         `Network error or translation service unavailable: ${error.message}`
-      ); // خطای شبکه یا سرویس در دسترس نیست
+      );
     }
   }
 };
