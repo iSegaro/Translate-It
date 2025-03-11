@@ -1,0 +1,28 @@
+{
+  "name": "translation-extension",
+  "version": "0.1.0",
+  "description": "Auto Translation Extension",
+  "scripts": {
+    "build": "webpack --mode production",
+    "watch": "webpack --watch --mode development",
+    "lint": "eslint src/**/*.js",
+    "format": "prettier --write src/**/*.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.9",
+    "@babel/preset-env": "^7.26.9",
+    "babel-loader": "^10.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "eslint": "^9.4.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.0",
+    "rimraf": "^6.0.1",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "core-js": "^3.41.0",
+    "glob": "^11.0.1",
+    "regenerator-runtime": "^0.14.1"
+  }
+}
