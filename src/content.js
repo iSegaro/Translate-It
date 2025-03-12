@@ -120,11 +120,8 @@ let notificationTimeout;
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "TOGGLE_SELECTION_MODE") {
     state.selectionActive = message.data;
-
     // پاک کردن نوتیفیکیشن قبلی
     if (notificationTimeout) clearTimeout(notificationTimeout);
-
-    // غیرفعال کردن حالت پس از کلیک روی المنت
     if (!state.selectionActive) {
       translationHandler.elementManager.cleanup();
     }
