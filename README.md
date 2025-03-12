@@ -57,17 +57,6 @@ Watch this [video guide](https://www.youtube.com/watch?v=o-eyHCP5XwY&t=0) for de
 
 ---
 
-## 🌱 Support
-
-- **Crypto Wallets:**
-  ETH: `0x38cEacDEe25E5892F38b133A79E4B2Fd5EF30502`
-  BTC: `bc1qh4p5nqa97adcnx0vpv2mfzm5q226688vsqwzmj`
-- **PayPal:** [Donate](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)
-
-_Donations are credited to [Mohammad X](https://x.com/M_Khani65/), not [iSegaro](https://x.com/iSegar0/)._
-
----
-
 ## Development
 
 ### Prerequisites
