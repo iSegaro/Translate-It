@@ -30,6 +30,7 @@ export default class TranslationHandler {
     this.handleError = this.handleError.bind(this); // Bind handleError
     this.displayedErrors = new Set();
     this.isProcessing = false;
+    this.selectionModeActive = false;
   }
 
   detectPlatform(target) {
@@ -91,7 +92,7 @@ export default class TranslationHandler {
         return;
       }
 
-      if (state.selectionActive && event.type === "click") {
+      if (this.selectionModeActive && event.type === "click") {
         await this.handleSelectionClick(event);
         return;
       }
@@ -101,7 +102,8 @@ export default class TranslationHandler {
         return;
       }
 
-      if (state.selectionActive) {
+      if (this.selectionModeActive) {
+        // استفاده از selectionModeActive
         await this.handleSelectionMode(event);
         return;
       }
@@ -120,6 +122,7 @@ export default class TranslationHandler {
    */
   async handleSelectionClick(event) {
     event.stopPropagation();
+    event.preventDefault(); // برای جلوگیری از رفتار پیشفرض مرورگر
 
     const targetElement =
       event.target.closest('[contenteditable="true"], input, textarea') ||
@@ -129,6 +132,10 @@ export default class TranslationHandler {
       this.elementManager.cleanup();
       return;
     }
+
+    this.selectionModeActive = false; // غیرفعال کردن حالت انتخاب
+    chrome.storage.local.set({ selectionActive: false });
+    state.selectionActive = false; // به روز رسانی state.selectionActive
 
     if (!this.hasTextContent(targetElement)) {
       this.elementManager.cleanup();
@@ -147,8 +154,6 @@ export default class TranslationHandler {
       this.handleError(error);
     } finally {
       this.elementManager.cleanup();
-      state.selectionActive = false;
-      chrome.storage.local.set({ selectionActive: false });
     }
   }
 
@@ -233,7 +238,8 @@ export default class TranslationHandler {
       if (newTarget && newTarget !== state.highlightedElement) {
         this.elementManager.cleanup();
 
-        if (newTarget.innerText.trim()) {
+        if (newTarget.innerText?.trim()) {
+          // اطمینان از وجود متن قبل از هایلایت
           state.highlightedElement = newTarget;
           newTarget.style.outline = CONFIG.HIGHLIGHT_STYLE;
           newTarget.style.opacity = "0.9";
@@ -244,6 +250,7 @@ export default class TranslationHandler {
 
   handleEscape(event) {
     event.stopPropagation();
+    this.selectionModeActive = false; // غیرفعال کردن حالت انتخاب با کلید Escape
     state.selectionActive = false;
     this.elementManager.cleanup();
   }
@@ -318,7 +325,6 @@ export default class TranslationHandler {
           params.target,
           translated
         );
-        // شرط جدید: اعمال نکردن applyTextDirection برای پلتفرم مدیوم
         if (platform !== "medium") {
           this.elementManager.applyTextDirection(params.target, translated);
         }
@@ -350,7 +356,6 @@ export default class TranslationHandler {
   async updateTargetElement(target, translated) {
     const platform = this.detectPlatform(target);
     await this.strategies[platform].updateElement(target, translated);
-    // شرط جدید: اعمال نکردن applyTextDirection برای پلتفرم مدیوم
     if (platform !== "medium") {
       this.elementManager.applyTextDirection(target, translated);
     }
@@ -513,7 +518,7 @@ export default class TranslationHandler {
     try {
       const translated = await translateText(text);
       await this.updateTargetElement(element, translated);
-      // شرط جدید: اعمال نکردن applyTextDirection برای پلتفرم مدیوم
+
       if (this.detectPlatform(element) !== "medium") {
         this.elementManager.applyTextDirection(element, translated);
       }
@@ -543,4 +548,24 @@ export default class TranslationHandler {
       timeout = setTimeout(() => func.apply(this, args), wait);
     };
   };
+
+  // این تابع باید از content.js فراخوانی شود
+  activateSelectionMode() {
+    this.selectionModeActive = true;
+    state.selectionActive = true; // همگام سازی با state.selectionActive برای سازگاری با بخش های دیگر کد
+    chrome.storage.local.set({ selectionActive: true });
+    this.notifier.show(
+      "حالت انتخاب فعال شد. روی متن مورد نظر کلیک کنید.",
+      "info"
+    );
+  }
+
+  // برای غیر فعال سازی حالت انتخاب
+  deactivateSelectionMode() {
+    this.selectionModeActive = false;
+    state.selectionActive = false;
+    chrome.storage.local.set({ selectionActive: false });
+    this.elementManager.cleanup(); // پاکسازی هایلایت و ...
+    this.notifier.show("حالت انتخاب غیر فعال شد.", "info");
+  }
 }
