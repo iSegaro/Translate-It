@@ -1,3 +1,4 @@
+// src/strategies/TwitterStrategy.js
 import PlatformStrategy from "./PlatformStrategy";
 import { delay } from "../utils/helpers";
 import { CONFIG } from "../config";
@@ -16,8 +17,6 @@ export default class TwitterStrategy extends PlatformStrategy {
   clearTweetField(tweetField) {
     if (!tweetField) return;
 
-    // console.log("clearTweetField called on:", tweetField); // لاگ برای بررسی فراخوانی
-
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(tweetField);
@@ -32,7 +31,6 @@ export default class TwitterStrategy extends PlatformStrategy {
       clipboardData: dt,
     });
     tweetField.dispatchEvent(pasteEvent);
-    // console.log("Dispatching paste event for clearing (clearTweetField)"); // لاگ برای بررسی پاک کردن
   }
 
   /**
@@ -53,7 +51,7 @@ export default class TwitterStrategy extends PlatformStrategy {
       });
       tweetField.dispatchEvent(pasteEvent);
     } catch (error) {
-      // console.error("Error pasting text:", error); //نیازی به نمایش این خطا نیست، خطاها در TranslationHandler نمایش داده می‌شوند مدیریت می شوند
+      // خطاها از طرف TranslationHandler مدیریت می‌شوند
     }
   }
 
@@ -70,19 +68,43 @@ export default class TwitterStrategy extends PlatformStrategy {
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
-    // console.log("setCursorToEnd called"); // لاگ برای بررسی عملکرد مکان نما
   }
 
   async updateElement(element, translatedText) {
-    const tweetField = element.closest(
-      '[data-testid="tweetTextarea_0"], [role="textbox"]',
-      '[data-testid="tweetTextarea"]'
+    // تلاش برای یافتن فیلد هدف با استفاده از closest
+    let tweetField = element.closest(
+      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]'
     );
+
+    // اگر فیلد پیدا نشد، بررسی می‌کنیم آیا خود عنصر (element) یک فیلد ورودی معتبر است
+    if (
+      !tweetField &&
+      (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
+    ) {
+      tweetField = element;
+    }
+
+    // اگر باز هم فیلد پیدا نشد، خطا چاپ می‌شود
     if (!tweetField) {
       console.error("Tweet field element not found in Twitter.");
       return;
     }
 
+    // بررسی اینکه آیا این فیلد مربوط به جستجو است یا توییت نویسی
+    const placeholder = tweetField.getAttribute("placeholder") || "";
+    const ariaLabel = tweetField.getAttribute("aria-label") || "";
+    if (
+      placeholder.toLowerCase().includes("search") ||
+      ariaLabel.toLowerCase().includes("search")
+    ) {
+      // به‌روزرسانی ساده برای فیلد جستجو
+      tweetField.value = translatedText;
+      tweetField.dispatchEvent(new Event("input", { bubbles: true }));
+      console.info("Translation applied to Twitter search field.");
+      return;
+    }
+
+    // ادامه روند در حالت توییت‌نویسی
     tweetField.focus();
     this.clearTweetField(tweetField);
     await delay(50);

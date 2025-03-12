@@ -120,40 +120,56 @@ export default class TranslationHandler {
    * Handle click event when selection mode is active
    * @param {MouseEvent} event
    */
-  async handleSelectionClick(event) {
-    event.stopPropagation();
-    event.preventDefault(); // برای جلوگیری از رفتار پیشفرض مرورگر
+  // در فایل TranslationHandler.js (یا هر جای مربوط به پردازش انتخاب)
+  async handleSelectionClick(e) {
+    const targetElement = e.target;
+    const walker = document.createTreeWalker(
+      targetElement,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
 
-    const targetElement =
-      event.target.closest('[contenteditable="true"], input, textarea') ||
-      document.elementFromPoint(event.clientX, event.clientY);
+    let nodes = [];
+    let texts = [];
+    let node;
 
-    if (!targetElement) {
-      this.elementManager.cleanup();
-      return;
+    // جمع‌آوری نودهای متنی و متن‌های آن‌ها
+    while ((node = walker.nextNode())) {
+      if (node.textContent.trim()) {
+        // فقط نودهای متنی غیرخالی را در نظر بگیر
+        nodes.push(node);
+        texts.push(node.textContent.trim()); // trim کردن متن برای جلوگیری از ترجمه فضاهای خالی
+      }
     }
 
-    this.selectionModeActive = false; // غیرفعال کردن حالت انتخاب
-    chrome.storage.local.set({ selectionActive: false });
-    state.selectionActive = false; // به روز رسانی state.selectionActive
-
-    if (!this.hasTextContent(targetElement)) {
-      this.elementManager.cleanup();
-      return;
-    }
+    if (texts.length === 0) return; // اگر متنی برای ترجمه وجود نداشت، خارج شو
 
     try {
-      const textLength = targetElement.innerText.trim().length;
-      if (textLength > 1000) {
-        this.notifier.show("متن انتخابی بیش از حد طولانی است!", "warning");
-        return;
-      }
+      // نمایش پیام وضعیت ترجمه
+      const statusNotification = this.notifier.show(
+        "در حال ترجمه...",
+        "status"
+      );
 
-      await this.translateTextNodesInElement(targetElement);
+      // ترجمه دسته‌ای متن‌ها به صورت همزمان
+      const translatedTexts = await Promise.all(
+        texts.map((text) => translateText(text))
+      );
+
+      // جایگزینی متن‌های ترجمه‌شده در نودهای متنی مربوطه
+      nodes.forEach((node, index) => {
+        node.textContent = translatedTexts[index];
+        this.elementManager.applyTextDirection(
+          node.parentElement,
+          translatedTexts[index]
+        );
+      });
+
+      // حذف پیام وضعیت ترجمه
+      this.notifier.dismiss(statusNotification);
     } catch (error) {
-      this.handleError(error);
-    } finally {
-      this.elementManager.cleanup();
+      this.handleError(error); // مدیریت خطا
     }
   }
 
@@ -204,7 +220,7 @@ export default class TranslationHandler {
         totalLength += trimmedText.length;
       }
 
-      // در صورت وجود متن بسیار زیاد، نمایش هشدار
+      // در صورت وجود متن بسیار زیاد
       if (totalLength > 3000) {
         this.notifier.show(
           "متن انتخابی خیلی طولانی است. لطفا محدوده کوچکتری انتخاب کنید.",
@@ -213,7 +229,8 @@ export default class TranslationHandler {
         return;
       }
 
-      // ترجمه تک تک text nodeها به صورت جداگانه
+      // Todo: نیازمند بهینه سازی هستش، تا هر متن را بصورت جدا برای ترجمه ارسال نکنه
+      // ترجمه تک تک text node ها به صورت جداگانه
       const translatedTexts = await Promise.all(
         texts.map((text) => translateText(text))
       );
@@ -250,7 +267,7 @@ export default class TranslationHandler {
 
   handleEscape(event) {
     event.stopPropagation();
-    this.selectionModeActive = false; // غیرفعال کردن حالت انتخاب با کلید Escape
+    this.selectionModeActive = false;
     state.selectionActive = false;
     this.elementManager.cleanup();
   }

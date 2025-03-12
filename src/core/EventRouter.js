@@ -24,23 +24,45 @@ export function setupEventListeners(translationHandler) {
 
   document.addEventListener("click", (e) => {
     if (state.selectionActive) {
-      // غیرفعال کردن حالت پس از کلیک موفق
+      // غیرفعال کردن حالت انتخاب پس از کلیک موفق
       translationHandler.elementManager.cleanup();
       state.selectionActive = false;
 
       // آپدیت storage
       chrome.storage.local.set({ selectionActive: false });
 
-      // تاخیر برای اجازه دادن برای به روزرسانی DOM
+      // ارسال پیام به background برای به روز رسانی وضعیت تب جاری
+      chrome.runtime.sendMessage({
+        action: "UPDATE_SELECTION_STATE",
+        data: false,
+      });
+
+      // تاخیر برای اجازه دادن به به‌روز شدن DOM
       setTimeout(() => {
         translationHandler.handleSelectionClick(e);
       }, 100);
     }
   });
 
-  document.addEventListener("keydown", (e) =>
-    translationHandler.handleEvent(e)
-  );
+  // در src/core/EventRouter.js
+  document.addEventListener("keydown", (e) => {
+    // بررسی کلید Escape برای خروج از حالت انتخاب
+    if (e.key === "Escape" && state.selectionActive) {
+      translationHandler.elementManager.cleanup();
+      state.selectionActive = false;
+      chrome.storage.local.set({ selectionActive: false });
+
+      // ارسال پیام به background برای به‌روز کردن وضعیت تب
+      chrome.runtime.sendMessage({
+        action: "UPDATE_SELECTION_STATE",
+        data: false,
+      });
+
+      console.info("Selection mode deactivated via Esc key.");
+      return; // جلوگیری از فراخوانی ادامه‌ی رویداد
+    }
+    translationHandler.handleEvent(e);
+  });
 
   document.addEventListener("mouseover", (e) => {
     if (!state.selectionActive) return;
@@ -50,13 +72,10 @@ export function setupEventListeners(translationHandler) {
 
     // اگر المنت جدید متفاوت از المنت highlight‌شده قبلی است، تغییرات اعمال شود
     if (state.highlightedElement !== e.target) {
-      // پاک کردن استایل‌های المنت قبلی (در صورت وجود)
       if (state.highlightedElement) {
         state.highlightedElement.style.outline = "";
         state.highlightedElement.style.opacity = "";
       }
-
-      // اعمال استایل highlight به المنت جدید
       state.highlightedElement = e.target;
       e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
       e.target.style.opacity = "0.9";
@@ -65,9 +84,11 @@ export function setupEventListeners(translationHandler) {
 }
 
 export function teardownEventListeners() {
+  // در صورت نیاز، از متغیرهای تعریف‌شده برای حذف event listener استفاده کنید.
+  // توجه داشته باشید که در این نمونه متغیرهای handleFocus و ... باید در سطح بالاتری تعریف شوند.
   document.removeEventListener("focus", handleFocus, true);
   document.removeEventListener("blur", handleBlur, true);
-  document.removeEventListener("selectionchange", handleSelectionChange);
+  document.removeEventListener("selectionchange", handleEvent);
   document.removeEventListener("click", handleClick);
   document.removeEventListener("keydown", handleKeyDown);
   document.removeEventListener("mouseover", handleMouseOver);

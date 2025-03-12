@@ -4,37 +4,41 @@ import NotificationManager from "./managers/NotificationManager.js"; // Import N
 
 // Detect extension reload
 let isReloaded = false;
+// نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
+const selectionStates = {};
 const notifier = new NotificationManager(); // Instantiate NotificationManager for background script
 const displayedErrorsBackground = new Set(); // Set for tracking displayed errors in background
 
 chrome.action.onClicked.addListener((tab) => {
   if (!tab?.id || tab.status !== "complete") return;
+  const tabId = tab.id;
+  // تغییر وضعیت فقط برای تب فعلی
+  selectionStates[tabId] = !selectionStates[tabId];
 
-  chrome.storage.local.get(["selectionActive"], (result) => {
-    const newState = !result.selectionActive;
-
-    chrome.storage.local.set({ selectionActive: newState }, () => {
-      chrome.tabs
-        .sendMessage(tab.id, {
-          action: "TOGGLE_SELECTION_MODE",
-          data: newState,
+  chrome.tabs
+    .sendMessage(tabId, {
+      action: "TOGGLE_SELECTION_MODE",
+      data: selectionStates[tabId],
+    })
+    .catch((error) => {
+      console.log("Retrying injection...");
+      chrome.scripting
+        .executeScript({
+          target: { tabId },
+          files: ["content.bundle.js"],
         })
-        .catch((error) => {
-          console.log("Retrying injection...");
-          chrome.scripting
-            .executeScript({
-              target: { tabId: tab.id },
-              files: ["content.bundle.js"],
-            })
-            .then(() => {
-              chrome.tabs.sendMessage(tab.id, {
-                action: "TOGGLE_SELECTION_MODE",
-                data: newState,
-              });
-            });
+        .then(() => {
+          chrome.tabs.sendMessage(tabId, {
+            action: "TOGGLE_SELECTION_MODE",
+            data: selectionStates[tabId],
+          });
         });
     });
-  });
+});
+
+// پاکسازی وضعیت تب زمانی که تب بسته می‌شود
+chrome.tabs.onRemoved.addListener((tabId) => {
+  delete selectionStates[tabId];
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -68,6 +72,13 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (
+    message.action === "UPDATE_SELECTION_STATE" &&
+    sender.tab &&
+    sender.tab.id
+  ) {
+    selectionStates[sender.tab.id] = message.data;
+  }
   if (message.action === "CONTEXT_INVALID") {
     chrome.runtime.reload();
   } else if (message.action === "fetchTranslation") {
