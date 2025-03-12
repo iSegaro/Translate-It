@@ -75,7 +75,8 @@ export default class TwitterStrategy extends PlatformStrategy {
 
   async updateElement(element, translatedText) {
     const tweetField = element.closest(
-      '[data-testid="tweetTextarea_0"], [role="textbox"]'
+      '[data-testid="tweetTextarea_0"], [role="textbox"]',
+      '[data-testid="tweetTextarea"]'
     );
     if (!tweetField) {
       console.error("Tweet field element not found in Twitter.");
