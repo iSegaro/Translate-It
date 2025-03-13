@@ -70,23 +70,35 @@ export default class TwitterStrategy extends PlatformStrategy {
     selection.addRange(range);
   }
 
-  async updateElement(element, translatedText) {
-    // تلاش برای یافتن فیلد هدف با استفاده از closest
-    let tweetField = element.closest(
-      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]'
-    );
+  isInputElement(el) {
+    return el.tagName === "INPUT" || el.tagName === "TEXTAREA";
+  }
 
-    // اگر فیلد پیدا نشد، بررسی می‌کنیم آیا خود عنصر (element) یک فیلد ورودی معتبر است
-    if (
-      !tweetField &&
-      (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
-    ) {
+  // src/strategies/TwitterStrategy.js
+  async updateElement(element, translatedText) {
+    let tweetField = null;
+
+    // اولویت اول: استفاده از المان فوکوس شده اگر یک فیلد توییتر باشد
+    if (this.isTwitterElement(document.activeElement)) {
+      tweetField = document.activeElement;
+    }
+    // اگر المان فوکوس شده فیلد توییتر نیست، از المان ارائه شده استفاده کنید
+    else if (this.isTwitterElement(element)) {
       tweetField = element;
     }
+    // اگر هیچ کدام از موارد بالا نبود، به دنبال فیلد بگردید (برای سناریوهایی که فوکوس به درستی تشخیص داده نمی‌شود)
+    else {
+      const SELECTORS =
+        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
+      tweetField = this.findField(element, SELECTORS);
+    }
 
-    // اگر باز هم فیلد پیدا نشد، خطا چاپ می‌شود
     if (!tweetField) {
-      console.error("Tweet field element not found in Twitter.");
+      console.warn("فیلد توییت برای ترجمه یافت نشد.");
+      return;
+    }
+
+    if (!this.validateField(tweetField)) {
       return;
     }
 
@@ -122,6 +134,36 @@ export default class TwitterStrategy extends PlatformStrategy {
 
     await delay(100);
     this.setCursorToEnd(tweetField);
+  }
+
+  extractText(target) {
+    let tweetField = null;
+
+    // اولویت اول: استفاده از المان فوکوس شده اگر یک فیلد توییتر باشد
+    if (this.isTwitterElement(document.activeElement)) {
+      tweetField = document.activeElement;
+    }
+    // اگر المان فوکوس شده فیلد توییتر نیست، از المان ارائه شده استفاده کنید
+    else if (this.isTwitterElement(target)) {
+      tweetField = target;
+    }
+    // اگر هیچ کدام از موارد بالا نبود، به دنبال فیلد بگردید
+    else {
+      const SELECTORS =
+        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
+      tweetField = this.findField(target, SELECTORS);
+    }
+
+    if (!tweetField) {
+      console.warn("فیلد توییت برای استخراج متن یافت نشد.");
+      return "";
+    }
+
+    if (tweetField?.tagName === "DIV") {
+      return tweetField.textContent.trim();
+    }
+
+    return tweetField.value || tweetField.textContent.trim();
   }
 
   applyTextDirection(element, translatedText) {

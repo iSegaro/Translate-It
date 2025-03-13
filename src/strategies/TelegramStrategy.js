@@ -104,16 +104,33 @@ export default class TelegramStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
+    const SELECTORS =
+      '[aria-label="Message input"], .composer_rich_textarea, .public_DraftEditor-content, [contenteditable="true"]';
+
     try {
       await delay(100);
-      let telegramField = this.getTelegramField(element);
-      if (!telegramField) {
-        console.error("Telegram field element NOT FOUND using all selectors.");
+
+      // 1. ادغام منطق پیدا کردن فیلد
+      let telegramField =
+        this.findField(element, SELECTORS) ||
+        this.getTelegramField(element) ||
+        document.querySelector(SELECTORS);
+
+      // 2. اعتبارسنجی پیشرفته
+      if (!this.validateField(telegramField)) {
+        // throw new Error("فیلد تلگرام یافت نشد")
+        return;
+      }
+
+      // 3. جلوگیری از پردازش المان‌های غیرفعال
+      if (element !== telegramField && !telegramField.contains(element)) {
+        // console.warn("Element is not part of Telegram field. Skipping...");
         return;
       }
 
       await this.safeFocus(telegramField);
 
+      // 4. منطق به‌روزرسانی یکپارچه
       if (this.isInputField(telegramField)) {
         telegramField.value = translatedText;
         telegramField.setAttribute(
@@ -124,14 +141,9 @@ export default class TelegramStrategy extends PlatformStrategy {
       } else {
         await this.clearField(telegramField);
         this.pasteText(telegramField, translatedText);
-        telegramField.style.transition = "background-color 0.5s ease";
-        telegramField.style.backgroundColor = "#d4f8d4";
-        requestAnimationFrame(() => {
-          setTimeout(
-            () => (telegramField.style.backgroundColor = "transparent"),
-            1000
-          );
-        });
+
+        // 5. بهبود افکت بصری بدون تاثیر بر عملکرد
+        this.applyVisualFeedback(telegramField);
       }
 
       await delay(100);
@@ -140,6 +152,39 @@ export default class TelegramStrategy extends PlatformStrategy {
       console.error("TelegramStrategy: updateElement ERROR:", error);
       throw error;
     }
+  }
+
+  // 6. افزودن متدهای جدید
+  applyVisualFeedback(field) {
+    const originalTransition = field.style.transition;
+    field.style.transition = "background-color 0.5s ease";
+    field.style.backgroundColor = "#d4f8d4";
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        field.style.backgroundColor = "transparent";
+        field.style.transition = originalTransition;
+      }, 1000);
+    });
+  }
+
+  extractText(target) {
+    const telegramField = this.getTelegramField(target);
+
+    if (telegramField?.isContentEditable) {
+      return telegramField.innerText.trim();
+    }
+
+    return telegramField?.value.trim() || "";
+  }
+
+  // 7. بهبود متد validateField
+  validateField(element) {
+    return (
+      element &&
+      element.isConnected &&
+      (this.isInputField(element) || this.isContentEditable(element))
+    );
   }
 
   async safeFocus(field) {

@@ -44,10 +44,11 @@ export function setupEventListeners(translationHandler) {
     }
   });
 
-  // در src/core/EventRouter.js
   document.addEventListener("keydown", (e) => {
+    console.log("keydown event detected. Key:", e.key);
     // بررسی کلید Escape برای خروج از حالت انتخاب
     if (e.key === "Escape" && state.selectionActive) {
+      console.log("EventRouter: کلید ESC شناسایی شد.");
       translationHandler.elementManager.cleanup();
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });

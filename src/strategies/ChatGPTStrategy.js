@@ -1,3 +1,5 @@
+// src/strategies/ChatGPTStrategy.js
+// Todo: Needs some works
 import PlatformStrategy from "./PlatformStrategy";
 import { setCursorToEnd } from "../utils/helpers";
 

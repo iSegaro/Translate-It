@@ -11,7 +11,10 @@ export default class MediumStrategy extends PlatformStrategy {
 
   // بررسی اینکه عنصر مربوط به مدیوم هست یا خیر
   isMediumElement(target) {
-    return !!target.closest('[role="textbox"]');
+    return !!(
+      target.closest('[role="textbox"]') ||
+      target.closest('[data-testid="editor-container"]') // اضافه کردن شناسه جدید
+    );
   }
 
   /**
@@ -28,11 +31,10 @@ export default class MediumStrategy extends PlatformStrategy {
     }
 
     // 2. برای فیلدهای contenteditable (کامنت‌ها و نظرسنجی‌ها) - کپی به کلیپبورد
-    const mediumField = element.closest(
-      '[role="textbox"][contenteditable="true"]'
-    );
+    const mediumField = this.findMediumTextField(element);
     if (!mediumField) {
-      console.error("Medium text field not found.");
+      console.error("Medium text field not found for element:", element);
+      throw new Error("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
       return;
     }
 
@@ -74,10 +76,39 @@ export default class MediumStrategy extends PlatformStrategy {
     });
   }
 
+  extractText(target) {
+    // برای فیلدهای جستجو
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      return target.value.trim();
+    }
+
+    // برای فیلدهای contenteditable
+    const mediumField = this.findMediumTextField(target);
+    return mediumField?.innerText.trim() || "";
+  }
+
   async safeFocus(element) {
-    element.focus({ preventScroll: true });
-    await delay(100);
-    return element;
+    try {
+      if (!element.isConnected) {
+        console.warn("Element not in DOM:", element);
+        return null;
+      }
+
+      element.focus({ preventScroll: true });
+      await delay(150); // افزایش تاخیر برای اطمینان
+
+      // بررسی وضعیت فوکوس
+      if (document.activeElement !== element) {
+        console.warn("Focus failed, retrying...");
+        element.focus({ preventScroll: true });
+        await delay(100);
+      }
+
+      return element;
+    } catch (error) {
+      console.error("Focus error:", error);
+      return null;
+    }
   }
 
   async selectAllContent(element) {
@@ -99,6 +130,30 @@ export default class MediumStrategy extends PlatformStrategy {
 
     element.dispatchEvent(pasteEvent);
     await delay(50);
+  }
+
+  /**
+   * پیدا کردن فیلد متن مدیوم با الگوریتم پیشرفته
+   */
+  findMediumTextField(startElement) {
+    // جستجو در سلسله مراتب والدین
+    let currentElement = startElement;
+    for (let i = 0; i < 5; i++) {
+      // حداکثر 5 سطح بالاتر
+      if (!currentElement) break;
+
+      const candidate = currentElement.closest(
+        '[role="textbox"][contenteditable="true"], [data-testid="editor-container"]'
+      );
+      if (candidate) return candidate;
+
+      currentElement = currentElement.parentElement;
+    }
+
+    // جستجوی جایگزین در صورت عدم یافتن
+    return document.querySelector(
+      '[role="textbox"][contenteditable="true"], [data-testid="editor-container"]'
+    );
   }
 
   triggerStateUpdate(element) {

@@ -1,38 +1,44 @@
 // src/strategies/PlatformStrategy.js
-import { CONFIG } from "../config.js";
-
 export default class PlatformStrategy {
+  constructor(notifier = null) {
+    this.notifier = notifier;
+  }
+
   extractText(target) {
-    return target.value || target.innerText?.trim() || "";
+    throw new Error("متد extractText باید در کلاس فرزند پیاده‌سازی شود");
   }
 
-  async updateElement(element, translated) {
-    element.value = translated;
-    this.applyBaseStyling(element, translated);
-  }
-
-  applyBaseStyling(element, translated) {
-    const isRtl = CONFIG.RTL_REGEX.test(translated);
-    element.style.direction = isRtl ? "rtl" : "ltr";
-    element.style.textAlign = isRtl ? "right" : "left";
-  }
-
-  pasteContent(element, content) {
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.value = content;
-    } else {
-      element.innerHTML = content;
+  // متد یکپارچه برای یافتن المان‌ها
+  findField(startElement, selectors, maxDepth = 5) {
+    let currentElement = startElement;
+    for (let i = 0; i < maxDepth; i++) {
+      if (!currentElement) break;
+      const found = currentElement.closest(selectors);
+      if (found) return found;
+      currentElement = currentElement.parentElement;
     }
+    return document.querySelector(selectors);
   }
 
-  applyTextDirection(element, translatedText) {
-    const isRtl = CONFIG.RTL_REGEX.test(translatedText);
-    element.style.direction = isRtl ? "rtl" : "ltr";
-    element.style.textAlign = isRtl ? "right" : "left";
+  // اعتبارسنجی المان
+  validateField(element) {
+    return (
+      element &&
+      element.isConnected &&
+      (this.isInputElement(element) || element.hasAttribute("contenteditable"))
+    );
   }
 
-  replaceSelection(range, translated) {
-    range.deleteContents();
-    range.insertNode(document.createTextNode(translated));
+  // مدیریت خطای استاندارد
+  handleFieldError(errorName, platformName) {
+    const errorMap = {
+      FIELD_NOT_FOUND: `لطفا روی فیلد متن ${platformName} کلیک کنید`,
+      CLIPBOARD_ERROR: "خطای دسترسی به کلیپبورد",
+    };
+
+    if (this.notifier) {
+      this.notifier.show(errorMap[errorName], "warning");
+    }
+    throw new Error(errorName);
   }
 }

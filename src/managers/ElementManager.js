@@ -17,14 +17,13 @@ export default class ElementManager {
     state.activeTranslateIcon = null;
   }
 
+  // در کلاس ElementManager
   applyTextDirection(element, text) {
+    if (!element || !element.style) return;
+
     const isRtl = CONFIG.RTL_REGEX.test(text);
     element.style.direction = isRtl ? "rtl" : "ltr";
     element.style.textAlign = isRtl ? "right" : "left";
-
-    if (["INPUT", "TEXTAREA"].includes(element.tagName)) {
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-    }
   }
 
   createTranslateIcon(target) {

@@ -25,29 +25,110 @@ export default class TranslationHandler {
       default: new DefaultStrategy(),
     };
 
+    for (const [name, strategy] of Object.entries(this.strategies)) {
+      if (typeof strategy.extractText !== "function") {
+        console.error(`استراتژی ${name} متد extractText را ندارد!`);
+      }
+    }
+
     this.elementManager = new ElementManager();
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
     this.handleError = this.handleError.bind(this); // Bind handleError
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
+
+    // اعتبارسنجی استراتژی‌ها
+    Object.entries(this.strategies).forEach(([name, strategy]) => {
+      if (typeof strategy.extractText !== "function") {
+        throw new Error(
+          `استراتژی ${name} متد extractText را پیاده‌سازی نکرده است`
+        );
+      }
+    });
   }
 
   detectPlatform(target) {
     const hostname = window.location.hostname.toLowerCase();
-    if (hostname.includes("medium.com")) return "medium";
-    if (hostname.includes("x.com")) return "twitter";
-    if (hostname.includes("whatsapp.com")) return "whatsapp";
-    if (hostname.includes("telegram.org")) return "telegram";
-    if (hostname.includes("chat.openai.com")) return "chatgpt";
+    const platformMap = {
+      "web.whatsapp.com": "whatsapp",
+      "twitter.com": "twitter",
+      "x.com": "twitter",
+      "web.telegram.org": "telegram",
+      "medium.com": "medium",
+      "chat.openai.com": "chatgpt",
+    };
 
-    for (const platform of Object.keys(this.strategies)) {
-      const detectionMethod = `is${platform.charAt(0).toUpperCase()}${platform.slice(1)}Element`;
-      if (this.strategies[platform]?.[detectionMethod]?.(target))
-        return platform;
+    return platformMap[hostname] || "default";
+  }
+
+  getPlatformName() {
+    const hostname = window.location.hostname.toLowerCase();
+
+    // لیست پلتفرم‌های پشتیبانی شده
+    const platformPatterns = [
+      { name: "Twitter", patterns: ["twitter.com", "x.com"] },
+      { name: "WhatsApp", patterns: ["web.whatsapp.com"] },
+      { name: "Telegram", patterns: ["web.telegram.org"] },
+      { name: "Medium", patterns: ["medium.com"] },
+      { name: "ChatGPT", patterns: ["chat.openai.com"] },
+      // اضافه کردن پلتفرم‌های دیگر در اینجا
+    ];
+
+    // جستجو در لیست پلتفرم‌ها
+    for (const platform of platformPatterns) {
+      if (platform.patterns.some((pattern) => hostname.includes(pattern))) {
+        return platform.name;
+      }
     }
 
+    // اگر پلتفرم تشخیص داده نشد، از حالت پیش‌فرض استفاده کنید
     return "default";
+  }
+
+  detectPlatformByURL() {
+    const hostname = window.location.hostname;
+    if (hostname.includes("twitter.com")) return "twitter";
+    if (hostname.includes("x.com")) return "twitter";
+    if (hostname.includes("medium.com")) return "medium";
+    if (hostname.includes("telegram.com")) return "telegram";
+    if (hostname.includes("whatsapp.com")) return "whatsapp";
+    if (hostname.includes("medium.com")) return "medium";
+  }
+
+  async processTranslation(params) {
+    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+
+    try {
+      const platform =
+        params.target ?
+          this.detectPlatform(params.target)
+        : this.detectPlatformByURL();
+
+      // تنظیم حالت ترجمه
+      state.translationMode = params.selectionRange ? "selection" : "field";
+
+      const translated = await translateText(params.text);
+
+      if (params.selectionRange) {
+        this.strategies[platform].replaceSelection(
+          params.selectionRange,
+          translated
+        );
+      } else if (params.target) {
+        await this.strategies[platform].updateElement(
+          params.target,
+          translated
+        );
+        if (platform !== "medium") {
+          this.elementManager.applyTextDirection(params.target, translated);
+        }
+      }
+    } catch (error) {
+      this.handleEnhancedError(error, params.target);
+    } finally {
+      this.notifier.dismiss(statusNotification);
+    }
   }
 
   handleEditableFocus(element) {
@@ -120,7 +201,6 @@ export default class TranslationHandler {
    * Handle click event when selection mode is active
    * @param {MouseEvent} event
    */
-  // در فایل TranslationHandler.js (یا هر جای مربوط به پردازش انتخاب)
   async handleSelectionClick(e) {
     const targetElement = e.target;
     const walker = document.createTreeWalker(
@@ -130,46 +210,81 @@ export default class TranslationHandler {
       false
     );
 
-    let nodes = [];
+    let textNodes = [];
     let texts = [];
     let node;
 
-    // جمع‌آوری نودهای متنی و متن‌های آن‌ها
     while ((node = walker.nextNode())) {
       if (node.textContent.trim()) {
-        // فقط نودهای متنی غیرخالی را در نظر بگیر
-        nodes.push(node);
-        texts.push(node.textContent.trim()); // trim کردن متن برای جلوگیری از ترجمه فضاهای خالی
+        textNodes.push(node);
+        texts.push(node.textContent.trim());
       }
     }
 
-    if (texts.length === 0) return; // اگر متنی برای ترجمه وجود نداشت، خارج شو
+    if (texts.length === 0) return;
 
     try {
-      // نمایش پیام وضعیت ترجمه
       const statusNotification = this.notifier.show(
         "در حال ترجمه...",
         "status"
       );
 
-      // ترجمه دسته‌ای متن‌ها به صورت همزمان
-      const translatedTexts = await Promise.all(
-        texts.map((text) => translateText(text))
+      // تنظیم حالت ترجمه برای بازگردانی با ESC
+      state.translationMode = "selection";
+
+      // ذخیره Text Node و متن اصلی آن
+      textNodes.forEach((textNode, index) => {
+        // تولید شناسه یکتا
+        const uniqueId =
+          Math.random().toString(36).substring(2, 15) +
+          Math.random().toString(36).substring(2, 15);
+        textNode.parentElement.setAttribute("data-original-text-id", uniqueId); // اضافه کردن شناسه به والد گره متنی
+
+        state.originalTexts.set(uniqueId, {
+          // استفاده از شناسه یکتا به عنوان کلید
+          originalInnerHTML: textNode.parentElement.innerHTML, // ذخیره innerHTML والد
+          translatedText: "", // مقدار ترجمه شده بعدا به‌روزرسانی می‌شود
+          parent: textNode.parentElement, // ذخیره والد همچنان مفید است
+        });
+        console.log(
+          "handleSelectionClick: ذخیره innerHTML والد:",
+          textNode.parentElement.innerHTML,
+          "با شناسه:",
+          uniqueId,
+          "و والد:",
+          textNode.parentElement
+        );
+      });
+      console.log(
+        "handleSelectionClick: وضعیت state.originalTexts بعد از ذخیره:",
+        state.originalTexts
       );
 
-      // جایگزینی متن‌های ترجمه‌شده در نودهای متنی مربوطه
-      nodes.forEach((node, index) => {
-        node.textContent = translatedTexts[index];
+      // ترجمه و جایگزینی
+      const translatedTexts = await Promise.all(texts.map(translateText));
+
+      textNodes.forEach((textNode, index) => {
+        textNode.textContent = translatedTexts[index];
+        // به‌روزرسانی متن ترجمه شده در state.originalTexts
+        const uniqueId = textNode.parentElement.getAttribute(
+          "data-original-text-id"
+        );
+        if (uniqueId) {
+          const data = state.originalTexts.get(uniqueId);
+          if (data) {
+            data.translatedText = translatedTexts[index];
+          }
+        }
+
         this.elementManager.applyTextDirection(
-          node.parentElement,
+          textNode.parentElement,
           translatedTexts[index]
         );
       });
 
-      // حذف پیام وضعیت ترجمه
       this.notifier.dismiss(statusNotification);
     } catch (error) {
-      this.handleError(error); // مدیریت خطا
+      this.handleError(error);
     }
   }
 
@@ -269,6 +384,11 @@ export default class TranslationHandler {
     event.stopPropagation();
     this.selectionModeActive = false;
     state.selectionActive = false;
+
+    if (state.translationMode === "selection") {
+      this.revertTranslations();
+    }
+
     this.elementManager.cleanup();
   }
 
@@ -290,8 +410,13 @@ export default class TranslationHandler {
 
       if (!text) return;
 
+      console.log(
+        "handleCtrlSlash: Calling processTranslation with params.target:",
+        activeElement
+      ); // افزودن این خط
       await this.processTranslation({
         text,
+        originalText: text, // ارسال متن اصلی به processTranslation
         target: isTextSelected ? null : activeElement,
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
@@ -311,24 +436,43 @@ export default class TranslationHandler {
     const text = selection.toString().trim();
     if (!text) return;
 
+    console.log(
+      "handleCtrlSelection: Calling processTranslation with params.target: null (selection)"
+    ); // افزودن این خط
     await this.processTranslation({
       text,
+      originalText: text, // ارسال متن اصلی به processTranslation
       selectionRange: selection.getRangeAt(0),
     });
   }
 
+  // در TranslationHandler.js
   async processTranslation(params) {
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
     console.log(
       "TranslationHandler: processTranslation started for text:",
-      params.text.substring(0, 20) + "..."
+      params.text.substring(0, 20) + "...",
+      "originalText:",
+      params.originalText.substring(0, 20) + "..."
     );
 
     try {
-      const translated = await translateText(params.text);
-
       const platform =
-        params.target ? this.detectPlatform(params.target) : "default";
+        params.target ?
+          this.detectPlatform(params.target)
+        : this.detectPlatformByURL();
+
+      // بررسی وجود استراتژی
+      if (
+        !this.strategies[platform] ||
+        typeof this.strategies[platform].extractText !== "function"
+      ) {
+        throw new Error(
+          `استراتژی ${platform} معتبر نیست یا متد extractText را ندارد.`
+        );
+      }
+
+      const translated = await translateText(params.text);
 
       if (params.selectionRange) {
         this.strategies[platform].replaceSelection(
@@ -336,8 +480,6 @@ export default class TranslationHandler {
           translated
         );
       } else if (params.target) {
-        state.originalTexts[params.target] = params.target.innerText;
-
         await this.strategies[platform].updateElement(
           params.target,
           translated
@@ -347,27 +489,79 @@ export default class TranslationHandler {
         }
       }
     } catch (error) {
-      this.handleError(error);
+      this.handleEnhancedError(error, params.target);
     } finally {
       this.notifier.dismiss(statusNotification);
     }
   }
 
   revertTranslations() {
-    console.log("Reverting translations...");
-    for (const element in state.originalTexts) {
-      if (state.originalTexts.hasOwnProperty(element)) {
-        const originalText = state.originalTexts[element];
-        const elementNode = document.querySelector(`:scope > *`);
-        if (elementNode) {
-          elementNode.innerText = originalText;
-          this.elementManager.applyTextDirection(elementNode, originalText);
+    console.log(
+      "revertTranslations: وضعیت state.originalTexts در شروع:",
+      state.originalTexts
+    );
+    console.log("Starting revert process...");
+    let successfulReverts = 0;
+
+    for (const [uniqueId, data] of state.originalTexts.entries()) {
+      // پیمایش بر روی شناسه‌های یکتا
+      try {
+        if (!data.parent || !data.originalInnerHTML) {
+          console.warn(
+            "revertTranslations: داده‌های والد یا innerHTML اصلی برای شناسه",
+            uniqueId,
+            "معتبر نیستند."
+          );
+          continue;
         }
+
+        if (!data.parent.isConnected) {
+          // console.warn(
+          //   "revertTranslations: عنصر والد برای شناسه",
+          //   uniqueId,
+          //   "دیگر به DOM متصل نیست."
+          // );
+          continue;
+        }
+
+        console.log(
+          "revertTranslations: بازگردانی innerHTML والد با شناسه:",
+          uniqueId,
+          "innerHTML اصلی:",
+          data.originalInnerHTML
+        );
+
+        // جایگزینی innerHTML
+        data.parent.innerHTML = data.originalInnerHTML;
+
+        successfulReverts++;
+      } catch (error) {
+        console.error(
+          "revertTranslations: خطای بازگردانی innerHTML والد:",
+          error
+        );
       }
     }
-    state.originalTexts = {};
+
+    // نمایش نتایج
+    if (successfulReverts > 0) {
+      this.notifier.show(
+        `${successfulReverts} متن با موفقیت بازگردانی شد`,
+        "success"
+      );
+    } else {
+      if (process.env.NODE_ENV === "development") {
+        this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
+      }
+    }
+
+    // پاکسازی state
+    state.originalTexts.clear();
     this.elementManager.cleanup();
-    this.notifier.show("متن‌ها به حالت اولیه بازگردانده شدند.", "success");
+    console.log(
+      "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
+      state.originalTexts
+    );
   }
 
   async updateTargetElement(target, translated) {
@@ -405,6 +599,9 @@ export default class TranslationHandler {
       message = "API key is missing. Please set it in the extension options.";
       onClick = () => openOptionsPage();
       type = "error";
+    } else if (error.message.includes("medium field")) {
+      message = "لطفا روی فیلد متن مدیوم کلیک کنید";
+      type = "warning";
     } else {
       message = "خطای ارتباط با سرویس ترجمه";
       console.error("Translation Error:", error);

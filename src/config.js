@@ -35,7 +35,8 @@ export const state = {
   selectionActive: false,
   highlightedElement: null,
   activeTranslateIcon: null,
-  originalTexts: {},
+  originalTexts: new Map(),
+  translationMode: null,
 };
 
 export const getApiKeyAsync = async () => {
