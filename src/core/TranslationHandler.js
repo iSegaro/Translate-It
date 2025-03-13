@@ -11,6 +11,11 @@ import { debounce } from "../utils/debounce.js";
 import { CONFIG, state } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { openOptionsPage } from "../utils/helpers.js";
+import {
+  detectPlatform,
+  getPlatformName,
+  detectPlatformByURL,
+} from "../utils/platformDetector.js"; // Import اضافه شد
 
 export default class TranslationHandler {
   constructor() {
@@ -48,62 +53,14 @@ export default class TranslationHandler {
     });
   }
 
-  detectPlatform(target) {
-    const hostname = window.location.hostname.toLowerCase();
-    const platformMap = {
-      "web.whatsapp.com": "whatsapp",
-      "twitter.com": "twitter",
-      "x.com": "twitter",
-      "web.telegram.org": "telegram",
-      "medium.com": "medium",
-      "chat.openai.com": "chatgpt",
-    };
-
-    return platformMap[hostname] || "default";
-  }
-
-  getPlatformName() {
-    const hostname = window.location.hostname.toLowerCase();
-
-    // لیست پلتفرم‌های پشتیبانی شده
-    const platformPatterns = [
-      { name: "Twitter", patterns: ["twitter.com", "x.com"] },
-      { name: "WhatsApp", patterns: ["web.whatsapp.com"] },
-      { name: "Telegram", patterns: ["web.telegram.org"] },
-      { name: "Medium", patterns: ["medium.com"] },
-      { name: "ChatGPT", patterns: ["chat.openai.com"] },
-      // اضافه کردن پلتفرم‌های دیگر در اینجا
-    ];
-
-    // جستجو در لیست پلتفرم‌ها
-    for (const platform of platformPatterns) {
-      if (platform.patterns.some((pattern) => hostname.includes(pattern))) {
-        return platform.name;
-      }
-    }
-
-    // اگر پلتفرم تشخیص داده نشد، از حالت پیش‌فرض استفاده کنید
-    return "default";
-  }
-
-  detectPlatformByURL() {
-    const hostname = window.location.hostname;
-    if (hostname.includes("twitter.com")) return "twitter";
-    if (hostname.includes("x.com")) return "twitter";
-    if (hostname.includes("medium.com")) return "medium";
-    if (hostname.includes("telegram.com")) return "telegram";
-    if (hostname.includes("whatsapp.com")) return "whatsapp";
-    if (hostname.includes("medium.com")) return "medium";
-  }
-
   async processTranslation(params) {
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
 
     try {
       const platform =
         params.target ?
-          this.detectPlatform(params.target)
-        : this.detectPlatformByURL();
+          detectPlatform(params.target) // استفاده از تابع import شده
+        : detectPlatformByURL(); // استفاده از تابع import شده
 
       // تنظیم حالت ترجمه
       state.translationMode = params.selectionRange ? "selection" : "field";
@@ -459,8 +416,8 @@ export default class TranslationHandler {
     try {
       const platform =
         params.target ?
-          this.detectPlatform(params.target)
-        : this.detectPlatformByURL();
+          detectPlatform(params.target) // استفاده از تابع import شده
+        : detectPlatformByURL(); // استفاده از تابع import شده
 
       // بررسی وجود استراتژی
       if (
@@ -565,7 +522,7 @@ export default class TranslationHandler {
   }
 
   async updateTargetElement(target, translated) {
-    const platform = this.detectPlatform(target);
+    const platform = detectPlatform(target); // استفاده از تابع import شده
     await this.strategies[platform].updateElement(target, translated);
     if (platform !== "medium") {
       this.elementManager.applyTextDirection(target, translated);
@@ -668,12 +625,12 @@ export default class TranslationHandler {
   }
 
   extractFromActiveElement(element) {
-    const platform = this.detectPlatform(element);
+    const platform = detectPlatform(element); // استفاده از تابع import شده
     return this.strategies[platform].extractText(element);
   }
 
   pasteContent(element, content) {
-    const platform = this.detectPlatform(element);
+    const platform = detectPlatform(element); // استفاده از تابع import شده
     this.strategies[platform].pasteContent(element, content);
   }
 
@@ -695,7 +652,7 @@ export default class TranslationHandler {
         icon.remove();
 
         const text =
-          this.strategies[this.detectPlatform(target)].extractText(target);
+          this.strategies[detectPlatform(target)].extractText(target); // استفاده از تابع import شده
         if (!text) return;
 
         const statusNotification = this.notifier.show(
@@ -720,8 +677,7 @@ export default class TranslationHandler {
   }
 
   async processElementTranslation(element) {
-    const text =
-      this.strategies[this.detectPlatform(element)].extractText(element);
+    const text = this.strategies[detectPlatform(element)].extractText(element); // استفاده از تابع import شده
     if (!text) return;
 
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
@@ -733,7 +689,8 @@ export default class TranslationHandler {
       const translated = await translateText(text);
       await this.updateTargetElement(element, translated);
 
-      if (this.detectPlatform(element) !== "medium") {
+      if (detectPlatform(element) !== "medium") {
+        // استفاده از تابع import شده
         this.elementManager.applyTextDirection(element, translated);
       }
       console.log(
