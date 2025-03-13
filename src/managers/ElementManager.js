@@ -17,7 +17,6 @@ export default class ElementManager {
     state.activeTranslateIcon = null;
   }
 
-  // در کلاس ElementManager
   applyTextDirection(element, text) {
     if (!element || !element.style) return;
 
