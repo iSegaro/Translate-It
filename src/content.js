@@ -20,10 +20,9 @@ function injectCSS(filePath) {
 
 // بررسی hostname و انتخاب فایل CSS مناسب
 const hostname = window.location.hostname;
+injectCSS("styles/content.css");
 if (hostname.includes("whatsapp.com")) {
   injectCSS("styles/whatsapp.css");
-} else {
-  injectCSS("styles/content.css");
 }
 
 // Initialize core components
