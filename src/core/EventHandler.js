@@ -1,6 +1,10 @@
 // src/core/EventHandler.js
 import { CONFIG, state } from "../config.js";
 import { translateText } from "../utils/api.js";
+import {
+  detectPlatform,
+  detectPlatformByURL,
+} from "../utils/platformDetector.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -237,10 +241,8 @@ export default class EventHandler {
         e.preventDefault();
         icon.remove();
 
-        const text =
-          this.strategies[
-            this.translationHandler.detectPlatform(target)
-          ].extractText(target);
+        const platform = detectPlatform(target);
+        const text = this.strategies[platform].extractText(target);
         if (!text) return;
 
         const statusNotification = this.notifier.show(
