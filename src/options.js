@@ -8,6 +8,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadSettings();
 
+  const useMockCheckbox = document.getElementById("useMock");
+  const apiKeyInput = document.getElementById("apiKey");
+
+  function toggleApiKeyInput() {
+    if (useMockCheckbox.checked) {
+      apiKeyInput.disabled = true;
+    } else {
+      apiKeyInput.disabled = false;
+    }
+  }
+
+  // تنظیم وضعیت اولیه فیلد API Key بر اساس تنظیمات بارگذاری شده
+  toggleApiKeyInput();
+
+  // اضافه کردن رویداد برای تغییر وضعیت Mock Mode
+  useMockCheckbox.addEventListener("change", toggleApiKeyInput);
+
   document
     .getElementById("saveSettings")
     .addEventListener("click", async () => {
