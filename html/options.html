@@ -123,6 +123,23 @@
         margin-top: 10px;
         padding: 5px 10px;
       }
+      textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #111827;
+        margin-bottom: 16px;
+        box-sizing: border-box;
+        font-family: monospace; /* برای نمایش بهتر placeholder ها */
+        min-height: 80px;
+      }
+      textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
     </style>
     <script src="../options.bundle.js" defer></script>
   </head>
@@ -148,16 +165,32 @@
       <div class="setting-group">
         <label for="sourceLanguage">Source Language:</label>
         <select id="sourceLanguage">
-          <option value="en">English</option>
-          <option value="fa">Persian</option>
+          <option value="English">English</option>
+          <option value="Persian">Persian</option>
         </select>
       </div>
       <div class="setting-group">
         <label for="targetLanguage">Target Language:</label>
         <select id="targetLanguage">
-          <option value="en">English</option>
-          <option value="fa">Persian</option>
+          <option value="English">English</option>
+          <option value="Persian">Persian</option>
         </select>
+      </div>
+      <h2>Prompt Template</h2>
+      <div class="setting-group">
+        <label for="promptTemplate">Prompt Template:</label>
+        <textarea
+          id="promptTemplate"
+          placeholder="Use keywords to customize your prompt..."
+        ></textarea>
+        <p id="promptHelpText" style="font-size: smaller; color: #6b7280;">
+          You can use the following keywords in your prompt template:
+          <ul>
+            <li id="sourceLangHelp"><code>${SOURCE}</code>: Represents the selected source language code. <span id="sourceLangName"></span></li>
+            <li id="targetLangHelp"><code>${TARGET}</code>: Represents the selected target language code. <span id="targetLangName"></span></li>
+            <li><code>${TEXT}</code>: Represents the text to be translated.</li>
+          </ul>
+        </p>
       </div>
       <button id="saveSettings">Save Settings</button>
       <p id="status"></p>

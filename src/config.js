@@ -6,11 +6,9 @@ export const CONFIG = {
   USE_MOCK: false,
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
-  PROMPT_ENGLISH:
-    "Please translate the following text into English, preserving the sentence structure (like new lines) and displaying only the output:",
-  PROMPT_PERSIAN:
-    "متن زیر را به فارسی ترجمه کنید، ساختار جمله (مانند خطوط جدید) را حفظ کرده و فقط خروجی را نمایش دهید:",
   HIGHLIGHT_STYLE: "2px solid red",
+  promptTemplate:
+    "Perform bidirectional translation: If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Maintain sentence structure (including line breaks). Output ONLY print the translation:``` ${TEXT} ```",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
   DEBUG_TRANSLATED_ENGLISH_With_NewLine:
@@ -40,41 +38,10 @@ export const state = {
 };
 
 export const getSettingsAsync = async () => {
-  return new Promise((resolve, reject) => {
-    try {
-      if (!isExtensionContextValid()) {
-        reject(new Error("Extension context invalid"));
-        return;
-      }
-
-      if (!chrome?.storage?.sync) {
-        reject(new Error("Error: The extension has not loaded correctly"));
-        return;
-      }
-
-      chrome.storage.sync.get(
-        ["apiKey", "USE_MOCK", "API_URL", "sourceLanguage", "targetLanguage"],
-        (result) => {
-          if (chrome.runtime.lastError) {
-            reject(
-              new Error(`System error: ${chrome.runtime.lastError.message}`)
-            );
-            return;
-          }
-
-          resolve({
-            apiKey: result.apiKey || "",
-            USE_MOCK:
-              result.USE_MOCK !== undefined ? result.USE_MOCK : CONFIG.USE_MOCK,
-            API_URL: result.API_URL || CONFIG.API_URL,
-            sourceLanguage: result.sourceLanguage || "en",
-            targetLanguage: result.targetLanguage || "fa",
-          });
-        }
-      );
-    } catch (error) {
-      reject(new Error(`Access error: ${error.message}`));
-    }
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(null, (items) => {
+      resolve(items);
+    });
   });
 };
 
@@ -103,10 +70,7 @@ export const getTargetLanguageAsync = async () => {
   return settings.targetLanguage;
 };
 
-export const getPromptEnglishAsync = async () => {
-  return CONFIG.PROMPT_ENGLISH;
-};
-
-export const getPromptPersianAsync = async () => {
-  return CONFIG.PROMPT_PERSIAN;
+export const getPromptAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.promptTemplate;
 };

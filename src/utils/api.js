@@ -6,8 +6,7 @@ import {
   getApiUrlAsync,
   getSourceLanguageAsync,
   getTargetLanguageAsync,
-  getPromptEnglishAsync,
-  getPromptPersianAsync,
+  getPromptAsync,
 } from "../config.js";
 import { delay } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
@@ -33,23 +32,20 @@ export const translateText = async (text) => {
     const sourceLang = await getSourceLanguageAsync();
     const targetLang = await getTargetLanguageAsync();
 
-    let prompt = "";
-    if (sourceLang === "fa" && targetLang === "en") {
-      const promptEnglish = await getPromptEnglishAsync();
-      prompt = promptEnglish + text;
-    } else if (sourceLang === "en" && targetLang === "fa") {
-      const promptPersian = await getPromptPersianAsync();
-      prompt = promptPersian + text;
-    } else if (sourceLang === targetLang) {
+    // دریافت الگوی Prompt
+    let promptTemplate = await getPromptAsync();
+
+    // جایگزینی کلمات کلیدی با مقادیر واقعی زبان
+    const prompt = promptTemplate
+      .replace(/\${SOURCE}/g, sourceLang)
+      .replace(/\${TARGET}/g, targetLang)
+      .replace(/\${TEXT}/g, text);
+
+    if (sourceLang === targetLang) {
       return text; // No translation needed
-    } else {
-      // Handle other language pairs or default to a specific direction
-      const promptDefault =
-        targetLang === "en" ?
-          await getPromptEnglishAsync()
-        : await getPromptPersianAsync();
-      prompt = promptDefault + text;
     }
+
+    console.info("Generated Prompt: ", prompt);
 
     const apiUrl = await getApiUrlAsync();
     const response = await fetch(`${apiUrl}?key=${apiKey}`, {
