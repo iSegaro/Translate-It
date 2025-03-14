@@ -140,6 +140,10 @@
         border-color: #3b82f6;
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
       }
+      #promptHelpText{
+        font-size: smaller;
+        color: #6b7280;
+      }
     </style>
     <script src="../options.bundle.js" defer></script>
   </head>
@@ -164,17 +168,153 @@
       </div>
       <div class="setting-group">
         <label for="sourceLanguage">Source Language:</label>
-        <select id="sourceLanguage">
-          <option value="English">English</option>
-          <option value="Persian">Persian</option>
-        </select>
+        <input type="text" id="sourceLanguage" list="sourceLanguages" placeholder="Enter source language" />
+        <datalist id="sourceLanguages">
+          <option value="English"></option>
+          <option value="Persian"></option>
+          <option value="Chinese (Simplified)"></option>
+          <option value="Spanish"></option>
+          <option value="Hindi"></option>
+          <option value="Arabic"></option>
+          <option value="Bengali"></option>
+          <option value="Portuguese"></option>
+          <option value="Russian"></option>
+          <option value="Japanese"></option>
+          <option value="French"></option>
+          <option value="German"></option>
+          <option value="Urdu"></option>
+          <option value="Indonesian"></option>
+          <option value="Italian"></option>
+          <option value="Swahili"></option>
+          <option value="Marathi"></option>
+          <option value="Telugu"></option>
+          <option value="Tamil"></option>
+          <option value="Turkish"></option>
+          <option value="Vietnamese"></option>
+          <option value="Korean"></option>
+          <option value="Thai"></option>
+          <option value="Malay"></option>
+          <option value="Polish"></option>
+          <option value="Dutch"></option>
+          <option value="Filipino"></option>
+          <option value="Ukrainian"></option>
+          <option value="Romanian"></option>
+          <option value="Greek"></option>
+          <option value="Czech"></option>
+          <option value="Hungarian"></option>
+          <option value="Swedish"></option>
+          <option value="Norwegian"></option>
+          <option value="Danish"></option>
+          <option value="Finnish"></option>
+          <option value="Hebrew"></option>
+          <option value="Afrikaans"></option>
+          <option value="Albanian"></option>
+          <option value="Bulgarian"></option>
+          <option value="Catalan"></option>
+          <option value="Croatian"></option>
+          <option value="Estonian"></option>
+          <option value="Latvian"></option>
+          <option value="Lithuanian"></option>
+          <option value="Slovak"></option>
+          <option value="Slovenian"></option>
+          <option value="Serbian"></option>
+          <option value="Malayalam"></option>
+          <option value="Kannada"></option>
+          <option value="Odia"></option>
+          <option value="Punjabi"></option>
+          <option value="Sinhala"></option>
+          <option value="Nepali"></option>
+          <option value="Khmer"></option>
+          <option value="Burmese"></option>
+          <option value="Amharic"></option>
+          <option value="Yoruba"></option>
+          <option value="Igbo"></option>
+          <option value="Hausa"></option>
+          <option value="Javanese"></option>
+          <option value="Sundanese"></option>
+          <option value="Azerbaijani"></option>
+          <option value="Belarusian"></option>
+          <option value="Kazakh"></option>
+          <option value="Uzbek"></option>
+          <option value="Pashto"></option>
+          <option value="Tagalog"></option>
+          <option value="Cebuano"></option>
+        </datalist>
       </div>
       <div class="setting-group">
         <label for="targetLanguage">Target Language:</label>
-        <select id="targetLanguage">
-          <option value="English">English</option>
-          <option value="Persian">Persian</option>
-        </select>
+        <input type="text" id="targetLanguage" list="targetLanguages" placeholder="Enter target language" />
+        <datalist id="targetLanguages">
+          <option value="English"></option>
+          <option value="Persian"></option>
+          <option value="Chinese (Simplified)"></option>
+          <option value="Spanish"></option>
+          <option value="Hindi"></option>
+          <option value="Arabic"></option>
+          <option value="Bengali"></option>
+          <option value="Portuguese"></option>
+          <option value="Russian"></option>
+          <option value="Japanese"></option>
+          <option value="French"></option>
+          <option value="German"></option>
+          <option value="Urdu"></option>
+          <option value="Indonesian"></option>
+          <option value="Italian"></option>
+          <option value="Swahili"></option>
+          <option value="Marathi"></option>
+          <option value="Telugu"></option>
+          <option value="Tamil"></option>
+          <option value="Turkish"></option>
+          <option value="Vietnamese"></option>
+          <option value="Korean"></option>
+          <option value="Thai"></option>
+          <option value="Malay"></option>
+          <option value="Polish"></option>
+          <option value="Dutch"></option>
+          <option value="Filipino"></option>
+          <option value="Ukrainian"></option>
+          <option value="Romanian"></option>
+          <option value="Greek"></option>
+          <option value="Czech"></option>
+          <option value="Hungarian"></option>
+          <option value="Swedish"></option>
+          <option value="Norwegian"></option>
+          <option value="Danish"></option>
+          <option value="Finnish"></option>
+          <option value="Hebrew"></option>
+          <option value="Afrikaans"></option>
+          <option value="Albanian"></option>
+          <option value="Bulgarian"></option>
+          <option value="Catalan"></option>
+          <option value="Croatian"></option>
+          <option value="Estonian"></option>
+          <option value="Latvian"></option>
+          <option value="Lithuanian"></option>
+          <option value="Slovak"></option>
+          <option value="Slovenian"></option>
+          <option value="Serbian"></option>
+          <option value="Malayalam"></option>
+          <option value="Kannada"></option>
+          <option value="Odia"></option>
+          <option value="Punjabi"></option>
+          <option value="Sinhala"></option>
+          <option value="Nepali"></option>
+          <option value="Khmer"></option>
+          <option value="Burmese"></option>
+          <option value="Amharic"></option>
+          <option value="Yoruba"></option>
+          <option value="Igbo"></option>
+          <option value="Hausa"></option>
+          <option value="Javanese"></option>
+          <option value="Sundanese"></option>
+          <option value="Azerbaijani"></option>
+          <option value="Belarusian"></option>
+          <option value="Kazakh"></option>
+          <option value="Uzbek"></option>
+          <option value="Pashto"></option>
+          <option value="Tagalog"></option>
+          <option value="Cebuano"></option>
+        </datalist>
       </div>
       <h2>Prompt Template</h2>
       <div class="setting-group">
@@ -183,7 +323,7 @@
           id="promptTemplate"
           placeholder="Use keywords to customize your prompt..."
         ></textarea>
-        <p id="promptHelpText" style="font-size: smaller; color: #6b7280;">
+        <p id="promptHelpText">
           You can use the following keywords in your prompt template:
           <ul>
             <li id="sourceLangHelp"><code>${SOURCE}</code>: Represents the selected source language code. <span id="sourceLangName"></span></li>
