@@ -28,9 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const apiKey = document.getElementById("apiKey")?.value?.trim();
       const useMock = document.getElementById("useMock")?.checked;
       const apiUrl = document.getElementById("apiUrl")?.value?.trim();
-      const sourceLanguage = document.getElementById("sourceLanguage")?.value;
-      const targetLanguage = document.getElementById("targetLanguage")?.value;
-
+      const sourceLanguage = document.getElementById("sourceLanguage")?.value; // تغییر به دریافت از input
+      const targetLanguage = document.getElementById("targetLanguage")?.value; // تغییر به دریافت از input
       const promptTemplate = document
         .getElementById("promptTemplate")
         ?.value?.trim();
@@ -95,12 +94,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (apiUrlInput) {
         apiUrlInput.value = settings.API_URL || CONFIG.API_URL; // استفاده از مقدار پیش فرض از CONFIG
       }
-      const sourceLanguageSelect = document.getElementById("sourceLanguage");
-      if (sourceLanguageSelect)
-        sourceLanguageSelect.value = settings.sourceLanguage || "English";
-      const targetLanguageSelect = document.getElementById("targetLanguage");
-      if (targetLanguageSelect)
-        targetLanguageSelect.value = settings.targetLanguage || "Persian";
+      const sourceLanguageInput = document.getElementById("sourceLanguage"); // دریافت المنت input
+      if (sourceLanguageInput)
+        sourceLanguageInput.value = settings.sourceLanguage || "English"; // تنظیم مقدار input
+      const targetLanguageInput = document.getElementById("targetLanguage"); // دریافت المنت input
+      if (targetLanguageInput)
+        targetLanguageInput.value = settings.targetLanguage || "Persian"; // تنظیم مقدار input
       const promptTemplateInput = document.getElementById("promptTemplate");
       if (promptTemplateInput)
         promptTemplateInput.value =
