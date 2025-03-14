@@ -43,7 +43,7 @@ export default class TranslationHandler {
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
-    this.eventHandler = new EventHandler(this); // ایجاد نمونه EventHandler
+    this.eventHandler = new EventHandler(this);
 
     // اعتبارسنجی استراتژی‌ها
     Object.entries(this.strategies).forEach(([name, strategy]) => {
@@ -89,18 +89,18 @@ export default class TranslationHandler {
   }
 
   handleEditableFocus(element) {
-    this.elementManager.cleanup();
-    const icon = this.elementManager.createTranslateIcon(element);
-    this.eventHandler.setupIconBehavior(icon, element); // استفاده از متد EventHandler
-    state.activeTranslateIcon = icon;
+    this.eventHandler.handleEditableFocus(element);
   }
 
-  handleEditableBlur() {
+  handleEditableBlur_OLD() {
     setTimeout(() => {
       if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
         this.elementManager.cleanup();
       }
     }, 100);
+  }
+  handleEditableBlur() {
+    this.eventHandler.handleEditableBlur();
   }
 
   getDeepestTextNode(element) {
@@ -121,7 +121,6 @@ export default class TranslationHandler {
 
   /**
    * Main event handler router
-   * @param {Event} event - DOM event
    */
   async handleEvent(event) {
     await this.eventHandler.handleEvent(event);

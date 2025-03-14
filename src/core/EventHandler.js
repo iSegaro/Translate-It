@@ -12,6 +12,21 @@ export default class EventHandler {
     this.selectionModeActive = translationHandler.selectionModeActive;
   }
 
+  handleEditableFocus(element) {
+    this.elementManager.cleanup();
+    const icon = this.elementManager.createTranslateIcon(element);
+    this.setupIconBehavior(icon, element);
+    state.activeTranslateIcon = icon;
+  }
+
+  handleEditableBlur() {
+    setTimeout(() => {
+      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
+        this.elementManager.cleanup();
+      }
+    }, 100);
+  }
+
   async handleEvent(event) {
     try {
       if (this.isEscapeEvent(event)) {
