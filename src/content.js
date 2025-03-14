@@ -53,7 +53,7 @@ if (window.location.hostname === "web.whatsapp.com") {
   // بهبود مدیریت رویدادها برای واتساپ
   document.addEventListener("click", (e) => {
     if (state.selectionActive && e.target.closest('[role="textbox"]')) {
-      translationHandler.handleSelectionClick(e);
+      translationHandler.eventHandler.handleSelectionClick(e);
     }
   });
 }

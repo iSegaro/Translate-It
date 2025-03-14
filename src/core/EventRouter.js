@@ -39,7 +39,7 @@ export function setupEventListeners(translationHandler) {
 
       // تاخیر برای اجازه دادن به به‌روز شدن DOM
       setTimeout(() => {
-        translationHandler.handleSelectionClick(e);
+        translationHandler.eventHandler.handleSelectionClick(e);
       }, 100);
     }
   });

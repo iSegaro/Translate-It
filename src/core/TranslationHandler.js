@@ -15,7 +15,8 @@ import {
   detectPlatform,
   getPlatformName,
   detectPlatformByURL,
-} from "../utils/platformDetector.js"; // Import اضافه شد
+} from "../utils/platformDetector.js";
+import EventHandler from "./EventHandler.js";
 
 export default class TranslationHandler {
   constructor() {
@@ -42,6 +43,7 @@ export default class TranslationHandler {
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
+    this.eventHandler = new EventHandler(this); // ایجاد نمونه EventHandler
 
     // اعتبارسنجی استراتژی‌ها
     Object.entries(this.strategies).forEach(([name, strategy]) => {
@@ -58,9 +60,7 @@ export default class TranslationHandler {
 
     try {
       const platform =
-        params.target ?
-          detectPlatform(params.target) // استفاده از تابع import شده
-        : detectPlatformByURL(); // استفاده از تابع import شده
+        params.target ? detectPlatform(params.target) : detectPlatformByURL();
 
       // تنظیم حالت ترجمه
       state.translationMode = params.selectionRange ? "selection" : "field";
@@ -91,7 +91,7 @@ export default class TranslationHandler {
   handleEditableFocus(element) {
     this.elementManager.cleanup();
     const icon = this.elementManager.createTranslateIcon(element);
-    this.setupIconBehavior(icon, element);
+    this.eventHandler.setupIconBehavior(icon, element); // استفاده از متد EventHandler
     state.activeTranslateIcon = icon;
   }
 
@@ -124,125 +124,7 @@ export default class TranslationHandler {
    * @param {Event} event - DOM event
    */
   async handleEvent(event) {
-    try {
-      if (this.isEscapeEvent(event)) {
-        this.handleEscape(event);
-        return;
-      }
-
-      if (this.selectionModeActive && event.type === "click") {
-        await this.handleSelectionClick(event);
-        return;
-      }
-
-      if (this.isCtrlSlashEvent(event)) {
-        await this.handleCtrlSlash(event);
-        return;
-      }
-
-      if (this.selectionModeActive) {
-        // استفاده از selectionModeActive
-        await this.handleSelectionMode(event);
-        return;
-      }
-
-      if (this.isEditableTarget(event.target)) {
-        await this.handleEditableElement(event);
-      }
-    } catch (error) {
-      this.handleError(error); // Use bound handleError here
-    }
-  }
-
-  /**
-   * Handle click event when selection mode is active
-   * @param {MouseEvent} event
-   */
-  async handleSelectionClick(e) {
-    const targetElement = e.target;
-    const walker = document.createTreeWalker(
-      targetElement,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
-
-    let textNodes = [];
-    let texts = [];
-    let node;
-
-    while ((node = walker.nextNode())) {
-      if (node.textContent.trim()) {
-        textNodes.push(node);
-        texts.push(node.textContent.trim());
-      }
-    }
-
-    if (texts.length === 0) return;
-
-    try {
-      const statusNotification = this.notifier.show(
-        "در حال ترجمه...",
-        "status"
-      );
-
-      // تنظیم حالت ترجمه برای بازگردانی با ESC
-      state.translationMode = "selection";
-
-      // ذخیره Text Node و متن اصلی آن
-      textNodes.forEach((textNode, index) => {
-        // تولید شناسه یکتا
-        const uniqueId =
-          Math.random().toString(36).substring(2, 15) +
-          Math.random().toString(36).substring(2, 15);
-        textNode.parentElement.setAttribute("data-original-text-id", uniqueId); // اضافه کردن شناسه به والد گره متنی
-
-        state.originalTexts.set(uniqueId, {
-          // استفاده از شناسه یکتا به عنوان کلید
-          originalInnerHTML: textNode.parentElement.innerHTML, // ذخیره innerHTML والد
-          translatedText: "", // مقدار ترجمه شده بعدا به‌روزرسانی می‌شود
-          parent: textNode.parentElement, // ذخیره والد همچنان مفید است
-        });
-        console.log(
-          "handleSelectionClick: ذخیره innerHTML والد:",
-          textNode.parentElement.innerHTML,
-          "با شناسه:",
-          uniqueId,
-          "و والد:",
-          textNode.parentElement
-        );
-      });
-      console.log(
-        "handleSelectionClick: وضعیت state.originalTexts بعد از ذخیره:",
-        state.originalTexts
-      );
-
-      // ترجمه و جایگزینی
-      const translatedTexts = await Promise.all(texts.map(translateText));
-
-      textNodes.forEach((textNode, index) => {
-        textNode.textContent = translatedTexts[index];
-        // به‌روزرسانی متن ترجمه شده در state.originalTexts
-        const uniqueId = textNode.parentElement.getAttribute(
-          "data-original-text-id"
-        );
-        if (uniqueId) {
-          const data = state.originalTexts.get(uniqueId);
-          if (data) {
-            data.translatedText = translatedTexts[index];
-          }
-        }
-
-        this.elementManager.applyTextDirection(
-          textNode.parentElement,
-          translatedTexts[index]
-        );
-      });
-
-      this.notifier.dismiss(statusNotification);
-    } catch (error) {
-      this.handleError(error);
-    }
+    await this.eventHandler.handleEvent(event);
   }
 
   hasTextContent(element) {
@@ -320,136 +202,17 @@ export default class TranslationHandler {
     }
   }
 
-  async handleSelectionMode(event) {
-    if (event.type === "mouseover" || event.type === "mousemove") {
-      const newTarget = document.elementFromPoint(event.clientX, event.clientY);
-
-      if (newTarget && newTarget !== state.highlightedElement) {
-        this.elementManager.cleanup();
-
-        if (newTarget.innerText?.trim()) {
-          // اطمینان از وجود متن قبل از هایلایت
-          state.highlightedElement = newTarget;
-          newTarget.style.outline = CONFIG.HIGHLIGHT_STYLE;
-          newTarget.style.opacity = "0.9";
-        }
-      }
-    }
-  }
-
   handleEscape(event) {
-    event.stopPropagation();
-    this.selectionModeActive = false;
-    state.selectionActive = false;
-
-    if (state.translationMode === "selection") {
-      this.revertTranslations();
-    }
-
-    this.elementManager.cleanup();
+    this.eventHandler.handleEscape(event);
   }
 
   async handleCtrlSlash(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
-    try {
-      const { selection, activeElement } = this.getSelectionContext();
-      const isTextSelected = !selection.isCollapsed;
-
-      const text =
-        isTextSelected ?
-          selection.toString().trim()
-        : this.extractFromActiveElement(activeElement);
-
-      if (!text) return;
-
-      console.log(
-        "handleCtrlSlash: Calling processTranslation with params.target:",
-        activeElement
-      ); // افزودن این خط
-      await this.processTranslation({
-        text,
-        originalText: text, // ارسال متن اصلی به processTranslation
-        target: isTextSelected ? null : activeElement,
-        selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
-      });
-    } finally {
-      this.isProcessing = false;
-    }
+    await this.eventHandler.handleCtrlSlash(event);
   }
   isProcessing = false;
 
   async handleCtrlSelection(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) return;
-
-    const text = selection.toString().trim();
-    if (!text) return;
-
-    console.log(
-      "handleCtrlSelection: Calling processTranslation with params.target: null (selection)"
-    ); // افزودن این خط
-    await this.processTranslation({
-      text,
-      originalText: text, // ارسال متن اصلی به processTranslation
-      selectionRange: selection.getRangeAt(0),
-    });
-  }
-
-  // در TranslationHandler.js
-  async processTranslation(params) {
-    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
-    console.log(
-      "TranslationHandler: processTranslation started for text:",
-      params.text.substring(0, 20) + "...",
-      "originalText:",
-      params.originalText.substring(0, 20) + "..."
-    );
-
-    try {
-      const platform =
-        params.target ?
-          detectPlatform(params.target) // استفاده از تابع import شده
-        : detectPlatformByURL(); // استفاده از تابع import شده
-
-      // بررسی وجود استراتژی
-      if (
-        !this.strategies[platform] ||
-        typeof this.strategies[platform].extractText !== "function"
-      ) {
-        throw new Error(
-          `استراتژی ${platform} معتبر نیست یا متد extractText را ندارد.`
-        );
-      }
-
-      const translated = await translateText(params.text);
-
-      if (params.selectionRange) {
-        this.strategies[platform].replaceSelection(
-          params.selectionRange,
-          translated
-        );
-      } else if (params.target) {
-        await this.strategies[platform].updateElement(
-          params.target,
-          translated
-        );
-        if (platform !== "medium") {
-          this.elementManager.applyTextDirection(params.target, translated);
-        }
-      }
-    } catch (error) {
-      this.handleEnhancedError(error, params.target);
-    } finally {
-      this.notifier.dismiss(statusNotification);
-    }
+    await this.eventHandler.handleCtrlSelection(event);
   }
 
   revertTranslations() {
@@ -522,7 +285,7 @@ export default class TranslationHandler {
   }
 
   async updateTargetElement(target, translated) {
-    const platform = detectPlatform(target); // استفاده از تابع import شده
+    const platform = detectPlatform(target);
     await this.strategies[platform].updateElement(target, translated);
     if (platform !== "medium") {
       this.elementManager.applyTextDirection(target, translated);
@@ -577,41 +340,6 @@ export default class TranslationHandler {
     }, 5000);
   }
 
-  isCtrlSlashEvent(event) {
-    return (
-      (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
-    );
-  }
-
-  isEscapeEvent(event) {
-    return event.key === "Escape" && !event.repeat;
-  }
-
-  isCtrlSelectionEvent(event) {
-    console.log(
-      "isCtrlSelectionEvent:",
-      event.type,
-      event.ctrlKey,
-      window.getSelection().toString()
-    );
-    const selection = window.getSelection();
-
-    return (
-      event.ctrlKey &&
-      event.type === "selectionchange" &&
-      selection &&
-      !selection.isCollapsed
-    );
-  }
-
-  isEditableTarget(target) {
-    return (
-      target?.isContentEditable ||
-      ["INPUT", "TEXTAREA"].includes(target?.tagName) ||
-      (target?.closest && target.closest('[contenteditable="true"]'))
-    );
-  }
-
   getSelectionContext() {
     return {
       selection: window.getSelection(),
@@ -625,59 +353,21 @@ export default class TranslationHandler {
   }
 
   extractFromActiveElement(element) {
-    const platform = detectPlatform(element); // استفاده از تابع import شده
+    const platform = detectPlatform(element);
     return this.strategies[platform].extractText(element);
   }
 
   pasteContent(element, content) {
-    const platform = detectPlatform(element); // استفاده از تابع import شده
+    const platform = detectPlatform(element);
     this.strategies[platform].pasteContent(element, content);
   }
 
   async handleEditableElement(event) {
-    event.stopPropagation();
-    const target = event.target;
-
-    if (state.activeTranslateIcon) return;
-    this.elementManager.cleanup();
-
-    const translateIcon = this.elementManager.createTranslateIcon(target);
-    this.setupIconBehavior(translateIcon, target);
-  }
-
-  setupIconBehavior(icon, target) {
-    const clickHandler = async (e) => {
-      try {
-        e.preventDefault();
-        icon.remove();
-
-        const text =
-          this.strategies[detectPlatform(target)].extractText(target); // استفاده از تابع import شده
-        if (!text) return;
-
-        const statusNotification = this.notifier.show(
-          "در حال ترجمه...",
-          "status"
-        );
-        try {
-          const translated = await translateText(text);
-          await this.updateTargetElement(target, translated);
-        } finally {
-          this.notifier.dismiss(statusNotification);
-        }
-      } catch (error) {
-        this.elementManager.cleanup();
-        this.handleError(error); // Use bound handleError here
-      }
-    };
-
-    icon.addEventListener("click", clickHandler);
-    document.body.appendChild(icon);
-    state.activeTranslateIcon = icon;
+    await this.eventHandler.handleEditableElement(event);
   }
 
   async processElementTranslation(element) {
-    const text = this.strategies[detectPlatform(element)].extractText(element); // استفاده از تابع import شده
+    const text = this.strategies[detectPlatform(element)].extractText(element);
     if (!text) return;
 
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
@@ -690,7 +380,6 @@ export default class TranslationHandler {
       await this.updateTargetElement(element, translated);
 
       if (detectPlatform(element) !== "medium") {
-        // استفاده از تابع import شده
         this.elementManager.applyTextDirection(element, translated);
       }
       console.log(
@@ -703,13 +392,6 @@ export default class TranslationHandler {
         "TranslationHandler: processElementTranslation FINALLY block - status notification dismissed."
       );
     }
-  }
-
-  getSelectionContext() {
-    return {
-      selection: window.getSelection(),
-      activeElement: document.activeElement,
-    };
   }
 
   static debounce = (func, wait) => {
