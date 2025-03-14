@@ -40,6 +40,7 @@ export default class TranslationHandler {
     this.elementManager = new ElementManager();
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
     this.handleError = this.handleError.bind(this); // Bind handleError
+    this.handleEnhancedError = this.handleError.bind(this); // Bind handleEnhancedError
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
@@ -392,14 +393,6 @@ export default class TranslationHandler {
       );
     }
   }
-
-  static debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  };
 
   // این تابع باید از content.js فراخوانی شود
   activateSelectionMode() {

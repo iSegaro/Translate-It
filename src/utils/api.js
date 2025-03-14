@@ -1,12 +1,22 @@
 // src/utils/api.js
-import { CONFIG, getApiKeyAsync } from "../config.js";
+import {
+  CONFIG,
+  getApiKeyAsync,
+  getUseMockAsync,
+  getApiUrlAsync,
+  getSourceLanguageAsync,
+  getTargetLanguageAsync,
+  getPromptEnglishAsync,
+  getPromptPersianAsync,
+} from "../config.js";
 import { delay } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
 
 const MOCK_DELAY = 500;
 
 export const translateText = async (text) => {
-  if (CONFIG.USE_MOCK) {
+  const useMock = await getUseMockAsync();
+  if (useMock) {
     await delay(MOCK_DELAY);
     const isPersian = isPersianText(text);
     return isPersian ?
@@ -20,12 +30,29 @@ export const translateText = async (text) => {
       throw new Error("API key is missing");
     }
 
-    const prompt =
-      isPersianText(text) ?
-        CONFIG.PROMPT_ENGLISH + text
-      : CONFIG.PROMPT_PERSIAN + text;
+    const sourceLang = await getSourceLanguageAsync();
+    const targetLang = await getTargetLanguageAsync();
 
-    const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
+    let prompt = "";
+    if (sourceLang === "fa" && targetLang === "en") {
+      const promptEnglish = await getPromptEnglishAsync();
+      prompt = promptEnglish + text;
+    } else if (sourceLang === "en" && targetLang === "fa") {
+      const promptPersian = await getPromptPersianAsync();
+      prompt = promptPersian + text;
+    } else if (sourceLang === targetLang) {
+      return text; // No translation needed
+    } else {
+      // Handle other language pairs or default to a specific direction
+      const promptDefault =
+        targetLang === "en" ?
+          await getPromptEnglishAsync()
+        : await getPromptPersianAsync();
+      prompt = promptDefault + text;
+    }
+
+    const apiUrl = await getApiUrlAsync();
+    const response = await fetch(`${apiUrl}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -59,8 +86,6 @@ export const translateText = async (text) => {
   } catch (error) {
     // مدیریت اختصاصی خطای "Extension context invalid"
     if (error.message.includes("Extension context invalid")) {
-      // در صورت امکان، می‌توان محیط اکستنشن را ریستارت کرد:
-      // chrome.runtime.reload();
       throw new Error(
         "Extension context invalid. Please refresh the page to continue."
       );

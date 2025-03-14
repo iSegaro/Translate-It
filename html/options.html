@@ -33,6 +33,14 @@
         width: 100%;
         max-width: 400px;
       }
+      .setting-group {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .setting-group:last-child {
+        border-bottom: none;
+      }
       label {
         font-size: 14px;
         font-weight: 500;
@@ -40,7 +48,8 @@
         margin-bottom: 8px;
         display: block;
       }
-      input {
+      input[type="text"],
+      select {
         width: 100%;
         padding: 10px;
         border: 1px solid #d1d5db;
@@ -50,10 +59,14 @@
         margin-bottom: 16px;
         box-sizing: border-box;
       }
-      input:focus {
+      input:focus,
+      select:focus {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+      input[type="checkbox"] {
+        margin-right: 8px;
       }
       button {
         background-color: #3b82f6;
@@ -119,10 +132,34 @@
       <p id="NameVersion"></p>
     </div>
     <div class="container">
-      <h2>API Settings</h2>
-      <label for="apiKey">Enter your API Key:</label>
-      <input type="text" id="apiKey" placeholder="Paste your API key here" />
-      <button id="saveApiKey">Save API Key</button>
+      <h2>General Settings</h2>
+      <div class="setting-group">
+        <label for="apiKey">Enter your API Key:</label>
+        <input type="text" id="apiKey" placeholder="Paste your API key here" />
+      </div>
+      <div class="setting-group">
+        <label for="useMock">Use Mock Data:</label>
+        <input type="checkbox" id="useMock" />
+      </div>
+      <div class="setting-group">
+        <label for="apiUrl">API URL:</label>
+        <input type="text" id="apiUrl" placeholder="Enter API URL" />
+      </div>
+      <div class="setting-group">
+        <label for="sourceLanguage">Source Language:</label>
+        <select id="sourceLanguage">
+          <option value="en">English</option>
+          <option value="fa">Persian</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="targetLanguage">Target Language:</label>
+        <select id="targetLanguage">
+          <option value="en">English</option>
+          <option value="fa">Persian</option>
+        </select>
+      </div>
+      <button id="saveSettings">Save Settings</button>
       <p id="status"></p>
     </div>
   </body>

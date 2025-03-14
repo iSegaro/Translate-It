@@ -1,9 +1,9 @@
 // src/config.js
 import { isExtensionContextValid } from "./utils/helpers.js";
 
-// Shared configuration
+// Shared configuration (initial defaults)
 export const CONFIG = {
-  USE_MOCK: false,
+  USE_MOCK: true,
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   PROMPT_ENGLISH:
@@ -39,7 +39,7 @@ export const state = {
   translationMode: null,
 };
 
-export const getApiKeyAsync = async () => {
+export const getSettingsAsync = async () => {
   return new Promise((resolve, reject) => {
     try {
       if (!isExtensionContextValid()) {
@@ -52,18 +52,61 @@ export const getApiKeyAsync = async () => {
         return;
       }
 
-      chrome.storage.sync.get(["apiKey"], (result) => {
-        if (chrome.runtime.lastError) {
-          reject(
-            new Error(`System error: ${chrome.runtime.lastError.message}`)
-          );
-          return;
-        }
+      chrome.storage.sync.get(
+        ["apiKey", "USE_MOCK", "API_URL", "sourceLanguage", "targetLanguage"],
+        (result) => {
+          if (chrome.runtime.lastError) {
+            reject(
+              new Error(`System error: ${chrome.runtime.lastError.message}`)
+            );
+            return;
+          }
 
-        resolve(result.apiKey || "");
-      });
+          resolve({
+            apiKey: result.apiKey || "",
+            USE_MOCK:
+              result.USE_MOCK !== undefined ? result.USE_MOCK : CONFIG.USE_MOCK,
+            API_URL: result.API_URL || CONFIG.API_URL,
+            sourceLanguage: result.sourceLanguage || "en",
+            targetLanguage: result.targetLanguage || "fa",
+          });
+        }
+      );
     } catch (error) {
       reject(new Error(`Access error: ${error.message}`));
     }
   });
+};
+
+export const getApiKeyAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.apiKey;
+};
+
+export const getUseMockAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.USE_MOCK;
+};
+
+export const getApiUrlAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.API_URL;
+};
+
+export const getSourceLanguageAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.sourceLanguage;
+};
+
+export const getTargetLanguageAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.targetLanguage;
+};
+
+export const getPromptEnglishAsync = async () => {
+  return CONFIG.PROMPT_ENGLISH;
+};
+
+export const getPromptPersianAsync = async () => {
+  return CONFIG.PROMPT_PERSIAN;
 };
