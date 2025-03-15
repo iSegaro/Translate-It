@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveSettingsButton = document.getElementById("saveSettings");
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
+  const geminiApiSettings = document.getElementById("geminiApiSettings");
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
@@ -27,23 +28,26 @@ document.addEventListener("DOMContentLoaded", () => {
     if (apiKeyInput) apiKeyInput.disabled = isMockEnabled;
     if (apiUrlInput) apiUrlInput.disabled = isMockEnabled;
     if (promptTemplateInput) promptTemplateInput.disabled = isMockEnabled;
-    if (saveSettingsButton) saveSettingsButton.disabled = isMockEnabled;
-    // زبان‌ها همیشه فعال هستند
     sourceLanguageInput.disabled = false;
     targetLanguageInput.disabled = false;
   }
 
   function toggleCustomApiSettings() {
     const isCustom = translationApiSelect.value === "custom";
+    const isGemini = translationApiSelect.value === "gemini";
+
+    updateMockState(useMockCheckbox.checked); // ابتدا وضعیت Mock را به‌روزرسانی کنید
+
     customApiSettings.style.display = isCustom ? "block" : "none";
-    if (apiKeySettingGroup) {
-      apiKeySettingGroup.style.display =
-        !isCustom && !useMockCheckbox.checked ? "block" : "none";
+
+    if (geminiApiSettings) {
+      geminiApiSettings.style.display = isGemini ? "block" : "none";
     }
+
+    // نمایش فیلد API URL فقط در صورتی که Gemini انتخاب شده باشد
     if (apiUrlSettingGroup) {
-      apiUrlSettingGroup.style.display = !isCustom ? "block" : "none";
+      apiUrlSettingGroup.style.display = isGemini ? "block" : "none";
     }
-    updateMockState(useMockCheckbox.checked); // به‌روزرسانی وضعیت غیرفعال بودن المنت‌ها
   }
 
   toggleCustomApiSettings(); // تنظیم حالت اولیه
@@ -56,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
 
   useMockCheckbox.addEventListener("change", () => {
-    toggleCustomApiSettings(); // با تغییر وضعیت Mock، وضعیت نمایش API Key و URL و غیرفعال بودن المنت‌ها را به‌روزرسانی می‌کنیم
+    toggleCustomApiSettings();
   });
 
   document
@@ -162,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("customApiModel").value =
           settings.customApiModel || CONFIG.CUSTOM_API_MODEL;
       toggleCustomApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
-      updateMockState(settings.USE_MOCK); // تنظیم وضعیت غیرفعال بودن المنت‌ها هنگام بارگیری
+      updateMockState(settings.USE_MOCK);
       await updatePromptHelpText();
     } catch (error) {
       console.error("Error loading settings:", error);
