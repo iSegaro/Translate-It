@@ -86,10 +86,10 @@ export default class NotificationManager {
     }
 
     const baseNotification = {
-      error: { icon: "❌", duration: 5000 },
-      warning: { icon: "⚠️", duration: 4000 },
-      success: { icon: "✅", duration: 3000 },
-      info: { icon: "ℹ️", duration: 3000 },
+      error: { icon: CONFIG.ICON_ERROR, duration: 5000 },
+      warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
+      success: { icon: CONFIG.ICON_SECCESS, duration: 3000 },
+      info: { icon: CONFIG.ICON_INFO, duration: 3000 },
     };
 
     const config = baseNotification[type] || baseNotification.info;
@@ -98,7 +98,7 @@ export default class NotificationManager {
     const notification = document.createElement("div");
     notification.className = "translation-notification";
 
-    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "💠";
+    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "ℹ️";
 
     notification.innerHTML = `
       <span class="notification-icon">${icon}</span>
@@ -132,8 +132,8 @@ export default class NotificationManager {
   getBackgroundColor(type) {
     const colors = {
       error: "rgba(255,0,0,0.8)",
-      success: "rgba(0,128,0,0.8)",
-      status: "rgba(0,0,0,0.7)",
+      success: "rgba(0,128,0,0.7)",
+      status: "rgba(0,0,0,0.4)",
       warning: "rgba(255,165,0,0.8)",
       info: "rgba(30,144,255,0.8)",
     };

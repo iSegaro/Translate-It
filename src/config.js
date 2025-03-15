@@ -33,7 +33,7 @@ export const CONFIG = {
   ICON_SECCESS: "✅ ",
   ICON_STATUS: "🔄 ",
   ICON_WARNING: "⚠️ ",
-  ICON_INFO: "💠 ",
+  ICON_INFO: "ℹ️ ",
   RTL_REGEX: /[\u0600-\u06FF]/,
   PERSIAN_REGEX:
     /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
