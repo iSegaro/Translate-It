@@ -93,7 +93,8 @@ export default class EventHandler {
     try {
       const statusNotification = this.notifier.show(
         "در حال ترجمه...",
-        "status"
+        "status",
+        false
       );
 
       state.translationMode = "selection";
@@ -142,8 +143,6 @@ export default class EventHandler {
           translatedTexts[index]
         );
       });
-
-      this.notifier.dismiss(statusNotification);
     } catch (error) {
       console.debug("Error caught in handleSelectionClick:", error);
       // بررسی دقیق‌تر برای خطاهای شبکه
@@ -159,6 +158,8 @@ export default class EventHandler {
       //   type: ErrorTypes.SERVICE,
       //   context: "selection-translation",
       // });
+    } finally {
+      this.notifier.dismiss(statusNotification);
     }
   }
 
