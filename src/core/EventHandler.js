@@ -80,6 +80,7 @@ export default class EventHandler {
     let textNodes = [];
     let texts = [];
     let node;
+    let statusNotification;
 
     while ((node = walker.nextNode())) {
       if (node.textContent.trim()) {
@@ -91,7 +92,7 @@ export default class EventHandler {
     if (texts.length === 0) return;
 
     try {
-      const statusNotification = this.notifier.show(
+      statusNotification = this.notifier.show(
         "در حال ترجمه...",
         "status",
         false
@@ -143,6 +144,8 @@ export default class EventHandler {
           translatedTexts[index]
         );
       });
+
+      this.notifier.dismiss(statusNotification);
     } catch (error) {
       console.debug("Error caught in handleSelectionClick:", error);
       // بررسی دقیق‌تر برای خطاهای شبکه
@@ -150,7 +153,14 @@ export default class EventHandler {
         error?.type === ErrorTypes.NETWORK ||
         error?.message?.includes("Failed to fetch")
       ) {
+        if (statusNotification) {
+          this.notifier.dismiss(statusNotification); // حذف پیغام در صورت بروز خطا
+        }
         return; // اگر خطای شبکه بود، از هندل کردن مجدد خودداری کنید
+      }
+
+      if (statusNotification) {
+        this.notifier.dismiss(statusNotification); // اطمینان از حذف پیغام در صورت بروز هر خطای دیگر
       }
 
       // غیرفعال کردن مدیریت خطای سرویس در این سطح
@@ -158,8 +168,6 @@ export default class EventHandler {
       //   type: ErrorTypes.SERVICE,
       //   context: "selection-translation",
       // });
-    } finally {
-      this.notifier.dismiss(statusNotification);
     }
   }
 
@@ -276,6 +284,7 @@ export default class EventHandler {
 
   setupIconBehavior(icon, target) {
     const clickHandler = async (e) => {
+      let statusNotification; // تعریف متغیر برای نگهداری شیء نوتیفیکیشن
       try {
         e.preventDefault();
         icon.remove();
@@ -284,15 +293,19 @@ export default class EventHandler {
         const text = this.strategies[platform].extractText(target);
         if (!text) return;
 
-        const statusNotification = this.notifier.show(
+        statusNotification = this.notifier.show(
+          // ذخیره شیء نوتیفیکیشن
           "در حال ترجمه...",
-          "status"
+          "status",
+          false // غیرفعال کردن حذف خودکار
         );
         try {
           const translated = await translateText(text);
           await this.translationHandler.updateTargetElement(target, translated);
         } finally {
-          this.notifier.dismiss(statusNotification);
+          if (statusNotification) {
+            this.notifier.dismiss(statusNotification); // حذف پیغام پس از اتمام ترجمه یا بروز خطا
+          }
         }
       } catch (error) {
         this.elementManager.cleanup();
@@ -303,6 +316,9 @@ export default class EventHandler {
           context: "translate-icon-click",
           element: target,
         });
+        if (statusNotification) {
+          this.notifier.dismiss(statusNotification); // اطمینان از حذف پیغام در صورت بروز خطای کلی
+        }
       }
     };
 
