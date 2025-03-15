@@ -17,10 +17,14 @@ import {
   detectPlatformByURL,
 } from "../utils/platformDetector.js";
 import EventHandler from "./EventHandler.js";
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export default class TranslationHandler {
   constructor() {
+    this.errorHandler = new ErrorHandler(this.notifier);
+    this.ErrorTypes = ErrorTypes;
     this.notifier = new NotificationManager();
+    this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
       whatsapp: new WhatsAppStrategy(this.notifier),
@@ -38,9 +42,6 @@ export default class TranslationHandler {
     }
 
     this.elementManager = new ElementManager();
-    this.handleEvent = debounce(this.handleEvent.bind(this), 300);
-    this.handleError = this.handleError.bind(this); // Bind handleError
-    this.handleEnhancedError = this.handleError.bind(this); // Bind handleEnhancedError
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
@@ -83,7 +84,11 @@ export default class TranslationHandler {
         }
       }
     } catch (error) {
-      this.handleEnhancedError(error, params.target);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        element: params.target,
+        context: "translation-process",
+      });
     } finally {
       this.notifier.dismiss(statusNotification);
     }
@@ -290,54 +295,6 @@ export default class TranslationHandler {
     if (platform !== "medium") {
       this.elementManager.applyTextDirection(target, translated);
     }
-  }
-
-  /**
-   * مدیریت خطاهای سیستمی و نمایش به کاربر
-   * @param {Error} error - شی خطا
-   */
-  handleError(error) {
-    let message = "خطای ناشناخته";
-    let type = "error";
-    let onClick;
-
-    if (error.message.includes("API key")) {
-      message =
-        "کلید API نامعتبر است. برای تنظیم به صفحه extension options مراجعه کنید.";
-      onClick = () => openOptionsPage();
-    } else if (error.message === "EXTENSION_RELOADED") {
-      message = "لطفا صفحه را رفرش کنید (Ctrl+R)";
-      type = "warning";
-    } else if (
-      error.message.includes("model is overloaded") ||
-      error.message.includes("size exceeded") ||
-      error.message.includes("Quota exceeded")
-    ) {
-      message = "The model is overloaded. Please try again later.";
-      type = "warning";
-    } else if (error.message.includes("API key is missing")) {
-      message = "API key is missing. Please set it in the extension options.";
-      onClick = () => openOptionsPage();
-      type = "error";
-    } else if (error.message.includes("medium field")) {
-      message = "لطفا روی فیلد متن مدیوم کلیک کنید";
-      type = "warning";
-    } else {
-      message = "خطای ارتباط با سرویس ترجمه";
-      console.error("Translation Error:", error);
-    }
-
-    this.processError(message, type, onClick);
-  }
-
-  processError(message, type, onClick) {
-    if (this.displayedErrors.has(message)) return;
-
-    this.notifier.show(message, type, true, 5000, onClick);
-    this.displayedErrors.add(message);
-    setTimeout(() => {
-      this.displayedErrors.delete(message);
-    }, 5000);
   }
 
   getSelectionContext() {

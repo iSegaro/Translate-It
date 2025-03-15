@@ -1,5 +1,15 @@
 // src/config.js
 
+export const TRANSLATION_ERRORS = {
+  INVALID_CONTEXT:
+    "Extension context invalid. Please refresh the page to continue.",
+  MISSING_API_KEY: "API key is missing",
+  SERVICE_OVERLOADED: "Translation service overloaded:",
+  NETWORK_FAILURE: "Connection to server failed",
+  INVALID_RESPONSE: "Invalid API response format",
+  CONTEXT_LOST: "Extension context lost",
+};
+
 // Shared configuration (initial defaults)
 export const CONFIG = {
   USE_MOCK: false,

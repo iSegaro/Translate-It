@@ -14,6 +14,9 @@ export default class EventHandler {
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
     this.selectionModeActive = translationHandler.selectionModeActive;
+    this.handleEvent = this.handleEvent.bind(this);
+    this.handleSelectionClick = this.handleSelectionClick.bind(this);
+    this.handleEscape = this.handleEscape.bind(this);
   }
 
   handleEditableFocus(element) {
@@ -57,7 +60,10 @@ export default class EventHandler {
         await this.handleEditableElement(event);
       }
     } catch (error) {
-      this.translationHandler.handleError(error);
+      this.translationHandler.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "event-handling",
+      });
     }
   }
 
@@ -138,7 +144,10 @@ export default class EventHandler {
 
       this.notifier.dismiss(statusNotification);
     } catch (error) {
-      this.translationHandler.handleError(error);
+      this.translationHandler.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "selection-translation",
+      });
     }
   }
 

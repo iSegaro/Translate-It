@@ -79,10 +79,10 @@ export default class ElementManager {
         const translated = await translateText(text);
         await this.updateTargetElement(target, translated);
       } catch (error) {
-        this.notifier.show(error.message, "error");
-      } finally {
-        icon.remove();
-        this.notifier.dismiss(statusNotification);
+        this.translationHandler.errorHandler.handle(error, {
+          type: ErrorTypes.NETWORK,
+          element: target,
+        });
       }
     };
 
