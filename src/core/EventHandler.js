@@ -5,6 +5,7 @@ import {
   detectPlatform,
   detectPlatformByURL,
 } from "../utils/platformDetector.js";
+import { ErrorTypes } from "../services/ErrorService.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -144,10 +145,20 @@ export default class EventHandler {
 
       this.notifier.dismiss(statusNotification);
     } catch (error) {
-      this.translationHandler.errorHandler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: "selection-translation",
-      });
+      console.debug("Error caught in handleSelectionClick:", error);
+      // بررسی دقیق‌تر برای خطاهای شبکه
+      if (
+        error?.type === ErrorTypes.NETWORK ||
+        error?.message?.includes("Failed to fetch")
+      ) {
+        return; // اگر خطای شبکه بود، از هندل کردن مجدد خودداری کنید
+      }
+
+      // غیرفعال کردن مدیریت خطای سرویس در این سطح
+      // this.translationHandler.errorHandler.handle(error, {
+      //   type: ErrorTypes.SERVICE,
+      //   context: "selection-translation",
+      // });
     }
   }
 
@@ -208,6 +219,13 @@ export default class EventHandler {
         target: isTextSelected ? null : activeElement,
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.translationHandler.errorHandler.handle(normalizedError, {
+        type: ErrorTypes.UI,
+        context: "ctrl-selection",
+      });
     } finally {
       this.isProcessing = false;
     }
@@ -217,20 +235,31 @@ export default class EventHandler {
     event.preventDefault();
     event.stopPropagation();
 
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) return;
+    try {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) return;
 
-    const text = selection.toString().trim();
-    if (!text) return;
+      const text = selection.toString().trim();
+      if (!text) return;
 
-    console.log(
-      "handleCtrlSelection: Calling processTranslation with params.target: null (selection)"
-    );
-    await this.translationHandler.processTranslation({
-      text,
-      originalText: text,
-      selectionRange: selection.getRangeAt(0),
-    });
+      console.log(
+        "handleCtrlSelection: Calling processTranslation with params.target: null (selection)"
+      );
+      await this.translationHandler.processTranslation({
+        text,
+        originalText: text,
+        selectionRange: selection.getRangeAt(0),
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.translationHandler.errorHandler.handle(normalizedError, {
+        type: ErrorTypes.UI,
+        context: "ctrl-selection",
+      });
+    } finally {
+      this.isProcessing = false;
+    }
   }
 
   async handleEditableElement(event) {
@@ -266,7 +295,13 @@ export default class EventHandler {
         }
       } catch (error) {
         this.elementManager.cleanup();
-        this.translationHandler.handleError(error);
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        this.translationHandler.errorHandler.handle(normalizedError, {
+          type: ErrorTypes.UI,
+          context: "translate-icon-click",
+          element: target,
+        });
       }
     };
 

@@ -75,13 +75,7 @@ export default class TranslationHandler {
           translated
         );
       } else if (params.target) {
-        await this.strategies[platform].updateElement(
-          params.target,
-          translated
-        );
-        if (platform !== "medium") {
-          this.elementManager.applyTextDirection(params.target, translated);
-        }
+        await this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -98,13 +92,6 @@ export default class TranslationHandler {
     this.eventHandler.handleEditableFocus(element);
   }
 
-  handleEditableBlur_OLD() {
-    setTimeout(() => {
-      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
-        this.elementManager.cleanup();
-      }
-    }, 100);
-  }
   handleEditableBlur() {
     this.eventHandler.handleEditableBlur();
   }
@@ -203,8 +190,15 @@ export default class TranslationHandler {
         );
       });
     } catch (error) {
+      console.error("Error caught in translateTextNodesInElement:", error); // اضافه کردن لاگ برای بررسی نوع خطا
       this.handleError(error);
     }
+  }
+
+  handleError(error, meta = {}) {
+    const normalizedError =
+      error instanceof Error ? error : new Error(String(error));
+    this.errorHandler.handle(normalizedError, meta);
   }
 
   handleEscape(event) {
@@ -290,10 +284,18 @@ export default class TranslationHandler {
   }
 
   async updateTargetElement(target, translated) {
-    const platform = detectPlatform(target);
-    await this.strategies[platform].updateElement(target, translated);
-    if (platform !== "medium") {
-      this.elementManager.applyTextDirection(target, translated);
+    try {
+      const platform = detectPlatform(target);
+      await this.strategies[platform].updateElement(target, translated);
+      if (platform !== "medium") {
+        this.elementManager.applyTextDirection(target, translated);
+      }
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI, // Or SERVICE depending on the error
+        context: "update-target-element",
+        element: target,
+      });
     }
   }
 

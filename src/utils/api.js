@@ -36,7 +36,10 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
   ]);
 
   if (!apiKey) {
-    throw errorHandler.handle(new Error(TRANSLATION_ERRORS.MISSING_API_KEY), {
+    const error = new Error(TRANSLATION_ERRORS.MISSING_API_KEY);
+    error.statusCode = 401;
+    error.type = ErrorTypes.API;
+    throw errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: 401,
     });
@@ -53,8 +56,10 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || response.statusText;
-
-      throw errorHandler.handle(new Error(errorMessage), {
+      const error = new Error(errorMessage);
+      error.statusCode = response.status;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         service: "gemini",
@@ -64,7 +69,10 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
     const data = await response.json();
 
     if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw errorHandler.handle(new Error("Invalid response format"), {
+      const error = new Error("Invalid response format");
+      error.statusCode = 500;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
       });
@@ -72,6 +80,9 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
 
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
+    error.type = ErrorTypes.API;
+    error.statusCode = error.statusCode || 500;
+    error.context = "gemini-translation";
     throw errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
@@ -100,7 +111,10 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw errorHandler.handle(new Error(errorText), {
+      const error = new Error(errorText);
+      error.statusCode = response.status;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         service: "custom-api",
@@ -110,7 +124,10 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
     const data = await response.json();
 
     if (typeof data?.response !== "string") {
-      throw errorHandler.handle(new Error("Invalid custom API response"), {
+      const error = new Error("Invalid custom API response");
+      error.statusCode = 500;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
       });
@@ -118,12 +135,17 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
 
     return data.response;
   } catch (error) {
+    error.type = ErrorTypes.NETWORK;
+    error.context = "custom-translation";
+    error.isCustomNetworkError = true; // اضافه کردن flag
     throw errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
       context: "custom-translation",
     });
   }
 }
+
+// src/utils/api.js
 
 export const translateText = async (text) => {
   if (await getUseMockAsync()) {
@@ -146,16 +168,20 @@ export const translateText = async (text) => {
       case "custom":
         return await handleCustomTranslation(text, sourceLang, targetLang);
       default:
-        throw errorHandler.handle(
-          new Error("Invalid translation API selected"),
-          {
-            type: ErrorTypes.VALIDATION,
-            statusCode: 400,
-          }
-        );
+        const error = new Error("Invalid translation API selected");
+        error.type = ErrorTypes.VALIDATION;
+        error.statusCode = 400;
+        throw errorHandler.handle(error, {
+          type: ErrorTypes.VALIDATION,
+          statusCode: 400,
+        });
     }
   } catch (error) {
+    console.debug("Error caught in translateText:", error);
+    // مدیریت خطاهای مربوط به context
     if (error.message.includes("Extension context invalid")) {
+      error.type = ErrorTypes.CONTEXT;
+      error.statusCode = 403;
       throw errorHandler.handle(error, {
         type: ErrorTypes.CONTEXT,
         statusCode: 403,
@@ -163,8 +189,19 @@ export const translateText = async (text) => {
     }
 
     // مدیریت خطاهای شبکه
-    if (error.message.includes("Failed to fetch")) {
-      throw errorHandler.handle(error, {
+    if (
+      error.type === ErrorTypes.NETWORK ||
+      error.message.includes("Failed to fetch")
+    ) {
+      // اگر خطا از handleCustomTranslation آمده و قبلاً به عنوان NETWORK handle شده است، رد شود
+      if (error.isCustomNetworkError) {
+        return;
+      }
+      console.deb("Error caught in translateText:Network:", error);
+      const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
+      networkError.type = ErrorTypes.NETWORK;
+      networkError.statusCode = 503;
+      throw errorHandler.handle(networkError, {
         type: ErrorTypes.NETWORK,
         statusCode: 503,
       });
@@ -172,10 +209,15 @@ export const translateText = async (text) => {
 
     // خطاهای از قبل handle شده نیاز به بازنویسی ندارند
     if (error.isHandled) {
+      console.debug("Error caught in translateText:isHandled:", error);
       return error;
     }
 
     // سایر خطاها
+    console.debug("Error caught in translateText:OtherErrors:", error);
+    error.type = ErrorTypes.SERVICE;
+    error.statusCode = error.statusCode || 500;
+    error.context = "translation-service";
     throw errorHandler.handle(error, {
       type: ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
