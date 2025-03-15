@@ -1,9 +1,10 @@
 // src/config.js
-import { isExtensionContextValid } from "./utils/helpers.js";
 
 // Shared configuration (initial defaults)
 export const CONFIG = {
   USE_MOCK: false,
+  CUSTOM_API_URL: "http://localhost:6969",
+  CUSTOM_API_MODEL: "gemini-1.5-flash",
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
@@ -73,4 +74,19 @@ export const getTargetLanguageAsync = async () => {
 export const getPromptAsync = async () => {
   const settings = await getSettingsAsync();
   return settings.promptTemplate;
+};
+
+export const getTranslationApiAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.translationApi || "gemini";
+};
+
+export const getCustomApiUrlAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.customApiUrl || CONFIG.CUSTOM_API_URL;
+};
+
+export const getCustomApiModelAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.customApiModel || CONFIG.CUSTOM_API_MODEL;
 };

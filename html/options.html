@@ -155,12 +155,31 @@
     <div class="container">
       <h2>General Settings</h2>
       <div class="setting-group">
-        <label for="apiKey">Enter your API Key:</label>
-        <input type="text" id="apiKey" placeholder="Paste your API key here" />
-      </div>
-      <div class="setting-group">
         <label for="useMock">Use Mock Data:</label>
         <input type="checkbox" id="useMock" />
+      </div>
+
+      <div class="setting-group">
+        <label for="translationApi">Translation API:</label>
+        <select id="translationApi">
+          <option value="gemini">Gemini API</option>
+          <option value="custom">Custom API</option>
+        </select>
+      </div>
+      <div id="customApiSettings" style="display: none;">
+        <div class="setting-group">
+          <label for="customApiUrl">Custom API URL:</label>
+          <input type="text" id="customApiUrl" placeholder="Enter custom API URL" />
+        </div>
+        <div class="setting-group">
+          <label for="customApiModel">Custom API Model:</label>
+          <input type="text" id="customApiModel" placeholder="Enter custom API model (optional)" />
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label for="apiKey">Enter your API Key:</label>
+        <input type="text" id="apiKey" placeholder="Paste your API key here" />
       </div>
       <div class="setting-group">
         <label for="apiUrl">API URL:</label>
