@@ -13,8 +13,8 @@ export const TRANSLATION_ERRORS = {
 // Shared configuration (initial defaults)
 export const CONFIG = {
   USE_MOCK: false,
-  CUSTOM_API_URL: "http://localhost:6969",
-  CUSTOM_API_MODEL: "gemini-1.5-flash",
+  CUSTOM_API_URL: "http://localhost:6969/translate",
+  CUSTOM_API_MODEL: "gemini-2.0-flash",
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
