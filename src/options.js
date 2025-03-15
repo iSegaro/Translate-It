@@ -4,10 +4,46 @@ import { getSettingsAsync, CONFIG } from "./config.js";
 document.addEventListener("DOMContentLoaded", () => {
   const translationApiSelect = document.getElementById("translationApi");
   const customApiSettings = document.getElementById("customApiSettings");
+  const apiKeySettingGroup = document
+    .getElementById("apiKey")
+    ?.closest(".setting-group");
+  const apiUrlSettingGroup = document
+    .getElementById("apiUrl")
+    ?.closest(".setting-group");
+  const useMockCheckbox = document.getElementById("useMock");
+  const customApiUrlInput = document.getElementById("customApiUrl");
+  const customApiModelInput = document.getElementById("customApiModel");
+  const apiKeyInput = document.getElementById("apiKey");
+  const apiUrlInput = document.getElementById("apiUrl");
+  const promptTemplateInput = document.getElementById("promptTemplate");
+  const saveSettingsButton = document.getElementById("saveSettings");
+  const sourceLanguageInput = document.getElementById("sourceLanguage");
+  const targetLanguageInput = document.getElementById("targetLanguage");
+
+  function updateMockState(isMockEnabled) {
+    translationApiSelect.disabled = isMockEnabled;
+    if (customApiUrlInput) customApiUrlInput.disabled = isMockEnabled;
+    if (customApiModelInput) customApiModelInput.disabled = isMockEnabled;
+    if (apiKeyInput) apiKeyInput.disabled = isMockEnabled;
+    if (apiUrlInput) apiUrlInput.disabled = isMockEnabled;
+    if (promptTemplateInput) promptTemplateInput.disabled = isMockEnabled;
+    if (saveSettingsButton) saveSettingsButton.disabled = isMockEnabled;
+    // زبان‌ها همیشه فعال هستند
+    sourceLanguageInput.disabled = false;
+    targetLanguageInput.disabled = false;
+  }
 
   function toggleCustomApiSettings() {
-    customApiSettings.style.display =
-      translationApiSelect.value === "custom" ? "block" : "none";
+    const isCustom = translationApiSelect.value === "custom";
+    customApiSettings.style.display = isCustom ? "block" : "none";
+    if (apiKeySettingGroup) {
+      apiKeySettingGroup.style.display =
+        !isCustom && !useMockCheckbox.checked ? "block" : "none";
+    }
+    if (apiUrlSettingGroup) {
+      apiUrlSettingGroup.style.display = !isCustom ? "block" : "none";
+    }
+    updateMockState(useMockCheckbox.checked); // به‌روزرسانی وضعیت غیرفعال بودن المنت‌ها
   }
 
   toggleCustomApiSettings(); // تنظیم حالت اولیه
@@ -19,19 +55,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadSettings();
 
-  const useMockCheckbox = document.getElementById("useMock");
-  const apiKeyInput = document.getElementById("apiKey");
-
-  function toggleApiKeyInput() {
-    if (useMockCheckbox.checked) {
-      apiKeyInput.disabled = true;
-    } else {
-      apiKeyInput.disabled = false;
-    }
-  }
-
-  toggleApiKeyInput();
-  useMockCheckbox.addEventListener("change", toggleApiKeyInput);
+  useMockCheckbox.addEventListener("change", () => {
+    toggleCustomApiSettings(); // با تغییر وضعیت Mock، وضعیت نمایش API Key و URL و غیرفعال بودن المنت‌ها را به‌روزرسانی می‌کنیم
+  });
 
   document
     .getElementById("saveSettings")
@@ -114,14 +140,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (useMockInput) useMockInput.checked = settings.USE_MOCK;
       const apiUrlInput = document.getElementById("apiUrl");
       if (apiUrlInput) {
-        apiUrlInput.value = settings.API_URL || CONFIG.API_URL; // استفاده از مقدار پیش فرض از CONFIG
+        apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
       }
-      const sourceLanguageInput = document.getElementById("sourceLanguage"); // دریافت المنت input
+      const sourceLanguageInput = document.getElementById("sourceLanguage");
       if (sourceLanguageInput)
-        sourceLanguageInput.value = settings.sourceLanguage || "English"; // تنظیم مقدار input
-      const targetLanguageInput = document.getElementById("targetLanguage"); // دریافت المنت input
+        sourceLanguageInput.value = settings.sourceLanguage || "English";
+      const targetLanguageInput = document.getElementById("targetLanguage");
       if (targetLanguageInput)
-        targetLanguageInput.value = settings.targetLanguage || "Persian"; // تنظیم مقدار input
+        targetLanguageInput.value = settings.targetLanguage || "Persian";
       const promptTemplateInput = document.getElementById("promptTemplate");
       if (promptTemplateInput)
         promptTemplateInput.value =
@@ -136,7 +162,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("customApiModel").value =
           settings.customApiModel || CONFIG.CUSTOM_API_MODEL;
       toggleCustomApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
-      await updatePromptHelpText(); // فراخوانی برای تنظیم نام زبان‌ها هنگام بارگیری اولیه
+      updateMockState(settings.USE_MOCK); // تنظیم وضعیت غیرفعال بودن المنت‌ها هنگام بارگیری
+      await updatePromptHelpText();
     } catch (error) {
       console.error("Error loading settings:", error);
       showStatus("خطا در بارگیری تنظیمات.", "error");
