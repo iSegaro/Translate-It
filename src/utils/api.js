@@ -99,21 +99,34 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
 
   try {
     const prompt = await createPrompt(text, sourceLang, targetLang);
-    const response = await fetch(`${customApiUrl}/gemini`, {
+
+    const response = await fetch(`${customApiUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: prompt,
         model: customApiModel,
         images: [],
+        // پارامترهای اختیاری برای کنترل session
+        reset_session: shouldResetSession(), // افزودن منطق بازنشانی session در صورت نیاز
       }),
     });
 
+    // مدیریت خطاهای HTTP
     if (!response.ok) {
-      const errorText = await response.text();
-      const error = new Error(errorText);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.detail || errorData.message || response.statusText;
+      const error = new Error(errorMessage);
       error.statusCode = response.status;
       error.type = ErrorTypes.API;
+
+      // مدیریت خطاهای خاص session
+      if (response.status === 409) {
+        // خطای تضاد session
+        error.sessionConflict = true;
+      }
+
       throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
@@ -123,8 +136,9 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
 
     const data = await response.json();
 
+    // تطبیق با ساختار پاسخ جدید
     if (typeof data?.response !== "string") {
-      const error = new Error("Invalid custom API response");
+      const error = new Error("Invalid custom API response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
       throw errorHandler.handle(error, {
@@ -133,11 +147,22 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
       });
     }
 
+    // ذخیره اطلاعات session برای استفاده بعدی
+    storeSessionContext({
+      model: customApiModel,
+      lastUsed: Date.now(),
+    });
+
     return data.response;
   } catch (error) {
+    // بازنشانی session در صورت خطای مربوطه
+    if (error.sessionConflict) {
+      resetSessionContext();
+    }
+
     error.type = ErrorTypes.NETWORK;
     error.context = "custom-translation";
-    error.isCustomNetworkError = true; // اضافه کردن flag
+    error.isCustomNetworkError = true;
     throw errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
       context: "custom-translation",
@@ -145,7 +170,24 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
   }
 }
 
-// src/utils/api.js
+// توابع کمکی برای مدیریت session
+let sessionContext = null;
+
+function storeSessionContext(context) {
+  sessionContext = {
+    ...context,
+    timestamp: Date.now(),
+  };
+}
+
+function resetSessionContext() {
+  sessionContext = null;
+}
+
+function shouldResetSession() {
+  // بازنشانی session اگر بیش از 5 دقیقه از آخرین استفاده گذشته باشد
+  return sessionContext && Date.now() - sessionContext.lastUsed > 300000; // 5 دقیقه
+}
 
 export const translateText = async (text) => {
   if (await getUseMockAsync()) {
@@ -161,6 +203,10 @@ export const translateText = async (text) => {
       getSourceLanguageAsync(),
       getTargetLanguageAsync(),
     ]);
+
+    if (translationApi === "custom" && !sessionContext) {
+      resetSessionContext(); // اطمینان از مقداردهی اولیه
+    }
 
     switch (translationApi) {
       case "gemini":
@@ -178,6 +224,12 @@ export const translateText = async (text) => {
     }
   } catch (error) {
     console.debug("Error caught in translateText:", error);
+    // افزودن هندلینگ خطاهای session
+    if (error.sessionConflict) {
+      console.warn("Session conflict, retrying...");
+      resetSessionContext();
+      return await handleCustomTranslation(text, sourceLang, targetLang);
+    }
     // مدیریت خطاهای مربوط به context
     if (error.message.includes("Extension context invalid")) {
       error.type = ErrorTypes.CONTEXT;
