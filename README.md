@@ -25,15 +25,15 @@ A lightweight browser extension that translates text in input fields (e.g., text
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/iSegaro/Gemini-Translate.git
+   git clone [https://github.com/iSegaro/Gemini-Translate.git](https://github.com/iSegaro/Gemini-Translate.git)
    cd Gemini-Translate
    ```
 
 2. **Load in Chrome:**
 
    - Open `chrome://extensions/` and enable Developer mode.
-   - **Option 1:** Click **Load unpacked** and select the `dist/` folder.
-   - **Option 2:** Drag and drop the `dist/` folder onto the `chrome://extensions/` page.
+   - **Option 1:** Click **Load unpacked** and select the `Chrome-Extension/dist/` folder.
+   - **Option 2:** Drag and drop the `Chrome-Extension/dist/` folder onto the `chrome://extensions/` page.
 
 3. **Set your API key on the Options page.**
 
@@ -74,7 +74,7 @@ npm install
 npm run build
 ```
 
-This generates the `dist/` folder for manual installation.
+This generates the `Chrome-Extension/dist/` folder for manual installation.
 For live updates, run:
 
 ```bash

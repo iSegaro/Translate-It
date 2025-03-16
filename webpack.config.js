@@ -5,7 +5,7 @@ const TerserPlugin = require("terser-webpack-plugin");
 
 const rimraf = require("rimraf");
 // پاک کردن دستی دایرکتوری dist قبل از build
-rimraf.sync(path.resolve(__dirname, "dist"));
+rimraf.sync(path.resolve(__dirname, "Chrome-Extension", "dist"));
 
 module.exports = {
   entry: {
@@ -22,7 +22,7 @@ module.exports = {
     extensions: [".js"],
   },
   output: {
-    path: path.resolve(__dirname, "dist"),
+    path: path.resolve(__dirname, "Chrome-Extension", "dist"),
     filename: "[name].bundle.js",
   },
   target: "web",
@@ -46,7 +46,7 @@ module.exports = {
       new TerserPlugin({
         terserOptions: {
           compress: {
-            drop_console: true, // حذف console.log در حالت production
+            drop_console: process.env.NODE_ENV === "production" ? true : false, // حذف console.log در حالت production
           },
         },
       }),
