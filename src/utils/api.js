@@ -399,7 +399,7 @@ export const translateText = async (text) => {
       if (error.isWebAINetworkError) {
         return;
       }
-      console.deb("Error caught in translateText:Network:", error);
+      console.debug("Error caught in translateText:Network:", error);
       const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
       networkError.type = ErrorTypes.NETWORK;
       networkError.statusCode = 503;
