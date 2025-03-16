@@ -22,21 +22,6 @@ export default class EventHandler {
     this.handleEscape = this.handleEscape.bind(this);
   }
 
-  handleEditableFocus(element) {
-    this.IconManager.cleanup();
-    const icon = this.IconManager.createTranslateIcon(element);
-    this.setupIconBehavior(icon, element);
-    state.activeTranslateIcon = icon;
-  }
-
-  handleEditableBlur() {
-    setTimeout(() => {
-      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
-        this.IconManager.cleanup();
-      }
-    }, 100);
-  }
-
   async handleEvent(event) {
     try {
       if (this.isEscapeEvent(event)) {
@@ -69,6 +54,39 @@ export default class EventHandler {
         context: "event-handling",
       });
     }
+  }
+
+  isCtrlSlashEvent(event) {
+    return (
+      (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
+    );
+  }
+
+  isEscapeEvent(event) {
+    return event.key === "Escape" && !event.repeat;
+  }
+
+  isEditableTarget(target) {
+    return (
+      target?.isContentEditable ||
+      ["INPUT", "TEXTAREA"].includes(target?.tagName) ||
+      (target?.closest && target.closest('[contenteditable="true"]'))
+    );
+  }
+
+  handleEditableFocus(element) {
+    this.IconManager.cleanup();
+    const icon = this.IconManager.createTranslateIcon(element);
+    this.setupIconBehavior(icon, element);
+    state.activeTranslateIcon = icon;
+  }
+
+  handleEditableBlur() {
+    setTimeout(() => {
+      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
+        this.IconManager.cleanup();
+      }
+    }, 100);
   }
 
   async handleSelectionClick(e) {
@@ -117,10 +135,22 @@ export default class EventHandler {
       textNodes.forEach((textNode) => {
         const originalText = textNode.textContent.trim();
         if (cachedTranslations.has(originalText)) {
-          textNode.textContent = cachedTranslations.get(originalText);
+          const translatedText = cachedTranslations.get(originalText);
+          const parentElement = textNode.parentElement;
+          const uniqueId =
+            Math.random().toString(36).substring(2, 15) +
+            Math.random().toString(36).substring(2, 15);
+          parentElement.setAttribute("data-original-text-id", uniqueId);
+
+          state.originalTexts.set(uniqueId, {
+            originalInnerHTML: parentElement.innerHTML,
+            translatedText: translatedText,
+            parent: parentElement,
+          });
+          textNode.textContent = translatedText;
           this.IconManager.applyTextDirection(
             textNode.parentElement,
-            cachedTranslations.get(originalText)
+            translatedText
           );
         }
       });
@@ -198,6 +228,7 @@ export default class EventHandler {
       }
     }
   }
+
   async handleSelectionMode(event) {
     if (event.type === "mouseover" || event.type === "mousemove") {
       const newTarget = document.elementFromPoint(event.clientX, event.clientY);
@@ -256,14 +287,14 @@ export default class EventHandler {
         error instanceof Error ? error : new Error(String(error));
       this.translationHandler.errorHandler.handle(normalizedError, {
         type: ErrorTypes.UI,
-        context: "ctrl-selection",
+        context: "select-element",
       });
     } finally {
       this.isProcessing = false;
     }
   }
 
-  async handleCtrlSelection(event) {
+  async handleSelectElement(event) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -284,7 +315,7 @@ export default class EventHandler {
         error instanceof Error ? error : new Error(String(error));
       this.translationHandler.errorHandler.handle(normalizedError, {
         type: ErrorTypes.UI,
-        context: "ctrl-selection",
+        context: "select-element",
       });
     } finally {
       this.isProcessing = false;
@@ -344,23 +375,5 @@ export default class EventHandler {
     icon.addEventListener("click", clickHandler);
     document.body.appendChild(icon);
     state.activeTranslateIcon = icon;
-  }
-
-  isCtrlSlashEvent(event) {
-    return (
-      (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
-    );
-  }
-
-  isEscapeEvent(event) {
-    return event.key === "Escape" && !event.repeat;
-  }
-
-  isEditableTarget(target) {
-    return (
-      target?.isContentEditable ||
-      ["INPUT", "TEXTAREA"].includes(target?.tagName) ||
-      (target?.closest && target.closest('[contenteditable="true"]'))
-    );
   }
 }
