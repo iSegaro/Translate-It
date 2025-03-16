@@ -329,6 +329,7 @@
             <option value="gemini">Gemini API</option>
             <option value="webai">WebAI API</option>
             <option value="openai">OpenAI API</option>
+            <option value="openrouter">OpenRouter API</option>
           </select>
         </div>
 
@@ -364,13 +365,25 @@
           </div>
           <div class="setting-group">
             <label for="openaiApiModel">Model</label>
-            <input type="text" id="openaiApiModel" placeholder="Enter OpenAI model (optional)" />
+            <input type="text" id="openaiApiModel" placeholder="Enter OpenAI model" />
+          </div>
+        </div>
+
+        <div id="openRouterApiSettings" style="display: none;">
+          <h3>OpenRouter API Settings</h3>
+          <div class="setting-group">
+            <label for="openrouterApiKey">API Key</label>
+            <input type="text" id="openrouterApiKey" placeholder="Paste your OpenRouter API key here" />
+          </div>
+          <div class="setting-group">
+            <label for="openrouterApiModel">Model</label>
+            <input type="text" id="openrouterApiModel" placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)" />
           </div>
         </div>
       </section>
 
-      <button id="saveSettings">Save Settings</button>
-      <p id="status"></p>
+      <div id="status" class=""></div>
+      <button id="saveSettings">Save</button>
     </div>
   </body>
 </html>
