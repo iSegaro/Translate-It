@@ -327,7 +327,8 @@
           <label for="translationApi">API Choice</label>
           <select id="translationApi">
             <option value="gemini">Gemini API</option>
-            <option value="custom">WebAI API</option>
+            <option value="webai">WebAI API</option>
+            <option value="openai">OpenAI API</option>
           </select>
         </div>
 
@@ -352,6 +353,18 @@
           <div class="setting-group">
             <label for="apiUrl">API URL</label>
             <input type="text" id="apiUrl" placeholder="Enter API URL" />
+          </div>
+        </div>
+
+        <div id="openAIApiSettings" style="display: none;">
+          <h3>OpenAI API Settings</h3>
+          <div class="setting-group">
+            <label for="openaiApiKey">API Key</label>
+            <input type="text" id="openaiApiKey" placeholder="Paste your OpenAI API key here" />
+          </div>
+          <div class="setting-group">
+            <label for="openaiApiModel">Model</label>
+            <input type="text" id="openaiApiModel" placeholder="Enter OpenAI model (optional)" />
           </div>
         </div>
       </section>

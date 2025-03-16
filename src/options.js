@@ -3,7 +3,7 @@ import { getSettingsAsync, CONFIG } from "./config.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const translationApiSelect = document.getElementById("translationApi");
-  const customApiSettings = document.getElementById("customApiSettings");
+  const webAIApiSettings = document.getElementById("customApiSettings"); // تغییر نام
   const apiKeySettingGroup = document
     .getElementById("apiKey")
     ?.closest(".setting-group");
@@ -11,8 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("apiUrl")
     ?.closest(".setting-group");
   const useMockCheckbox = document.getElementById("useMock");
-  const customApiUrlInput = document.getElementById("customApiUrl");
-  const customApiModelInput = document.getElementById("customApiModel");
+  const webAIApiUrlInput = document.getElementById("customApiUrl"); // تغییر نام
+  const webAIApiModelInput = document.getElementById("customApiModel"); // تغییر نام
   const apiKeyInput = document.getElementById("apiKey");
   const apiUrlInput = document.getElementById("apiUrl");
   const promptTemplateInput = document.getElementById("promptTemplate");
@@ -20,28 +20,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
   const geminiApiSettings = document.getElementById("geminiApiSettings");
+  const openAIApiSettings = document.getElementById("openAIApiSettings"); // اضافه شده
+  const openAIApiKeyInput = document.getElementById("openaiApiKey"); // اضافه شده
+  const openAIModelInput = document.getElementById("openaiApiModel"); // اضافه شده
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
-    if (customApiUrlInput) customApiUrlInput.disabled = isMockEnabled;
-    if (customApiModelInput) customApiModelInput.disabled = isMockEnabled;
+    if (webAIApiUrlInput) webAIApiUrlInput.disabled = isMockEnabled; // تغییر نام
+    if (webAIApiModelInput) webAIApiModelInput.disabled = isMockEnabled; // تغییر نام
     if (apiKeyInput) apiKeyInput.disabled = isMockEnabled;
     if (apiUrlInput) apiUrlInput.disabled = isMockEnabled;
     if (promptTemplateInput) promptTemplateInput.disabled = isMockEnabled;
+    if (openAIApiKeyInput) openAIApiKeyInput.disabled = isMockEnabled; // اضافه شده
+    if (openAIModelInput) openAIModelInput.disabled = isMockEnabled; // اضافه شده
     sourceLanguageInput.disabled = false;
     targetLanguageInput.disabled = false;
   }
 
-  function toggleCustomApiSettings() {
-    const isCustom = translationApiSelect.value === "custom";
-    const isGemini = translationApiSelect.value === "gemini";
+  function toggleApiSettings() {
+    // تغییر نام تابع برای خوانایی بیشتر
+    const selectedApi = translationApiSelect.value;
+    const isGemini = selectedApi === "gemini";
+    const isWebAI = selectedApi === "webai"; // تغییر نام
+    const isOpenAI = selectedApi === "openai";
 
     updateMockState(useMockCheckbox.checked); // ابتدا وضعیت Mock را به‌روزرسانی کنید
 
-    customApiSettings.style.display = isCustom ? "block" : "none";
+    if (webAIApiSettings) {
+      webAIApiSettings.style.display = isWebAI ? "block" : "none"; // تغییر نام
+    }
 
     if (geminiApiSettings) {
       geminiApiSettings.style.display = isGemini ? "block" : "none";
+    }
+
+    if (openAIApiSettings) {
+      openAIApiSettings.style.display = isOpenAI ? "block" : "none"; // اضافه شده
     }
 
     // نمایش فیلد API URL فقط در صورتی که Gemini انتخاب شده باشد
@@ -50,8 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  toggleCustomApiSettings(); // تنظیم حالت اولیه
-  translationApiSelect.addEventListener("change", toggleCustomApiSettings);
+  toggleApiSettings(); // تنظیم حالت اولیه
+  translationApiSelect.addEventListener("change", toggleApiSettings);
 
   const manifest = chrome.runtime.getManifest();
   document.getElementById("NameVersion").textContent =
@@ -60,16 +74,16 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
 
   useMockCheckbox.addEventListener("change", () => {
-    toggleCustomApiSettings();
+    toggleApiSettings();
   });
 
   document
     .getElementById("saveSettings")
     .addEventListener("click", async () => {
-      const customApiUrl = document
+      const webAIApiUrl = document // تغییر نام
         .getElementById("customApiUrl")
         ?.value?.trim();
-      const customApiModel = document
+      const webAIApiModel = document // تغییر نام
         .getElementById("customApiModel")
         ?.value?.trim();
       const apiKey = document.getElementById("apiKey")?.value?.trim();
@@ -82,6 +96,12 @@ document.addEventListener("DOMContentLoaded", () => {
         ?.value?.trim();
       const translationApiSelect = document.getElementById("translationApi"); // دریافت المنت dropdown
       const translationApi = translationApiSelect.value;
+      const openaiApiKey = document
+        .getElementById("openaiApiKey")
+        ?.value?.trim(); // اضافه شده
+      const openaiApiModel = document
+        .getElementById("openaiApiModel")
+        ?.value?.trim(); // اضافه شده
 
       const settings = {
         apiKey: apiKey || "",
@@ -91,8 +111,10 @@ document.addEventListener("DOMContentLoaded", () => {
         targetLanguage: targetLanguage || "Persian",
         promptTemplate: promptTemplate || CONFIG.promptTemplate,
         translationApi: translationApi || "gemini",
-        customApiUrl: customApiUrl || CONFIG.CUSTOM_API_URL,
-        customApiModel: customApiModel || CONFIG.CUSTOM_API_MODEL,
+        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL, // تغییر نام
+        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL, // تغییر نام
+        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY, // اضافه شده
+        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL, // اضافه شده
       };
 
       try {
@@ -161,11 +183,19 @@ document.addEventListener("DOMContentLoaded", () => {
         translationApiSelect.value = settings.translationApi || "gemini";
       if (document.getElementById("customApiUrl"))
         document.getElementById("customApiUrl").value =
-          settings.customApiUrl || CONFIG.CUSTOM_API_URL;
+          settings.webAIApiUrl || CONFIG.WEBAI_API_URL; // تغییر نام
       if (document.getElementById("customApiModel"))
         document.getElementById("customApiModel").value =
-          settings.customApiModel || CONFIG.CUSTOM_API_MODEL;
-      toggleCustomApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
+          settings.webAIApiModel || CONFIG.WEBAI_API_MODEL; // تغییر نام
+      if (document.getElementById("openaiApiKey"))
+        // اضافه شده
+        document.getElementById("openaiApiKey").value =
+          settings.openaiApiKey || CONFIG.OPENAI_API_KEY;
+      if (document.getElementById("openaiApiModel"))
+        // اضافه شده
+        document.getElementById("openaiApiModel").value =
+          settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+      toggleApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
       updateMockState(settings.USE_MOCK);
       await updatePromptHelpText();
     } catch (error) {
