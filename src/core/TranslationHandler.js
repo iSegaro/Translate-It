@@ -57,6 +57,43 @@ export default class TranslationHandler {
     });
   }
 
+  /**
+   * Main event handler router
+   */
+  async handleEvent(event) {
+    await this.eventHandler.handleEvent(event);
+  }
+
+  handleError(error, meta = {}) {
+    const normalizedError =
+      error instanceof Error ? error : new Error(String(error));
+    this.errorHandler.handle(normalizedError, meta);
+  }
+
+  handleEditableFocus(element) {
+    this.eventHandler.handleEditableFocus(element);
+  }
+
+  handleEditableBlur() {
+    this.eventHandler.handleEditableBlur();
+  }
+
+  handleEscape(event) {
+    this.eventHandler.handleEscape(event);
+  }
+
+  async handleCtrlSlash(event) {
+    await this.eventHandler.handleCtrlSlash(event);
+  }
+
+  async handleSelectElement(event) {
+    await this.eventHandler.handleSelectElement(event);
+  }
+
+  async handleEditableElement(event) {
+    await this.eventHandler.handleEditableElement(event);
+  }
+
   async processTranslation(params) {
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
 
@@ -88,14 +125,6 @@ export default class TranslationHandler {
     }
   }
 
-  handleEditableFocus(element) {
-    this.eventHandler.handleEditableFocus(element);
-  }
-
-  handleEditableBlur() {
-    this.eventHandler.handleEditableBlur();
-  }
-
   getDeepestTextNode(element) {
     const walker = document.createTreeWalker(
       element,
@@ -110,13 +139,6 @@ export default class TranslationHandler {
     }
 
     return lastTextNode?.parentElement || element;
-  }
-
-  /**
-   * Main event handler router
-   */
-  async handleEvent(event) {
-    await this.eventHandler.handleEvent(event);
   }
 
   hasTextContent(element) {
@@ -234,31 +256,12 @@ export default class TranslationHandler {
     }
   }
 
-  handleError(error, meta = {}) {
-    const normalizedError =
-      error instanceof Error ? error : new Error(String(error));
-    this.errorHandler.handle(normalizedError, meta);
-  }
-
-  handleEscape(event) {
-    this.eventHandler.handleEscape(event);
-  }
-
-  async handleCtrlSlash(event) {
-    await this.eventHandler.handleCtrlSlash(event);
-  }
-  isProcessing = false;
-
-  async handleCtrlSelection(event) {
-    await this.eventHandler.handleCtrlSelection(event);
-  }
-
   revertTranslations() {
     // console.log(
     //   "revertTranslations: وضعیت state.originalTexts در شروع:",
     //   state.originalTexts
     // );
-    console.log("Starting revert process...");
+    console.info("TranslationHandler:Starting revert process...");
     let successfulReverts = 0;
 
     for (const [uniqueId, data] of state.originalTexts.entries()) {
@@ -358,10 +361,6 @@ export default class TranslationHandler {
   pasteContent(element, content) {
     const platform = detectPlatform(element);
     this.strategies[platform].pasteContent(element, content);
-  }
-
-  async handleEditableElement(event) {
-    await this.eventHandler.handleEditableElement(event);
   }
 
   async processElementTranslation(element) {
