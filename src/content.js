@@ -88,7 +88,7 @@ if (isExtensionContextValid()) {
 
   // Add cleanup on `pagehide`, instead `unload`
   window.addEventListener("pagehide", () => {
-    translationHandler.elementManager.cleanup();
+    translationHandler.IconManager.cleanup();
     state.selectionActive = false;
   });
 } else {
@@ -122,7 +122,7 @@ chrome.runtime.onMessage.addListener((message) => {
     // پاک کردن نوتیفیکیشن قبلی
     if (notificationTimeout) clearTimeout(notificationTimeout);
     if (!state.selectionActive) {
-      translationHandler.elementManager.cleanup();
+      translationHandler.IconManager.cleanup();
     }
   }
 });
@@ -137,6 +137,6 @@ function updateSelectionUI() {
     //   true,
     //   100
     // );
-    translationHandler.elementManager.cleanup();
+    translationHandler.IconManager.cleanup();
   }
 }

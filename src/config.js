@@ -13,8 +13,14 @@ export const TRANSLATION_ERRORS = {
 // Shared configuration (initial defaults)
 export const CONFIG = {
   USE_MOCK: false,
-  CUSTOM_API_URL: "http://localhost:6969/translate",
-  CUSTOM_API_MODEL: "gemini-2.0-flash",
+  WEBAI_API_URL: "http://localhost:6969/translate",
+  WEBAI_API_MODEL: "gemini-2.0-flash",
+  OPENAI_API_KEY: "",
+  OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
+  OPENAI_API_MODEL: "gpt-3.5-turbo",
+  OPENROUTER_API_KEY: "",
+  OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
+  OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
@@ -91,12 +97,43 @@ export const getTranslationApiAsync = async () => {
   return settings.translationApi || "gemini";
 };
 
-export const getCustomApiUrlAsync = async () => {
+export const getWebAIApiUrlAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.customApiUrl || CONFIG.CUSTOM_API_URL;
+  return settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
 };
 
-export const getCustomApiModelAsync = async () => {
+export const getWebAIApiModelAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.customApiModel || CONFIG.CUSTOM_API_MODEL;
+  return settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
+};
+
+export const getOpenAIApiKeyAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.openaiApiKey;
+};
+
+export const getOpenAIApiUrlAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.openaiApiUrl || CONFIG.OPENAI_API_URL;
+};
+
+export const getOpenAIModelAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+};
+
+export const getOpenRouterApiKeyAsync = () => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get("openrouterApiKey", (data) => {
+      resolve(data.openrouterApiKey || CONFIG.OPENROUTER_API_KEY);
+    });
+  });
+};
+
+export const getOpenRouterApiModelAsync = () => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get("openrouterApiModel", (data) => {
+      resolve(data.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL);
+    });
+  });
 };

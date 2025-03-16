@@ -9,8 +9,13 @@ import {
   getTargetLanguageAsync,
   getPromptAsync,
   getTranslationApiAsync,
-  getCustomApiUrlAsync,
-  getCustomApiModelAsync,
+  getWebAIApiUrlAsync,
+  getWebAIApiModelAsync,
+  getOpenAIApiKeyAsync,
+  getOpenAIApiUrlAsync,
+  getOpenAIModelAsync,
+  getOpenRouterApiKeyAsync,
+  getOpenRouterApiModelAsync,
 } from "../config.js";
 import { delay } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
@@ -91,21 +96,21 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
   }
 }
 
-async function handleCustomTranslation(text, sourceLang, targetLang) {
-  const [customApiUrl, customApiModel] = await Promise.all([
-    getCustomApiUrlAsync(),
-    getCustomApiModelAsync(),
+async function handleWebAITranslation(text, sourceLang, targetLang) {
+  const [webAIApiUrl, webAIApiModel] = await Promise.all([
+    getWebAIApiUrlAsync(),
+    getWebAIApiModelAsync(),
   ]);
 
   try {
     const prompt = await createPrompt(text, sourceLang, targetLang);
 
-    const response = await fetch(`${customApiUrl}`, {
+    const response = await fetch(`${webAIApiUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: prompt,
-        model: customApiModel,
+        model: webAIApiModel,
         images: [],
         // پارامترهای اختیاری برای کنترل session
         reset_session: shouldResetSession(), // افزودن منطق بازنشانی session در صورت نیاز
@@ -130,15 +135,14 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
       throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
-        service: "custom-api",
+        service: "webai-api",
       });
     }
 
     const data = await response.json();
 
-    // تطبیق با ساختار پاسخ جدید
     if (typeof data?.response !== "string") {
-      const error = new Error("Invalid custom API response format");
+      const error = new Error("Invalid WebAI API response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
       throw errorHandler.handle(error, {
@@ -149,7 +153,7 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
 
     // ذخیره اطلاعات session برای استفاده بعدی
     storeSessionContext({
-      model: customApiModel,
+      model: webAIApiModel,
       lastUsed: Date.now(),
     });
 
@@ -161,11 +165,153 @@ async function handleCustomTranslation(text, sourceLang, targetLang) {
     }
 
     error.type = ErrorTypes.NETWORK;
-    error.context = "custom-translation";
-    error.isCustomNetworkError = true;
+    error.context = "webai-translation" || 500;
+    error.isWebAINetworkError = true;
     throw errorHandler.handle(error, {
-      type: ErrorTypes.NETWORK,
-      context: "custom-translation",
+      type: ErrorTypes.NETWORK || 500,
+      context: "webai-translation",
+    });
+  }
+}
+
+async function handleOpenAITranslation(text, sourceLang, targetLang) {
+  const [openAIApiKey, openAIApiUrl, openAIModel] = await Promise.all([
+    getOpenAIApiKeyAsync(),
+    getOpenAIApiUrlAsync(),
+    getOpenAIModelAsync(),
+  ]);
+
+  if (!openAIApiKey) {
+    const error = new Error("OpenAI API key is missing");
+    error.statusCode = 401;
+    error.type = ErrorTypes.API;
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 401,
+    });
+  }
+
+  try {
+    const prompt = await createPrompt(text, sourceLang, targetLang);
+
+    const response = await fetch(openAIApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openAIApiKey}`,
+      },
+      body: JSON.stringify({
+        model: openAIModel || "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || response.statusText;
+      const error = new Error(errorMessage);
+      error.statusCode = response.status;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: response.status,
+        service: "openai",
+      });
+    }
+
+    const data = await response.json();
+
+    if (!data?.choices?.[0]?.message?.content) {
+      const error = new Error("Invalid OpenAI API response format");
+      error.statusCode = 500;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: 500,
+      });
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    error.type = ErrorTypes.API;
+    error.statusCode = error.statusCode || 500;
+    error.context = "openai-translation";
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: error.statusCode || 500,
+      context: "openai-translation",
+    });
+  }
+}
+
+async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
+  const [openRouterApiKey, openRouterApiModel] = await Promise.all([
+    getOpenRouterApiKeyAsync(),
+    getOpenRouterApiModelAsync(),
+  ]);
+
+  if (!openRouterApiKey) {
+    const error = new Error("OpenRouter API key is missing");
+    error.statusCode = 401;
+    error.type = ErrorTypes.API;
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 401,
+    });
+  }
+
+  try {
+    const prompt = await createPrompt(text, sourceLang, targetLang);
+    const apiUrl = CONFIG.OPENROUTER_API_URL; // استفاده از URL از config
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openRouterApiKey}`,
+        "HTTP-Referer": window.location.origin, // تنظیم HTTP-Referer به origin اکستنشن
+        "X-Title": chrome.runtime.getManifest().name, // تنظیم X-Title به نام اکستنشن
+      },
+      body: JSON.stringify({
+        model: openRouterApiModel || "openai/gpt-3.5-turbo", // استفاده از مدل قابل تنظیم
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || response.statusText;
+      const error = new Error(errorMessage);
+      error.statusCode = response.status;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: response.status,
+        service: "openrouter",
+      });
+    }
+
+    const data = await response.json();
+
+    if (!data?.choices?.[0]?.message?.content) {
+      const error = new Error("Invalid OpenRouter API response format");
+      error.statusCode = 500;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: 500,
+      });
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    error.type = ErrorTypes.API;
+    error.statusCode = error.statusCode || 500;
+    error.context = "openrouter-translation";
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: error.statusCode || 500,
+      context: "openrouter-translation",
     });
   }
 }
@@ -204,15 +350,19 @@ export const translateText = async (text) => {
       getTargetLanguageAsync(),
     ]);
 
-    if (translationApi === "custom" && !sessionContext) {
+    if (translationApi === "webai" && !sessionContext) {
       resetSessionContext(); // اطمینان از مقداردهی اولیه
     }
 
     switch (translationApi) {
       case "gemini":
         return await handleGeminiTranslation(text, sourceLang, targetLang);
-      case "custom":
-        return await handleCustomTranslation(text, sourceLang, targetLang);
+      case "webai":
+        return await handleWebAITranslation(text, sourceLang, targetLang);
+      case "openai":
+        return await handleOpenAITranslation(text, sourceLang, targetLang);
+      case "openrouter":
+        return await handleOpenRouterTranslation(text, sourceLang, targetLang);
       default:
         const error = new Error("Invalid translation API selected");
         error.type = ErrorTypes.VALIDATION;
@@ -228,7 +378,7 @@ export const translateText = async (text) => {
     if (error.sessionConflict) {
       console.warn("Session conflict, retrying...");
       resetSessionContext();
-      return await handleCustomTranslation(text, sourceLang, targetLang);
+      return await handleWebAITranslation(text, sourceLang, targetLang);
     }
     // مدیریت خطاهای مربوط به context
     if (error.message.includes("Extension context invalid")) {
@@ -245,11 +395,11 @@ export const translateText = async (text) => {
       error.type === ErrorTypes.NETWORK ||
       error.message.includes("Failed to fetch")
     ) {
-      // اگر خطا از handleCustomTranslation آمده و قبلاً به عنوان NETWORK handle شده است، رد شود
-      if (error.isCustomNetworkError) {
+      // اگر خطا از handleWebAITranslation آمده و قبلاً به عنوان NETWORK handle شده است، رد شود // تغییر نام
+      if (error.isWebAINetworkError) {
         return;
       }
-      console.deb("Error caught in translateText:Network:", error);
+      console.debug("Error caught in translateText:Network:", error);
       const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
       networkError.type = ErrorTypes.NETWORK;
       networkError.statusCode = 503;

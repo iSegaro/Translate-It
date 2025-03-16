@@ -1,39 +1,46 @@
 # Gemini Translate
 
-A lightweight browser extension that translates text in input fields (e.g., text boxes, textareas, and contenteditable elements) using either a mock translation for testing or real API calls in production. It replaces the original text with the translated version when you click the icon or press Ctrl+/.
+A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations are triggered by either clicking the extension icon or pressing the Ctrl+/ shortcut.
 
-🚧 **This project is in development and not yet officially released.**
+**It's a writing and translation assistant.**
 
 ---
 
 ## Features
 
-- **Universal Compatibility:** Works on both standard and advanced input fields.
-- **Multiple Triggers:** Activate via icon click or Ctrl+/ shortcut.
+- **Universal Compatibility:** Works seamlessly with standard and advanced input fields.
+- **Multiple Activation Methods:** Trigger translation via the icon click or the Ctrl+/ shortcut.
+- **Provider Support:** Choose between multiple translation providers, including [Gemini](https://gemini.com/), [OpenAI](https://chat.openai.com/), and [WebAI to API](https://github.com/Amm1rr/WebAI-to-API/).
 
 ---
 
 ## Requirements
 
 - A modern Chromium-based browser (Chrome, Edge, Brave, etc.)
-- A valid API key if not using mock mode
+- A valid API key if not using [WebAI ot API](https://github.com/Amm1rr/WebAI-to-API/)
 
 ---
 
 ## Installation
 
-1. **Clone the Repository:**
+1. **Install via CRX File:**
 
-   ```bash
-   git clone https://github.com/iSegaro/Gemini-Translate.git
-   cd Gemini-Translate
-   ```
+   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/dist.crx) file from the `Chrome-Extension/` folder.
+   - Open `chrome://extensions/` in Chrome and enable Developer mode.
+   - Drag and drop the `.crx` file onto the `chrome://extensions/` page to install the extension.
 
-2. **Load in Chrome:**
+2. **Install via Git:**
 
-   - Open `chrome://extensions/` and enable Developer mode.
-   - **Option 1:** Click **Load unpacked** and select the `dist/` folder.
-   - **Option 2:** Drag and drop the `dist/` folder onto the `chrome://extensions/` page.
+   - Clone the repository:
+
+     ```bash
+     git clone https://github.com/iSegaro/Gemini-Translate.git
+     cd Gemini-Translate
+     ```
+
+   - Load the extension in Chrome:
+     - Open `chrome://extensions/` and enable Developer mode.
+     - Click **Load unpacked** and select the `Chrome-Extension/dist/` folder.
 
 3. **Set your API key on the Options page.**
 
@@ -74,7 +81,7 @@ npm install
 npm run build
 ```
 
-This generates the `dist/` folder for manual installation.
+This generates the `Chrome-Extension/dist/` folder for manual installation.
 For live updates, run:
 
 ```bash

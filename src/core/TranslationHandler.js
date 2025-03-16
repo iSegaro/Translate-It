@@ -6,7 +6,7 @@ import MediumStrategy from "../strategies/MediumStrategy.js";
 import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
-import ElementManager from "../managers/ElementManager.js";
+import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
 import { CONFIG, state } from "../config.js";
 import { translateText } from "../utils/api.js";
@@ -41,7 +41,7 @@ export default class TranslationHandler {
       }
     }
 
-    this.elementManager = new ElementManager();
+    this.IconManager = new IconManager();
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
@@ -184,7 +184,7 @@ export default class TranslationHandler {
       // جایگزینی متن‌های ترجمه‌شده در هر text node
       nodes.forEach((node, index) => {
         node.textContent = translatedTexts[index];
-        this.elementManager.applyTextDirection(
+        this.IconManager.applyTextDirection(
           node.parentElement,
           translatedTexts[index]
         );
@@ -276,7 +276,7 @@ export default class TranslationHandler {
 
     // پاکسازی state
     state.originalTexts.clear();
-    this.elementManager.cleanup();
+    this.IconManager.cleanup();
     console.log(
       "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
       state.originalTexts
@@ -288,7 +288,7 @@ export default class TranslationHandler {
       const platform = detectPlatform(target);
       await this.strategies[platform].updateElement(target, translated);
       if (platform !== "medium") {
-        this.elementManager.applyTextDirection(target, translated);
+        this.IconManager.applyTextDirection(target, translated);
       }
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -339,7 +339,7 @@ export default class TranslationHandler {
       await this.updateTargetElement(element, translated);
 
       if (detectPlatform(element) !== "medium") {
-        this.elementManager.applyTextDirection(element, translated);
+        this.IconManager.applyTextDirection(element, translated);
       }
       console.log(
         "TranslationHandler: processElementTranslation SUCCESS for text:",
@@ -369,7 +369,7 @@ export default class TranslationHandler {
     this.selectionModeActive = false;
     state.selectionActive = false;
     chrome.storage.local.set({ selectionActive: false });
-    this.elementManager.cleanup(); // پاکسازی هایلایت و ...
+    this.IconManager.cleanup(); // پاکسازی هایلایت و ...
     this.notifier.show("حالت انتخاب غیر فعال شد.", "info");
   }
 }

@@ -90,6 +90,7 @@ export default class NotificationManager {
       warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
       success: { icon: CONFIG.ICON_SECCESS, duration: 3000 },
       info: { icon: CONFIG.ICON_INFO, duration: 3000 },
+      status: { icon: CONFIG.ICON_INFO, duration: 2000 }, // پیش‌فرض برای وضعیت
     };
 
     const config = baseNotification[type] || baseNotification.info;
@@ -115,7 +116,9 @@ export default class NotificationManager {
 
     this.container.appendChild(notification);
 
-    if (autoDismiss) {
+    // فقط در صورتی حذف خودکار انجام شود که autoDismiss برابر با true باشد
+    if (autoDismiss && type !== "status") {
+      // برای پیغام وضعیت حذف خودکار نداریم
       setTimeout(() => {
         this.dismiss(notification);
         notification.removeEventListener("click", clickHandler);
