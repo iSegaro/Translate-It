@@ -1,5 +1,6 @@
 // src/managers/ElementManager.js
 import { CONFIG, state } from "../config.js";
+import { ErrorTypes } from "../services/ErrorService.js";
 
 export default class ElementManager {
   cleanup() {
@@ -17,7 +18,6 @@ export default class ElementManager {
     state.activeTranslateIcon = null;
   }
 
-  // در کلاس ElementManager
   applyTextDirection(element, text) {
     if (!element || !element.style) return;
 
@@ -78,12 +78,13 @@ export default class ElementManager {
           "status"
         );
         const translated = await translateText(text);
-        await this.updateTargetElement(target, translated);
+        await this.translationHandler.updateTargetElement(target, translated);
       } catch (error) {
-        this.notifier.show(error.message, "error");
-      } finally {
-        icon.remove();
-        this.notifier.dismiss(statusNotification);
+        this.translationHandler.errorHandler.handle(error, {
+          type: ErrorTypes.UI, // Or SERVICE depending on the error source
+          context: "translate-icon-click",
+          element: target,
+        });
       }
     };
 

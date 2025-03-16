@@ -20,10 +20,9 @@ function injectCSS(filePath) {
 
 // بررسی hostname و انتخاب فایل CSS مناسب
 const hostname = window.location.hostname;
+injectCSS("styles/content.css");
 if (hostname.includes("whatsapp.com")) {
   injectCSS("styles/whatsapp.css");
-} else {
-  injectCSS("styles/content.css");
 }
 
 // Initialize core components
@@ -54,7 +53,7 @@ if (window.location.hostname === "web.whatsapp.com") {
   // بهبود مدیریت رویدادها برای واتساپ
   document.addEventListener("click", (e) => {
     if (state.selectionActive && e.target.closest('[role="textbox"]')) {
-      translationHandler.handleSelectionClick(e);
+      translationHandler.eventHandler.handleSelectionClick(e);
     }
   });
 }

@@ -4,11 +4,33 @@ import { fadeOut } from "../utils/helpers.js";
 
 export default class NotificationManager {
   constructor() {
+    this.typeMapping = {
+      error: {
+        title: "خطا - ترجمه خودکار",
+        icon: CONFIG.ICON_ERROR,
+        priority: 2,
+      },
+      warning: {
+        title: "هشدار - ترجمه خودکار",
+        icon: CONFIG.ICON_WARNING,
+        priority: 1,
+      },
+      success: {
+        title: "موفقیت - ترجمه خودکار",
+        icon: CONFIG.ICON_SUCCESS,
+        priority: 0,
+      },
+      info: {
+        title: "اطلاعات - ترجمه خودکار",
+        icon: CONFIG.ICON_INFO,
+        priority: 0,
+      },
+    };
+
     if (typeof document !== "undefined") {
-      // Check if document is defined (browser context)
       this.container = this.createContainer();
     } else {
-      this.container = null; // Or handle differently for non-browser context
+      this.container = null;
     }
   }
 
@@ -31,14 +53,52 @@ export default class NotificationManager {
     return container;
   }
 
-  show(message, type = "info", autoDismiss = true, duration = 3000, onClick) {
+  // بهبود نمایش نوتیفیکیشن‌های سیستمی
+  showBackgroundNotification(message, type = "info", onClick) {
+    const config = this.typeMapping[type] || this.typeMapping.info;
+
+    chrome.notifications.create(
+      {
+        type: "basic",
+        iconUrl: "icons/icon-48.png",
+        title: config.title,
+        message: message,
+        priority: config.priority,
+      },
+      (notificationId) => {
+        if (onClick) {
+          const handleClick = (clickedId) => {
+            if (clickedId === notificationId) {
+              onClick();
+              chrome.notifications.clear(notificationId);
+              chrome.notifications.onClicked.removeListener(handleClick);
+            }
+          };
+          chrome.notifications.onClicked.addListener(handleClick);
+        }
+      }
+    );
+  }
+
+  show(message, type = "info", autoDismiss = true, duration = null, onClick) {
     if (!this.container) {
-      // If no container (background context), use Chrome Notifications API
       return this.showBackgroundNotification(message, type, onClick);
     }
 
+    const baseNotification = {
+      error: { icon: CONFIG.ICON_ERROR, duration: 5000 },
+      warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
+      success: { icon: CONFIG.ICON_SECCESS, duration: 3000 },
+      info: { icon: CONFIG.ICON_INFO, duration: 3000 },
+    };
+
+    const config = baseNotification[type] || baseNotification.info;
+    const finalDuration = duration || config.duration;
+
     const notification = document.createElement("div");
-    const icon = CONFIG[`ICON_${type.toUpperCase()}`] || "💠";
+    notification.className = "translation-notification";
+
+    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "ℹ️";
 
     notification.innerHTML = `
       <span class="notification-icon">${icon}</span>
@@ -46,28 +106,20 @@ export default class NotificationManager {
     `;
 
     Object.assign(notification.style, {
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
       background: this.getBackgroundColor(type),
-      color: "#fff",
-      padding: "8px 12px",
-      borderRadius: "4px",
-      fontSize: "14px",
-      cursor: "pointer",
-      opacity: "1",
     });
 
-    if (onClick) {
-      notification.addEventListener("click", onClick);
-    } else {
-      notification.addEventListener("click", () => this.dismiss(notification));
-    }
+    const clickHandler = onClick ? onClick : () => this.dismiss(notification);
+
+    notification.addEventListener("click", clickHandler);
 
     this.container.appendChild(notification);
 
     if (autoDismiss) {
-      setTimeout(() => this.dismiss(notification), duration);
+      setTimeout(() => {
+        this.dismiss(notification);
+        notification.removeEventListener("click", clickHandler);
+      }, finalDuration);
     }
 
     return notification;
@@ -80,8 +132,8 @@ export default class NotificationManager {
   getBackgroundColor(type) {
     const colors = {
       error: "rgba(255,0,0,0.8)",
-      success: "rgba(0,128,0,0.8)",
-      status: "rgba(0,0,0,0.7)",
+      success: "rgba(0,128,0,0.7)",
+      status: "rgba(0,0,0,0.4)",
       warning: "rgba(255,165,0,0.8)",
       info: "rgba(30,144,255,0.8)",
     };
