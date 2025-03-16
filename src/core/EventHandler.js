@@ -309,6 +309,9 @@ export default class EventHandler {
         }
       } catch (error) {
         this.elementManager.cleanup();
+        if (statusNotification) {
+          this.notifier.dismiss(statusNotification); // اطمینان از حذف پیغام در صورت بروز خطای کلی
+        }
         const normalizedError =
           error instanceof Error ? error : new Error(String(error));
         this.translationHandler.errorHandler.handle(normalizedError, {
@@ -316,9 +319,6 @@ export default class EventHandler {
           context: "translate-icon-click",
           element: target,
         });
-        if (statusNotification) {
-          this.notifier.dismiss(statusNotification); // اطمینان از حذف پیغام در صورت بروز خطای کلی
-        }
       }
     };
 
