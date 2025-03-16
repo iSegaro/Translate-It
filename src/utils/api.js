@@ -14,6 +14,8 @@ import {
   getOpenAIApiKeyAsync,
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
+  getOpenRouterApiKeyAsync,
+  getOpenRouterApiModelAsync,
 } from "../config.js";
 import { delay } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
@@ -242,6 +244,78 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
   }
 }
 
+async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
+  const [openRouterApiKey, openRouterApiModel] = await Promise.all([
+    getOpenRouterApiKeyAsync(),
+    getOpenRouterApiModelAsync(),
+  ]);
+
+  if (!openRouterApiKey) {
+    const error = new Error("OpenRouter API key is missing");
+    error.statusCode = 401;
+    error.type = ErrorTypes.API;
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 401,
+    });
+  }
+
+  try {
+    const prompt = await createPrompt(text, sourceLang, targetLang);
+    const apiUrl = CONFIG.OPENROUTER_API_URL; // استفاده از URL از config
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openRouterApiKey}`,
+        "HTTP-Referer": window.location.origin, // تنظیم HTTP-Referer به origin اکستنشن
+        "X-Title": chrome.runtime.getManifest().name, // تنظیم X-Title به نام اکستنشن
+      },
+      body: JSON.stringify({
+        model: openRouterApiModel || "openai/gpt-3.5-turbo", // استفاده از مدل قابل تنظیم
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || response.statusText;
+      const error = new Error(errorMessage);
+      error.statusCode = response.status;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: response.status,
+        service: "openrouter",
+      });
+    }
+
+    const data = await response.json();
+
+    if (!data?.choices?.[0]?.message?.content) {
+      const error = new Error("Invalid OpenRouter API response format");
+      error.statusCode = 500;
+      error.type = ErrorTypes.API;
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: 500,
+      });
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    error.type = ErrorTypes.API;
+    error.statusCode = error.statusCode || 500;
+    error.context = "openrouter-translation";
+    throw errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: error.statusCode || 500,
+      context: "openrouter-translation",
+    });
+  }
+}
+
 // توابع کمکی برای مدیریت session
 let sessionContext = null;
 
@@ -287,6 +361,8 @@ export const translateText = async (text) => {
         return await handleWebAITranslation(text, sourceLang, targetLang);
       case "openai":
         return await handleOpenAITranslation(text, sourceLang, targetLang);
+      case "openrouter":
+        return await handleOpenRouterTranslation(text, sourceLang, targetLang);
       default:
         const error = new Error("Invalid translation API selected");
         error.type = ErrorTypes.VALIDATION;

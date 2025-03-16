@@ -11,8 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("apiUrl")
     ?.closest(".setting-group");
   const useMockCheckbox = document.getElementById("useMock");
-  const webAIApiUrlInput = document.getElementById("customApiUrl"); // تغییر نام
-  const webAIApiModelInput = document.getElementById("customApiModel"); // تغییر نام
+  const webAIApiUrlInput = document.getElementById("customApiUrl");
+  const webAIApiModelInput = document.getElementById("customApiModel");
   const apiKeyInput = document.getElementById("apiKey");
   const apiUrlInput = document.getElementById("apiUrl");
   const promptTemplateInput = document.getElementById("promptTemplate");
@@ -20,34 +20,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
   const geminiApiSettings = document.getElementById("geminiApiSettings");
-  const openAIApiSettings = document.getElementById("openAIApiSettings"); // اضافه شده
-  const openAIApiKeyInput = document.getElementById("openaiApiKey"); // اضافه شده
-  const openAIModelInput = document.getElementById("openaiApiModel"); // اضافه شده
+  const openAIApiSettings = document.getElementById("openAIApiSettings");
+  const openAIApiKeyInput = document.getElementById("openaiApiKey");
+  const openAIModelInput = document.getElementById("openaiApiModel");
+  const openRouterApiSettings = document.getElementById(
+    "openRouterApiSettings"
+  );
+  const openRouterApiKeyInput = document.getElementById("openrouterApiKey");
+  const openRouterApiModelInput = document.getElementById("openrouterApiModel");
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
-    if (webAIApiUrlInput) webAIApiUrlInput.disabled = isMockEnabled; // تغییر نام
-    if (webAIApiModelInput) webAIApiModelInput.disabled = isMockEnabled; // تغییر نام
+    if (webAIApiUrlInput) webAIApiUrlInput.disabled = isMockEnabled;
+    if (webAIApiModelInput) webAIApiModelInput.disabled = isMockEnabled;
     if (apiKeyInput) apiKeyInput.disabled = isMockEnabled;
     if (apiUrlInput) apiUrlInput.disabled = isMockEnabled;
     if (promptTemplateInput) promptTemplateInput.disabled = isMockEnabled;
-    if (openAIApiKeyInput) openAIApiKeyInput.disabled = isMockEnabled; // اضافه شده
-    if (openAIModelInput) openAIModelInput.disabled = isMockEnabled; // اضافه شده
+    if (openAIApiKeyInput) openAIApiKeyInput.disabled = isMockEnabled;
+    if (openAIModelInput) openAIModelInput.disabled = isMockEnabled;
+    if (openRouterApiKeyInput) openRouterApiKeyInput.disabled = isMockEnabled;
+    if (openRouterApiModelInput)
+      openRouterApiModelInput.disabled = isMockEnabled;
     sourceLanguageInput.disabled = false;
     targetLanguageInput.disabled = false;
   }
 
   function toggleApiSettings() {
-    // تغییر نام تابع برای خوانایی بیشتر
     const selectedApi = translationApiSelect.value;
     const isGemini = selectedApi === "gemini";
-    const isWebAI = selectedApi === "webai"; // تغییر نام
+    const isWebAI = selectedApi === "webai";
     const isOpenAI = selectedApi === "openai";
+    const isOpenRouter = selectedApi === "openrouter";
 
     updateMockState(useMockCheckbox.checked); // ابتدا وضعیت Mock را به‌روزرسانی کنید
 
     if (webAIApiSettings) {
-      webAIApiSettings.style.display = isWebAI ? "block" : "none"; // تغییر نام
+      webAIApiSettings.style.display = isWebAI ? "block" : "none";
     }
 
     if (geminiApiSettings) {
@@ -55,7 +63,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (openAIApiSettings) {
-      openAIApiSettings.style.display = isOpenAI ? "block" : "none"; // اضافه شده
+      openAIApiSettings.style.display = isOpenAI ? "block" : "none";
+    }
+
+    if (openRouterApiSettings) {
+      openRouterApiSettings.style.display = isOpenRouter ? "block" : "none";
     }
 
     // نمایش فیلد API URL فقط در صورتی که Gemini انتخاب شده باشد
@@ -80,10 +92,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("saveSettings")
     .addEventListener("click", async () => {
-      const webAIApiUrl = document // تغییر نام
+      const webAIApiUrl = document
         .getElementById("customApiUrl")
         ?.value?.trim();
-      const webAIApiModel = document // تغییر نام
+      const webAIApiModel = document
         .getElementById("customApiModel")
         ?.value?.trim();
       const apiKey = document.getElementById("apiKey")?.value?.trim();
@@ -102,6 +114,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const openaiApiModel = document
         .getElementById("openaiApiModel")
         ?.value?.trim(); // اضافه شده
+      // اضافه شده برای OpenRouter:
+      const openrouterApiKey = document
+        .getElementById("openrouterApiKey")
+        ?.value?.trim();
+      const openrouterApiModel = document
+        .getElementById("openrouterApiModel")
+        ?.value?.trim();
 
       const settings = {
         apiKey: apiKey || "",
@@ -111,10 +130,12 @@ document.addEventListener("DOMContentLoaded", () => {
         targetLanguage: targetLanguage || "Persian",
         promptTemplate: promptTemplate || CONFIG.promptTemplate,
         translationApi: translationApi || "gemini",
-        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL, // تغییر نام
-        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL, // تغییر نام
-        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY, // اضافه شده
-        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL, // اضافه شده
+        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
+        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
+        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
+        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
+        openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
+        openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
       };
 
       try {
@@ -195,6 +216,13 @@ document.addEventListener("DOMContentLoaded", () => {
         // اضافه شده
         document.getElementById("openaiApiModel").value =
           settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+      if (document.getElementById("openrouterApiKey"))
+        document.getElementById("openrouterApiKey").value =
+          settings.openrouterApiKey || CONFIG.OPENROUTER_API_KEY;
+      if (document.getElementById("openrouterApiModel"))
+        document.getElementById("openrouterApiModel").value =
+          settings.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL;
+
       toggleApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
       updateMockState(settings.USE_MOCK);
       await updatePromptHelpText();

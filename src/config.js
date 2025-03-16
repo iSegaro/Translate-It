@@ -18,6 +18,9 @@ export const CONFIG = {
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   OPENAI_API_MODEL: "gpt-3.5-turbo",
+  OPENROUTER_API_KEY: "",
+  OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
+  OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
@@ -117,4 +120,20 @@ export const getOpenAIApiUrlAsync = async () => {
 export const getOpenAIModelAsync = async () => {
   const settings = await getSettingsAsync();
   return settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+};
+
+export const getOpenRouterApiKeyAsync = () => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get("openrouterApiKey", (data) => {
+      resolve(data.openrouterApiKey || CONFIG.OPENROUTER_API_KEY);
+    });
+  });
+};
+
+export const getOpenRouterApiModelAsync = () => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get("openrouterApiModel", (data) => {
+      resolve(data.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL);
+    });
+  });
 };
