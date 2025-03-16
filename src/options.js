@@ -2,8 +2,25 @@
 import { getSettingsAsync, CONFIG } from "./config.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const tabButtons = document.querySelectorAll(".tab-button");
+  const tabContents = document.querySelectorAll(".tab-content");
+
+  function showTab(tabId) {
+    tabButtons.forEach((button) => button.classList.remove("active"));
+    tabContents.forEach((content) => content.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+  }
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const tabId = event.target.getAttribute("data-tab");
+      showTab(tabId);
+    });
+  });
+
   const translationApiSelect = document.getElementById("translationApi");
-  const webAIApiSettings = document.getElementById("customApiSettings"); // تغییر نام
+  const webAIApiSettings = document.getElementById("webAIApiSettings");
   const apiKeySettingGroup = document
     .getElementById("apiKey")
     ?.closest(".setting-group");
@@ -11,8 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("apiUrl")
     ?.closest(".setting-group");
   const useMockCheckbox = document.getElementById("useMock");
-  const webAIApiUrlInput = document.getElementById("customApiUrl");
-  const webAIApiModelInput = document.getElementById("customApiModel");
+  const webAIApiUrlInput = document.getElementById("webAIApiUrl");
+  const webAIApiModelInput = document.getElementById("webAIApiModel");
   const apiKeyInput = document.getElementById("apiKey");
   const apiUrlInput = document.getElementById("apiUrl");
   const promptTemplateInput = document.getElementById("promptTemplate");
@@ -31,18 +48,66 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
-    if (webAIApiUrlInput) webAIApiUrlInput.disabled = isMockEnabled;
-    if (webAIApiModelInput) webAIApiModelInput.disabled = isMockEnabled;
-    if (apiKeyInput) apiKeyInput.disabled = isMockEnabled;
-    if (apiUrlInput) apiUrlInput.disabled = isMockEnabled;
-    if (promptTemplateInput) promptTemplateInput.disabled = isMockEnabled;
-    if (openAIApiKeyInput) openAIApiKeyInput.disabled = isMockEnabled;
-    if (openAIModelInput) openAIModelInput.disabled = isMockEnabled;
-    if (openRouterApiKeyInput) openRouterApiKeyInput.disabled = isMockEnabled;
-    if (openRouterApiModelInput)
+    sourceLanguageInput.disabled = isMockEnabled;
+    targetLanguageInput.disabled = isMockEnabled;
+
+    // غیرفعال/فعال کردن تنظیمات WebAI API
+    if (webAIApiUrlInput) {
+      webAIApiUrlInput.disabled = isMockEnabled;
+    }
+    if (webAIApiModelInput) {
+      webAIApiModelInput.disabled = isMockEnabled;
+    }
+
+    // غیرفعال/فعال کردن تنظیمات Gemini API
+    if (apiKeyInput) {
+      apiKeyInput.disabled = isMockEnabled;
+    }
+    if (apiUrlInput) {
+      apiUrlInput.disabled = isMockEnabled;
+    }
+
+    // غیرفعال/فعال کردن تنظیمات OpenAI API
+    if (openAIApiKeyInput) {
+      openAIApiKeyInput.disabled = isMockEnabled;
+    }
+    if (openAIModelInput) {
+      openAIModelInput.disabled = isMockEnabled;
+    }
+
+    // غیرفعال/فعال کردن تنظیمات OpenRouter API
+    if (openRouterApiKeyInput) {
+      openRouterApiKeyInput.disabled = isMockEnabled;
+    }
+    if (openRouterApiModelInput) {
       openRouterApiModelInput.disabled = isMockEnabled;
-    sourceLanguageInput.disabled = false;
-    targetLanguageInput.disabled = false;
+    }
+
+    // نمایش/عدم نمایش تنظیمات API بر اساس انتخاب و وضعیت MOCK
+    if (webAIApiSettings) {
+      webAIApiSettings.style.display =
+        !isMockEnabled && translationApiSelect.value === "webai" ?
+          "block"
+        : "none";
+    }
+    if (geminiApiSettings) {
+      geminiApiSettings.style.display =
+        !isMockEnabled && translationApiSelect.value === "gemini" ?
+          "block"
+        : "none";
+    }
+    if (openAIApiSettings) {
+      openAIApiSettings.style.display =
+        !isMockEnabled && translationApiSelect.value === "openai" ?
+          "block"
+        : "none";
+    }
+    if (openRouterApiSettings) {
+      openRouterApiSettings.style.display =
+        !isMockEnabled && translationApiSelect.value === "openrouter" ?
+          "block"
+        : "none";
+    }
   }
 
   function toggleApiSettings() {
@@ -51,8 +116,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const isWebAI = selectedApi === "webai";
     const isOpenAI = selectedApi === "openai";
     const isOpenRouter = selectedApi === "openrouter";
-
-    updateMockState(useMockCheckbox.checked); // ابتدا وضعیت Mock را به‌روزرسانی کنید
 
     if (webAIApiSettings) {
       webAIApiSettings.style.display = isWebAI ? "block" : "none";
@@ -86,17 +149,15 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
 
   useMockCheckbox.addEventListener("change", () => {
-    toggleApiSettings();
+    updateMockState(useMockCheckbox.checked);
   });
 
   document
     .getElementById("saveSettings")
     .addEventListener("click", async () => {
-      const webAIApiUrl = document
-        .getElementById("customApiUrl")
-        ?.value?.trim();
+      const webAIApiUrl = document.getElementById("webAIApiUrl")?.value?.trim();
       const webAIApiModel = document
-        .getElementById("customApiModel")
+        .getElementById("webAIApiModel")
         ?.value?.trim();
       const apiKey = document.getElementById("apiKey")?.value?.trim();
       const useMock = document.getElementById("useMock")?.checked;
@@ -202,18 +263,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (translationApiSelect)
         translationApiSelect.value = settings.translationApi || "gemini";
-      if (document.getElementById("customApiUrl"))
-        document.getElementById("customApiUrl").value =
-          settings.webAIApiUrl || CONFIG.WEBAI_API_URL; // تغییر نام
-      if (document.getElementById("customApiModel"))
-        document.getElementById("customApiModel").value =
-          settings.webAIApiModel || CONFIG.WEBAI_API_MODEL; // تغییر نام
+      if (document.getElementById("webAIApiUrl"))
+        document.getElementById("webAIApiUrl").value =
+          settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
+      if (document.getElementById("webAIApiModel"))
+        document.getElementById("webAIApiModel").value =
+          settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
       if (document.getElementById("openaiApiKey"))
-        // اضافه شده
         document.getElementById("openaiApiKey").value =
           settings.openaiApiKey || CONFIG.OPENAI_API_KEY;
       if (document.getElementById("openaiApiModel"))
-        // اضافه شده
         document.getElementById("openaiApiModel").value =
           settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
       if (document.getElementById("openrouterApiKey"))
@@ -223,8 +282,18 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("openrouterApiModel").value =
           settings.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL;
 
-      toggleApiSettings(); // تنظیم نمایش/عدم نمایش در هنگام بارگیری
-      updateMockState(settings.USE_MOCK);
+      const initialTranslationApi = settings.translationApi || "gemini";
+      const initialUseMock = settings.USE_MOCK;
+
+      // نمایش تب API و تنظیمات مربوطه پس از بارگیری تنظیمات
+      showTab("languages"); // نمایش تب Languages به صورت پیش فرض
+      if (initialUseMock) {
+        updateMockState(true);
+      } else {
+        translationApiSelect.value = initialTranslationApi;
+        toggleApiSettings();
+      }
+
       await updatePromptHelpText();
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -237,4 +306,11 @@ document.addEventListener("DOMContentLoaded", () => {
     status.textContent = message;
     status.className = `status-${type}`;
   }
+
+  // نمایش تب "Languages" به عنوان تب پیش‌فرض هنگام بارگیری صفحه.
+  // این کار تضمین می‌کند که کاربر در ابتدا یک محتوا را مشاهده کند در حالی که تنظیمات در حال بارگیری هستند.
+  // متد loadSettings پس از این خط اجرا می‌شود و ممکن است تب فعال را بر اساس تنظیمات ذخیره شده تغییر دهد.
+  // با این حال، فراخوانی showTab در اینجا به این دلیل حفظ شده است که یک تب پیش‌فرض به کاربر نشان داده شود
+  // قبل از اینکه تنظیمات ذخیره شده (در صورت وجود) از حافظه بارگیری و اعمال شوند.
+  showTab("languages");
 });
