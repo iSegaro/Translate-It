@@ -39,7 +39,7 @@ export function setupEventListeners(translationHandler) {
 
   const handleClick = handleEventWithErrorHandling((e) => {
     if (state.selectionActive) {
-      translationHandler.elementManager.cleanup();
+      translationHandler.IconManager.cleanup();
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
 
@@ -58,7 +58,7 @@ export function setupEventListeners(translationHandler) {
     console.log("keydown event detected. Key:", e.key);
     if (e.key === "Escape" && state.selectionActive) {
       console.log("EventRouter: کلید ESC شناسایی شد.");
-      translationHandler.elementManager.cleanup();
+      translationHandler.IconManager.cleanup();
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
 

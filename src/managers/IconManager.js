@@ -1,8 +1,8 @@
-// src/managers/ElementManager.js
+// src/managers/IconManager.js
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
-export default class ElementManager {
+export default class IconManager {
   cleanup() {
     if (state.highlightedElement) {
       state.highlightedElement.style.outline = "";
@@ -77,6 +77,7 @@ export default class ElementManager {
           "در حال ترجمه...",
           "status"
         );
+
         const translated = await translateText(text);
         await this.translationHandler.updateTargetElement(target, translated);
       } catch (error) {
@@ -85,6 +86,8 @@ export default class ElementManager {
           context: "translate-icon-click",
           element: target,
         });
+      } finally {
+        this.notifier.dismiss(statusNotification);
       }
     };
 
