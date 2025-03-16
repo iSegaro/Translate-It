@@ -137,10 +137,9 @@ export default class TranslationHandler {
     return false;
   }
 
-  //Todo: Still need some works
   async translateTextNodesInElement(element) {
+    const translationCache = new Map(); // Create a cache within this module
     try {
-      // استفاده از کل المنت به عنوان ریشه برای TreeWalker
       const walker = document.createTreeWalker(
         element,
         NodeFilter.SHOW_TEXT,
@@ -155,18 +154,23 @@ export default class TranslationHandler {
       );
 
       let nodes = [];
-      let texts = [];
+      const originalTextsMap = new Map();
       let totalLength = 0;
 
       while (walker.nextNode()) {
         const node = walker.currentNode;
         const trimmedText = node.textContent.trim();
-        nodes.push(node);
-        texts.push(trimmedText);
-        totalLength += trimmedText.length;
+        if (trimmedText) {
+          nodes.push(node);
+          totalLength += trimmedText.length;
+          if (originalTextsMap.has(trimmedText)) {
+            originalTextsMap.get(trimmedText).push(node);
+          } else {
+            originalTextsMap.set(trimmedText, [node]);
+          }
+        }
       }
 
-      // در صورت وجود متن بسیار زیاد
       if (totalLength > 3000) {
         this.notifier.show(
           "متن انتخابی خیلی طولانی است. لطفا محدوده کوچکتری انتخاب کنید.",
@@ -175,22 +179,57 @@ export default class TranslationHandler {
         return;
       }
 
-      // Todo: نیازمند بهینه سازی هستش، تا هر متن را بصورت جدا برای ترجمه ارسال نکنه
-      // ترجمه تک تک text node ها به صورت جداگانه
-      const translatedTexts = await Promise.all(
-        texts.map((text) => translateText(text))
-      );
+      const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
 
-      // جایگزینی متن‌های ترجمه‌شده در هر text node
-      nodes.forEach((node, index) => {
-        node.textContent = translatedTexts[index];
-        this.IconManager.applyTextDirection(
-          node.parentElement,
-          translatedTexts[index]
-        );
+      const textsToTranslate = [];
+      const cachedTranslations = new Map();
+      uniqueOriginalTexts.forEach((text) => {
+        if (translationCache.has(text)) {
+          cachedTranslations.set(text, translationCache.get(text));
+        } else {
+          textsToTranslate.push(text);
+        }
+      });
+
+      if (textsToTranslate.length === 0) {
+        nodes.forEach((node) => {
+          const originalText = node.textContent.trim();
+          if (cachedTranslations.has(originalText)) {
+            node.textContent = cachedTranslations.get(originalText);
+            this.IconManager.applyTextDirection(
+              node.parentElement,
+              cachedTranslations.get(originalText)
+            );
+          }
+        });
+        this.notifier.show("تمام متون از حافظه پنهان بارگیری شدند.", "info");
+        return;
+      }
+
+      const translatedTextsArray = await translateText(textsToTranslate);
+
+      const newTranslations = new Map();
+      textsToTranslate.forEach((originalText, index) => {
+        const translatedText = translatedTextsArray[index];
+        newTranslations.set(originalText, translatedText);
+        translationCache.set(originalText, translatedText);
+      });
+
+      nodes.forEach((node) => {
+        const originalText = node.textContent.trim();
+        const translatedText =
+          cachedTranslations.get(originalText) ||
+          newTranslations.get(originalText);
+        if (translatedText) {
+          node.textContent = translatedText;
+          this.IconManager.applyTextDirection(
+            node.parentElement,
+            translatedText
+          );
+        }
       });
     } catch (error) {
-      console.error("Error caught in translateTextNodesInElement:", error); // اضافه کردن لاگ برای بررسی نوع خطا
+      console.error("Error caught in translateTextNodesInElement:", error);
       this.handleError(error);
     }
   }
@@ -215,10 +254,10 @@ export default class TranslationHandler {
   }
 
   revertTranslations() {
-    console.log(
-      "revertTranslations: وضعیت state.originalTexts در شروع:",
-      state.originalTexts
-    );
+    // console.log(
+    //   "revertTranslations: وضعیت state.originalTexts در شروع:",
+    //   state.originalTexts
+    // );
     console.log("Starting revert process...");
     let successfulReverts = 0;
 
@@ -226,11 +265,11 @@ export default class TranslationHandler {
       // پیمایش بر روی شناسه‌های یکتا
       try {
         if (!data.parent || !data.originalInnerHTML) {
-          console.warn(
-            "revertTranslations: داده‌های والد یا innerHTML اصلی برای شناسه",
-            uniqueId,
-            "معتبر نیستند."
-          );
+          // console.warn(
+          //   "revertTranslations: داده‌های والد یا innerHTML اصلی برای شناسه",
+          //   uniqueId,
+          //   "معتبر نیستند."
+          // );
           continue;
         }
 
@@ -243,12 +282,12 @@ export default class TranslationHandler {
           continue;
         }
 
-        console.log(
-          "revertTranslations: بازگردانی innerHTML والد با شناسه:",
-          uniqueId,
-          "innerHTML اصلی:",
-          data.originalInnerHTML
-        );
+        // console.log(
+        //   "revertTranslations: بازگردانی innerHTML والد با شناسه:",
+        //   uniqueId,
+        //   "innerHTML اصلی:",
+        //   data.originalInnerHTML
+        // );
 
         // جایگزینی innerHTML
         data.parent.innerHTML = data.originalInnerHTML;
@@ -277,10 +316,10 @@ export default class TranslationHandler {
     // پاکسازی state
     state.originalTexts.clear();
     this.IconManager.cleanup();
-    console.log(
-      "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
-      state.originalTexts
-    );
+    // console.log(
+    //   "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
+    //   state.originalTexts
+    // );
   }
 
   async updateTargetElement(target, translated) {
