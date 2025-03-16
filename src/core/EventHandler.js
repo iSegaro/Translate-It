@@ -135,10 +135,22 @@ export default class EventHandler {
       textNodes.forEach((textNode) => {
         const originalText = textNode.textContent.trim();
         if (cachedTranslations.has(originalText)) {
-          textNode.textContent = cachedTranslations.get(originalText);
+          const translatedText = cachedTranslations.get(originalText);
+          const parentElement = textNode.parentElement;
+          const uniqueId =
+            Math.random().toString(36).substring(2, 15) +
+            Math.random().toString(36).substring(2, 15);
+          parentElement.setAttribute("data-original-text-id", uniqueId);
+
+          state.originalTexts.set(uniqueId, {
+            originalInnerHTML: parentElement.innerHTML,
+            translatedText: translatedText,
+            parent: parentElement,
+          });
+          textNode.textContent = translatedText;
           this.IconManager.applyTextDirection(
             textNode.parentElement,
-            cachedTranslations.get(originalText)
+            translatedText
           );
         }
       });
