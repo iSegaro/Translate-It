@@ -1,5 +1,6 @@
 // src/core/TranslationHandler.js
 import WhatsAppStrategy from "../strategies/WhatsAppStrategy.js";
+import InstagramStrategy from "../strategies/InstagramStrategy.js";
 import TwitterStrategy from "../strategies/TwitterStrategy.js";
 import TelegramStrategy from "../strategies/TelegramStrategy.js";
 import MediumStrategy from "../strategies/MediumStrategy.js";
@@ -28,6 +29,7 @@ export default class TranslationHandler {
 
     this.strategies = {
       whatsapp: new WhatsAppStrategy(this.notifier),
+      instagram: new InstagramStrategy(this.notifier),
       medium: new MediumStrategy(this.notifier),
       telegram: new TelegramStrategy(this.notifier),
       twitter: new TwitterStrategy(this.notifier),
