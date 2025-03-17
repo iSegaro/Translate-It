@@ -62,7 +62,8 @@ chrome.runtime.onInstalled.addListener((details) => {
             "web.telegram.org",
             "instagram.com",
             "twitter.com",
-            "youtube.com",
+            "medium.com",
+            "x.com",
           ].some((domain) => tab.url.includes(domain))
         ) {
           chrome.tabs
