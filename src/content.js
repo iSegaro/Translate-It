@@ -2,7 +2,7 @@
 import { CONFIG, state } from "./config.js";
 import TranslationHandler from "./core/TranslationHandler.js";
 import { setupEventListeners } from "./core/EventRouter.js";
-import { isExtensionContextValid } from "./utils/helpers.js";
+import { isExtensionContextValid, taggleLinks } from "./utils/helpers.js";
 import WhatsAppStrategy from "./strategies/WhatsAppStrategy.js";
 
 /**
@@ -143,35 +143,5 @@ chrome.runtime.onMessage.addListener((message) => {
     translationHandler.updateSelectionState(message.data);
   }
 });
-
-/**
- * متد taggleLinks جهت تغییر حالت کلیک‌ناپذیر بودن تمام المنت‌های صفحه
- */
-export function taggleLinks(enable = true) {
-  try {
-    if (!document || !document.body) return;
-    if (enable) {
-      document.documentElement.classList.add("disable-links");
-    } else {
-      document.documentElement.classList.remove("disable-links");
-    }
-  } catch (error) {
-    // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
-    if (
-      error.message &&
-      error.message.includes("Extension context invalidated")
-    ) {
-      // translationHandler.errorHandler.notifier.show(
-      //   "Extension context invalidated, ignoring error in taggleLinks.",
-      //   "warning"
-      // );
-    } else {
-      translationHandler.errorHandler.handle(error, {
-        type: translationHandler.ErrorTypes.UI,
-        context: "taggleLinks",
-      });
-    }
-  }
-}
 
 export { translationHandler };

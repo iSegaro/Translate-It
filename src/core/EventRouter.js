@@ -1,6 +1,6 @@
 // src/core/EventRouter.js
 import { CONFIG, state } from "../config.js";
-import { isEditable } from "../utils/helpers.js";
+import { isEditable, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 export function setupEventListeners(translationHandler) {
@@ -42,6 +42,8 @@ export function setupEventListeners(translationHandler) {
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
 
+      taggleLinks(false);
+
       chrome.runtime.sendMessage({
         action: "UPDATE_SELECTION_STATE",
         data: false,
@@ -58,6 +60,8 @@ export function setupEventListeners(translationHandler) {
       translationHandler.IconManager.cleanup();
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
+
+      taggleLinks(false);
 
       chrome.runtime.sendMessage({
         action: "UPDATE_SELECTION_STATE",
