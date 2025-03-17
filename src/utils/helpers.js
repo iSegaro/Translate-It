@@ -118,11 +118,7 @@ export const showStatus = (() => {
 export function taggleLinks(enable = true) {
   try {
     if (!document || !document.body) return;
-    if (enable) {
-      document.documentElement.classList.add("disable-links");
-    } else {
-      document.documentElement.classList.remove("disable-links");
-    }
+    document.documentElement.classList.toggle("disable-links", enable);
   } catch (error) {
     // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
     if (
