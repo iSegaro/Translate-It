@@ -4,13 +4,10 @@ import TranslationHandler from "./core/TranslationHandler.js";
 import { setupEventListeners } from "./core/EventRouter.js";
 import { isExtensionContextValid } from "./utils/helpers.js";
 import WhatsAppStrategy from "./strategies/WhatsAppStrategy.js";
-// import ChatGPTStrategy from "./strategies/ChatGPTStrategy.js";
-// import DefaultStrategy from "./strategies/DefaultStrategy.js";
-// import MediumStrategy from "./strategies/MediumStrategy.js";
-// import TelegramStrategy from "./strategies/TelegramStrategy.js";
-// import TwitterStrategy from "./strategies/TwitterStrategy.js";
 
-// تابع برای تزریق CSS به صورت داینامیک
+/**
+ * تابع تزریق CSS به صورت داینامیک
+ */
 function injectCSS(filePath) {
   const linkElement = document.createElement("link");
   linkElement.href = chrome.runtime.getURL(filePath);
@@ -18,39 +15,42 @@ function injectCSS(filePath) {
   document.head.appendChild(linkElement);
 }
 
-// بررسی hostname و انتخاب فایل CSS مناسب
+// تزریق فایل‌های CSS مناسب بر اساس hostname
 const hostname = window.location.hostname;
 injectCSS("styles/content.css");
 if (hostname.includes("whatsapp.com")) {
   injectCSS("styles/whatsapp.css");
 }
 
-// Initialize core components
+// ایجاد نمونه TranslationHandler
 const translationHandler = new TranslationHandler();
 
+// در صورت استفاده از واتساپ، استراتژی مربوطه و مانیتورینگ context تنظیم می‌شود
 if (window.location.hostname === "web.whatsapp.com") {
   translationHandler.strategies.whatsapp = new WhatsAppStrategy();
 
-  // مانیتورینگ وضعیت context
+  // مانیتورینگ وضعیت context هر ۵ ثانیه
   setInterval(() => {
     try {
       if (!isExtensionContextValid()) {
         chrome.runtime.sendMessage({ action: "CONTEXT_INVALID" });
       }
     } catch (error) {
-      // اگر خطا مربوط به از بین رفتن context باشد، آن را نادیده بگیر
+      // در صورت خطای "Extension context invalidated"، نادیده گرفته می‌شود
       if (
         error.message &&
         error.message.includes("Extension context invalidated")
       ) {
         return;
       }
-      // در صورت بروز سایر خطاها، آن‌ها را در کنسول نمایش بده (اختیاری)
-      console.error(error);
+      translationHandler.errorHandler.handle(error, {
+        type: translationHandler.ErrorTypes.CONTEXT,
+        context: "context-monitoring",
+      });
     }
   }, 5000);
 
-  // بهبود مدیریت رویدادها برای واتساپ
+  // تنظیم event listener ویژه واتساپ برای کلیک روی باکس‌های متنی
   document.addEventListener("click", (e) => {
     if (state.selectionActive && e.target.closest('[role="textbox"]')) {
       translationHandler.eventHandler.handleSelectionClick(e);
@@ -58,11 +58,18 @@ if (window.location.hostname === "web.whatsapp.com") {
   });
 }
 
-// Polyfill برای مرورگرهای قدیمی
+// افزودن polyfill‌های مورد نیاز برای متدهای matches و closest
 if (!Element.prototype.matches) {
   Element.prototype.matches =
     Element.prototype.msMatchesSelector ||
-    Element.prototype.webkitMatchesSelector;
+    function (selector) {
+      const matches = (this.document || this.ownerDocument).querySelectorAll(
+          selector
+        ),
+        i = matches.length;
+      while (--i >= 0 && matches.item(i) !== this) {}
+      return i > -1;
+    };
 }
 
 if (!Element.prototype.closest) {
@@ -76,23 +83,55 @@ if (!Element.prototype.closest) {
   };
 }
 
-// Extension initialization
+// اگر context معتبر است، تنظیمات افزونه و event listener ها اعمال می‌شوند
 if (isExtensionContextValid()) {
   console.info("Extension initialized successfully");
 
-  // Setup global event listeners
-  setupEventListeners(translationHandler);
+  // تعریف متد یکپارچه updateSelectionState با استفاده از errorHandler
+  translationHandler.updateSelectionState = function (newState) {
+    if (isExtensionContextValid()) {
+      try {
+        state.selectionActive = newState;
+        chrome.storage.local.set({ selectionActive: newState });
+        chrome.runtime.sendMessage({
+          action: "UPDATE_SELECTION_STATE",
+          data: newState,
+        });
+        taggleLinks(newState);
+        if (!newState) {
+          this.IconManager.cleanup();
+        }
+      } catch (error) {
+        if (
+          error.message &&
+          error.message.includes("Extension context invalidated")
+        ) {
+          // console.warn(
+          //   "Extension context invalidated during updateSelectionState."
+          // );
+        } else {
+          this.errorHandler.handle(error, {
+            type: this.ErrorTypes.CONTEXT,
+            context: "updateSelectionState",
+          });
+        }
+      }
+    } else {
+      // console.info(
+      //   "Extension context is not valid, skipping updateSelectionState."
+      // );
+    }
+  };
 
-  // Apply initial configuration
+  setupEventListeners(translationHandler);
   Object.freeze(CONFIG);
 
-  // Add cleanup on `pagehide`, instead `unload`
   window.addEventListener("pagehide", () => {
     translationHandler.IconManager.cleanup();
     state.selectionActive = false;
+    translationHandler.updateSelectionState(false);
   });
 } else {
-  // console.error("Extension context lost - please refresh page");
   translationHandler.notifier.show(
     "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
     "error",
@@ -100,43 +139,50 @@ if (isExtensionContextValid()) {
   );
 }
 
-// Initialize with default state
 chrome.storage.local.get(["selectionActive"], (result) => {
   state.selectionActive = result.selectionActive || false;
 });
 
-// Listen to storage changes
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.selectionActive) {
-    state.selectionActive = changes.selectionActive.newValue;
-    updateSelectionUI();
+    translationHandler.updateSelectionState(changes.selectionActive.newValue);
   }
 });
-
-// Message listener
-let notificationTimeout;
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "TOGGLE_SELECTION_MODE") {
-    state.selectionActive = message.data;
-    // پاک کردن نوتیفیکیشن قبلی
-    if (notificationTimeout) clearTimeout(notificationTimeout);
-    if (!state.selectionActive) {
-      translationHandler.IconManager.cleanup();
-    }
+    translationHandler.updateSelectionState(message.data);
   }
 });
 
-function updateSelectionUI() {
-  if (state.selectionActive) {
-    // translationHandler.notifier.show("حالت انتخاب فعال شد", "info", true, 100);
-  } else {
-    // translationHandler.notifier.show(
-    //   "حالت انتخاب غیرفعال شد",
-    //   "info",
-    //   true,
-    //   100
-    // );
-    translationHandler.IconManager.cleanup();
+/**
+ * متد taggleLinks جهت تغییر حالت کلیک‌ناپذیر بودن تمام المنت‌های صفحه
+ */
+export function taggleLinks(enable = true) {
+  try {
+    if (!document || !document.body) return;
+    if (enable) {
+      document.documentElement.classList.add("disable-links");
+    } else {
+      document.documentElement.classList.remove("disable-links");
+    }
+  } catch (error) {
+    // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
+    if (
+      error.message &&
+      error.message.includes("Extension context invalidated")
+    ) {
+      // translationHandler.errorHandler.notifier.show(
+      //   "Extension context invalidated, ignoring error in taggleLinks.",
+      //   "warning"
+      // );
+    } else {
+      translationHandler.errorHandler.handle(error, {
+        type: translationHandler.ErrorTypes.UI,
+        context: "taggleLinks",
+      });
+    }
   }
 }
+
+export { translationHandler };

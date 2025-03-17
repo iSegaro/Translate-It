@@ -6,3 +6,10 @@
   visibility: visible !important;
   pointer-events: all !important;
 }
+
+.disable-links a {
+  pointer-events: none !important;
+  cursor: crosshair !important; /* تغییر نشانگر موس */
+  color: inherit; /* اخیاری: برای حذف رنگ پیش‌فرض لینک‌ها */
+  text-decoration: none;
+}
