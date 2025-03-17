@@ -12,8 +12,9 @@
 
 .disable-links a,
 .disable-links button,
-.disable-links [role="link"],
 .disable-links [onclick],
+.disable-links [role="link"],
+.disable-links div[role="link"],
 .disable-links [data-testid="tweet"],
 .disable-links article[data-testid="tweet"] {
   pointer-events: none !important;
