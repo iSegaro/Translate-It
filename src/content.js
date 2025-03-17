@@ -92,7 +92,6 @@ if (isExtensionContextValid()) {
     if (isExtensionContextValid()) {
       try {
         state.selectionActive = newState;
-        chrome.storage.local.set({ selectionActive: newState });
         chrome.runtime.sendMessage({
           action: "UPDATE_SELECTION_STATE",
           data: newState,
@@ -106,8 +105,8 @@ if (isExtensionContextValid()) {
           error.message &&
           error.message.includes("Extension context invalidated")
         ) {
-          // console.warn(
-          //   "Extension context invalidated during updateSelectionState."
+          // console.info(
+          //   "Extension context is not valid, skipping updateSelectionState."
           // );
         } else {
           this.errorHandler.handle(error, {
@@ -138,16 +137,6 @@ if (isExtensionContextValid()) {
     true
   );
 }
-
-chrome.storage.local.get(["selectionActive"], (result) => {
-  state.selectionActive = result.selectionActive || false;
-});
-
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.selectionActive) {
-    translationHandler.updateSelectionState(changes.selectionActive.newValue);
-  }
-});
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "TOGGLE_SELECTION_MODE") {

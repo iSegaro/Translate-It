@@ -1,42 +1,43 @@
 // src/background.js
 import { CONFIG, getApiKeyAsync } from "./config.js";
-import NotificationManager from "./managers/NotificationManager.js"; // Import NotificationManager
+import NotificationManager from "./managers/NotificationManager.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 
 const errorHandler = new ErrorHandler();
-
-// Detect extension reload
 let isReloaded = false;
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
 const selectionStates = {};
-const notifier = new NotificationManager(); // Instantiate NotificationManager for background script
-const displayedErrorsBackground = new Set(); // Set for tracking displayed errors in background
 
-chrome.action.onClicked.addListener((tab) => {
-  if (!tab?.id || tab.status !== "complete") return;
-  const tabId = tab.id;
-  // تغییر وضعیت فقط برای تب فعلی
-  selectionStates[tabId] = !selectionStates[tabId];
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      const tabId = tabs[0].id;
 
-  chrome.tabs
-    .sendMessage(tabId, {
-      action: "TOGGLE_SELECTION_MODE",
-      data: selectionStates[tabId],
-    })
-    .catch((error) => {
-      console.log("Retrying injection...");
-      chrome.scripting
-        .executeScript({
-          target: { tabId },
-          files: ["content.bundle.js"],
+      // تغییر وضعیت فقط برای تب فعال
+      selectionStates[tabId] = !selectionStates[tabId];
+
+      // ارسال پیام فقط به تب فعال
+      chrome.tabs
+        .sendMessage(tabId, {
+          action: "TOGGLE_SELECTION_MODE",
+          data: selectionStates[tabId],
         })
-        .then(() => {
-          chrome.tabs.sendMessage(tabId, {
-            action: "TOGGLE_SELECTION_MODE",
-            data: selectionStates[tabId],
-          });
+        .catch((error) => {
+          console.log("Retrying injection...");
+          chrome.scripting
+            .executeScript({
+              target: { tabId },
+              files: ["content.bundle.js"],
+            })
+            .then(() => {
+              chrome.tabs.sendMessage(tabId, {
+                action: "TOGGLE_SELECTION_MODE",
+                data: selectionStates[tabId],
+              });
+            });
         });
-    });
+    }
+  });
 });
 
 // پاکسازی وضعیت تب زمانی که تب بسته می‌شود
