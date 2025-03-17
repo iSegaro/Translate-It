@@ -8,18 +8,21 @@ export function detectPlatform() {
   const hostname = window.location.hostname.toLowerCase();
   const platformMap = {
     "web.whatsapp.com": "whatsapp",
+    "web.telegram.org": "telegram",
+    "www.instagram.com": "instagram",
     "twitter.com": "twitter",
     "x.com": "twitter",
-    "web.telegram.org": "telegram",
     "medium.com": "medium",
     "chat.openai.com": "chatgpt",
+    "chat.com": "chatgpt",
+    "chatgpt.com": "chatgpt",
   };
 
   return platformMap[hostname] || "default";
 }
 
 /**
- * دریافت نام پلتفرم به صورت خوانا.
+ * دریافت نام پلتفرم.
  * @returns {string} نام پلتفرم یا 'default' اگر تشخیص داده نشد.
  */
 export function getPlatformName() {
@@ -32,7 +35,7 @@ export function getPlatformName() {
     { name: "Telegram", patterns: ["web.telegram.org"] },
     { name: "Medium", patterns: ["medium.com"] },
     { name: "ChatGPT", patterns: ["chat.openai.com"] },
-    // اضافه کردن پلتفرم‌های دیگر در اینجا
+    { name: "Instagram", patterns: ["instagram.com"] },
   ];
 
   // جستجو در لیست پلتفرم‌ها
@@ -48,15 +51,15 @@ export function getPlatformName() {
 
 /**
  * تشخیص پلتفرم بر اساس بخشی از URL.
- * @returns {string} نام پلتفرم یا undefined اگر تشخیص داده نشد.
+ * @returns {string} نام پلتفرم یا 'default' اگر تشخیص داده نشد.
  */
 export function detectPlatformByURL() {
-  const hostname = window.location.hostname;
-  if (hostname.includes("twitter.com")) return "twitter";
-  if (hostname.includes("x.com")) return "twitter";
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname.includes("twitter.com") || hostname.includes("x.com"))
+    return "twitter";
   if (hostname.includes("medium.com")) return "medium";
   if (hostname.includes("telegram.com")) return "telegram";
   if (hostname.includes("whatsapp.com")) return "whatsapp";
-  if (hostname.includes("medium.com")) return "medium";
-  return undefined;
+  if (hostname.includes("instagram.com")) return "instagram";
+  return "default";
 }

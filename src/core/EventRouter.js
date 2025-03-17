@@ -1,6 +1,6 @@
 // src/core/EventRouter.js
 import { CONFIG, state } from "../config.js";
-import { isEditable } from "../utils/helpers.js";
+import { isEditable, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 export function setupEventListeners(translationHandler) {
@@ -20,7 +20,6 @@ export function setupEventListeners(translationHandler) {
     };
   };
 
-  // Event Handlers با مدیریت خطای یکپارچه
   const handleFocus = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
       translationHandler.handleEditableFocus(e.target);
@@ -43,11 +42,12 @@ export function setupEventListeners(translationHandler) {
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
 
+      taggleLinks(false);
+
       chrome.runtime.sendMessage({
         action: "UPDATE_SELECTION_STATE",
         data: false,
       });
-
       setTimeout(() => {
         translationHandler.eventHandler.handleSelectionClick(e);
       }, 100);
@@ -57,16 +57,16 @@ export function setupEventListeners(translationHandler) {
   const handleKeyDown = handleEventWithErrorHandling((e) => {
     console.log("keydown event detected. Key:", e.key);
     if (e.key === "Escape" && state.selectionActive) {
-      console.log("EventRouter: کلید ESC شناسایی شد.");
       translationHandler.IconManager.cleanup();
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
+
+      taggleLinks(false);
 
       chrome.runtime.sendMessage({
         action: "UPDATE_SELECTION_STATE",
         data: false,
       });
-
       console.info("Selection mode deactivated via Esc key.");
       return;
     }
@@ -87,7 +87,6 @@ export function setupEventListeners(translationHandler) {
       e.target.style.opacity = "0.9";
     }
   });
-
   // ثبت Event Listeners
   document.addEventListener("focus", handleFocus, true);
   document.addEventListener("blur", handleBlur, true);

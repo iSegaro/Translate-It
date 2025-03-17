@@ -119,7 +119,7 @@ export default class EventHandler {
 
     const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
 
-    // جداسازی متن‌های موجود در حافظه پنهان و متن‌های جدید
+    // جداسازی متن‌های موجود در حافظه کش و متن‌های جدید
     const textsToTranslate = [];
     const cachedTranslations = new Map();
     uniqueOriginalTexts.forEach((text) => {
@@ -131,7 +131,7 @@ export default class EventHandler {
     });
 
     if (textsToTranslate.length === 0) {
-      // تمام متون از حافظه پنهان بارگیری شدند
+      // تمام متون از حافظه کش بارگیری شدند
       textNodes.forEach((textNode) => {
         const originalText = textNode.textContent.trim();
         if (cachedTranslations.has(originalText)) {
@@ -154,7 +154,7 @@ export default class EventHandler {
           );
         }
       });
-      this.notifier.show("تمام متون از حافظه پنهان بارگیری شدند.", "info");
+      this.notifier.show("تمام متون از حافظه کَش بارگیری شدند.", "info");
       return;
     }
 
@@ -181,7 +181,7 @@ export default class EventHandler {
       textsToTranslate.forEach((originalText, index) => {
         const translatedText = translatedTextsArray[index];
         newTranslations.set(originalText, translatedText);
-        // ذخیره در حافظه پنهان
+        // ذخیره در حافظه کش
         translationCache.set(originalText, translatedText);
       });
 

@@ -1,5 +1,6 @@
 // src/core/TranslationHandler.js
 import WhatsAppStrategy from "../strategies/WhatsAppStrategy.js";
+import InstagramStrategy from "../strategies/InstagramStrategy.js";
 import TwitterStrategy from "../strategies/TwitterStrategy.js";
 import TelegramStrategy from "../strategies/TelegramStrategy.js";
 import MediumStrategy from "../strategies/MediumStrategy.js";
@@ -28,6 +29,7 @@ export default class TranslationHandler {
 
     this.strategies = {
       whatsapp: new WhatsAppStrategy(this.notifier),
+      instagram: new InstagramStrategy(this.notifier),
       medium: new MediumStrategy(this.notifier),
       telegram: new TelegramStrategy(this.notifier),
       twitter: new TwitterStrategy(this.notifier),
@@ -329,9 +331,9 @@ export default class TranslationHandler {
     try {
       const platform = detectPlatform(target);
       await this.strategies[platform].updateElement(target, translated);
-      if (platform !== "medium") {
-        this.IconManager.applyTextDirection(target, translated);
-      }
+      // if (platform !== "medium") {
+      //   this.IconManager.applyTextDirection(target, translated);
+      // }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI, // Or SERVICE depending on the error
@@ -389,25 +391,5 @@ export default class TranslationHandler {
         "TranslationHandler: processElementTranslation FINALLY block - status notification dismissed."
       );
     }
-  }
-
-  // این تابع باید از content.js فراخوانی شود
-  activateSelectionMode() {
-    this.selectionModeActive = true;
-    state.selectionActive = true; // همگام سازی با state.selectionActive برای سازگاری با بخش های دیگر کد
-    chrome.storage.local.set({ selectionActive: true });
-    this.notifier.show(
-      "حالت انتخاب فعال شد. روی متن مورد نظر کلیک کنید.",
-      "info"
-    );
-  }
-
-  // برای غیر فعال سازی حالت انتخاب
-  deactivateSelectionMode() {
-    this.selectionModeActive = false;
-    state.selectionActive = false;
-    chrome.storage.local.set({ selectionActive: false });
-    this.IconManager.cleanup(); // پاکسازی هایلایت و ...
-    this.notifier.show("حالت انتخاب غیر فعال شد.", "info");
   }
 }

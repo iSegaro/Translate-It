@@ -114,3 +114,26 @@ export const showStatus = (() => {
     }, duration);
   };
 })();
+
+export function taggleLinks(enable = true) {
+  try {
+    if (!document || !document.body) return;
+    document.documentElement.classList.toggle("disable-links", enable);
+  } catch (error) {
+    // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
+    if (
+      error.message &&
+      error.message.includes("Extension context invalidated")
+    ) {
+      // translationHandler.errorHandler.notifier.show(
+      //   "Extension context invalidated, ignoring error in taggleLinks.",
+      //   "warning"
+      // );
+    } else {
+      translationHandler.errorHandler.handle(error, {
+        type: translationHandler.ErrorTypes.UI,
+        context: "taggleLinks",
+      });
+    }
+  }
+}
