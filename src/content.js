@@ -21,6 +21,9 @@ injectCSS("styles/content.css");
 if (hostname.includes("whatsapp.com")) {
   injectCSS("styles/whatsapp.css");
 }
+if (hostname.includes("x.com")) {
+  injectCSS("styles/twitter.css");
+}
 
 // ایجاد نمونه TranslationHandler
 const translationHandler = new TranslationHandler();

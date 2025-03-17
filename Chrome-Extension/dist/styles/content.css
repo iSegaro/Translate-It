@@ -6,3 +6,13 @@
   visibility: visible !important;
   pointer-events: all !important;
 }
+
+.disable-links a,
+.disable-links button,
+.disable-links [onclick],
+.disable-links [role="link"],
+.disable-links div[role="link"] {
+  pointer-events: none !important;
+  /* cursor: crosshair !important; */
+  color: inherit;
+}
