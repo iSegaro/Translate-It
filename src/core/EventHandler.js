@@ -373,6 +373,7 @@ export default class EventHandler {
         }
         const normalizedError =
           error instanceof Error ? error : new Error(String(error));
+
         this.translationHandler.errorHandler.handle(normalizedError, {
           type: ErrorTypes.UI,
           context: "translate-icon-click",
@@ -386,8 +387,8 @@ export default class EventHandler {
     state.activeTranslateIcon = icon;
 
     // Positioning fix
-    const rect = target.getBoundingClientRect();
-    icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-    icon.style.left = `${rect.left + window.scrollX}px`;
+    // const rect = target.getBoundingClientRect();
+    // icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
+    // icon.style.left = `${rect.left + window.scrollX}px`;
   }
 }
