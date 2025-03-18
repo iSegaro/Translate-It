@@ -14,12 +14,17 @@ export default class DefaultStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
-    if (element.isContentEditable) {
-      element.innerHTML = translatedText;
-    } else {
-      element.value = translatedText;
+    try {
+      if (element.isContentEditable) {
+        element.innerHTML = translatedText;
+      } else {
+        element.value = translatedText;
+      }
+      this.applyTextDirection(element, translatedText);
+    } catch (error) {
+      error.context = "default-strategy-updateElement";
+      throw error;
     }
-    this.applyTextDirection(element, translatedText);
   }
 
   /**
