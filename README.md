@@ -1,4 +1,4 @@
-# Gemini Translate
+# AIWritingCompanion
 
 A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations are triggered by either clicking the extension icon or pressing the Ctrl+/ shortcut.
 
