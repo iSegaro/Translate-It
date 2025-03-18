@@ -246,6 +246,7 @@ export default class EventHandler {
   }
 
   handleEscape(event) {
+    event.preventDefault();
     event.stopPropagation();
     this.translationHandler.selectionModeActive = false;
     state.selectionActive = false;
@@ -334,10 +335,18 @@ export default class EventHandler {
   }
 
   setupIconBehavior(icon, target) {
+    // Add slight delay for positioning
+    setTimeout(() => {
+      const rect = target.getBoundingClientRect();
+      icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
+      icon.style.left = `${rect.left + window.scrollX}px`;
+    }, 50);
+
     const clickHandler = async (e) => {
       let statusNotification;
       try {
         e.preventDefault();
+        e.stopPropagation();
         icon.remove();
 
         const platform = detectPlatform(target);
@@ -375,5 +384,10 @@ export default class EventHandler {
     icon.addEventListener("click", clickHandler);
     document.body.appendChild(icon);
     state.activeTranslateIcon = icon;
+
+    // Positioning fix
+    const rect = target.getBoundingClientRect();
+    icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
+    icon.style.left = `${rect.left + window.scrollX}px`;
   }
 }
