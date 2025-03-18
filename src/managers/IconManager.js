@@ -27,32 +27,35 @@ export default class IconManager {
   }
 
   createTranslateIcon(target) {
-    const icon = document.createElement("button");
-    icon.className = "translation-icon-extension";
-    Object.assign(icon.style, {
-      position: "absolute",
-      background: "white",
-      border: "1px solid gray",
-      borderRadius: "4px",
-      padding: "2px 5px",
-      fontSize: "12px",
-      cursor: "pointer",
-      zIndex: "9999999999",
-      pointerEvents: "auto",
-    });
+    try {
+      const icon = document.createElement("button");
+      icon.className = "translation-icon-extension";
+      Object.assign(icon.style, {
+        position: "absolute",
+        background: "white",
+        border: "1px solid gray",
+        borderRadius: "4px",
+        padding: "2px 5px",
+        fontSize: "12px",
+        cursor: "pointer",
+        zIndex: "9999999999",
+        pointerEvents: "auto",
+      });
 
-    icon.textContent = CONFIG.ICON_TRANSLATION;
-    icon.title = CONFIG.TRANSLATION_ICON_TITLE;
+      icon.textContent = CONFIG.ICON_TRANSLATION;
+      icon.title = CONFIG.TRANSLATION_ICON_TITLE;
 
-    // محاسبه موقعیت جدید با در نظر گرفتن اسکرول
-    const rect = target.getBoundingClientRect();
-    icon.style.top = `${rect.top + window.scrollY + 5}px`;
-    icon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
+      const rect = target.getBoundingClientRect();
+      icon.style.top = `${rect.top + window.scrollY + 5}px`;
+      icon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
 
-    // نمایش همیشگی آیکون
-    icon.style.display = "block !important";
-    icon.style.visibility = "visible !important";
+      icon.style.display = "block !important";
+      icon.style.visibility = "visible !important";
 
-    return icon;
+      return icon;
+    } catch (error) {
+      console.error("[IconManager] Error in createTranslateIcon:", error);
+      throw error;
+    }
   }
 }
