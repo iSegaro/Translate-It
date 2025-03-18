@@ -6,6 +6,7 @@ import { ErrorTypes } from "../services/ErrorService.js";
 export function setupEventListeners(translationHandler) {
   const errorHandler = translationHandler.errorHandler;
 
+  // تمام event handlerها در این تابع در صورت بروز خطا، آن را از طریق ErrorHandler مدیریت می‌کنند
   const handleEventWithErrorHandling = (handler) => {
     return (...args) => {
       try {
@@ -87,7 +88,8 @@ export function setupEventListeners(translationHandler) {
       e.target.style.opacity = "0.9";
     }
   });
-  // ثبت Event Listeners
+
+  // ثبت Event Listenerها
   document.addEventListener("focus", handleFocus, true);
   document.addEventListener("blur", handleBlur, true);
   document.addEventListener("selectionchange", handleSelectionChange);
@@ -95,7 +97,7 @@ export function setupEventListeners(translationHandler) {
   document.addEventListener("keydown", handleKeyDown);
   document.addEventListener("mouseover", handleMouseOver);
 
-  // برگرداندن توابع برای مدیریت حذف
+  // برگرداندن توابع جهت امکان حذف بعدی
   return {
     handleFocus,
     handleBlur,
