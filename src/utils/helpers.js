@@ -137,3 +137,25 @@ export function taggleLinks(enable = true) {
     }
   }
 }
+
+/**
+ * تابع تزریق CSS به صورت داینامیک
+ */
+function injectCSS(filePath) {
+  const linkElement = document.createElement("link");
+  linkElement.href = chrome.runtime.getURL(filePath);
+  linkElement.rel = "stylesheet";
+  document.head.appendChild(linkElement);
+}
+
+export function injectStyle() {
+  // تزریق فایل‌های CSS مناسب بر اساس hostname
+  const hostname = window.location.hostname;
+  injectCSS("styles/content.css");
+  if (hostname.includes("whatsapp.com")) {
+    injectCSS("styles/whatsapp.css");
+  }
+  if (hostname.includes("x.com")) {
+    injectCSS("styles/twitter.css");
+  }
+}

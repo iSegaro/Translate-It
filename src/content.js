@@ -2,28 +2,14 @@
 import { CONFIG, state } from "./config.js";
 import TranslationHandler from "./core/TranslationHandler.js";
 import { setupEventListeners } from "./core/EventRouter.js";
-import { isExtensionContextValid, taggleLinks } from "./utils/helpers.js";
+import {
+  isExtensionContextValid,
+  taggleLinks,
+  injectStyle,
+} from "./utils/helpers.js";
 import WhatsAppStrategy from "./strategies/WhatsAppStrategy.js";
 
-/**
- * تابع تزریق CSS به صورت داینامیک
- */
-function injectCSS(filePath) {
-  const linkElement = document.createElement("link");
-  linkElement.href = chrome.runtime.getURL(filePath);
-  linkElement.rel = "stylesheet";
-  document.head.appendChild(linkElement);
-}
-
-// تزریق فایل‌های CSS مناسب بر اساس hostname
-const hostname = window.location.hostname;
-injectCSS("styles/content.css");
-if (hostname.includes("whatsapp.com")) {
-  injectCSS("styles/whatsapp.css");
-}
-if (hostname.includes("x.com")) {
-  injectCSS("styles/twitter.css");
-}
+injectStyle();
 
 // ایجاد نمونه TranslationHandler
 const translationHandler = new TranslationHandler();
