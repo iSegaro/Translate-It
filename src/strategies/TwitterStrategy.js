@@ -1,4 +1,5 @@
 // src/strategies/TwitterStrategy.js
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import PlatformStrategy from "./PlatformStrategy";
 import { delay } from "../utils/helpers";
 import { CONFIG } from "../config";
@@ -51,7 +52,10 @@ export default class TwitterStrategy extends PlatformStrategy {
       });
       tweetField.dispatchEvent(pasteEvent);
     } catch (error) {
-      // خطاها از طرف TranslationHandler مدیریت می‌شوند
+      new ErrorHandler(this.notifier).handle(error, {
+        type: ErrorTypes.UI,
+        context: "twitter-strategy-pasteText",
+      });
     }
   }
 
@@ -75,68 +79,64 @@ export default class TwitterStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
-    let tweetField = null;
-
-    // اولویت اول: بررسی فیلد جستجو
-    const searchInput = document.querySelector(
-      '[data-testid="SearchBox_Search_Input"]'
-    );
-    if (
-      searchInput &&
-      this.validateField(searchInput) &&
-      (element === searchInput ||
-        element?.contains(searchInput) ||
-        document.activeElement === searchInput)
-    ) {
-      tweetField = searchInput;
-      tweetField.value = translatedText;
-      tweetField.dispatchEvent(new Event("input", { bubbles: true }));
-      console.info("Translation applied to Twitter search field.");
-      return;
-    }
-
-    // اگر فیلد جستجو نبود، به بررسی فیلدهای توییت‌نویسی بپردازید
-    if (this.isTwitterElement(document.activeElement)) {
-      tweetField = document.activeElement;
-    } else if (this.isTwitterElement(element)) {
-      tweetField = element;
-    } else {
-      const SELECTORS =
-        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
-      tweetField = this.findField(element, SELECTORS);
-    }
-
-    if (!tweetField) {
-      console.warn("فیلد توییت برای ترجمه یافت نشد.");
-      return;
-    }
-
-    if (!this.validateField(tweetField)) {
-      return;
-    }
-
-    // اگر فیلد، فیلد جستجو نبود، ادامه روند توییت‌نویسی
-    const isSearchField =
-      tweetField.getAttribute("data-testid") === "SearchBox_Search_Input";
-
-    if (!isSearchField) {
-      tweetField.focus();
-      this.clearTweetField(tweetField);
-      await delay(50);
-
-      this.pasteText(tweetField, translatedText);
-
-      tweetField.style.transition = "background-color 0.5s ease";
-      tweetField.style.backgroundColor = "#d4f8d4";
-      requestAnimationFrame(() => {
-        setTimeout(
-          () => (tweetField.style.backgroundColor = "transparent"),
-          1000
-        );
+    try {
+      let tweetField = null;
+      const searchInput = document.querySelector(
+        '[data-testid="SearchBox_Search_Input"]'
+      );
+      if (
+        searchInput &&
+        this.validateField(searchInput) &&
+        (element === searchInput ||
+          element?.contains(searchInput) ||
+          document.activeElement === searchInput)
+      ) {
+        tweetField = searchInput;
+        tweetField.value = translatedText;
+        tweetField.dispatchEvent(new Event("input", { bubbles: true }));
+        console.info("Translation applied to Twitter search field.");
+        return;
+      }
+      if (this.isTwitterElement(document.activeElement)) {
+        tweetField = document.activeElement;
+      } else if (this.isTwitterElement(element)) {
+        tweetField = element;
+      } else {
+        const SELECTORS =
+          '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
+        tweetField = this.findField(element, SELECTORS);
+      }
+      if (!tweetField) {
+        console.warn("فیلد توییت برای ترجمه یافت نشد.");
+        return;
+      }
+      if (!this.validateField(tweetField)) {
+        return;
+      }
+      const isSearchField =
+        tweetField.getAttribute("data-testid") === "SearchBox_Search_Input";
+      if (!isSearchField) {
+        tweetField.focus();
+        this.clearTweetField(tweetField);
+        await delay(50);
+        this.pasteText(tweetField, translatedText);
+        tweetField.style.transition = "background-color 0.5s ease";
+        tweetField.style.backgroundColor = "#d4f8d4";
+        requestAnimationFrame(() => {
+          setTimeout(
+            () => (tweetField.style.backgroundColor = "transparent"),
+            1000
+          );
+        });
+        await delay(100);
+        this.setCursorToEnd(tweetField);
+      }
+    } catch (error) {
+      error.context = "twitter-strategy-updateElement";
+      throw new ErrorHandler(this.notifier).handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "twitter-strategy-updateElement",
       });
-
-      await delay(100);
-      this.setCursorToEnd(tweetField);
     }
   }
 
