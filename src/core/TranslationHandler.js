@@ -22,9 +22,10 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export default class TranslationHandler {
   constructor() {
+    // ابتدا notifier را ایجاد می‌کنیم تا برای ErrorHandler موجود باشد
+    this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
     this.ErrorTypes = ErrorTypes;
-    this.notifier = new NotificationManager();
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
@@ -253,60 +254,39 @@ export default class TranslationHandler {
         }
       });
     } catch (error) {
-      console.error("Error caught in translateTextNodesInElement:", error);
-      this.handleError(error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "translate-text-nodes",
+      });
     }
   }
 
   revertTranslations() {
-    // console.log(
-    //   "revertTranslations: وضعیت state.originalTexts در شروع:",
-    //   state.originalTexts
-    // );
-    console.info("TranslationHandler:Starting revert process...");
+    console.info("TranslationHandler: Starting revert process...");
     let successfulReverts = 0;
 
+    // پیمایش بر روی شناسه‌های یکتا
     for (const [uniqueId, data] of state.originalTexts.entries()) {
-      // پیمایش بر روی شناسه‌های یکتا
       try {
         if (!data.parent || !data.originalInnerHTML) {
-          // console.warn(
-          //   "revertTranslations: داده‌های والد یا innerHTML اصلی برای شناسه",
-          //   uniqueId,
-          //   "معتبر نیستند."
-          // );
           continue;
         }
 
         if (!data.parent.isConnected) {
-          // console.warn(
-          //   "revertTranslations: عنصر والد برای شناسه",
-          //   uniqueId,
-          //   "دیگر به DOM متصل نیست."
-          // );
           continue;
         }
 
-        // console.log(
-        //   "revertTranslations: بازگردانی innerHTML والد با شناسه:",
-        //   uniqueId,
-        //   "innerHTML اصلی:",
-        //   data.originalInnerHTML
-        // );
-
-        // جایگزینی innerHTML
         data.parent.innerHTML = data.originalInnerHTML;
-
         successfulReverts++;
       } catch (error) {
-        console.error(
-          "revertTranslations: خطای بازگردانی innerHTML والد:",
-          error
-        );
+        this.errorHandler.handle(error, {
+          type: ErrorTypes.UI,
+          context: "revert-translations",
+          element: data.parent,
+        });
       }
     }
 
-    // نمایش نتایج
     if (successfulReverts > 0) {
       this.notifier.show(
         `${successfulReverts} متن با موفقیت بازگردانی شد`,
@@ -321,22 +301,15 @@ export default class TranslationHandler {
     // پاکسازی state
     state.originalTexts.clear();
     this.IconManager.cleanup();
-    // console.log(
-    //   "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
-    //   state.originalTexts
-    // );
   }
 
   async updateTargetElement(target, translated) {
     try {
       const platform = detectPlatform(target);
       await this.strategies[platform].updateElement(target, translated);
-      // if (platform !== "medium") {
-      //   this.IconManager.applyTextDirection(target, translated);
-      // }
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI, // Or SERVICE depending on the error
+        type: ErrorTypes.UI, // یا SERVICE بسته به نوع خطا
         context: "update-target-element",
         element: target,
       });
@@ -385,6 +358,12 @@ export default class TranslationHandler {
         "TranslationHandler: processElementTranslation SUCCESS for text:",
         text.substring(0, 20) + "..."
       );
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "process-element-translation",
+        element,
+      });
     } finally {
       this.notifier.dismiss(statusNotification);
       console.log(
