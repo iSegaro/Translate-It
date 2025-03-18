@@ -44,10 +44,7 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
     const error = new Error(TRANSLATION_ERRORS.MISSING_API_KEY);
     error.statusCode = 401;
     error.type = ErrorTypes.API;
-    throw errorHandler.handle(error, {
-      type: ErrorTypes.API,
-      statusCode: 401,
-    });
+    throw error; // پرتاب خطا به سطح بالاتر
   }
 
   try {
@@ -64,11 +61,7 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
       const error = new Error(errorMessage);
       error.statusCode = response.status;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
-        type: ErrorTypes.API,
-        statusCode: response.status,
-        service: "gemini",
-      });
+      throw error; // پرتاب خطا به سطح بالاتر
     }
 
     const data = await response.json();
@@ -77,10 +70,7 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
       const error = new Error("Invalid response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
-        type: ErrorTypes.API,
-        statusCode: 500,
-      });
+      throw error; // پرتاب خطا به سطح بالاتر
     }
 
     return data.candidates[0].content.parts[0].text;
@@ -88,11 +78,7 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
     error.type = ErrorTypes.API;
     error.statusCode = error.statusCode || 500;
     error.context = "gemini-translation";
-    throw errorHandler.handle(error, {
-      type: ErrorTypes.API,
-      statusCode: error.statusCode || 500,
-      context: "gemini-translation",
-    });
+    throw error; // پرتاب خطا به سطح بالاتر
   }
 }
 
@@ -158,17 +144,16 @@ async function handleWebAITranslation(text, sourceLang, targetLang) {
     });
 
     return data.response;
-  } catch (error) {
     // بازنشانی session در صورت خطای مربوطه
+  } catch (error) {
     if (error.sessionConflict) {
       resetSessionContext();
     }
-
     error.type = ErrorTypes.NETWORK;
-    error.context = "webai-translation" || 500;
+    error.context = "webai-translation";
     error.isWebAINetworkError = true;
     throw errorHandler.handle(error, {
-      type: ErrorTypes.NETWORK || 500,
+      type: ErrorTypes.NETWORK,
       context: "webai-translation",
     });
   }
@@ -351,7 +336,7 @@ export const translateText = async (text) => {
     ]);
 
     if (translationApi === "webai" && !sessionContext) {
-      resetSessionContext(); // اطمینان از مقداردهی اولیه
+      resetSessionContext();
     }
 
     switch (translationApi) {
@@ -367,63 +352,62 @@ export const translateText = async (text) => {
         const error = new Error("Invalid translation API selected");
         error.type = ErrorTypes.VALIDATION;
         error.statusCode = 400;
-        throw errorHandler.handle(error, {
-          type: ErrorTypes.VALIDATION,
-          statusCode: 400,
-        });
+        throw error;
     }
   } catch (error) {
-    console.debug("Error caught in translateText:", error);
-    // افزودن هندلینگ خطاهای session
+    // console.debug("api.js : translateText:", error);
+    // بررسی دقیق‌تر خطای API Key
+    if (
+      error.statusCode === 400 &&
+      error.type === ErrorTypes.API &&
+      error.message?.includes("API key not valid")
+    ) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: error.statusCode,
+      });
+      return;
+    }
     if (error.sessionConflict) {
       console.warn("Session conflict, retrying...");
       resetSessionContext();
       return await handleWebAITranslation(text, sourceLang, targetLang);
     }
-    // مدیریت خطاهای مربوط به context
-    if (error.message.includes("Extension context invalid")) {
+    if (error.message?.includes("Extension context invalid")) {
       error.type = ErrorTypes.CONTEXT;
       error.statusCode = 403;
-      throw errorHandler.handle(error, {
+      errorHandler.handle(error, {
         type: ErrorTypes.CONTEXT,
         statusCode: 403,
       });
+      return;
     }
-
-    // مدیریت خطاهای شبکه
     if (
       error.type === ErrorTypes.NETWORK ||
-      error.message.includes("Failed to fetch")
+      error.message?.includes("Failed to fetch")
     ) {
-      // اگر خطا از handleWebAITranslation آمده و قبلاً به عنوان NETWORK handle شده است، رد شود // تغییر نام
       if (error.isWebAINetworkError) {
         return;
       }
-      console.debug("Error caught in translateText:Network:", error);
       const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
       networkError.type = ErrorTypes.NETWORK;
       networkError.statusCode = 503;
-      throw errorHandler.handle(networkError, {
+      errorHandler.handle(networkError, {
         type: ErrorTypes.NETWORK,
         statusCode: 503,
       });
+      return;
     }
 
-    // خطاهای از قبل handle شده نیاز به بازنویسی ندارند
-    if (error.isHandled) {
-      console.debug("Error caught in translateText:isHandled:", error);
-      return error;
-    }
-
-    // سایر خطاها
-    console.debug("Error caught in translateText:OtherErrors:", error);
+    // هندل کردن سایر خطاها
     error.type = ErrorTypes.SERVICE;
     error.statusCode = error.statusCode || 500;
     error.context = "translation-service";
-    throw errorHandler.handle(error, {
+    errorHandler.handle(error, {
       type: ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
       context: "translation-service",
     });
+    return;
   }
 };

@@ -15,9 +15,19 @@ export class ErrorHandler {
   constructor(notificationManager = new NotificationManager()) {
     this.notifier = notificationManager;
     this.displayedErrors = new Set();
+    this.isHandling = false; // فلگ برای جلوگیری از هندلینگ چندباره در یک چرخه
   }
 
   handle(error, meta = {}) {
+    if (this.isHandling) {
+      console.debug(
+        "[ErrorHandler] Ignoring subsequent error in the same flow:",
+        error
+      );
+      return error;
+    }
+    this.isHandling = true;
+
     // نرمال‌سازی خطا در صورتی که از نوع Error نباشد
     if (!(error instanceof Error)) {
       error = new Error(String(error));
@@ -28,12 +38,14 @@ export class ErrorHandler {
     this._logError(error, meta);
     this._notifyUser(message, type, element);
 
+    this.isHandling = false; // ریست کردن فلگ بعد از هندلینگ
     return error;
   }
 
   _getErrorMessage(error, type, statusCode) {
     const errorMap = {
       [ErrorTypes.API]: {
+        400: "کلید API نامعتبر است", // اضافه کردن هندلینگ برای status code 400
         401: TRANSLATION_ERRORS.MISSING_API_KEY,
         403: "کلید API نامعتبر است",
         429: TRANSLATION_ERRORS.SERVICE_OVERLOADED,

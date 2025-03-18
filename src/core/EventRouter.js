@@ -56,7 +56,7 @@ export function setupEventListeners(translationHandler) {
   });
 
   const handleKeyDown = handleEventWithErrorHandling((e) => {
-    console.log("keydown event detected. Key:", e.key);
+    // console.log("keydown event detected. Key:", e.key);
     if (e.key === "Escape" && state.selectionActive) {
       translationHandler.IconManager.cleanup();
       state.selectionActive = false;
