@@ -55,48 +55,4 @@ export default class IconManager {
 
     return icon;
   }
-
-  setupIconBehavior(icon, target) {
-    // Add slight delay for positioning
-    setTimeout(() => {
-      const rect = target.getBoundingClientRect();
-      icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      icon.style.left = `${rect.left + window.scrollX}px`;
-    }, 50);
-
-    const clickHandler = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      try {
-        const text =
-          this.strategies[this.detectPlatform(target)].extractText(target);
-        if (!text) return;
-
-        const statusNotification = this.notifier.show(
-          "در حال ترجمه...",
-          "status"
-        );
-
-        const translated = await translateText(text);
-        await this.translationHandler.updateTargetElement(target, translated);
-      } catch (error) {
-        this.translationHandler.errorHandler.handle(error, {
-          type: ErrorTypes.UI, // Or SERVICE depending on the error source
-          context: "translate-icon-click",
-          element: target,
-        });
-      } finally {
-        this.notifier.dismiss(statusNotification);
-      }
-    };
-
-    icon.addEventListener("click", clickHandler);
-    document.body.appendChild(icon);
-
-    // Positioning fix
-    const rect = target.getBoundingClientRect();
-    icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-    icon.style.left = `${rect.left + window.scrollX}px`;
-  }
 }
