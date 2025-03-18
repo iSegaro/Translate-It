@@ -53,7 +53,7 @@ export default class NotificationManager {
     return container;
   }
 
-  // بهبود نمایش نوتیفیکیشن‌های سیستمی
+  // نمایش اعلان در صورتی که container وجود نداشته باشد (برای پس‌زمینه)
   showBackgroundNotification(message, type = "info", onClick) {
     const config = this.typeMapping[type] || this.typeMapping.info;
 
@@ -88,9 +88,9 @@ export default class NotificationManager {
     const baseNotification = {
       error: { icon: CONFIG.ICON_ERROR, duration: 5000 },
       warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
-      success: { icon: CONFIG.ICON_SECCESS, duration: 3000 },
+      success: { icon: CONFIG.ICON_SUCCESS, duration: 3000 },
       info: { icon: CONFIG.ICON_INFO, duration: 3000 },
-      status: { icon: CONFIG.ICON_INFO, duration: 2000 }, // پیش‌فرض برای وضعیت
+      status: { icon: CONFIG.ICON_INFO, duration: 2000 },
     };
 
     const config = baseNotification[type] || baseNotification.info;
@@ -116,9 +116,8 @@ export default class NotificationManager {
 
     this.container.appendChild(notification);
 
-    // فقط در صورتی حذف خودکار انجام شود که autoDismiss برابر با true باشد
+    // اعلان‌های وضعیت autoDismiss نمی‌شوند
     if (autoDismiss && type !== "status") {
-      // برای پیغام وضعیت حذف خودکار نداریم
       setTimeout(() => {
         this.dismiss(notification);
         notification.removeEventListener("click", clickHandler);
@@ -141,48 +140,5 @@ export default class NotificationManager {
       info: "rgba(30,144,255,0.8)",
     };
     return colors[type] || "rgba(0,0,0,0.7)";
-  }
-
-  showBackgroundNotification(message, type, onClick) {
-    // Method to show Chrome Notifications API
-    const notificationOptions = {
-      type: "basic",
-      iconUrl: "icons/icon.png", // Path to your extension icon
-      title: "ترجمه خودکار", // Extension name or a general title
-      message: message,
-      priority: 2, // Priority level (0-2, 2 is highest)
-    };
-
-    if (type === "error") {
-      notificationOptions.title = "خطا - ترجمه خودکار";
-      notificationOptions.priority = 2;
-    } else if (type === "warning") {
-      notificationOptions.title = "هشدار - ترجمه خودکار";
-      notificationOptions.priority = 1;
-    } else if (type === "success") {
-      notificationOptions.title = "موفقیت - ترجمه خودکار";
-      notificationOptions.priority = 0;
-    }
-
-    chrome.notifications.create(
-      undefined,
-      notificationOptions,
-      (notificationId) => {
-        if (onClick) {
-          chrome.notifications.onClicked.addListener(
-            function notificationClicked(clickedNotificationId) {
-              if (clickedNotificationId === notificationId) {
-                onClick();
-                chrome.notifications.clear(notificationId);
-                chrome.notifications.onClicked.removeListener(
-                  notificationClicked
-                ); // Clean up listener
-              }
-            }
-          );
-        }
-        // Notifications auto-dismiss after a certain time by default in Chrome, no need for manual dismiss in background
-      }
-    );
   }
 }
