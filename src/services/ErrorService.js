@@ -18,13 +18,17 @@ export class ErrorHandler {
   }
 
   handle(error, meta = {}) {
+    // نرمال‌سازی خطا در صورتی که از نوع Error نباشد
+    if (!(error instanceof Error)) {
+      error = new Error(String(error));
+    }
     const { type, statusCode, element } = meta;
     const message = this._getErrorMessage(error, type, statusCode);
 
     this._logError(error, meta);
     this._notifyUser(message, type, element);
 
-    return new Error(message);
+    return error;
   }
 
   _getErrorMessage(error, type, statusCode) {
@@ -46,21 +50,32 @@ export class ErrorHandler {
       [ErrorTypes.CONTEXT]: {
         default: TRANSLATION_ERRORS.INVALID_CONTEXT,
       },
+      [ErrorTypes.UI]: {
+        default: "خطای سیستمی رخ داده است",
+      },
+      [ErrorTypes.VALIDATION]: {
+        default: "خطای اعتبارسنجی رخ داده است",
+      },
     };
 
-    const category = errorMap[type] || errorMap[ErrorTypes.SERVICE];
-    return category[statusCode] || category.default;
+    if (type && errorMap[type]) {
+      return errorMap[type][statusCode] || errorMap[type].default;
+    }
+
+    // در صورت نداشتن نوع مشخص از پیام اصلی خطا استفاده می‌شود
+    return error.message || "خطای ناشناخته رخ داده است";
   }
 
   _logError(error, meta) {
-    console.error("[ErrorHandler]", {
-      message: error.message,
-      stack: error.stack,
-      ...meta,
-    });
+    // چاپ نام و پیام خطا به همراه متادیتا و استک (در صورت وجود) برای دیباگ
+    console.error(`[ErrorHandler] ${error.name}: ${error.message}`, meta);
+    if (error.stack) {
+      console.error(error.stack);
+    }
   }
 
   _notifyUser(message, type, element) {
+    // جلوگیری از نمایش خطاهای تکراری به مدت زمان مشخص
     if (this.displayedErrors.has(message)) return;
 
     const notificationType = this._getNotificationType(type);
@@ -72,11 +87,12 @@ export class ErrorHandler {
 
   _getNotificationType(errorType) {
     const typeMap = {
+      [ErrorTypes.UI]: "error",
       [ErrorTypes.API]: "error",
       [ErrorTypes.NETWORK]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
-      [ErrorTypes.UI]: "error",
+      [ErrorTypes.VALIDATION]: "warning",
     };
 
     return typeMap[errorType] || "error";
