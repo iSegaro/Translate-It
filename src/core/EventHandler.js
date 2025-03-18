@@ -61,7 +61,6 @@ export default class EventHandler {
       (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
     );
   }
-
   isEscapeEvent(event) {
     return event.key === "Escape" && !event.repeat;
   }
@@ -167,7 +166,7 @@ export default class EventHandler {
 
       state.translationMode = "selection";
 
-      const delimiter = "\n\n---\n\n"; // یک جداکننده احتمالی
+      const delimiter = "\n\n---\n\n"; // جداکننده برای اتصال متون
 
       // ارسال یک درخواست ترجمه برای تمام متن‌های جدید (متصل شده با جداکننده)
       const joinedTextsToTranslate = textsToTranslate.join(delimiter);
@@ -212,20 +211,20 @@ export default class EventHandler {
 
       this.notifier.dismiss(statusNotification);
     } catch (error) {
-      console.debug("Error caught in handleSelectionClick:", error);
-      if (
-        error?.type === ErrorTypes.NETWORK ||
-        error?.message?.includes("Failed to fetch")
-      ) {
-        if (statusNotification) {
-          this.notifier.dismiss(statusNotification);
-        }
-        return;
-      }
-
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
       }
+      // مدیریت خطا به صورت مرکزی؛ ساختار مناسب برای خطاهای شبکه یا سرویس
+      this.translationHandler.errorHandler.handle(error, {
+        type:
+          (
+            error?.type === ErrorTypes.NETWORK ||
+            error?.message?.includes("Failed to fetch")
+          ) ?
+            ErrorTypes.NETWORK
+          : ErrorTypes.SERVICE,
+        context: "handleSelectionClick",
+      });
     }
   }
 
@@ -284,12 +283,13 @@ export default class EventHandler {
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
     } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error));
-      this.translationHandler.errorHandler.handle(normalizedError, {
-        type: ErrorTypes.UI,
-        context: "select-element",
-      });
+      this.translationHandler.errorHandler.handle(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          type: ErrorTypes.UI,
+          context: "ctrl-slash",
+        }
+      );
     } finally {
       this.isProcessing = false;
     }
@@ -312,12 +312,13 @@ export default class EventHandler {
         selectionRange: selection.getRangeAt(0),
       });
     } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error));
-      this.translationHandler.errorHandler.handle(normalizedError, {
-        type: ErrorTypes.UI,
-        context: "select-element",
-      });
+      this.translationHandler.errorHandler.handle(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          type: ErrorTypes.UI,
+          context: "select-element",
+        }
+      );
     } finally {
       this.isProcessing = false;
     }
@@ -371,14 +372,14 @@ export default class EventHandler {
         if (statusNotification) {
           this.notifier.dismiss(statusNotification);
         }
-        const normalizedError =
-          error instanceof Error ? error : new Error(String(error));
-
-        this.translationHandler.errorHandler.handle(normalizedError, {
-          type: ErrorTypes.UI,
-          context: "translate-icon-click",
-          element: target,
-        });
+        this.translationHandler.errorHandler.handle(
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            type: ErrorTypes.UI,
+            context: "translate-icon-click",
+            element: target,
+          }
+        );
       }
     };
 
