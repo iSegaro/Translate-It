@@ -14,39 +14,6 @@ injectStyle();
 // ایجاد نمونه TranslationHandler
 const translationHandler = new TranslationHandler();
 
-// در صورت استفاده از واتساپ، استراتژی مربوطه و مانیتورینگ context تنظیم می‌شود
-if (window.location.hostname === "web.whatsapp.com") {
-  translationHandler.strategies.whatsapp = new WhatsAppStrategy();
-
-  // مانیتورینگ وضعیت context هر ۵ ثانیه
-  setInterval(() => {
-    try {
-      if (!isExtensionContextValid()) {
-        chrome.runtime.sendMessage({ action: "CONTEXT_INVALID" });
-      }
-    } catch (error) {
-      if (
-        error.message &&
-        error.message.includes("Extension context invalidated")
-      ) {
-        // this.notifier.show("!مجددا تلاش کنید", "info", true);
-        return;
-      }
-      translationHandler.errorHandler.handle(error, {
-        type: translationHandler.ErrorTypes.CONTEXT,
-        context: "context-monitoring",
-      });
-    }
-  }, 5000);
-
-  // تنظیم event listener ویژه واتساپ برای کلیک روی باکس‌های متنی
-  document.addEventListener("click", (e) => {
-    if (state.selectionActive && e.target.closest('[role="textbox"]')) {
-      translationHandler.eventHandler.handleSelectionClick(e);
-    }
-  });
-}
-
 // افزودن polyfill‌های مورد نیاز برای متدهای matches و closest
 if (!Element.prototype.matches) {
   Element.prototype.matches =
