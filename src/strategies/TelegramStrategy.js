@@ -1,4 +1,5 @@
 // src/strategies/TelegramStrategy.js
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import PlatformStrategy from "./PlatformStrategy";
 import { CONFIG } from "../config.js";
 import { delay } from "../utils/helpers";
@@ -18,27 +19,35 @@ export default class TelegramStrategy extends PlatformStrategy {
   }
 
   getTelegramField(element) {
-    if (this.isInputField(element) || this.isContentEditable(element)) {
-      return element;
+    if (!element) {
+      return;
     }
-    let field = element.closest('[aria-label="Message input"]');
-    if (field) return field;
-    field =
-      element.closest(".composer_rich_textarea") ||
-      element.closest(".public_DraftEditor-content");
-    if (field) return field;
-    field =
-      document.querySelector(".composer_rich_textarea") ||
-      document.querySelector(".public_DraftEditor-content");
-    if (!field) {
-      const editableFields = document.querySelectorAll(
-        '[contenteditable="true"]'
-      );
-      if (editableFields.length === 1) {
-        field = editableFields[0];
+    try {
+      if (this.isInputField(element) || this.isContentEditable(element)) {
+        return element;
       }
+      let field = element.closest('[aria-label="Message input"]');
+      if (field) return field;
+      field =
+        element.closest(".composer_rich_textarea") ||
+        element.closest(".public_DraftEditor-content");
+      if (field) return field;
+      field =
+        document.querySelector(".composer_rich_textarea") ||
+        document.querySelector(".public_DraftEditor-content");
+      if (!field) {
+        const editableFields = document.querySelectorAll(
+          '[contenteditable="true"]'
+        );
+        if (editableFields.length === 1) {
+          field = editableFields[0];
+        }
+      }
+      return field;
+    } catch (error) {
+      error.context = "Telegram-strategy-getTelegramField";
+      throw error;
     }
-    return field;
   }
 
   /**
@@ -48,63 +57,94 @@ export default class TelegramStrategy extends PlatformStrategy {
    *   و یک رویداد paste با داده خالی ارسال می‌شود تا تغییرات لازم اعمال گردد.
    */
   async clearField(field) {
-    if (this.isInputField(field)) {
-      field.value = "";
-    } else {
-      const selection = window.getSelection();
-      if (selection) {
-        const range = document.createRange();
-        range.selectNodeContents(field);
-        selection.removeAllRanges();
-        selection.addRange(range);
+    try {
+      if (!field) {
+        return;
       }
-      await delay(50);
-      // پاکسازی مستقیم محتوا
-      field.innerHTML = "";
-      const dt = new DataTransfer();
-      dt.setData("text/plain", "");
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
+      if (this.isInputField(field)) {
+        field.value = "";
+      } else {
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(field);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        await delay(50);
+        // پاکسازی مستقیم محتوا
+        field.innerHTML = "";
+        const dt = new DataTransfer();
+        dt.setData("text/plain", "");
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
 
-      await delay(50);
-      field.dispatchEvent(pasteEvent);
+        await delay(50);
+        field.dispatchEvent(pasteEvent);
+      }
+    } catch (error) {
+      error.context = "Telegram-strategy-clearField";
+      throw error;
     }
   }
 
   pasteText(field, text) {
     try {
-      const dt = new DataTransfer();
-      dt.setData("text/plain", text);
-      dt.setData("text/html", text.replace(/\n/g, "<br>"));
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      field.dispatchEvent(pasteEvent);
+      if (!field) {
+        return;
+      }
+      if (text !== undefined && text !== null) {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        let htmlText = text.replace(/\n/g, "<br>");
+        dt.setData("text/html", htmlText);
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
+        field.dispatchEvent(pasteEvent);
+      }
     } catch (error) {
-      console.error("TelegramStrategy: pasteText ERROR:", error);
+      new ErrorHandler(this.notifier).handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-pasteText",
+      });
     }
   }
 
   setCursorToEnd(field) {
-    if (this.isInputField(field)) {
-      const len = field.value.length;
-      field.setSelectionRange(len, len);
-    } else {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(field);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
+    try {
+      if (!field) {
+        return;
+      }
+      if (this.isInputField(field)) {
+        const len = field.value.length;
+        field.setSelectionRange(len, len);
+      } else {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(field);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } catch (error) {
+      error.context = "Telegram-strategy-setCursorToEnd";
+      throw error;
     }
   }
 
   async updateElement(element, translatedText) {
+    if (!translatedText) {
+      return;
+    }
+    if (!element) {
+      return;
+    }
     const SELECTORS =
       '[aria-label="Message input"], .composer_rich_textarea, .public_DraftEditor-content, [contenteditable="true"]';
 
@@ -150,33 +190,51 @@ export default class TelegramStrategy extends PlatformStrategy {
       await delay(100);
       this.setCursorToEnd(telegramField);
     } catch (error) {
-      console.error("TelegramStrategy: updateElement ERROR:", error);
-      throw error;
+      throw new ErrorHandler(this.notifier).handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "telegram-strategy-updateElement",
+      });
     }
   }
 
   // 6. افزودن متدهای جدید
   applyVisualFeedback(field) {
-    const originalTransition = field.style.transition;
-    field.style.transition = "background-color 0.5s ease";
-    field.style.backgroundColor = "#d4f8d4";
+    if (!field) {
+      return;
+    }
+    try {
+      const originalTransition = field.style.transition;
+      field.style.transition = "background-color 0.5s ease";
+      field.style.backgroundColor = "#d4f8d4";
 
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        field.style.backgroundColor = "transparent";
-        field.style.transition = originalTransition;
-      }, 1000);
-    });
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          field.style.backgroundColor = "transparent";
+          field.style.transition = originalTransition;
+        }, 1000);
+      });
+    } catch (error) {
+      error.context = "Telegram-strategy-applyVisualFeedback";
+      throw error;
+    }
   }
 
   extractText(target) {
-    const telegramField = this.getTelegramField(target);
-
-    if (telegramField?.isContentEditable) {
-      return telegramField.innerText.trim();
+    if (!target) {
+      return "";
     }
+    try {
+      const telegramField = this.getTelegramField(target);
 
-    return telegramField?.value.trim() || "";
+      if (telegramField?.isContentEditable) {
+        return telegramField.innerText.trim();
+      }
+
+      return telegramField?.value.trim() || "";
+    } catch (error) {
+      error.context = "Telegram-strategy-extractText";
+      throw error;
+    }
   }
 
   // 7. بهبود متد validateField
@@ -189,28 +247,54 @@ export default class TelegramStrategy extends PlatformStrategy {
   }
 
   async safeFocus(field) {
-    field.focus({ preventScroll: true });
-    await delay(100);
-    return field;
+    if (!field) {
+      return;
+    }
+    try {
+      field.focus({ preventScroll: true });
+      await delay(100);
+      return field;
+    } catch (error) {
+      error.context = "Telegram-strategy-safeFocus";
+      throw error;
+    }
   }
 
   async selectAllContent(field) {
-    document.execCommand("selectAll");
-    await delay(100);
-    return field;
+    if (!field) {
+      return;
+    }
+    try {
+      document.execCommand("selectAll");
+      await delay(100);
+      return field;
+    } catch (error) {
+      error.context = "Telegram-strategy-selectAllContent";
+      throw error;
+    }
   }
 
   async simulatePaste(field, text) {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
-    field.dispatchEvent(pasteEvent);
-    await delay(50);
+    if (!field) {
+      return;
+    }
+    try {
+      if (text !== undefined && text !== null) {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        dt.setData("text/html", text.replace(/\n/g, "<br>"));
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
+        field.dispatchEvent(pasteEvent);
+        await delay(50);
+      }
+    } catch (error) {
+      error.context = "Telegram-strategy-simulatePaste";
+      throw error;
+    }
   }
 
   triggerStateUpdate(field) {
