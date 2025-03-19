@@ -96,11 +96,31 @@ export class ErrorHandler {
     const isProduction = process.env.NODE_ENV === "production";
     const isKnownErrorType = Object.values(ErrorTypes).includes(meta.type);
 
+    const errorDetails = {
+      name: error.name,
+      message: error.message,
+      type: meta.type || error.type,
+      statusCode: meta.statusCode || error.statusCode,
+      context: meta.context,
+      stack: error.stack,
+    };
+
     if (!isProduction || !isKnownErrorType) {
-      // در حالت توسعه یا در حالت production برای خطاهایی که نوع مشخص ندارند، لاگ می‌کنیم
-      console.error(`[ErrorHandler] ${error.name}: ${error.message}`, meta);
+      // استفاده از console.dir برای نمایش ساختار کامل آبجکت
+      // نمایش تمام سطوح آبجکت با عمق نامحدود
+      // console.error("[ErrorHandler] Error Details:");
+      // console.dir(errorDetails, { depth: null, colors: true });
+
+      // نمایش نسخه متنی برای محیط‌هایی که آبجکت را کامل نشان نمی‌دهند
+      console.error(
+        `[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}\n` +
+          `Type: ${errorDetails.type}\n` +
+          `Status: ${errorDetails.statusCode}\n` +
+          `Context: ${errorDetails.context}`
+      );
+
       if (error.stack) {
-        console.error(error.stack);
+        console.error("Stack Trace:", error.stack);
       }
     } else if (isProduction && isKnownErrorType) {
       // می‌توانید لاگ کردن خطاهای شناخته شده در حالت production را در صورت نیاز اضافه کنید
