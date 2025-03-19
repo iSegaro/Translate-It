@@ -25,7 +25,7 @@ A lightweight and versatile browser extension designed to translate text within 
 
 1. **Install via CRX File:**
 
-   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/dist.crx) file from the `Chrome-Extension/` folder.
+   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/AI_Writing_Companion_v0.1.0.crx) file from the `Chrome-Extension/` folder.
    - Open `chrome://extensions/` in Chrome and enable Developer mode.
    - Drag and drop the `.crx` file onto the `chrome://extensions/` page to install the extension.
 
