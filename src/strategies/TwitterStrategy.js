@@ -41,21 +41,21 @@ export default class TwitterStrategy extends PlatformStrategy {
     if (!tweetField) return;
 
     try {
-      const dt = new DataTransfer();
-      dt.setData("text/plain", text);
-      dt.setData("text/html", text.replace(/\n/g, "<br>"));
+      if (text !== undefined && text !== null) {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        dt.setData("text/html", text.replace(/\n/g, "<br>"));
 
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      tweetField.dispatchEvent(pasteEvent);
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
+        tweetField.dispatchEvent(pasteEvent);
+      }
     } catch (error) {
-      new ErrorHandler(this.notifier).handle(error, {
-        type: ErrorTypes.UI,
-        context: "twitter-strategy-pasteText",
-      });
+      error.context = "Twitter-strategy-Text";
+      throw error;
     }
   }
 
