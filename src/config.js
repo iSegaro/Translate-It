@@ -3,7 +3,8 @@
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
     "Extension context invalid. Please refresh the page to continue.",
-  MISSING_API_KEY: "API key is missing",
+  API_KEY_MISSING: "API key is missing",
+  API_KEY_WRONG: "API key is wrong",
   SERVICE_OVERLOADED: "Translation service overloaded:",
   NETWORK_FAILURE: "Connection to server failed",
   INVALID_RESPONSE: "Invalid API response format",
