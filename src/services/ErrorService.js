@@ -33,28 +33,27 @@ export class ErrorHandler {
       error = new Error(String(error));
     }
 
-    // **بررسی و بازبینی نوع خطا بر اساس محتوای خطا**
+    // بررسی و بازبینی نوع خطا بر اساس محتوای خطا
     let { type, statusCode, element } = meta;
-    if (error.message.includes("Extension context invalidated")) {
-      type = ErrorTypes.CONTEXT;
-    }
+    type = this._reviewErrorTypeBasedOnContent(error, type);
 
     const message = this._getErrorMessage(error, type, statusCode);
 
     this._logError(error, meta);
 
-    if (!this.notifier) {
-      console.error(
-        "[ErrorHandler] Notifier is undefined. Cannot notify user."
-      );
-      this.isHandling = false;
-      return error;
-    }
-
     this._notifyUser(message, type, element);
 
     this.isHandling = false; // ریست کردن فلگ بعد از هندلینگ
     return error;
+  }
+
+  _reviewErrorTypeBasedOnContent(error, currentType) {
+    let type = currentType;
+    if (error.message.includes("Extension context invalidated")) {
+      type = ErrorTypes.CONTEXT;
+    }
+    // می‌توانید بررسی‌های مشابهی برای سایر شرایط خاص اضافه کنید
+    return type;
   }
 
   _getErrorMessage(error, type, statusCode) {
@@ -89,19 +88,35 @@ export class ErrorHandler {
       return errorMap[type][statusCode] || errorMap[type].default;
     }
 
-    // در صورت نداشتن نوع مشخص از پیام اصلی خطا استفاده می‌شود
+    // در صورت نداشتن نوع مشخص، از پیامِ اصلیِ خطا استفاده می‌شود
     return error.message || "خطای ناشناخته رخ داده است";
   }
 
   _logError(error, meta) {
-    // چاپ نام و پیام خطا به همراه متادیتا و استک (در صورت وجود) برای دیباگ
-    console.error(`[ErrorHandler] ${error.name}: ${error.message}`, meta);
-    if (error.stack) {
-      console.error(error.stack);
+    const isProduction = process.env.NODE_ENV === "production";
+    const isKnownErrorType = Object.values(ErrorTypes).includes(meta.type);
+
+    if (!isProduction || !isKnownErrorType) {
+      // در حالت توسعه یا در حالت production برای خطاهایی که نوع مشخص ندارند، لاگ می‌کنیم
+      console.error(`[ErrorHandler] ${error.name}: ${error.message}`, meta);
+      if (error.stack) {
+        console.error(error.stack);
+      }
+    } else if (isProduction && isKnownErrorType) {
+      // می‌توانید لاگ کردن خطاهای شناخته شده در حالت production را در صورت نیاز اضافه کنید
+      // برای مثال، می‌توانید فقط خطاهای نوع خاصی را لاگ کنید.
+      // console.debug(`[ErrorHandler] (Production) Handled error: ${error.message}`, meta);
     }
   }
 
   _notifyUser(message, type, element) {
+    if (!this.notifier) {
+      console.error(
+        "[ErrorHandler] Notifier is undefined. Cannot notify user."
+      );
+      return;
+    }
+
     // جلوگیری از نمایش خطاهای تکراری به مدت زمان مشخص
     if (this.displayedErrors.has(message)) return;
 
