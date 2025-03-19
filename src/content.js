@@ -25,11 +25,11 @@ if (window.location.hostname === "web.whatsapp.com") {
         chrome.runtime.sendMessage({ action: "CONTEXT_INVALID" });
       }
     } catch (error) {
-      // در صورت خطای "Extension context invalidated"، نادیده گرفته می‌شود
       if (
         error.message &&
         error.message.includes("Extension context invalidated")
       ) {
+        // this.notifier.show("!مجددا تلاش کنید", "info", true);
         return;
       }
       translationHandler.errorHandler.handle(error, {
@@ -86,7 +86,7 @@ if (isExtensionContextValid()) {
           data: newState,
         });
         taggleLinks(newState);
-        if (!newState) {
+        if (!newState && this.IconManager) {
           this.IconManager.cleanup();
         }
       } catch (error) {
@@ -97,6 +97,8 @@ if (isExtensionContextValid()) {
           // console.info(
           //   "Extension context is not valid, skipping updateSelectionState."
           // );
+          // this.notifier.show("تلاش مجدد", "info", true);
+          // return;
         } else {
           this.errorHandler.handle(error, {
             type: this.ErrorTypes.CONTEXT,
@@ -115,7 +117,9 @@ if (isExtensionContextValid()) {
   Object.freeze(CONFIG);
 
   window.addEventListener("pagehide", () => {
-    translationHandler.IconManager.cleanup();
+    if (translationHandler.IconManager) {
+      translationHandler.IconManager.cleanup();
+    }
     state.selectionActive = false;
     translationHandler.updateSelectionState(false);
   });
@@ -130,6 +134,13 @@ if (isExtensionContextValid()) {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "TOGGLE_SELECTION_MODE") {
     translationHandler.updateSelectionState(message.data);
+  } else if (message.action === "CONTEXT_INVALID") {
+    translationHandler.notifier.show(
+      "در حال بارگذاری مجدد...دوباره تلاش کنید",
+      "info",
+      true
+    );
+    chrome.runtime.reload();
   }
 });
 

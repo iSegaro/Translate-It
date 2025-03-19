@@ -6,7 +6,7 @@ export class ErrorTypes {
   static API = "API";
   static NETWORK = "NETWORK";
   static SERVICE = "SERVICE";
-  static VALIDATION = "VALIDATION";
+  static VALIDATIONMODEL = "VALIDATIONMODEL";
   static CONTEXT = "CONTEXT";
   static UI = "UI";
 }
@@ -32,10 +32,25 @@ export class ErrorHandler {
     if (!(error instanceof Error)) {
       error = new Error(String(error));
     }
-    const { type, statusCode, element } = meta;
+
+    // **بررسی و بازبینی نوع خطا بر اساس محتوای خطا**
+    let { type, statusCode, element } = meta;
+    if (error.message.includes("Extension context invalidated")) {
+      type = ErrorTypes.CONTEXT;
+    }
+
     const message = this._getErrorMessage(error, type, statusCode);
 
     this._logError(error, meta);
+
+    if (!this.notifier) {
+      console.error(
+        "[ErrorHandler] Notifier is undefined. Cannot notify user."
+      );
+      this.isHandling = false;
+      return error;
+    }
+
     this._notifyUser(message, type, element);
 
     this.isHandling = false; // ریست کردن فلگ بعد از هندلینگ
@@ -45,7 +60,7 @@ export class ErrorHandler {
   _getErrorMessage(error, type, statusCode) {
     const errorMap = {
       [ErrorTypes.API]: {
-        400: "کلید API نامعتبر است", // اضافه کردن هندلینگ برای status code 400
+        400: "کلید API نامعتبر است",
         401: TRANSLATION_ERRORS.MISSING_API_KEY,
         403: "کلید API نامعتبر است",
         429: TRANSLATION_ERRORS.SERVICE_OVERLOADED,
@@ -60,13 +75,13 @@ export class ErrorHandler {
         default: "خطای سرویس ترجمه",
       },
       [ErrorTypes.CONTEXT]: {
-        default: TRANSLATION_ERRORS.INVALID_CONTEXT,
+        default: "لطفا صفحه را رفرش کنید.",
       },
       [ErrorTypes.UI]: {
         default: "خطای سیستمی رخ داده است",
       },
-      [ErrorTypes.VALIDATION]: {
-        default: "خطای اعتبارسنجی رخ داده است",
+      [ErrorTypes.VALIDATIONMODEL]: {
+        default: "خطا در مدلِ انتخاب شده",
       },
     };
 
@@ -104,7 +119,7 @@ export class ErrorHandler {
       [ErrorTypes.NETWORK]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
-      [ErrorTypes.VALIDATION]: "warning",
+      [ErrorTypes.VALIDATIONMODEL]: "warning",
     };
 
     return typeMap[errorType] || "error";

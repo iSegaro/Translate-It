@@ -350,7 +350,7 @@ export const translateText = async (text) => {
         return await handleOpenRouterTranslation(text, sourceLang, targetLang);
       default:
         const error = new Error("Invalid translation API selected");
-        error.type = ErrorTypes.VALIDATION;
+        error.type = ErrorTypes.VALIDATIONMODEL;
         error.statusCode = 400;
         throw error;
     }
