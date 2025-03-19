@@ -59,11 +59,11 @@ export class ErrorHandler {
   _getErrorMessage(error, type, statusCode) {
     const errorMap = {
       [ErrorTypes.API]: {
-        400: "کلید API نامعتبر است",
-        401: TRANSLATION_ERRORS.MISSING_API_KEY,
-        403: "کلید API نامعتبر است",
-        429: TRANSLATION_ERRORS.SERVICE_OVERLOADED,
-        500: "خطای داخلی سرور",
+        400: `400: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
+        401: `401: ${TRANSLATION_ERRORS.API_KEY_MISSING}`,
+        403: `403: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
+        429: `429: ${TRANSLATION_ERRORS.SERVICE_OVERLOADED}`,
+        500: "500: خطای داخلی سرور",
         default: "خطای سرویس API",
       },
       [ErrorTypes.NETWORK]: {
