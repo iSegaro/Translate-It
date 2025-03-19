@@ -110,10 +110,29 @@ export default class TranslationHandler {
       const translated = await translateText(params.text);
 
       if (params.selectionRange) {
-        this.strategies[platform].replaceSelection(
-          params.selectionRange,
-          translated
-        );
+        if (
+          this.strategies[platform] &&
+          typeof this.strategies[platform].replaceSelection === "function"
+        ) {
+          this.strategies[platform].replaceSelection(
+            params.selectionRange,
+            translated
+          );
+        } else {
+          // console.error(
+          //   `استراتژی برای پلتفرم ${platform} یا متد replaceSelection در آن تعریف نشده است.`
+          // );
+          this.errorHandler.handle(
+            new Error(
+              `متد replaceSelection برای پلتفرم ${platform} تعریف نشده است.`
+            ),
+            {
+              type: ErrorTypes.UI,
+              context: "processTranslation",
+              platform: platform,
+            }
+          );
+        }
       } else if (params.target) {
         await this.updateTargetElement(params.target, translated);
       }
