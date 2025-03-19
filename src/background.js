@@ -48,11 +48,28 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onInstalled.addListener((details) => {
   console.log("Extension installed/updated:", details.reason);
 
-  chrome.storage.sync.get(["apiKey"], (result) => {
-    console.log("Stored API Key:", result.apiKey ? "Exists" : "Missing");
-  });
+  // مقداردهی اولیه تنظیمات فقط در نصب اولیه
+  if (details.reason === "install") {
+    const defaultSettings = {
+      apiKey: "",
+      USE_MOCK: CONFIG.USE_MOCK,
+      API_URL: CONFIG.API_URL,
+      sourceLanguage: "English",
+      targetLanguage: "Persian",
+      promptTemplate: CONFIG.promptTemplate,
+      translationApi: "gemini",
+      webAIApiUrl: CONFIG.WEBAI_API_URL,
+      webAIApiModel: CONFIG.WEBAI_API_MODEL,
+      openaiApiKey: CONFIG.OPENAI_API_KEY,
+      openaiApiModel: CONFIG.OPENAI_API_MODEL,
+      openrouterApiKey: CONFIG.OPENROUTER_API_KEY,
+      openrouterApiModel: CONFIG.OPENROUTER_API_MODEL,
+    };
 
-  if (details.reason === "update") {
+    chrome.storage.sync.set(defaultSettings, () => {
+      console.log("Default settings initialized");
+    });
+  } else if (details.reason === "update") {
     isReloaded = true;
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
