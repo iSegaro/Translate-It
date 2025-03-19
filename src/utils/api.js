@@ -355,12 +355,12 @@ export const translateText = async (text) => {
         throw error;
     }
   } catch (error) {
-    // console.debug("api.js : translateText:", error);
     // بررسی دقیق‌تر خطای API Key
     if (
-      error.statusCode === 400 &&
+      error.statusCode === 401 &&
       error.type === ErrorTypes.API &&
-      error.message?.includes("API key not valid")
+      (error.message.includes("API key") ||
+        error.message === TRANSLATION_ERRORS.MISSING_API_KEY)
     ) {
       errorHandler.handle(error, {
         type: ErrorTypes.API,
@@ -400,11 +400,10 @@ export const translateText = async (text) => {
     }
 
     // هندل کردن سایر خطاها
-    error.type = ErrorTypes.SERVICE;
     error.statusCode = error.statusCode || 500;
     error.context = "translation-service";
     errorHandler.handle(error, {
-      type: ErrorTypes.SERVICE,
+      type: error.type || ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
       context: "translation-service",
     });
