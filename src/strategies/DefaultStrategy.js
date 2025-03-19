@@ -15,12 +15,15 @@ export default class DefaultStrategy extends PlatformStrategy {
 
   async updateElement(element, translatedText) {
     try {
-      if (element.isContentEditable) {
-        element.innerHTML = translatedText;
-      } else {
-        element.value = translatedText;
+      if (translatedText !== undefined && translatedText !== null) {
+        let htmlText = translatedText.replace(/\n/g, "<br>");
+        if (element.isContentEditable) {
+          element.innerHTML = htmlText;
+        } else {
+          element.value = htmlText;
+        }
+        this.applyTextDirection(element, htmlText);
       }
-      this.applyTextDirection(element, translatedText);
     } catch (error) {
       error.context = "default-strategy-updateElement";
       throw error;
