@@ -300,7 +300,9 @@ export default class TranslationHandler {
 
     // پاکسازی state
     state.originalTexts.clear();
-    this.IconManager.cleanup();
+    if (this.IconManager) {
+      this.IconManager.cleanup();
+    }
   }
 
   async updateTargetElement(target, translated) {

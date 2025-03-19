@@ -74,16 +74,20 @@ export default class EventHandler {
   }
 
   handleEditableFocus(element) {
-    this.IconManager.cleanup();
-    const icon = this.IconManager.createTranslateIcon(element);
-    this.setupIconBehavior(icon, element);
-    state.activeTranslateIcon = icon;
+    if (this.IconManager) {
+      this.IconManager.cleanup();
+      const icon = this.IconManager.createTranslateIcon(element);
+      this.setupIconBehavior(icon, element);
+      state.activeTranslateIcon = icon;
+    }
   }
 
   handleEditableBlur() {
     setTimeout(() => {
       if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
-        this.IconManager.cleanup();
+        if (this.IconManager) {
+          this.IconManager.cleanup();
+        }
       }
     }, 100);
   }
@@ -153,7 +157,7 @@ export default class EventHandler {
           );
         }
       });
-      this.notifier.show("تمام متون از حافظه کَش بارگیری شدند.", "info");
+      this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
       return;
     }
 
@@ -172,42 +176,44 @@ export default class EventHandler {
       const joinedTextsToTranslate = textsToTranslate.join(delimiter);
       const translatedTextsString = await translateText(joinedTextsToTranslate);
 
-      // جدا کردن متن‌های ترجمه‌شده از پاسخ
-      const translatedTextsArray = translatedTextsString.split(delimiter);
+      if (translatedTextsString) {
+        // جدا کردن متن‌های ترجمه‌شده از پاسخ
+        const translatedTextsArray = translatedTextsString.split(delimiter);
 
-      // ایجاد نگاشت بین متن اصلی و متن ترجمه شده
-      const newTranslations = new Map();
-      textsToTranslate.forEach((originalText, index) => {
-        const translatedText = translatedTextsArray[index];
-        newTranslations.set(originalText, translatedText);
-        // ذخیره در حافظه کش
-        translationCache.set(originalText, translatedText);
-      });
+        // ایجاد نگاشت بین متن اصلی و متن ترجمه شده
+        const newTranslations = new Map();
+        textsToTranslate.forEach((originalText, index) => {
+          const translatedText = translatedTextsArray[index];
+          newTranslations.set(originalText, translatedText);
+          // ذخیره در حافظه کش
+          translationCache.set(originalText, translatedText);
+        });
 
-      // اعمال ترجمه‌ها به گره‌های متنی و ذخیره اطلاعات برای Revert
-      textNodes.forEach((textNode) => {
-        const originalText = textNode.textContent.trim();
-        const translatedText =
-          cachedTranslations.get(originalText) ||
-          newTranslations.get(originalText);
+        // اعمال ترجمه‌ها به گره‌های متنی و ذخیره اطلاعات برای Revert
+        textNodes.forEach((textNode) => {
+          const originalText = textNode.textContent.trim();
+          const translatedText =
+            cachedTranslations.get(originalText) ||
+            newTranslations.get(originalText);
 
-        if (translatedText) {
-          const parentElement = textNode.parentElement;
-          const uniqueId =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15);
-          parentElement.setAttribute("data-original-text-id", uniqueId);
+          if (translatedText) {
+            const parentElement = textNode.parentElement;
+            const uniqueId =
+              Math.random().toString(36).substring(2, 15) +
+              Math.random().toString(36).substring(2, 15);
+            parentElement.setAttribute("data-original-text-id", uniqueId);
 
-          state.originalTexts.set(uniqueId, {
-            originalInnerHTML: parentElement.innerHTML,
-            translatedText: translatedText,
-            parent: parentElement,
-          });
+            state.originalTexts.set(uniqueId, {
+              originalInnerHTML: parentElement.innerHTML,
+              translatedText: translatedText,
+              parent: parentElement,
+            });
 
-          textNode.textContent = translatedText;
-          this.IconManager.applyTextDirection(parentElement, translatedText);
-        }
-      });
+            textNode.textContent = translatedText;
+            this.IconManager.applyTextDirection(parentElement, translatedText);
+          }
+        });
+      }
 
       this.notifier.dismiss(statusNotification);
     } catch (error) {
@@ -233,7 +239,9 @@ export default class EventHandler {
       const newTarget = document.elementFromPoint(event.clientX, event.clientY);
 
       if (newTarget && newTarget !== state.highlightedElement) {
-        this.IconManager.cleanup();
+        if (this.IconManager) {
+          this.IconManager.cleanup();
+        }
 
         if (newTarget.innerText?.trim()) {
           state.highlightedElement = newTarget;
@@ -254,7 +262,9 @@ export default class EventHandler {
       this.translationHandler.revertTranslations();
     }
 
-    this.IconManager.cleanup();
+    if (this.IconManager) {
+      this.IconManager.cleanup();
+    }
   }
 
   async handleCtrlSlash(event) {
@@ -329,10 +339,12 @@ export default class EventHandler {
     const target = event.target;
 
     if (state.activeTranslateIcon) return;
-    this.IconManager.cleanup();
+    if (this.IconManager) {
+      this.IconManager.cleanup();
 
-    const translateIcon = this.IconManager.createTranslateIcon(target);
-    this.setupIconBehavior(translateIcon, target);
+      const translateIcon = this.IconManager.createTranslateIcon(target);
+      this.setupIconBehavior(translateIcon, target);
+    }
   }
 
   setupIconBehavior(icon, target) {
@@ -368,7 +380,9 @@ export default class EventHandler {
           }
         }
       } catch (error) {
-        this.IconManager.cleanup();
+        if (this.IconManager) {
+          this.IconManager.cleanup();
+        }
         if (statusNotification) {
           this.notifier.dismiss(statusNotification);
         }

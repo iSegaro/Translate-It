@@ -23,13 +23,17 @@ export function setupEventListeners(translationHandler) {
 
   const handleFocus = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
-      translationHandler.handleEditableFocus(e.target);
+      if (translationHandler.IconManager) {
+        translationHandler.handleEditableFocus(e.target);
+      }
     }
   });
 
   const handleBlur = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
-      translationHandler.handleEditableBlur(e.target);
+      if (translationHandler.IconManager) {
+        translationHandler.handleEditableBlur(e.target);
+      }
     }
   });
 
@@ -38,10 +42,22 @@ export function setupEventListeners(translationHandler) {
   });
 
   const handleClick = handleEventWithErrorHandling((e) => {
-    if (state.selectionActive) {
-      translationHandler.IconManager.cleanup();
+    if (state && state.selectionActive) {
+      // اضافه شدن بررسی برای state
+      if (translationHandler.IconManager) {
+        translationHandler.IconManager.cleanup();
+      }
       state.selectionActive = false;
-      chrome.storage.local.set({ selectionActive: false });
+      if (
+        typeof chrome !== "undefined" &&
+        chrome.storage &&
+        chrome.storage.local
+      ) {
+        // بررسی برای اطمینان از وجود chrome.storage
+        chrome.storage.local.set({ selectionActive: false });
+      } else {
+        console.warn("[EventRouter] chrome.storage.local is not available.");
+      }
 
       taggleLinks(false);
 
@@ -58,7 +74,9 @@ export function setupEventListeners(translationHandler) {
   const handleKeyDown = handleEventWithErrorHandling((e) => {
     // console.log("keydown event detected. Key:", e.key);
     if (e.key === "Escape" && state.selectionActive) {
-      translationHandler.IconManager.cleanup();
+      if (translationHandler.IconManager) {
+        translationHandler.IconManager.cleanup();
+      }
       state.selectionActive = false;
       chrome.storage.local.set({ selectionActive: false });
 
