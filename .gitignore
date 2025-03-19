@@ -1,2 +1,4 @@
 node_modules/
+.vscode/
+Chrome-Extension/*/
 Chrome-Extension/*.pem
