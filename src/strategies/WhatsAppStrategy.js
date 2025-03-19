@@ -93,18 +93,28 @@ export default class WhatsAppStrategy extends PlatformStrategy {
   }
 
   async simulatePaste(element, text) {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
+    if (!element) return;
+    try {
+      if (text !== undefined && text !== null) {
+        let htmlText = "";
+        htmlText = text.replace(/\n/g, "<br>");
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        dt.setData("text/html", htmlText);
 
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
 
-    element.dispatchEvent(pasteEvent);
-    await delay(50);
+        element.dispatchEvent(pasteEvent);
+        await delay(50);
+      }
+    } catch (error) {
+      error.context = "WhatsApp-strategy-simulatePaste";
+      throw error;
+    }
   }
 
   triggerStateUpdate(element) {
