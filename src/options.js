@@ -1,9 +1,12 @@
 // src/options.js
 import { getSettingsAsync, CONFIG } from "./config.js";
+import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabContents = document.querySelectorAll(".tab-content");
+
+  const errorHandler = new ErrorHandler(); // ایجاد یک نمونه از ErrorHandler
 
   function showTab(tabId) {
     tabButtons.forEach((button) => button.classList.remove("active"));
@@ -32,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const webAIApiModelInput = document.getElementById("webAIApiModel");
   const apiKeyInput = document.getElementById("apiKey");
   const apiUrlInput = document.getElementById("apiUrl");
-  const promptTemplateInput = document.getElementById("promptTemplate");
+  // const promptTemplateInput = document.getElementById("promptTemplate");
   const saveSettingsButton = document.getElementById("saveSettings");
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
@@ -45,6 +48,11 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   const openRouterApiKeyInput = document.getElementById("openrouterApiKey");
   const openRouterApiModelInput = document.getElementById("openrouterApiModel");
+
+  // Elements for Import/Export
+  const exportSettingsButton = document.getElementById("exportSettings");
+  const importFile = document.getElementById("importFile");
+  const importSettingsButton = document.getElementById("importSettings");
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
@@ -171,11 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const translationApi = translationApiSelect.value;
       const openaiApiKey = document
         .getElementById("openaiApiKey")
-        ?.value?.trim(); // اضافه شده
+        ?.value?.trim();
       const openaiApiModel = document
         .getElementById("openaiApiModel")
-        ?.value?.trim(); // اضافه شده
-      // اضافه شده برای OpenRouter:
+        ?.value?.trim();
       const openrouterApiKey = document
         .getElementById("openrouterApiKey")
         ?.value?.trim();
@@ -218,8 +225,10 @@ document.addEventListener("DOMContentLoaded", () => {
           showStatus("", ""); // پاک کردن پیام
         }, 2000);
       } catch (error) {
-        console.error("Error saving settings:", error);
-        showStatus("خطا در ذخیره سازی: " + error.message, "error");
+        errorHandler.handle(error, {
+          type: ErrorTypes.UI,
+          context: "saveSettings",
+        });
       }
     });
 
@@ -285,8 +294,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const initialTranslationApi = settings.translationApi || "gemini";
       const initialUseMock = settings.USE_MOCK;
 
-      // نمایش تب API و تنظیمات مربوطه پس از بارگیری تنظیمات
-      showTab("languages"); // نمایش تب Languages به صورت پیش فرض
+      // نمایش تب Languages به صورت پیش فرض
+      showTab("languages");
       if (initialUseMock) {
         updateMockState(true);
       } else {
@@ -296,8 +305,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await updatePromptHelpText();
     } catch (error) {
-      console.error("Error loading settings:", error);
-      showStatus("خطا در بارگیری تنظیمات.", "error");
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "loadSettings",
+      });
     }
   }
 
@@ -306,6 +317,78 @@ document.addEventListener("DOMContentLoaded", () => {
     status.textContent = message;
     status.className = `status-${type}`;
   }
+
+  // Export Settings functionality
+  exportSettingsButton.addEventListener("click", async () => {
+    try {
+      const settings = await getSettingsAsync();
+      const settingsJSON = JSON.stringify(settings, null, 2);
+      const filename = "gemini_translate_settings.json";
+      const blob = new Blob([settingsJSON], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showStatus("تنظیمات با موفقیت صادر شدند!", "success");
+      setTimeout(() => {
+        showStatus("", "");
+      }, 2000);
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "exportSettings",
+      });
+    }
+  });
+
+  // Import Settings functionality
+  importSettingsButton.addEventListener("click", () => {
+    importFile.click(); // Trigger file input click
+  });
+
+  importFile.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const importedSettings = JSON.parse(e.target.result);
+          await new Promise((resolve, reject) => {
+            chrome.storage.sync.set(importedSettings, () => {
+              if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+              } else {
+                resolve();
+              }
+            });
+          });
+          showStatus(
+            "تنظیمات با موفقیت وارد شدند! صفحه در حال بارگیری مجدد است.",
+            "success"
+          );
+          setTimeout(() => {
+            window.location.reload(); // Reload the page to apply imported settings
+          }, 1500);
+        } catch (error) {
+          errorHandler.handle(error, {
+            type: ErrorTypes.UI,
+            context: "importSettings-parse",
+          });
+        }
+      };
+      reader.onerror = () => {
+        errorHandler.handle(reader.error, {
+          type: ErrorTypes.UI,
+          context: "importSettings-read",
+        });
+      };
+      reader.readAsText(file);
+    }
+  });
 
   // نمایش تب "Languages" به عنوان تب پیش‌فرض هنگام بارگیری صفحه.
   // این کار تضمین می‌کند که کاربر در ابتدا یک محتوا را مشاهده کند در حالی که تنظیمات در حال بارگیری هستند.
