@@ -15,7 +15,7 @@
     "service_worker": "background.bundle.js"
   },
   "action": {
-    "default_title": "AI Writing Companion",
+    "default_title": "مترجم خودکار",
     "default_icon": {
       "16": "icons/icon.png",
       "48": "icons/icon.png",
