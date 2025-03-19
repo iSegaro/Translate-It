@@ -110,7 +110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } catch (error) {
         const handledError = errorHandler.handle(error, {
           type: ErrorTypes.API,
-          endpoint: "gemini-api",
+          context: "background-fetchTranslation",
         });
         sendResponse({ error: handledError.message });
       }
