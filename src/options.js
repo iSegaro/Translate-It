@@ -8,20 +8,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const errorHandler = new ErrorHandler(); // ایجاد یک نمونه از ErrorHandler
 
-  function showTab(tabId) {
-    tabButtons.forEach((button) => button.classList.remove("active"));
-    tabContents.forEach((content) => content.classList.remove("active"));
-    document.getElementById(tabId).classList.add("active");
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
-  }
+  // Elements for Tab Navigation
+  const languagesTabButton = document.querySelector('[data-tab="languages"]');
+  const apiSettingsTabButton = document.querySelector(
+    '[data-tab="apiSettings"]'
+  );
+  const importExportTabButton = document.querySelector(
+    '[data-tab="importExport"]'
+  );
+  const languagesTabContent = document.getElementById("languages");
+  const apiSettingsTabContent = document.getElementById("apiSettings");
+  const importExportTabContent = document.getElementById("importExport");
 
-  tabButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const tabId = event.target.getAttribute("data-tab");
-      showTab(tabId);
-    });
-  });
-
+  // Elements for API Settings
   const translationApiSelect = document.getElementById("translationApi");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
   const apiKeySettingGroup = document
@@ -35,7 +34,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const webAIApiModelInput = document.getElementById("webAIApiModel");
   const apiKeyInput = document.getElementById("apiKey");
   const apiUrlInput = document.getElementById("apiUrl");
-  // const promptTemplateInput = document.getElementById("promptTemplate");
   const saveSettingsButton = document.getElementById("saveSettings");
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
@@ -53,6 +51,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportSettingsButton = document.getElementById("exportSettings");
   const importFile = document.getElementById("importFile");
   const importSettingsButton = document.getElementById("importSettings");
+
+  // Elements for Status and Manifest Info
+  const statusElement = document.getElementById("status");
+  const manifestNameElement = document.getElementById("MANIFEST_NAME");
+  const manifestDescriptionElement = document.getElementById(
+    "MANIFEST_DESCRIPTION"
+  );
+  const manifestTitle_OPTION_PAGE_Element = document.getElementById(
+    "MANIFEST_TITLE_OPTION_PAGE"
+  );
+  const promptTemplateInput = document.getElementById("promptTemplate");
+  const sourceLangNameSpan = document.getElementById("sourceLangName");
+  const targetLangNameSpan = document.getElementById("targetLangName");
+
+  function showTab(tabId) {
+    tabButtons.forEach((button) => button.classList.remove("active"));
+    tabContents.forEach((content) => content.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+  }
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const tabId = event.target.getAttribute("data-tab");
+      showTab(tabId);
+    });
+  });
 
   function updateMockState(isMockEnabled) {
     translationApiSelect.disabled = isMockEnabled;
@@ -150,95 +175,73 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleApiSettings(); // تنظیم حالت اولیه
   translationApiSelect.addEventListener("change", toggleApiSettings);
 
-  const manifest = chrome.runtime.getManifest();
-  document.getElementById("NameVersion").textContent =
-    `${manifest.name} v${manifest.version}`;
-
   loadSettings();
 
   useMockCheckbox.addEventListener("change", () => {
     updateMockState(useMockCheckbox.checked);
   });
 
-  document
-    .getElementById("saveSettings")
-    .addEventListener("click", async () => {
-      const webAIApiUrl = document.getElementById("webAIApiUrl")?.value?.trim();
-      const webAIApiModel = document
-        .getElementById("webAIApiModel")
-        ?.value?.trim();
-      const apiKey = document.getElementById("apiKey")?.value?.trim();
-      const useMock = document.getElementById("useMock")?.checked;
-      const apiUrl = document.getElementById("apiUrl")?.value?.trim();
-      const sourceLanguage = document.getElementById("sourceLanguage")?.value;
-      const targetLanguage = document.getElementById("targetLanguage")?.value;
-      const promptTemplate = document
-        .getElementById("promptTemplate")
-        ?.value?.trim();
-      const translationApiSelect = document.getElementById("translationApi"); // دریافت المنت dropdown
-      const translationApi = translationApiSelect.value;
-      const openaiApiKey = document
-        .getElementById("openaiApiKey")
-        ?.value?.trim();
-      const openaiApiModel = document
-        .getElementById("openaiApiModel")
-        ?.value?.trim();
-      const openrouterApiKey = document
-        .getElementById("openrouterApiKey")
-        ?.value?.trim();
-      const openrouterApiModel = document
-        .getElementById("openrouterApiModel")
-        ?.value?.trim();
+  saveSettingsButton.addEventListener("click", async () => {
+    const webAIApiUrl = webAIApiUrlInput?.value?.trim();
+    const webAIApiModel = webAIApiModelInput?.value?.trim();
+    const apiKey = apiKeyInput?.value?.trim();
+    const useMock = false; //useMockCheckbox?.checked;
+    const apiUrl = apiUrlInput?.value?.trim();
+    const sourceLanguage = sourceLanguageInput?.value;
+    const targetLanguage = targetLanguageInput?.value;
+    const promptTemplate = promptTemplateInput?.value?.trim();
+    const translationApi = translationApiSelect.value; // دریافت المنت dropdown برای مدل‌ها
+    const openaiApiKey = openAIApiKeyInput?.value?.trim();
+    const openaiApiModel = openAIModelInput?.value?.trim();
+    const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
+    const openrouterApiModel = openRouterApiModelInput?.value?.trim();
 
-      const settings = {
-        apiKey: apiKey || "",
-        USE_MOCK: useMock,
-        API_URL: apiUrl || CONFIG.API_URL,
-        sourceLanguage: sourceLanguage || "English",
-        targetLanguage: targetLanguage || "Persian",
-        promptTemplate: promptTemplate || CONFIG.promptTemplate,
-        translationApi: translationApi || "gemini",
-        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
-        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
-        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
-        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
-        openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
-        openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
-      };
+    const settings = {
+      apiKey: apiKey || "",
+      USE_MOCK: useMock,
+      API_URL: apiUrl || CONFIG.API_URL,
+      sourceLanguage: sourceLanguage || "English",
+      targetLanguage: targetLanguage || "Persian",
+      promptTemplate: promptTemplate || CONFIG.promptTemplate,
+      translationApi: translationApi || "gemini",
+      webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
+      webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
+      openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
+      openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
+      openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
+      openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
+    };
 
-      try {
-        await new Promise((resolve, reject) => {
-          chrome.storage.sync.set(settings, () => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError);
-            } else {
-              resolve();
-            }
-          });
+    try {
+      await new Promise((resolve, reject) => {
+        chrome.storage.sync.set(settings, () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve();
+          }
         });
+      });
 
-        updatePromptHelpText();
+      updatePromptHelpText();
 
-        showStatus("ذخیره شد!", "success");
+      showStatus("ذخیره شد!", "success");
 
-        setTimeout(() => {
-          showStatus("", ""); // پاک کردن پیام
-        }, 2000);
-      } catch (error) {
-        errorHandler.handle(error, {
-          type: ErrorTypes.UI,
-          context: "saveSettings",
-        });
-      }
-    });
+      setTimeout(() => {
+        showStatus("", ""); // پاک کردن پیام
+      }, 2000);
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "saveSettings",
+      });
+    }
+  });
 
   async function updatePromptHelpText() {
     const settings = await getSettingsAsync();
     const sourceLang = settings.sourceLanguage || "English";
     const targetLang = settings.targetLanguage || "Persian";
-
-    const sourceLangNameSpan = document.getElementById("sourceLangName");
-    const targetLangNameSpan = document.getElementById("targetLangName");
 
     if (sourceLangNameSpan) {
       sourceLangNameSpan.textContent = `(${sourceLang})`;
@@ -251,48 +254,52 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadSettings() {
     try {
       const settings = await getSettingsAsync();
-      const apiKeyInput = document.getElementById("apiKey");
       if (apiKeyInput) apiKeyInput.value = settings.apiKey || "";
-      const useMockInput = document.getElementById("useMock");
-      if (useMockInput) useMockInput.checked = settings.USE_MOCK;
-      const apiUrlInput = document.getElementById("apiUrl");
+      if (useMockCheckbox) useMockCheckbox.checked = settings.USE_MOCK;
       if (apiUrlInput) {
         apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
       }
-      const sourceLanguageInput = document.getElementById("sourceLanguage");
       if (sourceLanguageInput)
         sourceLanguageInput.value = settings.sourceLanguage || "English";
-      const targetLanguageInput = document.getElementById("targetLanguage");
       if (targetLanguageInput)
         targetLanguageInput.value = settings.targetLanguage || "Persian";
-      const promptTemplateInput = document.getElementById("promptTemplate");
       if (promptTemplateInput)
         promptTemplateInput.value =
           settings.promptTemplate || CONFIG.promptTemplate;
 
       if (translationApiSelect)
         translationApiSelect.value = settings.translationApi || "gemini";
-      if (document.getElementById("webAIApiUrl"))
-        document.getElementById("webAIApiUrl").value =
-          settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
-      if (document.getElementById("webAIApiModel"))
-        document.getElementById("webAIApiModel").value =
+      if (webAIApiUrlInput)
+        webAIApiUrlInput.value = settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
+      if (webAIApiModelInput)
+        webAIApiModelInput.value =
           settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
-      if (document.getElementById("openaiApiKey"))
-        document.getElementById("openaiApiKey").value =
+      if (openAIApiKeyInput)
+        openAIApiKeyInput.value =
           settings.openaiApiKey || CONFIG.OPENAI_API_KEY;
-      if (document.getElementById("openaiApiModel"))
-        document.getElementById("openaiApiModel").value =
+      if (openAIModelInput)
+        openAIModelInput.value =
           settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
-      if (document.getElementById("openrouterApiKey"))
-        document.getElementById("openrouterApiKey").value =
+      if (openRouterApiKeyInput)
+        openRouterApiKeyInput.value =
           settings.openrouterApiKey || CONFIG.OPENROUTER_API_KEY;
-      if (document.getElementById("openrouterApiModel"))
-        document.getElementById("openrouterApiModel").value =
+      if (openRouterApiModelInput)
+        openRouterApiModelInput.value =
           settings.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL;
 
       const initialTranslationApi = settings.translationApi || "gemini";
       const initialUseMock = settings.USE_MOCK;
+
+      const manifest = chrome.runtime.getManifest();
+      if (manifestNameElement) {
+        manifestNameElement.textContent = `${manifest.name} v${manifest.version}`;
+      }
+      if (manifestDescriptionElement) {
+        manifestDescriptionElement.textContent = `${manifest.description}`;
+      }
+      if (manifestTitle_OPTION_PAGE_Element) {
+        manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name}-Settings`;
+      }
 
       // نمایش تب Languages به صورت پیش فرض
       showTab("languages");
@@ -313,9 +320,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showStatus(message, type) {
-    const status = document.getElementById("status");
-    status.textContent = message;
-    status.className = `status-${type}`;
+    if (statusElement) {
+      statusElement.textContent = message;
+      statusElement.className = `status-${type}`;
+    }
   }
 
   // Export Settings functionality
@@ -323,7 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const settings = await getSettingsAsync();
       const settingsJSON = JSON.stringify(settings, null, 2);
-      const filename = "gemini_translate_settings.json";
+      const filename = "AI_Writing_Companion_Settings.json";
       const blob = new Blob([settingsJSON], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
