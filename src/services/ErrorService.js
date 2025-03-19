@@ -34,14 +34,14 @@ export class ErrorHandler {
     }
 
     // بررسی و بازبینی نوع خطا بر اساس محتوای خطا
-    let { type, statusCode, element } = meta;
+    let { type, statusCode } = meta;
     type = this._reviewErrorTypeBasedOnContent(error, type);
 
     const message = this._getErrorMessage(error, type, statusCode);
 
     this._logError(error, meta);
 
-    this._notifyUser(message, type, element);
+    this._notifyUser(message, type);
 
     this.isHandling = false; // ریست کردن فلگ بعد از هندلینگ
     return error;
@@ -129,7 +129,7 @@ export class ErrorHandler {
     }
   }
 
-  _notifyUser(message, type, element) {
+  _notifyUser(message, type) {
     if (!this.notifier) {
       console.error(
         "[ErrorHandler] Notifier is undefined. Cannot notify user."

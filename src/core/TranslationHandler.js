@@ -139,7 +139,6 @@ export default class TranslationHandler {
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
-        element: params.target,
         context: "translation-process",
       });
     } finally {
@@ -301,7 +300,6 @@ export default class TranslationHandler {
         this.errorHandler.handle(error, {
           type: ErrorTypes.UI,
           context: "revert-translations",
-          element: data.parent,
         });
       }
     }
@@ -332,7 +330,6 @@ export default class TranslationHandler {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI, // یا SERVICE بسته به نوع خطا
         context: "update-target-element",
-        element: target,
       });
     }
   }

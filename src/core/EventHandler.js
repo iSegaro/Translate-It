@@ -391,7 +391,6 @@ export default class EventHandler {
           {
             type: ErrorTypes.UI,
             context: "translate-icon-click",
-            element: target,
           }
         );
       }
