@@ -16,7 +16,7 @@ export function detectPlatform() {
     "chat.openai.com": "chatgpt",
     "chat.com": "chatgpt",
     "chatgpt.com": "chatgpt",
-    "youtube.com": "youtube",
+    "www.youtube.com": "youtube",
   };
 
   return platformMap[hostname] || "default";
