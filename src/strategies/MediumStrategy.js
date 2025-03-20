@@ -28,7 +28,7 @@ export default class MediumStrategy extends PlatformStrategy {
    * - برای فیلدهای contenteditable (مانند کامنت‌ها و نظرسنجی‌ها): متن ترجمه شده به کلیپبورد کپی می‌شود.
    */
   async updateElement(element, translatedText) {
-    // 1. برای input/textarea (مثلاً فیلد جستجو) - بدون تغییر
+    // 1. برای input/textarea (مثلاً فیلد جستجو)
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       element.value = translatedText;
       element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -61,21 +61,14 @@ export default class MediumStrategy extends PlatformStrategy {
         true,
         3000
       );
+      // اعمال انیمیشن
+      this.applyVisualFeedback(mediumField);
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "medium-strategy-updateElement",
       });
     }
-
-    // اعمال افکت تغییر رنگ پس‌زمینه برای اطلاع‌رسانی به کاربر (بدون تغییر)
-    mediumField.style.transition = "background-color 0.5s ease";
-    mediumField.style.backgroundColor = "#d4f8d4";
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        mediumField.style.backgroundColor = "transparent";
-      }, 1000);
-    });
   }
 
   extractText(target) {
