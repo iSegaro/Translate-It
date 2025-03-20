@@ -1,4 +1,4 @@
-# AIWritingCompanion
+# AI Writing Companion
 
 A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations are triggered by either clicking the extension icon or pressing the Ctrl+/ shortcut.
 
@@ -25,7 +25,7 @@ A lightweight and versatile browser extension designed to translate text within 
 
 1. **Install via CRX File:**
 
-   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/dist.crx) file from the `Chrome-Extension/` folder.
+   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/AI_Writing_Companion_v0.1.0.crx) file from the `Chrome-Extension/` folder.
    - Open `chrome://extensions/` in Chrome and enable Developer mode.
    - Drag and drop the `.crx` file onto the `chrome://extensions/` page to install the extension.
 
@@ -38,9 +38,7 @@ A lightweight and versatile browser extension designed to translate text within 
      cd Gemini-Translate
      ```
 
-   - Load the extension in Chrome:
-     - Open `chrome://extensions/` and enable Developer mode.
-     - Click **Load unpacked** and select the `Chrome-Extension/dist/` folder.
+   - Load the extension in Chrome
 
 3. **Set your API key on the Options page.**
 

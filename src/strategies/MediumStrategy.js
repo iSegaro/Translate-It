@@ -1,12 +1,17 @@
 // src/strategies/MediumStrategy.js
-import PlatformStrategy from "./PlatformStrategy";
-import { delay } from "../utils/helpers";
+import { ErrorTypes } from "../services/ErrorService.js";
+import { CONFIG } from "../config";
+import PlatformStrategy from "./PlatformStrategy.js";
+import { delay } from "../utils/helpers.js";
 
 export default class MediumStrategy extends PlatformStrategy {
-  constructor(notifier) {
-    // Accept NotificationManager instance
-    super();
-    this.notifier = notifier; // Store notifier instance
+  constructor(notifier, errorHandler) {
+    super(notifier);
+    this.errorHandler = errorHandler;
+  }
+
+  shouldShowDefaultIcon() {
+    return true;
   }
 
   // بررسی اینکه عنصر مربوط به مدیوم هست یا خیر
@@ -23,7 +28,7 @@ export default class MediumStrategy extends PlatformStrategy {
    * - برای فیلدهای contenteditable (مانند کامنت‌ها و نظرسنجی‌ها): متن ترجمه شده به کلیپبورد کپی می‌شود.
    */
   async updateElement(element, translatedText) {
-    // 1. برای input/textarea (مثلاً فیلد جستجو) - بدون تغییر
+    // 1. برای input/textarea (مثلاً فیلد جستجو)
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       element.value = translatedText;
       element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -35,7 +40,6 @@ export default class MediumStrategy extends PlatformStrategy {
     if (!mediumField) {
       console.error("Medium text field not found for element:", element);
       throw new Error("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
-      return;
     }
 
     this.safeFocus(mediumField); // فوکوس روی فیلد
@@ -43,37 +47,28 @@ export default class MediumStrategy extends PlatformStrategy {
     // کپی متن ترجمه شده به کلیپبورد
     try {
       console.log(
-        "MediumStrategy: clipboard write attempt for text:",
+        "MediumStrategy: clipboard write attempt for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write attempt
       await navigator.clipboard.writeText(translatedText);
       console.log(
-        "MediumStrategy: clipboard write SUCCESS for text:",
+        "MediumStrategy: clipboard write SUCCESS for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write success
       this.notifier.show(
-        // Now this.notifier is correctly defined
-        "✅ ترجمه در حافظه کپی شد. Paste کنید (Ctrl+V).",
+        "✅ ترجمه در حافظه کپی شد. (Ctrl+V)",
         "success",
         true,
         3000
       );
-    } catch (err) {
-      // مدیریت خطا به TranslationHandler منتقل شد
-      console.error("MediumStrategy: Clipboard write ERROR:", err); // Log clipboard write error
-      throw new Error(
-        `Clipboard write error in MediumStrategy: ${err.message}`
-      ); // Throw error for TranslationHandler to handle
+      // اعمال انیمیشن
+      this.applyVisualFeedback(mediumField);
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "medium-strategy-updateElement",
+      });
     }
-
-    // اعمال افکت تغییر رنگ پس‌زمینه برای اطلاع‌رسانی به کاربر (بدون تغییر)
-    mediumField.style.transition = "background-color 0.5s ease";
-    mediumField.style.backgroundColor = "#d4f8d4";
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        mediumField.style.backgroundColor = "transparent";
-      }, 1000);
-    });
   }
 
   extractText(target) {
@@ -106,8 +101,10 @@ export default class MediumStrategy extends PlatformStrategy {
 
       return element;
     } catch (error) {
-      console.error("Focus error:", error);
-      return null;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "medium-strategy-safeFocus",
+      });
     }
   }
 

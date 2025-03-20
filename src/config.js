@@ -3,7 +3,8 @@
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
     "Extension context invalid. Please refresh the page to continue.",
-  MISSING_API_KEY: "API key is missing",
+  API_KEY_MISSING: "API key is missing",
+  API_KEY_WRONG: "API key is wrong",
   SERVICE_OVERLOADED: "Translation service overloaded:",
   NETWORK_FAILURE: "Connection to server failed",
   INVALID_RESPONSE: "Invalid API response format",
@@ -37,12 +38,16 @@ export const CONFIG = {
   ICON_TRANSLATION: "🌐",
   ICON_ERROR: "❌ ",
   ICON_SECCESS: "✅ ",
-  ICON_STATUS: "🔄 ",
+  ICON_STATUS: "⏳ ",
+  ICON_REVERT: "",
   ICON_WARNING: "⚠️ ",
-  ICON_INFO: "ℹ️ ",
+  ICON_INFO: "🔵 ",
   RTL_REGEX: /[\u0600-\u06FF]/,
   PERSIAN_REGEX:
     /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
+  NOTIFICATION_ALIGNMENT: "right", // برای جهت قرارگیری کلی اعلان
+  NOTIFICATION_TEXT_DIRECTION: "rtl", // جهت پیش فرض متن (راست به چپ)
+  NOTIFICATION_TEXT_ALIGNMENT: "right", // ترازبندی پیش فرض متن (راست)
 };
 
 // Initial state

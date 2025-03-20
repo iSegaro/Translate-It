@@ -9,21 +9,43 @@ export default class NotificationManager {
         title: "خطا - ترجمه خودکار",
         icon: CONFIG.ICON_ERROR,
         priority: 2,
+        duration: 5000, // مدت زمان پیش فرض برای خطا
+        className: "AIWritingCompanion-notification-error", // اضافه کردن کلاس CSS مربوط به نوع خطا
       },
       warning: {
         title: "هشدار - ترجمه خودکار",
         icon: CONFIG.ICON_WARNING,
         priority: 1,
+        duration: 4000, // مدت زمان پیش فرض برای هشدار
+        className: "AIWritingCompanion-notification-warning", // اضافه کردن کلاس CSS مربوط به نوع هشدار
       },
       success: {
         title: "موفقیت - ترجمه خودکار",
         icon: CONFIG.ICON_SUCCESS,
         priority: 0,
+        duration: 3000, // مدت زمان پیش فرض برای موفقیت
+        className: "AIWritingCompanion-notification-success", // اضافه کردن کلاس CSS مربوط به نوع موفقیت
       },
       info: {
         title: "اطلاعات - ترجمه خودکار",
         icon: CONFIG.ICON_INFO,
         priority: 0,
+        duration: 3000, // مدت زمان پیش فرض برای اطلاعات
+        className: "AIWritingCompanion-notification-info", // اضافه کردن کلاس CSS مربوط به نوع اطلاعات
+      },
+      status: {
+        title: "وضعیت - ترجمه خودکار",
+        icon: CONFIG.ICON_INFO,
+        priority: 0,
+        duration: 2000, // مدت زمان پیش فرض برای وضعیت
+        className: "AIWritingCompanion-notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
+      },
+      revert: {
+        title: "بازگشت - ترجمه خودکار",
+        icon: CONFIG.ICON_REVERT,
+        priority: 0,
+        duration: 600, // مدت زمان پیش فرض برای بازگشت
+        className: "AIWritingCompanion-notification-revert", // اضافه کردن کلاس CSS مربوط به نوع بازگشت
       },
     };
 
@@ -35,32 +57,51 @@ export default class NotificationManager {
   }
 
   createContainer() {
-    let container = document.getElementById("translation-notifications");
+    const containerId = "AIWritingCompanion-translation-notifications";
+    let container = document.getElementById(containerId);
+
     if (!container) {
       container = document.createElement("div");
-      container.id = "translation-notifications";
-      Object.assign(container.style, {
+      container.id = containerId;
+
+      const commonStyles = {
         position: "fixed",
         top: "20px",
-        right: "20px",
         zIndex: "10000000000",
         display: "flex",
         flexDirection: "column",
         gap: "8px",
-      });
+      };
+
+      Object.assign(container.style, commonStyles);
+
+      if (CONFIG.NOTIFICATION_ALIGNMENT === "right") {
+        container.style.right = "20px";
+      } else {
+        container.style.left = "20px";
+      }
+
       document.body.appendChild(container);
     }
+
+    if (CONFIG.TEXT_DIRECTION) {
+      container.style.setProperty("--text-direction", CONFIG.TEXT_DIRECTION);
+    }
+    if (CONFIG.TEXT_ALIGNMENT) {
+      container.style.setProperty("--text-alignment", CONFIG.TEXT_ALIGNMENT);
+    }
+
     return container;
   }
 
-  // بهبود نمایش نوتیفیکیشن‌های سیستمی
+  // نمایش اعلان در صورتی که container وجود نداشته باشد (برای پس‌زمینه)
   showBackgroundNotification(message, type = "info", onClick) {
     const config = this.typeMapping[type] || this.typeMapping.info;
 
     chrome.notifications.create(
       {
         type: "basic",
-        iconUrl: "icons/icon-48.png",
+        iconUrl: "icons/icon.png",
         title: config.title,
         message: message,
         priority: config.priority,
@@ -85,30 +126,21 @@ export default class NotificationManager {
       return this.showBackgroundNotification(message, type, onClick);
     }
 
-    const baseNotification = {
-      error: { icon: CONFIG.ICON_ERROR, duration: 5000 },
-      warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
-      success: { icon: CONFIG.ICON_SECCESS, duration: 3000 },
-      info: { icon: CONFIG.ICON_INFO, duration: 3000 },
-      status: { icon: CONFIG.ICON_INFO, duration: 2000 }, // پیش‌فرض برای وضعیت
-    };
-
-    const config = baseNotification[type] || baseNotification.info;
-    const finalDuration = duration || config.duration;
-
+    const baseNotification = this.typeMapping[type] || this.typeMapping.info;
+    const finalDuration = duration || baseNotification.duration;
+    const icon = baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`];
     const notification = document.createElement("div");
-    notification.className = "translation-notification";
+    notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`; // اضافه کردن کلاس اصلی و کلاس مربوط به نوع
 
-    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "ℹ️";
+    let iconHtml = "";
+    if (icon) {
+      iconHtml = `<span class="AIWritingCompanion-notification-icon">${icon}</span>`;
+    }
 
     notification.innerHTML = `
-      <span class="notification-icon">${icon}</span>
-      <span class="notification-text">${message}</span>
-    `;
-
-    Object.assign(notification.style, {
-      background: this.getBackgroundColor(type),
-    });
+    ${iconHtml}
+    <span class="AIWritingCompanion-notification-text">${message}</span>
+  `;
 
     const clickHandler = onClick ? onClick : () => this.dismiss(notification);
 
@@ -116,9 +148,8 @@ export default class NotificationManager {
 
     this.container.appendChild(notification);
 
-    // فقط در صورتی حذف خودکار انجام شود که autoDismiss برابر با true باشد
+    // اعلان‌های وضعیت autoDismiss نمی‌شوند
     if (autoDismiss && type !== "status") {
-      // برای پیغام وضعیت حذف خودکار نداریم
       setTimeout(() => {
         this.dismiss(notification);
         notification.removeEventListener("click", clickHandler);
@@ -130,59 +161,5 @@ export default class NotificationManager {
 
   dismiss(notification) {
     fadeOut(notification);
-  }
-
-  getBackgroundColor(type) {
-    const colors = {
-      error: "rgba(255,0,0,0.8)",
-      success: "rgba(0,128,0,0.7)",
-      status: "rgba(0,0,0,0.4)",
-      warning: "rgba(255,165,0,0.8)",
-      info: "rgba(30,144,255,0.8)",
-    };
-    return colors[type] || "rgba(0,0,0,0.7)";
-  }
-
-  showBackgroundNotification(message, type, onClick) {
-    // Method to show Chrome Notifications API
-    const notificationOptions = {
-      type: "basic",
-      iconUrl: "icons/icon.png", // Path to your extension icon
-      title: "ترجمه خودکار", // Extension name or a general title
-      message: message,
-      priority: 2, // Priority level (0-2, 2 is highest)
-    };
-
-    if (type === "error") {
-      notificationOptions.title = "خطا - ترجمه خودکار";
-      notificationOptions.priority = 2;
-    } else if (type === "warning") {
-      notificationOptions.title = "هشدار - ترجمه خودکار";
-      notificationOptions.priority = 1;
-    } else if (type === "success") {
-      notificationOptions.title = "موفقیت - ترجمه خودکار";
-      notificationOptions.priority = 0;
-    }
-
-    chrome.notifications.create(
-      undefined,
-      notificationOptions,
-      (notificationId) => {
-        if (onClick) {
-          chrome.notifications.onClicked.addListener(
-            function notificationClicked(clickedNotificationId) {
-              if (clickedNotificationId === notificationId) {
-                onClick();
-                chrome.notifications.clear(notificationId);
-                chrome.notifications.onClicked.removeListener(
-                  notificationClicked
-                ); // Clean up listener
-              }
-            }
-          );
-        }
-        // Notifications auto-dismiss after a certain time by default in Chrome, no need for manual dismiss in background
-      }
-    );
   }
 }

@@ -1,9 +1,9 @@
-import { ErrorTypes } from "../services/ErrorService";
+// src/strategies/YoutubeStrategy.js
+import { ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import TranslationHandler from "../core/TranslationHandler.js";
 
-export default class DefaultStrategy extends PlatformStrategy {
+export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
     this.errorHandler = errorHandler;
@@ -37,7 +37,7 @@ export default class DefaultStrategy extends PlatformStrategy {
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
-        context: "default-strategy-updateElement",
+        context: "youtube-strategy-updateElement",
       });
     }
   }

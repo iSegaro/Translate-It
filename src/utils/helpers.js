@@ -118,7 +118,10 @@ export const showStatus = (() => {
 export function taggleLinks(enable = true) {
   try {
     if (!document || !document.body) return;
-    document.documentElement.classList.toggle("disable-links", enable);
+    document.documentElement.classList.toggle(
+      "AIWritingCompanion-disable-links",
+      enable
+    );
   } catch (error) {
     // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
     if (
@@ -135,5 +138,27 @@ export function taggleLinks(enable = true) {
         context: "taggleLinks",
       });
     }
+  }
+}
+
+/**
+ * تابع تزریق CSS به صورت داینامیک
+ */
+function injectCSS(filePath) {
+  const linkElement = document.createElement("link");
+  linkElement.href = chrome.runtime.getURL(filePath);
+  linkElement.rel = "stylesheet";
+  document.head.appendChild(linkElement);
+}
+
+export function injectStyle() {
+  // تزریق فایل‌های CSS مناسب بر اساس hostname
+  const hostname = window.location.hostname;
+  injectCSS("styles/content.css");
+  if (hostname.includes("whatsapp.com")) {
+    injectCSS("styles/whatsapp.css");
+  }
+  if (hostname.includes("x.com")) {
+    injectCSS("styles/twitter.css");
   }
 }

@@ -1,12 +1,13 @@
 // src/strategies/InstagramStrategy.js
+import { ErrorTypes } from "../services/ErrorService";
 import { CONFIG } from "../config.js";
-import PlatformStrategy from "./PlatformStrategy";
+import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 
 export default class InstagramStrategy extends PlatformStrategy {
-  constructor(notifier) {
+  constructor(notifier, errorHandler) {
     super(notifier);
-    this.notifier = notifier;
+    this.errorHandler = errorHandler;
   }
 
   /**
@@ -21,17 +22,27 @@ export default class InstagramStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
-    // بررسی اگر المان، فیلد متنی دایرکت مسیج باشد
-    if (this.isDirectMessageInputField(element)) {
-      await this.clearContent(element); // اضافه کردن مرحله پاک کردن محتوا
-      await this.pasteText(element, translatedText);
-      this.triggerStateUpdate(element);
-    } else if (element.isContentEditable) {
-      element.innerHTML = translatedText;
-      this.applyTextDirection(element, translatedText);
-    } else {
-      element.value = translatedText;
-      this.applyTextDirection(element, translatedText);
+    try {
+      // بررسی اگر المان، فیلد متنی دایرکت مسیج باشد
+      if (this.isDirectMessageInputField(element)) {
+        await this.clearContent(element);
+        await this.pasteText(element, translatedText);
+        this.triggerStateUpdate(element);
+        this.applyVisualFeedback(element);
+      } else if (element.isContentEditable) {
+        element.innerHTML = translatedText;
+        this.applyTextDirection(element, translatedText);
+        this.applyVisualFeedback(element);
+      } else {
+        element.value = translatedText;
+        this.applyTextDirection(element, translatedText);
+        this.applyVisualFeedback(element);
+      }
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-updateElement",
+      });
     }
   }
 
@@ -44,7 +55,10 @@ export default class InstagramStrategy extends PlatformStrategy {
       await this.simulatePaste(element, ""); // پیست کردن متن خالی برای پاک کردن
       await delay(50); // کمی تاخیر برای پردازش
     } catch (error) {
-      console.error("InstagramStrategy: clearContent ERROR:", error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-clearContent",
+      });
     }
   }
 
@@ -64,7 +78,10 @@ export default class InstagramStrategy extends PlatformStrategy {
       target.dispatchEvent(pasteEvent);
       await delay(50); // کمی تاخیر برای پردازش رویداد
     } catch (error) {
-      console.error("InstagramStrategy: pasteText ERROR:", error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-pasteText",
+      });
     }
   }
 
@@ -76,9 +93,16 @@ export default class InstagramStrategy extends PlatformStrategy {
   }
 
   async safeFocus(element) {
-    element.focus({ preventScroll: true });
-    await delay(100);
-    return element;
+    try {
+      element.focus({ preventScroll: true });
+      await delay(100);
+      return element;
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-safeFocus",
+      });
+    }
   }
 
   async selectAllContent(element) {
@@ -90,7 +114,10 @@ export default class InstagramStrategy extends PlatformStrategy {
       selection.addRange(range);
       await delay(100);
     } catch (error) {
-      console.error("InstagramStrategy: selectAllContent ERROR:", error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-selectAllContent",
+      });
     }
     return element;
   }
@@ -117,19 +144,5 @@ export default class InstagramStrategy extends PlatformStrategy {
         composed: true,
       })
     );
-  }
-
-  applyTextDirection(element, translatedText) {
-    const isRtl = CONFIG.RTL_REGEX.test(translatedText);
-
-    // برای input/textarea
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-    }
-    // برای سایر المان‌ها (مانند div با contenteditable)
-    else if (element.isContentEditable) {
-      element.style.direction = isRtl ? "rtl" : "ltr";
-      element.style.textAlign = isRtl ? "right" : "left";
-    }
   }
 }

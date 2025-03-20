@@ -6,6 +6,7 @@ import { ErrorTypes } from "../services/ErrorService.js";
 export function setupEventListeners(translationHandler) {
   const errorHandler = translationHandler.errorHandler;
 
+  // تمام event handlerها در این تابع در صورت بروز خطا، آن را از طریق ErrorHandler مدیریت می‌کنند
   const handleEventWithErrorHandling = (handler) => {
     return (...args) => {
       try {
@@ -13,7 +14,7 @@ export function setupEventListeners(translationHandler) {
       } catch (error) {
         errorHandler.handle(error, {
           type: ErrorTypes.UI,
-          context: "event-router",
+          context: "event-router-handleEventWithErrorHandling",
           eventType: args[0]?.type,
         });
       }
@@ -22,13 +23,17 @@ export function setupEventListeners(translationHandler) {
 
   const handleFocus = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
-      translationHandler.handleEditableFocus(e.target);
+      if (translationHandler.IconManager) {
+        translationHandler.handleEditableFocus(e.target);
+      }
     }
   });
 
   const handleBlur = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
-      translationHandler.handleEditableBlur(e.target);
+      if (translationHandler.IconManager) {
+        translationHandler.handleEditableBlur(e.target);
+      }
     }
   });
 
@@ -37,10 +42,22 @@ export function setupEventListeners(translationHandler) {
   });
 
   const handleClick = handleEventWithErrorHandling((e) => {
-    if (state.selectionActive) {
-      translationHandler.IconManager.cleanup();
+    if (state && state.selectionActive) {
+      // اضافه شدن بررسی برای state
+      if (translationHandler.IconManager) {
+        translationHandler.IconManager.cleanup();
+      }
       state.selectionActive = false;
-      chrome.storage.local.set({ selectionActive: false });
+      if (
+        typeof chrome !== "undefined" &&
+        chrome.storage &&
+        chrome.storage.local
+      ) {
+        // بررسی برای اطمینان از وجود chrome.storage
+        chrome.storage.local.set({ selectionActive: false });
+      } else {
+        console.warn("[EventRouter] chrome.storage.local is not available.");
+      }
 
       taggleLinks(false);
 
@@ -55,22 +72,32 @@ export function setupEventListeners(translationHandler) {
   });
 
   const handleKeyDown = handleEventWithErrorHandling((e) => {
-    console.log("keydown event detected. Key:", e.key);
-    if (e.key === "Escape" && state.selectionActive) {
-      translationHandler.IconManager.cleanup();
-      state.selectionActive = false;
-      chrome.storage.local.set({ selectionActive: false });
+    // console.log("keydown event detected. Key:", e.key);
+    try {
+      translationHandler.handleEvent(e);
+      if (e.key === "Escape" && state.selectionActive) {
+        if (translationHandler.IconManager) {
+          translationHandler.IconManager.cleanup();
+        }
+        state.selectionActive = false;
+        chrome.storage.local.set({ selectionActive: false });
 
-      taggleLinks(false);
+        taggleLinks(false);
 
-      chrome.runtime.sendMessage({
-        action: "UPDATE_SELECTION_STATE",
-        data: false,
+        chrome.runtime.sendMessage({
+          action: "UPDATE_SELECTION_STATE",
+          data: false,
+        });
+        console.info("Selection mode deactivated via Esc key.");
+        return;
+      }
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "event-router-handleKeyDown",
+        eventType: args[0]?.type,
       });
-      console.info("Selection mode deactivated via Esc key.");
-      return;
     }
-    translationHandler.handleEvent(e);
   });
 
   const handleMouseOver = handleEventWithErrorHandling((e) => {
@@ -87,7 +114,8 @@ export function setupEventListeners(translationHandler) {
       e.target.style.opacity = "0.9";
     }
   });
-  // ثبت Event Listeners
+
+  // ثبت Event Listenerها
   document.addEventListener("focus", handleFocus, true);
   document.addEventListener("blur", handleBlur, true);
   document.addEventListener("selectionchange", handleSelectionChange);
@@ -95,7 +123,7 @@ export function setupEventListeners(translationHandler) {
   document.addEventListener("keydown", handleKeyDown);
   document.addEventListener("mouseover", handleMouseOver);
 
-  // برگرداندن توابع برای مدیریت حذف
+  // برگرداندن توابع جهت امکان حذف بعدی
   return {
     handleFocus,
     handleBlur,

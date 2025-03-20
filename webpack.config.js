@@ -2,10 +2,23 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
+const fs = require("fs");
 
 const rimraf = require("rimraf");
-// پاک کردن دستی دایرکتوری dist قبل از build
-rimraf.sync(path.resolve(__dirname, "Chrome-Extension", "dist"));
+
+// خواندن محتویات فایل manifest.json
+const manifest = JSON.parse(fs.readFileSync("./manifest.json", "utf8"));
+const extensionName = manifest.name.replace(/ /g, "_");
+const extensionVersion = manifest.version;
+const outputFolderName = `${extensionName}_v${extensionVersion}`;
+const outputFullPath = path.resolve(
+  __dirname,
+  "Chrome-Extension",
+  outputFolderName
+);
+
+// پاک کردن دستی دایرکتوری build قبل از build
+rimraf.sync(outputFullPath);
 
 module.exports = {
   entry: {
@@ -22,7 +35,7 @@ module.exports = {
     extensions: [".js"],
   },
   output: {
-    path: path.resolve(__dirname, "Chrome-Extension", "dist"),
+    path: outputFullPath,
     filename: "[name].bundle.js",
   },
   target: "web",

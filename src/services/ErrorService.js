@@ -6,34 +6,73 @@ export class ErrorTypes {
   static API = "API";
   static NETWORK = "NETWORK";
   static SERVICE = "SERVICE";
-  static VALIDATION = "VALIDATION";
+  static VALIDATIONMODEL = "VALIDATIONMODEL";
   static CONTEXT = "CONTEXT";
   static UI = "UI";
+  static INTEGRATION = "INTEGRATION";
 }
 
 export class ErrorHandler {
   constructor(notificationManager = new NotificationManager()) {
     this.notifier = notificationManager;
     this.displayedErrors = new Set();
+    this.isHandling = false; // فلگ برای جلوگیری از هندلینگ چندباره در یک چرخه
   }
 
   handle(error, meta = {}) {
-    const { type, statusCode, element } = meta;
+    if (this.isHandling) {
+      console.debug(
+        "[ErrorHandler] Ignoring subsequent error in the same flow:",
+        error
+      );
+      return error;
+    }
+    this.isHandling = true;
+
+    // نرمال‌سازی خطا در صورتی که از نوع Error نباشد
+    if (!(error instanceof Error)) {
+      error = new Error(String(error));
+    }
+
+    // بررسی و بازبینی نوع خطا بر اساس محتوای خطا
+    let { type, statusCode } = meta;
+    type = this._reviewErrorTypeBasedOnContent(error, type, meta);
+
     const message = this._getErrorMessage(error, type, statusCode);
 
     this._logError(error, meta);
-    this._notifyUser(message, type, element);
 
-    return new Error(message);
+    this._notifyUser(message, type);
+
+    this.isHandling = false; // ریست کردن فلگ بعد از هندلینگ
+    return error;
   }
 
-  _getErrorMessage(error, type, statusCode) {
+  _reviewErrorTypeBasedOnContent(error, currentType, meta) {
+    let type = currentType;
+    if (error.message.includes("Extension context invalidated")) {
+      type = ErrorTypes.CONTEXT;
+    }
+
+    if (
+      error.message.includes("reading 'handle'") &&
+      meta.context === "ctrl-slash"
+    ) {
+      type = ErrorTypes.INTEGRATION;
+    }
+
+    // می‌توانید بررسی‌های مشابهی برای سایر شرایط خاص اضافه کنید
+    return type;
+  }
+
+  _getErrorMessage(error, type, statusCode, meta) {
     const errorMap = {
       [ErrorTypes.API]: {
-        401: TRANSLATION_ERRORS.MISSING_API_KEY,
-        403: "کلید API نامعتبر است",
-        429: TRANSLATION_ERRORS.SERVICE_OVERLOADED,
-        500: "خطای داخلی سرور",
+        400: `400: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
+        401: `401: ${TRANSLATION_ERRORS.API_KEY_MISSING}`,
+        403: `403: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
+        429: `429: ${TRANSLATION_ERRORS.SERVICE_OVERLOADED}`,
+        500: "500: خطای داخلی سرور",
         default: "خطای سرویس API",
       },
       [ErrorTypes.NETWORK]: {
@@ -44,23 +83,86 @@ export class ErrorHandler {
         default: "خطای سرویس ترجمه",
       },
       [ErrorTypes.CONTEXT]: {
-        default: TRANSLATION_ERRORS.INVALID_CONTEXT,
+        default: "لطفا صفحه را رفرش کنید.",
+      },
+      [ErrorTypes.UI]: {
+        default: "خطای سیستمی رخ داده است",
+      },
+      [ErrorTypes.VALIDATIONMODEL]: {
+        default: "خطا در مدلِ انتخاب شده",
+      },
+      [ErrorTypes.INTEGRATION]: {
+        ctrl_slash: "خطا در اتصال شورتکات به صفحه",
+        default: "خطا در اتصال به این صفحه",
       },
     };
 
-    const category = errorMap[type] || errorMap[ErrorTypes.SERVICE];
-    return category[statusCode] || category.default;
+    if (type && errorMap[type]) {
+      const typeError = errorMap[type];
+      if (
+        type === ErrorTypes.INTEGRATION &&
+        error.message.includes("reading 'handle'")
+      ) {
+        return typeError.ctrl_slash;
+      }
+      return typeError[statusCode] || typeError.default;
+    }
+
+    // در صورت نداشتن نوع مشخص، از پیامِ اصلیِ خطا استفاده می‌شود
+    return error.message || "خطای ناشناخته رخ داده است";
   }
 
   _logError(error, meta) {
-    console.error("[ErrorHandler]", {
+    const isProduction = process.env.NODE_ENV === "production";
+    const isKnownErrorType = Object.values(ErrorTypes).includes(meta.type);
+
+    const errorDetails = {
+      name: error.name,
       message: error.message,
+      type: meta.type || error.type,
+      statusCode: meta.statusCode || error.statusCode,
+      context: meta.context,
       stack: error.stack,
-      ...meta,
-    });
+    };
+
+    if (!isProduction || !isKnownErrorType) {
+      // استفاده از console.dir برای نمایش ساختار کامل آبجکت
+      // نمایش تمام سطوح آبجکت با عمق نامحدود
+      // console.error("[ErrorHandler] Error Details:");
+      // console.dir(errorDetails, { depth: null, colors: true });
+
+      // نمایش نسخه متنی برای محیط‌هایی که آبجکت را کامل نشان نمی‌دهند
+      console.error(
+        `[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}\n` +
+          `Type: ${errorDetails.type}\n` +
+          `Status: ${errorDetails.statusCode}\n` +
+          `Context: ${errorDetails.context}`
+      );
+
+      if (error.stack) {
+        console.error("Stack Trace:", error.stack);
+      }
+    } else if (isProduction && isKnownErrorType) {
+      // می‌توانید لاگ کردن خطاهای شناخته شده در حالت production را در صورت نیاز اضافه کنید
+      // برای مثال، می‌توانید فقط خطاهای نوع خاصی را لاگ کنید.
+      // console.debug(`[ErrorHandler] (Production) Known Error: ${error.message}`, meta);
+    } else if (isProduction && !isKnownErrorType) {
+      console.debug(
+        `[ErrorHandler] (Production) Unknown Error: ${error.message}`,
+        meta
+      );
+    }
   }
 
-  _notifyUser(message, type, element) {
+  _notifyUser(message, type) {
+    if (!this.notifier) {
+      console.error(
+        "[ErrorHandler] Notifier is undefined. Cannot notify user."
+      );
+      return;
+    }
+
+    // جلوگیری از نمایش خطاهای تکراری به مدت زمان مشخص
     if (this.displayedErrors.has(message)) return;
 
     const notificationType = this._getNotificationType(type);
@@ -72,11 +174,13 @@ export class ErrorHandler {
 
   _getNotificationType(errorType) {
     const typeMap = {
+      [ErrorTypes.UI]: "error",
       [ErrorTypes.API]: "error",
       [ErrorTypes.NETWORK]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
-      [ErrorTypes.UI]: "error",
+      [ErrorTypes.VALIDATIONMODEL]: "warning",
+      [ErrorTypes.INTEGRATION]: "warning",
     };
 
     return typeMap[errorType] || "error";

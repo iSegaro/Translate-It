@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ترجمه خودکار",
-  "version": "0.1",
-  "description": "اکستنشن ترجمه متن به فارسی و انگلیسی",
+  "name": "AI Writing Companion",
+  "version": "0.1.0",
+  "description": "Translate Everywhere. Simply.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -15,7 +15,7 @@
     "service_worker": "background.bundle.js"
   },
   "action": {
-    "default_title": "ترجمه خودکار",
+    "default_title": "AI Writing Companion",
     "default_icon": {
       "16": "icons/icon.png",
       "48": "icons/icon.png",

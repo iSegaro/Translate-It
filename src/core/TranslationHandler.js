@@ -5,6 +5,7 @@ import TwitterStrategy from "../strategies/TwitterStrategy.js";
 import TelegramStrategy from "../strategies/TelegramStrategy.js";
 import MediumStrategy from "../strategies/MediumStrategy.js";
 import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
+import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
@@ -22,19 +23,21 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export default class TranslationHandler {
   constructor() {
+    // ابتدا notifier را ایجاد می‌کنیم تا برای ErrorHandler موجود باشد
+    this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
     this.ErrorTypes = ErrorTypes;
-    this.notifier = new NotificationManager();
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
-      whatsapp: new WhatsAppStrategy(this.notifier),
-      instagram: new InstagramStrategy(this.notifier),
-      medium: new MediumStrategy(this.notifier),
-      telegram: new TelegramStrategy(this.notifier),
-      twitter: new TwitterStrategy(this.notifier),
-      chatgpt: new ChatGPTStrategy(),
-      default: new DefaultStrategy(),
+      whatsapp: new WhatsAppStrategy(this.notifier, this.eventHandler),
+      instagram: new InstagramStrategy(this.notifier, this.eventHandler),
+      medium: new MediumStrategy(this.notifier, this.eventHandler),
+      telegram: new TelegramStrategy(this.notifier, this.eventHandler),
+      twitter: new TwitterStrategy(this.notifier, this.eventHandler),
+      chatgpt: new ChatGPTStrategy(this.notifier, this.eventHandler),
+      youtube: new YoutubeStrategy(this.notifier, this.eventHandler),
+      default: new DefaultStrategy(this.notifier, this.eventHandler),
     };
 
     for (const [name, strategy] of Object.entries(this.strategies)) {
@@ -109,17 +112,35 @@ export default class TranslationHandler {
       const translated = await translateText(params.text);
 
       if (params.selectionRange) {
-        this.strategies[platform].replaceSelection(
-          params.selectionRange,
-          translated
-        );
+        if (
+          this.strategies[platform] &&
+          typeof this.strategies[platform].replaceSelection === "function"
+        ) {
+          this.strategies[platform].replaceSelection(
+            params.selectionRange,
+            translated
+          );
+        } else {
+          // console.error(
+          //   `استراتژی برای پلتفرم ${platform} یا متد replaceSelection در آن تعریف نشده است.`
+          // );
+          this.errorHandler.handle(
+            new Error(
+              `متد replaceSelection برای پلتفرم ${platform} تعریف نشده است.`
+            ),
+            {
+              type: ErrorTypes.UI,
+              context: "processTranslation",
+              platform: platform,
+            }
+          );
+        }
       } else if (params.target) {
         await this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
-        element: params.target,
         context: "translation-process",
       });
     } finally {
@@ -226,7 +247,7 @@ export default class TranslationHandler {
             );
           }
         });
-        this.notifier.show("تمام متون از حافظه پنهان بارگیری شدند.", "info");
+        this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
         return;
       }
 
@@ -253,65 +274,40 @@ export default class TranslationHandler {
         }
       });
     } catch (error) {
-      console.error("Error caught in translateTextNodesInElement:", error);
-      this.handleError(error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "translate-text-nodes",
+      });
     }
   }
 
   revertTranslations() {
-    // console.log(
-    //   "revertTranslations: وضعیت state.originalTexts در شروع:",
-    //   state.originalTexts
-    // );
-    console.info("TranslationHandler:Starting revert process...");
+    console.info("TranslationHandler: Starting revert process...");
     let successfulReverts = 0;
 
+    // پیمایش بر روی شناسه‌های یکتا
     for (const [uniqueId, data] of state.originalTexts.entries()) {
-      // پیمایش بر روی شناسه‌های یکتا
       try {
         if (!data.parent || !data.originalInnerHTML) {
-          // console.warn(
-          //   "revertTranslations: داده‌های والد یا innerHTML اصلی برای شناسه",
-          //   uniqueId,
-          //   "معتبر نیستند."
-          // );
           continue;
         }
 
         if (!data.parent.isConnected) {
-          // console.warn(
-          //   "revertTranslations: عنصر والد برای شناسه",
-          //   uniqueId,
-          //   "دیگر به DOM متصل نیست."
-          // );
           continue;
         }
 
-        // console.log(
-        //   "revertTranslations: بازگردانی innerHTML والد با شناسه:",
-        //   uniqueId,
-        //   "innerHTML اصلی:",
-        //   data.originalInnerHTML
-        // );
-
-        // جایگزینی innerHTML
         data.parent.innerHTML = data.originalInnerHTML;
-
         successfulReverts++;
       } catch (error) {
-        console.error(
-          "revertTranslations: خطای بازگردانی innerHTML والد:",
-          error
-        );
+        this.errorHandler.handle(error, {
+          type: ErrorTypes.UI,
+          context: "revert-translations",
+        });
       }
     }
 
-    // نمایش نتایج
     if (successfulReverts > 0) {
-      this.notifier.show(
-        `${successfulReverts} متن با موفقیت بازگردانی شد`,
-        "success"
-      );
+      this.notifier.show(`${successfulReverts}`, "revert");
     } else {
       if (process.env.NODE_ENV === "development") {
         this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
@@ -320,25 +316,19 @@ export default class TranslationHandler {
 
     // پاکسازی state
     state.originalTexts.clear();
-    this.IconManager.cleanup();
-    // console.log(
-    //   "revertTranslations: وضعیت state.originalTexts بعد از پاکسازی:",
-    //   state.originalTexts
-    // );
+    if (this.IconManager) {
+      this.IconManager.cleanup();
+    }
   }
 
   async updateTargetElement(target, translated) {
     try {
       const platform = detectPlatform(target);
       await this.strategies[platform].updateElement(target, translated);
-      // if (platform !== "medium") {
-      //   this.IconManager.applyTextDirection(target, translated);
-      // }
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI, // Or SERVICE depending on the error
+        type: ErrorTypes.UI, // یا SERVICE بسته به نوع خطا
         context: "update-target-element",
-        element: target,
       });
     }
   }
@@ -385,6 +375,12 @@ export default class TranslationHandler {
         "TranslationHandler: processElementTranslation SUCCESS for text:",
         text.substring(0, 20) + "..."
       );
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "process-element-translation",
+        element,
+      });
     } finally {
       this.notifier.dismiss(statusNotification);
       console.log(

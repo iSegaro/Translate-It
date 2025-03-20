@@ -11,9 +11,11 @@ export default class IconManager {
     }
 
     // حذف تمام آیکون‌ها
-    document.querySelectorAll(".translation-icon-extension").forEach((icon) => {
-      icon.remove();
-    });
+    document
+      .querySelectorAll(".AIWritingCompanion-translation-icon-extension")
+      .forEach((icon) => {
+        icon.remove();
+      });
 
     state.activeTranslateIcon = null;
   }
@@ -26,77 +28,47 @@ export default class IconManager {
     element.style.textAlign = isRtl ? "right" : "left";
   }
 
+  /**
+   *
+   * @param {Text-field where the icon is created} target
+   *
+   * اگر در هر استراتژی متد insertTranslationIcon وجود نداشته باشد
+   *
+   * این متد باید فراخوانی شود تا آیکون مترجم در فیلد مربوطه ساخته شود
+   * @returns
+   */
   createTranslateIcon(target) {
-    const icon = document.createElement("button");
-    icon.className = "translation-icon-extension";
-    Object.assign(icon.style, {
-      position: "absolute",
-      background: "white",
-      border: "1px solid gray",
-      borderRadius: "4px",
-      padding: "2px 5px",
-      fontSize: "12px",
-      cursor: "pointer",
-      zIndex: "9999999999",
-      pointerEvents: "auto",
-    });
+    try {
+      const icon = document.createElement("button");
+      icon.className = "AIWritingCompanion-translation-icon-extension";
+      Object.assign(icon.style, {
+        position: "absolute",
+        background: "white",
+        border: "1px solid gray",
+        borderRadius: "4px",
+        padding: "2px 5px",
+        fontSize: "12px",
+        cursor: "pointer",
+        zIndex: "9999999999",
+        pointerEvents: "auto",
+      });
 
-    icon.textContent = CONFIG.ICON_TRANSLATION;
-    icon.title = CONFIG.TRANSLATION_ICON_TITLE;
+      icon.textContent = CONFIG.ICON_TRANSLATION;
+      icon.title = CONFIG.TRANSLATION_ICON_TITLE;
 
-    // محاسبه موقعیت جدید با در نظر گرفتن اسکرول
-    const rect = target.getBoundingClientRect();
-    icon.style.top = `${rect.top + window.scrollY + 5}px`;
-    icon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
-
-    // نمایش همیشگی آیکون
-    icon.style.display = "block !important";
-    icon.style.visibility = "visible !important";
-
-    return icon;
-  }
-
-  setupIconBehavior(icon, target) {
-    // Add slight delay for positioning
-    setTimeout(() => {
       const rect = target.getBoundingClientRect();
-      icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      icon.style.left = `${rect.left + window.scrollX}px`;
-    }, 50);
+      icon.style.top = `${rect.top + window.scrollY + 5}px`;
+      icon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
 
-    const clickHandler = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      icon.style.display = "block !important";
+      icon.style.visibility = "visible !important";
 
-      try {
-        const text =
-          this.strategies[this.detectPlatform(target)].extractText(target);
-        if (!text) return;
-
-        const statusNotification = this.notifier.show(
-          "در حال ترجمه...",
-          "status"
-        );
-
-        const translated = await translateText(text);
-        await this.translationHandler.updateTargetElement(target, translated);
-      } catch (error) {
-        this.translationHandler.errorHandler.handle(error, {
-          type: ErrorTypes.UI, // Or SERVICE depending on the error source
-          context: "translate-icon-click",
-          element: target,
-        });
-      } finally {
-        this.notifier.dismiss(statusNotification);
-      }
-    };
-
-    icon.addEventListener("click", clickHandler);
-    document.body.appendChild(icon);
-
-    // Positioning fix
-    const rect = target.getBoundingClientRect();
-    icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-    icon.style.left = `${rect.left + window.scrollX}px`;
+      return icon;
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "IconManager-createTranslateIcon",
+      });
+    }
   }
 }

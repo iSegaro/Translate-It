@@ -1,12 +1,13 @@
 // src/strategies/WhatsAppStrategy.js
-import PlatformStrategy from "./PlatformStrategy";
+import { ErrorTypes } from "../services/ErrorService.js";
+import { CONFIG } from "../config";
+import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 
 export default class WhatsAppStrategy extends PlatformStrategy {
-  constructor(notifier) {
-    // اضافه کردن notifier به constructor و ارسال به کلاس والد
+  constructor(notifier, errorHandler) {
     super(notifier);
-    this.notifier = notifier;
+    this.errorHandler = errorHandler;
   }
 
   /**
@@ -59,9 +60,10 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       // به روزرسانی state واتس‌اپ
       this.triggerStateUpdate(whatsappField);
     } catch (error) {
-      // مدیریت خطا به TranslationHandler منتقل شد
-      console.error("WhatsAppStrategy: updateElement ERROR:", error); // Log error
-      throw error; // پرتاب خطا برای مدیریت در TranslationHandler
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "whatsapp-strategy-updateElement",
+      });
     }
   }
 
@@ -86,25 +88,40 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       selection.removeAllRanges();
       selection.addRange(range);
       await delay(100);
+      return element;
     } catch (error) {
-      console.error("WhatsAppStrategy: selectAllContent ERROR:", error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "whatsapp-strategy-selectAllContent",
+      });
     }
-    return element;
   }
 
   async simulatePaste(element, text) {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
+    if (!element) return;
+    try {
+      if (text !== undefined && text !== null) {
+        let htmlText = "";
+        htmlText = text.replace(/\n/g, "<br>");
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        dt.setData("text/html", htmlText);
 
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
 
-    element.dispatchEvent(pasteEvent);
-    await delay(50);
+        element.dispatchEvent(pasteEvent);
+        await delay(50);
+      }
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "whatsapp-strategy-simulatePaste",
+      });
+    }
   }
 
   triggerStateUpdate(element) {
