@@ -47,17 +47,16 @@ export default class MediumStrategy extends PlatformStrategy {
     // کپی متن ترجمه شده به کلیپبورد
     try {
       console.log(
-        "MediumStrategy: clipboard write attempt for text:",
+        "MediumStrategy: clipboard write attempt for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write attempt
       await navigator.clipboard.writeText(translatedText);
       console.log(
-        "MediumStrategy: clipboard write SUCCESS for text:",
+        "MediumStrategy: clipboard write SUCCESS for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write success
       this.notifier.show(
-        // Now this.notifier is correctly defined
-        "✅ ترجمه در حافظه کپی شد. Paste کنید (Ctrl+V).",
+        "✅ ترجمه در حافظه کپی شد. (Ctrl+V)",
         "success",
         true,
         3000
