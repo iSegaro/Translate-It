@@ -1,8 +1,13 @@
-// src/strategies/DefaultStrategy.js
+import { ErrorTypes } from "../services/ErrorService";
 import { CONFIG } from "../config.js";
-import PlatformStrategy from "./PlatformStrategy";
+import PlatformStrategy from "./PlatformStrategy.js";
+import TranslationHandler from "../core/TranslationHandler.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
+  constructor(notifier, errorHandler) {
+    super(notifier);
+    this.errorHandler = errorHandler;
+  }
   /**
    * استخراج متن از المان‌های استاندارد
    */
@@ -25,7 +30,10 @@ export default class DefaultStrategy extends PlatformStrategy {
         this.applyTextDirection(element, htmlText);
       }
     } catch (error) {
-      error.context = "default-strategy-updateElement";
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "default-strategy-updateElement",
+      });
       throw error;
     }
   }
