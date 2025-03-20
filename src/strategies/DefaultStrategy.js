@@ -25,10 +25,12 @@ export default class DefaultStrategy extends PlatformStrategy {
           // برای عناصر contentEditable از <br> استفاده کنید
           const htmlText = translatedText.replace(/\n/g, "<br>");
           element.innerHTML = htmlText;
+          this.applyVisualFeedback(element);
           this.applyTextDirection(element, htmlText);
         } else {
           // برای input و textarea از \n استفاده کنید
           element.value = translatedText;
+          this.applyVisualFeedback(element);
           this.applyTextDirection(element, translatedText);
         }
       }
@@ -48,23 +50,6 @@ export default class DefaultStrategy extends PlatformStrategy {
       element.value = "";
     } else {
       element.innerHTML = "";
-    }
-  }
-
-  /**
-   * اعمال جهت متن برای استراتژی پیش‌فرض
-   */
-  applyTextDirection(element, translatedText) {
-    const isRtl = CONFIG.RTL_REGEX.test(translatedText);
-
-    // برای input/textarea
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-    }
-    // برای سایر المان‌ها
-    else {
-      element.style.direction = isRtl ? "rtl" : "ltr";
-      element.style.textAlign = isRtl ? "right" : "left";
     }
   }
 }
