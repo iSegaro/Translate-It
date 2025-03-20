@@ -1,12 +1,17 @@
 // src/strategies/MediumStrategy.js
-import PlatformStrategy from "./PlatformStrategy";
-import { delay } from "../utils/helpers";
+import { ErrorTypes } from "../services/ErrorService.js";
+import { CONFIG } from "../config";
+import PlatformStrategy from "./PlatformStrategy.js";
+import { delay } from "../utils/helpers.js";
 
 export default class MediumStrategy extends PlatformStrategy {
-  constructor(notifier) {
-    // Accept NotificationManager instance
-    super();
-    this.notifier = notifier; // Store notifier instance
+  constructor(notifier, errorHandler) {
+    super(notifier);
+    this.errorHandler = errorHandler;
+  }
+
+  shouldShowDefaultIcon() {
+    return true;
   }
 
   // بررسی اینکه عنصر مربوط به مدیوم هست یا خیر
@@ -35,7 +40,6 @@ export default class MediumStrategy extends PlatformStrategy {
     if (!mediumField) {
       console.error("Medium text field not found for element:", element);
       throw new Error("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
-      return;
     }
 
     this.safeFocus(mediumField); // فوکوس روی فیلد
@@ -58,12 +62,11 @@ export default class MediumStrategy extends PlatformStrategy {
         true,
         3000
       );
-    } catch (err) {
-      // مدیریت خطا به TranslationHandler منتقل شد
-      console.error("MediumStrategy: Clipboard write ERROR:", err); // Log clipboard write error
-      throw new Error(
-        `Clipboard write error in MediumStrategy: ${err.message}`
-      ); // Throw error for TranslationHandler to handle
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "medium-strategy-updateElement",
+      });
     }
 
     // اعمال افکت تغییر رنگ پس‌زمینه برای اطلاع‌رسانی به کاربر (بدون تغییر)
@@ -106,8 +109,10 @@ export default class MediumStrategy extends PlatformStrategy {
 
       return element;
     } catch (error) {
-      console.error("Focus error:", error);
-      return null;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "medium-strategy-safeFocus",
+      });
     }
   }
 
