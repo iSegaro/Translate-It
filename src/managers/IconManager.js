@@ -26,6 +26,15 @@ export default class IconManager {
     element.style.textAlign = isRtl ? "right" : "left";
   }
 
+  /**
+   *
+   * @param {Text-field where the icon is created} target
+   *
+   * اگر در هر استراتژی متد insertTranslationIcon وجود نداشته باشد
+   *
+   * این متد باید فراخوانی شود تا آیکون مترجم در فیلد مربوطه ساخته شود
+   * @returns
+   */
   createTranslateIcon(target) {
     try {
       const icon = document.createElement("button");
@@ -54,8 +63,10 @@ export default class IconManager {
 
       return icon;
     } catch (error) {
-      console.error("[IconManager] Error in createTranslateIcon:", error);
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "IconManager-createTranslateIcon",
+      });
     }
   }
 }
