@@ -1,7 +1,10 @@
 // src/strategies/PlatformStrategy.js
+import { ErrorTypes } from "../services/ErrorService.js";
+
 export default class PlatformStrategy {
-  constructor(notifier = null) {
+  constructor(notifier = null, errorHandler = null) {
     this.notifier = notifier;
+    this.errorHandler = errorHandler;
   }
 
   extractText(target) {
@@ -39,6 +42,13 @@ export default class PlatformStrategy {
     if (this.notifier) {
       this.notifier.show(errorMap[errorName], "warning");
     }
-    throw new Error(errorName);
+    if (this.errorHandler) {
+      this.errorHandler.handle(new Error(errorName), {
+        type: ErrorTypes.UI,
+        context: "platform-strategy-field-error",
+      });
+    } else {
+      throw new Error(errorName);
+    }
   }
 }
