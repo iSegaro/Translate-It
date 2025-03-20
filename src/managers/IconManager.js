@@ -11,9 +11,11 @@ export default class IconManager {
     }
 
     // حذف تمام آیکون‌ها
-    document.querySelectorAll(".translation-icon-extension").forEach((icon) => {
-      icon.remove();
-    });
+    document
+      .querySelectorAll(".AIWritingCompanion-translation-icon-extension")
+      .forEach((icon) => {
+        icon.remove();
+      });
 
     state.activeTranslateIcon = null;
   }
@@ -38,7 +40,7 @@ export default class IconManager {
   createTranslateIcon(target) {
     try {
       const icon = document.createElement("button");
-      icon.className = "translation-icon-extension";
+      icon.className = "AIWritingCompanion-translation-icon-extension";
       Object.assign(icon.style, {
         position: "absolute",
         background: "white",

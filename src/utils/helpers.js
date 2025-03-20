@@ -118,7 +118,10 @@ export const showStatus = (() => {
 export function taggleLinks(enable = true) {
   try {
     if (!document || !document.body) return;
-    document.documentElement.classList.toggle("disable-links", enable);
+    document.documentElement.classList.toggle(
+      "AIWritingCompanion-disable-links",
+      enable
+    );
   } catch (error) {
     // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
     if (

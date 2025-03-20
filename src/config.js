@@ -45,6 +45,9 @@ export const CONFIG = {
   RTL_REGEX: /[\u0600-\u06FF]/,
   PERSIAN_REGEX:
     /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
+  NOTIFICATION_ALIGNMENT: "right", // برای جهت قرارگیری کلی اعلان
+  NOTIFICATION_TEXT_DIRECTION: "rtl", // جهت پیش فرض متن (راست به چپ)
+  NOTIFICATION_TEXT_ALIGNMENT: "right", // ترازبندی پیش فرض متن (راست)
 };
 
 // Initial state

@@ -1,5 +1,5 @@
 /* src/styles/content.css */
-.translation-icon-extension {
+.AIWritingCompanion-translation-icon-extension {
   position: absolute !important;
   z-index: 2147483647 !important; /* حداکثر z-index */
   display: block !important;
@@ -7,7 +7,7 @@
   pointer-events: all !important;
 }
 
-.translation-notification {
+.AIWritingCompanion-translation-notification {
   background-color: #f8f8f8; /* رنگ پس زمینه پیش فرض */
   color: #333; /* رنگ متن پیش فرض */
   border: 1px solid #ddd;
@@ -17,60 +17,64 @@
   align-items: center;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   opacity: 0.95;
+  direction: var(--text-direction, rtl);
+  text-align: var(--text-alignment, right);
 }
 
-.notification-icon {
+.AIWritingCompanion-notification-icon {
   margin-right: 10px;
   font-size: 1.2em;
 }
 
-.notification-text {
+.AIWritingCompanion-notification-text {
   flex-grow: 1;
+  padding-right: 5px;
+  padding-left: 5px;
 }
 
 /* استایل های مخصوص برای انواع اعلان */
-.notification-error {
+.AIWritingCompanion-notification-error {
   background-color: #ffe0e0;
   border-color: #ffb3b3;
   color: #cc0000;
 }
 
-.notification-warning {
+.AIWritingCompanion-notification-warning {
   background-color: #fff3e0;
   border-color: #ffe0b3;
   color: #ff9800;
 }
 
-.notification-success {
+.AIWritingCompanion-notification-success {
   background-color: #e0f7fa;
   border-color: #b2ebf2;
   color: #00897b;
 }
 
-.notification-info {
+.AIWritingCompanion-notification-info {
   background-color: #e3f2fd;
   border-color: #cce5ff;
   color: #1e88e5;
 }
 
-.notification-status {
+.AIWritingCompanion-notification-status {
   background-color: #f5f5f5;
   border-color: #e0e0e0;
   color: #757575;
 }
 
-.notification-revert {
+.AIWritingCompanion-notification-revert {
   background-color: #f0f4c3;
   border-color: #e6ee9c;
   color: #689f38;
 }
 
 /* Disable Hyperlinks */
-.disable-links a,
-.disable-links button,
-.disable-links [onclick],
-.disable-links [role="link"],
-.disable-links div[role="link"] {
+.AIWritingCompanion-disable-links a,
+.AIWritingCompanion-disable-links button,
+.AIWritingCompanion-disable-links [onclick],
+.AIWritingCompanion-disable-links [role="link"],
+.AIWritingCompanion-disable-links div[role="link"] {
   pointer-events: none !important;
   /* cursor: crosshair !important; */
   color: inherit;
