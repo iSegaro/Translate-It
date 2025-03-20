@@ -1,15 +1,14 @@
 // src/strategies/TelegramStrategy.js
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
-import PlatformStrategy from "./PlatformStrategy";
+import { ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG } from "../config.js";
+import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 
 export default class TelegramStrategy extends PlatformStrategy {
-  constructor(notifier) {
-    super();
-    this.notifier = notifier;
+  constructor(notifier, errorHandler) {
+    super(notifier);
+    this.errorHandler = errorHandler;
   }
-
   isInputField(field) {
     return field.tagName === "INPUT" || field.tagName === "TEXTAREA";
   }
@@ -45,8 +44,10 @@ export default class TelegramStrategy extends PlatformStrategy {
       }
       return field;
     } catch (error) {
-      error.context = "Telegram-strategy-getTelegramField";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-getTelegramField",
+      });
     }
   }
 
@@ -86,8 +87,10 @@ export default class TelegramStrategy extends PlatformStrategy {
         field.dispatchEvent(pasteEvent);
       }
     } catch (error) {
-      error.context = "Telegram-strategy-clearField";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-Clearfield",
+      });
     }
   }
 
@@ -109,7 +112,7 @@ export default class TelegramStrategy extends PlatformStrategy {
         field.dispatchEvent(pasteEvent);
       }
     } catch (error) {
-      new ErrorHandler(this.notifier).handle(error, {
+      this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "telegram-strategy-pasteText",
       });
@@ -133,8 +136,10 @@ export default class TelegramStrategy extends PlatformStrategy {
         selection.addRange(range);
       }
     } catch (error) {
-      error.context = "Telegram-strategy-setCursorToEnd";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.SERVICE,
+        context: "telegram-strategy-setCursorToEnd",
+      });
     }
   }
 
@@ -190,7 +195,7 @@ export default class TelegramStrategy extends PlatformStrategy {
       await delay(100);
       this.setCursorToEnd(telegramField);
     } catch (error) {
-      throw new ErrorHandler(this.notifier).handle(error, {
+      this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
         context: "telegram-strategy-updateElement",
       });
@@ -214,8 +219,10 @@ export default class TelegramStrategy extends PlatformStrategy {
         }, 1000);
       });
     } catch (error) {
-      error.context = "Telegram-strategy-applyVisualFeedback";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-applyVisualFeedback",
+      });
     }
   }
 
@@ -232,8 +239,10 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       return telegramField?.value.trim() || "";
     } catch (error) {
-      error.context = "Telegram-strategy-extractText";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-extractText",
+      });
     }
   }
 
@@ -255,8 +264,10 @@ export default class TelegramStrategy extends PlatformStrategy {
       await delay(100);
       return field;
     } catch (error) {
-      error.context = "Telegram-strategy-safeFocus";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-safeFocus",
+      });
     }
   }
 
@@ -269,8 +280,10 @@ export default class TelegramStrategy extends PlatformStrategy {
       await delay(100);
       return field;
     } catch (error) {
-      error.context = "Telegram-strategy-selectAllContent";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-SelectAllContent",
+      });
     }
   }
 
@@ -292,8 +305,10 @@ export default class TelegramStrategy extends PlatformStrategy {
         await delay(50);
       }
     } catch (error) {
-      error.context = "Telegram-strategy-simulatePaste";
-      throw error;
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "telegram-strategy-simulatePaste",
+      });
     }
   }
 
