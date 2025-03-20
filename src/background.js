@@ -10,6 +10,9 @@ const selectionStates = {};
 
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0].url.startsWith("chrome://")) {
+      return;
+    }
     if (tabs && tabs.length > 0) {
       const tabId = tabs[0].id;
 
