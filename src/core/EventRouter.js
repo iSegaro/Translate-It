@@ -14,7 +14,7 @@ export function setupEventListeners(translationHandler) {
       } catch (error) {
         errorHandler.handle(error, {
           type: ErrorTypes.UI,
-          context: "event-router",
+          context: "event-router-handleEventWithErrorHandling",
           eventType: args[0]?.type,
         });
       }
@@ -73,23 +73,31 @@ export function setupEventListeners(translationHandler) {
 
   const handleKeyDown = handleEventWithErrorHandling((e) => {
     // console.log("keydown event detected. Key:", e.key);
-    if (e.key === "Escape" && state.selectionActive) {
-      if (translationHandler.IconManager) {
-        translationHandler.IconManager.cleanup();
+    try {
+      translationHandler.handleEvent(e);
+      if (e.key === "Escape" && state.selectionActive) {
+        if (translationHandler.IconManager) {
+          translationHandler.IconManager.cleanup();
+        }
+        state.selectionActive = false;
+        chrome.storage.local.set({ selectionActive: false });
+
+        taggleLinks(false);
+
+        chrome.runtime.sendMessage({
+          action: "UPDATE_SELECTION_STATE",
+          data: false,
+        });
+        console.info("Selection mode deactivated via Esc key.");
+        return;
       }
-      state.selectionActive = false;
-      chrome.storage.local.set({ selectionActive: false });
-
-      taggleLinks(false);
-
-      chrome.runtime.sendMessage({
-        action: "UPDATE_SELECTION_STATE",
-        data: false,
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "event-router-handleKeyDown",
+        eventType: args[0]?.type,
       });
-      console.info("Selection mode deactivated via Esc key.");
-      return;
     }
-    translationHandler.handleEvent(e);
   });
 
   const handleMouseOver = handleEventWithErrorHandling((e) => {
