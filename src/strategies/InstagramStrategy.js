@@ -1,12 +1,13 @@
 // src/strategies/InstagramStrategy.js
+import { ErrorTypes } from "../services/ErrorService";
 import { CONFIG } from "../config.js";
-import PlatformStrategy from "./PlatformStrategy";
+import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 
 export default class InstagramStrategy extends PlatformStrategy {
-  constructor(notifier) {
+  constructor(notifier, errorHandler) {
     super(notifier);
-    this.notifier = notifier;
+    this.errorHandler = errorHandler;
   }
 
   /**
