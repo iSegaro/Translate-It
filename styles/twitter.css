@@ -1,4 +1,6 @@
 /* src/styles/twitter.css */
+
+/* Disable Hyperlinks on Twitter */
 .disable-links a,
 .disable-links button,
 .disable-links [onclick],
