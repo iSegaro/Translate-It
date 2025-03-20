@@ -9,21 +9,43 @@ export default class NotificationManager {
         title: "خطا - ترجمه خودکار",
         icon: CONFIG.ICON_ERROR,
         priority: 2,
+        duration: 5000, // مدت زمان پیش فرض برای خطا
+        className: "notification-error", // اضافه کردن کلاس CSS مربوط به نوع خطا
       },
       warning: {
         title: "هشدار - ترجمه خودکار",
         icon: CONFIG.ICON_WARNING,
         priority: 1,
+        duration: 4000, // مدت زمان پیش فرض برای هشدار
+        className: "notification-warning", // اضافه کردن کلاس CSS مربوط به نوع هشدار
       },
       success: {
         title: "موفقیت - ترجمه خودکار",
         icon: CONFIG.ICON_SUCCESS,
         priority: 0,
+        duration: 3000, // مدت زمان پیش فرض برای موفقیت
+        className: "notification-success", // اضافه کردن کلاس CSS مربوط به نوع موفقیت
       },
       info: {
         title: "اطلاعات - ترجمه خودکار",
         icon: CONFIG.ICON_INFO,
         priority: 0,
+        duration: 3000, // مدت زمان پیش فرض برای اطلاعات
+        className: "notification-info", // اضافه کردن کلاس CSS مربوط به نوع اطلاعات
+      },
+      status: {
+        title: "وضعیت - ترجمه خودکار",
+        icon: CONFIG.ICON_INFO,
+        priority: 0,
+        duration: 2000, // مدت زمان پیش فرض برای وضعیت
+        className: "notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
+      },
+      revert: {
+        title: "بازگشت - ترجمه خودکار",
+        icon: CONFIG.ICON_REVERT,
+        priority: 0,
+        duration: 2000, // مدت زمان پیش فرض برای بازگشت
+        className: "notification-revert", // اضافه کردن کلاس CSS مربوط به نوع بازگشت
       },
     };
 
@@ -85,31 +107,17 @@ export default class NotificationManager {
       return this.showBackgroundNotification(message, type, onClick);
     }
 
-    const baseNotification = {
-      error: { icon: CONFIG.ICON_ERROR, duration: 5000 },
-      warning: { icon: CONFIG.ICON_WARNING, duration: 4000 },
-      success: { icon: CONFIG.ICON_SUCCESS, duration: 3000 },
-      info: { icon: CONFIG.ICON_INFO, duration: 3000 },
-      status: { icon: CONFIG.ICON_INFO, duration: 2000 },
-      revert: { icon: CONFIG.ICON_REVERT, duration: 2000 },
-    };
-
-    const config = baseNotification[type] || baseNotification.info;
-    const finalDuration = duration || config.duration;
-
+    const baseNotification = this.typeMapping[type] || this.typeMapping.info;
+    const finalDuration = duration || baseNotification.duration;
+    const icon =
+      baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "🔵";
     const notification = document.createElement("div");
-    notification.className = "translation-notification";
-
-    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "🔵";
+    notification.className = `translation-notification ${baseNotification.className || ""}`; // اضافه کردن کلاس اصلی و کلاس مربوط به نوع
 
     notification.innerHTML = `
       <span class="notification-icon">${icon}</span>
       <span class="notification-text">${message}</span>
     `;
-
-    Object.assign(notification.style, {
-      background: this.getBackgroundColor(type),
-    });
 
     const clickHandler = onClick ? onClick : () => this.dismiss(notification);
 
@@ -130,16 +138,5 @@ export default class NotificationManager {
 
   dismiss(notification) {
     fadeOut(notification);
-  }
-
-  getBackgroundColor(type) {
-    const colors = {
-      error: "rgba(255,0,0,0.8)",
-      success: "rgba(0,128,0,0.7)",
-      status: "rgba(0,0,0,0.4)",
-      warning: "rgba(255,165,0,0.8)",
-      info: "rgba(30,144,255,0.8)",
-    };
-    return colors[type] || "rgba(0,0,0,0.7)";
   }
 }
