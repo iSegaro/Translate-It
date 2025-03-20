@@ -35,7 +35,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
-        context: "whatsapp-strategy-updateElement",
+        context: "youtube-strategy-updateElement",
       });
     }
   }
