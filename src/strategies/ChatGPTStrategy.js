@@ -1,9 +1,14 @@
 // src/strategies/ChatGPTStrategy.js
 // Todo: Needs some works
-import PlatformStrategy from "./PlatformStrategy";
+import { ErrorTypes } from "../services/ErrorService";
+import PlatformStrategy from "./PlatformStrategy.js";
 import { setCursorToEnd } from "../utils/helpers";
 
 export default class ChatGPTStrategy extends PlatformStrategy {
+  constructor(notifier, errorHandler) {
+    super(notifier);
+    this.errorHandler = errorHandler;
+  }
   /**
    * شناسایی المان ویرایشگر ChatGPT
    * @param {HTMLElement} target - المان هدف
