@@ -9,6 +9,7 @@ export class ErrorTypes {
   static VALIDATIONMODEL = "VALIDATIONMODEL";
   static CONTEXT = "CONTEXT";
   static UI = "UI";
+  static INTEGRATION = "INTEGRATION";
 }
 
 export class ErrorHandler {
@@ -35,7 +36,7 @@ export class ErrorHandler {
 
     // بررسی و بازبینی نوع خطا بر اساس محتوای خطا
     let { type, statusCode } = meta;
-    type = this._reviewErrorTypeBasedOnContent(error, type);
+    type = this._reviewErrorTypeBasedOnContent(error, type, meta);
 
     const message = this._getErrorMessage(error, type, statusCode);
 
@@ -47,16 +48,24 @@ export class ErrorHandler {
     return error;
   }
 
-  _reviewErrorTypeBasedOnContent(error, currentType) {
+  _reviewErrorTypeBasedOnContent(error, currentType, meta) {
     let type = currentType;
     if (error.message.includes("Extension context invalidated")) {
       type = ErrorTypes.CONTEXT;
     }
+
+    if (
+      error.message.includes("reading 'handle'") &&
+      meta.context === "ctrl-slash"
+    ) {
+      type = ErrorTypes.INTEGRATION;
+    }
+
     // می‌توانید بررسی‌های مشابهی برای سایر شرایط خاص اضافه کنید
     return type;
   }
 
-  _getErrorMessage(error, type, statusCode) {
+  _getErrorMessage(error, type, statusCode, meta) {
     const errorMap = {
       [ErrorTypes.API]: {
         400: `400: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
@@ -82,10 +91,21 @@ export class ErrorHandler {
       [ErrorTypes.VALIDATIONMODEL]: {
         default: "خطا در مدلِ انتخاب شده",
       },
+      [ErrorTypes.INTEGRATION]: {
+        ctrl_slash: "خطا در اتصال شورتکات به صفحه",
+        default: "خطا در اتصال به این صفحه",
+      },
     };
 
     if (type && errorMap[type]) {
-      return errorMap[type][statusCode] || errorMap[type].default;
+      const typeError = errorMap[type];
+      if (
+        type === ErrorTypes.INTEGRATION &&
+        error.message.includes("reading 'handle'")
+      ) {
+        return typeError.ctrl_slash;
+      }
+      return typeError[statusCode] || typeError.default;
     }
 
     // در صورت نداشتن نوع مشخص، از پیامِ اصلیِ خطا استفاده می‌شود
@@ -125,7 +145,12 @@ export class ErrorHandler {
     } else if (isProduction && isKnownErrorType) {
       // می‌توانید لاگ کردن خطاهای شناخته شده در حالت production را در صورت نیاز اضافه کنید
       // برای مثال، می‌توانید فقط خطاهای نوع خاصی را لاگ کنید.
-      // console.debug(`[ErrorHandler] (Production) Handled error: ${error.message}`, meta);
+      // console.debug(`[ErrorHandler] (Production) Known Error: ${error.message}`, meta);
+    } else if (isProduction && !isKnownErrorType) {
+      console.debug(
+        `[ErrorHandler] (Production) Unknown Error: ${error.message}`,
+        meta
+      );
     }
   }
 
@@ -155,6 +180,7 @@ export class ErrorHandler {
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
       [ErrorTypes.VALIDATIONMODEL]: "warning",
+      [ErrorTypes.INTEGRATION]: "warning",
     };
 
     return typeMap[errorType] || "error";
