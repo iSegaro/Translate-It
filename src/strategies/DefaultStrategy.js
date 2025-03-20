@@ -21,20 +21,22 @@ export default class DefaultStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (translatedText !== undefined && translatedText !== null) {
-        let htmlText = translatedText.replace(/\n/g, "<br>");
         if (element.isContentEditable) {
+          // برای عناصر contentEditable از <br> استفاده کنید
+          const htmlText = translatedText.replace(/\n/g, "<br>");
           element.innerHTML = htmlText;
+          this.applyTextDirection(element, htmlText);
         } else {
-          element.value = htmlText;
+          // برای input و textarea از \n استفاده کنید
+          element.value = translatedText;
+          this.applyTextDirection(element, translatedText);
         }
-        this.applyTextDirection(element, htmlText);
       }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "default-strategy-updateElement",
       });
-      throw error;
     }
   }
 
