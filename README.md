@@ -38,9 +38,7 @@ A lightweight and versatile browser extension designed to translate text within 
      cd Gemini-Translate
      ```
 
-   - Load the extension in Chrome:
-     - Open `chrome://extensions/` and enable Developer mode.
-     - Click **Load unpacked** and select the `Chrome-Extension/dist/` folder.
+   - Load the extension in Chrome
 
 3. **Set your API key on the Options page.**
 
