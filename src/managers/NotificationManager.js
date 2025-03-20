@@ -91,6 +91,7 @@ export default class NotificationManager {
       success: { icon: CONFIG.ICON_SUCCESS, duration: 3000 },
       info: { icon: CONFIG.ICON_INFO, duration: 3000 },
       status: { icon: CONFIG.ICON_INFO, duration: 2000 },
+      revert: { icon: CONFIG.ICON_REVERT, duration: 2000 },
     };
 
     const config = baseNotification[type] || baseNotification.info;
@@ -99,7 +100,7 @@ export default class NotificationManager {
     const notification = document.createElement("div");
     notification.className = "translation-notification";
 
-    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "ℹ️";
+    const icon = config.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "🔵";
 
     notification.innerHTML = `
       <span class="notification-icon">${icon}</span>

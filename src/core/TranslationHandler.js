@@ -307,10 +307,7 @@ export default class TranslationHandler {
     }
 
     if (successfulReverts > 0) {
-      this.notifier.show(
-        `${successfulReverts} متن با موفقیت بازگردانی شد`,
-        "success"
-      );
+      this.notifier.show(`${successfulReverts}`, "revert");
     } else {
       if (process.env.NODE_ENV === "development") {
         this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
