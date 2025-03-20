@@ -26,12 +26,12 @@ export default class YoutubeStrategy extends PlatformStrategy {
           const htmlText = translatedText.replace(/\n/g, "<br>");
           element.innerHTML = htmlText;
           this.applyVisualFeedback(element);
-          // this.applyTextDirection(element, htmlText);
+          this.applyTextDirection(element, htmlText);
         } else {
           // برای input و textarea از \n استفاده کنید
           element.value = translatedText;
           this.applyVisualFeedback(element);
-          // this.applyTextDirection(element, translatedText);
+          this.applyTextDirection(element, translatedText);
         }
       }
     } catch (error) {
