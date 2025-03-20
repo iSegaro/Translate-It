@@ -132,10 +132,15 @@ export default class NotificationManager {
     const notification = document.createElement("div");
     notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`; // اضافه کردن کلاس اصلی و کلاس مربوط به نوع
 
+    let iconHtml = "";
+    if (icon) {
+      iconHtml = `<span class="AIWritingCompanion-notification-icon">${icon}</span>`;
+    }
+
     notification.innerHTML = `
-      <span class="AIWritingCompanion-notification-icon">${icon}</span>
-      <span class="AIWritingCompanion-notification-text">${message}</span>
-    `;
+    ${iconHtml}
+    <span class="AIWritingCompanion-notification-text">${message}</span>
+  `;
 
     const clickHandler = onClick ? onClick : () => this.dismiss(notification);
 
