@@ -202,30 +202,6 @@ export default class TelegramStrategy extends PlatformStrategy {
     }
   }
 
-  // 6. افزودن متدهای جدید
-  applyVisualFeedback(field) {
-    if (!field) {
-      return;
-    }
-    try {
-      const originalTransition = field.style.transition;
-      field.style.transition = "background-color 0.5s ease";
-      field.style.backgroundColor = "#d4f8d4";
-
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          field.style.backgroundColor = "transparent";
-          field.style.transition = originalTransition;
-        }, 1000);
-      });
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "telegram-strategy-applyVisualFeedback",
-      });
-    }
-  }
-
   extractText(target) {
     if (!target) {
       return "";
