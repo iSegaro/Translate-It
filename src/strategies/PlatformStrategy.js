@@ -35,30 +35,44 @@ export default class PlatformStrategy {
   // انیمیشن
   applyVisualFeedback(element) {
     if (!element) return;
-    const originalBackgroundColor = element.style.backgroundColor;
-    element.style.transition = "background-color 0.5s ease";
-    element.style.backgroundColor = "#d4f8d4";
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        element.style.backgroundColor = originalBackgroundColor;
-      }, 1000);
-    });
+    try {
+      const originalBackgroundColor = element.style.backgroundColor;
+      element.style.transition = "background-color 0.5s ease";
+      element.style.backgroundColor = "#d4f8d4";
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          element.style.backgroundColor = originalBackgroundColor;
+        }, 1000);
+      });
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "platform-strategy-animation",
+      });
+    }
   }
 
   /**
    * اعمال جهت متن
    */
   applyTextDirection(element, translatedText) {
-    const isRtl = CONFIG.RTL_REGEX.test(translatedText);
+    try {
+      const isRtl = CONFIG.RTL_REGEX.test(translatedText);
 
-    // برای input/textarea
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-    }
-    // برای سایر المان‌ها
-    else {
-      element.style.direction = isRtl ? "rtl" : "ltr";
-      element.style.textAlign = isRtl ? "right" : "left";
+      // برای input/textarea
+      if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+        element.setAttribute("dir", isRtl ? "rtl" : "ltr");
+      }
+      // برای سایر المان‌ها
+      else {
+        element.style.direction = isRtl ? "rtl" : "ltr";
+        element.style.textAlign = isRtl ? "right" : "left";
+      }
+    } catch (error) {
+      // this.errorHandler.handle(error, {
+      //   type: ErrorTypes.UI,
+      //   context: "platform-strategy-TextDirection",
+      // });
     }
   }
 
