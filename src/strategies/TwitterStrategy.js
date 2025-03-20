@@ -126,14 +126,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         this.clearTweetField(tweetField);
         await delay(50);
         this.pasteText(tweetField, translatedText);
-        tweetField.style.transition = "background-color 0.5s ease";
-        tweetField.style.backgroundColor = "#d4f8d4";
-        requestAnimationFrame(() => {
-          setTimeout(
-            () => (tweetField.style.backgroundColor = "transparent"),
-            1000
-          );
-        });
+        this.applyVisualFeedback(tweetField);
         await delay(100);
         this.setCursorToEnd(tweetField);
       }
