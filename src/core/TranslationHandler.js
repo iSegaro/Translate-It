@@ -247,7 +247,7 @@ export default class TranslationHandler {
             );
           }
         });
-        this.notifier.show("تمام متون از حافظه پنهان بارگیری شدند.", "info");
+        this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
         return;
       }
 
