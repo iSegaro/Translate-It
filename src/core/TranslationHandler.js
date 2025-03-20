@@ -5,7 +5,7 @@ import TwitterStrategy from "../strategies/TwitterStrategy.js";
 import TelegramStrategy from "../strategies/TelegramStrategy.js";
 import MediumStrategy from "../strategies/MediumStrategy.js";
 import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
-import Youtube from "../strategies/YoutubeStrategy.js";
+import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
@@ -36,7 +36,7 @@ export default class TranslationHandler {
       telegram: new TelegramStrategy(this.notifier, this.eventHandler),
       twitter: new TwitterStrategy(this.notifier, this.eventHandler),
       chatgpt: new ChatGPTStrategy(this.notifier, this.eventHandler),
-      youtube: new YoutubeGPTStrategy(this.notifier, this.eventHandler),
+      youtube: new YoutubeStrategy(this.notifier, this.eventHandler),
       default: new DefaultStrategy(this.notifier, this.eventHandler),
     };
 
