@@ -60,7 +60,7 @@ export default class NotificationManager {
     chrome.notifications.create(
       {
         type: "basic",
-        iconUrl: "icons/icon-48.png",
+        iconUrl: "icons/icon.png",
         title: config.title,
         message: message,
         priority: config.priority,
