@@ -44,7 +44,7 @@ export default class NotificationManager {
         title: "بازگشت - ترجمه خودکار",
         icon: CONFIG.ICON_REVERT,
         priority: 0,
-        duration: 1500, // مدت زمان پیش فرض برای بازگشت
+        duration: 600, // مدت زمان پیش فرض برای بازگشت
         className: "AIWritingCompanion-notification-revert", // اضافه کردن کلاس CSS مربوط به نوع بازگشت
       },
     };
@@ -128,8 +128,7 @@ export default class NotificationManager {
 
     const baseNotification = this.typeMapping[type] || this.typeMapping.info;
     const finalDuration = duration || baseNotification.duration;
-    const icon =
-      baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`] || "🔵";
+    const icon = baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`];
     const notification = document.createElement("div");
     notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`; // اضافه کردن کلاس اصلی و کلاس مربوط به نوع
 

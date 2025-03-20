@@ -39,7 +39,7 @@ export const CONFIG = {
   ICON_ERROR: "❌ ",
   ICON_SECCESS: "✅ ",
   ICON_STATUS: "⏳ ",
-  ICON_REVERT: "↩️ ",
+  ICON_REVERT: "",
   ICON_WARNING: "⚠️ ",
   ICON_INFO: "🔵 ",
   RTL_REGEX: /[\u0600-\u06FF]/,
