@@ -16,6 +16,7 @@ export function detectPlatform() {
     "chat.openai.com": "chatgpt",
     "chat.com": "chatgpt",
     "chatgpt.com": "chatgpt",
+    "youtube.com": "youtube",
   };
 
   return platformMap[hostname] || "default";
@@ -36,6 +37,7 @@ export function getPlatformName() {
     { name: "Medium", patterns: ["medium.com"] },
     { name: "ChatGPT", patterns: ["chat.openai.com"] },
     { name: "Instagram", patterns: ["instagram.com"] },
+    { name: "Youtube", patterns: ["youtube.com"] },
   ];
 
   // جستجو در لیست پلتفرم‌ها
@@ -61,5 +63,6 @@ export function detectPlatformByURL() {
   if (hostname.includes("telegram.com")) return "telegram";
   if (hostname.includes("whatsapp.com")) return "whatsapp";
   if (hostname.includes("instagram.com")) return "instagram";
+  if (hostname.includes("youtube.com")) return "youtube";
   return "default";
 }

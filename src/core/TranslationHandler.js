@@ -5,6 +5,7 @@ import TwitterStrategy from "../strategies/TwitterStrategy.js";
 import TelegramStrategy from "../strategies/TelegramStrategy.js";
 import MediumStrategy from "../strategies/MediumStrategy.js";
 import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
+import Youtube from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
@@ -29,13 +30,14 @@ export default class TranslationHandler {
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
-      whatsapp: new WhatsAppStrategy(this.notifier),
-      instagram: new InstagramStrategy(this.notifier),
-      medium: new MediumStrategy(this.notifier),
-      telegram: new TelegramStrategy(this.notifier),
-      twitter: new TwitterStrategy(this.notifier),
-      chatgpt: new ChatGPTStrategy(),
-      default: new DefaultStrategy(),
+      whatsapp: new WhatsAppStrategy(this.notifier, this.eventHandler),
+      instagram: new InstagramStrategy(this.notifier, this.eventHandler),
+      medium: new MediumStrategy(this.notifier, this.eventHandler),
+      telegram: new TelegramStrategy(this.notifier, this.eventHandler),
+      twitter: new TwitterStrategy(this.notifier, this.eventHandler),
+      chatgpt: new ChatGPTStrategy(this.notifier, this.eventHandler),
+      youtube: new YoutubeGPTStrategy(this.notifier, this.eventHandler),
+      default: new DefaultStrategy(this.notifier, this.eventHandler),
     };
 
     for (const [name, strategy] of Object.entries(this.strategies)) {
