@@ -1,15 +1,4 @@
 /* src/styles/twitter.css */
-.translation-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  background: rgba(29, 155, 240, 0.1);
-  pointer-events: none;
-}
-
 .disable-links a,
 .disable-links button,
 .disable-links [onclick],
