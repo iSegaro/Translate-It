@@ -1,4 +1,5 @@
 node_modules/
 .vscode/
-Chrome-Extension/*/
-Chrome-Extension/*.pem
+Build-Extension/Chrome/*
+Build-Extension/Firefox/*
+*.pem
