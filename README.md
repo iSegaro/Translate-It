@@ -124,7 +124,7 @@ To generate the production-ready extension files:
 npm run build
 ```
 
-This will create the `AI-Writing-Companion/Chrome-Extension/dist/` folder for manual installation.
+This will create the `AI-Writing-Companion/Build-Extension/Chrome/` folder for manual installation.
 
 For live updates during development, run:
 
