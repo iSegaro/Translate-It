@@ -1,72 +1,87 @@
 # AI Writing Companion
 
-A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations are triggered by either clicking the extension icon or pressing the Ctrl+/ shortcut.
+A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations can be triggered by clicking the extension icon or using the `Ctrl + /` shortcut.
 
-**It's a writing and translation assistant.**
+**AI Writing Companion is your smart writing and translation assistant.**
 
 ---
 
-## Features
+## 🚀 Features
 
 - **Universal Compatibility:** Works seamlessly with standard and advanced input fields.
-- **Multiple Activation Methods:** Trigger translation via the icon click or the Ctrl+/ shortcut.
-- **Provider Support:** Choose between multiple translation providers, including [Gemini](https://gemini.com/), [OpenAI](https://chat.openai.com/), and [WebAI to API](https://github.com/Amm1rr/WebAI-to-API/).
+- **Multiple Activation Methods:** Trigger translation via icon click or the `Ctrl + /` shortcut.
+- **Flexible Provider Support:** Choose from multiple translation providers, including:
+  - [Gemini](https://gemini.com/)
+  - [OpenAI](https://chat.openai.com/)
+  - [OpenRouter](https://openaourter.com/)
+  - [WebAI to API](https://github.com/Amm1rr/WebAI-to-API/)
 
 ---
 
-## Requirements
+## 📋 Requirements
 
 - A modern Chromium-based browser (Chrome, Edge, Brave, etc.)
-- A valid API key if not using [WebAI ot API](https://github.com/Amm1rr/WebAI-to-API/)
+- A valid API key (if not using [WebAI to API](https://github.com/Amm1rr/WebAI-to-API/))
 
 ---
 
-## Installation
+## 🔧 Installation
 
-1. **Install via CRX File:**
+### 1. Install via CRX File
 
-   - Download the [`Gemini-Translation-Extension.crx`](https://github.com/iSegaro/Gemini-Translate/raw/refs/heads/Dev/Chrome-Extension/AI_Writing_Companion_v0.1.0.crx) file from the `Chrome-Extension/` folder.
-   - Open `chrome://extensions/` in Chrome and enable Developer mode.
-   - Drag and drop the `.crx` file onto the `chrome://extensions/` page to install the extension.
+- Download the last version of the [`AI-Writing-Companion.crx`](https://github.com/iSegaro/AI-Writing-Companion/raw/refs/heads/main/Build-Extension/Chrome/AI-Writing-Companion.crx) file from the [`Build-Extension/Chrome/`](https://github.com/iSegaro/AI-Writing-Companion/raw/refs/heads/main/Build-Extension/Chrome/) folder.
+- Open `chrome://extensions/` in Chrome and enable **Developer mode**.
+- Drag and drop the `.crx` file onto the `chrome://extensions/` page to install the extension.
 
-2. **Install via Git:**
+### 2. Install via Git
 
-   - Clone the repository:
+```bash
+# Clone the repository
+git clone https://github.com/iSegaro/AI-Writing-Companion.git
+cd AI-Writing-Companion
+```
 
-     ```bash
-     git clone https://github.com/iSegaro/Gemini-Translate.git
-     cd Gemini-Translate
-     ```
+- Follow the **CRX installation steps** above.
 
-   - Load the extension in Chrome
+### 3. Set Your API Key
 
-3. **Set your API key on the Options page.**
-
----
-
-## 🔑 Get a Free Google API Key
-
-1. Visit [Google AI Studio](https://aistudio.google.com/apikey) and log in.
-2. Click **Get API Key**, then **Create API Key**, and copy it.
-
-_Free Tier: 1,500 requests/day with Gemini 1.5 Flash._
-
-Watch this [video guide](https://www.youtube.com/watch?v=o-eyHCP5XwY&t=0) for details.
+- Go to the **Options** page of the extension and enter your API key.
 
 ---
 
-## Usage
+## 🔑 API Keys
 
-- **Automatic:** Hover or click an input field to reveal the translation icon.
-- **Shortcut:** Press Ctrl+/ when an input field is active.
+#### Get a Free Google Gemini API Key
+
+- Visit: [Google AI Studio](https://aistudio.google.com/apikey/)
+
+#### OpenAI API Key
+
+- Visit: [OpenAI API Keys](https://platform.openai.com/api-keys/)
+
+#### OpenRouter API Key
+
+- Visit: [OpenRouter API Keys](httpshttps://openrouter.ai/settings/keys/)
+
+#### Get Free WebAI to API
+
+- Visit: [WebAI to API](https://github.com/amm1rr/WebAI-to-API/)
 
 ---
 
-## Development
+## 🎯 Usage
+
+- **Select Element:** Click on the extension icon, then click on an element to translate its text.
+- **Automatic:** Hover over or click an input field to reveal the translation icon.
+- **Shortcut:** Press `Ctrl + /` while an input field is active to trigger translation.
+
+---
+
+## ⚙️ Development
 
 ### Prerequisites
 
-Install Node.js (which includes npm), then run:
+Ensure **Node.js** is installed (which includes npm), then run:
 
 ```bash
 cd Gemini-Translate
@@ -75,12 +90,15 @@ npm install
 
 ### Build
 
+To generate the production-ready extension files:
+
 ```bash
 npm run build
 ```
 
-This generates the `Chrome-Extension/dist/` folder for manual installation.
-For live updates, run:
+This will create the `Chrome-Extension/dist/` folder for manual installation.
+
+For live updates during development, run:
 
 ```bash
 npm run watch
@@ -88,21 +106,20 @@ npm run watch
 
 ---
 
-## Contribute
+## 🤝 Contribute
 
-- **Star** the repo.
-- **Report issues:** [GitHub Issues](https://github.com/iSegaro/Gemini-Translate/issues)
-- **Submit PRs.**
-
----
-
-## Thanks
-
-Icon by <a href="https://www.flaticon.com/free-icons/translate" title="translate icons">Translate icons created by Pixel perfect - Flaticon</a>
+- **⭐ Star the repo** to support the project.
+- **🐞 Report issues:** [GitHub Issues](https://github.com/iSegaro/Gemini-Translate/issues)
+- **📥 Submit Pull Requests (PRs)** to contribute improvements.
 
 ---
 
-## License
+## 🎨 Credits
 
-This project is licensed under the MIT License.
-Feel free to improve and share!
+Icon by [Pixel perfect - Flaticon](https://www.flaticon.com/free-icons/translate)
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License**. Feel free to improve and share!
