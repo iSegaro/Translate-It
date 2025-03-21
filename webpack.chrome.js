@@ -46,7 +46,6 @@ const chromeDistConfig = {
     new CopyPlugin({
       patterns: [
         {
-          // کپی manifest و تغییر نام آن به manifest.json در خروجی
           from: "src/manifest.chrome.json",
           to: "manifest.json",
         },
