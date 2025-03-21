@@ -58,7 +58,7 @@ const chromeDistConfig = {
           to: "styles/[name][ext]",
         },
         {
-          from: "icons/icon*.png",
+          from: "icons/*.png",
           to: ({ absoluteFilename }) => {
             const iconName = path.basename(absoluteFilename);
             return `icons/${iconName}`;
