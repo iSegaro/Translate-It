@@ -134,7 +134,7 @@ export default class EventHandler {
     });
 
     if (textsToTranslate.length === 0) {
-      // تمام متون از حافظه کش بارگیری شدند
+      // تمام متون از کَش بارگیری شدند
       textNodes.forEach((textNode) => {
         const originalText = textNode.textContent.trim();
         if (cachedTranslations.has(originalText)) {
