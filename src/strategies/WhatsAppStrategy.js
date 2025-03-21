@@ -51,6 +51,8 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       // اعمال فوکوس با تنظیمات ایمن
       await this.safeFocus(element);
 
+      this.applyVisualFeedback(whatsappField);
+
       // انتخاب تمام محتوا با استفاده از Selection API
       await this.selectAllContent(whatsappField);
 
