@@ -26,7 +26,7 @@ export const CONFIG = {
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
   promptTemplate:
-    "Perform bidirectional translation: If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Maintain sentence structure (including line breaks). Output ONLY print the translation:``` ${TEXT} ```",
+    "Detect the language of the following text. If it is in ${TARGET}, translate it to ${SOURCE}. Otherwise, translate it to ${TARGET}. Maintain the original structure, formatting, and line breaks exactly. Output ONLY the translated text with no additional words before or after:\n\n${TEXT}",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
   DEBUG_TRANSLATED_ENGLISH_With_NewLine:
