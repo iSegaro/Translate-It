@@ -10,7 +10,7 @@ const common = require("./webpack.common.js");
 const manifest = JSON.parse(fs.readFileSync("./manifest.firefox.json", "utf8"));
 const extensionName = manifest.name.replace(/ /g, "_");
 const extensionVersion = manifest.version;
-const outputFolderName = `${extensionName}_v${extensionVersion}_firefox`;
+const outputFolderName = `${extensionName}`;
 const outputFullPath = path.resolve(
   __dirname,
   "Build-Extension",
@@ -36,7 +36,7 @@ const firefoxConfig = {
             let manifest = JSON.parse(content);
             manifest.browser_specific_settings = {
               gecko: {
-                id: "ai-writing-company@amm1rr.com", // شناسه یکتا برای افزونه
+                id: "ai-writing-companion@amm1rr.com", // شناسه یکتا برای افزونه
                 strict_min_version: "91.0",
               },
             };
