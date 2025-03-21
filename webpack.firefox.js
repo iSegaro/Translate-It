@@ -3,14 +3,17 @@ const path = require("path");
 const fs = require("fs");
 const rimraf = require("rimraf");
 const CopyPlugin = require("copy-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 const { merge } = require("webpack-merge");
+const ZipPlugin = require("zip-webpack-plugin");
 const common = require("./webpack.common.js");
 
-// خواندن manifest مربوط به فایرفاکس
+// خواندن manifest مربوط به فایرفاکس از فایل manifest.firefox.json
 const manifest = JSON.parse(fs.readFileSync("./manifest.firefox.json", "utf8"));
 const extensionName = manifest.name.replace(/ /g, "_");
 const extensionVersion = manifest.version;
-const outputFolderName = `${extensionName}`;
+const outputFolderName = extensionName;
+const outputFullPathZIP = path.resolve(__dirname, "Build-Extension", "Firefox");
 const outputFullPath = path.resolve(
   __dirname,
   "Build-Extension",
@@ -18,18 +21,30 @@ const outputFullPath = path.resolve(
   outputFolderName
 );
 
-// حذف دایرکتوری build قبل از build
+// پاکسازی پوشه build قبلی
 rimraf.sync(outputFullPath);
 
-const firefoxConfig = {
+const firefoxDistConfig = {
+  mode: "production",
   output: {
     path: outputFullPath,
     filename: "[name].bundle.js",
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          compress: { drop_console: true },
+        },
+      }),
+    ],
   },
   plugins: [
     new CopyPlugin({
       patterns: [
         {
+          // کپی manifest.firefox.json و تغییر نام آن به manifest.json با افزودن تنظیمات مخصوص فایرفاکس
           from: "manifest.firefox.json",
           to: "manifest.json",
           transform(content, path) {
@@ -44,6 +59,10 @@ const firefoxConfig = {
           },
         },
         {
+          from: "html/*.html",
+          to: "html/[name][ext]",
+        },
+        {
           from: "styles/*.css",
           to: "styles/[name][ext]",
         },
@@ -54,13 +73,22 @@ const firefoxConfig = {
             return `icons/${iconName}`;
           },
         },
-        {
-          from: "html/*.html",
-          to: "html/[name][ext]",
-        },
       ],
+    }),
+    new ZipPlugin({
+      filename: `${extensionName}_v${extensionVersion}.zip`,
+      path: outputFullPathZIP,
+      fileOptions: {
+        mtime: new Date(),
+        mode: 0o100664,
+        compress: true,
+        forceZip64Format: false,
+      },
+      zipOptions: {
+        forceZip64Format: false,
+      },
     }),
   ],
 };
 
-module.exports = merge(common, firefoxConfig);
+module.exports = merge(common, firefoxDistConfig);
