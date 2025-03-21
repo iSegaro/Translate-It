@@ -27,6 +27,17 @@ module.exports = {
           },
         },
       },
+      // در صورت استفاده از فایل‌های CSS یا SCSS، می‌توانید قوانین زیر را فعال کنید
+      // {
+      //   test: /\.(css|scss)$/,
+      //   use: [
+      //     {
+      //       loader: MiniCssExtractPlugin.loader,
+      //     },
+      //     "css-loader",
+      //     "sass-loader",
+      //   ],
+      // },
     ],
   },
   optimization: {
