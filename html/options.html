@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title id="MANIFEST_TITLE_OPTION_PAGE">AI Writing Companion - Settings</title>
-    <link rel="stylesheet" href="../styles/options.css">
+    <title id="MANIFEST_TITLE_OPTION_PAGE">
+      AI Writing Companion - Settings
+    </title>
+    <link rel="stylesheet" href="../styles/options.css" />
     <script src="../options.bundle.js" defer></script>
   </head>
   <body>
@@ -14,10 +16,14 @@
     </div>
     <div class="container">
       <div class="tabs">
-        <button class="tab-button active" data-tab="languages">Languages</button>
+        <button class="tab-button active" data-tab="languages">
+          Languages
+        </button>
         <button class="tab-button" data-tab="prompt">Prompt</button>
         <button class="tab-button" data-tab="api">API</button>
-        <button class="tab-button" data-tab="import-export">Import/Export</button>
+        <button class="tab-button" data-tab="import-export">
+          Import/Export
+        </button>
       </div>
 
       <div id="languages" class="tab-content active">
@@ -25,7 +31,12 @@
           <h2>Languages</h2>
           <div class="setting-group">
             <label for="sourceLanguage">Source Language</label>
-            <input type="text" id="sourceLanguage" list="sourceLanguages" placeholder="Enter source language" />
+            <input
+              type="text"
+              id="sourceLanguage"
+              list="sourceLanguages"
+              placeholder="Enter source language"
+            />
             <datalist id="sourceLanguages">
               <option value="English"></option>
               <option value="Persian"></option>
@@ -100,7 +111,12 @@
           </div>
           <div class="setting-group">
             <label for="targetLanguage">Target Language</label>
-            <input type="text" id="targetLanguage" list="targetLanguages" placeholder="Enter target language" />
+            <input
+              type="text"
+              id="targetLanguage"
+              list="targetLanguages"
+              placeholder="Enter target language"
+            />
             <datalist id="targetLanguages">
               <option value="English"></option>
               <option value="Persian"></option>
@@ -178,21 +194,34 @@
 
       <div id="prompt" class="tab-content">
         <section>
-          <h2>Prompt</h2>
-          <div class="setting-group">
-            <label for="promptTemplate">Prompt Template</label>
+          <h2>Prompt Template</h2>
+          <div class="setting-group prompt-template-group">
+            <label for="promptTemplate">
+              Prompt Template
+              <span class="prompt-template-info"
+                >Use keywords to customize your prompt...</span
+              >
+            </label>
             <textarea
               id="promptTemplate"
-              placeholder="Use keywords to customize your prompt..."
+              class="prompt-template-input"
+              placeholder="Enter your prompt template here. Use keywords like ${SOURCE}, ${TARGET}, and ${TEXT}."
+              rows="5"
             ></textarea>
-            <p id="promptHelpText">
-              You can use the following keywords in your prompt template:
+            <div class="prompt-template-help">
+              <p>You can use the following keywords in your prompt template:</p>
               <ul>
-                <li id="sourceLangHelp"><code>${SOURCE}</code>: Source language. <span id="sourceLangName"></span></li>
-                <li id="targetLangHelp"><code>${TARGET}</code>: Target language. <span id="targetLangName"></span></li>
+                <li id="sourceLangHelp">
+                  <code>${SOURCE}</code>: Source language.
+                  <span id="sourceLangName"></span>
+                </li>
+                <li id="targetLangHelp">
+                  <code>${TARGET}</code>: Target language.
+                  <span id="targetLangName"></span>
+                </li>
                 <li><code>${TEXT}</code>: Text to be translated.</li>
               </ul>
-            </p>
+            </div>
           </div>
         </section>
       </div>
@@ -219,11 +248,19 @@
             <h3>WebAI API Settings</h3>
             <div class="setting-group">
               <label for="webAIApiUrl">WebAI API URL</label>
-              <input type="text" id="webAIApiUrl" placeholder="Enter WebAI API URL" />
+              <input
+                type="text"
+                id="webAIApiUrl"
+                placeholder="Enter WebAI API URL"
+              />
             </div>
             <div class="setting-group">
               <label for="webAIApiModel">WebAI API Model</label>
-              <input type="text" id="webAIApiModel" placeholder="Enter WebAI API model" />
+              <input
+                type="text"
+                id="webAIApiModel"
+                placeholder="Enter WebAI API model"
+              />
             </div>
           </div>
 
@@ -231,7 +268,11 @@
             <h3>Gemini API Settings</h3>
             <div class="setting-group">
               <label for="apiKey">API Key</label>
-              <input type="text" id="apiKey" placeholder="Paste your API key here" />
+              <input
+                type="text"
+                id="apiKey"
+                placeholder="Paste your API key here"
+              />
             </div>
             <div class="setting-group">
               <label for="apiUrl">API URL</label>
@@ -239,27 +280,43 @@
             </div>
           </div>
 
-          <div id="openAIApiSettings" style="display: none;">
+          <div id="openAIApiSettings" style="display: none">
             <h3>OpenAI API Settings</h3>
             <div class="setting-group">
               <label for="openaiApiKey">API Key</label>
-              <input type="text" id="openaiApiKey" placeholder="Paste your OpenAI API key here" />
+              <input
+                type="text"
+                id="openaiApiKey"
+                placeholder="Paste your OpenAI API key here"
+              />
             </div>
             <div class="setting-group">
               <label for="openaiApiModel">Model</label>
-              <input type="text" id="openaiApiModel" placeholder="Enter OpenAI model" />
+              <input
+                type="text"
+                id="openaiApiModel"
+                placeholder="Enter OpenAI model"
+              />
             </div>
           </div>
 
-          <div id="openRouterApiSettings" style="display: none;">
+          <div id="openRouterApiSettings" style="display: none">
             <h3>OpenRouter API Settings</h3>
             <div class="setting-group">
               <label for="openrouterApiKey">API Key</label>
-              <input type="text" id="openrouterApiKey" placeholder="Paste your OpenRouter API key here" />
+              <input
+                type="text"
+                id="openrouterApiKey"
+                placeholder="Paste your OpenRouter API key here"
+              />
             </div>
             <div class="setting-group">
               <label for="openrouterApiModel">Model</label>
-              <input type="text" id="openrouterApiModel" placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)" />
+              <input
+                type="text"
+                id="openrouterApiModel"
+                placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
+              />
             </div>
           </div>
         </section>
@@ -273,7 +330,7 @@
           </div>
           <div class="setting-group">
             <label for="importFile">Import Settings</label>
-            <input type="file" id="importFile" accept=".json">
+            <input type="file" id="importFile" accept=".json" />
           </div>
           <div class="setting-group">
             <button id="importSettings">Import Settings</button>
@@ -286,10 +343,22 @@
     </div>
     <footer>
       <p>
-        by 
-        <a class="about-link" href="https://x.com/M_Khani65" target="_blank" rel="noopener noreferrer">Me</a> 
+        by
+        <a
+          class="about-link"
+          href="https://x.com/M_Khani65"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Me</a
+        >
         and
-        <a class="about-link" href="https://x.com/iSegar0" target="_blank" rel="noopener noreferrer">iSegar0</a>
+        <a
+          class="about-link"
+          href="https://x.com/iSegar0"
+          target="_blank"
+          rel="noopener noreferrer"
+          >iSegar0</a
+        >
         <span>&copy; 2025</span>
       </p>
     </footer>

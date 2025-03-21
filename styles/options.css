@@ -175,3 +175,70 @@ button:hover {
   background-size: 4px 4px;
   color: #4caf50;
 }
+
+/* Prompt Template Styles */
+.prompt-template-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.prompt-template-group label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.prompt-template-info {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.prompt-template-input {
+  font-family: inherit; /* استفاده از فونت اصلی صفحه */
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #333;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  resize: vertical; /* امکان تغییر ارتفاع textarea */
+}
+
+.prompt-template-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.prompt-template-help {
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.prompt-template-help p {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.prompt-template-help ul {
+  padding-left: 20px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prompt-template-help li {
+  margin-bottom: 3px;
+}
+
+.prompt-template-help code {
+  font-family: monospace;
+  background-color: #eee;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
