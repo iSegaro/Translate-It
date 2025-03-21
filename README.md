@@ -78,18 +78,22 @@ To utilize the full capabilities of AI Writing Companion, you might need API key
 
 ---
 
-## 🌱 Support the Project
+## ☕ Buy Me a Coffee
 
 If you find this project helpful, consider making a donation to support ongoing development:
 
-| 💰 Cryptocurrency      | 🔗 Address                                   |
-| ---------------------- | -------------------------------------------- |
-| 🟢 **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f` |
-| 🟠 **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw` |
+<br>
 
-Your contributions help maintain and improve the extension. Thank you for your support!
+| 💰 Payment Method      | 🔗 Link                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🟢 **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                     |
+| 🟠 **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                     |
+| 💲 **PayPal**          | [![Donate PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE) |
 
-Your support goes to [Mohammad][mohammad-x-url]
+<br>
+Thank you for your support!
+
+Your support goes to Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x>)][mohammad-x-url]
 
 <br>
 
@@ -109,7 +113,7 @@ Your support goes to [Mohammad][mohammad-x-url]
 
 ### Prerequisites
 
-Ensure **Node.js** is installed (which includes \`npm\`), then run:
+Ensure **Node.js** is installed (which includes `npm`), then run:
 
 ```bash
 cd AI-Writing-Companion
@@ -138,8 +142,8 @@ npm run watch
 
 ## 🎨 Credits
 
-- Author [@iSegar0][isegaro-x-url]
-- Developer [@m_khani65][m-khani65-x-url]
+- Author [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
+- Developer [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
 - Icon by [Pixel perfect - Flaticon][flaticon-url]
 
 <br>
