@@ -46,7 +46,6 @@ const firefoxDistConfig = {
     new CopyPlugin({
       patterns: [
         {
-          // کپی manifest.firefox.json و تغییر نام آن به manifest.json با افزودن تنظیمات مخصوص فایرفاکس
           from: "src/manifest.firefox.json",
           to: "manifest.json",
           transform(content, path) {
