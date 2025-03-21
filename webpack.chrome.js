@@ -9,7 +9,9 @@ const ZipPlugin = require("zip-webpack-plugin");
 const common = require("./webpack.common.js");
 
 // خواندن manifest مربوط به کروم از فایل manifest.chrome.json
-const manifest = JSON.parse(fs.readFileSync("./manifest.chrome.json", "utf8"));
+const manifest = JSON.parse(
+  fs.readFileSync("./src/manifest.chrome.json", "utf8")
+);
 const extensionName = manifest.name.replace(/ /g, "_");
 const extensionVersion = manifest.version;
 const outputFolderName = extensionName;
@@ -45,7 +47,7 @@ const chromeDistConfig = {
       patterns: [
         {
           // کپی manifest و تغییر نام آن به manifest.json در خروجی
-          from: "manifest.chrome.json",
+          from: "src/manifest.chrome.json",
           to: "manifest.json",
         },
         {

@@ -9,7 +9,9 @@ const ZipPlugin = require("zip-webpack-plugin");
 const common = require("./webpack.common.js");
 
 // خواندن manifest مربوط به فایرفاکس از فایل manifest.firefox.json
-const manifest = JSON.parse(fs.readFileSync("./manifest.firefox.json", "utf8"));
+const manifest = JSON.parse(
+  fs.readFileSync("./src/manifest.firefox.json", "utf8")
+);
 const extensionName = manifest.name.replace(/ /g, "_");
 const extensionVersion = manifest.version;
 const outputFolderName = extensionName;
@@ -45,7 +47,7 @@ const firefoxDistConfig = {
       patterns: [
         {
           // کپی manifest.firefox.json و تغییر نام آن به manifest.json با افزودن تنظیمات مخصوص فایرفاکس
-          from: "manifest.firefox.json",
+          from: "src/manifest.firefox.json",
           to: "manifest.json",
           transform(content, path) {
             let manifest = JSON.parse(content);
