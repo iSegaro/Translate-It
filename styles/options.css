@@ -158,3 +158,11 @@ button:hover {
 #promptHelpText li {
   margin-bottom: 2px;
 }
+
+.about {
+  padding: 10px;
+}
+
+.about a {
+  text-decoration: none !important;
+}
