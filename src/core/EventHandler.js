@@ -157,7 +157,7 @@ export default class EventHandler {
           );
         }
       });
-      this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
+      this.notifier.show("حافظه", "info");
       return;
     }
 
