@@ -92,8 +92,12 @@ export class ErrorHandler {
         default: "خطا در مدلِ انتخاب شده",
       },
       [ErrorTypes.INTEGRATION]: {
-        ctrl_slash: "خطا در اتصال شورتکات به صفحه",
-        default: "خطا در اتصال به این صفحه",
+        ctrl_slash: "⚠️ خطا در اتصال شورتکات به صفحه",
+        "invalid-tab": "⚠️ تب جاری معتبر نیست",
+        "invalid-protocol":
+          "❌ این قابلیت فقط در آدرس‌های وب معمولی (http/https) کار می‌کند",
+        "content-injection": "⚠️ خطا در تزریق کد ترجمه به صفحه",
+        default: "⚠️ خطا در اتصال به این صفحه",
       },
     };
 

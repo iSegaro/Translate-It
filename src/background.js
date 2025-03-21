@@ -10,36 +10,43 @@ const selectionStates = {};
 
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0].url.startsWith("chrome://")) {
+    if (!tabs?.[0]?.url || !tabs[0].id) {
+      errorHandler.handle(new Error("Invalid tab"), {
+        type: ErrorTypes.INTEGRATION,
+        context: "invalid-tab",
+      });
       return;
     }
-    if (tabs && tabs.length > 0) {
-      const tabId = tabs[0].id;
 
-      // تغییر وضعیت فقط برای تب فعال
-      selectionStates[tabId] = !selectionStates[tabId];
+    const tab = tabs[0];
+    const tabId = tab.id;
 
-      // ارسال پیام فقط به تب فعال
-      chrome.tabs
-        .sendMessage(tabId, {
-          action: "TOGGLE_SELECTION_MODE",
-          data: selectionStates[tabId],
-        })
-        .catch((error) => {
-          console.log("Retrying injection...");
-          chrome.scripting
-            .executeScript({
-              target: { tabId },
-              files: ["content.bundle.js"],
-            })
-            .then(() => {
-              chrome.tabs.sendMessage(tabId, {
-                action: "TOGGLE_SELECTION_MODE",
-                data: selectionStates[tabId],
-              });
-            });
-        });
+    if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
+      errorHandler.handle(new Error("Invalid protocol"), {
+        type: ErrorTypes.INTEGRATION,
+        context: "invalid-protocol",
+        statusCode: "PERMISSION_DENIED",
+      });
+
+      // اطمینان از وجود tabId قبل از استفاده
+      if (tabId) selectionStates[tabId] = false;
+      return;
     }
+
+    // ادامه عملیات اصلی
+    selectionStates[tabId] = !selectionStates[tabId];
+
+    chrome.tabs
+      .sendMessage(tabId, {
+        action: "TOGGLE_SELECTION_MODE",
+        data: selectionStates[tabId],
+      })
+      .catch((error) => {
+        errorHandler.handle(error, {
+          type: ErrorTypes.INTEGRATION,
+          context: "content-injection",
+        });
+      });
   });
 });
 
