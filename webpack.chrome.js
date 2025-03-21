@@ -5,14 +5,14 @@ const rimraf = require("rimraf");
 const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const { merge } = require("webpack-merge");
-const ZipPlugin = require("zip-webpack-plugin");
+// const ZipPlugin = require("zip-webpack-plugin");
 const common = require("./webpack.common.js");
 
 // خواندن manifest مربوط به کروم از فایل manifest.chrome.json
 const manifest = JSON.parse(
   fs.readFileSync("./src/manifest.chrome.json", "utf8")
 );
-const extensionName = manifest.name.replace(/ /g, "_");
+const extensionName = manifest.name.replace(/ /g, "-");
 const extensionVersion = manifest.version;
 const outputFolderName = extensionName;
 const outputFullPathZIP = path.resolve(__dirname, "Build-Extension", "Chrome");
@@ -66,19 +66,19 @@ const chromeDistConfig = {
         },
       ],
     }),
-    new ZipPlugin({
-      filename: `${extensionName}_v${extensionVersion}.zip`,
-      path: outputFullPathZIP,
-      fileOptions: {
-        mtime: new Date(),
-        mode: 0o100664,
-        compress: true,
-        forceZip64Format: false,
-      },
-      zipOptions: {
-        forceZip64Format: false,
-      },
-    }),
+    // new ZipPlugin({
+    //   filename: `${extensionName}-v${extensionVersion}.zip`,
+    //   path: outputFullPathZIP,
+    //   fileOptions: {
+    //     mtime: new Date(),
+    //     mode: 0o100664,
+    //     compress: true,
+    //     forceZip64Format: false,
+    //   },
+    //   zipOptions: {
+    //     forceZip64Format: false,
+    //   },
+    // }),
   ],
 };
 
