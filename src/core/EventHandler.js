@@ -134,7 +134,7 @@ export default class EventHandler {
     });
 
     if (textsToTranslate.length === 0) {
-      // تمام متون از حافظه کش بارگیری شدند
+      // تمام متون از کَش بارگیری شدند
       textNodes.forEach((textNode) => {
         const originalText = textNode.textContent.trim();
         if (cachedTranslations.has(originalText)) {
@@ -157,7 +157,7 @@ export default class EventHandler {
           );
         }
       });
-      this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
+      this.notifier.show("حافظه", "info");
       return;
     }
 
@@ -255,6 +255,7 @@ export default class EventHandler {
   handleEscape(event) {
     event.preventDefault();
     event.stopPropagation();
+
     this.translationHandler.selectionModeActive = false;
     state.selectionActive = false;
 

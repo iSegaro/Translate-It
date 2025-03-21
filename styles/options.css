@@ -158,3 +158,20 @@ button:hover {
 #promptHelpText li {
   margin-bottom: 2px;
 }
+
+.about-link {
+  text-decoration: none;
+  background-image: linear-gradient(to right, #4caf50 50%, transparent 50%);
+  background-position: 0 1.15em;
+  background-repeat: repeat-x;
+  background-size: 4px 2px;
+  color: #333;
+  transition:
+    background-size 0.3s,
+    color 0.3s;
+}
+
+.about-link:hover {
+  background-size: 4px 4px;
+  color: #4caf50;
+}

@@ -96,6 +96,12 @@ npm run watch
 
 ---
 
+## Thanks
+
+Icon by <a href="https://www.flaticon.com/free-icons/translate" title="translate icons">Translate icons created by Pixel perfect - Flaticon</a>
+
+---
+
 ## License
 
 This project is licensed under the MIT License.

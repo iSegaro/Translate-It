@@ -3,6 +3,12 @@
   "name": "AI Writing Companion",
   "version": "0.1.0",
   "description": "Translate Everywhere. Simply.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-writing-companion@amm1rr.com",
+      "strict_min_version": "91.0"
+    }
+  },
   "permissions": [
     "activeTab",
     "scripting",
@@ -17,15 +23,23 @@
   "action": {
     "default_title": "AI Writing Companion",
     "default_icon": {
-      "16": "icons/icon.png",
-      "48": "icons/icon.png",
-      "128": "icons/icon.png"
+      "16": "icons/16.png",
+      "24": "icons/24.png",
+      "32": "icons/32.png",
+      "64": "icons/64.png",
+      "128": "icons/128.png",
+      "256": "icons/256.png",
+      "512": "icons/512.png"
     }
   },
   "icons": {
-    "16": "icons/icon.png",
-    "48": "icons/icon.png",
-    "128": "icons/icon.png"
+    "16": "icons/16.png",
+    "24": "icons/24.png",
+    "32": "icons/32.png",
+    "64": "icons/64.png",
+    "128": "icons/128.png",
+    "256": "icons/256.png",
+    "512": "icons/512.png"
   },
   "options_ui": {
     "page": "html/options.html",

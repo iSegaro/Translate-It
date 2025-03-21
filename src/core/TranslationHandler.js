@@ -148,139 +148,6 @@ export default class TranslationHandler {
     }
   }
 
-  getDeepestTextNode(element) {
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
-
-    let lastTextNode;
-    while (walker.nextNode()) {
-      lastTextNode = walker.currentNode;
-    }
-
-    return lastTextNode?.parentElement || element;
-  }
-
-  hasTextContent(element) {
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
-
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.textContent.trim()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  async translateTextNodesInElement(element) {
-    const translationCache = new Map(); // Create a cache within this module
-    try {
-      const walker = document.createTreeWalker(
-        element,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode: function (node) {
-            return node.textContent.trim() ?
-                NodeFilter.FILTER_ACCEPT
-              : NodeFilter.FILTER_SKIP;
-          },
-        },
-        false
-      );
-
-      let nodes = [];
-      const originalTextsMap = new Map();
-      let totalLength = 0;
-
-      while (walker.nextNode()) {
-        const node = walker.currentNode;
-        const trimmedText = node.textContent.trim();
-        if (trimmedText) {
-          nodes.push(node);
-          totalLength += trimmedText.length;
-          if (originalTextsMap.has(trimmedText)) {
-            originalTextsMap.get(trimmedText).push(node);
-          } else {
-            originalTextsMap.set(trimmedText, [node]);
-          }
-        }
-      }
-
-      if (totalLength > 3000) {
-        this.notifier.show(
-          "متن انتخابی خیلی طولانی است. لطفا محدوده کوچکتری انتخاب کنید.",
-          "warning"
-        );
-        return;
-      }
-
-      const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
-
-      const textsToTranslate = [];
-      const cachedTranslations = new Map();
-      uniqueOriginalTexts.forEach((text) => {
-        if (translationCache.has(text)) {
-          cachedTranslations.set(text, translationCache.get(text));
-        } else {
-          textsToTranslate.push(text);
-        }
-      });
-
-      if (textsToTranslate.length === 0) {
-        nodes.forEach((node) => {
-          const originalText = node.textContent.trim();
-          if (cachedTranslations.has(originalText)) {
-            node.textContent = cachedTranslations.get(originalText);
-            this.IconManager.applyTextDirection(
-              node.parentElement,
-              cachedTranslations.get(originalText)
-            );
-          }
-        });
-        this.notifier.show("تمام متون از حافظه بارگیری شدند.", "info");
-        return;
-      }
-
-      const translatedTextsArray = await translateText(textsToTranslate);
-
-      const newTranslations = new Map();
-      textsToTranslate.forEach((originalText, index) => {
-        const translatedText = translatedTextsArray[index];
-        newTranslations.set(originalText, translatedText);
-        translationCache.set(originalText, translatedText);
-      });
-
-      nodes.forEach((node) => {
-        const originalText = node.textContent.trim();
-        const translatedText =
-          cachedTranslations.get(originalText) ||
-          newTranslations.get(originalText);
-        if (translatedText) {
-          node.textContent = translatedText;
-          this.IconManager.applyTextDirection(
-            node.parentElement,
-            translatedText
-          );
-        }
-      });
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: "translate-text-nodes",
-      });
-    }
-  }
-
   revertTranslations() {
     console.info("TranslationHandler: Starting revert process...");
     let successfulReverts = 0;
@@ -340,11 +207,6 @@ export default class TranslationHandler {
     };
   }
 
-  replaceSelectionContent(range, content) {
-    range.deleteContents();
-    range.insertNode(document.createTextNode(content));
-  }
-
   extractFromActiveElement(element) {
     const platform = detectPlatform(element);
     return this.strategies[platform].extractText(element);
@@ -353,39 +215,5 @@ export default class TranslationHandler {
   pasteContent(element, content) {
     const platform = detectPlatform(element);
     this.strategies[platform].pasteContent(element, content);
-  }
-
-  async processElementTranslation(element) {
-    const text = this.strategies[detectPlatform(element)].extractText(element);
-    if (!text) return;
-
-    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
-    console.log(
-      "TranslationHandler: processElementTranslation started for text:",
-      text.substring(0, 20) + "..."
-    );
-    try {
-      const translated = await translateText(text);
-      await this.updateTargetElement(element, translated);
-
-      if (detectPlatform(element) !== "medium") {
-        this.IconManager.applyTextDirection(element, translated);
-      }
-      console.log(
-        "TranslationHandler: processElementTranslation SUCCESS for text:",
-        text.substring(0, 20) + "..."
-      );
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: "process-element-translation",
-        element,
-      });
-    } finally {
-      this.notifier.dismiss(statusNotification);
-      console.log(
-        "TranslationHandler: processElementTranslation FINALLY block - status notification dismissed."
-      );
-    }
   }
 }

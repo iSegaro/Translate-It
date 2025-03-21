@@ -18,30 +18,31 @@ export default class TelegramStrategy extends PlatformStrategy {
   }
 
   getTelegramField(element) {
-    if (!element) {
-      return;
-    }
+    if (!element) return;
+
     try {
       if (this.isInputField(element) || this.isContentEditable(element)) {
         return element;
       }
-      let field = element.closest('[aria-label="Message input"]');
-      if (field) return field;
-      field =
+
+      let field =
+        element.closest('[aria-label="Message input"]') ||
         element.closest(".composer_rich_textarea") ||
         element.closest(".public_DraftEditor-content");
-      if (field) return field;
-      field =
-        document.querySelector(".composer_rich_textarea") ||
-        document.querySelector(".public_DraftEditor-content");
+
       if (!field) {
         const editableFields = document.querySelectorAll(
           '[contenteditable="true"]'
         );
-        if (editableFields.length === 1) {
-          field = editableFields[0];
-        }
+        field = editableFields.length === 1 ? editableFields[0] : null;
       }
+
+      // اصلاح جدید: بررسی المانهای تو در تو
+      if (field && !this.isContentEditable(field)) {
+        const nestedEditable = field.querySelector('[contenteditable="true"]');
+        if (nestedEditable) field = nestedEditable;
+      }
+
       return field;
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -177,6 +178,7 @@ export default class TelegramStrategy extends PlatformStrategy {
       await this.safeFocus(telegramField);
 
       // 4. منطق به‌روزرسانی یکپارچه
+      this.applyVisualFeedback(document.getElementById("message-input-text"));
       if (this.isInputField(telegramField)) {
         telegramField.value = translatedText;
         telegramField.setAttribute(
@@ -187,12 +189,8 @@ export default class TelegramStrategy extends PlatformStrategy {
       } else {
         await this.clearField(telegramField);
         this.pasteText(telegramField, translatedText);
-
-        // 5. بهبود افکت بصری بدون تاثیر بر عملکرد
-        this.applyVisualFeedback(telegramField);
       }
 
-      await delay(100);
       this.setCursorToEnd(telegramField);
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -224,10 +222,15 @@ export default class TelegramStrategy extends PlatformStrategy {
 
   // 7. بهبود متد validateField
   validateField(element) {
+    const hasNestedEditable = element?.querySelector(
+      '[contenteditable="true"]'
+    );
     return (
       element &&
       element.isConnected &&
-      (this.isInputField(element) || this.isContentEditable(element))
+      (this.isInputField(element) ||
+        this.isContentEditable(element) ||
+        hasNestedEditable)
     );
   }
 
