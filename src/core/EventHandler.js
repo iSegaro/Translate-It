@@ -255,6 +255,7 @@ export default class EventHandler {
   handleEscape(event) {
     event.preventDefault();
     event.stopPropagation();
+
     this.translationHandler.selectionModeActive = false;
     state.selectionActive = false;
 
