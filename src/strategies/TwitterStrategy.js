@@ -1,6 +1,5 @@
 // src/strategies/TwitterStrategy.js
 import { ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG } from "../config";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 
@@ -9,9 +8,16 @@ export default class TwitterStrategy extends PlatformStrategy {
     super(notifier);
     this.errorHandler = errorHandler;
   }
+
   isTwitterElement(target) {
     return !!target.closest(
-      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]'
+      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
+    );
+  }
+
+  isDMElement(target) {
+    return !!target.closest(
+      '[data-testid="dmComposerTextInput"], [role="textbox"][aria-label="Text message"]'
     );
   }
 
@@ -41,7 +47,7 @@ export default class TwitterStrategy extends PlatformStrategy {
   /**
    * درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
    */
-  pasteText(tweetField, text) {
+  async pasteText(tweetField, text) {
     if (!tweetField) return;
 
     try {
@@ -66,7 +72,7 @@ export default class TwitterStrategy extends PlatformStrategy {
   }
 
   /**
-   * قراردادن کرسر در انتهای فیلد متنی (الگوبرداری از userscript)
+   * قراردادن کرسر در انتهای فیلد متنی
    * @param {HTMLElement} tweetField - فیلد هدف
    */
   setCursorToEnd(tweetField) {
@@ -86,7 +92,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
   async updateElement(element, translatedText) {
     try {
-      let tweetField = null;
+      // 1. پردازش فیلد جستجو
       const searchInput = document.querySelector(
         '[data-testid="SearchBox_Search_Input"]'
       );
@@ -97,36 +103,57 @@ export default class TwitterStrategy extends PlatformStrategy {
           element?.contains(searchInput) ||
           document.activeElement === searchInput)
       ) {
-        tweetField = searchInput;
-        tweetField.value = translatedText;
-        tweetField.dispatchEvent(new Event("input", { bubbles: true }));
-        console.info("Translation applied to Twitter search field.");
+        searchInput.value = translatedText;
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        this.applyVisualFeedback(searchInput);
+        this.applyTextDirection(searchInput, translatedText);
         return;
       }
+
+      // 2. پردازش فیلد Direct Message
+      let dmField = null;
+      if (
+        this.isDMElement(element) ||
+        this.isDMElement(document.activeElement)
+      ) {
+        dmField = this.findField(
+          element,
+          '[data-testid="dmComposerTextInput"]'
+        );
+
+        if (dmField) {
+          dmField.focus();
+          this.clearTweetField(dmField);
+          await delay(50);
+          this.pasteText(dmField, translatedText);
+          this.applyVisualFeedback(dmField);
+          this.applyTextDirection(dmField, translatedText);
+          await delay(100);
+          this.setCursorToEnd(dmField);
+          return;
+        }
+      }
+
+      // 3. پردازش فیلدهای توییت
+      let tweetField = null;
       if (this.isTwitterElement(document.activeElement)) {
         tweetField = document.activeElement;
       } else if (this.isTwitterElement(element)) {
         tweetField = element;
       } else {
-        const SELECTORS =
-          '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
-        tweetField = this.findField(element, SELECTORS);
+        tweetField = this.findField(
+          element,
+          '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
+        );
       }
-      if (!tweetField) {
-        console.warn("فیلد توییت برای ترجمه یافت نشد.");
-        return;
-      }
-      if (!this.validateField(tweetField)) {
-        return;
-      }
-      const isSearchField =
-        tweetField.getAttribute("data-testid") === "SearchBox_Search_Input";
-      if (!isSearchField) {
+
+      if (tweetField && this.validateField(tweetField)) {
         tweetField.focus();
         this.clearTweetField(tweetField);
         await delay(50);
         this.pasteText(tweetField, translatedText);
         this.applyVisualFeedback(tweetField);
+        this.applyTextDirection(tweetField, translatedText);
         await delay(100);
         this.setCursorToEnd(tweetField);
       }
@@ -139,56 +166,55 @@ export default class TwitterStrategy extends PlatformStrategy {
   }
 
   extractText(target) {
-    let tweetField = null;
+    // 1. بررسی فیلد جستجو
+    const searchInput = document.querySelector(
+      '[data-testid="SearchBox_Search_Input"]'
+    );
+    if (
+      searchInput &&
+      this.validateField(searchInput) &&
+      (target === searchInput ||
+        document.activeElement === searchInput ||
+        searchInput.contains(target))
+    ) {
+      return searchInput.value.trim();
+    }
 
-    // اولویت اول: استفاده از المان فوکوس شده اگر یک فیلد توییتر باشد
+    // 2. بررسی فیلد Direct Message
+    if (this.isDMElement(target) || this.isDMElement(document.activeElement)) {
+      const dmField = this.findField(
+        target,
+        '[data-testid="dmComposerTextInput"]'
+      );
+      if (dmField?.tagName === "DIV") {
+        return dmField.textContent.trim();
+      }
+      return dmField?.value.trim() || "";
+    }
+
+    // 3. بررسی فیلدهای توییت
+    let tweetField = null;
     if (this.isTwitterElement(document.activeElement)) {
       tweetField = document.activeElement;
-    }
-    // اگر المان فوکوس شده فیلد توییتر نیست، از المان ارائه شده استفاده کنید
-    else if (this.isTwitterElement(target)) {
+    } else if (this.isTwitterElement(target)) {
       tweetField = target;
-    }
-    // اگر هیچ کدام از موارد بالا نبود، به دنبال فیلد بگردید
-    else {
+    } else {
       const SELECTORS =
-        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"], [role="textbox"]';
+        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]';
       tweetField = this.findField(target, SELECTORS);
     }
 
     if (!tweetField) {
-      console.warn("فیلد توییت برای استخراج متن یافت نشد.");
+      console.warn("فیلد متنی برای استخراج متن یافت نشد.");
       return "";
     }
 
-    // بررسی دقیق‌تر برای تشخیص فیلد جستجو در هنگام استخراج متن (اگرچه در اینجا کمتر محتمل است مشکل ایجاد کند)
-    const placeholder = tweetField.getAttribute("placeholder") || "";
-    const ariaLabel = tweetField.getAttribute("aria-label") || "";
-    const isSearchField =
-      placeholder.toLowerCase().includes("search") ||
-      ariaLabel.toLowerCase().includes("search");
-
-    if (isSearchField) {
-      return tweetField.value || "";
-    }
-
-    if (tweetField?.tagName === "DIV") {
-      return tweetField.textContent.trim();
-    }
-
-    return tweetField.value || tweetField.textContent.trim();
+    return tweetField?.tagName === "DIV" ?
+        tweetField.textContent.trim()
+      : tweetField.value.trim();
   }
 
   replaceSelection(element, translatedText) {
     return this.updateElement(element, translatedText);
-  }
-
-  applyTextDirection(element, translatedText) {
-    const paragraphs = element.querySelectorAll('[data-text="true"]');
-    paragraphs.forEach((p) => {
-      const isRtl = CONFIG.RTL_REGEX.test(p.textContent);
-      p.style.direction = isRtl ? "rtl" : "ltr";
-      p.style.textAlign = isRtl ? "right" : "left";
-    });
   }
 }
