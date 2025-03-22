@@ -2,15 +2,20 @@
 import { getApiKeyAsync } from "./config.js";
 
 document.getElementById("restore").addEventListener("click", () => {
-  chrome.scripting.executeScript({
-    target: { allFrames: true },
-    func: () => {
-      document.querySelectorAll("[data-original-text]").forEach((element) => {
-        element.innerText = element.dataset.original - text;
-        delete element.dataset.original - text;
-      });
-    },
-  });
+  if (chrome.scripting && chrome.scripting.executeScript) {
+    chrome.scripting.executeScript({
+      target: { allFrames: true },
+      func: () => {
+        document.querySelectorAll("[data-original-text]").forEach((element) => {
+          element.innerText = element.dataset.original - text;
+          delete element.dataset.original - text;
+        });
+      },
+    });
+  } else {
+    // errorHandler.handle(new Error('Scripting API disabled'), {...});
+    console.log("Popup.js: Scripting API disabled");
+  }
 });
 
 document.addEventListener("DOMContentLoaded", () => {
