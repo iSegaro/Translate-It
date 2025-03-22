@@ -14,6 +14,7 @@ chrome.action.onClicked.addListener(() => {
       errorHandler.handle(new Error("Invalid tab"), {
         type: ErrorTypes.INTEGRATION,
         context: "invalid-tab",
+        statusCode: "invalid-tab",
       });
       return;
     }
@@ -44,7 +45,8 @@ chrome.action.onClicked.addListener(() => {
       .catch((error) => {
         errorHandler.handle(error, {
           type: ErrorTypes.INTEGRATION,
-          context: "content-injection",
+          context: "content-injection-error",
+          statusCode: "content-injection-error",
         });
       });
   });
