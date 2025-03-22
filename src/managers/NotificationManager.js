@@ -101,7 +101,7 @@ export default class NotificationManager {
     chrome.notifications.create(
       {
         type: "basic",
-        iconUrl: "icons/icon.png",
+        iconUrl: "icons/512.png",
         title: config.title,
         message: message,
         priority: config.priority,
