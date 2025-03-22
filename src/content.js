@@ -7,7 +7,6 @@ import {
   taggleLinks,
   injectStyle,
 } from "./utils/helpers.js";
-import WhatsAppStrategy from "./strategies/WhatsAppStrategy.js";
 
 injectStyle();
 
@@ -57,15 +56,8 @@ if (isExtensionContextValid()) {
           this.IconManager.cleanup();
         }
       } catch (error) {
-        if (
-          error.message &&
-          error.message.includes("Extension context invalidated")
-        ) {
-          // console.info(
-          //   "Extension context is not valid, skipping updateSelectionState."
-          // );
-          // this.notifier.show("تلاش مجدد", "info", true);
-          // return;
+        if (error.message?.includes("context invalidated")) {
+          // console.info("Extension context invalidated");
         } else {
           this.errorHandler.handle(error, {
             type: this.ErrorTypes.CONTEXT,
@@ -99,15 +91,22 @@ if (isExtensionContextValid()) {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.action === "TOGGLE_SELECTION_MODE") {
-    translationHandler.updateSelectionState(message.data);
-  } else if (message.action === "CONTEXT_INVALID") {
-    translationHandler.notifier.show(
-      "در حال بارگذاری مجدد...دوباره تلاش کنید",
-      "info",
-      true
-    );
-    chrome.runtime.reload();
+  try {
+    if (message.action === "TOGGLE_SELECTION_MODE") {
+      translationHandler.updateSelectionState(message.data);
+    } else if (message.action === "CONTEXT_INVALID") {
+      translationHandler.notifier.show(
+        "در حال بارگذاری مجدد...دوباره تلاش کنید",
+        "info",
+        true
+      );
+      chrome.runtime.reload();
+    }
+  } catch (error) {
+    translationHandler.errorHandler.handle(error, {
+      type: translationHandler.ErrorTypes.INTEGRATION,
+      context: "message-listener",
+    });
   }
 });
 
