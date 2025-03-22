@@ -14,7 +14,8 @@
     "scripting",
     "storage",
     "clipboardWrite",
-    "clipboardRead"
+    "clipboardRead",
+    "notifications"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
