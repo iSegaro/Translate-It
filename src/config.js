@@ -14,6 +14,7 @@ export const TRANSLATION_ERRORS = {
 // Shared configuration (initial defaults)
 export const CONFIG = {
   USE_MOCK: false,
+  DEBUG_MODE: false,
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.0-flash",
   OPENAI_API_KEY: "",
@@ -23,7 +24,7 @@ export const CONFIG = {
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   API_URL:
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
   promptTemplate:
     "Perform bidirectional translation. If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Maintain the original structure, formatting, and line breaks exactly. Output ONLY the translated text with no additional words before or after:\n\n${TEXT}",
@@ -67,14 +68,19 @@ export const getSettingsAsync = async () => {
   });
 };
 
-export const getApiKeyAsync = async () => {
-  const settings = await getSettingsAsync();
-  return settings.apiKey;
-};
-
 export const getUseMockAsync = async () => {
   const settings = await getSettingsAsync();
   return settings.USE_MOCK;
+};
+
+export const getDebugModeAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.DEBUG_MODE;
+};
+
+export const getApiKeyAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.apiKey;
 };
 
 export const getApiUrlAsync = async () => {

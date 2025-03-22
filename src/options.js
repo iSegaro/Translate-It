@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("apiUrl")
     ?.closest(".setting-group");
   const useMockCheckbox = document.getElementById("useMock");
+  const debugModeCheckbox = document.getElementById("debugMode");
   const webAIApiUrlInput = document.getElementById("webAIApiUrl");
   const webAIApiModelInput = document.getElementById("webAIApiModel");
   const apiKeyInput = document.getElementById("apiKey");
@@ -79,67 +80,49 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  function updateMockState(isMockEnabled) {
-    translationApiSelect.disabled = isMockEnabled;
-    sourceLanguageInput.disabled = isMockEnabled;
-    targetLanguageInput.disabled = isMockEnabled;
+  async function updateMockState(isMockEnabled) {
+    try {
+      translationApiSelect.disabled = isMockEnabled;
+      sourceLanguageInput.disabled = isMockEnabled;
+      targetLanguageInput.disabled = isMockEnabled;
 
-    // غیرفعال/فعال کردن تنظیمات WebAI API
-    if (webAIApiUrlInput) {
-      webAIApiUrlInput.disabled = isMockEnabled;
-    }
-    if (webAIApiModelInput) {
-      webAIApiModelInput.disabled = isMockEnabled;
-    }
+      // مدیریت وضعیت المان‌ها
+      const elementsToToggle = [
+        webAIApiUrlInput,
+        webAIApiModelInput,
+        apiKeyInput,
+        apiUrlInput,
+        openAIApiKeyInput,
+        openAIModelInput,
+        openRouterApiKeyInput,
+        openRouterApiModelInput,
+      ];
 
-    // غیرفعال/فعال کردن تنظیمات Gemini API
-    if (apiKeyInput) {
-      apiKeyInput.disabled = isMockEnabled;
-    }
-    if (apiUrlInput) {
-      apiUrlInput.disabled = isMockEnabled;
-    }
+      elementsToToggle.forEach((element) => {
+        if (element) element.disabled = isMockEnabled;
+      });
 
-    // غیرفعال/فعال کردن تنظیمات OpenAI API
-    if (openAIApiKeyInput) {
-      openAIApiKeyInput.disabled = isMockEnabled;
-    }
-    if (openAIModelInput) {
-      openAIModelInput.disabled = isMockEnabled;
-    }
+      // مدیریت نمایش بخش‌های مختلف
+      const apiSections = {
+        webai: webAIApiSettings,
+        gemini: geminiApiSettings,
+        openai: openAIApiSettings,
+        openrouter: openRouterApiSettings,
+      };
 
-    // غیرفعال/فعال کردن تنظیمات OpenRouter API
-    if (openRouterApiKeyInput) {
-      openRouterApiKeyInput.disabled = isMockEnabled;
-    }
-    if (openRouterApiModelInput) {
-      openRouterApiModelInput.disabled = isMockEnabled;
-    }
-
-    // نمایش/عدم نمایش تنظیمات API بر اساس انتخاب و وضعیت MOCK
-    if (webAIApiSettings) {
-      webAIApiSettings.style.display =
-        !isMockEnabled && translationApiSelect.value === "webai" ?
-          "block"
-        : "none";
-    }
-    if (geminiApiSettings) {
-      geminiApiSettings.style.display =
-        !isMockEnabled && translationApiSelect.value === "gemini" ?
-          "block"
-        : "none";
-    }
-    if (openAIApiSettings) {
-      openAIApiSettings.style.display =
-        !isMockEnabled && translationApiSelect.value === "openai" ?
-          "block"
-        : "none";
-    }
-    if (openRouterApiSettings) {
-      openRouterApiSettings.style.display =
-        !isMockEnabled && translationApiSelect.value === "openrouter" ?
-          "block"
-        : "none";
+      Object.entries(apiSections).forEach(([key, section]) => {
+        if (section) {
+          section.style.display =
+            !isMockEnabled && translationApiSelect.value === key ?
+              "block"
+            : "none";
+        }
+      });
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "updateMockState-options",
+      });
     }
   }
 
@@ -186,6 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const webAIApiModel = webAIApiModelInput?.value?.trim();
     const apiKey = apiKeyInput?.value?.trim();
     const useMock = false; //useMockCheckbox?.checked;
+    const debugMode = debugModeCheckbox?.checked;
     const apiUrl = apiUrlInput?.value?.trim();
     const sourceLanguage = sourceLanguageInput?.value;
     const targetLanguage = targetLanguageInput?.value;
@@ -196,23 +180,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
 
-    const settings = {
-      apiKey: apiKey || "",
-      USE_MOCK: useMock,
-      API_URL: apiUrl || CONFIG.API_URL,
-      sourceLanguage: sourceLanguage || "English",
-      targetLanguage: targetLanguage || "Persian",
-      promptTemplate: promptTemplate || CONFIG.promptTemplate,
-      translationApi: translationApi || "gemini",
-      webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
-      webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
-      openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
-      openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
-      openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
-      openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
-    };
-
     try {
+      const settings = {
+        apiKey: apiKey || "",
+        USE_MOCK: useMock,
+        DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
+        API_URL: apiUrl || CONFIG.API_URL,
+        sourceLanguage: sourceLanguage || "English",
+        targetLanguage: targetLanguage || "Persian",
+        promptTemplate: promptTemplate || CONFIG.promptTemplate,
+        translationApi: translationApi || "gemini",
+        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
+        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
+        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
+        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
+        openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
+        openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
+      };
+
       await new Promise((resolve, reject) => {
         chrome.storage.sync.set(settings, () => {
           if (chrome.runtime.lastError) {
@@ -223,13 +208,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
 
-      updatePromptHelpText();
-
+      await updatePromptHelpText();
       showStatus("ذخیره شد!", "success");
-
-      setTimeout(() => {
-        showStatus("", ""); // پاک کردن پیام
-      }, 2000);
+      setTimeout(() => showStatus("", ""), 2000); // پاک کردن پیام
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -254,67 +235,97 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadSettings() {
     try {
       const settings = await getSettingsAsync();
-      if (apiKeyInput) apiKeyInput.value = settings.apiKey || "";
-      if (useMockCheckbox) useMockCheckbox.checked = settings.USE_MOCK;
-      if (apiUrlInput) {
-        apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
+
+      // مقداردهی اولیه تنظیمات دیباگ و ماد
+      if (debugModeCheckbox) {
+        debugModeCheckbox.checked = settings.DEBUG_MODE ?? CONFIG.DEBUG_MODE;
       }
-      if (sourceLanguageInput)
+      if (useMockCheckbox) {
+        useMockCheckbox.checked = settings.USE_MOCK ?? CONFIG.USE_MOCK;
+      }
+
+      // مقداردهی فیلدهای اصلی
+      if (apiKeyInput) apiKeyInput.value = settings.apiKey || "";
+      if (apiUrlInput) apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
+      if (sourceLanguageInput) {
         sourceLanguageInput.value = settings.sourceLanguage || "English";
-      if (targetLanguageInput)
+      }
+      if (targetLanguageInput) {
         targetLanguageInput.value = settings.targetLanguage || "Persian";
-      if (promptTemplateInput)
+      }
+      if (promptTemplateInput) {
         promptTemplateInput.value =
           settings.promptTemplate || CONFIG.promptTemplate;
+      }
 
-      if (translationApiSelect)
+      // مقداردهی انتخاب API
+      if (translationApiSelect) {
         translationApiSelect.value = settings.translationApi || "gemini";
-      if (webAIApiUrlInput)
+      }
+
+      // مقداردهی تنظیمات WebAI
+      if (webAIApiUrlInput) {
         webAIApiUrlInput.value = settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
-      if (webAIApiModelInput)
+      }
+      if (webAIApiModelInput) {
         webAIApiModelInput.value =
           settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
-      if (openAIApiKeyInput)
+      }
+
+      // مقداردهی تنظیمات OpenAI
+      if (openAIApiKeyInput) {
         openAIApiKeyInput.value =
           settings.openaiApiKey || CONFIG.OPENAI_API_KEY;
-      if (openAIModelInput)
+      }
+      if (openAIModelInput) {
         openAIModelInput.value =
           settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
-      if (openRouterApiKeyInput)
+      }
+
+      // مقداردهی تنظیمات OpenRouter
+      if (openRouterApiKeyInput) {
         openRouterApiKeyInput.value =
           settings.openrouterApiKey || CONFIG.OPENROUTER_API_KEY;
-      if (openRouterApiModelInput)
+      }
+      if (openRouterApiModelInput) {
         openRouterApiModelInput.value =
           settings.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL;
+      }
 
+      // تنظیم وضعیت اولیه API
       const initialTranslationApi = settings.translationApi || "gemini";
-      const initialUseMock = settings.USE_MOCK;
+      const initialUseMock = settings.USE_MOCK ?? CONFIG.USE_MOCK;
 
+      // نمایش اطلاعات مانیفست
       const manifest = chrome.runtime.getManifest();
       if (manifestNameElement) {
         manifestNameElement.textContent = `${manifest.name} v${manifest.version}`;
       }
       if (manifestDescriptionElement) {
-        manifestDescriptionElement.textContent = `${manifest.description}`;
+        manifestDescriptionElement.textContent = manifest.description;
       }
       if (manifestTitle_OPTION_PAGE_Element) {
-        manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name}-Settings`;
+        manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name} - Settings`;
       }
 
-      // نمایش تب Languages به صورت پیش فرض
+      // تنظیم تب پیش‌فرض در اینجا اتفاق می‌افتاد
       showTab("languages");
-      if (initialUseMock) {
-        updateMockState(true);
-      } else {
+      updateMockState(initialUseMock);
+      if (!initialUseMock) {
         translationApiSelect.value = initialTranslationApi;
         toggleApiSettings();
       }
 
+      // بروزرسانی متن راهنمای پرامپت
       await updatePromptHelpText();
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "loadSettings",
+        details: {
+          component: "options-page",
+          action: "initialize-settings",
+        },
       });
     }
   }
@@ -330,21 +341,25 @@ document.addEventListener("DOMContentLoaded", () => {
   exportSettingsButton.addEventListener("click", async () => {
     try {
       const settings = await getSettingsAsync();
-      const settingsJSON = JSON.stringify(settings, null, 2);
-      const filename = "AI_Writing_Companion_Settings.json";
-      const blob = new Blob([settingsJSON], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(settings, null, 2)], {
+        type: "application/json",
+      });
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = "AI_Writing_Companion_Settings.json";
+
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showStatus("تنظیمات با موفقیت صادر شدند!", "success");
+
       setTimeout(() => {
-        showStatus("", "");
-      }, 2000);
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+
+      showStatus("تنظیمات با موفقیت صادر شدند!", "success");
+      setTimeout(() => showStatus("", ""), 2000); // پاک کردن پیام
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -354,47 +369,34 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Import Settings functionality
-  importSettingsButton.addEventListener("click", () => {
-    importFile.click(); // Trigger file input click
-  });
+  importFile.addEventListener("change", async (event) => {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
 
-  importFile.addEventListener("change", (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const importedSettings = JSON.parse(e.target.result);
-          await new Promise((resolve, reject) => {
-            chrome.storage.sync.set(importedSettings, () => {
-              if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-              } else {
-                resolve();
-              }
-            });
-          });
-          showStatus(
-            "تنظیمات با موفقیت وارد شدند! صفحه در حال بارگیری مجدد است.",
-            "success"
-          );
-          setTimeout(() => {
-            window.location.reload(); // Reload the page to apply imported settings
-          }, 1500);
-        } catch (error) {
-          errorHandler.handle(error, {
-            type: ErrorTypes.UI,
-            context: "importSettings-parse",
-          });
-        }
-      };
-      reader.onerror = () => {
-        errorHandler.handle(reader.error, {
-          type: ErrorTypes.UI,
-          context: "importSettings-read",
+      const importedSettings = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(JSON.parse(e.target.result));
+        reader.onerror = (e) => reject(reader.error);
+        reader.readAsText(file);
+      });
+
+      await new Promise((resolve, reject) => {
+        chrome.storage.sync.set(importedSettings, () => {
+          chrome.runtime.lastError ?
+            reject(chrome.runtime.lastError)
+          : resolve();
         });
-      };
-      reader.readAsText(file);
+      });
+
+      showStatus("تنظیمات وارد شدند! در حال بارگذاری مجدد...", "success");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "importSettings",
+      });
+      importFile.value = ""; // Reset file input
     }
   });
 
