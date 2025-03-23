@@ -30,49 +30,57 @@ export default class TranslationHandler {
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
-      whatsapp: new WhatsAppStrategy(this.notifier, this.eventHandler),
-      instagram: new InstagramStrategy(this.notifier, this.eventHandler),
-      medium: new MediumStrategy(this.notifier, this.eventHandler),
-      telegram: new TelegramStrategy(this.notifier, this.eventHandler),
-      twitter: new TwitterStrategy(this.notifier, this.eventHandler),
-      chatgpt: new ChatGPTStrategy(this.notifier, this.eventHandler),
-      youtube: new YoutubeStrategy(this.notifier, this.eventHandler),
-      default: new DefaultStrategy(this.notifier, this.eventHandler),
+      whatsapp: new WhatsAppStrategy(this.notifier, this.errorHandler),
+      instagram: new InstagramStrategy(this.notifier, this.errorHandler),
+      medium: new MediumStrategy(this.notifier, this.errorHandler),
+      telegram: new TelegramStrategy(this.notifier, this.errorHandler),
+      twitter: new TwitterStrategy(this.notifier, this.errorHandler),
+      chatgpt: new ChatGPTStrategy(this.notifier, this.errorHandler),
+      youtube: new YoutubeStrategy(this.notifier, this.errorHandler),
+      default: new DefaultStrategy(this.notifier, this.errorHandler),
     };
 
-    for (const [name, strategy] of Object.entries(this.strategies)) {
-      if (typeof strategy.extractText !== "function") {
-        console.error(`استراتژی ${name} متد extractText را ندارد!`);
-      }
-    }
-
-    this.IconManager = new IconManager();
+    this.validateStrategies();
+    this.IconManager = new IconManager(this.errorHandler);
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.selectionModeActive = false;
     this.eventHandler = new EventHandler(this);
-
-    // اعتبارسنجی استراتژی‌ها
-    Object.entries(this.strategies).forEach(([name, strategy]) => {
-      if (typeof strategy.extractText !== "function") {
-        throw new Error(
-          `استراتژی ${name} متد extractText را پیاده‌سازی نکرده است`
-        );
-      }
-    });
   }
 
   /**
    * Main event handler router
    */
   async handleEvent(event) {
-    await this.eventHandler.handleEvent(event);
+    try {
+      await this.eventHandler.handleEvent(event);
+    } catch (error) {
+      const handlerError = this.errorHandler.handle(error, {
+        type: error.type || ErrorTypes.UI,
+        context: "handleEvent",
+        eventType: event.type,
+      });
+      throw handlerError;
+    }
   }
 
   handleError(error, meta = {}) {
-    const normalizedError =
-      error instanceof Error ? error : new Error(String(error));
-    this.errorHandler.handle(normalizedError, meta);
+    try {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+
+      this.errorHandler.handle(normalizedError, {
+        ...meta,
+        origin: "TranslationHandler",
+      });
+    } catch (error) {
+      console.debug("TranslationHandler:Error handling failed:", error);
+      const handlerError = this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "TranslationHandler-handleError",
+      });
+      throw handlerError;
+    }
   }
 
   handleEditableFocus(element) {
@@ -106,96 +114,158 @@ export default class TranslationHandler {
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
 
-      // تنظیم حالت ترجمه
       state.translationMode = params.selectionRange ? "selection" : "field";
-
       const translated = await translateText(params.text);
 
+      if (!translated || typeof translated !== "string") {
+        // console.debug(
+        //   "TranslationHandler: No translation result: ",
+        //   translated
+        // );
+        return;
+      }
+
       if (params.selectionRange) {
-        if (
-          this.strategies[platform] &&
-          typeof this.strategies[platform].replaceSelection === "function"
-        ) {
-          this.strategies[platform].replaceSelection(
-            params.selectionRange,
-            translated
-          );
-        } else {
-          // console.error(
-          //   `استراتژی برای پلتفرم ${platform} یا متد replaceSelection در آن تعریف نشده است.`
-          // );
-          this.errorHandler.handle(
-            new Error(
-              `متد replaceSelection برای پلتفرم ${platform} تعریف نشده است.`
-            ),
-            {
-              type: ErrorTypes.UI,
-              context: "processTranslation",
-              platform: platform,
-            }
+        this.handleSelectionTranslation(platform, params, translated);
+      } else if (params.target) {
+        this.updateTargetElement(params.target, translated);
+      }
+    } catch (error) {
+      const errorType = error.type || ErrorTypes.API;
+      const statusCode = error.statusCode || 900;
+
+      // فقط خطاهای API اصلی را منتشر کن
+      const handlerError = this.errorHandler.handle(error, {
+        type: errorType,
+        statusCode: statusCode,
+        context: "TranslationHandler-processTranslation",
+        translationParams: params,
+        isPrimary: true, // افزودن پرچم برای شناسایی خطای اصلی
+      });
+
+      // ایجاد خطای جدید با حفظ اطلاعات اصلی
+      const finalError = new Error(handledError.message);
+      Object.assign(finalError, {
+        type: handledError.type,
+        statusCode: handledError.statusCode,
+        isFinal: true,
+        originalError: error,
+      });
+
+      throw finalError;
+    } finally {
+      if (statusNotification) {
+        this.notifier.dismiss(statusNotification);
+      }
+    }
+  }
+
+  /**
+   * اعتبارسنجی استراتژیها
+   */
+  async validateStrategies() {
+    try {
+      Object.entries(this.strategies).forEach(([name, strategy]) => {
+        if (typeof strategy.extractText !== "function") {
+          throw new Error(
+            `استراتژی ${name} متد extractText را پیاده‌سازی نکرده است`
           );
         }
-      } else if (params.target) {
-        await this.updateTargetElement(params.target, translated);
+      });
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.INTEGRATION,
+        context: "strategy-validation",
+      });
+    }
+  }
+
+  async handleSelectionTranslation(platform, params, translated) {
+    try {
+      if (typeof translated !== "string" && !translated) {
+        return;
+      }
+      if (this.strategies[platform]?.replaceSelection) {
+        await this.strategies[platform].replaceSelection(
+          params.selectionRange,
+          translated
+        );
+      } else {
+        this.errorHandler.handle(
+          new Error(`متد replaceSelection برای ${platform} تعریف نشده`),
+          {
+            type: ErrorTypes.UI,
+            context: "selection-translation-replace",
+            platform: platform,
+          }
+        );
       }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
-        context: "translation-process",
+        context: "selection-translation",
+        platform: platform,
       });
-    } finally {
-      this.notifier.dismiss(statusNotification);
     }
   }
 
   revertTranslations() {
-    console.info("TranslationHandler: Starting revert process...");
     let successfulReverts = 0;
 
-    // پیمایش بر روی شناسه‌های یکتا
-    for (const [uniqueId, data] of state.originalTexts.entries()) {
-      try {
-        if (!data.parent || !data.originalInnerHTML) {
-          continue;
+    try {
+      for (const [uniqueId, data] of state.originalTexts.entries()) {
+        try {
+          if (
+            !data.parent ||
+            !data.originalInnerHTML ||
+            !data.parent.isConnected
+          )
+            continue;
+
+          data.parent.innerHTML = data.originalInnerHTML;
+          successfulReverts++;
+        } catch (error) {
+          this.errorHandler.handle(error, {
+            type: ErrorTypes.UI,
+            context: "revert-translations",
+            elementId: uniqueId,
+          });
         }
+      }
 
-        if (!data.parent.isConnected) {
-          continue;
+      if (successfulReverts > 0) {
+        this.notifier.show(`${successfulReverts}`, "revert");
+      } else {
+        if (
+          process.env.NODE_ENV === "development" ||
+          CONFIG.DEBUG_MODE === true
+        ) {
+          this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
         }
-
-        data.parent.innerHTML = data.originalInnerHTML;
-        successfulReverts++;
-      } catch (error) {
-        this.errorHandler.handle(error, {
-          type: ErrorTypes.UI,
-          context: "revert-translations",
-        });
       }
-    }
-
-    if (successfulReverts > 0) {
-      this.notifier.show(`${successfulReverts}`, "revert");
-    } else {
-      if (process.env.NODE_ENV === "development") {
-        this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
-      }
-    }
-
-    // پاکسازی state
-    state.originalTexts.clear();
-    if (this.IconManager) {
-      this.IconManager.cleanup();
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "revert-translations-main",
+      });
+    } finally {
+      // پاکسازی state
+      state.originalTexts.clear();
+      this.IconManager?.cleanup();
     }
   }
 
   async updateTargetElement(target, translated) {
     try {
-      const platform = detectPlatform(target);
-      await this.strategies[platform].updateElement(target, translated);
+      if (typeof translated === "string" && translated) {
+        const platform = detectPlatform(target);
+        await this.strategies[platform].updateElement(target, translated);
+      }
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI, // یا SERVICE بسته به نوع خطا
+        type: ErrorTypes.SERVICE,
         context: "update-target-element",
+        platform: detectPlatform(target),
       });
     }
   }
@@ -213,7 +283,15 @@ export default class TranslationHandler {
   }
 
   pasteContent(element, content) {
-    const platform = detectPlatform(element);
-    this.strategies[platform].pasteContent(element, content);
+    try {
+      const platform = detectPlatform(element);
+      this.strategies[platform].pasteContent(element, content);
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "paste-content",
+        platform: detectPlatform(element),
+      });
+    }
   }
 }
