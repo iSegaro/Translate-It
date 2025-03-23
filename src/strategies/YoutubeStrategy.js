@@ -5,21 +5,37 @@ import PlatformStrategy from "./PlatformStrategy.js";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
-    super(notifier);
+    super(notifier, errorHandler);
     this.errorHandler = errorHandler;
   }
-  /**
-   * استخراج متن از المان‌های استاندارد
-   */
+
   extractText(target) {
-    if (target.isContentEditable) {
-      return target.innerText.trim();
+    try {
+      if (!target) {
+        // console.debug("عنصر هدف برای استخراج متن وجود ندارد");
+      }
+
+      if (target.isContentEditable) {
+        return target.innerText.trim();
+      }
+      return target.value || target.textContent.trim();
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "youtube-strategy-extractText",
+        element: target?.tagName,
+      });
+      return "";
     }
-    return target.value || target.textContent.trim();
   }
 
   async updateElement(element, translatedText) {
     try {
+      if (!element || !element.isConnected) {
+        // throw new Error("عنصر معتبر برای به‌روزرسانی وجود ندارد");
+        return;
+      }
+
       if (translatedText !== undefined && translatedText !== null) {
         if (element.isContentEditable) {
           // برای عناصر contentEditable از <br> استفاده کنید
@@ -38,18 +54,32 @@ export default class YoutubeStrategy extends PlatformStrategy {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "youtube-strategy-updateElement",
+        element: element?.tagName,
       });
     }
   }
 
-  /**
-   * پاک کردن محتوای المان قابل ویرایش
-   */
-  clearContent(element) {
-    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      element.value = "";
-    } else {
-      element.innerHTML = "";
+  async clearContent(element) {
+    try {
+      if (!element || !element.isConnected) {
+        // throw new Error("عنصر معتبر برای پاک‌سازی وجود ندارد");
+        return;
+      }
+
+      if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+        element.value = "";
+      } else {
+        element.innerHTML = "";
+      }
+
+      this.applyVisualFeedback(element);
+    } catch (error) {
+      const handlerError = this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "youtube-strategy-clearContent",
+        element: element?.tagName,
+      });
+      throw handlerError;
     }
   }
 }
