@@ -51,7 +51,8 @@ export default class TwitterStrategy extends PlatformStrategy {
     if (!tweetField) return;
 
     try {
-      if (text !== undefined && text !== null) {
+      if (text && typeof text === "string") {
+        // بررسی نوع و وجود مقدار
         const dt = new DataTransfer();
         dt.setData("text/plain", text);
         dt.setData("text/html", text.replace(/\n/g, "<br>"));
@@ -62,12 +63,15 @@ export default class TwitterStrategy extends PlatformStrategy {
           clipboardData: dt,
         });
         tweetField.dispatchEvent(pasteEvent);
+      } else {
+        // console.debug("Text is not a valid string: ", text);
       }
     } catch (error) {
-      this.errorHandler.handle(error, {
+      const handlerError = this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "twitter-strategy-pasteText",
       });
+      throw handlerError;
     }
   }
 
