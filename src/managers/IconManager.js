@@ -3,6 +3,9 @@ import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 export default class IconManager {
+  constructor(errorHandler) {
+    this.errorHandler = errorHandler;
+  }
   cleanup() {
     if (state.highlightedElement) {
       state.highlightedElement.style.outline = "";
@@ -32,17 +35,22 @@ export default class IconManager {
    *
    * @param {Text-field where the icon is created} target
    *
-   * اگر در هر استراتژی متد insertTranslationIcon وجود نداشته باشد
-   *
    * این متد باید فراخوانی شود تا آیکون مترجم در فیلد مربوطه ساخته شود
    * @returns
    */
   createTranslateIcon(target) {
     try {
+      if (!target?.isConnected) {
+        throw new Error("المان هدف برای ایجاد آیکون معتبر نیست");
+      }
+
       const icon = document.createElement("button");
       icon.className = "AIWritingCompanion-translation-icon-extension";
+
+      // تنظیمات ضروری CSS
       Object.assign(icon.style, {
         position: "absolute",
+        display: "none", // ابتدا مخفی باشد
         background: "white",
         border: "1px solid gray",
         borderRadius: "4px",
@@ -56,12 +64,18 @@ export default class IconManager {
       icon.textContent = CONFIG.ICON_TRANSLATION;
       icon.title = CONFIG.TRANSLATION_ICON_TITLE;
 
-      const rect = target.getBoundingClientRect();
-      icon.style.top = `${rect.top + window.scrollY + 5}px`;
-      icon.style.left = `${rect.left + window.scrollX + rect.width + 5}px`;
+      // اضافه کردن به DOM قبل از موقعیت دهی
+      document.body.appendChild(icon);
 
-      icon.style.display = "block !important";
-      icon.style.visibility = "visible !important";
+      // محاسبه موقعیت با در نظر گرفتن وضعیت رندر
+      requestAnimationFrame(() => {
+        if (target.isConnected && document.contains(icon)) {
+          const rect = target.getBoundingClientRect();
+          icon.style.top = `${rect.top + window.scrollY + 10}px`;
+          icon.style.left = `${rect.left + window.scrollX + rect.width + 10}px`;
+          icon.style.display = "block";
+        }
+      });
 
       return icon;
     } catch (error) {
@@ -69,6 +83,7 @@ export default class IconManager {
         type: ErrorTypes.UI,
         context: "IconManager-createTranslateIcon",
       });
+      return null; // این مقدار بازگشتی null خیلی مهم است
     }
   }
 }
