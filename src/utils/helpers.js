@@ -1,4 +1,5 @@
 // src/utils/helpers.js
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -10,71 +11,88 @@ export const isEditable = (element) => {
 };
 
 export const setCursorToEnd = (element) => {
-  if (!element || !document.body.contains(element)) {
-    console.warn("Element not found in DOM");
-    return;
+  try {
+    if (!element?.isConnected) {
+      // console.debug("Element not connected to DOM: ", element);
+      return;
+    }
+
+    element.focus();
+
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      element.selectionStart = element.selectionEnd = element.value.length;
+    } else if (element.isContentEditable) {
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.selectNodeContents(element);
+      range.collapse(false); // Collapse to end
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    // Optional: Scroll to cursor position
+    element.scrollTop = element.scrollHeight;
+  } catch (error) {
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "helpers-setCursorToEnd",
+    });
+    throw handlerError;
   }
-
-  // Focus the element first
-  element.focus();
-
-  // Handle different element types
-  if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-    // For input/textarea elements
-    element.selectionStart = element.value.length;
-    element.selectionEnd = element.value.length;
-  } else if (element.isContentEditable) {
-    // For contenteditable elements
-    const range = document.createRange();
-    const selection = window.getSelection();
-
-    range.selectNodeContents(element);
-    range.collapse(false); // Collapse to end
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-  } else {
-    console.warn("Unsupported element type for cursor positioning");
-  }
-
-  // Optional: Scroll to cursor position
-  element.scrollTop = element.scrollHeight;
 };
 
 export const setCursorPosition = (element, position = "end", offset = 0) => {
-  if (!element || !document.body.contains(element)) return;
+  try {
+    if (!element || !document.body.contains(element)) return;
 
-  element.focus();
+    element.focus();
 
-  if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-    const pos = position === "start" ? 0 : element.value.length;
-    element.setSelectionRange(pos + offset, pos + offset);
-  } else if (element.isContentEditable) {
-    const range = document.createRange();
-    const selection = window.getSelection();
-    const childNodes = element.childNodes;
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      const pos = position === "start" ? 0 : element.value.length;
+      element.setSelectionRange(pos + offset, pos + offset);
+    } else if (element.isContentEditable) {
+      const range = document.createRange();
+      const selection = window.getSelection();
+      const childNodes = element.childNodes;
 
-    if (position === "start") {
-      range.setStart(childNodes[0] || element, 0);
-    } else {
-      range.setStart(
-        childNodes[childNodes.length - 1] || element,
-        element.textContent?.length || 0
-      );
+      if (position === "start") {
+        range.setStart(childNodes[0] || element, 0);
+      } else {
+        range.setStart(
+          childNodes[childNodes.length - 1] || element,
+          element.textContent?.length || 0
+        );
+      }
+
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
     }
 
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    element.scrollTop = element.scrollHeight;
+  } catch (error) {
+    const handlerError = new ErrorHandler();
+    errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "helpers-setCursorPosition",
+      element: element?.tagName,
+    });
+    throw handlerError;
   }
-
-  element.scrollTop = element.scrollHeight;
 };
 
 export const fadeOut = (element) => {
-  element.style.transition = "opacity 0.5s";
-  element.style.opacity = "0";
-  setTimeout(() => element.remove(), 500);
+  try {
+    element.style.transition = "opacity 0.5s";
+    element.style.opacity = "0";
+    setTimeout(() => element.remove(), 500);
+  } catch (error) {
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "helpers-fadeOut",
+      element: element?.tagName,
+    });
+    throw handlerError;
+  }
 };
 
 export const isExtensionContextValid = () => {
@@ -117,48 +135,63 @@ export const showStatus = (() => {
 
 export function taggleLinks(enable = true) {
   try {
-    if (!document || !document.body) return;
+    if (!document?.body) return;
     document.documentElement.classList.toggle(
       "AIWritingCompanion-disable-links",
       enable
     );
   } catch (error) {
-    // در صورت رخداد خطای مربوط به از بین رفتن context، با errorHandler مدیریت می‌شود
-    if (
-      error.message &&
-      error.message.includes("Extension context invalidated")
-    ) {
-      // translationHandler.errorHandler.notifier.show(
-      //   "Extension context invalidated, ignoring error in taggleLinks.",
-      //   "warning"
-      // );
-    } else {
-      translationHandler.errorHandler.handle(error, {
-        type: translationHandler.ErrorTypes.UI,
-        context: "taggleLinks",
-      });
-    }
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.CONTEXT,
+      context: "taggleLinks",
+      details: {
+        errorType:
+          error.message.includes("context invalidated") ?
+            "CONTEXT_INVALIDATED"
+          : "UNKNOWN_ERROR",
+      },
+    });
+    throw handlerError;
   }
 }
 
 /**
  * تابع تزریق CSS به صورت داینامیک
  */
-function injectCSS(filePath) {
-  const linkElement = document.createElement("link");
-  linkElement.href = chrome.runtime.getURL(filePath);
-  linkElement.rel = "stylesheet";
-  document.head.appendChild(linkElement);
-}
+const injectCSS = (filePath) => {
+  try {
+    if (!document.head) throw new Error("document.head not available");
 
-export function injectStyle() {
-  // تزریق فایل‌های CSS مناسب بر اساس hostname
-  const hostname = window.location.hostname;
-  injectCSS("styles/content.css");
-  if (hostname.includes("whatsapp.com")) {
-    injectCSS("styles/whatsapp.css");
+    const linkElement = document.createElement("link");
+    linkElement.href = chrome.runtime.getURL(filePath);
+    linkElement.rel = "stylesheet";
+    document.head.appendChild(linkElement);
+  } catch (error) {
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "injectCSS",
+      filePath,
+    });
+    throw handlerError;
   }
-  if (hostname.includes("x.com")) {
-    injectCSS("styles/twitter.css");
+};
+
+export const injectStyle = () => {
+  try {
+    const hostname = window.location.hostname;
+    injectCSS("styles/content.css");
+
+    if (hostname.includes("whatsapp.com")) {
+      injectCSS("styles/whatsapp.css");
+    }
+    if (hostname.includes("x.com")) {
+      injectCSS("styles/twitter.css");
+    }
+  } catch (error) {
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "injectStyle",
+    });
+    throw handlerError;
   }
-}
+};
