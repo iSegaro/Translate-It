@@ -59,10 +59,11 @@ if (isExtensionContextValid()) {
         if (error.message?.includes("context invalidated")) {
           // console.info("Extension context invalidated");
         } else {
-          this.errorHandler.handle(error, {
+          const handleError = this.errorHandler.handle(error, {
             type: this.ErrorTypes.CONTEXT,
             context: "updateSelectionState",
           });
+          throw handleError;
         }
       }
     } else {
@@ -83,6 +84,7 @@ if (isExtensionContextValid()) {
     translationHandler.updateSelectionState(false);
   });
 } else {
+  console.debug("Extension context is not valid");
   translationHandler.notifier.show(
     "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
     "error",
