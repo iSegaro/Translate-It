@@ -37,7 +37,7 @@ export default class TelegramStrategy extends PlatformStrategy {
         field = editableFields.length === 1 ? editableFields[0] : null;
       }
 
-      // اصلاح جدید: بررسی المانهای تو در تو
+      // بررسی المانهای تو در تو
       if (field && !this.isContentEditable(field)) {
         const nestedEditable = field.querySelector('[contenteditable="true"]');
         if (nestedEditable) field = nestedEditable;
@@ -204,19 +204,47 @@ export default class TelegramStrategy extends PlatformStrategy {
     if (!target) {
       return "";
     }
+
     try {
       const telegramField = this.getTelegramField(target);
 
-      if (telegramField?.isContentEditable) {
-        return telegramField.innerText.trim();
+      if (!telegramField || !(telegramField instanceof HTMLElement)) {
+        console.warn("Invalid Telegram field element");
+        return "";
       }
 
-      return telegramField?.value.trim() || "";
+      // بررسی محتوای واقعی المان
+      let content = "";
+
+      // حالت اول: المان قابل ویرایش (مانند div با contentEditable)
+      if (telegramField.isContentEditable) {
+        content = telegramField.textContent || telegramField.innerText || "";
+      }
+      // حالت دوم: المان استاندارد ورودی (مانند input یا textarea)
+      else if (
+        telegramField.tagName &&
+        ["INPUT", "TEXTAREA"].includes(telegramField.tagName.toUpperCase())
+      ) {
+        content = telegramField.value || "";
+      }
+      // حالت سوم: المان‌های خاص دیگر
+      else {
+        content = telegramField.textContent || telegramField.innerText || "";
+      }
+
+      // پردازش نهایی متن
+      const processedText = content
+        .replace(/\s+/g, " ")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "") // حذف کاراکترهای مخفی
+        .trim();
+
+      return processedText;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "telegram-strategy-extractText",
       });
+      return "";
     }
   }
 
