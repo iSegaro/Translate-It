@@ -3,9 +3,10 @@
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
     "Extension context invalid. Please refresh the page to continue.",
-  API_KEY_MISSING: "API key is missing",
-  API_KEY_WRONG: "API key is wrong",
-  SERVICE_OVERLOADED: "Translation service overloaded:",
+  API_KEY_MISSING: "API Key is missing",
+  API_KEY_WRONG: "API Key is wrong",
+  API_KEY_FORBIDDEN: "API Key is forbidden",
+  SERVICE_OVERLOADED: "Translation service overloaded, Try later",
   NETWORK_FAILURE: "Connection to server failed",
   INVALID_RESPONSE: "Invalid API response format",
   CONTEXT_LOST: "Extension context lost",
@@ -62,9 +63,18 @@ export const state = {
 
 export const getSettingsAsync = async () => {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(null, (items) => {
-      resolve(items);
-    });
+    try {
+      chrome.storage.sync.get(null, (items) => {
+        resolve(items);
+      });
+    } catch (error) {
+      // console.debug(
+      //   "[config.js] Error getting settings (context invalidated?):",
+      //   error
+      // );
+      // در صورت بروز خطا، می‌توانید یک شیء خالی یا مقادیر پیش‌فرض را resolve کنید
+      resolve({});
+    }
   });
 };
 
@@ -135,16 +145,32 @@ export const getOpenAIModelAsync = async () => {
 
 export const getOpenRouterApiKeyAsync = () => {
   return new Promise((resolve) => {
-    chrome.storage.sync.get("openrouterApiKey", (data) => {
-      resolve(data.openrouterApiKey || CONFIG.OPENROUTER_API_KEY);
-    });
+    try {
+      chrome.storage.sync.get("openrouterApiKey", (data) => {
+        resolve(data.openrouterApiKey || CONFIG.OPENROUTER_API_KEY);
+      });
+    } catch (error) {
+      // console.error(
+      //   "[config.js] Error getting openrouterApiKey (context invalidated?):",
+      //   error
+      // );
+      resolve(CONFIG.OPENROUTER_API_KEY); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
+    }
   });
 };
 
 export const getOpenRouterApiModelAsync = () => {
   return new Promise((resolve) => {
-    chrome.storage.sync.get("openrouterApiModel", (data) => {
-      resolve(data.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL);
-    });
+    try {
+      chrome.storage.sync.get("openrouterApiModel", (data) => {
+        resolve(data.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL);
+      });
+    } catch (error) {
+      // console.error(
+      //   "[config.js] Error getting openrouterApiModel (context invalidated?):",
+      //   error
+      // );
+      resolve(CONFIG.OPENROUTER_API_MODEL); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
+    }
   });
 };
