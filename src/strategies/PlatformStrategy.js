@@ -1,4 +1,5 @@
 // src/strategies/PlatformStrategy.js
+import { CONFIG } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 export default class PlatformStrategy {
@@ -11,7 +12,6 @@ export default class PlatformStrategy {
     throw new Error("متد extractText باید در کلاس فرزند پیاده‌سازی شود");
   }
 
-  // متد یکپارچه برای یافتن المان‌ها
   findField(startElement, selectors, maxDepth = 5) {
     let currentElement = startElement;
     for (let i = 0; i < maxDepth; i++) {
@@ -23,7 +23,6 @@ export default class PlatformStrategy {
     return document.querySelector(selectors);
   }
 
-  // اعتبارسنجی المان
   validateField(element) {
     return (
       element &&
@@ -32,7 +31,6 @@ export default class PlatformStrategy {
     );
   }
 
-  // انیمیشن
   applyVisualFeedback(element) {
     if (!element) return;
     try {
@@ -52,9 +50,6 @@ export default class PlatformStrategy {
     }
   }
 
-  /**
-   * اعمال جهت متن
-   */
   applyTextDirection(element, translatedText) {
     try {
       const isRtl = CONFIG.RTL_REGEX.test(translatedText);
@@ -69,14 +64,15 @@ export default class PlatformStrategy {
         element.style.textAlign = isRtl ? "right" : "left";
       }
     } catch (error) {
-      // this.errorHandler.handle(error, {
-      //   type: ErrorTypes.UI,
-      //   context: "platform-strategy-TextDirection",
-      // });
+      const handleError = this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        code: "text-direction-error",
+        context: "platform-strategy-TextDirection",
+      });
+      throw handleError;
     }
   }
 
-  // مدیریت خطای استاندارد
   handleFieldError(errorName, platformName) {
     const errorMap = {
       FIELD_NOT_FOUND: `لطفا روی فیلد متن ${platformName} کلیک کنید`,
