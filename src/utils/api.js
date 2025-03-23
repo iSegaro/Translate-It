@@ -33,7 +33,7 @@ async function createPrompt(text, sourceLang, targetLang) {
 }
 
 async function handleGeminiTranslation(text, sourceLang, targetLang) {
-  if (sourceLang === targetLang) return text;
+  if (sourceLang === targetLang) return null;
 
   const [apiKey, apiUrl] = await Promise.all([
     getApiKeyAsync(),
@@ -44,7 +44,12 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
     const error = new Error(TRANSLATION_ERRORS.MISSING_API_KEY);
     error.statusCode = 401;
     error.type = ErrorTypes.API;
-    throw error; // پرتاب خطا به سطح بالاتر
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 401,
+      context: "handle-gemini-translation",
+    });
+    throw handlerError;
   }
 
   try {
@@ -61,24 +66,38 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
       const error = new Error(errorMessage);
       error.statusCode = response.status;
       error.type = ErrorTypes.API;
-      throw error; // پرتاب خطا به سطح بالاتر
+      const handlerError = errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: response.status,
+        context: "api-gemini-translation-response",
+      });
+      throw handlerError;
     }
 
     const data = await response.json();
 
     if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      const error = new Error("Invalid response format");
-      error.statusCode = 500;
+      const error = new Error(
+        "No translation result found in Gemini API response"
+      );
       error.type = ErrorTypes.API;
-      throw error; // پرتاب خطا به سطح بالاتر
+      error.statusCode = response.status;
+      const handlerError = errorHandler.handle(error, {
+        context: "api-gemini-translation-error",
+      });
+      throw handlerError;
     }
 
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
     error.type = ErrorTypes.API;
     error.statusCode = error.statusCode || 500;
-    error.context = "gemini-translation";
-    throw error; // پرتاب خطا به سطح بالاتر
+    const handlerError = errorHandler.handle(error, {
+      type: error,
+      statusCode: error.statusCode || 500,
+      context: "api-gemini-translation",
+    });
+    throw handlerError;
   }
 }
 
@@ -98,12 +117,10 @@ async function handleWebAITranslation(text, sourceLang, targetLang) {
         message: prompt,
         model: webAIApiModel,
         images: [],
-        // پارامترهای اختیاری برای کنترل session
-        reset_session: shouldResetSession(), // افزودن منطق بازنشانی session در صورت نیاز
+        reset_session: shouldResetSession(),
       }),
     });
 
-    // مدیریت خطاهای HTTP
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage =
@@ -118,11 +135,12 @@ async function handleWebAITranslation(text, sourceLang, targetLang) {
         error.sessionConflict = true;
       }
 
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         service: "webai-api",
       });
+      throw handlerError;
     }
 
     const data = await response.json();
@@ -131,10 +149,11 @@ async function handleWebAITranslation(text, sourceLang, targetLang) {
       const error = new Error("Invalid WebAI API response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
       });
+      throw handlerError;
     }
 
     // ذخیره اطلاعات session برای استفاده بعدی
@@ -144,18 +163,20 @@ async function handleWebAITranslation(text, sourceLang, targetLang) {
     });
 
     return data.response;
-    // بازنشانی session در صورت خطای مربوطه
   } catch (error) {
+    if (error.message.includes("Failed to fetch")) {
+      error.code = "network-failure";
+    }
     if (error.sessionConflict) {
       resetSessionContext();
     }
     error.type = ErrorTypes.NETWORK;
-    error.context = "webai-translation";
     error.isWebAINetworkError = true;
-    throw errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
       context: "webai-translation",
     });
+    throw handlerError;
   }
 }
 
@@ -170,10 +191,11 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
     const error = new Error("OpenAI API key is missing");
     error.statusCode = 401;
     error.type = ErrorTypes.API;
-    throw errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: 401,
     });
+    throw handlerError;
   }
 
   try {
@@ -197,11 +219,12 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
       const error = new Error(errorMessage);
       error.statusCode = response.status;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         service: "openai",
       });
+      throw handlerError;
     }
 
     const data = await response.json();
@@ -210,10 +233,11 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
       const error = new Error("Invalid OpenAI API response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
       });
+      throw handlerError;
     }
 
     return data.choices[0].message.content;
@@ -221,11 +245,12 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
     error.type = ErrorTypes.API;
     error.statusCode = error.statusCode || 500;
     error.context = "openai-translation";
-    throw errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
       context: "openai-translation",
     });
+    throw handlerError;
   }
 }
 
@@ -239,15 +264,16 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
     const error = new Error("OpenRouter API key is missing");
     error.statusCode = 401;
     error.type = ErrorTypes.API;
-    throw errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: 401,
     });
+    throw handlerError;
   }
 
   try {
     const prompt = await createPrompt(text, sourceLang, targetLang);
-    const apiUrl = CONFIG.OPENROUTER_API_URL; // استفاده از URL از config
+    const apiUrl = CONFIG.OPENROUTER_API_URL;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -258,7 +284,7 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
         "X-Title": chrome.runtime.getManifest().name, // تنظیم X-Title به نام اکستنشن
       },
       body: JSON.stringify({
-        model: openRouterApiModel || "openai/gpt-3.5-turbo", // استفاده از مدل قابل تنظیم
+        model: openRouterApiModel || "openai/gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -269,11 +295,12 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
       const error = new Error(errorMessage);
       error.statusCode = response.status;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         service: "openrouter",
       });
+      throw handlerError;
     }
 
     const data = await response.json();
@@ -282,10 +309,11 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
       const error = new Error("Invalid OpenRouter API response format");
       error.statusCode = 500;
       error.type = ErrorTypes.API;
-      throw errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
       });
+      throw handlerError;
     }
 
     return data.choices[0].message.content;
@@ -293,15 +321,15 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
     error.type = ErrorTypes.API;
     error.statusCode = error.statusCode || 500;
     error.context = "openrouter-translation";
-    throw errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
       context: "openrouter-translation",
     });
+    throw handlerError;
   }
 }
 
-// توابع کمکی برای مدیریت session
 let sessionContext = null;
 
 function storeSessionContext(context) {
@@ -317,7 +345,7 @@ function resetSessionContext() {
 
 function shouldResetSession() {
   // بازنشانی session اگر بیش از 5 دقیقه از آخرین استفاده گذشته باشد
-  return sessionContext && Date.now() - sessionContext.lastUsed > 300000; // 5 دقیقه
+  return sessionContext && Date.now() - sessionContext.lastUsed > 300000;
 }
 
 export const translateText = async (text) => {
@@ -326,6 +354,10 @@ export const translateText = async (text) => {
     return isPersianText(text) ?
         CONFIG.DEBUG_TRANSLATED_ENGLISH
       : CONFIG.DEBUG_TRANSLATED_PERSIAN;
+  }
+
+  if (!text || typeof text !== "string") {
+    return null;
   }
 
   try {
@@ -352,7 +384,11 @@ export const translateText = async (text) => {
         const error = new Error("Invalid translation API selected");
         error.type = ErrorTypes.VALIDATIONMODEL;
         error.statusCode = 400;
-        throw error;
+        const handlerError = errorHandler.handle(error, {
+          type: ErrorTypes.VALIDATIONMODEL,
+          statusCode: 400,
+        });
+        throw handlerError;
     }
   } catch (error) {
     // بررسی دقیق‌تر خطای API Key
@@ -362,51 +398,81 @@ export const translateText = async (text) => {
       (error.message.includes("API key") ||
         error.message === TRANSLATION_ERRORS.MISSING_API_KEY)
     ) {
-      errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: error.statusCode,
+        context: "api-translateText",
       });
-      return;
+      throw handlerError;
     }
+
     if (error.sessionConflict) {
       console.warn("Session conflict, retrying...");
       resetSessionContext();
       return await handleWebAITranslation(text, sourceLang, targetLang);
     }
-    if (error.message?.includes("Extension context invalid")) {
+
+    if (error.message?.includes("context invalid")) {
       error.type = ErrorTypes.CONTEXT;
       error.statusCode = 403;
-      errorHandler.handle(error, {
+      const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.CONTEXT,
         statusCode: 403,
       });
-      return;
+      throw handlerError;
     }
+
     if (
       error.type === ErrorTypes.NETWORK ||
       error.message?.includes("Failed to fetch")
     ) {
-      if (error.isWebAINetworkError) {
-        return;
-      }
       const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
       networkError.type = ErrorTypes.NETWORK;
       networkError.statusCode = 503;
-      errorHandler.handle(networkError, {
+      const handlerError = errorHandler.handle(networkError, {
         type: ErrorTypes.NETWORK,
         statusCode: 503,
       });
-      return;
+      throw handlerError;
     }
 
-    // هندل کردن سایر خطاها
+    // if (error instanceof Promise) {
+    //   // console.debug("Caught a Promise in translateText catch block:");
+    //   error
+    //     .then((resolvedValue) => {
+    //       // console.debug("Promise resolved with:", resolvedValue);
+    //       const handlerError = errorHandler.handle(
+    //         new Error(String(resolvedValue)),
+    //         {
+    //           type: ErrorTypes.SERVICE, // نوع خطا را بر اساس محتوا تنظیم کنید
+    //           statusCode: 600, // کد وضعیت را بر اساس محتوا تنظیم کنید
+    //           context: "promise-error-in-translateText",
+    //         }
+    //       );
+    //       return handledError;
+    //     })
+    //     .catch((rejectedValue) => {
+    //       // console.debug("Promise rejected with:", rejectedValue);
+    //       const handlerError = errorHandler.handle(
+    //         new Error(String(rejectedValue)),
+    //         {
+    //           type: ErrorTypes.SERVICE, // نوع خطا را بر اساس محتوا تنظیم کنید
+    //           statusCode: 600, // کد وضعیت را بر اساس محتوا تنظیم کنید
+    //           context: "promise-rejection-in-translateText",
+    //         }
+    //       );
+    //       return handledError;
+    //     });
+    //   return; // مهم: برای جلوگیری از اجرای کد پایین‌تر، return کنید
+    // }
+
     error.statusCode = error.statusCode || 500;
     error.context = "translation-service";
-    errorHandler.handle(error, {
+    const handlerError = errorHandler.handle(error, {
       type: error.type || ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
       context: "translation-service",
     });
-    return;
+    return handlerError;
   }
 };
