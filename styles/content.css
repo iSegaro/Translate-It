@@ -76,6 +76,6 @@
 .AIWritingCompanion-disable-links [role="link"],
 .AIWritingCompanion-disable-links div[role="link"] {
   pointer-events: none !important;
-  /* cursor: crosshair !important; */
+  cursor: crosshair !important;
   color: inherit;
 }

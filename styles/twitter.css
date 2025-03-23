@@ -1,14 +1,9 @@
 /* src/styles/twitter.css */
 
 /* Disable Hyperlinks on Twitter */
-.AIWritingCompanion-disable-links a,
-.AIWritingCompanion-disable-links button,
-.AIWritingCompanion-disable-links [onclick],
-.AIWritingCompanion-disable-links [role="link"],
-.AIWritingCompanion-disable-links div[role="link"],
 .AIWritingCompanion-disable-links [data-testid="tweet"],
 .AIWritingCompanion-disable-links article[data-testid="tweet"] {
   pointer-events: none !important;
-  cursor: default !important;
+  cursor: crosshair !important;
   color: inherit;
 }
