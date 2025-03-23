@@ -84,10 +84,14 @@ export default class EventHandler {
 
   handleEditableBlur() {
     setTimeout(() => {
-      if (!document.activeElement.isSameNode(state.activeTranslateIcon)) {
-        if (this.IconManager) {
-          this.IconManager.cleanup();
-        }
+      if (
+        !document.activeElement?.isConnected ||
+        (document.activeElement !== state.activeTranslateIcon &&
+          !document.activeElement.closest(
+            ".AIWritingCompanion-translation-icon-extension"
+          ))
+      ) {
+        this.IconManager?.cleanup();
       }
     }, 100);
   }
@@ -140,21 +144,23 @@ export default class EventHandler {
         if (cachedTranslations.has(originalText)) {
           const translatedText = cachedTranslations.get(originalText);
           const parentElement = textNode.parentElement;
-          const uniqueId =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15);
-          parentElement.setAttribute("data-original-text-id", uniqueId);
+          if (parentElement) {
+            const uniqueId =
+              Math.random().toString(36).substring(2, 15) +
+              Math.random().toString(36).substring(2, 15);
+            parentElement.setAttribute("data-original-text-id", uniqueId);
 
-          state.originalTexts.set(uniqueId, {
-            originalInnerHTML: parentElement.innerHTML,
-            translatedText: translatedText,
-            parent: parentElement,
-          });
-          textNode.textContent = translatedText;
-          this.IconManager.applyTextDirection(
-            textNode.parentElement,
-            translatedText
-          );
+            state.originalTexts.set(uniqueId, {
+              originalInnerHTML: parentElement.innerHTML,
+              translatedText: translatedText,
+              parent: parentElement,
+            });
+            textNode.textContent = translatedText;
+            this.IconManager.applyTextDirection(
+              textNode.parentElement,
+              translatedText
+            );
+          }
         }
       });
       this.notifier.show("حافظه", "info");
@@ -175,8 +181,7 @@ export default class EventHandler {
       // ارسال یک درخواست ترجمه برای تمام متن‌های جدید (متصل شده با جداکننده)
       const joinedTextsToTranslate = textsToTranslate.join(delimiter);
       const translatedTextsString = await translateText(joinedTextsToTranslate);
-
-      if (translatedTextsString) {
+      if (translatedTextsString && typeof translatedTextsString === "string") {
         // جدا کردن متن‌های ترجمه‌شده از پاسخ
         const translatedTextsArray = translatedTextsString.split(delimiter);
 
@@ -198,19 +203,24 @@ export default class EventHandler {
 
           if (translatedText) {
             const parentElement = textNode.parentElement;
-            const uniqueId =
-              Math.random().toString(36).substring(2, 15) +
-              Math.random().toString(36).substring(2, 15);
-            parentElement.setAttribute("data-original-text-id", uniqueId);
+            if (parentElement) {
+              const uniqueId =
+                Math.random().toString(36).substring(2, 15) +
+                Math.random().toString(36).substring(2, 15);
+              parentElement.setAttribute("data-original-text-id", uniqueId);
 
-            state.originalTexts.set(uniqueId, {
-              originalInnerHTML: parentElement.innerHTML,
-              translatedText: translatedText,
-              parent: parentElement,
-            });
+              state.originalTexts.set(uniqueId, {
+                originalInnerHTML: parentElement.innerHTML,
+                translatedText: translatedText,
+                parent: parentElement,
+              });
 
-            textNode.textContent = translatedText;
-            this.IconManager.applyTextDirection(parentElement, translatedText);
+              textNode.textContent = translatedText;
+              this.IconManager.applyTextDirection(
+                parentElement,
+                translatedText
+              );
+            }
           }
         });
       }
@@ -220,17 +230,17 @@ export default class EventHandler {
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
       }
-      // مدیریت خطا به صورت مرکزی؛ ساختار مناسب برای خطاهای شبکه یا سرویس
-      this.translationHandler.errorHandler.handle(error, {
-        type:
-          (
-            error?.type === ErrorTypes.NETWORK ||
-            error?.message?.includes("Failed to fetch")
-          ) ?
-            ErrorTypes.NETWORK
-          : ErrorTypes.SERVICE,
+      if (error.isFinal || error.suppressSecondary) {
+        return;
+      }
+
+      const handlerError = this.translationHandler.errorHandler.handle(error, {
+        type: error.type || ErrorTypes.SYSTEM || ErrorTypes.API,
+        statusCode: error.statusCode || 500,
         context: "handleSelectionClick",
+        suppressSecondary: true,
       });
+      throw handlerError;
     }
   }
 
@@ -294,13 +304,24 @@ export default class EventHandler {
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
     } catch (error) {
-      this.translationHandler.errorHandler.handle(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          type: ErrorTypes.UI,
+      // تعیین نوع خطا با اولویت دادن به نوع موجود در خطا
+      // بررسی خطاهای پردازش شده و پرچم suppressSystemError
+      if (error.isFinal) {
+        return;
+      }
+
+      // فقط خطاهای اصلی را نمایش بده
+      if (!error.originalError?.isPrimary) {
+        const errorType = error.type || ErrorTypes.API;
+        const statusCode = error.statusCode || 500;
+
+        this.translationHandler.errorHandler.handle(error, {
+          type: errorType,
+          statusCode: statusCode,
           context: "ctrl-slash",
-        }
-      );
+          suppressSecondary: true, // جلوگیری از نمایش خطاهای ثانویه
+        });
+      }
     } finally {
       this.isProcessing = false;
     }
@@ -349,19 +370,55 @@ export default class EventHandler {
   }
 
   setupIconBehavior(icon, target) {
-    // Add slight delay for positioning
-    setTimeout(() => {
-      const rect = target.getBoundingClientRect();
-      icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      icon.style.left = `${rect.left + window.scrollX}px`;
-    }, 50);
+    if (!icon || !target) return;
+
+    let isCleanedUp = false; // فلگ برای جلوگیری از پاکسازی تکراری
+    let statusNotification;
+    let resizeObserver;
+    let mutationObserver;
+    const rafIds = new Set();
+
+    const cleanup = () => {
+      if (isCleanedUp) return;
+      isCleanedUp = true;
+
+      try {
+        // 1. لغو فریم‌های انیمیشن
+        rafIds.forEach((id) => cancelAnimationFrame(id));
+        rafIds.clear();
+
+        // 2. قطع observerها
+        resizeObserver?.disconnect();
+        mutationObserver?.disconnect();
+
+        // 3. حذف event listenerها
+        icon.removeEventListener("click", clickHandler);
+        icon.removeEventListener("blur", handleBlur);
+        target.removeEventListener("blur", handleBlur);
+
+        // 4. حذف فیزیکی المان فقط اگر وجود دارد
+        if (icon.isConnected) {
+          icon.remove();
+        }
+
+        // 5. ریست وضعیت
+        state.activeTranslateIcon = null;
+      } catch (cleanupError) {
+        this.translationHandler.errorHandler.handle(cleanupError, {
+          type: ErrorTypes.UI,
+          context: "icon-cleanup",
+        });
+      }
+    };
 
     const clickHandler = async (e) => {
-      let statusNotification;
+      e.preventDefault();
+      e.stopPropagation();
+
       try {
-        e.preventDefault();
-        e.stopPropagation();
-        icon.remove();
+        // غیرفعال کردن المان قبل از حذف
+        icon.style.pointerEvents = "none";
+        icon?.remove();
 
         const platform = detectPlatform(target);
         const text = this.strategies[platform].extractText(target);
@@ -372,38 +429,113 @@ export default class EventHandler {
           "status",
           false
         );
-        try {
-          const translated = await translateText(text);
+
+        const translated = await translateText(text);
+
+        if (translated) {
           await this.translationHandler.updateTargetElement(target, translated);
-        } finally {
-          if (statusNotification) {
-            this.notifier.dismiss(statusNotification);
-          }
+        } else {
+          // console.debug("EventHandler: No translation result: ", translated);
         }
-      } catch (error) {
-        if (this.IconManager) {
-          this.IconManager.cleanup();
-        }
+      } finally {
         if (statusNotification) {
           this.notifier.dismiss(statusNotification);
         }
-        this.translationHandler.errorHandler.handle(
-          error instanceof Error ? error : new Error(String(error)),
-          {
-            type: ErrorTypes.UI,
-            context: "translate-icon-click",
-          }
-        );
+        cleanup();
       }
     };
 
-    icon.addEventListener("click", clickHandler);
-    document.body.appendChild(icon);
-    state.activeTranslateIcon = icon;
+    // 3. مدیریت رویداد blur
+    const handleBlur = (e) => {
+      if (
+        !e.relatedTarget ||
+        (e.relatedTarget !== icon && !icon.contains(e.relatedTarget))
+      ) {
+        // تأخیر برای جلوگیری از تداخل با کلیک
+        setTimeout(cleanup, 50);
+      }
+    };
 
-    // Positioning fix
-    // const rect = target.getBoundingClientRect();
-    // icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-    // icon.style.left = `${rect.left + window.scrollX}px`;
+    const updatePosition = () => {
+      if (!target.isConnected || !icon.isConnected) {
+        cleanup();
+        return;
+      }
+
+      const id = requestAnimationFrame(() => {
+        try {
+          const rect = target.getBoundingClientRect();
+          if (
+            !rect ||
+            rect.width + rect.height === 0 ||
+            rect.top < 0 ||
+            rect.left < 0
+          ) {
+            // throw new Error("موقعیت اِلمان نامعتبر است");
+          }
+
+          icon.style.display = "block";
+          icon.style.top = `${Math.round(rect.bottom + window.scrollY + 5)}px`;
+          icon.style.left = `${Math.round(rect.left + window.scrollX)}px`;
+        } catch (error) {
+          this.translationHandler.errorHandler.handle(error, {
+            type: ErrorTypes.UI,
+            context: "icon-positioning",
+          });
+          cleanup();
+        }
+      });
+      rafIds.add(id);
+    };
+
+    try {
+      // اعتبارسنجی اولیه
+      if (!(icon instanceof HTMLElement) || !icon.isConnected) {
+        // throw new Error("آیکون معتبر نیست");
+        console.debug("آیکون معتبر نیست");
+      }
+
+      if (!target.isConnected || !document.contains(target)) {
+        // throw new Error("المان هدف در DOM وجود ندارد");
+        console.debug("المان هدف در DOM وجود ندارد");
+      }
+
+      // تنظیمات اولیه موقعیت
+      icon.style.display = "none";
+      document.body.appendChild(icon);
+
+      // 1. تنظیم observer برای تغییر سایز
+      resizeObserver = new ResizeObserver(() => updatePosition());
+      resizeObserver.observe(target);
+
+      // 4. افزودن event listeners
+      icon.addEventListener("click", clickHandler);
+      target.addEventListener("blur", handleBlur);
+      icon.addEventListener("blur", handleBlur);
+
+      // 5. مشاهده تغییرات DOM
+      mutationObserver = new MutationObserver((mutations) => {
+        if (!document.contains(target) || !document.contains(icon)) {
+          cleanup();
+        }
+      });
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      // 6. موقعیت دهی اولیه
+      updatePosition();
+
+      // 7. ثبت در state
+      state.activeTranslateIcon = icon;
+    } catch (error) {
+      cleanup();
+      this.translationHandler.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "setup-icon-behavior",
+        element: target?.tagName,
+      });
+    }
   }
 }
