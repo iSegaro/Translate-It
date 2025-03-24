@@ -37,6 +37,16 @@ export class ErrorHandler {
     ]);
   }
 
+  static async processError(error) {
+    if (typeof error.then === "function") {
+      error = await error;
+    }
+    if (error._isHandled) {
+      throw error;
+    }
+    return error;
+  }
+
   async handle(error, customMeta = {}) {
     // اگر error یک Promise باشد، منتظر تکمیل آن شود (resolve یا reject)
     if (typeof error.then === "function") {
@@ -49,7 +59,8 @@ export class ErrorHandler {
       return error;
     }
     this.isHandling = true;
-    this.displayedErrors.add(error.message); // Add the error message to the set to prevent duplicate notifications
+    // Add the error message to the set to prevent duplicate notifications
+    this.displayedErrors.add(error.message);
 
     try {
       // نرمال‌سازی خطا
@@ -64,7 +75,7 @@ export class ErrorHandler {
         statusCode: normalizedError.statusCode || customMeta.statusCode || 500,
       };
 
-      // تعیین نهایی نوع خطا بر اساس محتوا
+      // تعیین نهایی نوع خطا
       mergedMeta.type = this._reviewErrorType(
         normalizedError,
         mergedMeta.type,
@@ -90,11 +101,13 @@ export class ErrorHandler {
       // نمایش پیام به کاربر
       this._notifyUser(message, mergedMeta.type, code);
 
-      // اگر خطای CONTEXT دریافت شد، ریلود به صورت مرکزی انجام شود
+      // در صورت خطای CONTEXT، ریلود مرکزی انجام شود
       if (mergedMeta.type === ErrorTypes.CONTEXT && !this.reloadScheduled) {
         this._contextInvalidated();
       }
 
+      // علامت‌گذاری خطا به عنوان هندل شده
+      normalizedError._isHandled = true;
       return normalizedError;
     } catch (finalError) {
       console.error("[ErrorHandler] Critical Unknown Error:", finalError);
@@ -127,12 +140,17 @@ export class ErrorHandler {
   _reviewErrorType(error, currentType, meta) {
     let type = currentType;
     console.debug("[ErrorHandler] Reviewing error type:", error.message);
+
+    // بررسی خطاهای مربوط به API Key
     if (
       error.message.includes("API key") ||
-      error.message.includes("API_KEY")
+      error.message.includes("API_KEY") ||
+      error.message === TRANSLATION_ERRORS.MISSING_API_KEY
     ) {
       type = ErrorTypes.API;
     }
+
+    // بررسی خطاهای مربوط به Context
     if (
       error.message.includes("context invalidated") ||
       error.message.includes("Extension context invalid")
@@ -140,12 +158,20 @@ export class ErrorHandler {
       type = ErrorTypes.CONTEXT;
       error.code = "context-invalidated";
     }
+
+    // بررسی خطاهای Integration در شرایط خاص
     if (
       error.message.includes("reading 'handle'") &&
       meta.context === "ctrl-slash"
     ) {
       type = ErrorTypes.INTEGRATION;
     }
+
+    // بررسی خطاهای شبکه
+    if (error.message.includes("Failed to fetch")) {
+      type = ErrorTypes.NETWORK;
+    }
+
     return type;
   }
 
