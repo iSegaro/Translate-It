@@ -10,9 +10,9 @@ import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
-import { CONFIG, state } from "../config.js";
+import { CONFIG, state, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
-import { openOptionsPage } from "../utils/helpers.js";
+import { openOptionsPage, isExtensionContextValid } from "../utils/helpers.js";
 import {
   detectPlatform,
   getPlatformName,
@@ -46,6 +46,17 @@ export default class TranslationHandler {
     this.isProcessing = false;
     this.selectionModeActive = false;
     this.eventHandler = new EventHandler(this);
+  }
+
+  // در TranslationHandler.js
+  reinitialize() {
+    console.debug("Reinitializing TranslationHandler state after update...");
+    this.isProcessing = false;
+    this.selectionModeActive = false;
+    // در صورت نیاز، متغیرهای داخلی دیگر مانند caches یا stateهای دیگر را هم ریست کنید
+    // برای مثال:
+    // state.originalTexts.clear();
+    // this.IconManager.cleanup();
   }
 
   /**
@@ -108,46 +119,63 @@ export default class TranslationHandler {
   }
 
   async processTranslation(params) {
+    console.debug("TranslationHandler: Processing translation...", params);
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
-
     try {
-      const platform =
-        params.target ? detectPlatform(params.target) : detectPlatformByURL();
-
-      state.translationMode = params.selectionRange ? "selection" : "field";
-      const translated = await translateText(params.text);
-
-      if (!translated || typeof translated !== "string") {
-        // console.debug(
-        //   "TranslationHandler: No translation result: ",
-        //   translated
-        // );
-        return;
+      if (!isExtensionContextValid()) {
+        throw new Error(
+          "TranslationHandler: Translation failed: Context Invalid",
+          {
+            type: ErrorTypes.CONTEXT,
+            translationParams: params,
+          }
+        );
       }
 
+      // if (!params.text || !params.target) {
+      //   console.warn("TranslationHandler: Invalid parameter", params);
+      //   throw new Error("TranslationHandler: Translation failed, Invalid parameter", {
+      //     type: ErrorTypes.CONTEXT,
+      //     translationParams: params,
+      //   });
+      // }
+
+      const platform =
+        params.target ? detectPlatform(params.target) : detectPlatformByURL();
+      state.translationMode = params.selectionRange ? "selection" : "field";
+
+      const translated = await translateText(params.text);
+
+      console.debug("TranslationHandler: Translation result => ", translated);
+      if (!translated) {
+        throw new Error(TRANSLATION_ERRORS.INVALID_CONTEXT, {
+          type: ErrorTypes.CONTEXT,
+          context: "processTranslation-text",
+        });
+      }
+
+      // اگر کاربر متنی را انتخاب کرده باشد، آن را ترجمه کن
       if (params.selectionRange) {
         this.handleSelectionTranslation(platform, params, translated);
-      } else if (params.target) {
+      }
+      // در غیر این صورت، ترجمه را در عنصر هدف نمایش بده
+      else if (params.target) {
         this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
-      const errorType = error.type || ErrorTypes.API;
-      const statusCode = error.statusCode || 900;
+      const errorType = error.type || ErrorTypes.CONTEXT;
 
-      // فقط خطاهای API اصلی را منتشر کن
       const handlerError = this.errorHandler.handle(error, {
         type: errorType,
-        statusCode: statusCode,
         context: "TranslationHandler-processTranslation",
         translationParams: params,
-        isPrimary: true, // افزودن پرچم برای شناسایی خطای اصلی
+        isPrimary: true,
       });
 
-      // ایجاد خطای جدید با حفظ اطلاعات اصلی
-      const finalError = new Error(handledError.message);
+      const finalError = new Error(handlerError.message);
       Object.assign(finalError, {
-        type: handledError.type,
-        statusCode: handledError.statusCode,
+        type: handlerError.type,
+        statusCode: handlerError.statusCode,
         isFinal: true,
         originalError: error,
       });
