@@ -6,6 +6,7 @@ import {
   detectPlatformByURL,
 } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorService.js";
+import { isExtensionContextValid } from "../utils/helpers.js";
 
 const translationCache = new Map();
 
@@ -282,6 +283,8 @@ export default class EventHandler {
     event.preventDefault();
     event.stopPropagation();
 
+    console.debug("Handling Ctrl+/ event");
+
     if (this.isProcessing) return;
     this.isProcessing = true;
 
@@ -304,6 +307,7 @@ export default class EventHandler {
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
     } catch (error) {
+      console.debug("Ctrl+/ Error: ", error);
       // تعیین نوع خطا با اولویت دادن به نوع موجود در خطا
       // بررسی خطاهای پردازش شده و پرچم suppressSystemError
       if (error.isFinal) {
@@ -437,6 +441,9 @@ export default class EventHandler {
         } else {
           // console.debug("EventHandler: No translation result: ", translated);
         }
+      } catch (error) {
+        // const resolvedError = await Promise.resolve(error);
+        // console.debug("setupIconBehavior: ", resolvedError);
       } finally {
         if (statusNotification) {
           this.notifier.dismiss(statusNotification);
