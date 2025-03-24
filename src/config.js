@@ -6,6 +6,8 @@ export const TRANSLATION_ERRORS = {
   API_KEY_MISSING: "API Key is missing",
   API_KEY_WRONG: "API Key is wrong",
   API_KEY_FORBIDDEN: "API Key is forbidden",
+  API_URL_MISSING: "API URL is missing",
+  AI_MODEL_MISSING: "AI Model is missing",
   SERVICE_OVERLOADED: "Translation service overloaded, Try later",
   NETWORK_FAILURE: "Connection to server failed",
   INVALID_RESPONSE: "Invalid API response format",
@@ -16,6 +18,12 @@ export const TRANSLATION_ERRORS = {
 export const CONFIG = {
   USE_MOCK: false,
   DEBUG_MODE: false,
+  SOURCE_LANGUAGE: "English",
+  TARGET_LANGUAGE: "Persian",
+  TRANSLATION_API: "gemini",
+  API_URL:
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+  API_KEY: "",
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.0-flash",
   OPENAI_API_KEY: "",
@@ -24,10 +32,8 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
-  API_URL:
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
   HIGHLIGHT_STYLE: "2px solid red",
-  promptTemplate:
+  PROMPT_TEMPLATE:
     "Perform bidirectional translation. If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Maintain the original structure, formatting, and line breaks exactly. Output ONLY the translated text with no additional words before or after:\n\n${TEXT}",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
@@ -80,78 +86,88 @@ export const getSettingsAsync = async () => {
 
 export const getUseMockAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.USE_MOCK;
+  return settings.USE_MOCK || CONFIG.USE_MOCK;
 };
 
 export const getDebugModeAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.DEBUG_MODE;
+  return settings.DEBUG_MODE || CONFIG.DEBUG_MODE;
 };
 
 export const getApiKeyAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.apiKey;
+  return settings.API_KEY || CONFIG.API_KEY;
 };
 
 export const getApiUrlAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.API_URL;
+  return settings.API_URL || CONFIG.API_URL;
 };
 
 export const getSourceLanguageAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.sourceLanguage;
+  return settings.SOURCE_LANGUAGE || CONFIG.SOURCE_LANGUAGE;
 };
 
 export const getTargetLanguageAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.targetLanguage;
+  return settings.TARGET_LANGUAGE || CONFIG.TARGET_LANGUAGE;
 };
 
 export const getPromptAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.promptTemplate;
+  return settings.PROMPT_TEMPLATE || CONFIG.PROMPT_TEMPLATE;
 };
 
 export const getTranslationApiAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.translationApi || "gemini";
+  return settings.TRANSLATION_API || CONFIG.TRANSLATION_API;
 };
 
 export const getWebAIApiUrlAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
+  return settings.WEBAI_API_URL || CONFIG.WEBAI_API_URL;
 };
 
 export const getWebAIApiModelAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
+  return settings.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL;
 };
 
 export const getOpenAIApiKeyAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.openaiApiKey;
+  return settings.OPENAI_API_KEY || CONFIG.OPENAI_API_KEY;
 };
 
 export const getOpenAIApiUrlAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.openaiApiUrl || CONFIG.OPENAI_API_URL;
+  return settings.OPENAI_API_URL || CONFIG.OPENAI_API_URL;
 };
 
 export const getOpenAIModelAsync = async () => {
   const settings = await getSettingsAsync();
-  return settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+  return settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
 };
 
-export const getOpenRouterApiKeyAsync = () => {
+export const getOpenRouterApiKeyAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
+};
+
+export const getOpenRouterApiModelAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
+};
+
+export const getOpenRouterApiKeyAsync1 = () => {
   return new Promise((resolve) => {
     try {
       chrome.storage.sync.get("openrouterApiKey", (data) => {
-        resolve(data.openrouterApiKey || CONFIG.OPENROUTER_API_KEY);
+        resolve(data.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY);
       });
     } catch (error) {
       // console.error(
-      //   "[config.js] Error getting openrouterApiKey (context invalidated?):",
+      //   "[config.js] Error getting OPENROUTER_API_KEY (context invalidated?):",
       //   error
       // );
       resolve(CONFIG.OPENROUTER_API_KEY); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
@@ -159,15 +175,15 @@ export const getOpenRouterApiKeyAsync = () => {
   });
 };
 
-export const getOpenRouterApiModelAsync = () => {
+export const getOpenRouterApiModelAsync1 = () => {
   return new Promise((resolve) => {
     try {
       chrome.storage.sync.get("openrouterApiModel", (data) => {
-        resolve(data.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL);
+        resolve(data.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL);
       });
     } catch (error) {
       // console.error(
-      //   "[config.js] Error getting openrouterApiModel (context invalidated?):",
+      //   "[config.js] Error getting OPENROUTER_API_MODEL (context invalidated?):",
       //   error
       // );
       resolve(CONFIG.OPENROUTER_API_MODEL); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
