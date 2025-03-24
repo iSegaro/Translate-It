@@ -182,20 +182,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const settings = {
-        apiKey: apiKey || "",
+        API_KEY: apiKey || "",
         USE_MOCK: useMock,
         DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
         API_URL: apiUrl || CONFIG.API_URL,
-        sourceLanguage: sourceLanguage || "English",
-        targetLanguage: targetLanguage || "Persian",
-        promptTemplate: promptTemplate || CONFIG.promptTemplate,
-        translationApi: translationApi || "gemini",
-        webAIApiUrl: webAIApiUrl || CONFIG.WEBAI_API_URL,
-        webAIApiModel: webAIApiModel || CONFIG.WEBAI_API_MODEL,
-        openaiApiKey: openaiApiKey || CONFIG.OPENAI_API_KEY,
-        openaiApiModel: openaiApiModel || CONFIG.OPENAI_API_MODEL,
-        openrouterApiKey: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
-        openrouterApiModel: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
+        SOURCE_LANGUAGE: sourceLanguage || "English",
+        TARGET_LANGUAGE: targetLanguage || "Persian",
+        PROMPT_TEMPLATE: promptTemplate || CONFIG.PROMPT_TEMPLATE,
+        TRANSLATION_API: translationApi || "gemini",
+        WEBAI_API_URL: webAIApiUrl || CONFIG.WEBAI_API_URL,
+        WEBAI_API_MODEL: webAIApiModel || CONFIG.WEBAI_API_MODEL,
+        OPENAI_API_KEY: openaiApiKey || CONFIG.OPENAI_API_KEY,
+        OPENAI_API_MODEL: openaiApiModel || CONFIG.OPENAI_API_MODEL,
+        OPENROUTER_API_KEY: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
+        OPENROUTER_API_MODEL: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
       };
 
       await new Promise((resolve, reject) => {
@@ -221,8 +221,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function updatePromptHelpText() {
     const settings = await getSettingsAsync();
-    const sourceLang = settings.sourceLanguage || "English";
-    const targetLang = settings.targetLanguage || "Persian";
+    const sourceLang = settings.SOURCE_LANGUAGE || "English";
+    const targetLang = settings.TARGET_LANGUAGE || "Persian";
 
     if (sourceLangNameSpan) {
       sourceLangNameSpan.textContent = `(${sourceLang})`;
@@ -245,55 +245,55 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // مقداردهی فیلدهای اصلی
-      if (apiKeyInput) apiKeyInput.value = settings.apiKey || "";
+      if (apiKeyInput) apiKeyInput.value = settings.API_KEY || "";
       if (apiUrlInput) apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
       if (sourceLanguageInput) {
-        sourceLanguageInput.value = settings.sourceLanguage || "English";
+        sourceLanguageInput.value = settings.SOURCE_LANGUAGE || "English";
       }
       if (targetLanguageInput) {
-        targetLanguageInput.value = settings.targetLanguage || "Persian";
+        targetLanguageInput.value = settings.TARGET_LANGUAGE || "Persian";
       }
       if (promptTemplateInput) {
         promptTemplateInput.value =
-          settings.promptTemplate || CONFIG.promptTemplate;
+          settings.PROMPT_TEMPLATE || CONFIG.PROMPT_TEMPLATE;
       }
 
       // مقداردهی انتخاب API
       if (translationApiSelect) {
-        translationApiSelect.value = settings.translationApi || "gemini";
+        translationApiSelect.value = settings.TRANSLATION_API || "gemini";
       }
 
       // مقداردهی تنظیمات WebAI
       if (webAIApiUrlInput) {
-        webAIApiUrlInput.value = settings.webAIApiUrl || CONFIG.WEBAI_API_URL;
+        webAIApiUrlInput.value = settings.WEBAI_API_URL || CONFIG.WEBAI_API_URL;
       }
       if (webAIApiModelInput) {
         webAIApiModelInput.value =
-          settings.webAIApiModel || CONFIG.WEBAI_API_MODEL;
+          settings.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL;
       }
 
       // مقداردهی تنظیمات OpenAI
       if (openAIApiKeyInput) {
         openAIApiKeyInput.value =
-          settings.openaiApiKey || CONFIG.OPENAI_API_KEY;
+          settings.OPENAI_API_KEY || CONFIG.OPENAI_API_KEY;
       }
       if (openAIModelInput) {
         openAIModelInput.value =
-          settings.openaiApiModel || CONFIG.OPENAI_API_MODEL;
+          settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
       }
 
       // مقداردهی تنظیمات OpenRouter
       if (openRouterApiKeyInput) {
         openRouterApiKeyInput.value =
-          settings.openrouterApiKey || CONFIG.OPENROUTER_API_KEY;
+          settings.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
       }
       if (openRouterApiModelInput) {
         openRouterApiModelInput.value =
-          settings.openrouterApiModel || CONFIG.OPENROUTER_API_MODEL;
+          settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
       }
 
       // تنظیم وضعیت اولیه API
-      const initialTranslationApi = settings.translationApi || "gemini";
+      const initialTranslationApi = settings.TRANSLATION_API || "gemini";
       const initialUseMock = settings.USE_MOCK ?? CONFIG.USE_MOCK;
 
       // نمایش اطلاعات مانیفست
