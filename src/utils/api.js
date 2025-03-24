@@ -42,22 +42,20 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
 
   if (!apiKey) {
     const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
-    const handlerError = errorHandler.handle(error, {
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: 601,
-      context: "gemini-translation-apikey",
+      context: "api-gemini-translation-apikey",
     });
-    throw handlerError;
   }
 
   if (!apiUrl) {
     const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
-    const handlerError = errorHandler.handle(error, {
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.API,
-      statusCode: 601,
-      context: "gemini-translation-apiurl",
+      statusCode: 602,
+      context: "api-gemini-translation-apiurl",
     });
-    throw handlerError;
   }
 
   try {
@@ -72,38 +70,32 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || response.statusText;
       const error = new Error(errorMessage);
-      error.statusCode = response.status;
-      error.type = ErrorTypes.API;
-      const handlerError = errorHandler.handle(error, {
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
         context: "api-gemini-translation-response",
       });
-      throw handlerError;
     }
 
     const data = await response.json();
 
     if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      const error = new Error(
-        "No translation result found in Gemini API response"
-      );
-      error.type = ErrorTypes.API;
-      error.statusCode = response.status;
-      const handlerError = errorHandler.handle(error, {
-        context: "api-gemini-translation-error",
+      const error = new Error("Invalid Gemini response format");
+      throw errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: response.status || 500,
+        context: "api-gemini-translation-format",
       });
-      throw handlerError;
     }
 
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    const handlerError = errorHandler.handle(error, {
+    error = await ErrorHandler.processError(error);
+    throw await errorHandler.handle(error, {
       type: error.type || ErrorTypes.API,
       statusCode: error.statusCode || 500,
       context: "api-gemini-translation",
     });
-    throw handlerError;
   }
 }
 
@@ -146,25 +138,22 @@ async function handleWebAITranslation(
         error.sessionConflict = true;
       }
 
-      const handlerError = errorHandler.handle(error, {
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
-        service: "webai-api",
+        context: "api-webai-translation-response",
       });
-      throw handlerError;
     }
 
     const data = await response.json();
 
     if (typeof data?.response !== "string") {
-      const error = new Error("Invalid WebAI API response format");
-      error.statusCode = 500;
-      error.type = ErrorTypes.API;
-      const handlerError = errorHandler.handle(error, {
+      const error = new Error("Invalid WebAI response format");
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
-        statusCode: 500,
+        statusCode: response.status || 500,
+        context: "api-webai-translation-format",
       });
-      throw handlerError;
     }
 
     // ذخیره اطلاعات session برای استفاده بعدی
@@ -175,19 +164,17 @@ async function handleWebAITranslation(
 
     return data.response;
   } catch (error) {
-    if (error.message.includes("Failed to fetch")) {
-      error.code = "network-failure";
-    }
+    error = await ErrorHandler.processError(error);
+
     if (error.sessionConflict) {
       resetSessionContext();
     }
     error.type = ErrorTypes.NETWORK;
     error.isWebAINetworkError = true;
-    const handlerError = errorHandler.handle(error, {
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
-      context: "webai-translation",
+      context: "api-webai-translation",
     });
-    throw handlerError;
   }
 }
 
@@ -200,13 +187,20 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
 
   if (!openAIApiKey) {
     const error = new Error("OpenAI API key is missing");
-    error.statusCode = 401;
-    error.type = ErrorTypes.API;
-    const handlerError = errorHandler.handle(error, {
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.API,
-      statusCode: 401,
+      statusCode: 601,
+      context: "api-openai-translation-apikey",
     });
-    throw handlerError;
+  }
+
+  if (!openAIApiUrl) {
+    const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
+    throw await errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 602,
+      context: "api-openai-translation-apiurl",
+    });
   }
 
   try {
@@ -228,40 +222,32 @@ async function handleOpenAITranslation(text, sourceLang, targetLang) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || response.statusText;
       const error = new Error(errorMessage);
-      error.statusCode = response.status;
-      error.type = ErrorTypes.API;
-      const handlerError = errorHandler.handle(error, {
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
-        service: "openai",
+        context: "api-openai-translation-response",
       });
-      throw handlerError;
     }
 
     const data = await response.json();
 
     if (!data?.choices?.[0]?.message?.content) {
       const error = new Error("Invalid OpenAI API response format");
-      error.statusCode = 500;
-      error.type = ErrorTypes.API;
-      const handlerError = errorHandler.handle(error, {
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
-        statusCode: 500,
+        statusCode: response.status || 500,
+        context: "api-openai-translation-response-format",
       });
-      throw handlerError;
     }
 
     return data.choices[0].message.content;
   } catch (error) {
-    error.type = ErrorTypes.API;
-    error.statusCode = error.statusCode || 500;
-    error.context = "openai-translation";
-    const handlerError = errorHandler.handle(error, {
+    error = await ErrorHandler.processError(error);
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
-      context: "openai-translation",
+      context: "api-openai-translation-error",
     });
-    throw handlerError;
   }
 }
 
@@ -273,13 +259,11 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
 
   if (!openRouterApiKey) {
     const error = new Error("OpenRouter API key is missing");
-    error.statusCode = 401;
-    error.type = ErrorTypes.API;
-    const handlerError = errorHandler.handle(error, {
+    throw await errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: 401,
+      context: "api-openrouter-translation-apikey",
     });
-    throw handlerError;
   }
 
   try {
@@ -304,33 +288,31 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error?.message || response.statusText;
       const error = new Error(errorMessage);
-      error.statusCode = response.status;
-      error.type = ErrorTypes.API;
-      const handlerError = errorHandler.handle(error, {
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: response.status,
-        service: "openrouter",
+        context: "api-openrouter-translation-response",
       });
-      throw handlerError;
     }
 
     const data = await response.json();
 
     if (!data?.choices?.[0]?.message?.content) {
-      const error = new Error("Invalid OpenRouter API response format");
-      const handlerError = errorHandler.handle(error, {
+      const error = new Error("Invalid OpenRouter response format");
+      throw await errorHandler.handle(error, {
         type: ErrorTypes.API,
-        statusCode: 500,
+        statusCode: response.status || 500,
+        context: "api-openrouter-translation-format",
       });
-      throw handlerError;
     }
 
     return data.choices[0].message.content;
   } catch (error) {
+    error = await ErrorHandler.processError(error);
     throw (handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
-      context: "openrouter-translation",
+      context: "api-openrouter-translation",
     }));
   }
 }
@@ -399,24 +381,12 @@ export const translateText = async (text) => {
           {
             type: ErrorTypes.VALIDATIONMODEL,
             statusCode: 400,
+            context: "api-translateText-api-model",
           }
         );
     }
   } catch (error) {
-    console.debug("translateText error:", error);
-
-    if (
-      error.statusCode === 401 &&
-      error.type === ErrorTypes.API &&
-      (error.message.includes("API key") ||
-        error.message === TRANSLATION_ERRORS.MISSING_API_KEY)
-    ) {
-      throw errorHandler.handle(error, {
-        type: ErrorTypes.API,
-        statusCode: error.statusCode,
-        context: "api-translateText-apikey",
-      });
-    }
+    error = await ErrorHandler.processError(error);
 
     if (error.sessionConflict) {
       console.warn("Session conflict, retrying...");
@@ -424,58 +394,10 @@ export const translateText = async (text) => {
       return await handleWebAITranslation(text, sourceLang, targetLang, true);
     }
 
-    if (error.message?.includes("Extension context invalid")) {
-      throw errorHandler.handle(error, {
-        type: ErrorTypes.CONTEXT,
-        statusCode: 403,
-        context: "context-lost",
-      });
-    }
-
-    if (
-      error.type === ErrorTypes.NETWORK ||
-      error.message?.includes("Failed to fetch")
-    ) {
-      throw errorHandler.handle(new Error(TRANSLATION_ERRORS.NETWORK_FAILURE), {
-        type: ErrorTypes.NETWORK,
-        statusCode: 503,
-      });
-    }
-
-    // if (error instanceof Promise) {
-    //   // console.debug("Caught a Promise in translateText catch block:");
-    //   error
-    //     .then((resolvedValue) => {
-    //       // console.debug("Promise resolved with:", resolvedValue);
-    //       const handlerError = errorHandler.handle(
-    //         new Error(String(resolvedValue)),
-    //         {
-    //           type: ErrorTypes.SERVICE, // نوع خطا را بر اساس محتوا تنظیم کنید
-    //           statusCode: 600, // کد وضعیت را بر اساس محتوا تنظیم کنید
-    //           context: "promise-error-in-translateText",
-    //         }
-    //       );
-    //       return handledError;
-    //     })
-    //     .catch((rejectedValue) => {
-    //       // console.debug("Promise rejected with:", rejectedValue);
-    //       const handlerError = errorHandler.handle(
-    //         new Error(String(rejectedValue)),
-    //         {
-    //           type: ErrorTypes.SERVICE, // نوع خطا را بر اساس محتوا تنظیم کنید
-    //           statusCode: 600, // کد وضعیت را بر اساس محتوا تنظیم کنید
-    //           context: "promise-rejection-in-translateText",
-    //         }
-    //       );
-    //       return handledError;
-    //     });
-    //   return; // مهم: برای جلوگیری از اجرای کد پایین‌تر، return کنید
-    // }
-
     throw errorHandler.handle(error, {
       type: error.type || ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
-      context: "translation-service",
+      context: "api-translateText-translation-service",
     });
   }
 };
