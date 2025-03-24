@@ -12,7 +12,7 @@ import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
 import { CONFIG, state, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
-import { openOptionsPage, isExtensionContextValid } from "../utils/helpers.js";
+import { isExtensionContextValid } from "../utils/helpers.js";
 import {
   detectPlatform,
   getPlatformName,
