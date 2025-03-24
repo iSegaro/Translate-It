@@ -1,6 +1,5 @@
 // src/strategies/MediumStrategy.js
 import { ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG } from "../config";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers.js";
 
@@ -32,6 +31,7 @@ export default class MediumStrategy extends PlatformStrategy {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       element.value = translatedText;
       element.dispatchEvent(new Event("input", { bubbles: true }));
+      this.applyVisualFeedback(element);
       return;
     }
 
@@ -46,12 +46,8 @@ export default class MediumStrategy extends PlatformStrategy {
 
     // کپی متن ترجمه شده به کلیپبورد
     try {
-      console.log(
-        "MediumStrategy: clipboard write attempt for:",
-        translatedText.substring(0, 20) + "..."
-      ); // Log clipboard write attempt
       await navigator.clipboard.writeText(translatedText);
-      console.log(
+      console.debug(
         "MediumStrategy: clipboard write SUCCESS for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write success
