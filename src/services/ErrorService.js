@@ -1,6 +1,7 @@
 // src/services/ErrorService.js
 import { TRANSLATION_ERRORS, CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
+import { openOptionsPage } from "../utils/helpers.js";
 
 export class ErrorTypes {
   static API = "API";
@@ -312,8 +313,28 @@ Context: ${errorDetails.context}`);
       this.displayedErrors.has(message)
     )
       return;
+
     const notificationType = this._getNotificationType(type);
-    this.notifier.show(message, notificationType, true, 5000);
+
+    // تعریف مجموعه خطاهایی که نیاز به ارسال openOptionsPage دارند
+    const errorsWithOptions = new Set([
+      "api-key-wrong", // برای خطای 400
+      "api-key-missing", // برای خطای 601
+      "api-url-missing", // برای خطای 604
+    ]);
+
+    if (type === ErrorTypes.API && errorsWithOptions.has(errorCode)) {
+      this.notifier.show(
+        message,
+        notificationType,
+        true,
+        5000,
+        openOptionsPage
+      );
+    } else {
+      this.notifier.show(message, notificationType, true, 5000);
+    }
+
     this.displayedErrors.add(message);
     setTimeout(() => this.displayedErrors.delete(message), 5000);
   }
