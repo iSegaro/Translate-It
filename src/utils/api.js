@@ -17,7 +17,7 @@ import {
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
 } from "../config.js";
-import { delay } from "./helpers.js";
+import { delay, isExtensionContextValid } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
@@ -41,13 +41,21 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
   ]);
 
   if (!apiKey) {
-    const error = new Error(TRANSLATION_ERRORS.MISSING_API_KEY);
-    error.statusCode = 401;
-    error.type = ErrorTypes.API;
+    const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
     const handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
-      statusCode: 401,
-      context: "handle-gemini-translation",
+      statusCode: 601,
+      context: "gemini-translation-apikey",
+    });
+    throw handlerError;
+  }
+
+  if (!apiUrl) {
+    const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
+    const handlerError = errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      statusCode: 601,
+      context: "gemini-translation-apiurl",
     });
     throw handlerError;
   }
@@ -90,10 +98,8 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
 
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    error.type = ErrorTypes.API;
-    error.statusCode = error.statusCode || 500;
     const handlerError = errorHandler.handle(error, {
-      type: error,
+      type: error.type || ErrorTypes.API,
       statusCode: error.statusCode || 500,
       context: "api-gemini-translation",
     });
@@ -101,7 +107,12 @@ async function handleGeminiTranslation(text, sourceLang, targetLang) {
   }
 }
 
-async function handleWebAITranslation(text, sourceLang, targetLang) {
+async function handleWebAITranslation(
+  text,
+  sourceLang,
+  targetLang,
+  isCallInsideThisMethod = false
+) {
   const [webAIApiUrl, webAIApiModel] = await Promise.all([
     getWebAIApiUrlAsync(),
     getWebAIApiModelAsync(),
@@ -307,8 +318,6 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
 
     if (!data?.choices?.[0]?.message?.content) {
       const error = new Error("Invalid OpenRouter API response format");
-      error.statusCode = 500;
-      error.type = ErrorTypes.API;
       const handlerError = errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 500,
@@ -318,15 +327,11 @@ async function handleOpenRouterTranslation(text, sourceLang, targetLang) {
 
     return data.choices[0].message.content;
   } catch (error) {
-    error.type = ErrorTypes.API;
-    error.statusCode = error.statusCode || 500;
-    error.context = "openrouter-translation";
-    const handlerError = errorHandler.handle(error, {
+    throw (handlerError = errorHandler.handle(error, {
       type: ErrorTypes.API,
       statusCode: error.statusCode || 500,
       context: "openrouter-translation",
-    });
-    throw handlerError;
+    }));
   }
 }
 
@@ -357,7 +362,15 @@ export const translateText = async (text) => {
   }
 
   if (!text || typeof text !== "string") {
-    return null;
+    console.debug("api.js:translateText: => Invalid input", text);
+    return null; // مقدار نامعتبر، اما خطای مهمی نیست
+  }
+
+  if (!isExtensionContextValid()) {
+    throw errorHandler.handle(new Error(TRANSLATION_ERRORS.INVALID_CONTEXT), {
+      type: ErrorTypes.CONTEXT,
+      context: "api-translateText-context",
+    });
   }
 
   try {
@@ -381,59 +394,52 @@ export const translateText = async (text) => {
       case "openrouter":
         return await handleOpenRouterTranslation(text, sourceLang, targetLang);
       default:
-        const error = new Error("Invalid translation API selected");
-        error.type = ErrorTypes.VALIDATIONMODEL;
-        error.statusCode = 400;
-        const handlerError = errorHandler.handle(error, {
-          type: ErrorTypes.VALIDATIONMODEL,
-          statusCode: 400,
-        });
-        throw handlerError;
+        throw errorHandler.handle(
+          new Error("Invalid translation API selected"),
+          {
+            type: ErrorTypes.VALIDATIONMODEL,
+            statusCode: 400,
+          }
+        );
     }
   } catch (error) {
-    // بررسی دقیق‌تر خطای API Key
+    console.debug("translateText error:", error);
+
     if (
       error.statusCode === 401 &&
       error.type === ErrorTypes.API &&
       (error.message.includes("API key") ||
         error.message === TRANSLATION_ERRORS.MISSING_API_KEY)
     ) {
-      const handlerError = errorHandler.handle(error, {
+      throw errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: error.statusCode,
-        context: "api-translateText",
+        context: "api-translateText-apikey",
       });
-      throw handlerError;
     }
 
     if (error.sessionConflict) {
       console.warn("Session conflict, retrying...");
       resetSessionContext();
-      return await handleWebAITranslation(text, sourceLang, targetLang);
+      return await handleWebAITranslation(text, sourceLang, targetLang, true);
     }
 
-    if (error.message?.includes("context invalid")) {
-      error.type = ErrorTypes.CONTEXT;
-      error.statusCode = 403;
-      const handlerError = errorHandler.handle(error, {
+    if (error.message?.includes("Extension context invalid")) {
+      throw errorHandler.handle(error, {
         type: ErrorTypes.CONTEXT,
         statusCode: 403,
+        context: "context-lost",
       });
-      throw handlerError;
     }
 
     if (
       error.type === ErrorTypes.NETWORK ||
       error.message?.includes("Failed to fetch")
     ) {
-      const networkError = new Error(TRANSLATION_ERRORS.NETWORK_FAILURE);
-      networkError.type = ErrorTypes.NETWORK;
-      networkError.statusCode = 503;
-      const handlerError = errorHandler.handle(networkError, {
+      throw errorHandler.handle(new Error(TRANSLATION_ERRORS.NETWORK_FAILURE), {
         type: ErrorTypes.NETWORK,
         statusCode: 503,
       });
-      throw handlerError;
     }
 
     // if (error instanceof Promise) {
@@ -466,13 +472,10 @@ export const translateText = async (text) => {
     //   return; // مهم: برای جلوگیری از اجرای کد پایین‌تر، return کنید
     // }
 
-    error.statusCode = error.statusCode || 500;
-    error.context = "translation-service";
-    const handlerError = errorHandler.handle(error, {
+    throw errorHandler.handle(error, {
       type: error.type || ErrorTypes.SERVICE,
       statusCode: error.statusCode || 500,
       context: "translation-service",
     });
-    return handlerError;
   }
 };
