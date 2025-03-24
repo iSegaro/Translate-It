@@ -47,29 +47,48 @@ if (isExtensionContextValid()) {
     if (isExtensionContextValid()) {
       try {
         state.selectionActive = newState;
-        chrome.runtime.sendMessage({
-          action: "UPDATE_SELECTION_STATE",
-          data: newState,
-        });
+        chrome.runtime.sendMessage(
+          {
+            action: "UPDATE_SELECTION_STATE",
+            data: newState,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              if (
+                !chrome.runtime.lastError.message.includes(
+                  "The message port closed before a response was received"
+                ) &&
+                !chrome.runtime.lastError.message.includes(
+                  "Could not establish connection. Receiving end does not exist"
+                )
+              ) {
+                console.debug(
+                  "Error sending message:",
+                  chrome.runtime.lastError.message
+                );
+              }
+            }
+          }
+        );
         taggleLinks(newState);
         if (!newState && this.IconManager) {
           this.IconManager.cleanup();
         }
       } catch (error) {
+        console.debug("Content.js: Error in updateSelectionState => ", error);
         if (error.message?.includes("context invalidated")) {
-          // console.info("Extension context invalidated");
+          console.debug("Content.js: Extension context invalidated");
         } else {
-          const handleError = this.errorHandler.handle(error, {
+          throw this.errorHandler.handle(error, {
             type: this.ErrorTypes.CONTEXT,
             context: "updateSelectionState",
           });
-          throw handleError;
         }
       }
     } else {
-      // console.info(
-      //   "Extension context is not valid, skipping updateSelectionState."
-      // );
+      console.debug(
+        "Content.js: Extension context is not valid, skipping updateSelectionState."
+      );
     }
   };
 
@@ -84,7 +103,7 @@ if (isExtensionContextValid()) {
     translationHandler.updateSelectionState(false);
   });
 } else {
-  console.debug("Extension context is not valid");
+  console.debug("Content.js: Extension context is not valid");
   translationHandler.notifier.show(
     "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
     "error",
@@ -94,15 +113,28 @@ if (isExtensionContextValid()) {
 
 chrome.runtime.onMessage.addListener((message) => {
   try {
-    if (message.action === "TOGGLE_SELECTION_MODE") {
-      translationHandler.updateSelectionState(message.data);
-    } else if (message.action === "CONTEXT_INVALID") {
-      translationHandler.notifier.show(
-        "در حال بارگذاری مجدد...دوباره تلاش کنید",
-        "info",
-        true
-      );
-      chrome.runtime.reload();
+    // بررسی اینکه پیام یک شیء معتبر است و دارای کلیدهای action یا type می‌باشد
+    if (message && (message.action || message.type)) {
+      if (message.action === "TOGGLE_SELECTION_MODE") {
+        translationHandler.updateSelectionState(message.data);
+      } else if (
+        message.action === "CONTEXT_INVALID" ||
+        message.type === "EXTENSION_RELOADED"
+      ) {
+        translationHandler.notifier.show(
+          "در حال بارگذاری مجدد...دوباره تلاش کنید",
+          "info",
+          true
+        );
+        // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای chrome.runtime.reload()
+        setTimeout(() => {
+          chrome.runtime.reload();
+        }, 2000);
+      } else {
+        console.debug("Content.js: Received unknown message => ", message);
+      }
+    } else {
+      console.debug("Content.js: Received unknown message => ", message);
     }
   } catch (error) {
     translationHandler.errorHandler.handle(error, {
