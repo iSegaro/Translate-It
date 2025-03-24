@@ -182,17 +182,22 @@ chrome.runtime.onInstalled.addListener((details) => {
     // ارسال پیام به content script برای اطلاع‌رسانی آپدیت
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
-        if (
-          tab.url &&
-          [
-            "web.whatsapp.com",
-            "web.telegram.org",
-            "instagram.com",
-            "twitter.com",
-            "medium.com",
-            "x.com",
-          ].some((domain) => tab.url.includes(domain))
-        ) {
+        // if (
+        //   tab.url &&
+        //   [
+        //     "web.whatsapp.com",
+        //     "web.telegram.org",
+        //     "instagram.com",
+        //     "twitter.com",
+        //     "medium.com",
+        //     "x.com",
+        //   ].some((domain) => tab.url.includes(domain))
+        // ) {
+        //   chrome.tabs
+        //     .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
+        //     .catch(() => {});
+        // }
+        if (tab.url && tab.id) {
           chrome.tabs
             .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
             .catch(() => {});
