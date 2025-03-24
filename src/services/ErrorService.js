@@ -37,6 +37,11 @@ export class ErrorHandler {
   }
 
   async handle(error, customMeta = {}) {
+    // اگر error یک Promise باشد، منتظر تکمیل آن شود (resolve یا reject)
+    if (typeof error.then === "function") {
+      error = await error;
+    }
+
     // if (this.isHandling || this.displayedErrors.has(error.message)) {
     if (this.isHandling) {
       console.debug("[ErrorHandler] Ignoring duplicate error:", error);
@@ -86,25 +91,7 @@ export class ErrorHandler {
 
       // اگر خطای CONTEXT دریافت شد، ریلود به صورت مرکزی انجام شود
       if (mergedMeta.type === ErrorTypes.CONTEXT && !this.reloadScheduled) {
-        this.reloadScheduled = true;
-        // پیام Context Invalid به کاربر نمایش داده شده؛ حالا پس از 2000 میلی‌ثانیه اکستنشن ریلود شود.
-        if (chrome.runtime && chrome.runtime.sendMessage) {
-          setTimeout(() => {
-            try {
-              chrome.runtime.sendMessage({ action: "restart_content_script" });
-            } catch (e) {
-              if (e.message?.includes("context invalidated")) {
-                // console.debug("Extension context invalidated");
-              } else {
-                console.error("ErrorService: Cannot send restart message.");
-              }
-            }
-          }, 2000);
-        } else {
-          console.warn(
-            "Extension context invalid, cannot send restart message."
-          );
-        }
+        this._contextInvalidated();
       }
 
       return normalizedError;
@@ -113,6 +100,26 @@ export class ErrorHandler {
       return finalError;
     } finally {
       this.isHandling = false;
+    }
+  }
+
+  _contextInvalidated() {
+    this.reloadScheduled = true;
+    // پیام Context Invalid به کاربر نمایش داده شده؛ حالا پس از 2000 میلی‌ثانیه اکستنشن ریلود شود.
+    if (chrome.runtime && chrome.runtime.sendMessage) {
+      setTimeout(() => {
+        try {
+          chrome.runtime.sendMessage({ action: "restart_content_script" });
+        } catch (e) {
+          if (e.message?.includes("context invalidated")) {
+            // console.debug("Extension context invalidated");
+          } else {
+            console.error("ErrorService: Cannot send restart message.");
+          }
+        }
+      }, 2000);
+    } else {
+      console.warn("Extension context invalid, cannot send restart message.");
     }
   }
 
@@ -156,13 +163,21 @@ export class ErrorHandler {
           code: "api-key-wrong",
           message: `400: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
         },
-        401: {
+        601: {
           code: "api-key-missing",
           message: `401: ${TRANSLATION_ERRORS.API_KEY_MISSING}`,
         },
         403: {
           code: "api-forbidden",
           message: `403: ${TRANSLATION_ERRORS.API_KEY_FORBIDDEN}`,
+        },
+        604: {
+          code: "api-url-missing",
+          message: `604: ${TRANSLATION_ERRORS.API_URL_MISSING}`,
+        },
+        605: {
+          code: "api-model-missing",
+          message: `605: ${TRANSLATION_ERRORS.API_URL_MISSING}`,
         },
         429: {
           code: "service-overloaded",
@@ -171,7 +186,7 @@ export class ErrorHandler {
         500: { code: "internal-server-error", message: "500: خطای داخلی سرور" },
         600: {
           code: "internal-server-error",
-          message: "600: خطای Server API سرور",
+          message: "600: خطای سرور API",
         },
         default: { code: "api-error", message: "خطای سرویس API" },
       },
