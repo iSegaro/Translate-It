@@ -6,7 +6,6 @@ import { ErrorTypes } from "../services/ErrorService.js";
 export function setupEventListeners(translationHandler) {
   const errorHandler = translationHandler.errorHandler;
 
-  // تمام event handlerها در این تابع در صورت بروز خطا، آن را از طریق ErrorHandler مدیریت می‌کنند
   const handleEventWithErrorHandling = (handler) => {
     return (...args) => {
       try {
@@ -16,6 +15,7 @@ export function setupEventListeners(translationHandler) {
           type: ErrorTypes.UI,
           context: "event-router-handleEventWithErrorHandling",
           eventType: args[0]?.type,
+          element: args[0]?.target?.tagName,
         });
       }
     };
@@ -23,7 +23,8 @@ export function setupEventListeners(translationHandler) {
 
   const handleFocus = handleEventWithErrorHandling((e) => {
     if (isEditable(e.target)) {
-      if (translationHandler.IconManager) {
+      if (translationHandler?.IconManager) {
+        // Null-check ایمن
         translationHandler.handleEditableFocus(e.target);
       }
     }
@@ -38,41 +39,54 @@ export function setupEventListeners(translationHandler) {
   });
 
   const handleSelectionChange = handleEventWithErrorHandling((e) => {
-    translationHandler.handleEvent(e);
+    translationHandler?.handleEvent?.(e);
   });
 
   const handleClick = handleEventWithErrorHandling((e) => {
-    if (state && state.selectionActive) {
-      // اضافه شدن بررسی برای state
-      if (translationHandler.IconManager) {
-        translationHandler.IconManager.cleanup();
-      }
+    if (state?.selectionActive) {
+      translationHandler.IconManager?.cleanup();
       state.selectionActive = false;
-      if (
-        typeof chrome !== "undefined" &&
-        chrome.storage &&
-        chrome.storage.local
-      ) {
-        // بررسی برای اطمینان از وجود chrome.storage
+
+      try {
         chrome.storage.local.set({ selectionActive: false });
-      } else {
-        console.warn("[EventRouter] chrome.storage.local is not available.");
+      } catch (storageError) {
+        const handlerError = errorHandler.handle(storageError, {
+          type: ErrorTypes.INTEGRATION,
+          context: "chrome-storage-set",
+        });
+        throw handlerError;
       }
 
       taggleLinks(false);
 
-      chrome.runtime.sendMessage({
-        action: "UPDATE_SELECTION_STATE",
-        data: false,
-      });
+      try {
+        chrome.runtime.sendMessage({
+          action: "UPDATE_SELECTION_STATE",
+          data: false,
+        });
+      } catch (messageError) {
+        const handlerError = errorHandler.handle(messageError, {
+          type: ErrorTypes.INTEGRATION,
+          context: "runtime-sendMessage",
+        });
+        throw handlerError;
+      }
+
       setTimeout(() => {
-        translationHandler.eventHandler.handleSelectionClick(e);
+        try {
+          translationHandler.eventHandler.handleSelectionClick(e);
+        } catch (timeoutError) {
+          const handlerError = errorHandler.handle(timeoutError, {
+            type: ErrorTypes.UI,
+            context: "handleSelectionClick-timeout",
+          });
+          throw handlerError;
+        }
       }, 100);
     }
   });
 
   const handleKeyDown = handleEventWithErrorHandling((e) => {
-    // console.log("keydown event detected. Key:", e.key);
     try {
       translationHandler.handleEvent(e);
       if (e.key === "Escape" && state.selectionActive) {
@@ -95,35 +109,64 @@ export function setupEventListeners(translationHandler) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-router-handleKeyDown",
-        eventType: args[0]?.type,
+        eventType: e.type,
+        key: e.key,
       });
     }
   });
 
   const handleMouseOver = handleEventWithErrorHandling((e) => {
     if (!state.selectionActive) return;
-    if (!e.target?.innerText?.trim()) return;
+    const target = e.composedPath?.()?.[0] || e.target;
+    if (!target?.innerText?.trim()) return;
 
-    if (state.highlightedElement !== e.target) {
-      if (state.highlightedElement) {
-        state.highlightedElement.style.outline = "";
-        state.highlightedElement.style.opacity = "";
+    try {
+      if (state.highlightedElement !== e.target) {
+        if (state.highlightedElement) {
+          state.highlightedElement.style.outline = "";
+          state.highlightedElement.style.opacity = "";
+        }
+        state.highlightedElement = e.target;
+        e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
+        e.target.style.opacity = "0.9";
       }
-      state.highlightedElement = e.target;
-      e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
-      e.target.style.opacity = "0.9";
+    } catch (styleError) {
+      const handlerError = errorHandler.handle(styleError, {
+        type: ErrorTypes.UI,
+        context: "mouseover-style-update",
+        element: e.target?.tagName,
+      });
+      throw handlerError;
     }
   });
 
   // ثبت Event Listenerها
-  document.addEventListener("focus", handleFocus, true);
-  document.addEventListener("blur", handleBlur, true);
-  document.addEventListener("selectionchange", handleSelectionChange);
-  document.addEventListener("click", handleClick);
-  document.addEventListener("keydown", handleKeyDown);
-  document.addEventListener("mouseover", handleMouseOver);
+  const addListeners = async () => {
+    try {
+      const validateEventTarget = (target) => {
+        if (!(target instanceof EventTarget)) {
+          throw new Error("Invalid EventTarget");
+        }
+      };
 
-  // برگرداندن توابع جهت امکان حذف بعدی
+      validateEventTarget(document);
+      document.addEventListener("focus", handleFocus, true);
+      document.addEventListener("blur", handleBlur, true);
+      document.addEventListener("selectionchange", handleSelectionChange);
+      document.addEventListener("click", handleClick);
+      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener("mouseover", handleMouseOver);
+    } catch (listenerError) {
+      const handlerError = errorHandler.handle(listenerError, {
+        type: ErrorTypes.INTEGRATION,
+        context: "add-event-listeners",
+      });
+      throw handlerError;
+    }
+  };
+
+  addListeners();
+
   return {
     handleFocus,
     handleBlur,
@@ -134,14 +177,23 @@ export function setupEventListeners(translationHandler) {
   };
 }
 
-export function teardownEventListeners(listeners) {
-  document.removeEventListener("focus", listeners.handleFocus, true);
-  document.removeEventListener("blur", listeners.handleBlur, true);
-  document.removeEventListener(
-    "selectionchange",
-    listeners.handleSelectionChange
-  );
-  document.removeEventListener("click", listeners.handleClick);
-  document.removeEventListener("keydown", listeners.handleKeyDown);
-  document.removeEventListener("mouseover", listeners.handleMouseOver);
+export async function teardownEventListeners(listeners) {
+  try {
+    document.removeEventListener("focus", listeners.handleFocus, true);
+    document.removeEventListener("blur", listeners.handleBlur, true);
+    document.removeEventListener(
+      "selectionchange",
+      listeners.handleSelectionChange
+    );
+    document.removeEventListener("click", listeners.handleClick);
+    document.removeEventListener("keydown", listeners.handleKeyDown);
+    document.removeEventListener("mouseover", listeners.handleMouseOver);
+  } catch (teardownError) {
+    console.debug("Error Tearing Down Event Listeners:", teardownError);
+    const handlerError = errorHandler.handle(teardownError, {
+      type: ErrorTypes.SYSTEM,
+      context: "teardown-event-list",
+    });
+    throw handlerError;
+  }
 }
