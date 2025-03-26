@@ -45,6 +45,10 @@ export default class IconManager {
       }
 
       const icon = document.createElement("button");
+      if (!icon) {
+        console.debug("آیکون معتبر نیست!");
+        return;
+      }
       icon.className = "AIWritingCompanion-translation-icon-extension";
 
       // تنظیمات ضروری CSS
