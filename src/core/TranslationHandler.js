@@ -157,17 +157,13 @@ export default class TranslationHandler {
 
       const translated = await translateText(params.text);
       if (!translated) {
-        // throw new Error(TRANSLATION_ERRORS.INVALID_CONTEXT, {
-        //   type: ErrorTypes.CONTEXT,
-        //   context: "processTranslation-text",
-        // });
-        this.errorHandler.handle(
-          new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
-          {
-            type: ErrorTypes.CONTEXT,
-            context: "TranslationHandler-processTranslation-translated",
-          }
-        );
+        // await this.errorHandler.handle(
+        //   new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
+        //   {
+        //     type: ErrorTypes.CONTEXT,
+        //     context: "TranslationHandler-processTranslation-translated",
+        //   }
+        // );
         return;
       }
 
