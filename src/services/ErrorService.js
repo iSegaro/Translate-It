@@ -41,9 +41,6 @@ export class ErrorHandler {
     if (typeof error.then === "function") {
       error = await error;
     }
-    if (error._isHandled) {
-      throw error;
-    }
     return error;
   }
 
