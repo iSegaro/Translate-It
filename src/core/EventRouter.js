@@ -96,6 +96,7 @@ class EventRouter {
           type: ErrorTypes.INTEGRATION,
           context: "runtime-sendMessage",
         });
+        taggleLinks(true);
         return;
       }
 
@@ -107,6 +108,7 @@ class EventRouter {
             type: ErrorTypes.UI,
             context: "handleSelectionClick-timeout",
           });
+          taggleLinks(true);
         }
       }, 100);
     }
@@ -130,6 +132,7 @@ class EventRouter {
           data: false,
         });
         console.info("Selection mode deactivated via Esc key.");
+        taggleLinks(true);
         return;
       }
     } catch (error) {
@@ -139,6 +142,7 @@ class EventRouter {
         eventType: e.type,
         key: e.key,
       });
+      taggleLinks(true);
     }
   }
 
