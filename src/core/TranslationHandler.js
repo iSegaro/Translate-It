@@ -123,17 +123,7 @@ export default class TranslationHandler {
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
     try {
       if (!isExtensionContextValid()) {
-        // TODO: Requires further review, possible bug detected
-        // this.translationHandler.errorHandler.handle(
-        //   error instanceof Error ? error : new Error(String(error)),
-        //   {
-        //     type: ErrorTypes.CONTEXT,
-        //     context: "TranslationHandler-processTranslation-context",
-        //     translationParams: params,
-        //   }
-        // );
-        // OR
-        this.translationHandler.errorHandler.handle(
+        this.errorHandler.handle(
           new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
           {
             type: ErrorTypes.CONTEXT,
@@ -162,15 +152,23 @@ export default class TranslationHandler {
 
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
+
       state.translationMode = params.selectionRange ? "selection" : "field";
 
       const translated = await translateText(params.text);
-
       if (!translated) {
-        throw new Error(TRANSLATION_ERRORS.INVALID_CONTEXT, {
-          type: ErrorTypes.CONTEXT,
-          context: "processTranslation-text",
-        });
+        // throw new Error(TRANSLATION_ERRORS.INVALID_CONTEXT, {
+        //   type: ErrorTypes.CONTEXT,
+        //   context: "processTranslation-text",
+        // });
+        this.errorHandler.handle(
+          new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
+          {
+            type: ErrorTypes.CONTEXT,
+            context: "TranslationHandler-processTranslation-translated",
+          }
+        );
+        return;
       }
 
       // اگر کاربر متنی را انتخاب کرده باشد، آن را ترجمه کن
@@ -185,6 +183,7 @@ export default class TranslationHandler {
       // TODO: Requires further review, possible bug detected
       error = await ErrorHandler.processError(error);
 
+      console.warn("HERE", error);
       // هندل اولیه خطا توسط ErrorHandler (instance)
       const handlerError = await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.CONTEXT,
