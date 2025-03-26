@@ -77,8 +77,12 @@ export default class EventHandler {
     if (this.IconManager) {
       this.IconManager.cleanup();
       const icon = this.IconManager.createTranslateIcon(element);
-      this.setupIconBehavior(icon, element);
-      state.activeTranslateIcon = icon;
+      if (icon) {
+        this.setupIconBehavior(icon, element);
+        state.activeTranslateIcon = icon;
+      } else {
+        console.debug("EventHandler: Icon not created");
+      }
     }
   }
 
