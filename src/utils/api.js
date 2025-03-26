@@ -91,7 +91,7 @@ class ApiService {
 
       if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         const error = new Error("Invalid Gemini response format");
-        this.errorHandler.handle(error, {
+        await this.errorHandler.handle(error, {
           type: ErrorTypes.API,
           statusCode: response.status || 500,
           context: "api-gemini-translation-format",
@@ -281,10 +281,10 @@ class ApiService {
     ]);
 
     if (!openRouterApiKey) {
-      const error = new Error("OpenRouter API key is missing");
+      const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
       await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
-        statusCode: 401,
+        statusCode: 601,
         context: "api-openrouter-translation-apikey",
       });
       return;
@@ -313,7 +313,7 @@ class ApiService {
         const errorMessage = errorData.error?.message || response.statusText;
         const error = new Error(errorMessage);
         await this.errorHandler.handle(error, {
-          type: ErrorTypes.API,
+          type: ErrorTypes.API || 500,
           statusCode: response.status,
           context: "api-openrouter-translation-response",
         });
@@ -336,7 +336,7 @@ class ApiService {
     } catch (error) {
       error = await ErrorHandler.processError(error);
       await this.errorHandler.handle(error, {
-        type: ErrorTypes.API,
+        type: error.type || ErrorTypes.API,
         statusCode: error.statusCode || 500,
         context: "api-openrouter-translation",
       });
