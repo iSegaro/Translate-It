@@ -172,6 +172,7 @@ chrome.runtime.onInstalled.addListener((details) => {
           console.debug("Update settings...");
         });
       } catch (error) {
+        // TODO: Requires further review, possible bug detected
         throw await errorHandler.handle(error, {
           type: ErrorTypes.API,
           context: "background-Update-Settings",
@@ -248,6 +249,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
 
         if (!response.ok) {
+          // TODO: Requires further review, possible bug detected
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error?.message || response.statusText);
         }

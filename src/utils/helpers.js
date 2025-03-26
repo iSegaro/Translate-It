@@ -1,5 +1,6 @@
 // src/utils/helpers.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { CONFIG } from "../config.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -7,6 +8,7 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
 export function logMethod(target, propertyKey, descriptor) {
+  // if (!CONFIG.DEBUG_MODE) return;
   const originalMethod = descriptor.value;
   descriptor.value = async function (...args) {
     const className = target.constructor.name;
