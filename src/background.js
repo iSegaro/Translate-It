@@ -172,7 +172,7 @@ chrome.runtime.onInstalled.addListener((details) => {
           console.debug("Update settings...");
         });
       } catch (error) {
-        throw errorHandler.handle(error, {
+        throw await errorHandler.handle(error, {
           type: ErrorTypes.API,
           context: "background-Update-Settings",
         });

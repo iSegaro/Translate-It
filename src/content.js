@@ -7,43 +7,77 @@ import {
   taggleLinks,
   injectStyle,
 } from "./utils/helpers.js";
+import { logMethod } from "./utils/helpers.js";
 
-injectStyle();
+class ContentScript {
+  constructor() {
+    injectStyle();
+    this.translationHandler = new TranslationHandler();
+    this.initPolyfills();
+    this.init();
+  }
 
-// ایجاد نمونه TranslationHandler
-const translationHandler = new TranslationHandler();
-
-// افزودن polyfill‌های مورد نیاز برای متدهای matches و closest
-if (!Element.prototype.matches) {
-  Element.prototype.matches =
-    Element.prototype.msMatchesSelector ||
-    function (selector) {
-      const matches = (this.document || this.ownerDocument).querySelectorAll(
-          selector
-        ),
-        i = matches.length;
-      while (--i >= 0 && matches.item(i) !== this) {}
-      return i > -1;
-    };
-}
-
-if (!Element.prototype.closest) {
-  Element.prototype.closest = function (selector) {
-    let el = this;
-    while (el) {
-      if (el.matches(selector)) return el;
-      el = el.parentElement;
+  initPolyfills() {
+    if (!Element.prototype.matches) {
+      Element.prototype.matches =
+        Element.prototype.msMatchesSelector ||
+        function (selector) {
+          const matches = (
+              this.document || this.ownerDocument
+            ).querySelectorAll(selector),
+            i = matches.length;
+          while (--i >= 0 && matches.item(i) !== this) {}
+          return i > -1;
+        };
     }
-    return null;
-  };
-}
 
-// اگر context معتبر است، تنظیمات افزونه و event listener ها اعمال می‌شوند
-if (isExtensionContextValid()) {
-  console.info("Extension initialized successfully");
+    if (!Element.prototype.closest) {
+      Element.prototype.closest = function (selector) {
+        let el = this;
+        while (el) {
+          if (el.matches(selector)) return el;
+          el = el.parentElement;
+        }
+        return null;
+      };
+    }
+  }
 
-  // تعریف متد یکپارچه updateSelectionState با استفاده از errorHandler
-  translationHandler.updateSelectionState = function (newState) {
+  init() {
+    if (isExtensionContextValid()) {
+      console.info("Content:Extension initialized successfully");
+      this.setupUpdateSelectionState();
+      setupEventListeners(this.translationHandler);
+      Object.freeze(CONFIG);
+      this.setupPagehideListener();
+      this.setupMessageListener();
+    } else {
+      console.debug("Content: Extension context is not valid");
+      this.translationHandler.notifier.show(
+        "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
+        "error",
+        true
+      );
+    }
+  }
+
+  setupPagehideListener() {
+    window.addEventListener("pagehide", () => {
+      if (this.translationHandler.IconManager) {
+        this.translationHandler.IconManager.cleanup();
+      }
+      state.selectionActive = false;
+      this.updateSelectionState(false);
+    });
+  }
+
+  setupUpdateSelectionState() {
+    this.translationHandler.updateSelectionState =
+      this.updateSelectionState.bind(this);
+  }
+
+  @logMethod
+  updateSelectionState(newState) {
     if (isExtensionContextValid()) {
       try {
         state.selectionActive = newState;
@@ -63,7 +97,7 @@ if (isExtensionContextValid()) {
                 )
               ) {
                 console.debug(
-                  "Error sending message:",
+                  "Content:Error sending message:",
                   chrome.runtime.lastError.message
                 );
               }
@@ -71,77 +105,65 @@ if (isExtensionContextValid()) {
           }
         );
         taggleLinks(newState);
-        if (!newState && this.IconManager) {
-          this.IconManager.cleanup();
+        if (!newState && this.translationHandler.IconManager) {
+          this.translationHandler.IconManager.cleanup();
         }
       } catch (error) {
-        console.debug("Content.js: Error in updateSelectionState => ", error);
+        console.debug("Content: Error in updateSelectionState => ", error);
         if (error.message?.includes("context invalidated")) {
-          console.debug("Content.js: Extension context invalidated");
+          console.debug("Content: Extension context invalidated");
         } else {
-          throw this.errorHandler.handle(error, {
-            type: this.ErrorTypes.CONTEXT,
+          throw this.translationHandler.errorHandler.handle(error, {
+            type: this.translationHandler.ErrorTypes.CONTEXT,
             context: "updateSelectionState",
           });
         }
       }
     } else {
       console.debug(
-        "Content.js: Extension context is not valid, skipping updateSelectionState."
+        "Content: Extension context is not valid, skipping updateSelectionState."
       );
     }
-  };
+  }
 
-  setupEventListeners(translationHandler);
-  Object.freeze(CONFIG);
+  setupMessageListener() {
+    chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
+  }
 
-  window.addEventListener("pagehide", () => {
-    if (translationHandler.IconManager) {
-      translationHandler.IconManager.cleanup();
+  @logMethod
+  handleMessage(message) {
+    try {
+      // بررسی اینکه پیام یک شیء معتبر است و دارای کلیدهای action یا type می‌باشد
+      if (message && (message.action || message.type)) {
+        if (message.action === "TOGGLE_SELECTION_MODE") {
+          this.updateSelectionState(message.data);
+        } else if (
+          message.action === "CONTEXT_INVALID" ||
+          message.type === "EXTENSION_RELOADED"
+        ) {
+          this.translationHandler.notifier.show(
+            "در حال بارگذاری مجدد...دوباره تلاش کنید",
+            "info",
+            true
+          );
+          // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای chrome.runtime.reload()
+          setTimeout(() => {
+            chrome.runtime.reload();
+          }, 2000);
+        } else {
+          console.debug("Content: Received unknown message => ", message);
+        }
+      } else {
+        console.debug("Content: Received unknown message => ", message);
+      }
+    } catch (error) {
+      this.translationHandler.errorHandler.handle(error, {
+        type: this.translationHandler.ErrorTypes.INTEGRATION,
+        context: "message-listener",
+      });
     }
-    state.selectionActive = false;
-    translationHandler.updateSelectionState(false);
-  });
-} else {
-  console.debug("Content.js: Extension context is not valid");
-  translationHandler.notifier.show(
-    "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
-    "error",
-    true
-  );
+  }
 }
 
-chrome.runtime.onMessage.addListener((message) => {
-  try {
-    // بررسی اینکه پیام یک شیء معتبر است و دارای کلیدهای action یا type می‌باشد
-    if (message && (message.action || message.type)) {
-      if (message.action === "TOGGLE_SELECTION_MODE") {
-        translationHandler.updateSelectionState(message.data);
-      } else if (
-        message.action === "CONTEXT_INVALID" ||
-        message.type === "EXTENSION_RELOADED"
-      ) {
-        translationHandler.notifier.show(
-          "در حال بارگذاری مجدد...دوباره تلاش کنید",
-          "info",
-          true
-        );
-        // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای chrome.runtime.reload()
-        setTimeout(() => {
-          chrome.runtime.reload();
-        }, 2000);
-      } else {
-        console.debug("Content.js: Received unknown message => ", message);
-      }
-    } else {
-      console.debug("Content.js: Received unknown message => ", message);
-    }
-  } catch (error) {
-    translationHandler.errorHandler.handle(error, {
-      type: translationHandler.ErrorTypes.INTEGRATION,
-      context: "message-listener",
-    });
-  }
-});
-
-export { translationHandler };
+const contentScript = new ContentScript();
+export const translationHandler = contentScript.translationHandler;

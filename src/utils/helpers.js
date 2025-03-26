@@ -3,6 +3,25 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Decorator برای افزودن لاگینگ به ابتدای متد
+ */
+export function logMethod(target, propertyKey, descriptor) {
+  const originalMethod = descriptor.value;
+  descriptor.value = async function (...args) {
+    const className = target.constructor.name;
+    console.debug(`[${className}.${propertyKey}]`, ...args);
+    try {
+      const result = await originalMethod.apply(this, args);
+      return result;
+    } catch (error) {
+      console.error(`[${className}.${propertyKey}] Error:`, error);
+      throw error;
+    }
+  };
+  return descriptor;
+}
+
 export const isEditable = (element) => {
   return (
     element?.isContentEditable ||

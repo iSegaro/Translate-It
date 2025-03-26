@@ -1,12 +1,9 @@
 // src/core/EventHandler.js
 import { CONFIG, state } from "../config.js";
 import { translateText } from "../utils/api.js";
-import {
-  detectPlatform,
-  detectPlatformByURL,
-} from "../utils/platformDetector.js";
-import { ErrorTypes } from "../services/ErrorService.js";
-import { isExtensionContextValid } from "../utils/helpers.js";
+import { logMethod } from "../utils/helpers.js";
+import { detectPlatform } from "../utils/platformDetector.js";
+import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
 
 const translationCache = new Map();
 
@@ -23,6 +20,7 @@ export default class EventHandler {
     this.handleEscape = this.handleEscape.bind(this);
   }
 
+  @logMethod
   async handleEvent(event) {
     try {
       if (this.isEscapeEvent(event)) {
@@ -50,6 +48,7 @@ export default class EventHandler {
         return;
       }
     } catch (error) {
+      error = await ErrorHandler.processError(error);
       this.translationHandler.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-handling",
@@ -97,6 +96,7 @@ export default class EventHandler {
     }, 100);
   }
 
+  @logMethod
   async handleSelectionClick(e) {
     const targetElement = e.target;
     const walker = document.createTreeWalker(
@@ -228,23 +228,17 @@ export default class EventHandler {
 
       this.notifier.dismiss(statusNotification);
     } catch (error) {
+      error = await ErrorHandler.processError(error);
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
       }
       if (error.isFinal || error.suppressSecondary) {
         return;
       }
-
-      const handlerError = this.translationHandler.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.SYSTEM || ErrorTypes.API,
-        statusCode: error.statusCode || 500,
-        context: "handleSelectionClick",
-        suppressSecondary: true,
-      });
-      throw handlerError;
     }
   }
 
+  @logMethod
   async handleSelectionMode(event) {
     if (event.type === "mouseover" || event.type === "mousemove") {
       const newTarget = document.elementFromPoint(event.clientX, event.clientY);
@@ -307,6 +301,7 @@ export default class EventHandler {
         selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
       });
     } catch (error) {
+      error = await ErrorHandler.processError(error);
       console.debug("Ctrl+/ Error: ", error);
       // تعیین نوع خطا با اولویت دادن به نوع موجود در خطا
       // بررسی خطاهای پردازش شده و پرچم suppressSystemError
@@ -331,6 +326,7 @@ export default class EventHandler {
     }
   }
 
+  @logMethod
   async handleSelectElement(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -348,6 +344,7 @@ export default class EventHandler {
         selectionRange: selection.getRangeAt(0),
       });
     } catch (error) {
+      error = await ErrorHandler.processError(error);
       this.translationHandler.errorHandler.handle(
         error instanceof Error ? error : new Error(String(error)),
         {
@@ -373,6 +370,7 @@ export default class EventHandler {
     }
   }
 
+  @logMethod
   setupIconBehavior(icon, target) {
     if (!icon || !target) return;
 

@@ -2,96 +2,123 @@
 import { CONFIG, state } from "../config.js";
 import { isEditable, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
+import { logMethod } from "../utils/helpers.js";
 
-export function setupEventListeners(translationHandler) {
-  const errorHandler = translationHandler.errorHandler;
+class EventRouter {
+  constructor(translationHandler) {
+    this.translationHandler = translationHandler;
+    this.errorHandler = translationHandler.errorHandler;
+    this.listeners = {}; // برای نگهداری از لیستنرهای ثبت شده
 
-  const handleEventWithErrorHandling = (handler) => {
-    return (...args) => {
-      try {
-        return handler(...args);
-      } catch (error) {
-        errorHandler.handle(error, {
-          type: ErrorTypes.UI,
-          context: "event-router-handleEventWithErrorHandling",
-          eventType: args[0]?.type,
-          element: args[0]?.target?.tagName,
-        });
-      }
+    this.handleEventWithErrorHandling = (handler) => {
+      return (...args) => {
+        try {
+          return handler.apply(this, args); // اطمینان از درستی context
+        } catch (error) {
+          this.errorHandler.handle(error, {
+            type: ErrorTypes.UI,
+            context: "event-router-handleEventWithErrorHandling",
+            eventType: args[0]?.type,
+            element: args[0]?.target?.tagName,
+          });
+        }
+      };
     };
-  };
 
-  const handleFocus = handleEventWithErrorHandling((e) => {
+    this.handleFocus = this.handleEventWithErrorHandling(
+      this.handleFocusMethod
+    );
+    this.handleBlur = this.handleEventWithErrorHandling(this.handleBlurMethod);
+    this.handleSelectionChange = this.handleEventWithErrorHandling(
+      this.handleSelectionChangeMethod
+    );
+    this.handleClick = this.handleEventWithErrorHandling(
+      this.handleClickMethod
+    );
+    this.handleKeyDown = this.handleEventWithErrorHandling(
+      this.handleKeyDownMethod
+    );
+    this.handleMouseOver = this.handleEventWithErrorHandling(
+      this.handleMouseOverMethod
+    );
+
+    this.addListeners();
+  }
+
+  @logMethod
+  async handleFocusMethod(e) {
     if (isEditable(e.target)) {
-      if (translationHandler?.IconManager) {
-        // Null-check ایمن
-        translationHandler.handleEditableFocus(e.target);
+      if (this.translationHandler?.IconManager) {
+        this.translationHandler.handleEditableFocus(e.target);
       }
     }
-  });
+  }
 
-  const handleBlur = handleEventWithErrorHandling((e) => {
+  @logMethod
+  async handleBlurMethod(e) {
     if (isEditable(e.target)) {
-      if (translationHandler.IconManager) {
-        translationHandler.handleEditableBlur(e.target);
+      if (this.translationHandler.IconManager) {
+        this.translationHandler.handleEditableBlur(e.target);
       }
     }
-  });
+  }
 
-  const handleSelectionChange = handleEventWithErrorHandling((e) => {
-    translationHandler?.handleEvent?.(e);
-  });
+  @logMethod
+  async handleSelectionChangeMethod(e) {
+    this.translationHandler?.handleEvent?.(e);
+  }
 
-  const handleClick = handleEventWithErrorHandling((e) => {
+  @logMethod
+  async handleClickMethod(e) {
     if (state?.selectionActive) {
-      translationHandler.IconManager?.cleanup();
+      this.translationHandler.IconManager?.cleanup();
       state.selectionActive = false;
 
       try {
-        chrome.storage.local.set({ selectionActive: false });
+        await chrome.storage.local.set({ selectionActive: false });
       } catch (storageError) {
-        const handlerError = errorHandler.handle(storageError, {
+        await this.errorHandler.handle(storageError, {
           type: ErrorTypes.INTEGRATION,
           context: "chrome-storage-set",
         });
-        throw handlerError;
+        return;
       }
 
       taggleLinks(false);
 
       try {
-        chrome.runtime.sendMessage({
+        await chrome.runtime.sendMessage({
           action: "UPDATE_SELECTION_STATE",
           data: false,
         });
       } catch (messageError) {
-        const handlerError = errorHandler.handle(messageError, {
+        await this.errorHandler.handle(messageError, {
           type: ErrorTypes.INTEGRATION,
           context: "runtime-sendMessage",
         });
-        throw handlerError;
+        return;
       }
 
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          translationHandler.eventHandler.handleSelectionClick(e);
+          await this.translationHandler.eventHandler.handleSelectionClick(e);
         } catch (timeoutError) {
-          const handlerError = errorHandler.handle(timeoutError, {
+          await this.errorHandler.handle(timeoutError, {
             type: ErrorTypes.UI,
             context: "handleSelectionClick-timeout",
           });
-          throw handlerError;
         }
       }, 100);
     }
-  });
+  }
 
-  const handleKeyDown = handleEventWithErrorHandling((e) => {
+  @logMethod
+  async handleKeyDownMethod(e) {
     try {
-      translationHandler.handleEvent(e);
+      this.translationHandler.handleEvent(e);
       if (e.key === "Escape" && state.selectionActive) {
-        if (translationHandler.IconManager) {
-          translationHandler.IconManager.cleanup();
+        if (this.translationHandler.IconManager) {
+          this.translationHandler.IconManager.cleanup();
         }
         state.selectionActive = false;
         chrome.storage.local.set({ selectionActive: false });
@@ -106,16 +133,16 @@ export function setupEventListeners(translationHandler) {
         return;
       }
     } catch (error) {
-      errorHandler.handle(error, {
+      this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-router-handleKeyDown",
         eventType: e.type,
         key: e.key,
       });
     }
-  });
+  }
 
-  const handleMouseOver = handleEventWithErrorHandling((e) => {
+  async handleMouseOverMethod(e) {
     if (!state.selectionActive) return;
     const target = e.composedPath?.()?.[0] || e.target;
     if (!target?.innerText?.trim()) return;
@@ -130,18 +157,16 @@ export function setupEventListeners(translationHandler) {
         e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
         e.target.style.opacity = "0.9";
       }
-    } catch (styleError) {
-      const handlerError = errorHandler.handle(styleError, {
+    } catch (error) {
+      this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "mouseover-style-update",
         element: e.target?.tagName,
       });
-      throw handlerError;
     }
-  });
+  }
 
-  // ثبت Event Listenerها
-  const addListeners = async () => {
+  addListeners = async () => {
     try {
       const validateEventTarget = (target) => {
         if (!(target instanceof EventTarget)) {
@@ -150,50 +175,53 @@ export function setupEventListeners(translationHandler) {
       };
 
       validateEventTarget(document);
-      document.addEventListener("focus", handleFocus, true);
-      document.addEventListener("blur", handleBlur, true);
-      document.addEventListener("selectionchange", handleSelectionChange);
-      document.addEventListener("click", handleClick);
-      document.addEventListener("keydown", handleKeyDown);
-      document.addEventListener("mouseover", handleMouseOver);
+      document.addEventListener("focus", this.handleFocus, true);
+      document.addEventListener("blur", this.handleBlur, true);
+      document.addEventListener("selectionchange", this.handleSelectionChange);
+      document.addEventListener("click", this.handleClick);
+      document.addEventListener("keydown", this.handleKeyDown);
+      document.addEventListener("mouseover", this.handleMouseOver);
+
+      this.listeners = {
+        handleFocus: this.handleFocus,
+        handleBlur: this.handleBlur,
+        handleSelectionChange: this.handleSelectionChange,
+        handleClick: this.handleClick,
+        handleKeyDown: this.handleKeyDown,
+        handleMouseOver: this.handleMouseOver,
+      };
     } catch (listenerError) {
-      const handlerError = errorHandler.handle(listenerError, {
+      this.errorHandler.handle(listenerError, {
         type: ErrorTypes.INTEGRATION,
         context: "add-event-listeners",
       });
-      throw handlerError;
     }
   };
 
-  addListeners();
-
-  return {
-    handleFocus,
-    handleBlur,
-    handleSelectionChange,
-    handleClick,
-    handleKeyDown,
-    handleMouseOver,
-  };
+  async teardownEventListeners() {
+    try {
+      document.removeEventListener("focus", this.listeners.handleFocus, true);
+      document.removeEventListener("blur", this.listeners.handleBlur, true);
+      document.removeEventListener(
+        "selectionchange",
+        this.listeners.handleSelectionChange
+      );
+      document.removeEventListener("click", this.listeners.handleClick);
+      document.removeEventListener("keydown", this.listeners.handleKeyDown);
+      document.removeEventListener("mouseover", this.listeners.handleMouseOver);
+    } catch (teardownError) {
+      this.errorHandler.handle(teardownError, {
+        type: ErrorTypes.SYSTEM,
+        context: "teardown-event-list",
+      });
+    }
+  }
 }
 
-export async function teardownEventListeners(listeners) {
-  try {
-    document.removeEventListener("focus", listeners.handleFocus, true);
-    document.removeEventListener("blur", listeners.handleBlur, true);
-    document.removeEventListener(
-      "selectionchange",
-      listeners.handleSelectionChange
-    );
-    document.removeEventListener("click", listeners.handleClick);
-    document.removeEventListener("keydown", listeners.handleKeyDown);
-    document.removeEventListener("mouseover", listeners.handleMouseOver);
-  } catch (teardownError) {
-    console.debug("Error Tearing Down Event Listeners:", teardownError);
-    const handlerError = errorHandler.handle(teardownError, {
-      type: ErrorTypes.SYSTEM,
-      context: "teardown-event-list",
-    });
-    throw handlerError;
-  }
+export function setupEventListeners(translationHandler) {
+  return new EventRouter(translationHandler);
+}
+
+export async function teardownEventListeners(eventRouter) {
+  await eventRouter.teardownEventListeners();
 }

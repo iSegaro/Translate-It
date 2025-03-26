@@ -12,10 +12,9 @@ import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
 import { CONFIG, state, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
-import { isExtensionContextValid } from "../utils/helpers.js";
+import { logMethod, isExtensionContextValid } from "../utils/helpers.js";
 import {
   detectPlatform,
-  getPlatformName,
   detectPlatformByURL,
 } from "../utils/platformDetector.js";
 import EventHandler from "./EventHandler.js";
@@ -48,7 +47,7 @@ export default class TranslationHandler {
     this.eventHandler = new EventHandler(this);
   }
 
-  // در TranslationHandler.js
+  @logMethod
   reinitialize() {
     console.debug("Reinitializing TranslationHandler state after update...");
     this.isProcessing = false;
@@ -62,19 +61,20 @@ export default class TranslationHandler {
   /**
    * Main event handler router
    */
+  @logMethod
   async handleEvent(event) {
     try {
       await this.eventHandler.handleEvent(event);
     } catch (error) {
-      const handlerError = this.errorHandler.handle(error, {
+      throw await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.UI,
         context: "handleEvent",
         eventType: event.type,
       });
-      throw handlerError;
     }
   }
 
+  @logMethod
   handleError(error, meta = {}) {
     try {
       const normalizedError =
@@ -86,11 +86,10 @@ export default class TranslationHandler {
       });
     } catch (error) {
       console.debug("TranslationHandler:Error handling failed:", error);
-      const handlerError = this.errorHandler.handle(error, {
+      throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
       });
-      throw handlerError;
     }
   }
 
@@ -110,6 +109,7 @@ export default class TranslationHandler {
     await this.eventHandler.handleCtrlSlash(event);
   }
 
+  @logMethod
   async handleSelectElement(event) {
     await this.eventHandler.handleSelectElement(event);
   }
@@ -118,6 +118,7 @@ export default class TranslationHandler {
     await this.eventHandler.handleEditableElement(event);
   }
 
+  @logMethod
   async processTranslation(params) {
     console.debug("TranslationHandler: Processing translation...", params);
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
@@ -163,14 +164,22 @@ export default class TranslationHandler {
         this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
-      const errorType = error.type || ErrorTypes.CONTEXT;
+      error = await ErrorHandler.processError(error);
 
-      const handlerError = this.errorHandler.handle(error, {
-        type: errorType,
+      // هندل اولیه خطا توسط ErrorHandler (instance)
+      const handlerError = await this.errorHandler.handle(error, {
+        type: error.type || ErrorTypes.CONTEXT,
         context: "TranslationHandler-processTranslation",
         translationParams: params,
         isPrimary: true,
       });
+
+      // اگر خطا به عنوان نهایی علامت‌گذاری شده باشد، دیگر نیازی به throw نیست
+      if (handlerError.isFinal || handlerError.suppressSecondary) {
+        return; // یا می‌توانید null برگردانید
+      }
+
+      alert("Here");
 
       const finalError = new Error(handlerError.message);
       Object.assign(finalError, {
@@ -208,6 +217,7 @@ export default class TranslationHandler {
     }
   }
 
+  @logMethod
   async handleSelectionTranslation(platform, params, translated) {
     try {
       if (typeof translated !== "string" && !translated) {
@@ -237,6 +247,7 @@ export default class TranslationHandler {
     }
   }
 
+  @logMethod
   revertTranslations() {
     let successfulReverts = 0;
 
@@ -283,6 +294,7 @@ export default class TranslationHandler {
     }
   }
 
+  @logMethod
   async updateTargetElement(target, translated) {
     try {
       if (typeof translated === "string" && translated) {
@@ -310,6 +322,7 @@ export default class TranslationHandler {
     return this.strategies[platform].extractText(element);
   }
 
+  @logMethod
   pasteContent(element, content) {
     try {
       const platform = detectPlatform(element);
