@@ -120,17 +120,36 @@ export default class TranslationHandler {
 
   @logMethod
   async processTranslation(params) {
-    console.debug("TranslationHandler: Processing translation...", params);
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
     try {
       if (!isExtensionContextValid()) {
-        throw new Error(
-          "TranslationHandler: Translation failed: Context Invalid",
+        // TODO: Requires further review, possible bug detected
+        // this.translationHandler.errorHandler.handle(
+        //   error instanceof Error ? error : new Error(String(error)),
+        //   {
+        //     type: ErrorTypes.CONTEXT,
+        //     context: "TranslationHandler-processTranslation-context",
+        //     translationParams: params,
+        //   }
+        // );
+        // OR
+        this.translationHandler.errorHandler.handle(
+          new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
           {
             type: ErrorTypes.CONTEXT,
-            translationParams: params,
+            context: "TranslationHandler-processTranslation-context",
           }
         );
+        return;
+
+        // OR
+        // throw new Error(
+        //   "TranslationHandler: Translation failed: Context Invalid",
+        //   {
+        //     type: ErrorTypes.CONTEXT,
+        //     translationParams: params,
+        //   }
+        // );
       }
 
       // if (!params.text || !params.target) {
@@ -147,7 +166,6 @@ export default class TranslationHandler {
 
       const translated = await translateText(params.text);
 
-      console.debug("TranslationHandler: Translation result => ", translated);
       if (!translated) {
         throw new Error(TRANSLATION_ERRORS.INVALID_CONTEXT, {
           type: ErrorTypes.CONTEXT,
@@ -164,6 +182,7 @@ export default class TranslationHandler {
         this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
+      // TODO: Requires further review, possible bug detected
       error = await ErrorHandler.processError(error);
 
       // هندل اولیه خطا توسط ErrorHandler (instance)
@@ -178,8 +197,6 @@ export default class TranslationHandler {
       if (handlerError.isFinal || handlerError.suppressSecondary) {
         return; // یا می‌توانید null برگردانید
       }
-
-      alert("Here");
 
       const finalError = new Error(handlerError.message);
       Object.assign(finalError, {
