@@ -41,7 +41,7 @@ A lightweight and versatile browser extension designed to translate text within 
 
 ```bash
 # Clone the repository
-git clone https://github.com/iSegaro/AI-Writing-Companion.git
+git clone https://github.com/iSegaro/AIWritingCompanion.git
 cd AI-Writing-Companion
 ```
 
@@ -158,14 +158,14 @@ This project is licensed under the **MIT Licence**. Feel free to improve and sha
 [openai-url]: https://chat.openai.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
-[crx-download-url]: https://github.com/iSegaro/AI-Writing-Companion/raw/refs/heads/main/Build-Extension/Chrome/AI-Writing-Companion.crx
-[chrome-build-folder-url]: https://github.com/iSegaro/AI-Writing-Companion/raw/refs/heads/main/Build-Extension/Chrome/
+[crx-download-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/AI-Writing-Companion.crx
+[chrome-build-folder-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/
 [chrome-extensions-url]: chrome://extensions/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
 [mohammad-x-url]: https://x.com/m_khani65/
-[github-issues-url]: https://github.com/iSegaro/AI-Writing-Companion/issues
+[github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues
 [isegaro-x-url]: https://x.com/iSegar0/
 [m-khani65-x-url]: https://x.com/M_Khani65/
 [flaticon-url]: https://www.flaticon.com/free-icons/translate
