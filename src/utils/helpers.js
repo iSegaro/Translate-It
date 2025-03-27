@@ -8,7 +8,7 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
 export function logMethod(target, propertyKey, descriptor) {
-  // if (!CONFIG.DEBUG_MODE) return;
+  return;
   const originalMethod = descriptor.value;
   descriptor.value = async function (...args) {
     const className = target.constructor.name;
@@ -118,7 +118,7 @@ export const fadeOut = (element) => {
 
 export const isExtensionContextValid = () => {
   try {
-    return !!chrome?.runtime?.id && !!chrome?.storage?.sync;
+    return !!chrome?.runtime?.id && !!chrome?.storage?.local;
   } catch (e) {
     return false;
   }
