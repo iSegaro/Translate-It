@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       await new Promise((resolve, reject) => {
-        chrome.storage.sync.set(settings, () => {
+        chrome.storage.local.set(settings, () => {
           if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
           } else {
@@ -382,7 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       await new Promise((resolve, reject) => {
-        chrome.storage.sync.set(importedSettings, () => {
+        chrome.storage.local.set(importedSettings, () => {
           chrome.runtime.lastError ?
             reject(chrome.runtime.lastError)
           : resolve();

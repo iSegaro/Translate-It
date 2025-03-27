@@ -70,7 +70,7 @@ export const state = {
 export const getSettingsAsync = async () => {
   return new Promise((resolve) => {
     try {
-      chrome.storage.sync.get(null, (items) => {
+      chrome.storage.local.get(null, (items) => {
         resolve(items);
       });
     } catch (error) {
@@ -162,7 +162,7 @@ export const getOpenRouterApiModelAsync = async () => {
 export const getOpenRouterApiKeyAsync1 = () => {
   return new Promise((resolve) => {
     try {
-      chrome.storage.sync.get("openrouterApiKey", (data) => {
+      chrome.storage.local.get("openrouterApiKey", (data) => {
         resolve(data.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY);
       });
     } catch (error) {
@@ -178,7 +178,7 @@ export const getOpenRouterApiKeyAsync1 = () => {
 export const getOpenRouterApiModelAsync1 = () => {
   return new Promise((resolve) => {
     try {
-      chrome.storage.sync.get("openrouterApiModel", (data) => {
+      chrome.storage.local.get("openrouterApiModel", (data) => {
         resolve(data.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL);
       });
     } catch (error) {

@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("saveApiKey").addEventListener("click", () => {
     const apiKey = document.getElementById("apiKey").value.trim();
-    chrome.storage.sync.set({ apiKey }, () => {
+    chrome.storage.local.set({ apiKey }, () => {
       console.log("API key saved:", apiKey);
     });
   });

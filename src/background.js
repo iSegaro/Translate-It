@@ -132,7 +132,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       OPENROUTER_API_MODEL: CONFIG.OPENROUTER_API_MODEL,
     };
 
-    chrome.storage.sync.set(defaultSettings, () => {
+    chrome.storage.local.set(defaultSettings, () => {
       console.debug("Default settings initialized");
     });
   } else if (details.reason === "update") {
@@ -168,7 +168,7 @@ chrome.runtime.onInstalled.addListener((details) => {
             settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL,
         };
 
-        chrome.storage.sync.set(updatedSettings, () => {
+        chrome.storage.local.set(updatedSettings, () => {
           console.debug("Update settings...");
         });
       } catch (error) {
