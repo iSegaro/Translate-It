@@ -67,22 +67,31 @@ export const state = {
   translationMode: null,
 };
 
+let settingsCache = null;
+
 export const getSettingsAsync = async () => {
+  if (settingsCache !== null) {
+    return settingsCache;
+  }
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get(null, (items) => {
+        settingsCache = items;
         resolve(items);
       });
     } catch (error) {
-      // console.debug(
-      //   "[config.js] Error getting settings (context invalidated?):",
-      //   error
-      // );
-      // در صورت بروز خطا، می‌توانید یک شیء خالی یا مقادیر پیش‌فرض را resolve کنید
       resolve({});
     }
   });
 };
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && settingsCache) {
+    Object.keys(changes).forEach((key) => {
+      settingsCache[key] = changes[key].newValue;
+    });
+  }
+});
 
 export const getUseMockAsync = async () => {
   const settings = await getSettingsAsync();
@@ -163,14 +172,14 @@ export const getOpenRouterApiKeyAsync1 = () => {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get("openrouterApiKey", (data) => {
+        if (settingsCache) {
+          settingsCache.OPENROUTER_API_KEY =
+            data.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
+        }
         resolve(data.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY);
       });
     } catch (error) {
-      // console.error(
-      //   "[config.js] Error getting OPENROUTER_API_KEY (context invalidated?):",
-      //   error
-      // );
-      resolve(CONFIG.OPENROUTER_API_KEY); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
+      resolve(CONFIG.OPENROUTER_API_KEY);
     }
   });
 };
@@ -179,14 +188,19 @@ export const getOpenRouterApiModelAsync1 = () => {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get("openrouterApiModel", (data) => {
+        if (settingsCache) {
+          settingsCache.OPENROUTER_API_MODEL =
+            data.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
+        }
         resolve(data.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL);
       });
     } catch (error) {
-      // console.error(
+      // console.warn(
       //   "[config.js] Error getting OPENROUTER_API_MODEL (context invalidated?):",
       //   error
       // );
-      resolve(CONFIG.OPENROUTER_API_MODEL); // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
+      // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا
+      resolve(CONFIG.OPENROUTER_API_MODEL);
     }
   });
 };
