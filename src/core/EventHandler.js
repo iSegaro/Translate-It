@@ -83,7 +83,6 @@ export default class EventHandler {
     );
   }
   _processEditableElement(element) {
-    console.warn("1");
     if (this.IconManager) {
       this.IconManager.cleanup();
 
