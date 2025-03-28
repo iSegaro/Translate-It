@@ -121,13 +121,12 @@ class EventRouter {
     try {
       this.translationHandler.handleEvent(e);
       if (e.key === "Escape" && state.selectElementActive) {
+        taggleLinks(true);
         if (this.translationHandler.IconManager) {
           this.translationHandler.IconManager.cleanup();
         }
         state.selectElementActive = false;
         chrome.storage.local.set({ selectElementActive: false });
-
-        taggleLinks(false);
 
         chrome.runtime.sendMessage({
           action: "UPDATE_SELECT_ELEMENT_STATE",
@@ -136,7 +135,6 @@ class EventRouter {
         console.info(
           "[EventRouter] Select Element Mode deactivated via Esc key."
         );
-        taggleLinks(true);
         return;
       }
     } catch (error) {

@@ -7,6 +7,7 @@ import {
   separateCachedAndNewTexts,
   collectTextNodes,
   applyTranslationsToNodes,
+  taggleLinks,
 } from "../utils/helpers.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
@@ -202,14 +203,18 @@ export default class EventHandler {
   }
 
   handleEscape(event) {
-    event.preventDefault();
-    event.stopPropagation();
+    taggleLinks(false);
 
     this.translationHandler.select_Element_ModeActive = false;
     state.selectElementActive = false;
 
     if (state.translationMode === "select_element") {
-      this.translationHandler.revertTranslations();
+      revertTranslations({
+        state,
+        errorHandler: this.translationHandler.errorHandler,
+        notifier: this.notifier,
+        IconManager: this.IconManager,
+      });
     }
 
     if (this.IconManager) {
