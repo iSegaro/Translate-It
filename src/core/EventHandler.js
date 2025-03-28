@@ -2,7 +2,12 @@
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
 import { translateText } from "../utils/api.js";
-import { logMethod } from "../utils/helpers.js";
+import {
+  logMethod,
+  separateCachedAndNewTexts,
+  collectTextNodes,
+  applyTranslationsToNodes,
+} from "../utils/helpers.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 
@@ -112,77 +117,28 @@ export default class EventHandler {
   @logMethod
   async handleSelect_ElementClick(e) {
     const targetElement = e.target;
-    const walker = document.createTreeWalker(
-      targetElement,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
 
-    let textNodes = [];
-    const originalTextsMap = new Map(); // نگهداری متن اصلی و گره‌های مربوطه
-    let node;
-    let statusNotification;
-
-    while ((node = walker.nextNode())) {
-      const trimmedText = node.textContent.trim();
-      if (trimmedText) {
-        textNodes.push(node);
-        if (originalTextsMap.has(trimmedText)) {
-          originalTextsMap.get(trimmedText).push(node);
-        } else {
-          originalTextsMap.set(trimmedText, [node]);
-        }
-      }
-    }
+    const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
 
     if (originalTextsMap.size === 0) return;
 
-    const uniqueOriginalTexts = Array.from(originalTextsMap.keys());
-
-    // جداسازی متن‌های موجود در حافظه کش و متن‌های جدید
-    const textsToTranslate = [];
-    const cachedTranslations = new Map();
-    uniqueOriginalTexts.forEach((text) => {
-      if (translationCache.has(text)) {
-        cachedTranslations.set(text, translationCache.get(text));
-      } else {
-        textsToTranslate.push(text);
-      }
-    });
+    const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(
+      originalTextsMap,
+      translationCache
+    );
 
     if (textsToTranslate.length === 0) {
       // تمام متون از کَش بارگیری شدند
-      textNodes.forEach((textNode) => {
-        const originalText = textNode.textContent.trim();
-        if (cachedTranslations.has(originalText)) {
-          const translatedText = cachedTranslations.get(originalText);
-          const parentElement = textNode.parentElement;
-          if (parentElement) {
-            const uniqueId =
-              Math.random().toString(36).substring(2, 15) +
-              Math.random().toString(36).substring(2, 15);
-            parentElement.setAttribute("data-original-text-id", uniqueId);
-
-            state.originalTexts.set(uniqueId, {
-              originalInnerHTML: parentElement.innerHTML,
-              translatedText: translatedText,
-              parent: parentElement,
-            });
-            textNode.textContent = translatedText;
-            this.IconManager.applyTextDirection(
-              textNode.parentElement,
-              translatedText
-            );
-          }
-        }
+      applyTranslationsToNodes(textNodes, cachedTranslations, {
+        state,
+        IconManager: this.IconManager,
       });
       this.notifier.show("حافظه", "info");
       return;
     }
 
     try {
-      statusNotification = this.notifier.show(
+      let statusNotification = this.notifier.show(
         "در حال ترجمه...",
         "status",
         false
@@ -192,50 +148,25 @@ export default class EventHandler {
 
       const delimiter = "\n\n---\n\n"; // جداکننده برای اتصال متون
 
-      // ارسال یک درخواست ترجمه برای تمام متن‌های جدید (متصل شده با جداکننده)
       const joinedTextsToTranslate = textsToTranslate.join(delimiter);
       const translatedTextsString = await translateText(joinedTextsToTranslate);
-      if (translatedTextsString && typeof translatedTextsString === "string") {
-        // جدا کردن متن‌های ترجمه‌شده از پاسخ
-        const translatedTextsArray = translatedTextsString.split(delimiter);
 
-        // ایجاد نگاشت بین متن اصلی و متن ترجمه شده
+      if (translatedTextsString && typeof translatedTextsString === "string") {
+        const translatedTextsArray = translatedTextsString.split(delimiter);
         const newTranslations = new Map();
         textsToTranslate.forEach((originalText, index) => {
           const translatedText = translatedTextsArray[index];
           newTranslations.set(originalText, translatedText);
-          // ذخیره در حافظه کش
           translationCache.set(originalText, translatedText);
         });
 
-        // اعمال ترجمه‌ها به گره‌های متنی و ذخیره اطلاعات برای Revert
-        textNodes.forEach((textNode) => {
-          const originalText = textNode.textContent.trim();
-          const translatedText =
-            cachedTranslations.get(originalText) ||
-            newTranslations.get(originalText);
-
-          if (translatedText) {
-            const parentElement = textNode.parentElement;
-            if (parentElement) {
-              const uniqueId =
-                Math.random().toString(36).substring(2, 15) +
-                Math.random().toString(36).substring(2, 15);
-              parentElement.setAttribute("data-original-text-id", uniqueId);
-
-              state.originalTexts.set(uniqueId, {
-                originalInnerHTML: parentElement.innerHTML,
-                translatedText: translatedText,
-                parent: parentElement,
-              });
-
-              textNode.textContent = translatedText;
-              this.IconManager.applyTextDirection(
-                parentElement,
-                translatedText
-              );
-            }
-          }
+        const allTranslations = new Map([
+          ...cachedTranslations,
+          ...newTranslations,
+        ]);
+        applyTranslationsToNodes(textNodes, allTranslations, {
+          state,
+          IconManager: this.IconManager,
         });
       }
 
