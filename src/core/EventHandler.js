@@ -133,7 +133,7 @@ export default class EventHandler {
         state,
         IconManager: this.IconManager,
       });
-      this.notifier.show("حافظه", "info");
+      this.notifier.show("حافظه", "info", true, 1500);
       return;
     }
 
