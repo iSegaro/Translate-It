@@ -43,7 +43,7 @@ export default class TranslationHandler {
     this.IconManager = new IconManager(this.errorHandler);
     this.displayedErrors = new Set();
     this.isProcessing = false;
-    this.selectionModeActive = false;
+    this.select_Element_ModeActive = false;
     this.eventHandler = new EventHandler(this);
   }
 
@@ -51,7 +51,7 @@ export default class TranslationHandler {
   reinitialize() {
     console.debug("Reinitializing TranslationHandler state after update...");
     this.isProcessing = false;
-    this.selectionModeActive = false;
+    this.select_Element_ModeActive = false;
     // در صورت نیاز، متغیرهای داخلی دیگر مانند caches یا stateهای دیگر را هم ریست کنید
     // برای مثال:
     // state.originalTexts.clear();
@@ -153,7 +153,8 @@ export default class TranslationHandler {
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
 
-      state.translationMode = params.selectionRange ? "selection" : "field";
+      state.translationMode =
+        params.selectionRange ? "select_element" : "field";
 
       const translated = await translateText(params.text);
       if (!translated) {
@@ -169,7 +170,7 @@ export default class TranslationHandler {
 
       // اگر کاربر متنی را انتخاب کرده باشد، آن را ترجمه کن
       if (params.selectionRange) {
-        this.handleSelectionTranslation(platform, params, translated);
+        this.handleSelect_ElementTranslation(platform, params, translated);
       }
       // در غیر این صورت، ترجمه را در عنصر هدف نمایش بده
       else if (params.target) {
@@ -230,7 +231,7 @@ export default class TranslationHandler {
   }
 
   @logMethod
-  async handleSelectionTranslation(platform, params, translated) {
+  async handleSelect_ElementTranslation(platform, params, translated) {
     try {
       if (typeof translated !== "string" && !translated) {
         return;
@@ -245,7 +246,7 @@ export default class TranslationHandler {
           new Error(`متد replaceSelection برای ${platform} تعریف نشده`),
           {
             type: ErrorTypes.UI,
-            context: "selection-translation-replace",
+            context: "selecti-element-translation-replace",
             platform: platform,
           }
         );
@@ -253,7 +254,7 @@ export default class TranslationHandler {
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
-        context: "selection-translation",
+        context: "select-element-translation",
         platform: platform,
       });
     }
@@ -322,9 +323,9 @@ export default class TranslationHandler {
     }
   }
 
-  getSelectionContext() {
+  getSelectElementContext() {
     return {
-      selection: window.getSelection(),
+      select_element: window.getSelection(),
       activeElement: document.activeElement,
     };
   }

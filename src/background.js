@@ -4,7 +4,7 @@ import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 
 const errorHandler = new ErrorHandler();
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
-const selectionStates = {};
+const selectElementStates = {};
 let injectionInProgress = false;
 
 // تابع wrapper برای ارسال پیام بدون ایجاد خطای uncaught
@@ -14,6 +14,7 @@ async function safeSendMessage(tabId, message) {
       const err = chrome.runtime.lastError;
       if (err) {
         // فقط خطای "The message port closed before a response was received." را نادیده می‌گیریم
+        // احتمال داره که Context عوض شده باشه و صفحه نیاز به رفرش داشته باشه.
         if (
           err.message ==
             "The message port closed before a response was received." ||
@@ -31,6 +32,9 @@ async function safeSendMessage(tabId, message) {
   });
 }
 
+/**
+ * کلیک روی آیکون مترجم در نوارابزار مرورگر
+ */
 chrome.action.onClicked.addListener(async () => {
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     if (!tabs?.[0]?.url || !tabs[0].id) {
@@ -51,16 +55,16 @@ chrome.action.onClicked.addListener(async () => {
         context: "invalid-protocol",
         statusCode: "PERMISSION_DENIED",
       });
-      if (tabId) selectionStates[tabId] = false;
+      if (tabId) selectElementStates[tabId] = false;
       return;
     }
 
     // تغییر وضعیت انتخاب برای تب
-    selectionStates[tabId] = !selectionStates[tabId];
+    selectElementStates[tabId] = !selectElementStates[tabId];
 
     let response = await safeSendMessage(tabId, {
-      action: "TOGGLE_SELECTION_MODE",
-      data: selectionStates[tabId],
+      action: "TOGGLE_SELECT_ELEMENT_MODE",
+      data: selectElementStates[tabId],
     });
 
     if (response && response.error) {
@@ -77,8 +81,8 @@ chrome.action.onClicked.addListener(async () => {
             files: ["content.bundle.js"],
           });
           response = await safeSendMessage(tabId, {
-            action: "TOGGLE_SELECTION_MODE",
-            data: selectionStates[tabId],
+            action: "TOGGLE_SELECT_ELEMENT_MODE",
+            data: selectElementStates[tabId],
           });
           if (response && response.error) {
             console.error(
@@ -108,7 +112,7 @@ chrome.action.onClicked.addListener(async () => {
 
 // پاکسازی وضعیت تب زمانی که تب بسته می‌شود
 chrome.tabs.onRemoved.addListener((tabId) => {
-  delete selectionStates[tabId];
+  delete selectElementStates[tabId];
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -211,11 +215,11 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.debug("background.js: Message => ", message);
   if (
-    message.action === "UPDATE_SELECTION_STATE" &&
+    message.action === "UPDATE_SELECT_ELEMENT_STATE" &&
     sender.tab &&
     sender.tab.id
   ) {
-    selectionStates[sender.tab.id] = message.data;
+    selectElementStates[sender.tab.id] = message.data;
   }
 
   if (message && (message.action || message.type)) {

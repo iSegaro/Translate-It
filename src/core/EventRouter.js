@@ -29,8 +29,8 @@ class EventRouter {
       this.handleFocusMethod
     );
     this.handleBlur = this.handleEventWithErrorHandling(this.handleBlurMethod);
-    this.handleSelectionChange = this.handleEventWithErrorHandling(
-      this.handleSelectionChangeMethod
+    this.handleSelectElementChange = this.handleEventWithErrorHandling(
+      this.handleSelectElementMethod
     );
     this.handleClick = this.handleEventWithErrorHandling(
       this.handleClickMethod
@@ -64,18 +64,18 @@ class EventRouter {
   }
 
   @logMethod
-  async handleSelectionChangeMethod(e) {
+  async handleSelectElementMethod(e) {
     this.translationHandler?.handleEvent?.(e);
   }
 
   @logMethod
   async handleClickMethod(e) {
-    if (state?.selectionActive) {
+    if (state?.selectElementActive) {
       this.translationHandler.IconManager?.cleanup();
-      state.selectionActive = false;
+      state.selectElementActive = false;
 
       try {
-        await chrome.storage.local.set({ selectionActive: false });
+        await chrome.storage.local.set({ selectElementActive: false });
       } catch (storageError) {
         await this.errorHandler.handle(storageError, {
           type: ErrorTypes.INTEGRATION,
@@ -88,7 +88,7 @@ class EventRouter {
 
       try {
         await chrome.runtime.sendMessage({
-          action: "UPDATE_SELECTION_STATE",
+          action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });
       } catch (messageError) {
@@ -102,11 +102,13 @@ class EventRouter {
 
       setTimeout(async () => {
         try {
-          await this.translationHandler.eventHandler.handleSelectionClick(e);
+          await this.translationHandler.eventHandler.handleSelect_ElementModeClick(
+            e
+          );
         } catch (timeoutError) {
           await this.errorHandler.handle(timeoutError, {
             type: ErrorTypes.UI,
-            context: "handleSelectionClick-timeout",
+            context: "handleSelect_ElementModeClick-timeout",
           });
           taggleLinks(true);
         }
@@ -118,20 +120,20 @@ class EventRouter {
   async handleKeyDownMethod(e) {
     try {
       this.translationHandler.handleEvent(e);
-      if (e.key === "Escape" && state.selectionActive) {
+      if (e.key === "Escape" && state.selectElementActive) {
         if (this.translationHandler.IconManager) {
           this.translationHandler.IconManager.cleanup();
         }
-        state.selectionActive = false;
-        chrome.storage.local.set({ selectionActive: false });
+        state.selectElementActive = false;
+        chrome.storage.local.set({ selectElementActive: false });
 
         taggleLinks(false);
 
         chrome.runtime.sendMessage({
-          action: "UPDATE_SELECTION_STATE",
+          action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });
-        console.info("Selection mode deactivated via Esc key.");
+        console.info("Select Element mode deactivated via Esc key.");
         taggleLinks(true);
         return;
       }
@@ -147,7 +149,7 @@ class EventRouter {
   }
 
   async handleMouseOverMethod(e) {
-    if (!state.selectionActive) return;
+    if (!state.selectElementActive) return;
     const target = e.composedPath?.()?.[0] || e.target;
     if (!target?.innerText?.trim()) return;
 
@@ -181,7 +183,10 @@ class EventRouter {
       validateEventTarget(document);
       document.addEventListener("focus", this.handleFocus, true);
       document.addEventListener("blur", this.handleBlur, true);
-      document.addEventListener("selectionchange", this.handleSelectionChange);
+      document.addEventListener(
+        "selectionchange",
+        this.handleSelectElementChange
+      );
       document.addEventListener("click", this.handleClick);
       document.addEventListener("keydown", this.handleKeyDown);
       document.addEventListener("mouseover", this.handleMouseOver);
@@ -189,7 +194,7 @@ class EventRouter {
       this.listeners = {
         handleFocus: this.handleFocus,
         handleBlur: this.handleBlur,
-        handleSelectionChange: this.handleSelectionChange,
+        handleSelectElementChange: this.handleSelectElementChange,
         handleClick: this.handleClick,
         handleKeyDown: this.handleKeyDown,
         handleMouseOver: this.handleMouseOver,
@@ -208,7 +213,7 @@ class EventRouter {
       document.removeEventListener("blur", this.listeners.handleBlur, true);
       document.removeEventListener(
         "selectionchange",
-        this.listeners.handleSelectionChange
+        this.listeners.handleSelectElementChange
       );
       document.removeEventListener("click", this.listeners.handleClick);
       document.removeEventListener("keydown", this.listeners.handleKeyDown);

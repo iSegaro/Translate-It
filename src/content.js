@@ -46,7 +46,7 @@ class ContentScript {
   init() {
     if (isExtensionContextValid()) {
       console.info("Content:Extension initialized successfully");
-      this.setupUpdateSelectionState();
+      this.setupUpdateSelectElementState();
       setupEventListeners(this.translationHandler);
       Object.freeze(CONFIG);
       this.setupPagehideListener();
@@ -66,24 +66,24 @@ class ContentScript {
       if (this.translationHandler.IconManager) {
         this.translationHandler.IconManager.cleanup();
       }
-      state.selectionActive = false;
-      this.updateSelectionState(false);
+      state.selectElementActive = false;
+      this.updateSelectElementState(false);
     });
   }
 
-  setupUpdateSelectionState() {
-    this.translationHandler.updateSelectionState =
-      this.updateSelectionState.bind(this);
+  setupUpdateSelectElementState() {
+    this.translationHandler.updateSelectElementState =
+      this.updateSelectElementState.bind(this);
   }
 
   @logMethod
-  updateSelectionState(newState) {
+  updateSelectElementState(newState) {
     if (isExtensionContextValid()) {
       try {
-        state.selectionActive = newState;
+        state.selectElementActive = newState;
         chrome.runtime.sendMessage(
           {
-            action: "UPDATE_SELECTION_STATE",
+            action: "UPDATE_SELECT_ELEMENT_STATE",
             data: newState,
           },
           (response) => {
@@ -109,19 +109,19 @@ class ContentScript {
           this.translationHandler.IconManager.cleanup();
         }
       } catch (error) {
-        console.debug("Content: Error in updateSelectionState => ", error);
+        console.debug("Content: Error in updateSelectElementState => ", error);
         if (error.message?.includes("context invalidated")) {
           console.debug("Content: Extension context invalidated");
         } else {
           throw this.translationHandler.errorHandler.handle(error, {
             type: this.translationHandler.ErrorTypes.CONTEXT,
-            context: "updateSelectionState",
+            context: "updateSelectElementState",
           });
         }
       }
     } else {
       console.debug(
-        "Content: Extension context is not valid, skipping updateSelectionState."
+        "Content: Extension context is not valid, skipping updateSelectElementState."
       );
     }
   }
@@ -135,8 +135,8 @@ class ContentScript {
     try {
       // بررسی اینکه پیام یک شیء معتبر است و دارای کلیدهای action یا type می‌باشد
       if (message && (message.action || message.type)) {
-        if (message.action === "TOGGLE_SELECTION_MODE") {
-          this.updateSelectionState(message.data);
+        if (message.action === "TOGGLE_SELECT_ELEMENT_MODE") {
+          this.updateSelectElementState(message.data);
         } else if (
           message.action === "CONTEXT_INVALID" ||
           message.type === "EXTENSION_RELOADED"

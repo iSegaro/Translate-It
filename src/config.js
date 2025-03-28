@@ -60,7 +60,7 @@ export const CONFIG = {
 
 // Initial state
 export const state = {
-  selectionActive: false,
+  selectElementActive: false,
   highlightedElement: null,
   activeTranslateIcon: null,
   originalTexts: new Map(),

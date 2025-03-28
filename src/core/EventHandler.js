@@ -14,9 +14,11 @@ export default class EventHandler {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
-    this.selectionModeActive = translationHandler.selectionModeActive;
+    this.select_Element_ModeActive =
+      translationHandler.select_Element_ModeActive;
     this.handleEvent = this.handleEvent.bind(this);
-    this.handleSelectionClick = this.handleSelectionClick.bind(this);
+    this.handleSelect_ElementModeClick =
+      this.handleSelect_ElementClick.bind(this);
     this.handleEscape = this.handleEscape.bind(this);
   }
 
@@ -28,8 +30,8 @@ export default class EventHandler {
         return;
       }
 
-      if (this.selectionModeActive && event.type === "click") {
-        await this.handleSelectionClick(event);
+      if (this.select_Element_ModeActive && event.type === "click") {
+        await this.handleSelect_ElementClick(event);
         return;
       }
 
@@ -38,8 +40,8 @@ export default class EventHandler {
         return;
       }
 
-      if (this.selectionModeActive) {
-        await this.handleSelectionMode(event);
+      if (this.select_Element_ModeActive) {
+        await this.handleSelectElementMode(event);
         return;
       }
 
@@ -101,7 +103,7 @@ export default class EventHandler {
   }
 
   @logMethod
-  async handleSelectionClick(e) {
+  async handleSelect_ElementClick(e) {
     const targetElement = e.target;
     const walker = document.createTreeWalker(
       targetElement,
@@ -179,7 +181,7 @@ export default class EventHandler {
         false
       );
 
-      state.translationMode = "selection";
+      state.translationMode = "select_element";
 
       const delimiter = "\n\n---\n\n"; // جداکننده برای اتصال متون
 
@@ -243,7 +245,7 @@ export default class EventHandler {
   }
 
   @logMethod
-  async handleSelectionMode(event) {
+  async handleSelectElementMode(event) {
     if (event.type === "mouseover" || event.type === "mousemove") {
       const newTarget = document.elementFromPoint(event.clientX, event.clientY);
 
@@ -265,10 +267,10 @@ export default class EventHandler {
     event.preventDefault();
     event.stopPropagation();
 
-    this.translationHandler.selectionModeActive = false;
-    state.selectionActive = false;
+    this.translationHandler.select_Element_ModeActive = false;
+    state.selectElementActive = false;
 
-    if (state.translationMode === "selection") {
+    if (state.translationMode === "select_element") {
       this.translationHandler.revertTranslations();
     }
 
@@ -298,13 +300,13 @@ export default class EventHandler {
     this.isProcessing = true;
 
     try {
-      const { selection, activeElement } =
-        this.translationHandler.getSelectionContext();
-      const isTextSelected = !selection.isCollapsed;
+      const { select_element, activeElement } =
+        this.translationHandler.getSelectElementContext();
+      const isTextSelected = !select_element.isCollapsed;
 
       const text =
         isTextSelected ?
-          selection.toString().trim()
+          select_element.toString().trim()
         : this.translationHandler.extractFromActiveElement(activeElement);
 
       if (!text) return;
@@ -313,7 +315,7 @@ export default class EventHandler {
         text,
         originalText: text,
         target: isTextSelected ? null : activeElement,
-        selectionRange: isTextSelected ? selection.getRangeAt(0) : null,
+        selectionRange: isTextSelected ? select_element.getRangeAt(0) : null,
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
@@ -347,16 +349,16 @@ export default class EventHandler {
     event.stopPropagation();
 
     try {
-      const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) return;
+      const select_element = window.getSelection();
+      if (!select_element || select_element.isCollapsed) return;
 
-      const text = selection.toString().trim();
+      const text = select_element.toString().trim();
       if (!text) return;
 
       await this.translationHandler.processTranslation({
         text,
         originalText: text,
-        selectionRange: selection.getRangeAt(0),
+        selectionRange: select_element.getRangeAt(0),
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
