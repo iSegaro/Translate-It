@@ -75,14 +75,13 @@ export function collectTextNodes(targetElement) {
 
   while ((node = walker.nextNode())) {
     const trimmedText = node.textContent.trim();
-    if (trimmedText) {
-      textNodes.push(node);
-      if (originalTextsMap.has(trimmedText)) {
-        originalTextsMap.get(trimmedText).push(node);
-      } else {
-        originalTextsMap.set(trimmedText, [node]);
-      }
+    textNodes.push(node);
+
+    if (!originalTextsMap.has(trimmedText)) {
+      originalTextsMap.set(trimmedText, []);
     }
+
+    originalTextsMap.get(trimmedText).push(node);
   }
 
   return { textNodes, originalTextsMap };
