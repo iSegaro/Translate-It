@@ -19,7 +19,7 @@ export default function setupIconBehavior(
   let mutationObserver;
   const rafIds = new Set();
 
-  const cleanup = () => {
+  const cleanup_icon = () => {
     if (isCleanedUp) return;
     isCleanedUp = true;
 
@@ -81,7 +81,7 @@ export default function setupIconBehavior(
       if (statusNotification) {
         notifier.dismiss(statusNotification);
       }
-      cleanup();
+      cleanup_icon();
     }
   };
 
@@ -92,13 +92,13 @@ export default function setupIconBehavior(
       (e.relatedTarget !== icon && !icon.contains(e.relatedTarget))
     ) {
       // تأخیر برای جلوگیری از تداخل با کلیک
-      setTimeout(cleanup, 50);
+      setTimeout(cleanup_icon, 50);
     }
   };
 
   const updatePosition = () => {
     if (!target.isConnected || !icon.isConnected) {
-      cleanup();
+      cleanup_icon();
       return;
     }
 
@@ -122,7 +122,7 @@ export default function setupIconBehavior(
           type: ErrorTypes.UI,
           context: "icon-positioning",
         });
-        cleanup();
+        cleanup_icon();
       }
     });
     rafIds.add(id);
@@ -156,7 +156,7 @@ export default function setupIconBehavior(
     // 5. مشاهده تغییرات DOM
     mutationObserver = new MutationObserver((mutations) => {
       if (!document.contains(target) || !document.contains(icon)) {
-        cleanup();
+        cleanup_icon();
       }
     });
     mutationObserver.observe(document.body, {
@@ -170,7 +170,7 @@ export default function setupIconBehavior(
     // 7. ثبت در state
     state.activeTranslateIcon = icon;
   } catch (error) {
-    cleanup();
+    cleanup_icon();
     translationHandler.errorHandler.handle(error, {
       type: ErrorTypes.UI,
       context: "setup-icon-behavior",
