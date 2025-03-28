@@ -1,20 +1,29 @@
 # AI Writing Companion
 
-A lightweight and versatile browser extension designed to translate text within input fields (e.g., text boxes, textareas, and contenteditable elements). Translations can be triggered by clicking the extension icon or using the `Ctrl + /` shortcut.
-
-**AI Writing Companion is a handy, small writing tool and translation assistant.**
+<div align="center">
+    <strong>
+        • <a href="README.MD">English</a> | 
+        • <a href="README.FA.MD">فارسی</a>
+    </strong>
+</div>
 
 <br>
 
-## 🚀 Features
+A lightweight and versatile browser extension designed to translate text within input fields (such as text boxes, text areas, and contenteditable elements). Translations can be triggered by clicking the extension icon or using the `Ctrl + /` shortcut.
+
+**This is a handy, small writing tool and translation assistant.**
+
+<br>
+
+## ⚙️ Features
 
 - **Universal Compatibility:** Works seamlessly with standard and advanced input fields.
 - **Multiple Activation Methods:** Trigger translation via icon click or the `Ctrl + /` shortcut.
-- **Flexible Provider Support:** Choose from multiple translation providers, including:
-  - [Gemini][gemini-url] (✔ Free)
+- **Multi-AI Support:** Choose from multiple translation providers, including:
+  - [Gemini][gemini-url] (✔ Free)
   - [OpenAI][openai-url]
   - [OpenRouter][openrouter-url]
-  - [WebAI to API][webai-to-api-url] (✔ Free)
+  - [WebAI to API][webai-to-api-url] (✔ Free)
 
 <br>
 
@@ -29,13 +38,14 @@ A lightweight and versatile browser extension designed to translate text within 
 
 ## 🔧 Installation
 
+We're almost done with the fine-tuning, and we'll soon publish it on the Chrome Store.
+
 ### 1. Install via CRX File
 
 - Download the latest version of [`AI-Writing-Companion.crx`][crx-download-url] from the [`Build-Extension/Chrome/`][chrome-build-folder-url] folder.
 - Open [`chrome://extensions/`][chrome-extensions-url] in Chrome and enable **Developer mode**.
 - Drag and drop the [`.CRX`][crx-download-url] file onto the `chrome://extensions/` page to install the extension.
-
-- Go to the **Options** page of the extension and enter your API key.
+- Go to the **Settings** page of the extension and enter your API key.
 
 ### 2. Install via Git
 
@@ -45,7 +55,8 @@ git clone https://github.com/iSegaro/AIWritingCompanion.git
 cd AI-Writing-Companion
 ```
 
-- Follow the **CRX installation steps** above.
+- Instead of using the CRX file, you can use the "AI-Writing-Companion/Build-Extension/Chrome/" folder.
+- Follow the **CRX installation** steps.
 
 <br>
 
@@ -53,7 +64,7 @@ cd AI-Writing-Companion
 
 ## 🔑 API Keys
 
-To utilize the full capabilities of AI Writing Companion, you might need API keys from the following providers. Here's a quick guide on where to obtain them:
+To utilize the full capabilities of AI Writing Companion, you might need API keys from the following providers:
 
 | Provider      | Get API Key                                   | Cost                     |
 | ------------- | --------------------------------------------- | ------------------------ |
@@ -62,7 +73,7 @@ To utilize the full capabilities of AI Writing Companion, you might need API key
 | OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Potentially Paid         |
 | WebAI to API  | _(Doesn't Need)_                              | [Free][webai-to-api-url] |
 
-**Note:** **_`WebAI to API`_** is mentioned as a free option in the features section, potentially removing the direct need for an API key in the traditional sense. Please refer to their documentation for specific instructions.
+**Note:** **`WebAI to API`** is a Python server that allows you to have a local API without needing an real API key.
 
 <br>
 
@@ -70,9 +81,10 @@ To utilize the full capabilities of AI Writing Companion, you might need API key
 
 ## 🎯 Usage
 
-- **Select Element:** Click on the extension icon, then click on an element to translate its text.
-- **Automatic:** Hover over or click an input field to reveal the translation icon.
-- **Shortcut:** Press `Ctrl + /` while an input field is active to trigger translation.
+- **Element Selection:** Click on the translator icon in the browser toolbar, then select any element on the page that gets highlighted. The entire text within the selected element will be translated and replaced. Press ESC to revert to the original text.
+- **Writing Fields:** Click on any field to make the translation icon appear.
+- **Shortcut:** When an input field is active, press `Ctrl + /` to activate translation.
+  Type your text in your native language, and then by pressing the shortcut, the text will be automatically replaced with its translation. It's really cool, and we love it! : )
 
 <br>
 
@@ -80,7 +92,7 @@ To utilize the full capabilities of AI Writing Companion, you might need API key
 
 ## ☕ Buy Me a Coffee
 
-If you find this project helpful, consider making a donation to support ongoing development:
+If you found this project useful and can afford it, treat me to a coffee! :)
 
 <br>
 
@@ -113,7 +125,7 @@ Your support goes to Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(
 
 ### Prerequisites
 
-Ensure **Node.js** is installed (which includes `npm`), then run:
+Ensure **Node.js** is installed (which includes `npm`), then type the following in the terminal:
 
 ```bash
 cd AI-Writing-Companion
@@ -122,15 +134,15 @@ npm install
 
 ### Build
 
-To generate the production-ready extension files:
+To generate extension files, type:
 
 ```bash
 npm run build
 ```
 
-This will create the `AI-Writing-Companion/Build-Extension/Chrome/` folder for manual installation.
+This command creates the `AI-Writing-Companion/Build-Extension/Chrome/` folder for manual installation.
 
-For live updates during development, run:
+But if you want to make changes, use this command which is much more useful:
 
 ```bash
 npm run watch
@@ -142,8 +154,8 @@ npm run watch
 
 ## 🎨 Credits
 
-- Author [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
-- Developer [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
+- iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
+- Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
 - Icon by [Pixel perfect - Flaticon][flaticon-url]
 
 <br>
@@ -152,7 +164,7 @@ npm run watch
 
 ## 📜 License
 
-This project is licensed under the **MIT Licence**. Feel free to improve and share!
+This project is licensed under the **MIT License**. Feel free to improve and share!
 
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
