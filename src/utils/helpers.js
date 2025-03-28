@@ -78,11 +78,13 @@ export function collectTextNodes(targetElement) {
     const trimmedText = node.textContent.trim();
     textNodes.push(node);
 
-    if (!originalTextsMap.has(trimmedText)) {
-      originalTextsMap.set(trimmedText, []);
+    if (trimmedText) {
+      if (originalTextsMap.has(trimmedText)) {
+        originalTextsMap.get(trimmedText).push(node);
+      } else {
+        originalTextsMap.set(trimmedText, [node]);
+      }
     }
-
-    originalTextsMap.get(trimmedText).push(node);
   }
 
   return { textNodes, originalTextsMap };
