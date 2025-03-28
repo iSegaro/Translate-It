@@ -17,7 +17,12 @@ export default class IconManager {
     document
       .querySelectorAll(".AIWritingCompanion-translation-icon-extension")
       .forEach((icon) => {
-        icon.remove();
+        icon.classList.add("fade-out"); // اضافه کردن کلاس fade-out
+
+        // حذف آیکون بعد از اتمام انیمیشن fade-out
+        setTimeout(() => {
+          icon.remove();
+        }, 50); // 50 میلی ثانیه (مطابق با مدت زمان transition در CSS)
       });
 
     state.activeTranslateIcon = null;
@@ -71,6 +76,11 @@ export default class IconManager {
       // اضافه کردن به DOM قبل از موقعیت دهی
       document.body.appendChild(icon);
 
+      // اضافه کردن کلاس initial برای fade-in
+      icon.classList.add(
+        "AIWritingCompanion-translation-icon-extension-fade-in-initial"
+      );
+
       // محاسبه موقعیت با در نظر گرفتن وضعیت رندر
       requestAnimationFrame(() => {
         if (target.isConnected && document.contains(icon)) {
@@ -78,6 +88,16 @@ export default class IconManager {
           icon.style.top = `${rect.top + window.scrollY + 10}px`;
           icon.style.left = `${rect.left + window.scrollX + rect.width + 10}px`;
           icon.style.display = "block";
+
+          // فعال کردن افکت fade-in در فریم بعدی
+          requestAnimationFrame(() => {
+            icon.classList.remove(
+              "AIWritingCompanion-translation-icon-extension-fade-in-initial"
+            );
+            icon.classList.add(
+              "AIWritingCompanion-translation-icon-extension-fade-in"
+            );
+          });
         }
       });
 

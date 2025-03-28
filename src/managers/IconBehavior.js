@@ -37,9 +37,17 @@ export default function setupIconBehavior(
       icon.removeEventListener("blur", handleBlur);
       target.removeEventListener("blur", handleBlur);
 
-      // 4. حذف فیزیکی المان فقط اگر وجود دارد
-      if (icon.isConnected) {
-        icon.remove();
+      // 4. حذف فیزیکی المان با افکت fade
+      if (icon && icon.isConnected) {
+        icon.classList.add("fade-out"); // اضافه کردن کلاس fade-out
+
+        // حذف آیکون بعد از اتمام انیمیشن fade-out (مطابق با مدت زمان transition در CSS)
+        setTimeout(() => {
+          if (icon && icon.isConnected) {
+            // اطمینان از اینکه آیکون هنوز در DOM است
+            icon.remove();
+          }
+        }, 50); // 0.5 میلی ثانیه (مطابق با مدت زمان transition در CSS)
       }
 
       // 5. ریست وضعیت
@@ -57,10 +65,6 @@ export default function setupIconBehavior(
     e.stopPropagation();
 
     try {
-      // غیرفعال کردن المان قبل از حذف
-      icon.style.pointerEvents = "none";
-      icon?.remove();
-
       const platform = detectPlatform(target);
       const text = strategies[platform].extractText(target);
       if (!text) return;
@@ -114,9 +118,18 @@ export default function setupIconBehavior(
           // throw new Error("موقعیت اِلمان نامعتبر است");
         }
 
-        icon.style.display = "block";
+        // ابتدا کلاس fade-in-initial را اضافه می‌کنیم تا آیکون مخفی باشد
+        icon.classList.add("fade-in-initial");
+        icon.style.display = "block"; // نمایش بلاک برای اعمال موقعیت
+
         icon.style.top = `${Math.round(rect.bottom + window.scrollY + 5)}px`;
         icon.style.left = `${Math.round(rect.left + window.scrollX)}px`;
+
+        // بعد از یک فریم (برای اطمینان از اعمال استایل اولیه)، کلاس fade-in را اضافه می‌کنیم
+        requestAnimationFrame(() => {
+          icon.classList.remove("fade-in-initial");
+          icon.classList.add("fade-in");
+        });
       } catch (error) {
         translationHandler.errorHandler.handle(error, {
           type: ErrorTypes.UI,

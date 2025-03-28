@@ -1,4 +1,6 @@
 /* src/styles/content.css */
+
+/* Translation Icon */
 .AIWritingCompanion-translation-icon-extension {
   position: absolute !important;
   z-index: 2147483647 !important; /* حداکثر z-index */
@@ -7,6 +9,21 @@
   pointer-events: all !important;
 }
 
+.AIWritingCompanion-translation-icon-extension-fade-out {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out; /* تنظیم مدت زمان و نوع انیمیشن */
+}
+
+.AIWritingCompanion-translation-icon-extension-fade-in {
+  opacity: 1;
+  transition: opacity 0.1s ease-in-out; /* تنظیم مدت زمان و نوع انیمیشن */
+}
+
+.AIWritingCompanion-translation-icon-extension-fade-in-initial {
+  opacity: 0; /* حالت اولیه برای fade-in */
+}
+
+/* Notification */
 .AIWritingCompanion-translation-notification {
   background-color: #f8f8f8; /* رنگ پس زمینه پیش فرض */
   color: #333; /* رنگ متن پیش فرض */
