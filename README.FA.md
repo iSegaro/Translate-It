@@ -70,8 +70,8 @@ cd AI-Writing-Companion
 | ارائه‌دهنده   | دریافت کلید API                                  | هزینه                      |
 | ------------- | ------------------------------------------------ | -------------------------- |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]           | رایگان                     |
-| OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]         | احتمالاً پولی              |
-| OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url] | احتمالاً پولی              |
+| OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]         | پولی                       |
+| OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url] | رایگان                     |
 | WebAI to API  | _(نیاز به کلید ندارد)_                           | [رایگان][webai-to-api-url] |
 
 **توجه:** **`WebAI to API`** یک سرور python است که بدون نیاز به API میتونید API Local داشته باشید.

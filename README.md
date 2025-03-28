@@ -69,8 +69,8 @@ To utilize the full capabilities of AI Writing Companion, you might need API key
 | Provider      | Get API Key                                   | Cost                     |
 | ------------- | --------------------------------------------- | ------------------------ |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]        | Free                     |
-| OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Potentially Paid         |
-| OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Potentially Paid         |
+| OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
+| OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
 | WebAI to API  | _(Doesn't Need)_                              | [Free][webai-to-api-url] |
 
 **Note:** **`WebAI to API`** is a Python server that allows you to have a local API without needing an real API key.
