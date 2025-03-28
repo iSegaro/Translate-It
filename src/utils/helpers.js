@@ -1,5 +1,6 @@
 // src/utils/helpers.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { CONFIG } from "../config.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
