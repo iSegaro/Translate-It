@@ -106,7 +106,10 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         const uniqueId =
           Math.random().toString(36).substring(2, 15) +
           Math.random().toString(36).substring(2, 15);
-        parentElement.setAttribute("data-original-text-id", uniqueId);
+        parentElement.setAttribute(
+          "AIWritingCompanion-data-original-text-id",
+          uniqueId
+        );
 
         context.state.originalTexts.set(uniqueId, {
           originalInnerHTML: parentElement.innerHTML,
