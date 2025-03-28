@@ -262,53 +262,6 @@ export default class TranslationHandler {
   }
 
   @logMethod
-  revertTranslations() {
-    let successfulReverts = 0;
-
-    try {
-      for (const [uniqueId, data] of state.originalTexts.entries()) {
-        try {
-          if (
-            !data.parent ||
-            !data.originalInnerHTML ||
-            !data.parent.isConnected
-          )
-            continue;
-
-          data.parent.innerHTML = data.originalInnerHTML;
-          successfulReverts++;
-        } catch (error) {
-          this.errorHandler.handle(error, {
-            type: ErrorTypes.UI,
-            context: "revert-translations",
-            elementId: uniqueId,
-          });
-        }
-      }
-
-      if (successfulReverts > 0) {
-        this.notifier.show(`${successfulReverts}`, "revert");
-      } else {
-        if (
-          process.env.NODE_ENV === "development" ||
-          CONFIG.DEBUG_MODE === true
-        ) {
-          this.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
-        }
-      }
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "revert-translations-main",
-      });
-    } finally {
-      // پاکسازی state
-      state.originalTexts.clear();
-      this.IconManager?.cleanup();
-    }
-  }
-
-  @logMethod
   async updateTargetElement(target, translated) {
     try {
       if (typeof translated === "string" && translated) {

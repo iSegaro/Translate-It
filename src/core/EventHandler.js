@@ -8,6 +8,7 @@ import {
   collectTextNodes,
   applyTranslationsToNodes,
   taggleLinks,
+  revertTranslations,
 } from "../utils/helpers.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";

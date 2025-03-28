@@ -122,6 +122,53 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
   });
 }
 
+/**
+ * بازگردانی متن‌های ترجمه‌شده به حالت اولیه.
+ *
+ * @param {object} context شیء context شامل state، errorHandler و notifier.
+ */
+export function revertTranslations(context) {
+  let successfulReverts = 0;
+
+  try {
+    for (const [uniqueId, data] of context.state.originalTexts.entries()) {
+      try {
+        if (!data.parent || !data.originalInnerHTML || !data.parent.isConnected)
+          continue;
+
+        data.parent.innerHTML = data.originalInnerHTML;
+        successfulReverts++;
+      } catch (error) {
+        context.errorHandler.handle(error, {
+          type: ErrorTypes.UI,
+          context: "revert-translations",
+          elementId: uniqueId,
+        });
+      }
+    }
+
+    if (successfulReverts > 0) {
+      context.notifier.show(`${successfulReverts}`, "revert");
+    } else {
+      if (
+        process.env.NODE_ENV === "development" ||
+        CONFIG.DEBUG_MODE === true
+      ) {
+        context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
+      }
+    }
+  } catch (error) {
+    context.errorHandler.handle(error, {
+      type: ErrorTypes.UI,
+      context: "revert-translations-main",
+    });
+  } finally {
+    // پاکسازی state
+    context.state.originalTexts.clear();
+    context.IconManager?.cleanup();
+  }
+}
+
 export const setCursorToEnd = (element) => {
   try {
     if (!element?.isConnected) {
