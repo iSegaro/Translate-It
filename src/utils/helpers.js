@@ -34,7 +34,7 @@ export const isEditable = (element) => {
 export const setCursorToEnd = (element) => {
   try {
     if (!element?.isConnected) {
-      // console.debug("Element not connected to DOM: ", element);
+      // console.debug("[helpers] Element not connected to DOM: ", element);
       return;
     }
 

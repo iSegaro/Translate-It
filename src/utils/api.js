@@ -372,7 +372,7 @@ class ApiService {
     }
 
     if (!text || typeof text !== "string") {
-      console.debug("api.js:translateText: => Invalid input", text);
+      console.debug("[API] translateText: => Invalid input", text);
       return; // مقدار نامعتبر، اما خطای مهمی نیست
     }
 
@@ -434,7 +434,7 @@ class ApiService {
       error = await ErrorHandler.processError(error);
 
       if (error.sessionConflict) {
-        console.warn("Session conflict, retrying...");
+        console.warn("[API] Session conflict, retrying...");
         this.resetSessionContext();
         return await this.handleWebAITranslation(
           text,

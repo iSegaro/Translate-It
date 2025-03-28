@@ -69,7 +69,7 @@ chrome.action.onClicked.addListener(async () => {
 
     if (response && response.error) {
       console.debug(
-        "background.js: Retrying injection due to error:",
+        "[Background] Retrying injection due to error:",
         response.error
       );
 
@@ -86,7 +86,7 @@ chrome.action.onClicked.addListener(async () => {
           });
           if (response && response.error) {
             console.error(
-              "background.js: Failed to inject content script:",
+              "[Background] Failed to inject content script:",
               response.error
             );
             errorHandler.handle(new Error("Content script injection failed"), {
@@ -96,7 +96,7 @@ chrome.action.onClicked.addListener(async () => {
             });
           }
         } catch (scriptError) {
-          console.error("background.js: Script execution failed:", scriptError);
+          console.error("[Background] Script execution failed:", scriptError);
           errorHandler.handle(scriptError, {
             type: ErrorTypes.SERVICE,
             context: "script-execution",
@@ -116,7 +116,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log(`Extension ${details.reason}d`);
+  console.log(`AI Writing Companion ${details.reason}d`);
 
   if (details.reason === "install") {
     const defaultSettings = {
@@ -137,7 +137,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     };
 
     chrome.storage.local.set(defaultSettings, () => {
-      console.debug("Default settings initialized");
+      console.debug("[Background] Default settings initialized");
     });
   } else if (details.reason === "update") {
     (async () => {
@@ -173,7 +173,7 @@ chrome.runtime.onInstalled.addListener((details) => {
         };
 
         chrome.storage.local.set(updatedSettings, () => {
-          console.debug("Update settings...");
+          console.debug("[Background] Update settings...");
         });
       } catch (error) {
         // TODO: Requires further review, possible bug detected
@@ -213,7 +213,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.debug("background.js: Message => ", message);
+  console.debug("[Background] Message => ", message);
   if (
     message.action === "UPDATE_SELECT_ELEMENT_STATE" &&
     sender.tab &&
@@ -227,7 +227,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       message.action === "CONTEXT_INVALID" ||
       message.type === "EXTENSION_RELOADED"
     ) {
-      console.debug("background.js: Reloading extension...");
+      console.debug("[Background] Reloading extension...");
       try {
         chrome.runtime.reload();
       } catch (error) {
@@ -273,7 +273,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "restart_content_script") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length > 0) {
-        console.debug("background.js: Restarting content script...");
+        console.debug("[Background] Restarting content script...");
         try {
           chrome.runtime.reload();
         } catch (error) {

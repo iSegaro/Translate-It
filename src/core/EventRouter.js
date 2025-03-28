@@ -133,7 +133,9 @@ class EventRouter {
           action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });
-        console.info("Select Element mode deactivated via Esc key.");
+        console.info(
+          "[EventRouter] Select Element Mode deactivated via Esc key."
+        );
         taggleLinks(true);
         return;
       }

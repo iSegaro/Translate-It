@@ -49,7 +49,9 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-    console.debug("Reinitializing TranslationHandler state after update...");
+    console.debug(
+      "[TranslationHandler] Reinitializing TranslationHandler state after update..."
+    );
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
     // در صورت نیاز، متغیرهای داخلی دیگر مانند caches یا stateهای دیگر را هم ریست کنید
@@ -85,7 +87,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-      console.debug("TranslationHandler:Error handling failed:", error);
+      console.debug("[TranslationHandler] Error handling failed:", error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
@@ -143,7 +145,7 @@ export default class TranslationHandler {
       }
 
       // if (!params.text || !params.target) {
-      //   console.warn("TranslationHandler: Invalid parameter", params);
+      //   console.warn("[TranslationHandler] Invalid parameter", params);
       //   throw new Error("TranslationHandler: Translation failed, Invalid parameter", {
       //     type: ErrorTypes.CONTEXT,
       //     translationParams: params,
@@ -180,7 +182,6 @@ export default class TranslationHandler {
       // TODO: Requires further review, possible bug detected
       error = await ErrorHandler.processError(error);
 
-      console.warn("HERE", error);
       // هندل اولیه خطا توسط ErrorHandler (instance)
       const handlerError = await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.CONTEXT,

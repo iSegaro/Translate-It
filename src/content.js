@@ -45,14 +45,14 @@ class ContentScript {
 
   init() {
     if (isExtensionContextValid()) {
-      console.info("Content:Extension initialized successfully");
+      console.info("AI Writing Extension initialized successfully!");
       this.setupUpdateSelectElementState();
       setupEventListeners(this.translationHandler);
       Object.freeze(CONFIG);
       this.setupPagehideListener();
       this.setupMessageListener();
     } else {
-      console.debug("Content: Extension context is not valid");
+      console.debug("[Content] Extension context is not valid");
       this.translationHandler.notifier.show(
         "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
         "error",
@@ -97,7 +97,7 @@ class ContentScript {
                 )
               ) {
                 console.debug(
-                  "Content:Error sending message:",
+                  "[Content] Error sending message:",
                   chrome.runtime.lastError.message
                 );
               }
@@ -109,9 +109,9 @@ class ContentScript {
           this.translationHandler.IconManager.cleanup();
         }
       } catch (error) {
-        console.debug("Content: Error in updateSelectElementState => ", error);
+        console.debug("[Content] Error in updateSelectElementState => ", error);
         if (error.message?.includes("context invalidated")) {
-          console.debug("Content: Extension context invalidated");
+          console.debug("[Content] Extension context invalidated");
         } else {
           throw this.translationHandler.errorHandler.handle(error, {
             type: this.translationHandler.ErrorTypes.CONTEXT,
@@ -121,7 +121,7 @@ class ContentScript {
       }
     } else {
       console.debug(
-        "Content: Extension context is not valid, skipping updateSelectElementState."
+        "[Content] Extension context is not valid, skipping updateSelectElementState."
       );
     }
   }
@@ -151,10 +151,10 @@ class ContentScript {
             chrome.runtime.reload();
           }, 2000);
         } else {
-          console.debug("Content: Received unknown message => ", message);
+          console.debug("[Content] Received unknown message => ", message);
         }
       } else {
-        console.debug("Content: Received unknown message => ", message);
+        console.debug("[Content] Received unknown message => ", message);
       }
     } catch (error) {
       this.translationHandler.errorHandler.handle(error, {

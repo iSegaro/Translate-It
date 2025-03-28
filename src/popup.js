@@ -14,7 +14,7 @@ document.getElementById("restore").addEventListener("click", () => {
     });
   } else {
     // errorHandler.handle(new Error('Scripting API disabled'), {...});
-    console.log("Popup.js: Scripting API disabled");
+    console.log("[Popup] Scripting API disabled");
   }
 });
 
@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("saveApiKey").addEventListener("click", () => {
     const apiKey = document.getElementById("apiKey").value.trim();
     chrome.storage.local.set({ apiKey }, () => {
-      console.log("API key saved:", apiKey);
+      console.log("[Popup] API key saved:", apiKey);
     });
   });
 });

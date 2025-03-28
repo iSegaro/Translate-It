@@ -196,7 +196,7 @@ export const getOpenRouterApiModelAsync1 = () => {
       });
     } catch (error) {
       // console.warn(
-      //   "[config.js] Error getting OPENROUTER_API_MODEL (context invalidated?):",
+      //   "[Config] Error getting OPENROUTER_API_MODEL (context invalidated?):",
       //   error
       // );
       // بازگرداندن مقدار پیش‌فرض در صورت بروز خطا

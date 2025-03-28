@@ -52,7 +52,7 @@ export class ErrorHandler {
 
     // if (this.isHandling || this.displayedErrors.has(error.message)) {
     if (this.isHandling) {
-      console.debug("[ErrorHandler] Ignoring duplicate error:", error);
+      console.debug("[ErrorService] Ignoring duplicate error:", error);
       return error;
     }
     this.isHandling = true;
@@ -107,7 +107,7 @@ export class ErrorHandler {
       normalizedError._isHandled = true;
       return normalizedError;
     } catch (finalError) {
-      console.error("[ErrorHandler] Critical Unknown Error:", finalError);
+      console.error("[ErrorService] Critical Unknown Error:", finalError);
       return finalError;
     } finally {
       this.isHandling = false;
@@ -123,20 +123,22 @@ export class ErrorHandler {
           chrome.runtime.sendMessage({ action: "restart_content_script" });
         } catch (e) {
           if (e.message?.includes("context invalidated")) {
-            // console.debug("Extension context invalidated");
+            // console.debug("[ErrorService] Extension context invalidated");
           } else {
-            console.error("ErrorService: Cannot send restart message.");
+            console.error("[ErrorService] Cannot send restart message.");
           }
         }
       }, 2000);
     } else {
-      console.warn("Extension context invalid, cannot send restart message.");
+      console.warn(
+        "[ErrorService] Extension context invalid, cannot send restart message."
+      );
     }
   }
 
   _reviewErrorType(error, currentType, meta) {
     let type = currentType;
-    console.debug("[ErrorHandler] Reviewing error type:", error.message);
+    console.debug("[ErrorService] Reviewing error type:", error.message);
 
     // بررسی خطاهای مربوط به API Key
     if (
@@ -173,7 +175,7 @@ export class ErrorHandler {
   }
 
   _getErrorMessage(error, type, statusCode, meta) {
-    console.debug("[ErrorHandler]:getErrorMessage => ", error);
+    console.debug("[ErrorService] getErrorMessage => ", error);
     if (meta.suppressSystemError) {
       return { code: "suppressed-error", message: "" };
     }
@@ -315,17 +317,19 @@ export class ErrorHandler {
       stack: error.stack,
     };
     if (isDebugMode) {
-      console.error(`[ErrorHandler:DebugMode] ${errorDetails.name}: ${errorDetails.message}
+      console.error(`[ErrorService] ${errorDetails.name}: ${errorDetails.message}
 Type: ${errorDetails.type}
 Status: ${errorDetails.statusCode}
 Context: ${errorDetails.context}`);
-      if (error.stack) console.error("Stack Trace:", error.stack);
+      if (error.stack)
+        console.error("[ErrorService] Stack Trace:", error.stack);
     } else {
       console.error(`[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}
 Type: ${errorDetails.type}
 Status: ${errorDetails.statusCode}
 Context: ${errorDetails.context}`);
-      if (error.stack) console.error("Stack Trace:", error.stack);
+      if (error.stack)
+        console.error("[ErrorService] Stack Trace:", error.stack);
     }
   }
 
