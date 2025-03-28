@@ -83,8 +83,21 @@ export default class EventHandler {
     );
   }
   _processEditableElement(element) {
+    console.warn("1");
     if (this.IconManager) {
       this.IconManager.cleanup();
+
+      // TODO: Platform-specific handling for YouTube (Temporary Solution - Requires Refinement)
+      if (detectPlatform() === "youtube") {
+        const youtubeStrategies = this.strategies["youtube"];
+        // Skip processing for recognized special fields on YouTube (search query or end field).
+        // This is a temporary implementation and may need a more robust and scalable approach in the future.
+        if (youtubeStrategies.isYoutube_ExtraField(element)) {
+          return;
+        }
+      }
+      // TODO: End of platform-specific handling for YouTube (Temporary Solution)
+
       const icon = this.IconManager.createTranslateIcon(element);
       if (icon) {
         setupIconBehavior(

@@ -9,6 +9,16 @@ export default class YoutubeStrategy extends PlatformStrategy {
     this.errorHandler = errorHandler;
   }
 
+  isYoutube_ExtraField(target) {
+    if (!target || target.tagName !== "INPUT") {
+      return false;
+    }
+    return (
+      target.getAttribute("name") === "search_query" ||
+      target.getAttribute("id") === "end"
+    );
+  }
+
   extractText(target) {
     try {
       if (!target) {
