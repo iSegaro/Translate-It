@@ -34,7 +34,7 @@ export const CONFIG = {
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   HIGHLIGHT_STYLE: "2px solid red",
   PROMPT_TEMPLATE:
-    "Perform bidirectional translation. If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Maintain the original structure, formatting, and line breaks exactly. Output ONLY the translated text with no additional words before or after:\n\n${TEXT}",
+    "Perform bidirectional translation. If the input is in ${SOURCE}, translate to ${TARGET}. If in ${TARGET}, translate to ${SOURCE}. Otherwise translate to ${TARGET}. Maintain the original structure, formatting, and line breaks exactly. Output ONLY the translated text with no additional words before or after:\n\n${TEXT}",
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
   DEBUG_TRANSLATED_ENGLISH_With_NewLine:
