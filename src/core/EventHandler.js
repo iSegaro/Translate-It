@@ -82,8 +82,7 @@ export default class EventHandler {
       (target?.closest && target.closest('[contenteditable="true"]'))
     );
   }
-
-  handleEditableFocus(element) {
+  _processEditableElement(element) {
     if (this.IconManager) {
       this.IconManager.cleanup();
       const icon = this.IconManager.createTranslateIcon(element);
@@ -95,11 +94,26 @@ export default class EventHandler {
           this.notifier,
           this.strategies
         );
-        state.activeTranslateIcon = icon;
+        return icon;
       } else {
         console.debug("[EventHandler] Icon not created");
+        return null;
       }
     }
+    return null;
+  }
+
+  handleEditableFocus(element) {
+    if (state.activeTranslateIcon) return;
+    this._processEditableElement(element);
+  }
+
+  async handleEditableElement(event) {
+    event.stopPropagation();
+    const target = event.target;
+
+    if (state.activeTranslateIcon) return;
+    this._processEditableElement(target);
   }
 
   handleEditableBlur() {
@@ -315,25 +329,6 @@ export default class EventHandler {
       );
     } finally {
       this.isProcessing = false;
-    }
-  }
-
-  async handleEditableElement(event) {
-    event.stopPropagation();
-    const target = event.target;
-
-    if (state.activeTranslateIcon) return;
-    if (this.IconManager) {
-      this.IconManager.cleanup();
-
-      const translateIcon = this.IconManager.createTranslateIcon(target);
-      setupIconBehavior(
-        translateIcon,
-        target,
-        this.translationHandler,
-        this.notifier,
-        this.strategies
-      );
     }
   }
 }
