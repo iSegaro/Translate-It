@@ -55,7 +55,7 @@ git clone https://github.com/iSegaro/AIWritingCompanion.git
 cd AI-Writing-Companion
 ```
 
-- Instead of using the CRX file, you can use the "AI-Writing-Companion/Build-Extension/Chrome/" folder.
+- Instead of using the CRX file, you can use the `AI-Writing-Companion/Build-Extension/Chrome/` folder.
 - Follow the **CRX installation** steps.
 
 <br>
