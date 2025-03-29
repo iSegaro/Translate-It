@@ -23,7 +23,7 @@
 
   - [Gemini][gemini-url] (✔ رایگان)
   - [OpenAI][openai-url]
-  - [OpenRouter][openrouter-url]
+  - [OpenRouter][openrouter-url] (✔ رایگان)
   - [WebAI to API][webai-to-api-url] (✔ رایگان)
 
 <br>

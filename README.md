@@ -22,7 +22,7 @@ A lightweight and versatile browser extension designed to translate text within 
 - **Multi-AI Support:** Choose from multiple translation providers, including:
   - [Gemini][gemini-url] (✔ Free)
   - [OpenAI][openai-url]
-  - [OpenRouter][openrouter-url]
+  - [OpenRouter][openrouter-url] (✔ Free)
   - [WebAI to API][webai-to-api-url] (✔ Free)
 
 <br>
