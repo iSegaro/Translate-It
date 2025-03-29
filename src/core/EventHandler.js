@@ -201,6 +201,10 @@ export default class EventHandler {
       this.notifier.dismiss(statusNotification);
     } catch (error) {
       error = await ErrorHandler.processError(error);
+      this.translationHandler.errorHandler.handle(error, {
+        type: error.type || ErrorTypes.SERVICE,
+        context: "EventHandler-handleSelect_ElementClick",
+      });
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
       }
