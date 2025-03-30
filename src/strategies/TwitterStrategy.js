@@ -217,8 +217,4 @@ export default class TwitterStrategy extends PlatformStrategy {
         tweetField.textContent.trim()
       : tweetField.value.trim();
   }
-
-  replaceSelection(element, translatedText) {
-    return this.updateElement(element, translatedText);
-  }
 }
