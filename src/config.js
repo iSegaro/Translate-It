@@ -34,12 +34,16 @@ export const CONFIG = {
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   HIGHLIGHT_STYLE: "2px solid red",
   PROMPT_BASE_FIELD: `Act as a translation service that preserves the structure, formatting, and line breaks of the input text exactly. Perform bidirectional translation:
-    "- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-    "- If the input is in $_{TARGET}, translate it to $_{SOURCE},
-    "- If the input is in any other language, translate it to $_{TARGET}.
-    "Output **only** the translated text, with no additional words, explanations, or modifications:
+    - If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+    - If the input is in $_{TARGET}, translate it to $_{SOURCE},
+    - If the input is in any other language, translate it to $_{TARGET}.
+
+    Output **only** the translated text, with no additional words, explanations, or modifications:
     
-    $_{TEXT}`,
+    \`\`\`json input
+    $_{TEXT}
+    \`\`\`
+    `,
   PROMPT_BASE_SELECT: `You are an automated JSON translation service.
           The input is a JSON string representing an array of objects, each containing a "text" property.
           Your task is to process each object in the array:
@@ -52,7 +56,10 @@ export const CONFIG = {
           After processing all objects, output **only** the complete, valid, final JSON string representing the translated array.
           Do not include \`\`\`json markdown, explanations, or any other text outside the final JSON structure.
 
-          $_{TEXT}`,
+          \`\`\`json input
+          $_{TEXT}
+          \`\`\`
+          `,
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
 - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
 - If the input is in any other language, translate it to $_{TARGET}.`,
