@@ -100,24 +100,33 @@ export default class WhatsAppStrategy extends PlatformStrategy {
   }
 
   async simulatePaste(element, text) {
-    if (!element) return;
+    if (!element || text === undefined || text === null) return;
+
     try {
-      if (text !== undefined && text !== null) {
-        let htmlText = "";
-        htmlText = text.replace(/\n/g, "<br>");
-        const dt = new DataTransfer();
-        dt.setData("text/plain", text);
-        dt.setData("text/html", htmlText);
+      // 1. Trim the text to remove leading/trailing whitespace, including newlines.
+      let trimmedText = text.trim();
 
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: dt,
-        });
+      // 2. Collapse multiple consecutive newlines into single newlines.
+      trimmedText = trimmedText.replace(/\n{2,}/g, "\n");
 
-        element.dispatchEvent(pasteEvent);
-        await delay(50);
-      }
+      // 3. Convert newlines to <br> for HTML representation.
+      const htmlText = trimmedText.replace(/\n/g, "<br>");
+
+      // 4. Create DataTransfer object.
+      const dt = new DataTransfer();
+      dt.setData("text/plain", trimmedText); // Use trimmedText for plain text
+      dt.setData("text/html", htmlText); // Use htmlText for HTML
+
+      // 5. Create and dispatch the paste event.
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      element.dispatchEvent(pasteEvent);
+
+      // 6. Add a small delay for event processing.
+      await delay(50);
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
