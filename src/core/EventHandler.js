@@ -362,7 +362,7 @@ export default class EventHandler {
     event.preventDefault();
     event.stopPropagation();
 
-    console.debug("[EventHandler] Handling Ctrl+/ event");
+    logME("[EventHandler] Handling Ctrl+/ event");
 
     // TODO: جلوگیری از اجرای میانبر در سایت ChatGPT به دلیل تداخل با شورتکات‌های پیش‌فرض آن.
     // TODO: نیاز به بررسی بیشتر برای راه‌حل جایگزین دارد.
@@ -398,7 +398,7 @@ export default class EventHandler {
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
-      console.debug("[EventHandler] Ctrl+/ Error: ", error);
+      logME("[EventHandler] Ctrl+/ Error: ", error);
       // تعیین نوع خطا با اولویت دادن به نوع موجود در خطا
       // بررسی خطاهای پردازش شده و پرچم suppressSystemError
       if (error.isFinal) {
