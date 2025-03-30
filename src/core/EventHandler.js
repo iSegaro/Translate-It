@@ -8,7 +8,7 @@ import {
   applyTranslationsToNodes,
   revertTranslations,
 } from "../utils/textExtraction.js";
-import { logMethod, taggleLinks } from "../utils/helpers.js";
+import { logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 
@@ -146,13 +146,13 @@ export default class EventHandler {
     const currentPlatform = detectPlatform();
     switch (currentPlatform) {
       case Platform.Twitter:
-        console.log("You are on Twitter!");
+        logME("You are on Twitter!");
         break;
       case Platform.WhatsApp:
-        console.log("You are on WhatsApp!");
+        logME("You are on WhatsApp!");
         break;
       default:
-        console.log("You are on another platform.");
+        logME("You are on another platform.");
     }
 
     const targetElement = e.target;
@@ -200,11 +200,8 @@ export default class EventHandler {
       // translateText و createPrompt حالا طوری تنظیم شده‌اند که انتظار JSON در خروجی دارند
       const translatedJsonString = await translateText(jsonFormatString);
 
-      console.debug(
-        "Texts to translate:",
-        JSON.stringify(textsToTranslate, null, 2)
-      );
-      console.debug("Translated JSON response:", translatedJsonString);
+      logME("Texts to translate:", JSON.stringify(textsToTranslate, null, 2));
+      logME("Translated JSON response:", translatedJsonString);
 
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);

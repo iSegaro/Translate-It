@@ -130,8 +130,19 @@ export const getUseMockAsync = async () => {
 };
 
 export const getDebugModeAsync = async () => {
+  // if (process.env.NODE_ENV === "development") {
+  //   return true;
+  // }
+
   const settings = await getSettingsAsync();
   return settings.DEBUG_MODE || CONFIG.DEBUG_MODE;
+};
+
+export const IsDebug = async () => {
+  if (settingsCache && settingsCache.DEBUG_MODE !== undefined) {
+    return settingsCache.DEBUG_MODE;
+  }
+  return await getDebugModeAsync();
 };
 
 export const getApiKeyAsync = async () => {

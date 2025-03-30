@@ -1,6 +1,6 @@
 // src/utils/textExtraction.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, getDebugModeAsync, IsDebug } from "../config.js";
 
 /**
  * جداسازی متن‌های موجود در حافظه کش و متن‌های جدید برای ترجمه.
@@ -101,7 +101,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
  *
  * @param {object} context شیء context شامل state، errorHandler و notifier.
  */
-export function revertTranslations(context) {
+export async function revertTranslations(context) {
   let successfulReverts = 0;
 
   try {
@@ -124,10 +124,7 @@ export function revertTranslations(context) {
     if (successfulReverts > 0) {
       context.notifier.show(`${successfulReverts}`, "revert");
     } else {
-      if (
-        process.env.NODE_ENV === "development" ||
-        CONFIG.DEBUG_MODE === true
-      ) {
+      if ((await IsDebug()) === true) {
         context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
       }
     }

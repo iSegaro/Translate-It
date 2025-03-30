@@ -1,6 +1,6 @@
 // src/utils/helpers.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG, getDebugModeAsync } from "../config.js";
+import { CONFIG, IsDebug } from "../config.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -8,24 +8,33 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
 export function logMethod(target, propertyKey, descriptor) {
-  if (getDebugModeAsync() !== true) {
-    return;
-  }
-
-  const originalMethod = descriptor.value;
-  descriptor.value = async function (...args) {
-    const className = target.constructor.name;
-    console.debug(`[${className}.${propertyKey}]`, ...args);
-    try {
-      const result = await originalMethod.apply(this, args);
-      return result;
-    } catch (error) {
-      console.error(`[${className}.${propertyKey}] Error:`, error);
-      throw error;
+  IsDebug().then((IsDebug) => {
+    if (IsDebug) {
+      console.log("Debug mode is enabled.");
+      const originalMethod = descriptor.value;
+      descriptor.value = async function (...args) {
+        const className = target.constructor.name;
+        console.debug(`[${className}.${propertyKey}]`, ...args);
+        try {
+          const result = await originalMethod.apply(this, args);
+          return result;
+        } catch (error) {
+          console.error(`[${className}.${propertyKey}] Error:`, error);
+          throw error;
+        }
+      };
+      return descriptor;
     }
-  };
-  return descriptor;
+  });
 }
+
+export const logME = (...args) => {
+  IsDebug().then((IsDebug) => {
+    if (IsDebug) {
+      console.debug(...args);
+    }
+  });
+};
 
 export const isEditable = (element) => {
   return (
