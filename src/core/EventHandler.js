@@ -200,6 +200,12 @@ export default class EventHandler {
       // translateText و createPrompt حالا طوری تنظیم شده‌اند که انتظار JSON در خروجی دارند
       const translatedJsonString = await translateText(jsonFormatString);
 
+      console.debug(
+        "Texts to translate:",
+        JSON.stringify(textsToTranslate, null, 2)
+      );
+      console.debug("Translated JSON response:", translatedJsonString);
+
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
         statusNotification = null;
