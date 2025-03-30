@@ -63,21 +63,21 @@
             <textarea
               id="promptTemplate"
               class="prompt-template-input"
-              placeholder="Enter your prompt template here. Use keywords like ${SOURCE}, ${TARGET}, and ${TEXT}."
+              placeholder="Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
               rows="5"
             ></textarea>
             <div class="prompt-template-help">
               <p>You can use the following keywords in your prompt template:</p>
               <ul>
                 <li id="sourceLangHelp">
-                  <code>${SOURCE}</code>: Source language.
+                  <code>$_{SOURCE}</code>: Source language.
                   <span id="sourceLangName"></span>
                 </li>
                 <li id="targetLangHelp">
-                  <code>${TARGET}</code>: Target language.
+                  <code>$_{TARGET}</code>: Target language.
                   <span id="targetLangName"></span>
                 </li>
-                <li><code>${TEXT}</code>: Text to be translated.</li>
+                <li><code>$_{TEXT}</code>: Text to be translated.</li>
               </ul>
             </div>
           </div>
