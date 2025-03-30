@@ -41,26 +41,22 @@ export const CONFIG = {
 
 Return **only** the translated text without any extra words, explanations, or modifications.
 
-\`\`\`input text
+\`\`\`text input
 $_{TEXT}
 \`\`\`
 `,
-  PROMPT_BASE_SELECT: `You are an automated JSON translation service. The input is a JSON string representing an array of objects, each containing a "text" property. Your tasks are:
+  PROMPT_BASE_SELECT: `Act as an automated JSON translation service. The input is a JSON array where each object contains a "text" property. 
 
-1. For each object, inspect the value of the "text" property.
-2. Translate the text according to these bidirectional rules:
-   $_{USER_RULES}
-3. Preserve the original internal structure, formatting, and line breaks exactly.
-4. Replace the original "text" property with its translated version.
+1. Translate each "text" value according to the given rules: $_{USER_RULES}
+2. Preserve all input elements. **Do not omit, modify, or skip any entry.**
+3. If translation is not needed for a specific item (e.g., numbers, hashtags, URLs), **return the original value unchanged.**
+4. Maintain the internal structure, formatting, and line breaks exactly.
+5. Output **only** the translated JSON array, with no extra text, explanations, or markdown.
 
-Output **only** the final, valid JSON string representing the translated array without any markdown, explanations, or additional text.
-
-Input format:
 \`\`\`json input
 $_{TEXT}
 \`\`\`
-
-          `,
+  `,
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
 - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
 - If the input is in any other language, translate it to $_{TARGET}.`,
