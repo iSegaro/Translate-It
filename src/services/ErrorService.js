@@ -11,6 +11,7 @@ export class ErrorTypes {
   static CONTEXT = "CONTEXT";
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
+  static PARSE_TEXT = "PARSING_RESPONSE";
 }
 
 export class ErrorHandler {
@@ -25,6 +26,7 @@ export class ErrorHandler {
       "text-direction-error",
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
+      "parsing-response-error",
     ]);
     this.suppressed_ErrorsConsole = new Set([
       "invalid-protocol",
@@ -246,6 +248,12 @@ export class ErrorHandler {
         default: {
           code: "model-validation-error",
           message: "خطا در مدلِ انتخاب شده",
+        },
+      },
+      [ErrorTypes.PARSE_TEXT]: {
+        default: {
+          code: "parsing-response-error",
+          message: "خطا در پردازش پاسخ",
         },
       },
       [ErrorTypes.INTEGRATION]: {

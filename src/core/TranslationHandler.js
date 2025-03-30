@@ -21,6 +21,7 @@ import { logMethod, isExtensionContextValid } from "../utils/helpers.js";
 import {
   detectPlatform,
   detectPlatformByURL,
+  Platform,
 } from "../utils/platformDetector.js";
 import EventHandler from "./EventHandler.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
@@ -34,14 +35,23 @@ export default class TranslationHandler {
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
-      whatsapp: new WhatsAppStrategy(this.notifier, this.errorHandler),
-      instagram: new InstagramStrategy(this.notifier, this.errorHandler),
-      medium: new MediumStrategy(this.notifier, this.errorHandler),
-      telegram: new TelegramStrategy(this.notifier, this.errorHandler),
-      twitter: new TwitterStrategy(this.notifier, this.errorHandler),
-      chatgpt: new ChatGPTStrategy(this.notifier, this.errorHandler),
-      youtube: new YoutubeStrategy(this.notifier, this.errorHandler),
-      default: new DefaultStrategy(this.notifier, this.errorHandler),
+      [Platform.WhatsApp]: new WhatsAppStrategy(
+        this.notifier,
+        this.errorHandler
+      ),
+      [Platform.Instagram]: new InstagramStrategy(
+        this.notifier,
+        this.errorHandler
+      ),
+      [Platform.Medium]: new MediumStrategy(this.notifier, this.errorHandler),
+      [Platform.Telegram]: new TelegramStrategy(
+        this.notifier,
+        this.errorHandler
+      ),
+      [Platform.Twitter]: new TwitterStrategy(this.notifier, this.errorHandler),
+      [Platform.ChatGPT]: new ChatGPTStrategy(this.notifier, this.errorHandler),
+      [Platform.Youtube]: new YoutubeStrategy(this.notifier, this.errorHandler),
+      [Platform.Default]: new DefaultStrategy(this.notifier, this.errorHandler),
     };
 
     this.validateStrategies();
@@ -155,8 +165,6 @@ export default class TranslationHandler {
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
 
-      // state.translateMode =
-      //   params.selectionRange ? "select_element" : "field";
       state.translateMode =
         params.selectionRange ?
           TranslationMode.SelectElement
@@ -164,13 +172,6 @@ export default class TranslationHandler {
 
       const translated = await translateText(params.text);
       if (!translated) {
-        // await this.errorHandler.handle(
-        //   new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
-        //   {
-        //     type: ErrorTypes.CONTEXT,
-        //     context: "TranslationHandler-processTranslation-translated",
-        //   }
-        // );
         return;
       }
 
