@@ -29,9 +29,9 @@ class EventRouter {
       this.handleFocusMethod
     );
     this.handleBlur = this.handleEventWithErrorHandling(this.handleBlurMethod);
-    this.handleSelectElementChange = this.handleEventWithErrorHandling(
-      this.handleSelectElementMethod
-    );
+    // this.handleSelectElementChange = this.handleEventWithErrorHandling(
+    //   this.handleSelectElementMethod
+    // );
     this.handleClick = this.handleEventWithErrorHandling(
       this.handleClickMethod
     );
@@ -183,10 +183,10 @@ class EventRouter {
       validateEventTarget(document);
       document.addEventListener("focus", this.handleFocus, true);
       document.addEventListener("blur", this.handleBlur, true);
-      document.addEventListener(
-        "selectionchange",
-        this.handleSelectElementChange
-      );
+      // document.addEventListener(
+      //   "selectionchange",
+      //   this.handleSelectElementChange
+      // );
       document.addEventListener("click", this.handleClick);
       document.addEventListener("keydown", this.handleKeyDown);
       document.addEventListener("mouseover", this.handleMouseOver);
@@ -194,7 +194,7 @@ class EventRouter {
       this.listeners = {
         handleFocus: this.handleFocus,
         handleBlur: this.handleBlur,
-        handleSelectElementChange: this.handleSelectElementChange,
+        // handleSelectElementChange: this.handleSelectElementChange,
         handleClick: this.handleClick,
         handleKeyDown: this.handleKeyDown,
         handleMouseOver: this.handleMouseOver,
@@ -211,10 +211,10 @@ class EventRouter {
     try {
       document.removeEventListener("focus", this.listeners.handleFocus, true);
       document.removeEventListener("blur", this.listeners.handleBlur, true);
-      document.removeEventListener(
-        "selectionchange",
-        this.listeners.handleSelectElementChange
-      );
+      // document.removeEventListener(
+      //   "selectionchange",
+      //   this.listeners.handleSelectElementChange
+      // );
       document.removeEventListener("click", this.listeners.handleClick);
       document.removeEventListener("keydown", this.listeners.handleKeyDown);
       document.removeEventListener("mouseover", this.listeners.handleMouseOver);

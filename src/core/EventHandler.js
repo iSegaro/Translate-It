@@ -47,10 +47,10 @@ export default class EventHandler {
         return;
       }
 
-      if (this.select_Element_ModeActive) {
-        await this.handleSelectElementMode(event);
-        return;
-      }
+      // if (this.select_Element_ModeActive) {
+      //   await this.handleSelectElementMode(event);
+      //   return;
+      // }
 
       if (this.isEditableTarget(event.target)) {
         await this.handleEditableElement(event);
@@ -285,10 +285,11 @@ export default class EventHandler {
           );
           console.error("Raw response string:", translatedJsonString); // لاگ کردن رشته خام برای دیباگ
           await this.translationHandler.errorHandler.handle(parseError, {
-            type: ErrorTypes.API, // یا یک نوع خطای مشخص‌تر مثل PARSE_ERROR
+            type: ErrorTypes.PARSE_TEXT,
             context: "EventHandler-handleSelect-JSONParseOrValidateError",
             details: `Failed to process API response. Raw snippet: ${translatedJsonString.substring(0, 150)}...`,
           });
+          this.notifier.show("مجددا تلاش کنید", "info", true, 2000);
         }
       } else {
         // مدیریت حالتی که ترجمه null یا غیر رشته برگردانده
@@ -319,24 +320,24 @@ export default class EventHandler {
     }
   }
 
-  @logMethod
-  async handleSelectElementMode(event) {
-    if (event.type === "mouseover" || event.type === "mousemove") {
-      const newTarget = document.elementFromPoint(event.clientX, event.clientY);
+  // @logMethod
+  // async handleSelectElementMode(event) {
+  //   if (event.type === "mouseover" || event.type === "mousemove") {
+  //     const newTarget = document.elementFromPoint(event.clientX, event.clientY);
 
-      if (newTarget && newTarget !== state.highlightedElement) {
-        if (this.IconManager) {
-          this.IconManager.cleanup();
-        }
+  //     if (newTarget && newTarget !== state.highlightedElement) {
+  //       if (this.IconManager) {
+  //         this.IconManager.cleanup();
+  //       }
 
-        if (newTarget.innerText?.trim()) {
-          state.highlightedElement = newTarget;
-          newTarget.style.outline = CONFIG.HIGHLIGHT_STYLE;
-          newTarget.style.opacity = "0.9";
-        }
-      }
-    }
-  }
+  //       if (newTarget.innerText?.trim()) {
+  //         state.highlightedElement = newTarget;
+  //         newTarget.style.outline = CONFIG.HIGHLIGHT_STYLE;
+  //         newTarget.style.opacity = "0.9";
+  //       }
+  //     }
+  //   }
+  // }
 
   handleEscape(event) {
     taggleLinks(false);
@@ -367,7 +368,7 @@ export default class EventHandler {
     // TODO: جلوگیری از اجرای میانبر در سایت ChatGPT به دلیل تداخل با شورتکات‌های پیش‌فرض آن.
     // TODO: نیاز به بررسی بیشتر برای راه‌حل جایگزین دارد.
     const platform = detectPlatform();
-    if (platform === "chatgpt") {
+    if (platform === Platform.ChatGPT) {
       console.info(
         "میانبر در این وب‌سایت موقتا غیرفعال است. لطفاً از آیکون مترجم استفاده کنید."
       );
