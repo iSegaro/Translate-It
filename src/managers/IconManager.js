@@ -46,7 +46,9 @@ export default class IconManager {
   createTranslateIcon(target) {
     try {
       if (!target?.isConnected) {
-        throw new Error("المان هدف برای ایجاد آیکون معتبر نیست");
+        // throw new Error("المان هدف برای ایجاد آیکون معتبر نیست");
+        console.debug("المان هدف برای ایجاد آیکون معتبر نیست");
+        return;
       }
 
       const icon = document.createElement("button");
