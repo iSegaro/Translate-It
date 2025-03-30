@@ -3,13 +3,12 @@ import { CONFIG, state } from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
 import { translateText } from "../utils/api.js";
 import {
-  logMethod,
   separateCachedAndNewTexts,
   collectTextNodes,
   applyTranslationsToNodes,
-  taggleLinks,
   revertTranslations,
-} from "../utils/helpers.js";
+} from "../utils/textExtraction.js";
+import { logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 
