@@ -111,11 +111,6 @@ export default class TranslationHandler {
     await this.eventHandler.handleCtrlSlash(event);
   }
 
-  @logMethod
-  async handleSelectElement(event) {
-    await this.eventHandler.handleSelectElement(event);
-  }
-
   async handleEditableElement(event) {
     await this.eventHandler.handleEditableElement(event);
   }

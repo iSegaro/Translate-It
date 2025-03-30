@@ -315,35 +315,4 @@ export default class EventHandler {
       this.isProcessing = false;
     }
   }
-
-  @logMethod
-  async handleSelectElement(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    try {
-      const select_element = window.getSelection();
-      if (!select_element || select_element.isCollapsed) return;
-
-      const text = select_element.toString().trim();
-      if (!text) return;
-
-      await this.translationHandler.processTranslation({
-        text,
-        originalText: text,
-        selectionRange: select_element.getRangeAt(0),
-      });
-    } catch (error) {
-      error = await ErrorHandler.processError(error);
-      this.translationHandler.errorHandler.handle(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          type: ErrorTypes.UI,
-          context: "select-element",
-        }
-      );
-    } finally {
-      this.isProcessing = false;
-    }
-  }
 }
