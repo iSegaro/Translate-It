@@ -117,6 +117,8 @@ class ApiService {
       userRules
     );
 
+    // console.debug("Prompt finalPromptWithUserRules:", finalPromptWithUserRules);
+
     return finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
       Json_or_Text_ForTranslate
@@ -154,7 +156,7 @@ class ApiService {
 
     try {
       const prompt = await this.createPrompt(text, sourceLang, targetLang);
-      console.debug("Gemini Prompt:", prompt); // Log the generated prompt
+      // console.debug("Gemini Prompt:", prompt); // Log the generated prompt
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
