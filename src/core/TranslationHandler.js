@@ -241,17 +241,17 @@ export default class TranslationHandler {
       if (typeof translated !== "string" && !translated) {
         return;
       }
-      if (this.strategies[platform]?.replaceSelection) {
-        await this.strategies[platform].replaceSelection(
+      if (this.strategies[platform]?.updateElement) {
+        await this.strategies[platform].updateElement(
           params.selectionRange,
           translated
         );
       } else {
         this.errorHandler.handle(
-          new Error(`متد replaceSelection برای ${platform} تعریف نشده`),
+          new Error(`متد updateElement برای ${platform} تعریف نشده`),
           {
             type: ErrorTypes.UI,
-            context: "selecti-element-translation-replace",
+            context: "select-element-translation-updateElement",
             platform: platform,
           }
         );
