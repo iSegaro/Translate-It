@@ -33,12 +33,29 @@ export const CONFIG = {
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
   HIGHLIGHT_STYLE: "2px solid red",
-  PROMPT_TEMPLATE:
-    "Act as a translation service that preserves the structure, formatting, and line breaks of the input text exactly. Perform bidirectional translation:\n" +
-    "- If the input is in ${SOURCE}, translate it to ${TARGET}.\n" +
-    "- If the input is in ${TARGET}, translate it to ${SOURCE}.\n" +
-    "- If the input is in any other language, translate it to ${TARGET}.\n\n" +
-    "Output **only** the translated text, with no additional words, explanations, or modifications:\n\n${TEXT}",
+  PROMPT_BASE_FIELD: `Act as a translation service that preserves the structure, formatting, and line breaks of the input text exactly. Perform bidirectional translation:
+    "- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+    "- If the input is in $_{TARGET}, translate it to $_{SOURCE},
+    "- If the input is in any other language, translate it to $_{TARGET}.
+    "Output **only** the translated text, with no additional words, explanations, or modifications:
+    
+    $_{TEXT}`,
+  PROMPT_BASE_SELECT: `You are an automated JSON translation service.
+          The input is a JSON string representing an array of objects, each containing a "text" property.
+          Your task is to process each object in the array:
+          1.  Examine the string value of the "text" property.
+          2.  Translate this string value according to the following bidirectional rules:
+            $_{USER_RULES}
+          3.  While translating, preserve the original internal structure, formatting, and line breaks of the text value exactly.
+          4.  Replace the original string value of the "text" property with its translated version.
+
+          After processing all objects, output **only** the complete, valid, final JSON string representing the translated array.
+          Do not include \`\`\`json markdown, explanations, or any other text outside the final JSON structure.
+
+          $_{TEXT}`,
+  PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+- If the input is in any other language, translate it to $_{TARGET}.`,
 
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
@@ -63,13 +80,18 @@ export const CONFIG = {
   NOTIFICATION_TEXT_ALIGNMENT: "right", // ترازبندی پیش فرض متن (راست)
 };
 
+export const TranslationMode = {
+  Field: "field",
+  SelectElement: "select_element",
+};
+
 // Initial state
 export const state = {
   selectElementActive: false,
   highlightedElement: null,
   activeTranslateIcon: null,
   originalTexts: new Map(),
-  translationMode: null,
+  translateMode: null,
 };
 
 let settingsCache = null;
@@ -131,6 +153,16 @@ export const getTargetLanguageAsync = async () => {
 export const getPromptAsync = async () => {
   const settings = await getSettingsAsync();
   return settings.PROMPT_TEMPLATE || CONFIG.PROMPT_TEMPLATE;
+};
+
+export const getPromptBASESelectAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.PROMPT_BASE_SELECT || CONFIG.PROMPT_BASE_SELECT;
+};
+
+export const getPromptBASEFieldAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.PROMPT_BASE_FIELD || CONFIG.PROMPT_BASE_FIELD;
 };
 
 export const getTranslationApiAsync = async () => {

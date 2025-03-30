@@ -7,6 +7,8 @@ import {
   getApiUrlAsync,
   getSourceLanguageAsync,
   getTargetLanguageAsync,
+  getPromptBASESelectAsync,
+  getPromptBASEFieldAsync,
   getPromptAsync,
   getTranslationApiAsync,
   getWebAIApiUrlAsync,
@@ -23,6 +25,7 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { logMethod } from "./helpers.js";
 
 const MOCK_DELAY = 500;
+const TEXT_DELIMITER = "\n\n---\n\n";
 
 class ApiService {
   constructor() {
@@ -30,17 +33,99 @@ class ApiService {
     this.sessionContext = null;
   }
 
+  /**
+   * Checks if the object is an array of objects, where each object
+   * has a 'text' property with a string value.
+   * Example: [{"text": "hello"}, {"text": "world"}]
+   * @param {any} obj - The object to check.
+   * @returns {boolean} - True if it matches the specific JSON format, false otherwise.
+   */
+  _isSpecificTextJsonFormat(obj) {
+    return (
+      Array.isArray(obj) &&
+      obj.length > 0 &&
+      obj.every(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.text === "string"
+      )
+    );
+  }
+
+  @logMethod
   async createPrompt(text, sourceLang, targetLang) {
-    const promptTemplate = await getPromptAsync();
-    return promptTemplate
-      .replace(/\${SOURCE}/g, sourceLang)
-      .replace(/\${TARGET}/g, targetLang)
-      .replace(/\${TEXT}/g, text);
+    const promptTemplate = await getPromptAsync(); // Fetch the user-configured prompt
+    let Json_or_Text_ForTranslate = text; // Default to the original input text
+    let isJsonMode = false; // Flag to indicate if we are in JSON mode
+
+    try {
+      const parsedText = JSON.parse(text);
+      if (this._isSpecificTextJsonFormat(parsedText)) {
+        // It IS the specific JSON format.
+        // We will use the original 'text' (the JSON string) directly in the prompt.
+        // The prompt template ITSELF needs to instruct the model to handle JSON.
+        Json_or_Text_ForTranslate = text; // Keep the JSON string as the text for the prompt
+        isJsonMode = true;
+        // console.debug(
+        //   "[API createPrompt] Detected specific JSON format. Using JSON string directly in prompt. Ensure prompt template handles JSON input."
+        // );
+      } else {
+        // It's some other valid JSON or processing failed before this.
+        // Treat as plain text.
+        // console.debug(
+        //   "[API createPrompt] Input is valid JSON but not the specific array format, or parsing failed earlier. Treating as plain text."
+        // );
+        Json_or_Text_ForTranslate = text; // Keep original text
+      }
+    } catch (error) {
+      // Not valid JSON, treat as plain text.
+      // console.debug(
+      //   "[API createPrompt] Input is not valid JSON. Treating as plain text."
+      // );
+      Json_or_Text_ForTranslate = text; // Keep original text
+    }
+
+    // **Crucial:** The effectiveness now heavily depends on the CONTENT of `promptTemplate`.
+    // If isJsonMode is true, the promptTemplate MUST contain instructions for the model
+    // to parse the $_{TEXT} as JSON, translate values inside, and return JSON.
+    // If isJsonMode is false, it should work for plain text.
+
+    let promptBase;
+    if (isJsonMode) {
+      promptBase = await getPromptBASESelectAsync(); // Fetch the base select element mode prompt;
+    } else {
+      promptBase = await getPromptBASEFieldAsync(); // Fetch the base field mode prompt;
+    }
+
+    // console.debug("Prompt Template:", promptTemplate);
+
+    const userRules = promptTemplate
+      .replace(/\$_{SOURCE}/g, sourceLang)
+      .replace(/\$_{TARGET}/g, targetLang);
+
+    // console.debug("Prompt userRules:", userRules);
+
+    const base_clean = promptBase
+      .replace(/\$_{SOURCE}/g, sourceLang)
+      .replace(/\$_{TARGET}/g, targetLang);
+
+    // console.debug("Prompt base_clean:", base_clean);
+
+    const finalPromptWithUserRules = base_clean.replace(
+      /\$_{USER_RULES}/g,
+      userRules
+    );
+
+    return finalPromptWithUserRules.replace(
+      /\$_{TEXT}/g,
+      Json_or_Text_ForTranslate
+    );
   }
 
   @logMethod
   async handleGeminiTranslation(text, sourceLang, targetLang) {
-    if (sourceLang === targetLang) return null;
+    if (sourceLang === targetLang) return null; // Return null for same language
 
     const [apiKey, apiUrl] = await Promise.all([
       getApiKeyAsync(),
@@ -69,11 +154,13 @@ class ApiService {
 
     try {
       const prompt = await this.createPrompt(text, sourceLang, targetLang);
+      console.debug("Gemini Prompt:", prompt); // Log the generated prompt
       const response = await fetch(`${apiUrl}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       });
+      // console.warn("Gemini Response:", response); // Debug
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -366,14 +453,22 @@ class ApiService {
   async translateText(text) {
     if (await getUseMockAsync()) {
       await delay(MOCK_DELAY);
-      return isPersianText(text) ?
+      // Mock logic might need adjustment if it depends on the input structure,
+      // but likely okay as it operates on the final prompt string.
+      const sampleTextForMock = text.substring(0, 50); // Use a sample for detection
+      return isPersianText(sampleTextForMock) ?
           CONFIG.DEBUG_TRANSLATED_ENGLISH
         : CONFIG.DEBUG_TRANSLATED_PERSIAN;
     }
 
+    // Input validation can remain simple as createPrompt handles the complexity now
     if (!text || typeof text !== "string") {
-      console.debug("[API] translateText: => Invalid input", text);
-      return; // مقدار نامعتبر، اما خطای مهمی نیست
+      console.warn(
+        "[API] translateText: Received potentially invalid input type after createPrompt:",
+        typeof text
+      );
+      // Depending on requirements, you might return or throw an error here.
+      // Assuming createPrompt always returns a string or we proceed carefully.
     }
 
     if (!isExtensionContextValid()) {
@@ -384,19 +479,29 @@ class ApiService {
       return;
     }
 
+    let sourceLang, targetLang; // Declare here for access in catch block if needed
+
     try {
       const translationApi = await getTranslationApiAsync();
-      const [sourceLang, targetLang] = await Promise.all([
+      [sourceLang, targetLang] = await Promise.all([
         getSourceLanguageAsync(),
         getTargetLanguageAsync(),
       ]);
 
+      // createPrompt is now called within the API-specific handlers
+      // because it needs sourceLang and targetLang
+
       if (translationApi === "webai" && !this.sessionContext) {
-        this.resetSessionContext();
+        this.resetSessionContext(); // Keep session logic
       }
+
+      // Note: The actual prompt creation happens *inside* each handler now
+      // because it needs source/target languages. We pass the original `text`
+      // down to the handlers.
 
       switch (translationApi) {
         case "gemini":
+          // Pass the original text; the handler will call createPrompt
           return await this.handleGeminiTranslation(
             text,
             sourceLang,
@@ -421,7 +526,8 @@ class ApiService {
             targetLang
           );
         default:
-          throw this.errorHandler.handle(
+          // Use ErrorHandler consistently
+          await this.errorHandler.handle(
             new Error("Invalid translation API selected"),
             {
               type: ErrorTypes.VALIDATIONMODEL,
@@ -429,13 +535,17 @@ class ApiService {
               context: "api-translateText-api-model",
             }
           );
+          return; // Return undefined or throw after handling
       }
     } catch (error) {
       error = await ErrorHandler.processError(error);
 
-      if (error.sessionConflict) {
-        console.warn("[API] Session conflict, retrying...");
+      // Handle session conflict specifically for WebAI retry
+      if (error.sessionConflict && sourceLang && targetLang) {
+        // Check if langs are available
+        console.warn("[API] Session conflict, retrying WebAI...");
         this.resetSessionContext();
+        // Ensure source/targetLang are defined before retrying
         return await this.handleWebAITranslation(
           text,
           sourceLang,
@@ -444,14 +554,19 @@ class ApiService {
         );
       }
 
+      // General error handling
       await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.SERVICE,
         statusCode: error.statusCode || 500,
         context: "api-translateText-translation-service",
       });
+      // Depending on policy, you might want to return undefined or re-throw
+      return undefined;
     }
   }
 }
 
 const apiService = new ApiService();
+// Bind the main translateText method for export
 export const translateText = apiService.translateText.bind(apiService);
+export const API_TEXT_DELIMITER = TEXT_DELIMITER;

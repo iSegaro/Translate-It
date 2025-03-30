@@ -10,7 +10,12 @@ import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
-import { CONFIG, state, TRANSLATION_ERRORS } from "../config.js";
+import {
+  CONFIG,
+  state,
+  TranslationMode,
+  TRANSLATION_ERRORS,
+} from "../config.js";
 import { translateText } from "../utils/api.js";
 import { logMethod, isExtensionContextValid } from "../utils/helpers.js";
 import {
@@ -116,7 +121,7 @@ export default class TranslationHandler {
   }
 
   @logMethod
-  async processTranslation(params) {
+  async processTranslation_with_CtrlSlash(params) {
     const statusNotification = this.notifier.show("در حال ترجمه...", "status");
     try {
       if (!isExtensionContextValid()) {
@@ -150,8 +155,12 @@ export default class TranslationHandler {
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
 
-      state.translationMode =
-        params.selectionRange ? "select_element" : "field";
+      // state.translateMode =
+      //   params.selectionRange ? "select_element" : "field";
+      state.translateMode =
+        params.selectionRange ?
+          TranslationMode.SelectElement
+        : TranslationMode.Field;
 
       const translated = await translateText(params.text);
       if (!translated) {
