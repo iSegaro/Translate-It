@@ -1,43 +1,57 @@
 // src/utils/platformDetector.js
 
 /**
+ * تعریف ثابت‌های مربوط به پلتفرم‌ها.
+ */
+export const Platform = {
+  Default: "default",
+  WhatsApp: "whatsapp",
+  Telegram: "telegram",
+  Instagram: "instagram",
+  Twitter: "twitter",
+  Medium: "medium",
+  ChatGPT: "chatgpt",
+  Youtube: "youtube",
+};
+
+/**
  * تشخیص پلتفرم بر اساس نام دامنه.
- * @returns {string} نام پلتفرم یا 'default' اگر تشخیص داده نشد.
+ * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function detectPlatform() {
   const hostname = window.location.hostname.toLowerCase();
   const platformMap = {
-    "web.whatsapp.com": "whatsapp",
-    "web.telegram.org": "telegram",
-    "www.instagram.com": "instagram",
-    "twitter.com": "twitter",
-    "x.com": "twitter",
-    "medium.com": "medium",
-    "chat.openai.com": "chatgpt",
-    "chat.com": "chatgpt",
-    "chatgpt.com": "chatgpt",
-    "www.youtube.com": "youtube",
+    "web.whatsapp.com": Platform.WhatsApp,
+    "web.telegram.org": Platform.Telegram,
+    "www.instagram.com": Platform.Instagram,
+    "twitter.com": Platform.Twitter,
+    "x.com": Platform.Twitter,
+    "medium.com": Platform.Medium,
+    "chat.openai.com": Platform.ChatGPT,
+    "chat.com": Platform.ChatGPT,
+    "chatgpt.com": Platform.ChatGPT,
+    "www.youtube.com": Platform.Youtube,
   };
 
-  return platformMap[hostname] || "default";
+  return platformMap[hostname] || Platform.Default;
 }
 
 /**
  * دریافت نام پلتفرم.
- * @returns {string} نام پلتفرم یا 'default' اگر تشخیص داده نشد.
+ * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function getPlatformName() {
   const hostname = window.location.hostname.toLowerCase();
 
   // لیست پلتفرم‌های پشتیبانی شده
   const platformPatterns = [
-    { name: "Twitter", patterns: ["twitter.com", "x.com"] },
-    { name: "WhatsApp", patterns: ["web.whatsapp.com"] },
-    { name: "Telegram", patterns: ["web.telegram.org"] },
-    { name: "Medium", patterns: ["medium.com"] },
-    { name: "ChatGPT", patterns: ["chat.openai.com"] },
-    { name: "Instagram", patterns: ["instagram.com"] },
-    { name: "Youtube", patterns: ["youtube.com"] },
+    { name: Platform.Twitter, patterns: ["twitter.com", "x.com"] },
+    { name: Platform.WhatsApp, patterns: ["web.whatsapp.com"] },
+    { name: Platform.Telegram, patterns: ["web.telegram.org"] },
+    { name: Platform.Medium, patterns: ["medium.com"] },
+    { name: Platform.ChatGPT, patterns: ["chat.openai.com"] },
+    { name: Platform.Instagram, patterns: ["instagram.com"] },
+    { name: Platform.Youtube, patterns: ["youtube.com"] },
   ];
 
   // جستجو در لیست پلتفرم‌ها
@@ -48,21 +62,21 @@ export function getPlatformName() {
   }
 
   // اگر پلتفرم تشخیص داده نشد، از حالت پیش‌فرض استفاده کنید
-  return "default";
+  return Platform.Default;
 }
 
 /**
  * تشخیص پلتفرم بر اساس بخشی از URL.
- * @returns {string} نام پلتفرم یا 'default' اگر تشخیص داده نشد.
+ * @returns {string} نام پلتفرم یا Platform.Default اگر تشخیص داده نشد.
  */
 export function detectPlatformByURL() {
   const hostname = window.location.hostname.toLowerCase();
   if (hostname.includes("twitter.com") || hostname.includes("x.com"))
-    return "twitter";
-  if (hostname.includes("medium.com")) return "medium";
-  if (hostname.includes("telegram.com")) return "telegram";
-  if (hostname.includes("whatsapp.com")) return "whatsapp";
-  if (hostname.includes("instagram.com")) return "instagram";
-  if (hostname.includes("youtube.com")) return "youtube";
-  return "default";
+    return Platform.Twitter;
+  if (hostname.includes("medium.com")) return Platform.Medium;
+  if (hostname.includes("telegram.com")) return Platform.Telegram;
+  if (hostname.includes("whatsapp.com")) return Platform.WhatsApp;
+  if (hostname.includes("instagram.com")) return Platform.Instagram;
+  if (hostname.includes("youtube.com")) return Platform.Youtube;
+  return Platform.Default;
 }
