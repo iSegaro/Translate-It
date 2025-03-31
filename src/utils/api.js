@@ -19,7 +19,7 @@ import {
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
 } from "../config.js";
-import { delay, isExtensionContextValid, logMethod } from "./helpers.js";
+import { delay, isExtensionContextValid, logMethod, logME } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
@@ -157,7 +157,7 @@ class ApiService {
       Json_or_Text_ForTranslate
     );
 
-    // console.debug("Prompt finalPrompt : ", finalPrompt);
+    logME("Prompt finalPrompt : ", finalPrompt);
 
     return finalPrompt;
   }
