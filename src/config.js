@@ -40,7 +40,7 @@ export const CONFIG = {
 - If the input is in any other language, translate it to $_{TARGET}.
 - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
 
-Return **only** the translated text without any extra words, explanations, or modifications.
+Return **only** the translated text without any extra words, explanations, markdown, or modifications.
 
 \`\`\`text input
 $_{TEXT}
