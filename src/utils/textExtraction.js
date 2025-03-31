@@ -81,52 +81,71 @@ function generateUniqueId() {
  */
 export function applyTranslationsToNodes(textNodes, translations, context) {
   textNodes.forEach((textNode) => {
-    // فقط گره‌های متنی که مستقیماً در DOM هستند و والد دارند را پردازش کن
     if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
       return;
     }
 
-    const originalText = textNode.textContent; // ذخیره متن کامل، نه فقط trim شده
+    const originalText = textNode.textContent;
     const trimmedOriginalText = originalText.trim();
     const translatedText = translations.get(trimmedOriginalText);
 
-    // فقط در صورتی ادامه بده که متن trim شده، ترجمه داشته باشد
     if (translatedText && trimmedOriginalText) {
-      const parentElement = textNode.parentNode; // والد گره متنی
+      const parentElement = textNode.parentNode;
+      const originalLines = originalText.split("\n");
+      const translatedLines = translatedText.split("\n");
+      const fragment = document.createDocumentFragment();
 
-      // --- تغییر کلیدی: ایجاد wrapper span ---
-      const wrapperSpan = document.createElement("span");
-      const uniqueId = generateUniqueId();
+      originalLines.forEach((originalLine, index) => {
+        const translatedLine =
+          translatedLines[index] !== undefined ? translatedLines[index] : "";
+        const uniqueId = generateUniqueId();
+        const wrapperSpan = document.createElement("span");
+        wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+        wrapperSpan.textContent = translatedLine;
 
-      // شناسه و متن ترجمه شده را به span جدید اعمال کن
-      wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
-      wrapperSpan.textContent = translatedText;
+        context.state.originalTexts.set(uniqueId, {
+          originalText: originalLine, // ذخیره متن خط اصلی
+          wrapperElement: wrapperSpan,
+        });
 
-      // ذخیره متن *اصلی* گره متنی برای بازگردانی
-      context.state.originalTexts.set(uniqueId, {
-        originalText: originalText, // متن اصلی گره متنی
-        wrapperElement: wrapperSpan, // مرجع به span ایجاد شده (برای دسترسی سریع‌تر)
+        context.IconManager.applyTextDirection(wrapperSpan, translatedLine);
+        fragment.appendChild(wrapperSpan);
+
+        // اضافه کردن <br> اگر این آخرین خط نیست و خط اصلی خالی نیست
+        if (index < originalLines.length - 1 && originalLine.trim() !== "") {
+          fragment.appendChild(document.createElement("br"));
+        } else if (
+          index < originalLines.length - 1 &&
+          originalLine.trim() === ""
+        ) {
+          // برای حفظ خطوط خالی هم یک <br> اضافه می‌کنیم
+          fragment.appendChild(document.createElement("br"));
+        }
       });
 
-      // اعمال استایل‌ها (مثل جهت متن) به span جدید
-      context.IconManager.applyTextDirection(wrapperSpan, translatedText);
-
-      // جایگزینی گره متنی اصلی با span جدید در DOM
       try {
-        parentElement.replaceChild(wrapperSpan, textNode);
+        parentElement.replaceChild(fragment, textNode);
       } catch (error) {
-        logME("AIWC Error replacing text node with wrapper span:", error, {
+        logME("AIWC Error replacing text node with fragment:", error, {
           textNode,
-          wrapperSpan,
+          fragment,
           parentElement,
         });
-        // اگر جایگزینی ناموفق بود، این ترجمه را از state حذف کن
-        context.state.originalTexts.delete(uniqueId);
+        originalLines.forEach((originalLine, index) => {
+          const uniqueId = Array.from(context.state.originalTexts.keys()).find(
+            (key) =>
+              context.state.originalTexts.get(key)?.originalText ===
+              originalLine
+          );
+          if (uniqueId) {
+            context.state.originalTexts.delete(uniqueId);
+          }
+        });
         error = ErrorHandler.processError(error);
         context.errorHandler.handle(error, {
           type: ErrorTypes.PARSE_TEXT,
           context: "textExtraction-apply-translations-replace",
-          elementId: uniqueId,
+          elementId: "multiple",
         });
       }
     }
