@@ -35,9 +35,10 @@ export const CONFIG = {
   HIGHLIGHT_STYLE: "2px solid red",
   PROMPT_BASE_FIELD: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
 
-- If the input text is in $_{SOURCE}, translate it into $_{TARGET}.
-- If the input text is in $_{TARGET}, translate it into $_{SOURCE}.
-- If it is in any other language except $_{TARGET} and its subcategories, translate it into $_{TARGET}.
+- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+- If the input is in any other language, translate it to $_{TARGET}.
+- If the input has grammar mistakes but is in $_{SOURCE}, translate it to $_{TARGET} while preserving the intended meaning.
 
 Return **only** the translated text without any extra words, explanations, or modifications.
 
