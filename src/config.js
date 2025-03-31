@@ -38,7 +38,7 @@ export const CONFIG = {
 - If the input is in $_{SOURCE}, translate it to $_{TARGET}.
 - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
 - If the input is in any other language, translate it to $_{TARGET}.
-- If the input has grammar mistakes but is in $_{SOURCE}, translate it to $_{TARGET} while preserving the intended meaning.
+- If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
 
 Return **only** the translated text without any extra words, explanations, or modifications.
 
