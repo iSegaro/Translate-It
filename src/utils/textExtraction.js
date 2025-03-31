@@ -62,42 +62,75 @@ export function collectTextNodes(targetElement) {
 }
 
 /**
- * اعمال ترجمه‌ها به گره‌های متنی و ذخیره اطلاعات برای بازگشت به حالت قبل.
+ * Generates a unique ID for tracking translated elements.
+ * @returns {string} A unique identifier string.
+ */
+function generateUniqueId() {
+  // Simple but effective for runtime uniqueness within a page session
+  return `aiwc-${Math.random().toString(36).substring(2, 15)}`;
+}
+
+/**
+ * اعمال ترجمه‌ها با جایگزینی گره‌های متنی با عناصر span حاوی ترجمه.
+ * هر span یک ID منحصر به فرد برای بازگردانی دریافت می‌کند.
  *
- * @param {Node[]} textNodes آرایه‌ای از گره‌های متنی.
+ * @param {Node[]} textNodes آرایه‌ای از گره‌های متنی که باید ترجمه شوند.
  * @param {Map<string, string>} translations نگاشتی از متن اصلی به متن ترجمه‌شده.
  * @param {object} context شیء context شامل state و IconManager.
  */
 export function applyTranslationsToNodes(textNodes, translations, context) {
   textNodes.forEach((textNode) => {
-    const originalText = textNode.textContent.trim();
-    const translatedText = translations.get(originalText);
+    // فقط گره‌های متنی که مستقیماً در DOM هستند و والد دارند را پردازش کن
+    if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
+      return;
+    }
 
-    if (translatedText) {
-      const parentElement = textNode.parentElement;
-      if (parentElement) {
-        const uniqueId =
-          Math.random().toString(36).substring(2, 15) +
-          Math.random().toString(36).substring(2, 15);
-        parentElement.setAttribute(
-          "AIWritingCompanion-data-original-text-id",
-          uniqueId
+    const originalText = textNode.textContent; // ذخیره متن کامل، نه فقط trim شده
+    const trimmedOriginalText = originalText.trim();
+    const translatedText = translations.get(trimmedOriginalText);
+
+    // فقط در صورتی ادامه بده که متن trim شده، ترجمه داشته باشد
+    if (translatedText && trimmedOriginalText) {
+      const parentElement = textNode.parentNode; // والد گره متنی
+
+      // --- تغییر کلیدی: ایجاد wrapper span ---
+      const wrapperSpan = document.createElement("span");
+      const uniqueId = generateUniqueId();
+
+      // شناسه و متن ترجمه شده را به span جدید اعمال کن
+      wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
+      wrapperSpan.textContent = translatedText;
+
+      // ذخیره متن *اصلی* گره متنی (نه innerHTML والد) برای بازگردانی
+      context.state.originalTexts.set(uniqueId, {
+        originalText: originalText, // متن اصلی گره متنی
+        // parent: parentElement, // دیگر نیازی به ذخیره والد نیست
+        // originalInnerHTML: parentElement.innerHTML, // دیگر نیازی به این نیست
+        wrapperElement: wrapperSpan, // مرجع به span ایجاد شده (اختیاری، برای دسترسی سریع‌تر)
+      });
+
+      // اعمال استایل‌ها (مثل جهت متن) به span جدید
+      context.IconManager.applyTextDirection(wrapperSpan, translatedText);
+
+      // جایگزینی گره متنی اصلی با span جدید در DOM
+      try {
+        parentElement.replaceChild(wrapperSpan, textNode);
+      } catch (error) {
+        console.error(
+          "AIWC Error replacing text node with wrapper span:",
+          error,
+          { textNode, wrapperSpan, parentElement }
         );
-
-        context.state.originalTexts.set(uniqueId, {
-          originalInnerHTML: parentElement.innerHTML,
-          translatedText: translatedText,
-          parent: parentElement,
-        });
-        textNode.textContent = translatedText;
-        context.IconManager.applyTextDirection(parentElement, translatedText);
+        // اگر جایگزینی ناموفق بود، این ترجمه را از state حذف کن
+        context.state.originalTexts.delete(uniqueId);
+        // (می‌توانید خطا را به ErrorHandler نیز ارسال کنید)
       }
     }
   });
 }
 
 /**
- * بازگردانی متن‌های ترجمه‌شده به حالت اولیه.
+ * بازگردانی متن‌های ترجمه‌شده به حالت اولیه با جایگزینی wrapper span ها.
  *
  * @param {object} context شیء context شامل state، errorHandler و notifier.
  * @returns {Promise<number>} تعداد عناصری که با موفقیت به حالت اولیه بازگردانده شدند.
@@ -105,118 +138,95 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 export async function revertTranslations(context) {
   let successfulReverts = 0;
   let errors = [];
-
-  // لیست آی‌دی‌های عناصری که باید بازگردانی شوند
   const idsToRevert = Array.from(context.state.originalTexts.keys());
+  const revertedIds = new Set(); // برای جلوگیری از پاک کردن state موارد ناموفق
+
+  if (idsToRevert.length === 0) {
+    if (await IsDebug()) {
+      context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
+    }
+    return 0;
+  }
 
   try {
-    // ابتدا تمام عناصر را بررسی می‌کنیم تا از اتصال آنها به DOM اطمینان حاصل کنیم
-    const elementsToRevert = idsToRevert.filter((uniqueId) => {
+    for (const uniqueId of idsToRevert) {
       const data = context.state.originalTexts.get(uniqueId);
-      return (
-        data && data.parent && data.parent.isConnected && data.originalInnerHTML
-      );
-    });
-
-    // اگر هیچ عنصری برای بازگردانی نیست
-    if (elementsToRevert.length === 0) {
-      if (await IsDebug()) {
-        context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
+      if (!data || !data.originalText) {
+        errors.push({ uniqueId, message: "Missing data in state" });
+        continue; // برو به ID بعدی اگر داده‌ها ناقص هستند
       }
-      return 0;
-    }
 
-    // بازگردانی عناصر
-    for (const uniqueId of elementsToRevert) {
-      try {
-        const data = context.state.originalTexts.get(uniqueId);
+      // --- تغییر کلیدی: یافتن wrapper span با شناسه ---
+      const wrapperSelector = `[data-aiwc-original-id="${uniqueId}"]`;
+      const wrapperSpan = document.querySelector(wrapperSelector);
 
-        // استفاده از روش ایمن‌تر برای بازگردانی
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = data.originalInnerHTML;
+      if (wrapperSpan && wrapperSpan.isConnected) {
+        try {
+          // ایجاد یک گره متنی جدید با متن اصلی ذخیره شده
+          const originalTextNode = document.createTextNode(data.originalText);
 
-        // حفظ ویژگی‌های عنصر اصلی به جز محتوای داخلی
-        const parentAttributes = data.parent.attributes;
-        const attributesToPreserve = {};
+          // جایگزینی wrapper span با گره متنی اصلی
+          wrapperSpan.parentNode.replaceChild(originalTextNode, wrapperSpan);
 
-        for (let i = 0; i < parentAttributes.length; i++) {
-          const attr = parentAttributes[i];
-          // ذخیره تمام ویژگی‌ها به جز ویژگی خاص افزونه
-          if (attr.name !== "AIWritingCompanion-data-original-text-id") {
-            attributesToPreserve[attr.name] = attr.value;
-          }
+          successfulReverts++;
+          revertedIds.add(uniqueId); // علامت‌گذاری ID به عنوان موفق
+        } catch (error) {
+          const errorMessage = `Failed to replace wrapper span for ID: ${uniqueId}`;
+          errors.push({ error, uniqueId, message: errorMessage });
+          context.errorHandler.handle(error, {
+            type: ErrorTypes.DOM_MANIPULATION, // یا نوع خطای مناسب دیگر
+            context: "revert-translations-replace",
+            elementId: uniqueId,
+          });
         }
-
-        // جایگزینی محتوا
-        while (data.parent.firstChild) {
-          data.parent.removeChild(data.parent.firstChild);
-        }
-
-        while (tempDiv.firstChild) {
-          data.parent.appendChild(tempDiv.firstChild);
-        }
-
-        // حذف ویژگی خاص افزونه
-        data.parent.removeAttribute("AIWritingCompanion-data-original-text-id");
-
-        // بازگرداندن جهت متن به حالت اول
-        _resetTextDirection(data.parent);
-
-        successfulReverts++;
-      } catch (error) {
+      } else {
+        // اگر wrapper span پیدا نشد یا از DOM حذف شده بود
         errors.push({
-          error,
           uniqueId,
-          message: `Failed to revert element with ID: ${uniqueId}`,
+          message: `Wrapper span not found or disconnected for ID: ${uniqueId}`,
         });
-
-        context.errorHandler.handle(error, {
-          type: ErrorTypes.PARSE_TEXT,
-          context: "revert-translations",
-          elementId: uniqueId,
-        });
+        if (await IsDebug()) {
+          console.warn(
+            `AIWC: Wrapper span with ID ${uniqueId} not found for revert.`
+          );
+        }
+        // چون عنصر پیدا نشد، فرض می‌کنیم بازگردانی لازم نیست یا ممکن نیست
+        // و آن را از state حذف می‌کنیم تا در تلاش‌های بعدی مشکل‌ساز نشود.
+        revertedIds.add(uniqueId);
       }
     }
 
     // نمایش نتیجه به کاربر
     if (successfulReverts > 0) {
-      context.notifier.show(`${successfulReverts}`, "revert");
-    } else if (errors.length > 0) {
-      context.notifier.show("خطا در بازگردانی متن‌ها", "error");
+      context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert"); // پیام واضح‌تر
+    } else if (errors.length > 0 && idsToRevert.length > 0) {
+      context.notifier.show("خطا در بازگردانی برخی متن‌ها", "error");
       if (await IsDebug()) {
         console.error("Translation reversion errors:", errors);
       }
     }
   } catch (error) {
     context.errorHandler.handle(error, {
-      type: ErrorTypes.UI,
-      context: "revert-translations-main",
+      type: ErrorTypes.UI, // یا خطای عمومی‌تر
+      context: "revert-translations-main-loop",
     });
   } finally {
-    // پاکسازی state برای عناصری که با موفقیت بازگردانی شدند
-    // به جای پاکسازی کل state، فقط عناصر موفق را حذف می‌کنیم
-    // این کار امکان تلاش مجدد برای عناصر ناموفق را فراهم می‌کند
+    // --- تغییر کلیدی: پاکسازی state ---
+    // فقط ID هایی که با موفقیت بازگردانی شدند یا پیدا نشدند را از state حذف کن
+    revertedIds.forEach((id) => {
+      context.state.originalTexts.delete(id);
+    });
 
-    if (successfulReverts === context.state.originalTexts.size) {
-      // اگر همه عناصر بازگردانی شدند، کل state را پاک می‌کنیم
-      context.state.originalTexts.clear();
-      context.IconManager?.cleanup();
-    } else {
-      // فقط عناصر موفق را حذف می‌کنیم
-      idsToRevert.forEach((uniqueId) => {
-        if (errors.findIndex((e) => e.uniqueId === uniqueId) === -1) {
-          context.state.originalTexts.delete(uniqueId);
-        }
-      });
+    // اگر هیچ متنی در state باقی نمانده، cleanup را اجرا کن
+    if (context.state.originalTexts.size === 0) {
+      context.IconManager?.cleanup(); // اطمینان از وجود IconManager
+    }
 
-      // اگر تمام عملیات‌ها ناموفق بودند، نمایش خطا
-      if (successfulReverts === 0 && context.state.originalTexts.size > 0) {
-        if (await IsDebug()) {
-          console.error(
-            "Failed to revert any translations. Keeping state for retry."
-          );
-        }
-      }
+    if ((await IsDebug()) && context.state.originalTexts.size > 0) {
+      console.warn(
+        "AIWC: Some translations could not be reverted and remain in state:",
+        context.state.originalTexts
+      );
     }
   }
 
