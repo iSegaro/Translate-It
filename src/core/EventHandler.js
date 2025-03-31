@@ -165,7 +165,6 @@ export default class EventHandler {
       translationCache
     );
 
-    // Apply cached translations first if no new texts need fetching
     if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
       applyTranslationsToNodes(textNodes, cachedTranslations, {
         state,
@@ -174,7 +173,7 @@ export default class EventHandler {
       this.notifier.show("حافظه", "info", true, 1500);
       return;
     }
-    // If nothing new to translate and nothing from cache
+
     if (textsToTranslate.length === 0) return;
 
     let statusNotification = null;
@@ -187,37 +186,28 @@ export default class EventHandler {
       state.translateMode = TranslationMode.SelectElement;
 
       // --- مرحله 2: گسترش متن‌ها و ایجاد نگاشت ---
-      const expandedTexts = []; // آرایه نهایی متن‌ها برای ارسال (تقسیم شده با \n)
-      const originMapping = []; // نگاشت: index در expandedTexts -> { originalIndex, segmentIndex }
-      // ساختار کمکی برای بازسازی: originalIndex -> array of expanded indices
-      const originalToExpandedIndices = new Map();
-
-      textsToTranslate.forEach((originalText, originalIndex) => {
-        // تقسیم متن اصلی بر اساس خط جدید
-        const segments = originalText.split("\n");
-        const currentExpandedIndices = [];
-
-        segments.forEach((segment, segmentIndex) => {
-          // فقط قطعات غیر خالی را اضافه کن (برای جلوگیری از ارسال رشته خالی)
-          // if (segment) { // یا segment.trim() اگر فضاهای خالی هم مهم نیستند
-          expandedTexts.push(segment); // اضافه کردن بخش به آرایه نهایی
-          // ذخیره اطلاعات مبدا: این بخش از کدام متن اصلی و کدام قسمت آن آمده است
-          originMapping.push({ originalIndex, segmentIndex });
-          currentExpandedIndices.push(expandedTexts.length - 1);
-          // }
-        });
-        originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
-      });
-      // --- پایان مرحله 2 ---
+      const { expandedTexts, originMapping, originalToExpandedIndices } =
+        this.expandTextsForTranslation(textsToTranslate);
 
       // مرحله 3: ساخت JSON با متن‌های گسترش‌یافته
       const jsonPayloadArray = expandedTexts.map((text) => ({ text }));
       const jsonFormatString = JSON.stringify(jsonPayloadArray);
 
+      // --- مرحله 4: اندازه گیری حجم بار JSON ---
+      const maxPayloadSize = 20000;
+      if (jsonFormatString.length > maxPayloadSize) {
+        this.notifier.show(
+          `متن انتخابی خیلی بزرگ است. ${jsonFormatString.length}`,
+          "warning",
+          true,
+          3000
+        );
+        return; // از ادامه کار خارج شو
+      }
+      // --- پایان مرحله 4 ---
+
       // ارسال به سرویس ترجمه
       const translatedJsonString = await translateText(jsonFormatString);
-
-      // logME("JSON Sent:", JSON.stringify(jsonFormatString)); // لاگ متن‌های گسترش یافته
 
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
@@ -227,105 +217,20 @@ export default class EventHandler {
       if (translatedJsonString && typeof translatedJsonString === "string") {
         let translatedData;
         try {
-          // پاکسازی و پارس کردن JSON
-          let cleanJsonString = translatedJsonString.trim();
-          const jsonMarkdownRegex = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
-          const match = cleanJsonString.match(jsonMarkdownRegex);
-          if (match) {
-            cleanJsonString = match[1].trim();
-          }
-          translatedData = JSON.parse(cleanJsonString);
+          translatedData =
+            this.parseAndCleanTranslationResponse(translatedJsonString);
 
           // --- مرحله 5: بررسی و مدیریت عدم تطابق طول ---
-          if (!Array.isArray(translatedData)) {
-            console.error(
-              "پاسخ ترجمه یک آرایه نیست.",
-              "داده پارس شده:",
-              translatedData
-            );
-            throw new Error("Translated response is not an array."); // همچنان خطا برای نوع نامعتبر
-          }
-
-          if (translatedData.length !== expandedTexts.length) {
-            // به جای خطا، یک هشدار در کنسول ثبت کن
-            console.warn(
-              "عدم تطابق طول در پاسخ ترجمه شناسایی شد.",
-              `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
-              `طول دریافت شده: ${translatedData.length}`,
-              "علت احتمالی: تقسیم/ادغام متفاوت متن توسط API یا افزودن/حذف آیتم‌ها.",
-              "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد..."
-            );
-          }
-          // --- پایان مرحله 5 ---
+          this.handleTranslationLengthMismatch(translatedData, expandedTexts);
 
           // --- مرحله 6: بازسازی ترجمه‌ها ---
-          const newTranslations = new Map(); // نگاشت نهایی: متن اصلی -> متن ترجمه‌شده کامل
-          // ساختار کمکی برای نگهداری بخش‌های ترجمه‌شده به ترتیب
-          const translatedSegmentsMap = new Map(); // originalIndex -> array of translated segments strings
-
-          // پردازش پاسخ‌های دریافتی (تا حداقل طول برای جلوگیری از خطا)
-          const numItemsToProcess = Math.min(
-            expandedTexts.length,
-            translatedData.length
+          const newTranslations = this.reassembleTranslations(
+            translatedData,
+            expandedTexts,
+            originMapping,
+            textsToTranslate,
+            cachedTranslations
           );
-
-          for (let i = 0; i < numItemsToProcess; i++) {
-            const translatedItem = translatedData[i];
-            const mappingInfo = originMapping[i]; // اطلاعات مبدا این بخش
-
-            if (
-              translatedItem &&
-              typeof translatedItem.text === "string" &&
-              mappingInfo
-            ) {
-              const { originalIndex } = mappingInfo;
-              // اگر اولین بخش برای این متن اصلی است، آرایه را ایجاد کن
-              if (!translatedSegmentsMap.has(originalIndex)) {
-                translatedSegmentsMap.set(originalIndex, []);
-              }
-              // بخش ترجمه‌شده را به آرایه مربوط به متن اصلی اضافه کن
-              // فرض می‌کنیم ترتیب حفظ شده است
-              translatedSegmentsMap
-                .get(originalIndex)
-                .push(translatedItem.text);
-            } else {
-              // اگر ترجمه نامعتبر بود یا اطلاعات نگاشت نبود
-              console.warn(
-                `داده ترجمه نامعتبر یا گمشده برای آیتم در اندیس ${i}.`,
-                "آیتم دریافتی:",
-                translatedItem,
-                "اطلاعات نگاشت:",
-                mappingInfo
-              );
-              // رفتار جایگزین: می‌توانید متن اصلی بخش را استفاده کنید
-              if (mappingInfo) {
-                const { originalIndex } = mappingInfo;
-                if (!translatedSegmentsMap.has(originalIndex)) {
-                  translatedSegmentsMap.set(originalIndex, []);
-                }
-                // متن اصلی این بخش را به عنوان جایگزین اضافه کن
-                translatedSegmentsMap.get(originalIndex).push(expandedTexts[i]);
-              }
-            }
-          }
-
-          // حالا بخش‌های ترجمه‌شده را برای هر متن اصلی به هم بچسبان
-          textsToTranslate.forEach((originalText, originalIndex) => {
-            if (translatedSegmentsMap.has(originalIndex)) {
-              const segments = translatedSegmentsMap.get(originalIndex);
-              // با خط جدید دوباره به هم بچسبان
-              const reassembledText = segments.join("\n");
-              newTranslations.set(originalText, reassembledText);
-              translationCache.set(originalText, reassembledText); // کش را با متن بازسازی شده آپدیت کن
-            } else if (!cachedTranslations.has(originalText)) {
-              // اگر هیچ بخشی برای این متن پیدا نشد (و در کش هم نبود)
-              console.warn(
-                `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
-              );
-              newTranslations.set(originalText, originalText); // از متن اصلی به عنوان جایگزین استفاده کن
-            }
-          });
-          // --- پایان مرحله 6 ---
 
           // مرحله 7: ترکیب و اعمال ترجمه‌ها
           const allTranslations = new Map([
@@ -347,7 +252,10 @@ export default class EventHandler {
             {
               type: ErrorTypes.PARSE_TEXT,
               context: "EventHandler-handleSelect-JSONParseOrProcessError",
-              details: `Failed to process API response. Raw snippet: ${translatedJsonString.substring(0, 150)}...`,
+              details: `Failed to process API response. Raw snippet: ${translatedJsonString.substring(
+                0,
+                150
+              )}...`,
             }
           );
           this.notifier.show("خطا در پردازش پاسخ", "error", true, 2000);
@@ -371,6 +279,127 @@ export default class EventHandler {
         this.notifier.dismiss(statusNotification);
       }
     }
+  }
+
+  // --- توابع کمکی ---
+  expandTextsForTranslation(textsToTranslate) {
+    const expandedTexts = [];
+    const originMapping = [];
+    const originalToExpandedIndices = new Map();
+
+    textsToTranslate.forEach((originalText, originalIndex) => {
+      const segments = originalText.split("\n");
+      const currentExpandedIndices = [];
+
+      segments.forEach((segment, segmentIndex) => {
+        expandedTexts.push(segment);
+        originMapping.push({ originalIndex, segmentIndex });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      });
+      originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
+    });
+
+    return { expandedTexts, originMapping, originalToExpandedIndices };
+  }
+
+  parseAndCleanTranslationResponse(translatedJsonString) {
+    let cleanJsonString = translatedJsonString.trim();
+    const jsonMarkdownRegex = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
+    const match = cleanJsonString.match(jsonMarkdownRegex);
+    if (match) {
+      cleanJsonString = match[1].trim();
+    }
+    try {
+      return JSON.parse(cleanJsonString);
+    } catch (error) {
+      console.error("خطا در پارس JSON:", error);
+      throw error; // دوباره پرتاب کن تا در بلاک اصلی catch بگیرد
+    }
+  }
+
+  handleTranslationLengthMismatch(translatedData, expandedTexts) {
+    if (!Array.isArray(translatedData)) {
+      console.error(
+        "پاسخ ترجمه یک آرایه نیست.",
+        "داده پارس شده:",
+        translatedData
+      );
+      throw new Error("Translated response is not an array.");
+    }
+
+    if (translatedData.length !== expandedTexts.length) {
+      console.warn(
+        "عدم تطابق طول در پاسخ ترجمه شناسایی شد.",
+        `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
+        `طول دریافت شده: ${translatedData.length}`,
+        "علت احتمالی: تقسیم/ادغام متفاوت متن توسط API یا افزودن/حذف آیتم‌ها.",
+        "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد..."
+      );
+    }
+  }
+
+  reassembleTranslations(
+    translatedData,
+    expandedTexts,
+    originMapping,
+    textsToTranslate,
+    cachedTranslations
+  ) {
+    const newTranslations = new Map();
+    const translatedSegmentsMap = new Map();
+
+    const numItemsToProcess = Math.min(
+      expandedTexts.length,
+      translatedData.length
+    );
+
+    for (let i = 0; i < numItemsToProcess; i++) {
+      const translatedItem = translatedData[i];
+      const mappingInfo = originMapping[i];
+
+      if (
+        translatedItem &&
+        typeof translatedItem.text === "string" &&
+        mappingInfo
+      ) {
+        const { originalIndex } = mappingInfo;
+        if (!translatedSegmentsMap.has(originalIndex)) {
+          translatedSegmentsMap.set(originalIndex, []);
+        }
+        translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
+      } else {
+        console.warn(
+          `داده ترجمه نامعتبر یا گمشده برای آیتم در اندیس ${i}.`,
+          "آیتم دریافتی:",
+          translatedItem,
+          "اطلاعات نگاشت:",
+          mappingInfo
+        );
+        if (mappingInfo) {
+          const { originalIndex } = mappingInfo;
+          if (!translatedSegmentsMap.has(originalIndex)) {
+            translatedSegmentsMap.set(originalIndex, []);
+          }
+          translatedSegmentsMap.get(originalIndex).push(expandedTexts[i]);
+        }
+      }
+    }
+
+    textsToTranslate.forEach((originalText, originalIndex) => {
+      if (translatedSegmentsMap.has(originalIndex)) {
+        const segments = translatedSegmentsMap.get(originalIndex);
+        const reassembledText = segments.join("\n");
+        newTranslations.set(originalText, reassembledText);
+        translationCache.set(originalText, reassembledText);
+      } else if (!cachedTranslations.has(originalText)) {
+        console.warn(
+          `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
+        );
+        newTranslations.set(originalText, originalText);
+      }
+    });
+
+    return newTranslations;
   }
 
   // @logMethod
