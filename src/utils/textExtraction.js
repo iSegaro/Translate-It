@@ -201,8 +201,8 @@ export async function revertTranslations(context) {
       context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert");
     } else if (errors.length > 0 && idsToRevert.length > 0) {
       if (await IsDebug()) {
-        context.notifier.show("خطا در بازگردانی برخی متن‌ها", "error");
-        console.error("Translation reversion errors:", errors);
+        context.notifier.show("خطا در بازگردانی برخی متن‌ها", "info");
+        console.warn("Translation reversion errors:", errors);
       }
     }
   } catch (error) {
