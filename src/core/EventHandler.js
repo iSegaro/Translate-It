@@ -209,6 +209,8 @@ export default class EventHandler {
       // ارسال به سرویس ترجمه
       const translatedJsonString = await translateText(jsonFormatString);
 
+      logME("JSON خام پاسخ:", translatedJsonString);
+
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
         statusNotification = null;
