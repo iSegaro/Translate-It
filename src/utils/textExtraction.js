@@ -84,63 +84,53 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
     if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
       return;
     }
-
     const originalText = textNode.textContent;
     const trimmedOriginalText = originalText.trim();
     const translatedText = translations.get(trimmedOriginalText);
 
     if (translatedText && trimmedOriginalText) {
       const parentElement = textNode.parentNode;
+      // ایجاد container برای نگهداری ترجمه
+      const containerSpan = document.createElement("span");
+      const uniqueId = generateUniqueId();
+      containerSpan.setAttribute("data-aiwc-original-id", uniqueId);
+      // ذخیره کامل متن اصلی در attribute برای revert
+      containerSpan.setAttribute("data-aiwc-original-text", originalText);
+
       const originalLines = originalText.split("\n");
       const translatedLines = translatedText.split("\n");
-      const fragment = document.createDocumentFragment();
 
       originalLines.forEach((originalLine, index) => {
+        // ایجاد span داخلی برای هر خط ترجمه
         const translatedLine =
           translatedLines[index] !== undefined ? translatedLines[index] : "";
-        const uniqueId = generateUniqueId();
-        const wrapperSpan = document.createElement("span");
-        wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
-        wrapperSpan.textContent = translatedLine;
-
+        const innerSpan = document.createElement("span");
+        innerSpan.textContent = translatedLine;
+        // ثبت هر خط در state برای پشتیبانی از امکانات دیگر (در صورت نیاز)
         context.state.originalTexts.set(uniqueId, {
-          originalText: originalLine, // ذخیره متن خط اصلی
-          wrapperElement: wrapperSpan,
+          originalText: originalLine,
+          wrapperElement: innerSpan,
         });
+        context.IconManager.applyTextDirection(innerSpan, translatedLine);
+        containerSpan.appendChild(innerSpan);
 
-        context.IconManager.applyTextDirection(wrapperSpan, translatedLine);
-        fragment.appendChild(wrapperSpan);
-
-        // اضافه کردن <br> اگر این آخرین خط نیست و خط اصلی خالی نیست
-        if (index < originalLines.length - 1 && originalLine.trim() !== "") {
-          fragment.appendChild(document.createElement("br"));
-        } else if (
-          index < originalLines.length - 1 &&
-          originalLine.trim() === ""
-        ) {
-          // برای حفظ خطوط خالی هم یک <br> اضافه می‌کنیم
-          fragment.appendChild(document.createElement("br"));
+        // اضافه کردن <br> با نشانه‌گذاری برای خطوط جداگانه (جزء ترجمه چند خطی)
+        if (index < originalLines.length - 1) {
+          const br = document.createElement("br");
+          br.setAttribute("data-aiwc-br", "true");
+          containerSpan.appendChild(br);
         }
       });
 
       try {
-        parentElement.replaceChild(fragment, textNode);
+        parentElement.replaceChild(containerSpan, textNode);
       } catch (error) {
-        logME("AIWC Error replacing text node with fragment:", error, {
+        logME("AIWC Error replacing text node with container:", error, {
           textNode,
-          fragment,
+          containerSpan,
           parentElement,
         });
-        originalLines.forEach((originalLine, index) => {
-          const uniqueId = Array.from(context.state.originalTexts.keys()).find(
-            (key) =>
-              context.state.originalTexts.get(key)?.originalText ===
-              originalLine
-          );
-          if (uniqueId) {
-            context.state.originalTexts.delete(uniqueId);
-          }
-        });
+        context.state.originalTexts.delete(uniqueId);
         error = ErrorHandler.processError(error);
         context.errorHandler.handle(error, {
           type: ErrorTypes.PARSE_TEXT,
@@ -160,106 +150,51 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
  */
 export async function revertTranslations(context) {
   let successfulReverts = 0;
-  let errors = [];
-  const idsToRevert = Array.from(context.state.originalTexts.keys());
-  const revertedIds = new Set(); // برای جلوگیری از پاک کردن state موارد ناموفق
+  // یافتن تمام span هایی که دارای data-aiwc-original-text هستند
+  const containers = document.querySelectorAll("span[data-aiwc-original-text]");
 
-  if (idsToRevert.length === 0) {
-    if (await IsDebug()) {
-      context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
-    }
-    return 0;
-  }
+  containers.forEach((container) => {
+    const originalText = container.getAttribute("data-aiwc-original-text");
+    if (originalText !== null) {
+      try {
+        // ایجاد یک گره متنی جدید با متن اصلی ذخیره شده
+        const originalTextNode = document.createTextNode(originalText);
+        // جایگزینی container با گره متنی اصلی
+        container.parentNode.replaceChild(originalTextNode, container);
+        successfulReverts++;
 
-  try {
-    for (const uniqueId of idsToRevert) {
-      const data = context.state.originalTexts.get(uniqueId);
-      if (!data || !data.originalText) {
-        errors.push({ uniqueId, message: "Missing data in state" });
-        continue; // برو به ID بعدی اگر داده‌ها ناقص هستند
-      }
-
-      // --- تغییر کلیدی: یافتن wrapper span با شناسه ---
-      const wrapperSelector = `[data-aiwc-original-id="${uniqueId}"]`;
-      const wrapperSpan = document.querySelector(wrapperSelector);
-
-      if (wrapperSpan && wrapperSpan.isConnected) {
-        try {
-          // ایجاد یک گره متنی جدید با متن اصلی ذخیره شده
-          const originalTextNode = document.createTextNode(data.originalText);
-
-          // جایگزینی wrapper span با گره متنی اصلی
-          wrapperSpan.parentNode.replaceChild(originalTextNode, wrapperSpan);
-
-          successfulReverts++;
-          revertedIds.add(uniqueId); // علامت‌گذاری ID به عنوان موفق
-        } catch (error) {
-          const errorMessage = `Failed to replace wrapper span for ID: ${uniqueId}`;
-          errors.push({ error, uniqueId, message: errorMessage });
-          context.errorHandler.handle(error, {
-            type: ErrorTypes.DOM_MANIPULATION, // یا نوع خطای مناسب دیگر
-            context: "revert-translations-replace",
-            elementId: uniqueId,
-          });
+        // حذف گره‌های <br> مجاور که با ویژگی data-aiwc-br نشانه‌گذاری شده‌اند
+        let nextNode = originalTextNode.nextSibling;
+        while (
+          nextNode &&
+          nextNode.nodeName === "BR" &&
+          nextNode.getAttribute("data-aiwc-br") === "true"
+        ) {
+          const nodeToRemove = nextNode;
+          nextNode = nextNode.nextSibling;
+          nodeToRemove.parentNode.removeChild(nodeToRemove);
         }
-      } else {
-        // اگر wrapper span پیدا نشد یا از DOM حذف شده بود
-        errors.push({
-          uniqueId,
-          message: `Wrapper span not found or disconnected for ID: ${uniqueId}`,
+      } catch (error) {
+        const errorMessage = `Failed to revert container with original text.`;
+        context.errorHandler.handle(error, {
+          type: ErrorTypes.PARSE_TEXT,
+          context: "revert-translations-replace",
+          elementId: container.getAttribute("data-aiwc-original-id"),
         });
-        logME(`AIWC: Wrapper span with ID ${uniqueId} not found for revert.`);
-        // چون عنصر پیدا نشد، فرض می‌کنیم بازگردانی لازم نیست یا ممکن نیست
-        // و آن را از state حذف می‌کنیم تا در تلاش‌های بعدی مشکل‌ساز نشود.
-        revertedIds.add(uniqueId);
+        logME(errorMessage, error);
       }
     }
+  });
 
-    // نمایش نتیجه به کاربر
-    if (successfulReverts > 0) {
-      context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert");
-    } else if (errors.length > 0 && idsToRevert.length > 0) {
-      if (await IsDebug()) {
-        context.notifier.show("خطا در بازگردانی برخی متن‌ها", "info");
-        console.warn("Translation reversion errors:", errors);
-      }
-    }
-  } catch (error) {
-    context.errorHandler.handle(error, {
-      type: ErrorTypes.PARSE_TEXT,
-      context: "revert-translations-main-loop",
-    });
-  } finally {
-    // --- تغییر کلیدی: پاکسازی state ---
-    // فقط ID هایی که با موفقیت بازگردانی شدند یا پیدا نشدند را از state حذف کن
-    revertedIds.forEach((id) => {
-      context.state.originalTexts.delete(id);
-    });
-
-    // اگر هیچ متنی در state باقی نمانده، cleanup را اجرا کن
-    if (context.state.originalTexts.size === 0) {
-      context.IconManager?.cleanup(); // اطمینان از وجود IconManager
-    }
-
-    if ((await IsDebug()) && context.state.originalTexts.size > 0) {
-      console.warn(
-        "AIWC: Some translations could not be reverted and remain in state:",
-        context.state.originalTexts
-      );
-    }
+  if (successfulReverts > 0) {
+    context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert");
+  } else if (await IsDebug()) {
+    context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
   }
+
+  // پاکسازی state و انجام cleanup
+  context.IconManager?.cleanup();
+  context.state.originalTexts.clear();
 
   return successfulReverts;
-}
-
-function _resetTextDirection(element) {
-  if (element && element.hasAttribute("dir")) {
-    element.removeAttribute("dir");
-  }
-
-  // اگر کلاس‌های مرتبط با جهت متن وجود دارند، آن‌ها را حذف کنید
-  if (element) {
-    element.classList.remove("rtl-text", "ltr-text");
-    // هر کلاس دیگری که ممکن است توسط IconManager اضافه شده باشد
-  }
 }
