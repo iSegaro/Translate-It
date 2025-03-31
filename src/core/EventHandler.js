@@ -321,16 +321,12 @@ export default class EventHandler {
 
   handleTranslationLengthMismatch(translatedData, expandedTexts) {
     if (!Array.isArray(translatedData)) {
-      console.error(
-        "پاسخ ترجمه یک آرایه نیست.",
-        "داده پارس شده:",
-        translatedData
-      );
+      logME("پاسخ ترجمه یک آرایه نیست.", "داده پارس شده:", translatedData);
       throw new Error("Translated response is not an array.");
     }
 
     if (translatedData.length !== expandedTexts.length) {
-      console.warn(
+      logME(
         "عدم تطابق طول در پاسخ ترجمه شناسایی شد.",
         `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
         `طول دریافت شده: ${translatedData.length}`,
