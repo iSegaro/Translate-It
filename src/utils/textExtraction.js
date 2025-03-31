@@ -1,6 +1,7 @@
 // src/utils/textExtraction.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG, getDebugModeAsync, IsDebug } from "../config.js";
+import { logME } from "./helpers.js";
 
 /**
  * جداسازی متن‌های موجود در حافظه کش و متن‌های جدید برای ترجمه.
@@ -101,12 +102,10 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       wrapperSpan.setAttribute("data-aiwc-original-id", uniqueId);
       wrapperSpan.textContent = translatedText;
 
-      // ذخیره متن *اصلی* گره متنی (نه innerHTML والد) برای بازگردانی
+      // ذخیره متن *اصلی* گره متنی برای بازگردانی
       context.state.originalTexts.set(uniqueId, {
         originalText: originalText, // متن اصلی گره متنی
-        // parent: parentElement, // دیگر نیازی به ذخیره والد نیست
-        // originalInnerHTML: parentElement.innerHTML, // دیگر نیازی به این نیست
-        wrapperElement: wrapperSpan, // مرجع به span ایجاد شده (اختیاری، برای دسترسی سریع‌تر)
+        wrapperElement: wrapperSpan, // مرجع به span ایجاد شده (برای دسترسی سریع‌تر)
       });
 
       // اعمال استایل‌ها (مثل جهت متن) به span جدید
@@ -116,14 +115,19 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       try {
         parentElement.replaceChild(wrapperSpan, textNode);
       } catch (error) {
-        console.error(
-          "AIWC Error replacing text node with wrapper span:",
-          error,
-          { textNode, wrapperSpan, parentElement }
-        );
+        logME("AIWC Error replacing text node with wrapper span:", error, {
+          textNode,
+          wrapperSpan,
+          parentElement,
+        });
         // اگر جایگزینی ناموفق بود، این ترجمه را از state حذف کن
         context.state.originalTexts.delete(uniqueId);
-        // (می‌توانید خطا را به ErrorHandler نیز ارسال کنید)
+        error = ErrorHandler.processError(error);
+        context.errorHandler.handle(error, {
+          type: ErrorTypes.PARSE_TEXT,
+          context: "textExtraction-apply-translations-replace",
+          elementId: uniqueId,
+        });
       }
     }
   });
@@ -185,11 +189,7 @@ export async function revertTranslations(context) {
           uniqueId,
           message: `Wrapper span not found or disconnected for ID: ${uniqueId}`,
         });
-        if (await IsDebug()) {
-          console.warn(
-            `AIWC: Wrapper span with ID ${uniqueId} not found for revert.`
-          );
-        }
+        logME(`AIWC: Wrapper span with ID ${uniqueId} not found for revert.`);
         // چون عنصر پیدا نشد، فرض می‌کنیم بازگردانی لازم نیست یا ممکن نیست
         // و آن را از state حذف می‌کنیم تا در تلاش‌های بعدی مشکل‌ساز نشود.
         revertedIds.add(uniqueId);
@@ -198,16 +198,16 @@ export async function revertTranslations(context) {
 
     // نمایش نتیجه به کاربر
     if (successfulReverts > 0) {
-      context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert"); // پیام واضح‌تر
+      context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert");
     } else if (errors.length > 0 && idsToRevert.length > 0) {
-      context.notifier.show("خطا در بازگردانی برخی متن‌ها", "error");
       if (await IsDebug()) {
+        context.notifier.show("خطا در بازگردانی برخی متن‌ها", "error");
         console.error("Translation reversion errors:", errors);
       }
     }
   } catch (error) {
     context.errorHandler.handle(error, {
-      type: ErrorTypes.UI, // یا خطای عمومی‌تر
+      type: ErrorTypes.PARSE_TEXT,
       context: "revert-translations-main-loop",
     });
   } finally {
