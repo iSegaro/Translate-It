@@ -1,169 +1,351 @@
-// src/strategies/TwitterStrategy.js
 import { ErrorTypes } from "../services/ErrorService.js";
+
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers";
+
+import { delay, logME } from "../utils/helpers";
 
 export default class TwitterStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
+
     this.errorHandler = errorHandler;
   }
 
   isTwitterElement(target) {
-    return !!target.closest(
-      '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
-    );
+    if (!target || !(target instanceof Element)) {
+      return false;
+    }
+
+    try {
+      const result = !!target.closest(
+        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
+      );
+
+      return result;
+    } catch (error) {
+      return false;
+    }
   }
 
   isDMElement(target) {
-    return !!target.closest(
-      '[data-testid="dmComposerTextInput"], [role="textbox"][aria-label="Text message"]'
-    );
+    if (!target || !(target instanceof Element)) {
+      return false;
+    }
+
+    try {
+      const result = !!target.closest(
+        '[data-testid="dmComposerTextInput"], [role="textbox"][aria-label="Text message"]'
+      );
+
+      return result;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
-   * پاک کردن فیلد متنی از طریق ClipboardEvent
-   * @param {HTMLElement} tweetField - فیلد هدف
-   */
+
+* پاک کردن فیلد متنی از طریق ClipboardEvent
+
+* @param {HTMLElement} tweetField - فیلد هدف
+
+*/
+
   clearTweetField(tweetField) {
-    if (!tweetField) return;
+    if (!tweetField) {
+      return;
+    }
 
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(tweetField);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    try {
+      // First ensure we have focus on the element
 
-    const dt = new DataTransfer();
-    dt.setData("text/plain", "");
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
-    tweetField.dispatchEvent(pasteEvent);
+      tweetField.focus();
+
+      // Check if the element already has text selected (Select All state)
+
+      const selection = window.getSelection();
+
+      const isTextSelected = selection.toString().length > 0;
+
+      if (!isTextSelected) {
+        // Only create a new selection if nothing is currently selected
+
+        const range = document.createRange();
+
+        range.selectNodeContents(tweetField);
+
+        selection.removeAllRanges();
+
+        selection.addRange(range);
+      }
+
+      // Create an empty paste event to clear the selected content
+
+      const dt = new DataTransfer();
+
+      dt.setData("text/plain", "");
+
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+
+        cancelable: true,
+
+        clipboardData: dt,
+      });
+
+      tweetField.dispatchEvent(pasteEvent);
+    } catch (error) {
+      // Handle the error but don't throw it to prevent breaking the process
+
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+
+        context: "twitter-strategy-clearTweetField",
+      });
+    }
   }
 
   /**
-   * درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
-   */
+
+* درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
+
+*/
+
   async pasteText(tweetField, text) {
-    if (!tweetField) return;
+    if (!tweetField) {
+      return;
+    }
 
     try {
       if (text && typeof text === "string") {
         // بررسی نوع و وجود مقدار
+
         const dt = new DataTransfer();
+
         dt.setData("text/plain", text);
+
         dt.setData("text/html", text.replace(/\n/g, "<br>"));
 
         const pasteEvent = new ClipboardEvent("paste", {
           bubbles: true,
+
           cancelable: true,
+
           clipboardData: dt,
         });
+
         tweetField.dispatchEvent(pasteEvent);
-      } else {
-        // console.debug("Text is not a valid string: ", text);
       }
     } catch (error) {
       const handlerError = this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
+
         context: "twitter-strategy-pasteText",
       });
+
       throw handlerError;
     }
   }
 
   /**
-   * قراردادن کرسر در انتهای فیلد متنی
-   * @param {HTMLElement} tweetField - فیلد هدف
-   */
-  setCursorToEnd(tweetField) {
-    if (!tweetField) return;
 
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(tweetField);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
+* قراردادن کرسر در انتهای فیلد متنی
+
+* @param {HTMLElement} tweetField - فیلد هدف
+
+*/
+
+  setCursorToEnd(tweetField) {
+    if (!tweetField) {
+      return;
+    }
+
+    try {
+      const selection = window.getSelection();
+
+      const range = document.createRange();
+
+      range.selectNodeContents(tweetField);
+
+      range.collapse(false);
+
+      selection.removeAllRanges();
+
+      selection.addRange(range);
+    } catch (error) {
+      // Handle the error but don't throw it to prevent breaking the process
+
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+
+        context: "twitter-strategy-setCursorToEnd",
+      });
+    }
   }
 
   isInputElement(el) {
-    return el.tagName === "INPUT" || el.tagName === "TEXTAREA";
+    if (!el) {
+      return false;
+    }
+
+    const result = el.tagName === "INPUT" || el.tagName === "TEXTAREA";
+
+    return result;
   }
 
   async updateElement(element, translatedText) {
     try {
       // 1. پردازش فیلد جستجو
+
       const searchInput = document.querySelector(
         '[data-testid="SearchBox_Search_Input"]'
       );
-      if (
-        searchInput &&
-        this.validateField(searchInput) &&
-        (element === searchInput ||
-          element?.contains(searchInput) ||
-          document.activeElement === searchInput)
-      ) {
-        searchInput.value = translatedText;
-        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-        this.applyVisualFeedback(searchInput);
-        this.applyTextDirection(searchInput, translatedText);
-        return;
+
+      if (searchInput) {
+        // Check if element contains searchInput - add safety check
+
+        let containsSearchInput = false;
+
+        try {
+          if (element && typeof element.contains === "function") {
+            containsSearchInput = element.contains(searchInput);
+          }
+        } catch (err) {
+          //
+        }
+
+        if (
+          this.validateField(searchInput) &&
+          (element === searchInput ||
+            containsSearchInput ||
+            document.activeElement === searchInput)
+        ) {
+          // For input elements, it's safer to clear them directly using .value
+
+          searchInput.value = translatedText;
+
+          searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+          this.applyVisualFeedback(searchInput);
+
+          this.applyTextDirection(searchInput, translatedText);
+
+          return;
+        }
       }
 
       // 2. پردازش فیلد Direct Message
-      let dmField = null;
-      if (
-        this.isDMElement(element) ||
-        this.isDMElement(document.activeElement)
-      ) {
+
+      let isDMElementActive = false;
+
+      if (element) {
+        isDMElementActive = this.isDMElement(element);
+      }
+
+      let isDMElementDocumentActive = false;
+
+      isDMElementDocumentActive = this.isDMElement(document.activeElement);
+
+      if (isDMElementActive || isDMElementDocumentActive) {
+        let dmField = null;
+
         dmField = this.findField(
-          element,
+          element || document.activeElement,
+
           '[data-testid="dmComposerTextInput"]'
         );
 
         if (dmField) {
+          // First we clear any selection that might exist
+
+          try {
+            window.getSelection().removeAllRanges();
+          } catch (err) {
+            logME(
+              "[DEBUG] updateElement - Error removing selection ranges:",
+              err
+            );
+          }
+
           dmField.focus();
+
           this.clearTweetField(dmField);
+
           await delay(50);
+
           this.pasteText(dmField, translatedText);
+
           this.applyVisualFeedback(dmField);
+
           this.applyTextDirection(dmField, translatedText);
+
           await delay(100);
+
           this.setCursorToEnd(dmField);
+
           return;
         }
       }
 
       // 3. پردازش فیلدهای توییت
+
       let tweetField = null;
-      if (this.isTwitterElement(document.activeElement)) {
+
+      let isTwitterElementActive = false;
+
+      isTwitterElementActive = this.isTwitterElement(document.activeElement);
+
+      let isElementTwitter = false;
+
+      if (element) {
+        isElementTwitter = this.isTwitterElement(element);
+      }
+
+      if (isTwitterElementActive) {
         tweetField = document.activeElement;
-      } else if (this.isTwitterElement(element)) {
+      } else if (isElementTwitter) {
         tweetField = element;
       } else {
         tweetField = this.findField(
-          element,
+          element || document.body,
+
           '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
         );
       }
 
-      if (tweetField && this.validateField(tweetField)) {
-        tweetField.focus();
-        this.clearTweetField(tweetField);
-        await delay(50);
-        this.pasteText(tweetField, translatedText);
-        this.applyVisualFeedback(tweetField);
-        this.applyTextDirection(tweetField, translatedText);
-        await delay(100);
-        this.setCursorToEnd(tweetField);
+      if (tweetField) {
+        if (this.validateField(tweetField)) {
+          // First we clear any selection that might exist
+
+          try {
+            window.getSelection().removeAllRanges();
+          } catch (err) {
+            //
+          }
+
+          tweetField.focus();
+
+          this.clearTweetField(tweetField);
+
+          await delay(50);
+
+          this.pasteText(tweetField, translatedText);
+
+          this.applyVisualFeedback(tweetField);
+
+          this.applyTextDirection(tweetField, translatedText);
+
+          await delay(100);
+
+          this.setCursorToEnd(tweetField);
+        }
       }
     } catch (error) {
+      console.error("[DEBUG] Critical error in updateElement:", error);
+
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
+
         context: "twitter-strategy-updateElement",
       });
     }
@@ -171,50 +353,145 @@ export default class TwitterStrategy extends PlatformStrategy {
 
   extractText(target) {
     // 1. بررسی فیلد جستجو
+
     const searchInput = document.querySelector(
       '[data-testid="SearchBox_Search_Input"]'
     );
-    if (
-      searchInput &&
-      this.validateField(searchInput) &&
-      (target === searchInput ||
-        document.activeElement === searchInput ||
-        searchInput.contains(target))
-    ) {
-      return searchInput.value.trim();
+
+    if (searchInput) {
+      // Safe target contains check
+
+      let targetContainsSearchInput = false;
+
+      if (target && typeof target.contains === "function") {
+        targetContainsSearchInput = target.contains(searchInput);
+      }
+
+      if (
+        this.validateField(searchInput) &&
+        (target === searchInput ||
+          document.activeElement === searchInput ||
+          targetContainsSearchInput)
+      ) {
+        const result = searchInput.value.trim();
+
+        return result;
+      }
     }
 
     // 2. بررسی فیلد Direct Message
-    if (this.isDMElement(target) || this.isDMElement(document.activeElement)) {
-      const dmField = this.findField(
-        target,
+
+    let isDMElementTarget = false;
+
+    if (target) {
+      isDMElementTarget = this.isDMElement(target);
+    }
+
+    let isDMElementDocActive = false;
+
+    isDMElementDocActive = this.isDMElement(document.activeElement);
+
+    if (isDMElementTarget || isDMElementDocActive) {
+      let dmField = null;
+
+      dmField = this.findField(
+        target || document.activeElement,
+
         '[data-testid="dmComposerTextInput"]'
       );
-      if (dmField?.tagName === "DIV") {
-        return dmField.textContent.trim();
+
+      if (dmField) {
+        let result = "";
+
+        if (dmField.tagName === "DIV") {
+          result = dmField.textContent.trim();
+        } else {
+          result = (dmField.value || "").trim();
+        }
+
+        return result;
       }
-      return dmField?.value.trim() || "";
     }
 
     // 3. بررسی فیلدهای توییت
+
     let tweetField = null;
-    if (this.isTwitterElement(document.activeElement)) {
+
+    let isTwitterElementActive = false;
+
+    isTwitterElementActive = this.isTwitterElement(document.activeElement);
+
+    let isTargetTwitter = false;
+
+    if (target) {
+      isTargetTwitter = this.isTwitterElement(target);
+    }
+
+    if (isTwitterElementActive) {
       tweetField = document.activeElement;
-    } else if (this.isTwitterElement(target)) {
+    } else if (isTargetTwitter) {
       tweetField = target;
     } else {
       const SELECTORS =
         '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]';
-      tweetField = this.findField(target, SELECTORS);
+
+      tweetField = this.findField(target || document.body, SELECTORS);
     }
 
     if (!tweetField) {
-      console.warn("فیلد متنی برای استخراج متن یافت نشد.");
       return "";
     }
 
-    return tweetField?.tagName === "DIV" ?
-        tweetField.textContent.trim()
-      : tweetField.value.trim();
+    let result = "";
+
+    if (tweetField.tagName === "DIV") {
+      result = tweetField.textContent.trim();
+    } else {
+      result = (tweetField.value || "").trim();
+    }
+
+    return result;
+  }
+
+  // Helper method to safely check if an element is valid
+
+  validateField(field) {
+    try {
+      return !!field && field instanceof Element;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Helper method to safely find a field
+
+  findField(element, selector) {
+    if (!element) {
+      return null;
+    }
+
+    try {
+      // Check if element itself matches the selector
+
+      if (element.matches && element.matches(selector)) {
+        return element;
+      }
+
+      // Check if element can use querySelector
+
+      if (typeof element.querySelector === "function") {
+        const field = element.querySelector(selector);
+
+        return field;
+      }
+
+      // If element is not a proper DOM node with querySelector, try document
+
+      const field = document.querySelector(selector);
+
+      return field;
+    } catch (error) {
+      return null;
+    }
   }
 }
