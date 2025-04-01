@@ -63,7 +63,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       this.triggerStateUpdate(whatsappField);
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
+        type: ErrorTypes.PARSE_INPUT,
         context: "whatsapp-strategy-updateElement",
       });
     }
@@ -93,7 +93,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       return element;
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
+        type: ErrorTypes.PARSE_INPUT,
         context: "whatsapp-strategy-selectAllContent",
       });
     }
@@ -129,7 +129,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       await delay(50);
     } catch (error) {
       this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
+        type: ErrorTypes.PARSE_INPUT,
         context: "whatsapp-strategy-simulatePaste",
       });
     }
