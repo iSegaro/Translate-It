@@ -135,7 +135,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         context.state.originalTexts.delete(uniqueId);
         error = ErrorHandler.processError(error);
         context.errorHandler.handle(error, {
-          type: ErrorTypes.PARSE_TEXT,
+          type: ErrorTypes.PARSE_SELECT_ELEMENT,
           context: "textExtraction-apply-translations-replace",
           elementId: "multiple",
         });
@@ -179,7 +179,7 @@ export async function revertTranslations(context) {
       } catch (error) {
         const errorMessage = `Failed to revert container with original text.`;
         context.errorHandler.handle(error, {
-          type: ErrorTypes.PARSE_TEXT,
+          type: ErrorTypes.PARSE_SELECT_ELEMENT,
           context: "revert-translations-replace",
           elementId: container.getAttribute("data-aiwc-original-id"),
         });

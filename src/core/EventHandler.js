@@ -252,7 +252,7 @@ export default class EventHandler {
           await this.translationHandler.errorHandler.handle(
             parseOrProcessError,
             {
-              type: ErrorTypes.PARSE_TEXT,
+              type: ErrorTypes.PARSE_SELECT_ELEMENT,
               context: "EventHandler-handleSelect-JSONParseOrProcessError",
               details: `Failed to process API response. Raw snippet: ${translatedJsonString.substring(
                 0,

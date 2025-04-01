@@ -11,7 +11,8 @@ export class ErrorTypes {
   static CONTEXT = "CONTEXT";
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
-  static PARSE_TEXT = "PARSING_RESPONSE";
+  static PARSE_SELECT_ELEMENT = "PARSING_RESPONSE";
+  static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
 }
 
 export class ErrorHandler {
@@ -250,7 +251,7 @@ export class ErrorHandler {
           message: "خطا در مدلِ انتخاب شده",
         },
       },
-      [ErrorTypes.PARSE_TEXT]: {
+      [ErrorTypes.PARSE_SELECT_ELEMENT]: {
         default: {
           code: "parsing-response-error",
           message: "خطا در پردازش پاسخ",
