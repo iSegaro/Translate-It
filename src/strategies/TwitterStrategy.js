@@ -120,11 +120,22 @@ export default class TwitterStrategy extends PlatformStrategy {
       if (text && typeof text === "string") {
         // بررسی نوع و وجود مقدار
 
+        // تقسیم متن به خطوط
+        let lines = text.split("\n");
+
+        // حذف خطوط خالی انتهایی
+        while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
+          lines.pop();
+        }
+
+        // اتصال خطوط به همراه کاراکتر خط جدید
+        const trimmedText = lines.join("\n");
+
         const dt = new DataTransfer();
 
-        dt.setData("text/plain", text);
+        dt.setData("text/plain", trimmedText);
 
-        dt.setData("text/html", text.replace(/\n/g, "<br>"));
+        dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
 
         const pasteEvent = new ClipboardEvent("paste", {
           bubbles: true,
