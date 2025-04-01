@@ -2,7 +2,7 @@
 import { ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers";
+import { delay, logME } from "../utils/helpers";
 
 export default class TelegramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -165,7 +165,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       // 2. اعتبارسنجی پیشرفته
       if (!this.validateField(telegramField)) {
-        // throw new Error("فیلد تلگرام یافت نشد")
+        logME("فیلد تلگرام یافت نشد");
         return;
       }
 

@@ -1,6 +1,6 @@
 // src/utils/textExtraction.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG, getDebugModeAsync, IsDebug } from "../config.js";
+import { IsDebug } from "../config.js";
 import { logME } from "./helpers.js";
 
 const translationCache = new Map();
@@ -346,7 +346,7 @@ export function reassembleTranslations(
       newTranslations.set(originalText, reassembledText);
       translationCache.set(originalText, reassembledText);
     } else if (!cachedTranslations.has(originalText)) {
-      console.warn(
+      logME(
         `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
       );
       newTranslations.set(originalText, originalText);

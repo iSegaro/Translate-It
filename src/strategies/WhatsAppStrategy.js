@@ -1,8 +1,7 @@
 // src/strategies/WhatsAppStrategy.js
 import { ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG } from "../config";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers";
+import { delay, logME } from "../utils/helpers";
 
 export default class WhatsAppStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -26,7 +25,8 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       let whatsappField = this.findField(element, SELECTORS);
 
       if (!whatsappField) {
-        throw new Error("فیلد واتساپ یافت نشد");
+        logME("فیلد واتساپ یافت نشد");
+        return;
       }
 
       // استفاده مستقیم از بررسی نوع تگ و contenteditable به جای validateField
@@ -37,7 +37,8 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         whatsappField.isConnected;
 
       if (!isValidField) {
-        throw new Error("فیلد واتساپ نامعتبر است");
+        logME("فیلد واتساپ نامعتبر است");
+        return;
       }
 
       const isWhatsApp = this.isWhatsAppElement(element);

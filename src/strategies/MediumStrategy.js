@@ -1,7 +1,7 @@
 // src/strategies/MediumStrategy.js
 import { ErrorTypes } from "../services/ErrorService.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers.js";
+import { delay, logME } from "../utils/helpers.js";
 
 export default class MediumStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -39,7 +39,8 @@ export default class MediumStrategy extends PlatformStrategy {
     const mediumField = this.findMediumTextField(element);
     if (!mediumField) {
       console.error("Medium text field not found for element:", element);
-      throw new Error("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
+      logME("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
+      return;
     }
 
     this.safeFocus(mediumField); // فوکوس روی فیلد
