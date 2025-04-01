@@ -233,11 +233,11 @@ export default class TwitterStrategy extends PlatformStrategy {
         ) {
           // For input elements, it's safer to clear them directly using .value
 
+          this.applyVisualFeedback(searchInput);
+
           searchInput.value = translatedText;
 
           searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-          this.applyVisualFeedback(searchInput);
 
           this.applyTextDirection(searchInput, translatedText);
 
@@ -279,14 +279,13 @@ export default class TwitterStrategy extends PlatformStrategy {
           }
 
           dmField.focus();
+          this.applyVisualFeedback(dmField);
 
           this.clearTweetField(dmField);
 
           await delay(50);
 
           this.pasteText(dmField, translatedText);
-
-          this.applyVisualFeedback(dmField);
 
           this.applyTextDirection(dmField, translatedText);
 
@@ -335,14 +334,13 @@ export default class TwitterStrategy extends PlatformStrategy {
           }
 
           tweetField.focus();
+          this.applyVisualFeedback(tweetField);
 
           this.clearTweetField(tweetField);
 
           await delay(50);
 
           this.pasteText(tweetField, translatedText);
-
-          this.applyVisualFeedback(tweetField);
 
           this.applyTextDirection(tweetField, translatedText);
 
