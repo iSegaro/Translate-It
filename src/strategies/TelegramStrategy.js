@@ -232,23 +232,17 @@ export default class TelegramStrategy extends PlatformStrategy {
         content = telegramField.textContent || telegramField.innerText || "";
       }
 
-      // پردازش نهایی متن
-      const processedText = content
-        .replace(/\s+/g, " ")
-        .replace(/[\u200B-\u200D\uFEFF]/g, "") // حذف کاراکترهای مخفی
-        .trim();
-
-      return processedText;
+      return content;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "telegram-strategy-extractText",
+        content: content,
       });
       return "";
     }
   }
 
-  // 7. بهبود متد validateField
   validateField(element) {
     const hasNestedEditable = element?.querySelector(
       '[contenteditable="true"]'
@@ -295,22 +289,33 @@ export default class TelegramStrategy extends PlatformStrategy {
   }
 
   async simulatePaste(field, text) {
-    if (!field) {
-      return;
-    }
+    if (!field || text === undefined || text === null) return;
+
     try {
-      if (text !== undefined && text !== null) {
-        const dt = new DataTransfer();
-        dt.setData("text/plain", text);
-        dt.setData("text/html", text.replace(/\n/g, "<br>"));
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: dt,
-        });
-        field.dispatchEvent(pasteEvent);
-        await delay(50);
-      }
+      // 1. Trim the text to remove leading/trailing whitespace, including newlines.
+      let trimmedText = text.trim();
+
+      // 2. Collapse multiple consecutive newlines into single newlines.
+      trimmedText = trimmedText.replace(/\n{2,}/g, "\n");
+
+      // 3. Convert newlines to <br> for HTML representation.
+      const htmlText = trimmedText.replace(/\n/g, "<br>");
+
+      // 4. Create DataTransfer object.
+      const dt = new DataTransfer();
+      dt.setData("text/plain", trimmedText); // Use trimmedText for plain text
+      dt.setData("text/html", htmlText); // Use htmlText for HTML
+
+      // 5. Create and dispatch the paste event.
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      field.dispatchEvent(pasteEvent);
+
+      // 6. Add a small delay for event processing.
+      await delay(50);
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
