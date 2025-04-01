@@ -1,7 +1,5 @@
 import { ErrorTypes } from "../services/ErrorService";
-import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import TranslationHandler from "../core/TranslationHandler.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
