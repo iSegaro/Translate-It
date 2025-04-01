@@ -350,7 +350,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         }
       }
     } catch (error) {
-      console.error("[DEBUG] Critical error in updateElement:", error);
+      logME("[DEBUG] Critical error in updateElement:", error);
 
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,

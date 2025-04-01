@@ -65,7 +65,7 @@ class ApiService {
     try {
       const response = await fetch(url, fetchOptions);
 
-      // console.debug("API Response (Raw):", {
+      // logME("API Response (Raw):", {
       //   status: response.status,
       //   statusText: response.statusText,
       //   headers: Object.fromEntries(response.headers.entries()),
@@ -370,7 +370,7 @@ class ApiService {
     }
 
     if (!text || typeof text !== "string") {
-      console.warn(
+      logME(
         "[API] translateText: Received potentially invalid input type after createPrompt:",
         typeof text
       );
@@ -438,7 +438,7 @@ class ApiService {
     } catch (error) {
       error = await ErrorHandler.processError(error);
       if (error.sessionConflict && sourceLang && targetLang) {
-        console.warn("[API] Session conflict, retrying WebAI...");
+        logME("[API] Session conflict, retrying WebAI...");
         this.resetSessionContext();
         return await this.handleWebAITranslation(
           text,

@@ -1,6 +1,6 @@
 // src/utils/helpers.js
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
-import { CONFIG, IsDebug } from "../config.js";
+import { IsDebug } from "../config.js";
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -39,7 +39,8 @@ export const logME = (...args) => {
 export const isEditable = (element) => {
   return (
     element?.isContentEditable ||
-    ["INPUT", "TEXTAREA"].includes(element?.tagName)
+    ["INPUT", "TEXTAREA"].includes(element?.tagName) ||
+    (element?.closest && element.closest('[contenteditable="true"]'))
   );
 };
 

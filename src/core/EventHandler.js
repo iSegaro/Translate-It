@@ -1,7 +1,7 @@
 // src/core/EventHandler.js
-import { CONFIG, state, TranslationMode } from "../config.js";
+import { state, TranslationMode } from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
-import { translateText, API_TEXT_DELIMITER } from "../utils/api.js";
+import { translateText } from "../utils/api.js";
 import {
   separateCachedAndNewTexts,
   collectTextNodes,
@@ -12,7 +12,7 @@ import {
   handleTranslationLengthMismatch,
   reassembleTranslations,
 } from "../utils/textExtraction.js";
-import { logME, logMethod, taggleLinks } from "../utils/helpers.js";
+import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 
@@ -109,7 +109,7 @@ export default class EventHandler {
         );
         return icon;
       } else {
-        console.debug("[EventHandler] Icon not created");
+        logME("[EventHandler] Icon not created");
         return null;
       }
     }
@@ -154,7 +154,7 @@ export default class EventHandler {
         logME("You are on WhatsApp!");
         break;
       default:
-        logME("You are on another platform.");
+        logME(`You are on ${currentPlatform}.`);
     }
 
     const targetElement = e.target;
@@ -328,10 +328,10 @@ export default class EventHandler {
   }
 
   async handleCtrlSlash(event) {
+    logME("[EventHandler] Handling Ctrl+/ event");
+
     event.preventDefault();
     event.stopPropagation();
-
-    logME("[EventHandler] Handling Ctrl+/ event");
 
     if (this.isProcessing) return;
     this.isProcessing = true;
@@ -340,8 +340,12 @@ export default class EventHandler {
       const { select_element, activeElement } =
         this.translationHandler.getSelectElementContext();
 
+      if (!isEditable(activeElement)) {
+        return;
+      }
+
       /**
-       * اگر متنی داخل فیلد متنی انتخاب شده باشد، آن را انتخاب می کند
+       * اگر متنی داخل انتخاب شده باشد، آن را برای ترجمه انتخاب میکند می کند
        * ولی منطق برنامه برای هندل کردن آن متن انتخاب شده پیاده سازی نشده است
        * این کدها را با کامنت برای آینده باقی میگذارم تا در صورت نیاز بازآوری شود
        */

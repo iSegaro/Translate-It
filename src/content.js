@@ -52,7 +52,7 @@ class ContentScript {
       this.setupPagehideListener();
       this.setupMessageListener();
     } else {
-      console.debug("[Content] Extension context is not valid");
+      console.warn("[Content] Extension context is not valid");
       this.translationHandler.notifier.show(
         "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
         "error",
@@ -151,10 +151,10 @@ class ContentScript {
             chrome.runtime.reload();
           }, 2000);
         } else {
-          console.debug("[Content] Received unknown message => ", message);
+          logME("[Content] Received unknown message => ", message);
         }
       } else {
-        console.debug("[Content] Received unknown message => ", message);
+        logME("[Content] Received unknown message => ", message);
       }
     } catch (error) {
       this.translationHandler.errorHandler.handle(error, {

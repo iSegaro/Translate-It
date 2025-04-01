@@ -11,14 +11,9 @@ import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
-import {
-  CONFIG,
-  state,
-  TranslationMode,
-  TRANSLATION_ERRORS,
-} from "../config.js";
+import { state, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
-import { logMethod, isExtensionContextValid } from "../utils/helpers.js";
+import { logMethod, isExtensionContextValid, logME } from "../utils/helpers.js";
 import {
   detectPlatform,
   detectPlatformByURL,
@@ -66,7 +61,7 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-    console.debug(
+    logME(
       "[TranslationHandler] Reinitializing TranslationHandler state after update..."
     );
     this.isProcessing = false;
@@ -104,7 +99,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-      console.debug("[TranslationHandler] Error handling failed:", error);
+      logME("[TranslationHandler] Error handling failed:", error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",

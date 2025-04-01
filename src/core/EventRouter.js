@@ -1,6 +1,6 @@
 // src/core/EventRouter.js
 import { CONFIG, state } from "../config.js";
-import { isEditable, taggleLinks } from "../utils/helpers.js";
+import { isEditable, logME, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 import { logMethod } from "../utils/helpers.js";
 
@@ -132,9 +132,7 @@ class EventRouter {
           action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });
-        console.info(
-          "[EventRouter] Select Element Mode deactivated via Esc key."
-        );
+        logME("[EventRouter] Select Element Mode deactivated via Esc key.");
         return;
       }
     } catch (error) {

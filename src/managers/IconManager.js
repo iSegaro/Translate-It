@@ -1,5 +1,6 @@
 // src/managers/IconManager.js
 import { CONFIG, state } from "../config.js";
+import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 export default class IconManager {
@@ -47,13 +48,13 @@ export default class IconManager {
     try {
       if (!target?.isConnected) {
         // throw new Error("المان هدف برای ایجاد آیکون معتبر نیست");
-        console.debug("المان هدف برای ایجاد آیکون معتبر نیست");
+        logME("المان هدف برای ایجاد آیکون معتبر نیست");
         return;
       }
 
       const icon = document.createElement("button");
       if (!icon) {
-        console.debug("[IconManager] آیکون معتبر نیست!");
+        logME("[IconManager] آیکون معتبر نیست!");
         return;
       }
       icon.className = "AIWritingCompanion-translation-icon-extension";

@@ -1,8 +1,9 @@
 // src/managers/IconBehavior.js
-import { CONFIG, state } from "../config.js";
+import { state } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorService.js";
+import { logME } from "../utils/helpers.js";
 
 export default function setupIconBehavior(
   icon,
@@ -76,11 +77,11 @@ export default function setupIconBehavior(
       if (translated) {
         await translationHandler.updateTargetElement(target, translated);
       } else {
-        // console.debug("[IconBehavior] No translation result: ", translated);
+        // logME("[IconBehavior] No translation result: ", translated);
       }
     } catch (error) {
       // const resolvedError = await Promise.resolve(error);
-      // console.debug("[IconBehavior] setupIconBehavior: ", resolvedError);
+      // logME("[IconBehavior] setupIconBehavior: ", resolvedError);
     } finally {
       if (statusNotification) {
         notifier.dismiss(statusNotification);
@@ -145,12 +146,12 @@ export default function setupIconBehavior(
     // اعتبارسنجی اولیه
     if (!(icon instanceof HTMLElement) || !icon.isConnected) {
       // throw new Error("آیکون معتبر نیست");
-      console.debug("[IconBehavior] آیکون معتبر نیست");
+      logME("[IconBehavior] آیکون معتبر نیست");
     }
 
     if (!target.isConnected || !document.contains(target)) {
       // throw new Error("[IconBehavior] المان هدف در DOM وجود ندارد");
-      console.debug("[IconBehavior] المان هدف در DOM وجود ندارد");
+      logME("[IconBehavior] المان هدف در DOM وجود ندارد");
     }
 
     // تنظیمات اولیه موقعیت

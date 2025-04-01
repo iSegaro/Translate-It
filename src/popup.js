@@ -1,5 +1,6 @@
 // src/popup.js
 import { getApiKeyAsync } from "./config.js";
+import { logME } from "./utils/helpers.js";
 
 document.getElementById("restore").addEventListener("click", () => {
   if (chrome.scripting && chrome.scripting.executeScript) {
@@ -14,7 +15,7 @@ document.getElementById("restore").addEventListener("click", () => {
     });
   } else {
     // errorHandler.handle(new Error('Scripting API disabled'), {...});
-    console.log("[Popup] Scripting API disabled");
+    logME("[Popup] Scripting API disabled");
   }
 });
 
@@ -28,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("saveApiKey").addEventListener("click", () => {
     const apiKey = document.getElementById("apiKey").value.trim();
     chrome.storage.local.set({ apiKey }, () => {
-      console.log("[Popup] API key saved:", apiKey);
+      logME("[Popup] API key saved:", apiKey);
     });
   });
 });
