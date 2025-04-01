@@ -345,20 +345,36 @@ export default class EventHandler {
     try {
       const { select_element, activeElement } =
         this.translationHandler.getSelectElementContext();
-      const isTextSelected = !select_element.isCollapsed;
+
+      /**
+       * اگر متنی داخل فیلد متنی انتخاب شده باشد، آن را انتخاب می کند
+       * ولی منطق برنامه برای هندل کردن آن متن انتخاب شده پیاده سازی نشده است
+       * این کدها را با کامنت برای آینده باقی میگذارم تا در صورت نیاز بازآوری شود
+       */
+      // const isTextSelected = !select_element.isCollapsed;
+
+      // const text =
+      //   isTextSelected ?
+      //     select_element.toString().trim()
+      //   : this.translationHandler.extractFromActiveElement(activeElement);
+
+      // await this.translationHandler.processTranslation_with_CtrlSlash({
+      //   text,
+      //   originalText: text,
+      //   target: isTextSelected ? null : activeElement,
+      //   selectionRange: isTextSelected ? select_element.getRangeAt(0) : null,
+      // });
 
       const text =
-        isTextSelected ?
-          select_element.toString().trim()
-        : this.translationHandler.extractFromActiveElement(activeElement);
+        this.translationHandler.extractFromActiveElement(activeElement);
 
       if (!text) return;
 
       await this.translationHandler.processTranslation_with_CtrlSlash({
         text,
         originalText: text,
-        target: isTextSelected ? null : activeElement,
-        selectionRange: isTextSelected ? select_element.getRangeAt(0) : null,
+        target: activeElement,
+        selectionRange: null,
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
