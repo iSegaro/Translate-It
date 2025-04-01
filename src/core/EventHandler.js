@@ -209,7 +209,7 @@ export default class EventHandler {
       // ارسال به سرویس ترجمه
       const translatedJsonString = await translateText(jsonFormatString);
 
-      logME("JSON خام پاسخ:", translatedJsonString);
+      // logME("JSON خام پاسخ:", translatedJsonString);
 
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
@@ -217,14 +217,19 @@ export default class EventHandler {
       }
 
       if (translatedJsonString && typeof translatedJsonString === "string") {
-        let translatedData;
+        const translatedData = parseAndCleanTranslationResponse(
+          translatedJsonString,
+          this.translationHandler
+        );
+
+        if (!translatedData) {
+          return;
+        }
+
+        // --- مرحله 5: بررسی و مدیریت عدم تطابق طول ---
+        handleTranslationLengthMismatch(translatedData, expandedTexts);
+
         try {
-          translatedData =
-            parseAndCleanTranslationResponse(translatedJsonString);
-
-          // --- مرحله 5: بررسی و مدیریت عدم تطابق طول ---
-          handleTranslationLengthMismatch(translatedData, expandedTexts);
-
           // --- مرحله 6: بازسازی ترجمه‌ها ---
           const newTranslations = reassembleTranslations(
             translatedData,
