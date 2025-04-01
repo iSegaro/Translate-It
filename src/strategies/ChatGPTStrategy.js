@@ -20,6 +20,20 @@ export default class ChatGPTStrategy extends PlatformStrategy {
 
   extractText(target) {
     try {
+      const shortcutsModal = document.querySelector(".absolute .inset-0");
+      if (shortcutsModal) {
+        // const escapeEvent = new KeyboardEvent("keydown", {
+        //   key: "Escape",
+        //   code: "Escape",
+        //   keyCode: 27,
+        //   which: 27,
+        //   bubbles: true,
+        //   cancelable: true,
+        // });
+        // shortcutsModal.dispatchEvent(escapeEvent);
+        return "";
+      }
+
       if (this.isChatGPTElement(target)) {
         return Array.from(target.querySelectorAll("p"))
           .map((p) => p.textContent.trim())
@@ -37,6 +51,23 @@ export default class ChatGPTStrategy extends PlatformStrategy {
 
   async updateElement(element, translated) {
     try {
+      /**
+       * Detect Keyboard Shortcus Guide Modal ("absolute inset-0")
+       */
+      const shortcutsModal = document.querySelector(".absolute .inset-0");
+      if (shortcutsModal) {
+        // const escapeEvent = new KeyboardEvent("keydown", {
+        //   key: "Escape",
+        //   code: "Escape",
+        //   keyCode: 27,
+        //   which: 27,
+        //   bubbles: true,
+        //   cancelable: true,
+        // });
+        // shortcutsModal.dispatchEvent(escapeEvent);
+        return;
+      }
+
       element.innerHTML = translated.replace(/\n/g, "<br>");
       this.applyBaseStyling(element, translated);
       setCursorToEnd(element);

@@ -333,17 +333,6 @@ export default class EventHandler {
 
     logME("[EventHandler] Handling Ctrl+/ event");
 
-    // TODO: جلوگیری از اجرای میانبر در سایت ChatGPT به دلیل تداخل با شورتکات‌های پیش‌فرض آن.
-    // TODO: نیاز به بررسی بیشتر برای راه‌حل جایگزین دارد.
-    const platform = detectPlatform();
-    if (platform === Platform.ChatGPT) {
-      console.info(
-        "میانبر در این وب‌سایت موقتا غیرفعال است. لطفاً از آیکون مترجم استفاده کنید."
-      );
-      return;
-    }
-    // TODO: END
-
     if (this.isProcessing) return;
     this.isProcessing = true;
 
