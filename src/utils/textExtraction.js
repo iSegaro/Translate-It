@@ -201,57 +201,36 @@ export async function revertTranslations(context) {
   return successfulReverts;
 }
 
-export function parseAndCleanTranslationResponse(translatedJsonString) {
-  logME(
-    `parseAndCleanTranslationResponse called with: ${translatedJsonString}`
-  );
+export function parseAndCleanTranslationResponse(
+  translatedJsonString,
+  context
+) {
   let cleanJsonString = translatedJsonString.trim();
 
-  const jsonMarkdownRegex = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
+  // یافتن اولین ساختار JSON در متن
+  const jsonMatch = cleanJsonString.match(/(\[.*\]|\{.*\})/s);
 
-  const match = cleanJsonString.match(jsonMarkdownRegex);
-
-  if (match) {
-    cleanJsonString = match[1].trim();
+  if (!jsonMatch) {
+    const error = new Error("هیچ ساختار JSON معتبری در پاسخ یافت نشد.");
+    context.errorHandler.handle(error, {
+      type: ErrorTypes.PARSE_SELECT_ELEMENT,
+      context: "parseAndCleanTranslationResponse-JSON",
+      content: translatedJsonString,
+    });
+    return []; // برگرداندن یک آرایه خالی به عنوان مقدار پیش‌فرض
   }
 
   try {
+    cleanJsonString = jsonMatch[1].trim();
     return JSON.parse(cleanJsonString);
   } catch (error) {
-    console.error("خطا در پارس JSON:", error);
-
-    throw error; // دوباره پرتاب کن تا در بلاک اصلی catch بگیرد
-  }
-}
-
-export function parseAndCleanTranslationResponse_NEW(translatedJsonString) {
-  let cleanJsonString = translatedJsonString.trim();
-  const markdownRegex = /^```(?:json|text output)?\s*([\s\S]*?)\s*```$/;
-  const match = cleanJsonString.match(markdownRegex);
-  if (match) {
-    cleanJsonString = match[1].trim();
-  } else if (cleanJsonString.startsWith("```text output")) {
-    cleanJsonString = cleanJsonString.substring("```text output".length).trim();
-    if (cleanJsonString.endsWith("```")) {
-      cleanJsonString = cleanJsonString.slice(0, -3).trim();
-    }
-  } else if (cleanJsonString.startsWith("```json")) {
-    cleanJsonString = cleanJsonString.substring("```json".length).trim();
-    if (cleanJsonString.endsWith("```")) {
-      cleanJsonString = cleanJsonString.slice(0, -3).trim();
-    }
-  } else if (
-    cleanJsonString.startsWith("```") &&
-    cleanJsonString.endsWith("```")
-  ) {
-    cleanJsonString = cleanJsonString.slice(3, -3).trim();
-  }
-
-  try {
-    return JSON.parse(cleanJsonString);
-  } catch (error) {
-    console.error("خطا در پارس JSON:", error);
-    throw error; // دوباره پرتاب کن تا در بلاک اصلی catch بگیرد
+    const processedError = ErrorHandler.processError(error);
+    context.errorHandler.handle(processedError, {
+      type: ErrorTypes.PARSE_SELECT_ELEMENT,
+      context: "parseAndCleanTranslationResponse-Error",
+      content: translatedJsonString,
+    });
+    return []; // برگرداندن یک آرایه خالی در صورت بروز خطا
   }
 }
 
