@@ -31,7 +31,7 @@ export default class PlatformStrategy {
     );
   }
 
-  applyVisualFeedback(element) {
+  async applyVisualFeedback(element) {
     if (!element) return;
     try {
       const originalBackgroundColor = element.style.backgroundColor;
@@ -40,7 +40,7 @@ export default class PlatformStrategy {
       requestAnimationFrame(() => {
         setTimeout(() => {
           element.style.backgroundColor = originalBackgroundColor;
-        }, 1000);
+        }, 300);
       });
     } catch (error) {
       this.errorHandler.handle(error, {
