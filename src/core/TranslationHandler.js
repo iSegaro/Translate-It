@@ -7,6 +7,7 @@ import MediumStrategy from "../strategies/MediumStrategy.js";
 import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
 import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
+import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
@@ -52,6 +53,7 @@ export default class TranslationHandler {
       [Platform.ChatGPT]: new ChatGPTStrategy(this.notifier, this.errorHandler),
       [Platform.Youtube]: new YoutubeStrategy(this.notifier, this.errorHandler),
       [Platform.Default]: new DefaultStrategy(this.notifier, this.errorHandler),
+      [Platform.Discord]: new DiscordStrategy(this.notifier, this.errorHandler),
     };
 
     this.validateStrategies();

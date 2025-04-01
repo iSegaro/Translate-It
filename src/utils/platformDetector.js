@@ -12,6 +12,7 @@ export const Platform = {
   Medium: "medium",
   ChatGPT: "chatgpt",
   Youtube: "youtube",
+  Discord: "discrod",
 };
 
 /**
@@ -31,6 +32,7 @@ export function detectPlatform() {
     "chat.com": Platform.ChatGPT,
     "chatgpt.com": Platform.ChatGPT,
     "www.youtube.com": Platform.Youtube,
+    "discord.com": Platform.Discord,
   };
 
   return platformMap[hostname] || Platform.Default;
@@ -52,6 +54,7 @@ export function getPlatformName() {
     { name: Platform.ChatGPT, patterns: ["chat.openai.com"] },
     { name: Platform.Instagram, patterns: ["instagram.com"] },
     { name: Platform.Youtube, patterns: ["youtube.com"] },
+    { name: Platform.Discord, patterns: ["discord.com"] },
   ];
 
   // جستجو در لیست پلتفرم‌ها
@@ -78,5 +81,6 @@ export function detectPlatformByURL() {
   if (hostname.includes("whatsapp.com")) return Platform.WhatsApp;
   if (hostname.includes("instagram.com")) return Platform.Instagram;
   if (hostname.includes("youtube.com")) return Platform.Youtube;
+  if (hostname.includes("discord.com")) return Platform.Discord;
   return Platform.Default;
 }
