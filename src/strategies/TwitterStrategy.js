@@ -404,7 +404,18 @@ export default class TwitterStrategy extends PlatformStrategy {
         let result = "";
 
         if (dmField.tagName === "DIV") {
-          result = dmField.textContent.trim();
+          const contentDiv = dmField.querySelector('[data-contents="true"]');
+          if (contentDiv) {
+            const lines = Array.from(
+              contentDiv.querySelectorAll(":scope > div")
+            );
+            result = lines
+              .map((line) => line.textContent)
+              .join("\n")
+              .trim();
+          } else {
+            result = dmField.textContent.trim(); // اگر data-contents پیدا نشد، به روش قبلی برگردید
+          }
         } else {
           result = (dmField.value || "").trim();
         }
@@ -445,9 +456,15 @@ export default class TwitterStrategy extends PlatformStrategy {
     let result = "";
 
     if (tweetField.tagName === "DIV") {
-      result = tweetField.textContent.trim();
+      let contentDiv = tweetField.querySelector('[data-contents="true"]');
+      let lines = Array.from(contentDiv.querySelectorAll(":scope > div"));
+      result = lines
+        .map((line) => line.textContent)
+        .join("\n")
+        .trim();
     } else {
       result = (tweetField.value || "").trim();
+      logME("Twitter:Value", result);
     }
 
     return result;
