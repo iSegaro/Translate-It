@@ -74,9 +74,9 @@ export const CONFIG = {
   \`\`\`
     `,
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-  - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-  - If the input is in any other language, translate it to $_{TARGET}.
-  - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
+- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+- If the input is in any other language, translate it to $_{TARGET}.
+- If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
 
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
