@@ -57,7 +57,7 @@ export default class SelectionWindows {
         }
         const translatedText =
           translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
-        logME(selectedText, translatedText);
+        // logME(selectedText, translatedText);
         if (translatedText) {
           this.transitionToTranslatedText(translatedText, loadingContainer);
         } else {
@@ -71,6 +71,9 @@ export default class SelectionWindows {
         ) {
           this.handleTranslationError(error, loadingContainer);
         } else {
+          /**
+           * خطا در ترجمه نادیده گرفته شد زیرا ترجمه لغو شده است یا متن تغییر کرده است
+           */
           // logME(
           //   "[SelectionWindows] خطا در ترجمه نادیده گرفته شد زیرا ترجمه لغو شده است یا متن تغییر کرده است."
           // );

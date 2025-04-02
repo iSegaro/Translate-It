@@ -142,7 +142,7 @@ export default class EventHandler {
     if (this.selectionTimeoutId) {
       clearTimeout(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
-      logME("[EventHandler] ترجمه متن انتخاب شده لغو شد.");
+      // logME("[EventHandler] ترجمه متن انتخاب شده لغو شد.");
       document.removeEventListener(
         "mousedown",
         this.cancelSelectionTranslation
