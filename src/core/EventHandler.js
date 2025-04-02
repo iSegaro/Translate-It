@@ -37,6 +37,10 @@ export default class EventHandler {
       this.handleSelect_ElementClick.bind(this);
     this.handleEscape = this.handleEscape.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
+
+    this.selectionTimeoutId = null; // شناسه تایمر برای تاخیر در ترجمه انتخاب متن
+    this.cancelSelectionTranslation =
+      this.cancelSelectionTranslation.bind(this);
   }
 
   @logMethod
@@ -107,46 +111,81 @@ export default class EventHandler {
     }
 
     if (selectedText) {
-      // logME("[EventHandler] متن انتخاب شده در mouseup:", selectedText);
+      // اگر متن انتخاب شده وجود دارد و تایمر قبلی فعال نیست
+      if (!this.selectionTimeoutId) {
+        this.selectionTimeoutId = setTimeout(() => {
+          this.selectionTimeoutId = null; // پاک کردن شناسه تایمر بعد از اجرا
+          this.processSelectedText(selectedText, event);
+        }, 500);
 
-      // فقط اگر پاپ‌آپ نمایش داده نشده بود یا متن انتخاب شده جدید است، نمایش بده
-      if (
-        !this.SelectionWindows.isVisible ||
-        this.SelectionWindows.currentText !== selectedText
-      ) {
-        const selection = window.getSelection();
-        let position = { x: 0, y: 0 };
-        if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
-          // محاسبه موقعیت زیر متن انتخاب شده
-          position = {
-            x: rect.left + window.scrollX,
-            y: rect.bottom + window.scrollY + 15, // کمی فاصله
-          };
-
-          // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
-          const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ (باید با استایل هماهنگ باشد)
-          const viewportWidth = window.innerWidth;
-          if (position.x < 10) {
-            // جلوگیری از چسبیدن به لبه چپ
-            position.x = 10;
-          } else if (position.x + popupMaxWidth > viewportWidth - 10) {
-            // جلوگیری از خروج از لبه راست
-            position.x = viewportWidth - popupMaxWidth - 10;
-          }
-          // --- پایان بهبود موقعیت ---
-        }
-        // نمایش پاپ آپ با متن و موقعیت جدید
-        this.SelectionWindows?.show(selectedText, position);
-      } else {
-        // اگر متن همان متن قبلی است و پاپ‌آپ قابل مشاهده است، کاری نکن.
-        // اجازه بده listener مربوط به mousedown تصمیم بگیرد که ببندد یا نه.
-        // logME(
-        //   "[EventHandler] MouseUp on the same selected text while window is visible. Ignoring show()."
-        // );
+        // اضافه کردن listener برای لغو ترجمه در صورت کلیک
+        document.addEventListener("mousedown", this.cancelSelectionTranslation);
+      }
+    } else {
+      // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
+      if (this.selectionTimeoutId) {
+        clearTimeout(this.selectionTimeoutId);
+        this.selectionTimeoutId = null;
+        document.removeEventListener(
+          "mousedown",
+          this.cancelSelectionTranslation
+        );
+      }
+      // همچنین اگر پاپ‌آپ ترجمه متن انتخاب شده باز است آن را ببندید.
+      if (this.SelectionWindows?.isVisible) {
+        this.SelectionWindows.dismiss();
       }
     }
+  }
+
+  cancelSelectionTranslation() {
+    if (this.selectionTimeoutId) {
+      clearTimeout(this.selectionTimeoutId);
+      this.selectionTimeoutId = null;
+      logME("[EventHandler] ترجمه متن انتخاب شده لغو شد.");
+      document.removeEventListener(
+        "mousedown",
+        this.cancelSelectionTranslation
+      );
+    }
+  }
+
+  async processSelectedText(selectedText, event) {
+    const selection = window.getSelection();
+    let position = { x: 0, y: 0 };
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      // محاسبه موقعیت زیر متن انتخاب شده
+      position = {
+        x: rect.left + window.scrollX,
+        y: rect.bottom + window.scrollY + 15, // کمی فاصله
+      };
+
+      // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
+      const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ (باید با استایل هماهنگ باشد)
+      const viewportWidth = window.innerWidth;
+      if (position.x < 10) {
+        // جلوگیری از چسبیدن به لبه چپ
+        position.x = 10;
+      } else if (position.x + popupMaxWidth > viewportWidth - 10) {
+        // جلوگیری از خروج از لبه راست
+        position.x = viewportWidth - popupMaxWidth - 10;
+      }
+      // --- پایان بهبود موقعیت ---
+    } else {
+      /**
+       * اگر متن همان متن قبلی است و پاپ‌آپ قابل مشاهده است، کاری نکن.
+       * اجازه بده listener مربوط به mousedown تصمیم بگیرد که ببندد یا نه.
+       *  */
+      // logME(
+      //   "[EventHandler] MouseUp on the same selected text while window is visible. Ignoring show()."
+      // );
+    }
+
+    // نمایش پاپ آپ با متن و موقعیت جدید
+    this.SelectionWindows?.show(selectedText, position);
+    document.removeEventListener("mousedown", this.cancelSelectionTranslation); // حذف listener بعد از نمایش پاپ‌آپ
   }
 
   isEditableTarget(target) {
@@ -289,8 +328,6 @@ export default class EventHandler {
       // ارسال به سرویس ترجمه
       const translatedJsonString = await translateText(jsonFormatString);
 
-      // logME("JSON خام پاسخ:", translatedJsonString);
-
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
         statusNotification = null;
@@ -374,25 +411,6 @@ export default class EventHandler {
       }
     }
   }
-
-  // @logMethod
-  // async handleSelectElementMode(event) {
-  //   if (event.type === "mouseover" || event.type === "mousemove") {
-  //     const newTarget = document.elementFromPoint(event.clientX, event.clientY);
-
-  //     if (newTarget && newTarget !== state.highlightedElement) {
-  //       if (this.IconManager) {
-  //         this.IconManager.cleanup();
-  //       }
-
-  //       if (newTarget.innerText?.trim()) {
-  //         state.highlightedElement = newTarget;
-  //         newTarget.style.outline = CONFIG.HIGHLIGHT_STYLE;
-  //         newTarget.style.opacity = "0.9";
-  //       }
-  //     }
-  //   }
-  // }
 
   handleEscape(event) {
     taggleLinks(false);
