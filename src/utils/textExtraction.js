@@ -6,6 +6,26 @@ import { logME } from "./helpers.js";
 const translationCache = new Map();
 
 /**
+ * پاکسازی تمام حافظه‌های کش مورد استفاده در این ماژول.
+ * این شامل کش ترجمه‌ها و متن‌های اصلی ذخیره شده در state می‌شود.
+ *
+ * @param {object} context شیء context شامل state.
+ */
+export function clearAllCaches(context) {
+  // پاکسازی حافظه کش ترجمه‌ها
+  translationCache.clear();
+  // logME("translationCache با موفقیت پاکسازی شد.");
+
+  // پاکسازی متن‌های اصلی ذخیره شده در state (اگر context و state موجود باشند)
+  if (context && context.state && context.state.originalTexts) {
+    context.state.originalTexts.clear();
+    // logME("state.originalTexts با موفقیت پاکسازی شد.");
+  } else {
+    // logME("شیء context یا state.originalTexts در دسترس نیست.", "warning");
+  }
+}
+
+/**
  * جداسازی متن‌های موجود در حافظه کش و متن‌های جدید برای ترجمه.
  *
  * @param {Map<string, Node[]>} originalTextsMap نگاشت بین متن اصلی و گره‌های متنی مربوطه.
@@ -215,7 +235,6 @@ export function parseAndCleanTranslationResponse(
     context.errorHandler.handle(error, {
       type: ErrorTypes.PARSE_SELECT_ELEMENT,
       context: "parseAndCleanTranslationResponse-JSON",
-      content: translatedJsonString,
     });
     return []; // برگرداندن یک آرایه خالی به عنوان مقدار پیش‌فرض
   }
@@ -228,8 +247,8 @@ export function parseAndCleanTranslationResponse(
     context.errorHandler.handle(processedError, {
       type: ErrorTypes.PARSE_SELECT_ELEMENT,
       context: "parseAndCleanTranslationResponse-Error",
-      content: translatedJsonString,
     });
+    logME(cleanJsonString);
     return []; // برگرداندن یک آرایه خالی در صورت بروز خطا
   }
 }
@@ -325,9 +344,9 @@ export function reassembleTranslations(
       newTranslations.set(originalText, reassembledText);
       translationCache.set(originalText, reassembledText);
     } else if (!cachedTranslations.has(originalText)) {
-      logME(
-        `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
-      );
+      // logME(
+      //   `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
+      // );
       newTranslations.set(originalText, originalText);
     }
   });
