@@ -1,6 +1,6 @@
 // src/managers/NotificationManager.js
 import { CONFIG } from "../config.js";
-import { fadeOut } from "../utils/helpers.js";
+import { fadeOut, logME } from "../utils/helpers.js";
 
 export default class NotificationManager {
   constructor() {
@@ -130,7 +130,7 @@ export default class NotificationManager {
     const finalDuration = duration || baseNotification.duration;
     const icon = baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`];
     const notification = document.createElement("div");
-    notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`; // اضافه کردن کلاس اصلی و کلاس مربوط به نوع
+    notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`;
 
     let iconHtml = "";
     if (icon) {
@@ -138,21 +138,60 @@ export default class NotificationManager {
     }
 
     notification.innerHTML = `
-    ${iconHtml}
-    <span class="AIWritingCompanion-notification-text">${message}</span>
-  `;
+      ${iconHtml}
+      <span class="AIWritingCompanion-notification-text">${message}</span>
+    `;
 
-    const clickHandler = onClick ? onClick : () => this.dismiss(notification);
+    let timeoutId = null; // برای نگهداری شناسه تایمر autoDismiss
+
+    const clickHandler = () => {
+      logME(`Notification clicked: Type=${type}, Message=${message}`);
+
+      // اگر تابع onClick سفارشی وجود دارد، آن را اجرا کن
+      if (typeof onClick === "function") {
+        try {
+          onClick();
+        } catch (e) {
+          logME(
+            "NotificationManager: Error executing notification onClick handler:",
+            e
+          );
+        }
+      }
+
+      // همیشه نوتیفیکیشن را dismiss کن
+      this.dismiss(notification);
+
+      // اگر تایمر autoDismiss در حال اجرا بود، آن را پاک کن
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      // حذف listener برای جلوگیری از فراخوانی مجدد یا نشت حافظه
+      // (گرچه با حذف notification ممکن است خودکار حذف شود، اما این کار صریح بهتر است)
+      notification.removeEventListener("click", clickHandler);
+    };
 
     notification.addEventListener("click", clickHandler);
 
     this.container.appendChild(notification);
 
-    // اعلان‌های وضعیت autoDismiss نمی‌شوند
+    /** __نکته مهم__
+     * اعلان‌های وضعیت، نمایش وضعیت ترجمه هستند
+     * که در منطق برنامه به کار گرفته شده‌اند
+     * و نباید autodismis شوند
+     */
     if (autoDismiss && type !== "status") {
-      setTimeout(() => {
-        this.dismiss(notification);
+      timeoutId = setTimeout(() => {
+        // قبل از dismiss بررسی کن که آیا notification هنوز در DOM وجود دارد
+        // (ممکن است توسط کلیک کاربر زودتر حذف شده باشد)
+        if (notification.parentNode === this.container) {
+          this.dismiss(notification);
+        }
+        // حذف listener در صورت autoDismiss
         notification.removeEventListener("click", clickHandler);
+        timeoutId = null; // ریست کردن شناسه تایمر
       }, finalDuration);
     }
 
