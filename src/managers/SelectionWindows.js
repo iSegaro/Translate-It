@@ -12,6 +12,9 @@ export default class SelectionWindows {
     this.displayElement = null;
     this.removeMouseDownListener = null; // برای نگهداری رفرنس تابع حذف لیستنر
     this.translationHandler = options.translationHandler;
+    this.translationPromise = null; // برای نگهداری promise مربوط به ترجمه
+    this.isTranslationCancelled = false; // پرچم برای مشخص کردن اینکه آیا ترجمه لغو شده است
+    this.translatingText = null; // نگهداری متنی که در حال ترجمه است
   }
 
   async show(selectedText, position) {
@@ -22,9 +25,11 @@ export default class SelectionWindows {
       return;
     }
 
-    const translationPromise = translateText(selectedText);
+    this.isTranslationCancelled = false; // ریست کردن پرچم در هر بار نمایش
+    this.translatingText = selectedText; // ثبت متن در حال ترجمه
+    this.translationPromise = translateText(selectedText); // ذخیره promise ترجمه
 
-    this.dismiss(false);
+    this.dismiss(false); // بستن پاپ‌آپ قبلی
 
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-display-temp");
@@ -39,8 +44,17 @@ export default class SelectionWindows {
 
     this.animatePopupSize(loadingContainer);
 
-    translationPromise
+    this.translationPromise
       .then((translated_text_untrimmed) => {
+        if (
+          this.isTranslationCancelled ||
+          selectedText !== this.translatingText
+        ) {
+          // logME(
+          //   "[SelectionWindows] ترجمه لغو شد یا متن تغییر کرده، نتیجه نادیده گرفته می‌شود."
+          // );
+          return;
+        }
         const translatedText =
           translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
         logME(selectedText, translatedText);
@@ -51,7 +65,16 @@ export default class SelectionWindows {
         }
       })
       .catch((error) => {
-        this.handleTranslationError(error, loadingContainer);
+        if (
+          !this.isTranslationCancelled &&
+          selectedText === this.translatingText
+        ) {
+          this.handleTranslationError(error, loadingContainer);
+        } else {
+          // logME(
+          //   "[SelectionWindows] خطا در ترجمه نادیده گرفته شد زیرا ترجمه لغو شده است یا متن تغییر کرده است."
+          // );
+        }
       });
 
     const removeHandler = (event) => {
@@ -61,6 +84,7 @@ export default class SelectionWindows {
         event.stopPropagation();
         return;
       }
+      this.cancelTranslation(); // لغو ترجمه هنگام کلیک خارج از پاپ‌آپ
       this.dismiss();
     };
 
@@ -69,6 +93,20 @@ export default class SelectionWindows {
     }
     document.addEventListener("mousedown", removeHandler);
     this.removeMouseDownListener = removeHandler;
+  }
+
+  cancelTranslation() {
+    this.isTranslationCancelled = true;
+    this.translationPromise = null; // پاک کردن promise
+    this.translatingText = null; // پاک کردن متن در حال ترجمه
+    if (this.displayElement) {
+      this.displayElement.innerHTML = ""; // پاک کردن محتوای پاپ‌آپ
+      const loadingContainer = this.createLoadingDots();
+      this.displayElement.appendChild(loadingContainer); // نمایش مجدد لودینگ (اختیاری)
+      this.displayElement.style.opacity = "0.6"; // بازگرداندن شفافیت اولیه
+    }
+    // logME("[SelectionWindows] روند ترجمه لغو شد.");
+    // نیازی به تغییر وضعیت پاپ‌آپ در اینجا نیست، زیرا dismiss() فراخوانی می‌شود.
   }
 
   applyInitialStyles(position) {
@@ -104,7 +142,7 @@ export default class SelectionWindows {
       this.displayElement.style.transform = "scale(1)";
       setTimeout(() => {
         loadingContainer.style.opacity = "1";
-        logME("[SelectionWindows] Loading dots should be visible now.");
+        // logME("[SelectionWindows] Loading dots should be visible now.");
       }, 300);
     });
   }
@@ -125,7 +163,8 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        this.displayElement.innerHTML = "متن ترجمه خالی است.";
+        this.displayElement.innerHTML =
+          "(متن ترجمه خالی است، دوباره امتحان کنید).";
         this.displayElement.style.opacity = "0.9";
       }
     }, 300);
@@ -136,7 +175,7 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        this.displayElement.innerHTML = "خطا در ترجمه";
+        this.displayElement.innerHTML = "(خطا در ترجمه، دوباره امتحان کنید)";
         this.displayElement.style.opacity = "0.9";
       }
     }, 300);
@@ -152,7 +191,6 @@ export default class SelectionWindows {
     if (this.removeMouseDownListener) {
       document.removeEventListener("mousedown", this.removeMouseDownListener);
       this.removeMouseDownListener = null;
-      // logME("SelectionWindows: Removed mousedown listener during dismiss.");
     }
 
     this.isVisible = false; // وضعیت را بلافاصله آپدیت کن
@@ -178,18 +216,19 @@ export default class SelectionWindows {
     if (this.removeMouseDownListener) {
       document.removeEventListener("mousedown", this.removeMouseDownListener);
       this.removeMouseDownListener = null;
-      // logME(
-      //   "SelectionWindows: Removed mousedown listener during removeElement."
-      // );
     }
 
     if (this.displayElement && this.displayElement.parentNode) {
       this.displayElement.remove();
     }
+
     // Reset state
     this.displayElement = null;
-    // this.isVisible = false; // در dismiss انجام شد
+    this.isVisible = false;
     this.currentText = null;
+    this.translationPromise = null;
+    this.isTranslationCancelled = false;
+    this.translatingText = null; // اطمینان از پاک شدن متن در حال ترجمه
   }
 
   applyTextDirection(element, text) {
