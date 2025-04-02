@@ -157,7 +157,7 @@ class ApiService {
       Json_or_Text_ForTranslate
     );
 
-    logME("Prompt finalPrompt : ", finalPrompt);
+    // logME("Prompt finalPrompt : ", finalPrompt);
 
     return finalPrompt;
   }
