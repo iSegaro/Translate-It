@@ -32,36 +32,51 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
+  HIGHTLIH_NEW_ELEMETN_RED: "2px solid red",
+  TRANSLATION_ICON_TITLE: "Translate Text",
   HIGHLIGHT_STYLE: "2px solid red",
+  ICON_TRANSLATION: "🌐",
+  ICON_SECCESS: "✅ ",
+  ICON_WARNING: "⚠️ ",
+  ICON_STATUS: "⏳ ",
+  ICON_ERROR: "❌ ",
+  ICON_INFO: "🔵 ",
+  ICON_REVERT: "",
+  RTL_REGEX: /[\u0600-\u06FF]/,
+  PERSIAN_REGEX:
+    /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
+  NOTIFICATION_ALIGNMENT: "right", // برای جهت قرارگیری کلی اعلان
+  NOTIFICATION_TEXT_DIRECTION: "rtl", // جهت پیش فرض متن (راست به چپ)
+  NOTIFICATION_TEXT_ALIGNMENT: "right", // ترازبندی پیش فرض متن (راست)
   PROMPT_BASE_FIELD: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
 
-- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-- If the input is in any other language, translate it to $_{TARGET}.
-- If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
-
-Return **only** the translated text without any extra words, explanations, markdown, or modifications.
-
-\`\`\`text input
-$_{TEXT}
-\`\`\`
-`,
-  PROMPT_BASE_SELECT: `Act as an automated JSON translation service. The input is a JSON array where each object contains a "text" property. 
-
-1. Translate each "text" value according to the given rules: $_{USER_RULES}
-2. Preserve all input elements. **Do not omit, modify, or skip any entry.**
-3. If translation is not needed for a specific item (e.g., numbers, hashtags, URLs), **return the original value unchanged.**
-4. Maintain the internal structure, formatting, and line breaks exactly.
-5. Output **only** the translated JSON array, with no extra text, explanations, or markdown.
-
-\`\`\`json input
-$_{TEXT}
-\`\`\`
+  - If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+  - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+  - If the input is in any other language, translate it to $_{TARGET}.
+  - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
+  
+  Return **only** the translated text without any extra words, explanations, markdown, or modifications.
+  
+  \`\`\`text input
+  $_{TEXT}
+  \`\`\`
   `,
+  PROMPT_BASE_SELECT: `Act as an automated JSON translation service. The input is a JSON array where each object contains a "text" property. 
+  
+  1. Translate each "text" value according to the given rules: $_{USER_RULES}
+  2. Preserve all input elements. **Do not omit, modify, or skip any entry.**
+  3. If translation is not needed for a specific item (e.g., numbers, hashtags, URLs), **return the original value unchanged.**
+  4. Maintain the internal structure, formatting, and line breaks exactly.
+  5. Output **only** the translated JSON array, with no extra text, explanations, or markdown.
+  
+  \`\`\`json input
+  $_{TEXT}
+  \`\`\`
+    `,
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-- If the input is in any other language, translate it to $_{TARGET}.
-- If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
+  - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+  - If the input is in any other language, translate it to $_{TARGET}.
+  - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
 
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
   DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
@@ -69,26 +84,12 @@ $_{TEXT}
     "This is a mock \ntranslation to English with \nnew lines.",
   DEBUG_TRANSLATED_PERSIAN_With_NewLine:
     "این یک ترجمه آزمایشی \nبرای ترجمه به فارسی \nبا خطوط جدید است.",
-  HIGHTLIH_NEW_ELEMETN_RED: "2px solid red",
-  TRANSLATION_ICON_TITLE: "Translate Text",
-  ICON_TRANSLATION: "🌐",
-  ICON_ERROR: "❌ ",
-  ICON_SECCESS: "✅ ",
-  ICON_STATUS: "⏳ ",
-  ICON_REVERT: "",
-  ICON_WARNING: "⚠️ ",
-  ICON_INFO: "🔵 ",
-  RTL_REGEX: /[\u0600-\u06FF]/,
-  PERSIAN_REGEX:
-    /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
-  NOTIFICATION_ALIGNMENT: "right", // برای جهت قرارگیری کلی اعلان
-  NOTIFICATION_TEXT_DIRECTION: "rtl", // جهت پیش فرض متن (راست به چپ)
-  NOTIFICATION_TEXT_ALIGNMENT: "right", // ترازبندی پیش فرض متن (راست)
 };
 
 export const TranslationMode = {
   Field: "field",
   SelectElement: "select_element",
+  Selection: "selection",
 };
 
 // Initial state
