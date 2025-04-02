@@ -227,29 +227,113 @@ export function parseAndCleanTranslationResponse(
 ) {
   let cleanJsonString = translatedJsonString.trim();
 
-  // یافتن اولین ساختار JSON در متن
-  const jsonMatch = cleanJsonString.match(/(\[.*\]|\{.*\})/s);
+  // 1. یافتن اولین ساختار JSON (ترجیحاً آرایه)
+  // این Regex کمی بهبود یافته تا فضای خالی قبل/بعد براکت‌ها را هم در نظر بگیرد
+  // و اولویت را به آرایه ([...]) بدهد اگر هر دو ممکن باشند (گرچه بعید است)
+  const jsonMatch = cleanJsonString.match(
+    /(\[(?:.|\n|\r)*\]|\{(?:.|\n|\r)*\})/s
+  );
 
-  if (!jsonMatch) {
+  if (!jsonMatch || !jsonMatch[1]) {
+    logME("No JSON structure (array or object) found in the response string.");
     const error = new Error("هیچ ساختار JSON معتبری در پاسخ یافت نشد.");
     context.errorHandler.handle(error, {
       type: ErrorTypes.PARSE_SELECT_ELEMENT,
-      context: "parseAndCleanTranslationResponse-JSON",
+      context: "parseAndCleanTranslationResponse-NoJsonFound",
     });
-    return []; // برگرداندن یک آرایه خالی به عنوان مقدار پیش‌فرض
+    return []; // برگرداندن آرایه خالی
   }
 
+  let potentialJsonString = jsonMatch[1].trim();
+
+  // 2. تلاش اول برای پارس کردن
   try {
-    cleanJsonString = jsonMatch[1].trim();
-    return JSON.parse(cleanJsonString);
-  } catch (error) {
-    const processedError = ErrorHandler.processError(error);
-    context.errorHandler.handle(processedError, {
-      type: ErrorTypes.PARSE_SELECT_ELEMENT,
-      context: "parseAndCleanTranslationResponse-Error",
-    });
-    logME(cleanJsonString);
-    return []; // برگرداندن یک آرایه خالی در صورت بروز خطا
+    // اگر مستقیما پارس شد، نتیجه را برگردان
+    return JSON.parse(potentialJsonString);
+  } catch (initialError) {
+    logME(
+      "Initial JSON.parse failed. Attempting repair by removing the last element.",
+      initialError.message // لاگ کردن پیام خطا اولیه
+    );
+
+    // 3. تلاش برای تعمیر فقط اگر شبیه آرایه باشد
+    //    و خطای اولیه از نوع SyntaxError باشد (محتمل‌ترین نوع خطا برای JSON نامعتبر)
+    if (
+      potentialJsonString.startsWith("[") &&
+      initialError instanceof SyntaxError
+    ) {
+      // پیدا کردن آخرین ویرگول (,) که نشان‌دهنده جداکننده آیتم‌هاست
+      // جستجو را از یکی مانده به آخر شروع می‌کنیم تا از براکت انتهایی احتمالی صرف نظر شود
+      const lastCommaIndex = potentialJsonString.lastIndexOf(
+        ",",
+        potentialJsonString.length - 2 // نادیده گرفتن کاراکتر آخر
+      );
+
+      // اگر ویرگولی پیدا شد (یعنی حداقل دو آیتم وجود داشته یا یک آیتم و یک ویرگول اضافی)
+      if (lastCommaIndex !== -1) {
+        // رشته را تا قبل از آخرین ویرگول جدا کن
+        let repairedJsonString = potentialJsonString.substring(
+          0,
+          lastCommaIndex
+        );
+
+        // اطمینان از اینکه رشته با براکت بسته ] تمام می‌شود
+        // (ممکن است فضای خالی یا کاراکترهای خراب بعد از ویرگول وجود داشته باشد)
+        repairedJsonString = repairedJsonString.trimEnd() + "]";
+
+        logME("Attempting to parse repaired JSON string:", repairedJsonString);
+
+        // 4. تلاش دوم برای پارس کردن رشته تعمیر شده
+        try {
+          const parsedResult = JSON.parse(repairedJsonString);
+          logME(
+            "Successfully parsed JSON after removing the potentially corrupted last element.",
+            "warning"
+          );
+          // می‌توانید در اینجا یک نوع هشدار خاص برای handler ارسال کنید که تعمیر موفق بود
+          // context.errorHandler.handle(new Error("JSON repaired successfully"), { type: ..., level: 'warning' });
+          return parsedResult; // نتیجه تعمیر شده را برگردان
+        } catch (repairError) {
+          // اگر تعمیر هم ناموفق بود
+          logME(
+            "Repair attempt also failed.",
+            repairError.message // لاگ کردن پیام خطای دوم
+          );
+          // خطای اولیه را به handler ارسال کن چون ریشه مشکل همان بود
+          const processedError = ErrorHandler.processError(initialError);
+          context.errorHandler.handle(processedError, {
+            type: ErrorTypes.PARSE_SELECT_ELEMENT,
+            context: "parseAndCleanTranslationResponse-RepairFailed",
+          });
+          logME("Original problematic string:", potentialJsonString); // لاگ کردن رشته مشکل‌دار اصلی
+          return []; // برگرداندن آرایه خالی
+        }
+      } else {
+        // اگر ویرگولی پیدا نشد (مثلاً فقط یک آیتم خراب بود مثل "[{"text":"a"" )
+        logME(
+          "Could not repair JSON: No comma found to separate the last element."
+        );
+        const processedError = ErrorHandler.processError(initialError);
+        context.errorHandler.handle(processedError, {
+          type: ErrorTypes.PARSE_SELECT_ELEMENT,
+          context: "parseAndCleanTranslationResponse-NoCommaForRepair",
+        });
+        logME("Original problematic string:", potentialJsonString);
+        return [];
+      }
+    } else {
+      // اگر خطای اولیه SyntaxError نبود یا رشته با '[' شروع نشده بود
+      logME(
+        "Initial parse failed, and repair condition not met (not array or not SyntaxError)."
+      );
+      const processedError = ErrorHandler.processError(initialError);
+      context.errorHandler.handle(processedError, {
+        type: ErrorTypes.PARSE_SELECT_ELEMENT,
+        context: "parseAndCleanTranslationResponse-InitialErrorNotRepaired",
+      });
+      logME("Original problematic string:", potentialJsonString);
+      return [];
+    }
   }
 }
 
@@ -276,18 +360,30 @@ export function expandTextsForTranslation(textsToTranslate) {
 export function handleTranslationLengthMismatch(translatedData, expandedTexts) {
   if (!Array.isArray(translatedData)) {
     logME("پاسخ ترجمه یک آرایه نیست.", "داده پارس شده:", translatedData);
-    throw new Error("Translated response is not an array.");
+    // throw new Error("Translated response is not an array.");
+    return false;
   }
 
   if (translatedData.length !== expandedTexts.length) {
     logME(
-      "عدم تطابق طول در پاسخ ترجمه شناسایی شد.",
+      "عدم تطابق طول.",
       `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
       `طول دریافت شده: ${translatedData.length}`,
       "علت احتمالی: تقسیم/ادغام متفاوت متن توسط API یا افزودن/حذف آیتم‌ها.",
       "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد..."
     );
+
+    if (
+      Math.abs(translatedData.length - expandedTexts.length) <
+      (3 / 7) * expandedTexts.length
+    ) {
+      return true;
+    }
+
+    return false;
   }
+
+  return true;
 }
 
 export function reassembleTranslations(
