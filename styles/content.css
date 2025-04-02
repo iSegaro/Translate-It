@@ -106,10 +106,66 @@
   border-radius: 4px;
   font-size: 14px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  transition: opacity 0.15s ease-in-out; /* برای fade-in */
+  opacity: 0.6; /* شفافیت اولیه */
+  transform: scale(0.5); /* افزایش بیشتر سایز اولیه */
+  transform-origin: top left; /* مبدا تغییر سایز */
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.15s ease-in-out; /* انیمیشن برای تغییر سایز و شفافیت */
 }
 
 .aiwc-selection-display-temp.fade-out {
-  opacity: 0 !important; /* استفاده از !important برای اطمینان از اعمال شدن */
-  transition: opacity 0.15s ease-in-out; /* برای fade-out */
+  opacity: 0 !important;
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Loading Animation Container */
+.aiwc-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0; /* ابتدا مخفی باشد */
+  transition: opacity 0.3s ease-in-out; /* برای fade-in بعد از بزرگ شدن */
+}
+
+/* Loading Dots Animation */
+@keyframes blink {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  } /* Make it more prominent at the peak */
+  100% {
+    opacity: 0.3;
+  } /* Fade back to the initial opacity */
+}
+
+.aiwc-loading-dot {
+  font-size: 1.2em;
+  opacity: 0.3; /* کمی محوتر */
+  margin: 0 0.2em;
+  animation: blink 1.4s infinite; /* مدت زمان و حذف alternate */
+  color: black; /* تنظیم رنگ به مشکی */
+}
+
+.aiwc-loading-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.aiwc-loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.aiwc-loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.8;
+  }
 }

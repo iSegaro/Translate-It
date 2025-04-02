@@ -19,126 +19,113 @@ export default class SelectionWindows {
       !selectedText ||
       (this.isVisible && selectedText === this.currentText)
     ) {
-      // logME(
-      //   this.isVisible && selectedText === this.currentText ?
-      //     "SelectionWindows: کادر برای همین متن در حال نمایش است، از نمایش مجدد جلوگیری میشود."
-      //   : "SelectionWindows: متن انتخاب شده خالی است."
-      // );
       return;
     }
 
-    /**
-     * منطق ترجمه
-     */
-    const translated_text = await translateText(selectedText);
-
-    if (!translated_text) {
-      return;
-    }
-
-    this.currentText = translated_text;
-    /** // *** پایان منطق ترجمه *** */
+    const translationPromise = translateText(selectedText);
 
     // حذف کادر قبلی اگر وجود داشته باشد
-    this.dismiss(false); // false به معنی عدم اجرای fade-out در صورت عدم وجود کادر
+    this.dismiss(false);
 
-    // 1. ایجاد عنصر div برای نمایش متن
+    // 1. ایجاد عنصر div برای نمایش حالت بارگذاری
     this.displayElement = document.createElement("div");
-    this.displayElement.innerText = this.currentText;
-    this.displayElement.classList.add("aiwc-selection-display-temp"); // استفاده از کلاس CSS
+    this.displayElement.classList.add("aiwc-selection-display-temp");
 
-    // 2. اضافه کردن استایل‌های اولیه به صورت inline برای موقعیت و نمایش اولیه
+    const loadingContainer = document.createElement("div");
+    loadingContainer.classList.add("aiwc-loading-container");
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement("span");
+      dot.classList.add("aiwc-loading-dot");
+      dot.innerText = "."; // اضافه کردن نقطه به عنوان محتوا
+      loadingContainer.appendChild(dot);
+    }
+    this.displayElement.appendChild(loadingContainer);
+
+    // 2. اضافه کردن استایل‌های اولیه (شفافیت و موقعیت در CSS تنظیم شده)
     this.displayElement.style.position = "absolute";
-    this.displayElement.style.zIndex = "1000"; // اطمینان از اینکه روی عناصر دیگر قرار میگیرد
-    this.displayElement.style.maxWidth = "300px"; // حداکثر عرض
-    this.displayElement.style.overflowWrap = "break-word"; // شکستن کلمات طولانی
-    this.displayElement.style.fontFamily = "sans-serif"; // فونت خوانا
-    this.displayElement.style.opacity = "0"; // شروع با حالت محو
+    this.displayElement.style.zIndex = "1000";
+    this.displayElement.style.maxWidth = "400px";
+    this.displayElement.style.overflowWrap = "break-word";
+    this.displayElement.style.fontFamily = "sans-serif";
     this.displayElement.style.left = `${position.x}px`;
     this.displayElement.style.top = `${position.y}px`;
-    this.applyTextDirection(this.displayElement, this.currentText);
-    // *** اضافه کردن یک مشخصه برای شناسایی راحت‌تر کادر ***
+    this.applyTextDirection(this.displayElement, selectedText);
     this.displayElement.dataset.aiwcSelectionPopup = "true";
 
     // 3. اضافه کردن کادر به DOM
     document.body.appendChild(this.displayElement);
     this.isVisible = true;
 
-    // 4. فعال کردن افکت fade-in با یک تاخیر کوچک
-    // *** استفاده از requestAnimationFrame برای بهبود عملکرد انیمیشن ***
+    // 4. شروع انیمیشن بزرگ شدن و سپس نمایش نقاط
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        // Double requestAnimationFrame for stability across browsers
-        if (this.displayElement) {
-          this.displayElement.style.transition = `opacity ${this.fadeInDuration}ms ease-in-out`;
-          this.displayElement.style.opacity = "1";
-        }
-      });
+      this.displayElement.style.transform = "scale(1)";
+      setTimeout(() => {
+        loadingContainer.style.opacity = "1";
+        logME("[SelectionWindows] Loading dots should be visible now."); // اضافه کردن لاگ برای بررسی
+      }, 300); // افزایش تاخیر به 300ms
     });
 
-    // 5. حذف کادر با کلیک در جای دیگر با افکت fade-out
-    // *** Listener حالا فقط روی mousedown کار می‌کنه و جلوی انتشار رویداد رو می‌گیره ***
-    const removeHandler = (event) => {
-      if (!this.isVisible || !this.displayElement) return; // اگر کادر وجود نداره یا قابل مشاهده نیست، کاری نکن
-
-      const target = event.target;
-
-      // بررسی کلیک روی خود کادر
-      const isClickOnDisplayElement = this.displayElement.contains(target);
-
-      // بررسی کلیک روی متن انتخاب شده (با دقت بیشتر)
-      let isClickOnSelectedText = false;
-      if (!isClickOnDisplayElement) {
-        // فقط اگر کلیک روی کادر نبود، انتخاب متن رو بررسی کن
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          try {
-            // بررسی اینکه آیا گره کلیک شده بخشی از محدوده انتخاب شده است یا خیر
-            if (
-              range.intersectsNode(target) ||
-              range.commonAncestorContainer.contains(target)
-            ) {
-              // بررسی مختصات برای اطمینان بیشتر (اختیاری ولی مفید)
-              const rect = range.getBoundingClientRect();
-              const clickX = event.clientX;
-              const clickY = event.clientY;
-              isClickOnSelectedText =
-                clickX >= rect.left &&
-                clickX <= rect.right &&
-                clickY >= rect.top &&
-                clickY <= rect.bottom;
-            }
-          } catch (e) {
-            logME("AIWC: Error checking selected text intersection:", e);
-            // در صورت خطا، فرض می‌کنیم کلیک روی متن انتخاب شده نبوده
-            isClickOnSelectedText = false;
+    // 5. رسیدگی به نتیجه Promise ترجمه
+    translationPromise
+      .then((translated_text_untrimmed) => {
+        const translated_text =
+          translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
+        logME(selectedText, translated_text);
+        if (translated_text) {
+          this.currentText = translated_text;
+          if (this.displayElement) {
+            // Fade out کردن نقاط
+            loadingContainer.style.opacity = "0";
+            setTimeout(() => {
+              // جایگزینی با متن ترجمه شده با Fade In
+              this.displayElement.innerHTML = ""; // پاک کردن نقاط
+              this.displayElement.innerText = this.currentText;
+              this.applyTextDirection(this.displayElement, this.currentText);
+              this.displayElement.style.opacity = "0.9"; // رساندن شفافیت به 90 درصد
+            }, 300); // بعد از محو شدن نقاط
+          }
+        } else {
+          logME("Translated text is empty after trimming.");
+          if (this.displayElement) {
+            loadingContainer.style.opacity = "0";
+            setTimeout(() => {
+              this.displayElement.innerHTML = "متن ترجمه خالی است.";
+              this.displayElement.style.opacity = "0.9";
+            }, 300);
           }
         }
-      }
+      })
+      .catch((error) => {
+        logME("Error during translation:", error);
+        if (this.displayElement) {
+          loadingContainer.style.opacity = "0";
+          setTimeout(() => {
+            this.displayElement.innerHTML = "خطا در ترجمه";
+            this.displayElement.style.opacity = "0.9";
+          }, 300);
+        }
+      });
 
-      // اگر کلیک داخل کادر بود کاری انجام نده
-      // *** مهم: جلوی انتشار رویداد mousedown رو بگیر ***
+    // 6. حذف کادر با کلیک در جای دیگر (همان منطق قبلی)
+    const removeHandler = (event) => {
+      if (!this.isVisible || !this.displayElement) return;
+
+      const target = event.target;
+      const isClickOnDisplayElement = this.displayElement.contains(target);
+
       if (isClickOnDisplayElement) {
-        // logME(
-        //   "SelectionWindows: Click inside display element or on selected text. Preventing dismissal and stopping propagation."
-        // );
         event.stopPropagation();
         return;
       }
 
-      // اگر کلیک خارج از کادر و متن انتخاب شده بود، آن را حذف کن
-      // logME("SelectionWindows: Click outside. Dismissing.");
       this.dismiss();
     };
 
-    // اضافه کردن event listener برای حذف با mousedown
-    // *** مهم: Listener فقط یکبار بعد از نمایش اضافه می‌شود ***
     if (this.removeMouseDownListener) {
       document.removeEventListener("mousedown", this.removeMouseDownListener);
     }
     document.addEventListener("mousedown", removeHandler);
-    this.removeMouseDownListener = removeHandler; // ذخیره رفرنس برای حذف بعدی
+    this.removeMouseDownListener = removeHandler;
   }
 
   dismiss(withFadeOut = true) {
