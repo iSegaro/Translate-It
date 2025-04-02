@@ -15,6 +15,7 @@ import {
 import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
+import { clearAllCaches } from "../utils/textExtraction.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -170,7 +171,10 @@ export default class EventHandler {
         state,
         IconManager: this.IconManager,
       });
-      this.notifier.show("حافظه", "info", true, 1500);
+      this.notifier.show("حافظه", "info", true, 2000, () =>
+        clearAllCaches({ state })
+      );
+
       return;
     }
 
