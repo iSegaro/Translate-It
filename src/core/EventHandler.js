@@ -144,6 +144,12 @@ export default class EventHandler {
     }, 100);
   }
 
+  cleanCache() {
+    clearAllCaches({ state });
+    this.notifier.show("حافظه پاک شد", "info", true, 2000);
+    logME("حافظه پاک شد.");
+  }
+
   @logMethod
   async handleSelect_ElementClick(e) {
     const currentPlatform = detectPlatform();
@@ -171,9 +177,7 @@ export default class EventHandler {
         state,
         IconManager: this.IconManager,
       });
-      this.notifier.show("حافظه", "info", true, 2000, () =>
-        clearAllCaches({ state })
-      );
+      this.notifier.show("حافظه", "info", true, 2000, () => this.cleanCache());
 
       return;
     }
@@ -231,7 +235,14 @@ export default class EventHandler {
         }
 
         // --- مرحله 5: بررسی و مدیریت عدم تطابق طول ---
-        handleTranslationLengthMismatch(translatedData, expandedTexts);
+        const isLengthMismatch = handleTranslationLengthMismatch(
+          translatedData,
+          expandedTexts
+        );
+
+        if (!isLengthMismatch) {
+          this.notifier.show(" دوباره امتحان کنید", "info", true, 1500);
+        }
 
         try {
           // --- مرحله 6: بازسازی ترجمه‌ها ---
