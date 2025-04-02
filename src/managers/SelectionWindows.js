@@ -24,100 +24,43 @@ export default class SelectionWindows {
 
     const translationPromise = translateText(selectedText);
 
-    // حذف کادر قبلی اگر وجود داشته باشد
     this.dismiss(false);
 
-    // 1. ایجاد عنصر div برای نمایش حالت بارگذاری
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-display-temp");
 
-    const loadingContainer = document.createElement("div");
-    loadingContainer.classList.add("aiwc-loading-container");
-    for (let i = 0; i < 3; i++) {
-      const dot = document.createElement("span");
-      dot.classList.add("aiwc-loading-dot");
-      dot.innerText = "."; // اضافه کردن نقطه به عنوان محتوا
-      loadingContainer.appendChild(dot);
-    }
+    const loadingContainer = this.createLoadingDots();
     this.displayElement.appendChild(loadingContainer);
 
-    // 2. اضافه کردن استایل‌های اولیه (شفافیت و موقعیت در CSS تنظیم شده)
-    this.displayElement.style.position = "absolute";
-    this.displayElement.style.zIndex = "1000";
-    this.displayElement.style.maxWidth = "400px";
-    this.displayElement.style.overflowWrap = "break-word";
-    this.displayElement.style.fontFamily = "sans-serif";
-    this.displayElement.style.left = `${position.x}px`;
-    this.displayElement.style.top = `${position.y}px`;
-    this.applyTextDirection(this.displayElement, selectedText);
-    this.displayElement.dataset.aiwcSelectionPopup = "true";
+    this.applyInitialStyles(position);
 
-    // 3. اضافه کردن کادر به DOM
     document.body.appendChild(this.displayElement);
     this.isVisible = true;
 
-    // 4. شروع انیمیشن بزرگ شدن و سپس نمایش نقاط
-    requestAnimationFrame(() => {
-      this.displayElement.style.transform = "scale(1)";
-      setTimeout(() => {
-        loadingContainer.style.opacity = "1";
-        logME("[SelectionWindows] Loading dots should be visible now."); // اضافه کردن لاگ برای بررسی
-      }, 300); // افزایش تاخیر به 300ms
-    });
+    this.animatePopupSize(loadingContainer);
 
-    // 5. رسیدگی به نتیجه Promise ترجمه
     translationPromise
       .then((translated_text_untrimmed) => {
-        const translated_text =
+        const translatedText =
           translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
-        logME(selectedText, translated_text);
-        if (translated_text) {
-          this.currentText = translated_text;
-          if (this.displayElement) {
-            // Fade out کردن نقاط
-            loadingContainer.style.opacity = "0";
-            setTimeout(() => {
-              // جایگزینی با متن ترجمه شده با Fade In
-              this.displayElement.innerHTML = ""; // پاک کردن نقاط
-              this.displayElement.innerText = this.currentText;
-              this.applyTextDirection(this.displayElement, this.currentText);
-              this.displayElement.style.opacity = "0.9"; // رساندن شفافیت به 90 درصد
-            }, 300); // بعد از محو شدن نقاط
-          }
+        logME(selectedText, translatedText);
+        if (translatedText) {
+          this.transitionToTranslatedText(translatedText, loadingContainer);
         } else {
-          logME("Translated text is empty after trimming.");
-          if (this.displayElement) {
-            loadingContainer.style.opacity = "0";
-            setTimeout(() => {
-              this.displayElement.innerHTML = "متن ترجمه خالی است.";
-              this.displayElement.style.opacity = "0.9";
-            }, 300);
-          }
+          this.handleEmptyTranslation(loadingContainer);
         }
       })
       .catch((error) => {
-        logME("Error during translation:", error);
-        if (this.displayElement) {
-          loadingContainer.style.opacity = "0";
-          setTimeout(() => {
-            this.displayElement.innerHTML = "خطا در ترجمه";
-            this.displayElement.style.opacity = "0.9";
-          }, 300);
-        }
+        this.handleTranslationError(error, loadingContainer);
       });
 
-    // 6. حذف کادر با کلیک در جای دیگر (همان منطق قبلی)
     const removeHandler = (event) => {
       if (!this.isVisible || !this.displayElement) return;
-
       const target = event.target;
-      const isClickOnDisplayElement = this.displayElement.contains(target);
-
-      if (isClickOnDisplayElement) {
+      if (this.displayElement.contains(target)) {
         event.stopPropagation();
         return;
       }
-
       this.dismiss();
     };
 
@@ -126,6 +69,77 @@ export default class SelectionWindows {
     }
     document.addEventListener("mousedown", removeHandler);
     this.removeMouseDownListener = removeHandler;
+  }
+
+  applyInitialStyles(position) {
+    this.displayElement.style.position = "absolute";
+    this.displayElement.style.zIndex = "1000";
+    this.displayElement.style.maxWidth = "300px";
+    this.displayElement.style.overflowWrap = "break-word";
+    this.displayElement.style.fontFamily = "sans-serif";
+    this.displayElement.style.opacity = "0.6";
+    this.displayElement.style.transform = "scale(0.1)";
+    this.displayElement.style.transformOrigin = "top left";
+    this.displayElement.style.transition = `transform 0.2s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
+    this.displayElement.style.left = `${position.x}px`;
+    this.displayElement.style.top = `${position.y}px`;
+    this.applyTextDirection(this.displayElement, ""); // Initial text direction might not be relevant yet
+    this.displayElement.dataset.aiwcSelectionPopup = "true";
+  }
+
+  createLoadingDots() {
+    const loadingContainer = document.createElement("div");
+    loadingContainer.classList.add("aiwc-loading-container");
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement("span");
+      dot.classList.add("aiwc-loading-dot");
+      dot.innerText = ".";
+      loadingContainer.appendChild(dot);
+    }
+    return loadingContainer;
+  }
+
+  animatePopupSize(loadingContainer) {
+    requestAnimationFrame(() => {
+      this.displayElement.style.transform = "scale(1)";
+      setTimeout(() => {
+        loadingContainer.style.opacity = "1";
+        logME("[SelectionWindows] Loading dots should be visible now.");
+      }, 300);
+    });
+  }
+
+  transitionToTranslatedText(translatedText, loadingContainer) {
+    loadingContainer.style.opacity = "0";
+    setTimeout(() => {
+      if (this.displayElement) {
+        this.displayElement.innerHTML = "";
+        this.displayElement.innerText = translatedText;
+        this.applyTextDirection(this.displayElement, translatedText);
+        this.displayElement.style.opacity = "0.9";
+      }
+    }, 300);
+  }
+
+  handleEmptyTranslation(loadingContainer) {
+    loadingContainer.style.opacity = "0";
+    setTimeout(() => {
+      if (this.displayElement) {
+        this.displayElement.innerHTML = "متن ترجمه خالی است.";
+        this.displayElement.style.opacity = "0.9";
+      }
+    }, 300);
+  }
+
+  handleTranslationError(error, loadingContainer) {
+    logME("Error during translation:", error);
+    loadingContainer.style.opacity = "0";
+    setTimeout(() => {
+      if (this.displayElement) {
+        this.displayElement.innerHTML = "خطا در ترجمه";
+        this.displayElement.style.opacity = "0.9";
+      }
+    }, 300);
   }
 
   dismiss(withFadeOut = true) {
