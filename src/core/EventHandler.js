@@ -116,7 +116,7 @@ export default class EventHandler {
         this.selectionTimeoutId = setTimeout(() => {
           this.selectionTimeoutId = null; // پاک کردن شناسه تایمر بعد از اجرا
           this.processSelectedText(selectedText, event);
-        }, 500);
+        }, 250);
 
         // اضافه کردن listener برای لغو ترجمه در صورت کلیک
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
@@ -143,10 +143,14 @@ export default class EventHandler {
       clearTimeout(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
       // logME("[EventHandler] ترجمه متن انتخاب شده لغو شد.");
-      document.removeEventListener(
-        "mousedown",
-        this.cancelSelectionTranslation
-      );
+      try {
+        document.removeEventListener(
+          "mousedown",
+          this.cancelSelectionTranslation
+        );
+      } catch (error) {
+        // خطا در حذف
+      }
     }
   }
 
@@ -414,6 +418,10 @@ export default class EventHandler {
 
   handleEscape(event) {
     taggleLinks(false);
+
+    this.cancelSelectionTranslation();
+
+    this.SelectionWindows.cancelCurrentTranslation();
 
     this.translationHandler.select_Element_ModeActive = false;
     state.selectElementActive = false;
