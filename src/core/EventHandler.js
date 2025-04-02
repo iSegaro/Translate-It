@@ -16,7 +16,7 @@ import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
-import { handleSelection_Text } from "./Selection.js";
+import SelectionWindows from "../managers/SelectionWindows.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -25,13 +25,16 @@ export default class EventHandler {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
+    this.SelectionWindows = new SelectionWindows();
+
     this.select_Element_ModeActive =
       translationHandler.select_Element_ModeActive;
+
     this.handleEvent = this.handleEvent.bind(this);
     this.handleSelect_ElementModeClick =
       this.handleSelect_ElementClick.bind(this);
     this.handleEscape = this.handleEscape.bind(this);
-    this.handleMouseUpSelection = this.handleMouseUpSelection.bind(this);
+    this.handleMouseUp = this.handleMouseUp.bind(this);
   }
 
   @logMethod
@@ -52,14 +55,9 @@ export default class EventHandler {
         return;
       }
 
-      // if (this.select_Element_ModeActive) {
-      //   await this.handleSelectElementMode(event);
-      //   return;
-      // }
-
       // بررسی رویداد mouseup بعد از انتخاب متن
       if (this.isMouseUp(event)) {
-        await this.handleMouseUpSelection(event);
+        this.handleMouseUp(event);
         return;
       }
 
@@ -90,8 +88,63 @@ export default class EventHandler {
   }
 
   @logMethod
-  async handleMouseUpSelection(event) {
-    handleSelection_Text(event, this.translationHandler);
+  async handleMouseUp(event) {
+    const selectedText = window.getSelection().toString().trim();
+
+    // اول بررسی کنیم که آیا کلیک (mouseup) داخل پاپ‌آپ موجود رخ داده؟
+    // اگر بله، هیچ کاری نکنیم (نه نمایش جدید، نه بستن).
+    if (
+      this.SelectionWindows?.isVisible &&
+      this.SelectionWindows?.displayElement?.contains(event.target)
+    ) {
+      // logME(
+      //   "[EventHandler] MouseUp target is inside the selection window. Ignoring."
+      // );
+      // listener mousedown در SelectionWindows کار خودش رو کرده (stopPropagation)
+      return;
+    }
+
+    if (selectedText) {
+      // logME("[EventHandler] متن انتخاب شده در mouseup:", selectedText);
+
+      // فقط اگر پاپ‌آپ نمایش داده نشده بود یا متن انتخاب شده جدید است، نمایش بده
+      if (
+        !this.SelectionWindows.isVisible ||
+        this.SelectionWindows.currentText !== selectedText
+      ) {
+        const selection = window.getSelection();
+        let position = { x: 0, y: 0 };
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          // محاسبه موقعیت زیر متن انتخاب شده
+          position = {
+            x: rect.left + window.scrollX,
+            y: rect.bottom + window.scrollY + 15, // کمی فاصله
+          };
+
+          // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
+          const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ (باید با استایل هماهنگ باشد)
+          const viewportWidth = window.innerWidth;
+          if (position.x < 10) {
+            // جلوگیری از چسبیدن به لبه چپ
+            position.x = 10;
+          } else if (position.x + popupMaxWidth > viewportWidth - 10) {
+            // جلوگیری از خروج از لبه راست
+            position.x = viewportWidth - popupMaxWidth - 10;
+          }
+          // --- پایان بهبود موقعیت ---
+        }
+        // نمایش پاپ آپ با متن و موقعیت جدید
+        this.SelectionWindows?.show(selectedText, position);
+      } else {
+        // اگر متن همان متن قبلی است و پاپ‌آپ قابل مشاهده است، کاری نکن.
+        // اجازه بده listener مربوط به mousedown تصمیم بگیرد که ببندد یا نه.
+        // logME(
+        //   "[EventHandler] MouseUp on the same selected text while window is visible. Ignoring show()."
+        // );
+      }
+    }
   }
 
   isEditableTarget(target) {

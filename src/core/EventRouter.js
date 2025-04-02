@@ -177,18 +177,7 @@ class EventRouter {
   }
   @logMethod
   async handleMouseUpMethod(e) {
-    const selectedText = window.getSelection().toString().trim();
-    if (selectedText) {
-      this.translationHandler?.eventHandler?.handleEvent(e);
-    } else {
-      // اگر متنی انتخاب نشده بود، هر کادر نمایش قبلی را حذف کنید
-      const previousSelectionDisplay = document.querySelector(
-        ".selection-display-temp"
-      );
-      if (previousSelectionDisplay) {
-        previousSelectionDisplay.remove();
-      }
-    }
+    this.translationHandler?.handleEvent?.(e);
   }
 
   addListeners = async () => {
