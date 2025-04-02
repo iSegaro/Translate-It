@@ -1,5 +1,7 @@
 // src/managers/SelectionWindows.js
 import { logME } from "../utils/helpers";
+import { CONFIG } from "../config.js";
+import { translateText } from "../utils/api.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -9,9 +11,10 @@ export default class SelectionWindows {
     this.currentText = null;
     this.displayElement = null;
     this.removeMouseDownListener = null; // برای نگهداری رفرنس تابع حذف لیستنر
+    this.translationHandler = options.translationHandler;
   }
 
-  show(selectedText, position) {
+  async show(selectedText, position) {
     if (
       !selectedText ||
       (this.isVisible && selectedText === this.currentText)
@@ -24,14 +27,24 @@ export default class SelectionWindows {
       return;
     }
 
-    this.currentText = selectedText;
+    /**
+     * منطق ترجمه
+     */
+    const translated_text = await translateText(selectedText);
+
+    if (!translated_text) {
+      return;
+    }
+
+    this.currentText = translated_text;
+    /** // *** پایان منطق ترجمه *** */
 
     // حذف کادر قبلی اگر وجود داشته باشد
     this.dismiss(false); // false به معنی عدم اجرای fade-out در صورت عدم وجود کادر
 
     // 1. ایجاد عنصر div برای نمایش متن
     this.displayElement = document.createElement("div");
-    this.displayElement.innerText = selectedText;
+    this.displayElement.innerText = this.currentText;
     this.displayElement.classList.add("aiwc-selection-display-temp"); // استفاده از کلاس CSS
 
     // 2. اضافه کردن استایل‌های اولیه به صورت inline برای موقعیت و نمایش اولیه
@@ -43,6 +56,7 @@ export default class SelectionWindows {
     this.displayElement.style.opacity = "0"; // شروع با حالت محو
     this.displayElement.style.left = `${position.x}px`;
     this.displayElement.style.top = `${position.y}px`;
+    this.applyTextDirection(this.displayElement, this.currentText);
     // *** اضافه کردن یک مشخصه برای شناسایی راحت‌تر کادر ***
     this.displayElement.dataset.aiwcSelectionPopup = "true";
 
@@ -175,5 +189,13 @@ export default class SelectionWindows {
     this.displayElement = null;
     // this.isVisible = false; // در dismiss انجام شد
     this.currentText = null;
+  }
+
+  applyTextDirection(element, text) {
+    if (!element || !element.style) return;
+
+    const isRtl = CONFIG.RTL_REGEX.test(text);
+    element.style.direction = isRtl ? "rtl" : "ltr";
+    element.style.textAlign = isRtl ? "right" : "left";
   }
 }
