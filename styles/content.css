@@ -145,7 +145,7 @@
   font-size: 1.2em;
   opacity: 0.3; /* کمی محوتر */
   margin: 0 0.2em;
-  animation: blink 1.4s infinite; /* مدت زمان و حذف alternate */
+  animation: blink 0.7s infinite; /* مدت زمان و حذف alternate */
   color: black; /* تنظیم رنگ به مشکی */
 }
 
