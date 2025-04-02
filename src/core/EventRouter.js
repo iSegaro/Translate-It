@@ -41,6 +41,9 @@ class EventRouter {
     this.handleMouseOver = this.handleEventWithErrorHandling(
       this.handleMouseOverMethod
     );
+    this.handleMouseUp = this.handleEventWithErrorHandling(
+      this.handleMouseUpMethod
+    );
 
     this.addListeners();
   }
@@ -147,26 +150,44 @@ class EventRouter {
   }
 
   async handleMouseOverMethod(e) {
-    if (!state.selectElementActive) return;
-    const target = e.composedPath?.()?.[0] || e.target;
-    if (!target?.innerText?.trim()) return;
+    if (!state.selectElementActive) {
+      return; // از اینجا متن انتخاب شده در رویداد mouseover بررسی نمیشود
+    } else {
+      const target = e.composedPath?.()?.[0] || e.target;
+      if (!target?.innerText?.trim()) return;
 
-    try {
-      if (state.highlightedElement !== e.target) {
-        if (state.highlightedElement) {
-          state.highlightedElement.style.outline = "";
-          state.highlightedElement.style.opacity = "";
+      try {
+        if (state.highlightedElement !== e.target) {
+          if (state.highlightedElement) {
+            state.highlightedElement.style.outline = "";
+            state.highlightedElement.style.opacity = "";
+          }
+          state.highlightedElement = e.target;
+          e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
+          e.target.style.opacity = "0.9";
         }
-        state.highlightedElement = e.target;
-        e.target.style.outline = CONFIG.HIGHLIGHT_STYLE;
-        e.target.style.opacity = "0.9";
+      } catch (error) {
+        this.errorHandler.handle(error, {
+          type: ErrorTypes.UI,
+          context: "mouseover-style-update",
+          element: e.target?.tagName,
+        });
       }
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "mouseover-style-update",
-        element: e.target?.tagName,
-      });
+    }
+  }
+  @logMethod
+  async handleMouseUpMethod(e) {
+    const selectedText = window.getSelection().toString().trim();
+    if (selectedText) {
+      this.translationHandler?.eventHandler?.handleEvent(e);
+    } else {
+      // اگر متنی انتخاب نشده بود، هر کادر نمایش قبلی را حذف کنید
+      const previousSelectionDisplay = document.querySelector(
+        ".selection-display-temp"
+      );
+      if (previousSelectionDisplay) {
+        previousSelectionDisplay.remove();
+      }
     }
   }
 
@@ -188,6 +209,7 @@ class EventRouter {
       document.addEventListener("click", this.handleClick);
       document.addEventListener("keydown", this.handleKeyDown);
       document.addEventListener("mouseover", this.handleMouseOver);
+      document.addEventListener("mouseup", this.handleMouseUp);
 
       this.listeners = {
         handleFocus: this.handleFocus,
@@ -196,6 +218,7 @@ class EventRouter {
         handleClick: this.handleClick,
         handleKeyDown: this.handleKeyDown,
         handleMouseOver: this.handleMouseOver,
+        handleMouseUp: this.handleMouseUp,
       };
     } catch (listenerError) {
       this.errorHandler.handle(listenerError, {
@@ -216,6 +239,7 @@ class EventRouter {
       document.removeEventListener("click", this.listeners.handleClick);
       document.removeEventListener("keydown", this.listeners.handleKeyDown);
       document.removeEventListener("mouseover", this.listeners.handleMouseOver);
+      document.removeEventListener("mouseup", this.listeners.handleMouseUp);
     } catch (teardownError) {
       this.errorHandler.handle(teardownError, {
         type: ErrorTypes.SYSTEM,

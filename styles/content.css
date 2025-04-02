@@ -96,3 +96,20 @@
   cursor: crosshair !important;
   color: inherit;
 }
+
+/* Selection Text Window */
+.aiwc-selection-display-temp {
+  background-color: #f8f8f8;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: opacity 0.15s ease-in-out; /* برای fade-in */
+}
+
+.aiwc-selection-display-temp.fade-out {
+  opacity: 0 !important; /* استفاده از !important برای اطمینان از اعمال شدن */
+  transition: opacity 0.15s ease-in-out; /* برای fade-out */
+}

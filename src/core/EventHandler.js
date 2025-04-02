@@ -16,6 +16,7 @@ import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
+import { handleSelection_Text } from "./Selection.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -30,6 +31,7 @@ export default class EventHandler {
     this.handleSelect_ElementModeClick =
       this.handleSelect_ElementClick.bind(this);
     this.handleEscape = this.handleEscape.bind(this);
+    this.handleMouseUpSelection = this.handleMouseUpSelection.bind(this);
   }
 
   @logMethod
@@ -55,6 +57,12 @@ export default class EventHandler {
       //   return;
       // }
 
+      // بررسی رویداد mouseup بعد از انتخاب متن
+      if (this.isMouseUp(event)) {
+        await this.handleMouseUpSelection(event);
+        return;
+      }
+
       if (this.isEditableTarget(event.target)) {
         await this.handleEditableElement(event);
         return;
@@ -68,6 +76,10 @@ export default class EventHandler {
     }
   }
 
+  isMouseUp(event) {
+    return event.type === "mouseup";
+  }
+
   isCtrlSlashEvent(event) {
     return (
       (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
@@ -75,6 +87,11 @@ export default class EventHandler {
   }
   isEscapeEvent(event) {
     return event.key === "Escape" && !event.repeat;
+  }
+
+  @logMethod
+  async handleMouseUpSelection(event) {
+    handleSelection_Text(event, this.translationHandler);
   }
 
   isEditableTarget(target) {
