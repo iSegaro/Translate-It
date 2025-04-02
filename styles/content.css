@@ -1,32 +1,36 @@
 /* src/styles/content.css */
 
-/* Translation Icon */
+/* ==========================================================================
+   Translation Icon Styles
+   ========================================================================== */
 .AIWritingCompanion-translation-icon-extension {
   position: absolute !important;
-  z-index: 2147483647 !important; /* حداکثر z-index */
+  z-index: 2147483647 !important; /* Ensure it's always on top */
   display: block !important;
   visibility: visible !important;
-  pointer-events: all !important;
+  pointer-events: all !important; /* Allows interaction with the icon */
 }
 
 .AIWritingCompanion-translation-icon-extension-fade-out {
   opacity: 0;
-  transition: opacity 0.5s ease-in-out; /* تنظیم مدت زمان و نوع انیمیشن */
+  transition: opacity 0.3s ease-in-out; /* Slightly faster fade out for icon */
 }
 
 .AIWritingCompanion-translation-icon-extension-fade-in {
   opacity: 1;
-  transition: opacity 0.1s ease-in-out; /* تنظیم مدت زمان و نوع انیمیشن */
+  transition: opacity 0.05s ease-in-out; /* Faster fade in for icon */
 }
 
 .AIWritingCompanion-translation-icon-extension-fade-in-initial {
-  opacity: 0; /* حالت اولیه برای fade-in */
+  opacity: 0; /* Initial state for fade-in */
 }
 
-/* Notification */
+/* ==========================================================================
+     Notification Styles
+     ========================================================================== */
 .AIWritingCompanion-translation-notification {
-  background-color: #f8f8f8; /* رنگ پس زمینه پیش فرض */
-  color: #333; /* رنگ متن پیش فرض */
+  background-color: #f8f8f8;
+  color: #333;
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 5px;
@@ -86,7 +90,9 @@
   color: #689f38;
 }
 
-/* Disable Hyperlinks */
+/* ==========================================================================
+     Disable Hyperlinks Styles
+     ========================================================================== */
 .AIWritingCompanion-disable-links a,
 .AIWritingCompanion-disable-links button,
 .AIWritingCompanion-disable-links [onclick],
@@ -97,7 +103,9 @@
   color: inherit;
 }
 
-/* Selection Text Window */
+/* ==========================================================================
+     Selection Text Window Styles
+     ========================================================================== */
 .aiwc-selection-display-temp {
   background-color: #f8f8f8;
   color: #333;
@@ -106,47 +114,51 @@
   border-radius: 4px;
   font-size: 14px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  opacity: 0.6; /* شفافیت اولیه */
-  transform: scale(0.5); /* افزایش بیشتر سایز اولیه */
-  transform-origin: top left; /* مبدا تغییر سایز */
+  opacity: 0.6; /* Initial opacity of the popup */
+  transform: scale(0.1); /* Initial scale, starts small */
+  transform-origin: top left; /* Transformation origin for scaling */
   transition:
-    transform 0.2s ease-out,
-    opacity 0.15s ease-in-out; /* انیمیشن برای تغییر سایز و شفافیت */
+    transform 0.1s ease-out,
+    /* Faster scaling animation */ opacity 0.1s ease-in-out; /* Faster fade-in animation */
 }
 
 .aiwc-selection-display-temp.fade-out {
   opacity: 0 !important;
-  transition: opacity 0.15s ease-in-out;
+  transition: opacity 0.1s ease-in-out; /* Fade out animation when dismissing */
 }
 
-/* Loading Animation Container */
+/* ==========================================================================
+     Loading Animation Container Styles
+     ========================================================================== */
 .aiwc-loading-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  opacity: 0; /* ابتدا مخفی باشد */
-  transition: opacity 0.3s ease-in-out; /* برای fade-in بعد از بزرگ شدن */
+  opacity: 1; /* Initially visible */
+  transition: opacity 0.9s ease-in-out; /* Transition for fading out before text appears */
 }
 
-/* Loading Dots Animation */
+/* ==========================================================================
+     Loading Dots Animation Styles
+     ========================================================================== */
 @keyframes blink {
   0% {
     opacity: 0.3;
   }
   50% {
     opacity: 0.8;
-  } /* Make it more prominent at the peak */
+  }
   100% {
     opacity: 0.3;
-  } /* Fade back to the initial opacity */
+  }
 }
 
 .aiwc-loading-dot {
   font-size: 1.2em;
-  opacity: 0.3; /* کمی محوتر */
+  opacity: 0.3;
   margin: 0 0.2em;
-  animation: blink 0.7s infinite; /* مدت زمان و حذف alternate */
-  color: black; /* تنظیم رنگ به مشکی */
+  animation: blink 0.7s infinite;
+  color: black;
 }
 
 .aiwc-loading-dot:nth-child(1) {
@@ -159,13 +171,4 @@
 
 .aiwc-loading-dot:nth-child(3) {
   animation-delay: 0.4s;
-}
-
-@keyframes blink {
-  0% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 0.8;
-  }
 }
