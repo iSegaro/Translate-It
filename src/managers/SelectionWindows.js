@@ -5,8 +5,8 @@ import { translateText } from "../utils/api.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
-    this.fadeInDuration = options.fadeInDuration || 50; // مدت زمان پیش فرض برای fade-in (میلی ثانیه)
-    this.fadeOutDuration = options.fadeOutDuration || 125; // مدت زمان پیش فرض برای fade-out (میلی ثانیه)
+    this.fadeInDuration = options.fadeInDuration || 50; // مدت زمان پیش فرض برای fade-in
+    this.fadeOutDuration = options.fadeOutDuration || 125; // مدت زمان پیش فرض برای fade-out
     this.isVisible = false;
     this.currentText = null;
     this.displayElement = null;
@@ -76,8 +76,7 @@ export default class SelectionWindows {
         event.stopPropagation();
         return;
       }
-      this.cancelTranslation(); // لغو ترجمه هنگام کلیک خارج از پاپ‌آپ
-      this.dismiss();
+      this.cancelCurrentTranslation(); // فراخوانی متد جدید برای لغو ترجمه
     };
 
     if (this.removeMouseDownListener) {
@@ -87,17 +86,12 @@ export default class SelectionWindows {
     this.removeMouseDownListener = removeHandler;
   }
 
-  cancelTranslation() {
+  // لغو ترجمه
+  cancelCurrentTranslation() {
     this.isTranslationCancelled = true;
     this.translationPromise = null; // پاک کردن promise
     this.translatingText = null; // پاک کردن متن در حال ترجمه
-    if (this.displayElement) {
-      this.displayElement.innerHTML = ""; // پاک کردن محتوای پاپ‌آپ
-      const loadingContainer = this.createLoadingDots();
-      this.displayElement.appendChild(loadingContainer); // نمایش مجدد لودینگ (اختیاری)
-      this.displayElement.style.opacity = "0.6"; // بازگرداندن شفافیت اولیه
-    }
-    // نیازی به تغییر وضعیت پاپ‌آپ در اینجا نیست، زیرا dismiss() فراخوانی می‌شود.
+    this.dismiss(); // فراخوانی متد dismiss برای انجام fade out
   }
 
   applyInitialStyles(position) {
@@ -109,10 +103,9 @@ export default class SelectionWindows {
     this.displayElement.style.opacity = "0.6";
     this.displayElement.style.transform = "scale(0.1)";
     this.displayElement.style.transformOrigin = "top left";
-    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`; // کاهش مدت زمان
+    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
     this.displayElement.style.left = `${position.x}px`;
     this.displayElement.style.top = `${position.y}px`;
-    // this.applyTextDirection(this.displayElement, ""); // Initial text direction might not be relevant yet
     this.displayElement.dataset.aiwcSelectionPopup = "true";
   }
 
@@ -133,7 +126,7 @@ export default class SelectionWindows {
       this.displayElement.style.transform = "scale(1)";
       setTimeout(() => {
         loadingContainer.style.opacity = "1";
-      }, 300);
+      }, 100);
     });
   }
 
@@ -142,8 +135,8 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        // 2. تنظیم شفافیت به 0.9 قبل از جایگذاری متن
-        this.displayElement.style.opacity = "0.9";
+        // 2. تنظیم شفافیت به 0.6 قبل از جایگذاری متن
+        this.displayElement.style.opacity = "0.6";
 
         // 3. تنظیم متن ترجمه شده قبل از جایگذاری
         this.applyTextDirection(this.displayElement, translatedText);
@@ -154,11 +147,11 @@ export default class SelectionWindows {
 
         // 5. شروع انیمیشن Fade In با یک تاخیر کوتاه
         setTimeout(() => {
-          this.displayElement.style.transition = `opacity 0.15s ease-in-out`; // تنظیم transition برای fade in
+          this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
           this.displayElement.style.opacity = "0.9";
         }, 10); // تاخیر بسیار کم برای اطمینان از اعمال تغییرات
       }
-    }, 900); // مدت زمان محو شدن نقاط لودینگ (باید با CSS هماهنگ باشد)
+    }, 150); // مدت زمان محو شدن نقاط لودینگ (باید با CSS هماهنگ باشد)
   }
 
   handleEmptyTranslation(loadingContainer) {
@@ -223,6 +216,7 @@ export default class SelectionWindows {
     if (this.displayElement && this.displayElement.parentNode) {
       this.displayElement.remove();
     }
+
     // Reset state
     this.displayElement = null;
     this.isVisible = false;
