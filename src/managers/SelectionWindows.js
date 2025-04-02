@@ -5,8 +5,8 @@ import { translateText } from "../utils/api.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
-    this.fadeInDuration = options.fadeInDuration || 50; // مدت زمان پیش فرض برای fade-in
-    this.fadeOutDuration = options.fadeOutDuration || 125; // مدت زمان پیش فرض برای fade-out
+    this.fadeInDuration = options.fadeInDuration || 50; // مدت زمان پیش فرض برای fade-in (میلی ثانیه)
+    this.fadeOutDuration = options.fadeOutDuration || 125; // مدت زمان پیش فرض برای fade-out (میلی ثانیه)
     this.isVisible = false;
     this.currentText = null;
     this.displayElement = null;
@@ -50,14 +50,10 @@ export default class SelectionWindows {
           this.isTranslationCancelled ||
           selectedText !== this.translatingText
         ) {
-          // logME(
-          //   "[SelectionWindows] ترجمه لغو شد یا متن تغییر کرده، نتیجه نادیده گرفته می‌شود."
-          // );
           return;
         }
         const translatedText =
           translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
-        // logME(selectedText, translatedText);
         if (translatedText) {
           this.transitionToTranslatedText(translatedText, loadingContainer);
         } else {
@@ -70,13 +66,6 @@ export default class SelectionWindows {
           selectedText === this.translatingText
         ) {
           this.handleTranslationError(error, loadingContainer);
-        } else {
-          /**
-           * خطا در ترجمه نادیده گرفته شد زیرا ترجمه لغو شده است یا متن تغییر کرده است
-           */
-          // logME(
-          //   "[SelectionWindows] خطا در ترجمه نادیده گرفته شد زیرا ترجمه لغو شده است یا متن تغییر کرده است."
-          // );
         }
       });
 
@@ -108,7 +97,6 @@ export default class SelectionWindows {
       this.displayElement.appendChild(loadingContainer); // نمایش مجدد لودینگ (اختیاری)
       this.displayElement.style.opacity = "0.6"; // بازگرداندن شفافیت اولیه
     }
-    // logME("[SelectionWindows] روند ترجمه لغو شد.");
     // نیازی به تغییر وضعیت پاپ‌آپ در اینجا نیست، زیرا dismiss() فراخوانی می‌شود.
   }
 
@@ -121,10 +109,10 @@ export default class SelectionWindows {
     this.displayElement.style.opacity = "0.6";
     this.displayElement.style.transform = "scale(0.1)";
     this.displayElement.style.transformOrigin = "top left";
-    this.displayElement.style.transition = `transform 0.2s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
+    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`; // کاهش مدت زمان
     this.displayElement.style.left = `${position.x}px`;
     this.displayElement.style.top = `${position.y}px`;
-    this.applyTextDirection(this.displayElement, ""); // Initial text direction might not be relevant yet
+    // this.applyTextDirection(this.displayElement, ""); // Initial text direction might not be relevant yet
     this.displayElement.dataset.aiwcSelectionPopup = "true";
   }
 
@@ -145,21 +133,32 @@ export default class SelectionWindows {
       this.displayElement.style.transform = "scale(1)";
       setTimeout(() => {
         loadingContainer.style.opacity = "1";
-        // logME("[SelectionWindows] Loading dots should be visible now.");
       }, 300);
     });
   }
 
   transitionToTranslatedText(translatedText, loadingContainer) {
+    // 1. محو شدن نقاط لودینگ
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
+        // 2. تنظیم شفافیت به 0.9 قبل از جایگذاری متن
+        this.displayElement.style.opacity = "0.9";
+
+        // 3. تنظیم متن ترجمه شده قبل از جایگذاری
+        this.applyTextDirection(this.displayElement, translatedText);
+
+        // 4. جایگذاری متن ترجمه شده
         this.displayElement.innerHTML = "";
         this.displayElement.innerText = translatedText;
-        this.applyTextDirection(this.displayElement, translatedText);
-        this.displayElement.style.opacity = "0.9";
+
+        // 5. شروع انیمیشن Fade In با یک تاخیر کوتاه
+        setTimeout(() => {
+          this.displayElement.style.transition = `opacity 0.15s ease-in-out`; // تنظیم transition برای fade in
+          this.displayElement.style.opacity = "0.9";
+        }, 10); // تاخیر بسیار کم برای اطمینان از اعمال تغییرات
       }
-    }, 300);
+    }, 900); // مدت زمان محو شدن نقاط لودینگ (باید با CSS هماهنگ باشد)
   }
 
   handleEmptyTranslation(loadingContainer) {
@@ -196,7 +195,7 @@ export default class SelectionWindows {
       this.removeMouseDownListener = null;
     }
 
-    this.isVisible = false; // وضعیت را بلافاصله آپدیت کن
+    this.isVisible = false;
 
     if (withFadeOut && this.fadeOutDuration > 0) {
       // *** استفاده از transition به جای setTimeout مستقیم برای fade-out ***
@@ -224,7 +223,6 @@ export default class SelectionWindows {
     if (this.displayElement && this.displayElement.parentNode) {
       this.displayElement.remove();
     }
-
     // Reset state
     this.displayElement = null;
     this.isVisible = false;
