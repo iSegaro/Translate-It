@@ -2,6 +2,7 @@
 import { CONFIG, getApiKeyAsync, getSettingsAsync } from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
+import { getTranslateWithSelectElementAsync } from "./config.js";
 
 const errorHandler = new ErrorHandler();
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
@@ -57,6 +58,17 @@ chrome.action.onClicked.addListener(async () => {
         statusCode: "PERMISSION_DENIED",
       });
       if (tabId) selectElementStates[tabId] = false;
+      return;
+    }
+
+    if (selectElementStates[tabId] === undefined) {
+      selectElementStates[tabId] = false;
+    }
+
+    const shouldTranslateWithSelectElement =
+      await getTranslateWithSelectElementAsync();
+
+    if (!shouldTranslateWithSelectElement) {
       return;
     }
 

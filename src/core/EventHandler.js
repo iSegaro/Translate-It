@@ -1,5 +1,9 @@
 // src/core/EventHandler.js
 import {
+  getTranslateOnTextFieldsAsync,
+  getEnableShortcutForTextFieldsAsync,
+  getTranslateWithSelectElementAsync,
+  getTranslateOnTextSelectionAsync,
   getRequireCtrlForTextSelectionAsync,
   state,
   TranslationMode,
@@ -55,25 +59,58 @@ export default class EventHandler {
         return;
       }
 
+      /**
+       * translateWithSelectElement
+       *
+       * برای بررسیِ فعال بودن و یا نبودن translateWithSelectElement در اسکریپت
+       * Background، جایی که کلیک روی آیکون مترجم در نوارابزار مرورگر
+       * اتفاق می‌افتد مدیریت می‌شود
+       */
       if (this.select_Element_ModeActive && event.type === "click") {
         await this.handleSelect_ElementClick(event);
         return;
       }
 
-      if (this.isCtrlSlashEvent(event)) {
+      /**
+       * enableShortcutForTextFields
+       *
+       * بررسی فعال بودن شرتکات Ctrl+/ در اینجا انجام می‌شود
+       */
+      const shouldEnableShortcut = await getEnableShortcutForTextFieldsAsync();
+      if (shouldEnableShortcut && this.isCtrlSlashEvent(event)) {
         await this.handleCtrlSlash(event);
         return;
       }
 
+      /**
+       * translateOnTextFields
+       *
+       * شرط مربوط به فعال بودن و یا نبودن translateOnTextFields
+       * داخل متد handleEditableElement انجام می‌شود.
+       * جایی که موقع ساخت آیکون مترجم روی فیلد متنی میخواهد پردازش
+       * صورت بگیرد
+       */
       if (this.isEditableTarget(event.target)) {
         await this.handleEditableElement(event);
         return;
       }
 
       /**
+       * shouldTranslateOnTextSelection
+       *
+       * بررسی حالت ترجمه، "انتخاب متن" در اینجا صورت میگیرد
+       * در اینجا شرط مربوط به فعال بودن و یا نبودن این سرویس
+       * بررسی می شود.
+       *
+       * نکته:
        * بررسی رویداد mouseup بعد از انتخاب متن و چک کردن برای ماهیت فیلد بودن هدف
        **/
-      if (this.isMouseUp(event)) {
+      const shouldTranslateOnTextSelection =
+        await getTranslateOnTextSelectionAsync();
+      if (shouldTranslateOnTextSelection && this.isMouseUp(event)) {
+        /** requireCtrlForTextSelection
+         *  در اینجا شرط مربوط به نیاز بودن به نگه‌داشتن کلید کنترل بررسی می‌شود
+         */
         const requireCtrl = await getRequireCtrlForTextSelectionAsync();
 
         if (requireCtrl) {
@@ -222,48 +259,59 @@ export default class EventHandler {
     );
   }
   _processEditableElement(element) {
-    if (this.IconManager) {
-      this.IconManager.cleanup();
+    getTranslateOnTextFieldsAsync().then((shouldTranslateOnTextFields) => {
+      if (!shouldTranslateOnTextFields) {
+        return;
+      }
 
-      // TODO: Platform-specific handling for YouTube (Temporary Solution - Requires Refinement)
-      if (detectPlatform() === Platform.Youtube) {
-        const youtubeStrategies = this.strategies["youtube"];
-        // Skip processing for recognized special fields on YouTube (search query or end field).
-        // This is a temporary implementation and may need a more robust and scalable approach in the future.
-        if (youtubeStrategies.isYoutube_ExtraField(element)) {
-          return;
+      if (this.IconManager) {
+        this.IconManager.cleanup();
+
+        // TODO: Platform-specific handling for YouTube (Temporary Solution - Requires Refinement)
+        if (detectPlatform() === Platform.Youtube) {
+          const youtubeStrategies = this.strategies["youtube"];
+          // Skip processing for recognized special fields on YouTube (search query or end field).
+          // This is a temporary implementation and may need a more robust and scalable approach in the future.
+          if (youtubeStrategies.isYoutube_ExtraField(element)) {
+            return;
+          }
+        }
+        // TODO: End of platform-specific handling for YouTube (Temporary Solution)
+
+        const icon = this.IconManager.createTranslateIcon(element);
+        if (icon) {
+          setupIconBehavior(
+            icon,
+            element,
+            this.translationHandler,
+            this.notifier,
+            this.strategies
+          );
+          return icon;
+        } else {
+          logME("[EventHandler] Icon not created");
+          return null;
         }
       }
-      // TODO: End of platform-specific handling for YouTube (Temporary Solution)
-
-      const icon = this.IconManager.createTranslateIcon(element);
-      if (icon) {
-        setupIconBehavior(
-          icon,
-          element,
-          this.translationHandler,
-          this.notifier,
-          this.strategies
-        );
-        return icon;
-      } else {
-        logME("[EventHandler] Icon not created");
-        return null;
-      }
-    }
-    return null;
+      return null;
+    });
   }
 
   handleEditableFocus(element) {
     if (state.activeTranslateIcon) return;
-    this._processEditableElement(element);
+    getTranslateOnTextFieldsAsync().then((shouldTranslateOnTextFields) => {
+      if (!shouldTranslateOnTextFields) {
+        return;
+      }
+      this._processEditableElement(element);
+    });
   }
 
   async handleEditableElement(event) {
+    if (state.activeTranslateIcon) return;
+
     event.stopPropagation();
     const target = event.target;
-
-    if (state.activeTranslateIcon) return;
     this._processEditableElement(target);
   }
 
