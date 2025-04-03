@@ -214,6 +214,7 @@ export const injectStyle = () => {
   try {
     const hostname = window.location.hostname;
     injectCSS("styles/content.css");
+    injectCSS("styles/SelectionWindows.css");
 
     if (hostname.includes("whatsapp.com")) {
       injectCSS("styles/whatsapp.css");
