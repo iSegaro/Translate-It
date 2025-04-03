@@ -1,5 +1,5 @@
 // src/managers/IconBehavior.js
-import { state } from "../config.js";
+import { state, TranslationMode } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorService.js";
@@ -72,7 +72,10 @@ export default function setupIconBehavior(
 
       statusNotification = notifier.show("در حال ترجمه...", "status", false);
 
-      const translated = await translateText(text);
+      const translated = await translateText(
+        text,
+        TranslationMode.SelectElement
+      );
 
       if (translated) {
         await translationHandler.updateTargetElement(target, translated);

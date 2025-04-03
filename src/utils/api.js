@@ -18,6 +18,9 @@ import {
   getOpenAIModelAsync,
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
+  getPromptDictionaryAsync,
+  state,
+  TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid, logMethod, logME } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
@@ -115,7 +118,12 @@ class ApiService {
   }
 
   @logMethod
-  async createPrompt(text, sourceLang, targetLang) {
+  async createPrompt(
+    text,
+    sourceLang,
+    targetLang,
+    translateMode = TranslationMode.Field
+  ) {
     const promptTemplate = await getPromptAsync(); // Fetch the user-configured prompt
     let Json_or_Text_ForTranslate = text;
     let isJsonMode = false;
@@ -136,7 +144,11 @@ class ApiService {
     if (isJsonMode) {
       promptBase = await getPromptBASESelectAsync();
     } else {
-      promptBase = await getPromptBASEFieldAsync();
+      if (translateMode === TranslationMode.Dictionary_Translation) {
+        promptBase = await getPromptDictionaryAsync();
+      } else {
+        promptBase = await getPromptBASEFieldAsync();
+      }
     }
 
     const userRules = promptTemplate
@@ -163,7 +175,7 @@ class ApiService {
   }
 
   @logMethod
-  async handleGeminiTranslation(text, sourceLang, targetLang) {
+  async handleGeminiTranslation(text, sourceLang, targetLang, translateMode) {
     if (sourceLang === targetLang) return null;
 
     const [apiKey, apiUrl] = await Promise.all([
@@ -191,7 +203,12 @@ class ApiService {
       return;
     }
 
-    const prompt = await this.createPrompt(text, sourceLang, targetLang);
+    const prompt = await this.createPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
     const url = `${apiUrl}?key=${apiKey}`;
     const fetchOptions = {
       method: "POST",
@@ -360,7 +377,7 @@ class ApiService {
   }
 
   @logMethod
-  async translateText(text) {
+  async translateText(text, translateMode) {
     if (await getUseMockAsync()) {
       await delay(MOCK_DELAY);
       const sampleTextForMock = text.substring(0, 50);
@@ -404,7 +421,8 @@ class ApiService {
           return await this.handleGeminiTranslation(
             text,
             sourceLang,
-            targetLang
+            targetLang,
+            translateMode
           );
         case "webai":
           return await this.handleWebAITranslation(
