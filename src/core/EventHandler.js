@@ -1,5 +1,5 @@
 // src/core/EventHandler.js
-import { state, TranslationMode } from "../config.js";
+import { CONFIG, state, TranslationMode } from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
 import { translateText } from "../utils/api.js";
 import {
@@ -61,15 +61,26 @@ export default class EventHandler {
         return;
       }
 
-      // بررسی رویداد mouseup بعد از انتخاب متن
-      if (this.isMouseUp(event)) {
-        this.handleMouseUp(event);
-        return;
-      }
-
       if (this.isEditableTarget(event.target)) {
         await this.handleEditableElement(event);
         return;
+      }
+
+      /**
+       * بررسی رویداد mouseup بعد از انتخاب متن و چک کردن برای ماهیت فیلد بودن هدف
+       **/
+      if (this.isMouseUp(event)) {
+        if (CONFIG.CTRL_CLICK) {
+          if (this.isMouseUpCtrl(event)) {
+            await this.handleMouseUp(event);
+            return;
+          }
+        } else {
+          if (this.isMouseUp(event)) {
+            await this.handleMouseUp(event);
+            return;
+          }
+        }
       }
     } catch (error) {
       error = await ErrorHandler.processError(error);
@@ -78,6 +89,10 @@ export default class EventHandler {
         context: "event-handling",
       });
     }
+  }
+
+  isMouseUpCtrl(event) {
+    return event.type === "mouseup" && (event.ctrlKey || event.metaKey);
   }
 
   isMouseUp(event) {

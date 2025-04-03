@@ -32,6 +32,7 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
+  CTRL_CLICK: true,
   HIGHTLIH_NEW_ELEMETN_RED: "2px solid red",
   TRANSLATION_ICON_TITLE: "Translate Text",
   HIGHLIGHT_STYLE: "2px solid red",
@@ -146,6 +147,11 @@ export const IsDebug = async () => {
     return settingsCache.DEBUG_MODE;
   }
   return await getDebugModeAsync();
+};
+
+export const getCtrlClickAsync = async () => {
+  const settings = await getSettingsAsync();
+  return settings.CTRL_CLICK || CONFIG.CTRL_CLICK;
 };
 
 export const getApiKeyAsync = async () => {
