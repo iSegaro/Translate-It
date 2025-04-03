@@ -137,6 +137,8 @@ export default class TranslationHandler {
           {
             type: ErrorTypes.CONTEXT,
             context: "TranslationHandler-processTranslation-context",
+            code: "context-invalid",
+            statusCode: "context-invalid",
           }
         );
         return;

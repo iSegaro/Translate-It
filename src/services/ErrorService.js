@@ -28,6 +28,7 @@ export class ErrorHandler {
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
       "parsing-response-error",
+      "context-invalid",
     ]);
     this.suppressed_ErrorsConsole = new Set([
       "invalid-protocol",
@@ -37,6 +38,7 @@ export class ErrorHandler {
       "text-direction-error",
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
+      "context-invalid",
     ]);
   }
 
@@ -316,8 +318,13 @@ export class ErrorHandler {
   }
 
   _logError(error, meta, errorCode, isDebugMode) {
-    if (this.suppressed_ErrorsConsole.has(errorCode)) return;
-    if (meta.type === ErrorTypes.CONTEXT) return;
+    if (this.suppressed_ErrorsConsole.has(errorCode)) {
+      return;
+    }
+    if (meta.type === ErrorTypes.CONTEXT) {
+      return;
+    }
+
     const errorDetails = {
       name: error.name,
       message: error.message,

@@ -1,8 +1,9 @@
 // src/managers/SelectionWindows.js
-import { logME } from "../utils/helpers";
-import { CONFIG, TranslationMode } from "../config.js";
+import { logME, isExtensionContextValid } from "../utils/helpers";
+import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { marked } from "marked";
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -11,6 +12,7 @@ export default class SelectionWindows {
     this.isVisible = false;
     this.currentText = null;
     this.displayElement = null;
+    this.errorHandler = new ErrorHandler();
     this.removeMouseDownListener = null; // برای نگهداری رفرنس تابع حذف لیستنر
     this.translationHandler = options.translationHandler;
     this.translationPromise = null; // برای نگهداری promise مربوط به ترجمه
@@ -19,6 +21,19 @@ export default class SelectionWindows {
   }
 
   async show(selectedText, position) {
+    if (!isExtensionContextValid()) {
+      await this.errorHandler.handle(
+        new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
+        {
+          type: ErrorTypes.CONTEXT,
+          context: "SelectionWindows-show-context",
+          code: "context-invalid",
+          statusCode: "context-invalid",
+        }
+      );
+      return;
+    }
+
     if (
       !selectedText ||
       (this.isVisible && selectedText === this.currentText)

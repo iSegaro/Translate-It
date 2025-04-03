@@ -404,7 +404,8 @@ class ApiService {
         {
           type: ErrorTypes.CONTEXT,
           context: "api-translateText-context",
-          code: "api-translateText-context",
+          code: "context-invalid",
+          statusCode: "context-invalid",
         }
       );
       return;

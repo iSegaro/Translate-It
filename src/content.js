@@ -6,8 +6,9 @@ import {
   isExtensionContextValid,
   taggleLinks,
   injectStyle,
+  logME,
+  logMethod,
 } from "./utils/helpers.js";
-import { logMethod } from "./utils/helpers.js";
 
 class ContentScript {
   constructor() {
@@ -109,9 +110,9 @@ class ContentScript {
           this.translationHandler.IconManager.cleanup();
         }
       } catch (error) {
-        console.debug("[Content] Error in updateSelectElementState => ", error);
+        logME("[Content] Error in updateSelectElementState => ", error);
         if (error.message?.includes("context invalidated")) {
-          console.debug("[Content] Extension context invalidated");
+          logME("[Content] Extension context invalidated");
         } else {
           throw this.translationHandler.errorHandler.handle(error, {
             type: this.translationHandler.ErrorTypes.CONTEXT,
@@ -120,7 +121,7 @@ class ContentScript {
         }
       }
     } else {
-      console.debug(
+      logME(
         "[Content] Extension context is not valid, skipping updateSelectElementState."
       );
     }
