@@ -9,17 +9,21 @@
 
 <br>
 
-A lightweight and versatile browser extension designed to translate text within input fields (such as text boxes, text areas, and contenteditable elements). Translations can be triggered by clicking the extension icon or using the `Ctrl + /` shortcut.
+This Extension is a personal, lightweight, and efficient tool for easy text translation on the web. By offering three different translation methods, it provides a smooth and fast user experience: simply select the text to be translated, click on any element to translate its content, or translate in text fields using a shortcut.
 
 **This is a handy, small writing tool and translation assistant.**
 
 <br>
 
-## ⚙️ Features
+## ⚙️ Key Features
 
-- **Universal Compatibility:** Works seamlessly with standard and advanced input fields.
-- **Multiple Activation Methods:** Trigger translation via icon click or the `Ctrl + /` shortcut.
-- **Multi-AI Support:** Choose from multiple translation providers, including:
+- **Translate with Selected Text (Select Text):** Simply select the text you want to translate on any website. After releasing the mouse button, the translation will quickly appear in the same place.
+- **Translate with Selected Element (Select Element):** By activating the "Select Element" mode by clicking the extension icon in the browser toolbar, you can click on any desired element on the page (such as paragraphs, buttons, etc.) to translate its content into your preferred language.
+- **Translate in Text Fields (Field):** When working with forms, editors, and other text fields, you can translate your text in two ways:
+  - **Using the `Ctrl + /` shortcut:** By pressing these key combinations, the text in the active field will be translated quickly.
+  - **By clicking the translator icon:** A small translator icon appears next to text fields. By clicking on it, you can easily translate the content of the field.
+- **Supports Multiple Translation Providers:** This extension supports several different AI translation services, allowing you to choose the best option for your needs.
+
   - [Gemini][gemini-url] (✔ Free)
   - [OpenAI][openai-url]
   - [OpenRouter][openrouter-url] (✔ Free)
