@@ -167,7 +167,10 @@ export default class TranslationHandler {
           TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      const translated = await translateText(params.text);
+      const translated = await translateText(
+        params.text,
+        TranslationMode.Field
+      );
       if (!translated) {
         return;
       }

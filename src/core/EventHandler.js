@@ -400,7 +400,10 @@ export default class EventHandler {
       // --- پایان مرحله 4 ---
 
       // ارسال به سرویس ترجمه
-      const translatedJsonString = await translateText(jsonFormatString);
+      const translatedJsonString = await translateText(
+        jsonFormatString,
+        TranslationMode.SelectElement
+      );
 
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
