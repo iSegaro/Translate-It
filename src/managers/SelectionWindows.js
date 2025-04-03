@@ -1,6 +1,6 @@
 // src/managers/SelectionWindows.js
 import { logME } from "../utils/helpers";
-import { CONFIG } from "../config.js";
+import { CONFIG, TranslationMode } from "../config.js";
 import { translateText } from "../utils/api.js";
 
 export default class SelectionWindows {
@@ -27,7 +27,49 @@ export default class SelectionWindows {
 
     this.isTranslationCancelled = false; // ریست کردن پرچم در هر بار نمایش
     this.translatingText = selectedText; // ثبت متن در حال ترجمه
-    this.translationPromise = translateText(selectedText); // ذخیره promise ترجمه
+
+    this.translatingText = selectedText; // ثبت متن در حال ترجمه
+
+    let translationMode = TranslationMode.Field; // پیش فرض حالت ترجمه کامل
+
+    const maxDictionaryWords = 3; // حداکثر تعداد کلمات برای حالت دیکشنری
+    const maxDictionaryChars = 30; // حداکثر تعداد کاراکترها برای حالت دیکشنری
+    const stopWords = [
+      "the",
+      "a",
+      "an",
+      "is",
+      "are",
+      "was",
+      "were",
+      "in",
+      "on",
+      "at",
+      "to",
+      "of",
+      "for",
+      "with",
+      "by",
+      "from",
+    ]; // لیست کلمات رایج (بسته به زبان)
+
+    const words = selectedText.trim().split(/\s+/);
+
+    if (
+      words.length <= maxDictionaryWords &&
+      selectedText.length <= maxDictionaryChars
+    ) {
+      if (words.length === 1) {
+        const lowerCaseWord = words[0].toLowerCase();
+        if (!stopWords.includes(lowerCaseWord)) {
+          translationMode = TranslationMode.Dictionary_Translation;
+        }
+      } else if (words.length > 1) {
+        translationMode = TranslationMode.Dictionary_Translation;
+      }
+    }
+
+    this.translationPromise = translateText(selectedText, translationMode); // ذخیره promise ترجمه
 
     this.dismiss(false); // بستن پاپ‌آپ قبلی
 
