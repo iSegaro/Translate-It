@@ -89,6 +89,20 @@ export const CONFIG = {
   $_{TEXT}
   \`\`\`
     `,
+  PROMPT_BASE_DICTIONARY: `You are a $_{TARGET} dictionary service. Your task is to provide in detailed dictionary definitions while strictly preserving the input structure and formatting. Follow these rules:
+
+  - Provide the translation of the input word or phrase.
+  - Include synonyms, word type (noun, verb, adjective, etc.), and a brief definition.
+  - If applicable, provide example sentences using the word or phrase in context.
+  - If the input is ambiguous, return the most common meanings.
+  - If no definition is found, return "No definition available."
+
+  Return in $_{TARGET} language, and **ONLY** the dictionary entry without any extra words, explanations, markdown, or modifications.
+
+  \`\`\`text input
+  $_{TEXT}
+  \`\`\`
+  `,
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
 - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
 - If the input is in any other language, translate it to $_{TARGET}.
@@ -108,6 +122,7 @@ export const TranslationMode = {
   Field: "field",
   SelectElement: "select_element",
   Selection: "selection",
+  Dictionary_Translation: "dictionary",
 };
 
 export const state = {
@@ -236,6 +251,13 @@ export const getTargetLanguageAsync = async () => {
 
 export const getPromptAsync = async () => {
   return getSettingValueAsync("PROMPT_TEMPLATE", CONFIG.PROMPT_TEMPLATE);
+};
+
+export const getPromptDictionaryAsync = async () => {
+  return getSettingValueAsync(
+    "PROMPT_BASE_DICTIONARY",
+    CONFIG.PROMPT_BASE_DICTIONARY
+  );
 };
 
 export const getPromptBASESelectAsync = async () => {
