@@ -91,26 +91,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
 
-  // Function to handle the dependency between text selection checkboxes
-  function handleTextFieldsDependency() {
-    if (
-      !translateOnTextFieldsCheckbox ||
-      !enableShortcutForTextFieldsCheckbox ||
-      !textFieldShortcutGroup
-    )
-      return;
-
-    const isTextFieldsEnabled = translateOnTextFieldsCheckbox.checked;
-    enableShortcutForTextFieldsCheckbox.disabled = !isTextFieldsEnabled;
-    textFieldShortcutGroup.style.opacity = isTextFieldsEnabled ? "1" : "0.6";
-    textFieldShortcutGroup.style.pointerEvents =
-      isTextFieldsEnabled ? "auto" : "none";
-
-    if (!isTextFieldsEnabled) {
-      enableShortcutForTextFieldsCheckbox.checked = false; // غیرفعال کردن زیرمجموعه
-    }
-  }
-
   // وابستگی انتخاب متن
   function handleTextSelectionDependency() {
     if (
@@ -131,13 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Add event listener for the main text selection checkbox
-  if (translateOnTextFieldsCheckbox) {
-    translateOnTextFieldsCheckbox.addEventListener(
-      "change",
-      handleTextFieldsDependency
-    ); // Listener جدید
-  }
+  // Add event listener for the text selection checkbox
   if (translateOnTextSelectionCheckbox) {
     translateOnTextSelectionCheckbox.addEventListener(
       "change",
@@ -428,8 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
         manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name} - Settings`;
       }
 
-      // فراخوانی اولیه توابع وابستگی *بعد* از تنظیم مقادیر اولیه چک‌باکس‌ها  وضعیت های ترجمه
-      handleTextFieldsDependency(); // فراخوانی برای شورتکات
+      // فراخوانی اولیه تابع وابستگی *بعد* از تنظیم مقادیر اولیه چک‌باکس‌ها  وضعیت های ترجمه
       handleTextSelectionDependency(); // فراخوانی برای انتخاب متن
 
       if (!initialUseMock) {
