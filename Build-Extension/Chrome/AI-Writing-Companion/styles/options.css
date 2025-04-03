@@ -242,3 +242,63 @@ button:hover {
   padding: 2px 5px;
   border-radius: 3px;
 }
+
+/* Styling for the new translation activation section */
+.translation-activation h2 {
+  margin-top: 20px; /* Add some space above the new section title */
+  margin-bottom: 15px;
+  border-top: 1px solid #eee; /* Optional separator line */
+  padding-top: 20px; /* Space above title after the line */
+}
+
+.setting-group {
+  margin-bottom: 15px; /* Consistent spacing */
+  display: flex; /* Use flexbox for alignment */
+  align-items: center; /* Align items vertically */
+  flex-wrap: wrap; /* Allow wrapping if needed */
+}
+
+.setting-group label {
+  margin-right: 10px; /* Space between label and checkbox */
+  flex-shrink: 0; /* Prevent label from shrinking */
+}
+
+.setting-group input[type="checkbox"] {
+  margin-right: 5px; /* Space between checkbox and description */
+}
+
+/* Styling for setting descriptions */
+.setting-description {
+  font-size: 0.9em;
+  color: #666;
+  margin-left: 5px; /* Space after checkbox */
+  flex-grow: 1; /* Allow description to take remaining space */
+  margin-top: 3px; /* Small space if it wraps */
+  flex-basis: 100%; /* Make description take full width on wrap */
+  order: 3; /* Ensure description comes last visually */
+  margin-left: 30px; /* Align description under the label */
+}
+
+/* Indentation for the sub-setting group */
+.sub-setting-group {
+  margin-left: 30px; /* Adjust indentation as needed */
+  padding-left: 15px; /* Optional extra padding */
+  border-left: 2px solid #eee; /* Optional visual indicator for hierarchy */
+  transition: opacity 0.3s ease; /* Smooth transition for enable/disable */
+}
+
+/* Style disabled sub-setting labels for better visual feedback */
+.sub-setting-group label {
+  /* Opacity is handled by JS on the group now, but you can style label specifically */
+  /* color: #999; /* Example: Lighter text color when disabled */
+}
+
+/* Ensure checkbox and label alignment is good */
+.setting-group input[type="checkbox"] {
+  order: 2; /* Position checkbox after label */
+  margin-top: 1px; /* Fine-tune vertical alignment */
+}
+
+.setting-group label {
+  order: 1; /* Position label first */
+}

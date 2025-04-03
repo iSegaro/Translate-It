@@ -48,6 +48,67 @@
             />
           </div>
         </section>
+
+        <section class="translation-activation">
+          <h2>Translation Activation Methods</h2>
+
+          <div class="setting-group">
+            <label for="translateOnTextFields"
+              >Enable translation on text fields</label
+            >
+            <input type="checkbox" id="translateOnTextFields" />
+            <span class="setting-description"
+              >Allow triggering translation directly within input/textarea
+              fields (e.g., via context menu or shortcut).</span
+            >
+          </div>
+
+          <div class="setting-group" id="textFieldShortcutGroup">
+            <label for="enableShortcutForTextFields"
+              >Enable Ctrl+/ shortcut for text fields</label
+            >
+            <input type="checkbox" id="enableShortcutForTextFields" />
+            <span class="setting-description"
+              >Allow using the Ctrl+/ keyboard shortcut to trigger translation
+              when inside a text field.</span
+            >
+          </div>
+          <div class="setting-group">
+            <label for="translateWithSelectElement"
+              >Enable translation via select element</label
+            >
+            <input type="checkbox" id="translateWithSelectElement" />
+            <span class="setting-description"
+              >Allow triggering translation using a specific selection method
+              (if implemented, e.g., selecting a whole paragraph).</span
+            >
+          </div>
+
+          <div class="setting-group">
+            <label for="translateOnTextSelection"
+              >Enable translation on text selection</label
+            >
+            <input type="checkbox" id="translateOnTextSelection" />
+            <span class="setting-description"
+              >Allow triggering translation automatically or via shortcut after
+              selecting text on the page.</span
+            >
+          </div>
+
+          <div
+            class="setting-group sub-setting-group"
+            id="textSelectionCtrlGroup"
+          >
+            <label for="requireCtrlForTextSelection"
+              >Require Ctrl key for text selection translation</label
+            >
+            <input type="checkbox" id="requireCtrlForTextSelection" />
+            <span class="setting-description"
+              >When text selection translation is enabled, require holding Ctrl
+              key during selection to trigger translation.</span
+            >
+          </div>
+        </section>
       </div>
 
       <div id="prompt" class="tab-content">
@@ -88,7 +149,7 @@
         <section>
           <h2>Translation API</h2>
           <!-- Add Dev API Mode Checkbox Here -->
-          <div class="setting-group" style="display: none">
+          <div class="setting-group">
             <label for="useMock">Use Dev API Mode</label>
             <input type="checkbox" id="useMock" />
           </div>
