@@ -2,26 +2,27 @@
 
 <div align="center">
     <strong>
-        • <a href="./README.md">English</a> | 
+        • <a href="./README.md">English</a> |
         • <a href="./README.FA.md">فارسی</a>
     </strong>
 </div>
 
 <br>
 
-This Extension is a personal, lightweight, and efficient tool for easy text translation on the web. By offering three different translation methods, it provides a smooth and fast user experience: simply select the text to be translated, click on any element to translate its content, or translate in text fields using a shortcut.
+Browser Translator Extension, a personal, lightweight, and efficient tool for easy text translation on the web. By offering four different translation and lookup methods, it provides a smooth and fast user experience: quick text translation with selection, page element translation, in-text-field translation, and dictionary information for selected words.
 
-**This is a handy, small writing tool and translation assistant.**
+**This is a handy, small writing tool and translation assistant. Everyever**
 
 <br>
 
 ## ⚙️ Key Features
 
-- **Translate with Selected Text (Select Text):** Simply select the text you want to translate on any website. After releasing the mouse button, the translation will quickly appear in the same place.
+- **Translate with Selected Text (Select Text):** Simply select the text you want to translate on any website. After releasing the mouse button, the translation will quickly appear in the same place. **If a single word is selected, related dictionary information will also be displayed.**
 - **Translate with Selected Element (Select Element):** By activating the "Select Element" mode by clicking the extension icon in the browser toolbar, you can click on any desired element on the page (such as paragraphs, buttons, etc.) to translate its content into your preferred language.
 - **Translate in Text Fields (Field):** When working with forms, editors, and other text fields, you can translate your text in two ways:
   - **Using the `Ctrl + /` shortcut:** By pressing these key combinations, the text in the active field will be translated quickly.
   - **By clicking the translator icon:** A small translator icon appears next to text fields. By clicking on it, you can easily translate the content of the field.
+- **Dictionary Mode:** By selecting a single word on the page with the mouse, comprehensive information such as meaning, synonyms, word type, and examples (if available) will be displayed in addition to the translation. This feature helps you gain a deeper understanding of words.
 - **Supports Multiple Translation Providers:** This extension supports several different AI translation services, allowing you to choose the best option for your needs.
 
   - [Gemini][gemini-url] (✔ Free)
