@@ -19,6 +19,7 @@ import {
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
   getPromptDictionaryAsync,
+  getEnableDictionaryAsync,
   state,
   TranslationMode,
 } from "../config.js";
@@ -144,8 +145,12 @@ class ApiService {
     if (isJsonMode) {
       promptBase = await getPromptBASESelectAsync();
     } else {
-      if (translateMode === TranslationMode.Dictionary_Translation) {
-        promptBase = await getPromptDictionaryAsync();
+      if ((await getEnableDictionaryAsync()) === true) {
+        if (translateMode === TranslationMode.Dictionary_Translation) {
+          promptBase = await getPromptDictionaryAsync();
+        } else {
+          promptBase = await getPromptBASEFieldAsync();
+        }
       } else {
         promptBase = await getPromptBASEFieldAsync();
       }

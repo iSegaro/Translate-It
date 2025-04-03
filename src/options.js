@@ -45,6 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
     "textSelectionCtrlGroup"
   );
 
+  const enableDictionraryCheckbox =
+    document.getElementById("enableDictionrary");
+
   // Elements for API Settings
   const translationApiSelect = document.getElementById("translationApi");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
@@ -233,7 +236,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const openaiApiModel = openAIModelInput?.value?.trim();
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
-    // دریافت وضعیت چک‌باکس‌های جدید
+    // دریافت وضعیت چک‌باکس‌های حالت‌های ترجمه
+    const enableDictionary =
+      enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY;
     const translateOnTextFields =
       translateOnTextFieldsCheckbox?.checked ?? true;
     const enableShortcutForTextFields =
@@ -262,6 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         OPENROUTER_API_KEY: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
         OPENROUTER_API_MODEL: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
         TRANSLATE_ON_TEXT_FIELDS: translateOnTextFields,
+        ENABLE_DICTIONARY: enableDictionary,
         ENABLE_SHORTCUT_FOR_TEXT_FIELDS: enableShortcutForTextFields,
         TRANSLATE_WITH_SELECT_ELEMENT: translateWithSelectElement,
         TRANSLATE_ON_TEXT_SELECTION: translateOnTextSelection,
@@ -320,7 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
           settings.TRANSLATE_ON_TEXT_FIELDS ?? true;
       }
       if (enableShortcutForTextFieldsCheckbox) {
-        // جدید
         enableShortcutForTextFieldsCheckbox.checked =
           settings.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true;
       }
@@ -335,6 +340,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (requireCtrlForTextSelectionCheckbox) {
         requireCtrlForTextSelectionCheckbox.checked =
           settings.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false;
+      }
+
+      if (enableDictionraryCheckbox) {
+        enableDictionraryCheckbox.checked = settings.ENABLE_DICTIONARY ?? true;
       }
 
       // تنظیم وضعیت اولیه API
