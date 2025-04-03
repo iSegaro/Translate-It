@@ -30,6 +30,7 @@
   "dependencies": {
     "core-js": "^3.41.0",
     "glob": "^11.0.1",
+    "marked": "^15.0.7",
     "regenerator-runtime": "^0.14.1"
   }
 }

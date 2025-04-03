@@ -2,6 +2,7 @@
 import { logME } from "../utils/helpers";
 import { CONFIG, TranslationMode } from "../config.js";
 import { translateText } from "../utils/api.js";
+import { marked } from "marked";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -183,9 +184,8 @@ export default class SelectionWindows {
         // 3. تنظیم متن ترجمه شده قبل از جایگذاری
         this.applyTextDirection(this.displayElement, translatedText);
 
-        // 4. جایگذاری متن ترجمه شده
-        this.displayElement.innerHTML = "";
-        this.displayElement.innerText = translatedText;
+        // 4. جایگذاری متن ترجمه شده به صورت Markdown
+        this.displayElement.innerHTML = marked.parse(translatedText);
 
         // 5. شروع انیمیشن Fade In با یک تاخیر کوتاه
         setTimeout(() => {
