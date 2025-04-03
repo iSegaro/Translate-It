@@ -20,6 +20,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const apiSettingsTabContent = document.getElementById("apiSettings");
   const importExportTabContent = document.getElementById("importExport");
 
+  // Elements for Language Tab - Activation Settings
+  const translateOnTextFieldsCheckbox = document.getElementById(
+    "translateOnTextFields"
+  );
+  const enableShortcutForTextFieldsCheckbox = document.getElementById(
+    "enableShortcutForTextFields"
+  );
+  const textFieldShortcutGroup = document.getElementById(
+    "textFieldShortcutGroup"
+  );
+
+  const translateWithSelectElementCheckbox = document.getElementById(
+    "translateWithSelectElement"
+  );
+
+  const translateOnTextSelectionCheckbox = document.getElementById(
+    "translateOnTextSelection"
+  );
+  const requireCtrlForTextSelectionCheckbox = document.getElementById(
+    "requireCtrlForTextSelection"
+  );
+  const textSelectionCtrlGroup = document.getElementById(
+    "textSelectionCtrlGroup"
+  );
+
   // Elements for API Settings
   const translationApiSelect = document.getElementById("translationApi");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
@@ -65,6 +90,60 @@ document.addEventListener("DOMContentLoaded", () => {
   const promptTemplateInput = document.getElementById("promptTemplate");
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
+
+  // Function to handle the dependency between text selection checkboxes
+  function handleTextFieldsDependency() {
+    if (
+      !translateOnTextFieldsCheckbox ||
+      !enableShortcutForTextFieldsCheckbox ||
+      !textFieldShortcutGroup
+    )
+      return;
+
+    const isTextFieldsEnabled = translateOnTextFieldsCheckbox.checked;
+    enableShortcutForTextFieldsCheckbox.disabled = !isTextFieldsEnabled;
+    textFieldShortcutGroup.style.opacity = isTextFieldsEnabled ? "1" : "0.6";
+    textFieldShortcutGroup.style.pointerEvents =
+      isTextFieldsEnabled ? "auto" : "none";
+
+    if (!isTextFieldsEnabled) {
+      enableShortcutForTextFieldsCheckbox.checked = false; // غیرفعال کردن زیرمجموعه
+    }
+  }
+
+  // وابستگی انتخاب متن
+  function handleTextSelectionDependency() {
+    if (
+      !translateOnTextSelectionCheckbox ||
+      !requireCtrlForTextSelectionCheckbox ||
+      !textSelectionCtrlGroup
+    )
+      return;
+
+    const isTextSelectionEnabled = translateOnTextSelectionCheckbox.checked;
+    requireCtrlForTextSelectionCheckbox.disabled = !isTextSelectionEnabled;
+    textSelectionCtrlGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
+    textSelectionCtrlGroup.style.pointerEvents =
+      isTextSelectionEnabled ? "auto" : "none";
+
+    if (!isTextSelectionEnabled) {
+      requireCtrlForTextSelectionCheckbox.checked = false;
+    }
+  }
+
+  // Add event listener for the main text selection checkbox
+  if (translateOnTextFieldsCheckbox) {
+    translateOnTextFieldsCheckbox.addEventListener(
+      "change",
+      handleTextFieldsDependency
+    ); // Listener جدید
+  }
+  if (translateOnTextSelectionCheckbox) {
+    translateOnTextSelectionCheckbox.addEventListener(
+      "change",
+      handleTextSelectionDependency
+    );
+  }
 
   function showTab(tabId) {
     tabButtons.forEach((button) => button.classList.remove("active"));
@@ -158,17 +237,18 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleApiSettings(); // تنظیم حالت اولیه
   translationApiSelect.addEventListener("change", toggleApiSettings);
 
-  loadSettings();
-
   useMockCheckbox.addEventListener("change", () => {
     updateMockState(useMockCheckbox.checked);
   });
+
+  // فراخوانی اولیه loadSettings
+  loadSettings(); // Load settings when the DOM is ready
 
   saveSettingsButton.addEventListener("click", async () => {
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
     const webAIApiModel = webAIApiModelInput?.value?.trim();
     const apiKey = apiKeyInput?.value?.trim();
-    const useMock = false; //useMockCheckbox?.checked;
+    const useMock = useMockCheckbox?.checked;
     const debugMode = debugModeCheckbox?.checked;
     const apiUrl = apiUrlInput?.value?.trim();
     const sourceLanguage = sourceLanguageInput?.value;
@@ -179,6 +259,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const openaiApiModel = openAIModelInput?.value?.trim();
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
+    // دریافت وضعیت چک‌باکس‌های جدید
+    const translateOnTextFields =
+      translateOnTextFieldsCheckbox?.checked ?? true;
+    const enableShortcutForTextFields =
+      enableShortcutForTextFieldsCheckbox?.checked ?? true; // جدید - مقدار پیش‌فرض را true گذاشتم
+    const translateWithSelectElement =
+      translateWithSelectElementCheckbox?.checked ?? true;
+    const translateOnTextSelection =
+      translateOnTextSelectionCheckbox?.checked ?? true;
+    const requireCtrlForTextSelection =
+      requireCtrlForTextSelectionCheckbox?.checked ?? false;
 
     try {
       const settings = {
@@ -196,6 +287,11 @@ document.addEventListener("DOMContentLoaded", () => {
         OPENAI_API_MODEL: openaiApiModel || CONFIG.OPENAI_API_MODEL,
         OPENROUTER_API_KEY: openrouterApiKey || CONFIG.OPENROUTER_API_KEY,
         OPENROUTER_API_MODEL: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
+        TRANSLATE_ON_TEXT_FIELDS: translateOnTextFields,
+        ENABLE_SHORTCUT_FOR_TEXT_FIELDS: enableShortcutForTextFields,
+        TRANSLATE_WITH_SELECT_ELEMENT: translateWithSelectElement,
+        TRANSLATE_ON_TEXT_SELECTION: translateOnTextSelection,
+        REQUIRE_CTRL_FOR_TEXT_SELECTION: requireCtrlForTextSelection,
       };
 
       await new Promise((resolve, reject) => {
@@ -243,6 +339,34 @@ document.addEventListener("DOMContentLoaded", () => {
       if (useMockCheckbox) {
         useMockCheckbox.checked = settings.USE_MOCK ?? CONFIG.USE_MOCK;
       }
+
+      // مقداردهی اولیه تنظیمات حالت‌های مختلف ترجمه
+      if (translateOnTextFieldsCheckbox) {
+        translateOnTextFieldsCheckbox.checked =
+          settings.TRANSLATE_ON_TEXT_FIELDS ?? true;
+      }
+      if (enableShortcutForTextFieldsCheckbox) {
+        // جدید
+        enableShortcutForTextFieldsCheckbox.checked =
+          settings.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true;
+      }
+      if (translateWithSelectElementCheckbox) {
+        translateWithSelectElementCheckbox.checked =
+          settings.TRANSLATE_WITH_SELECT_ELEMENT ?? true;
+      }
+      if (translateOnTextSelectionCheckbox) {
+        translateOnTextSelectionCheckbox.checked =
+          settings.TRANSLATE_ON_TEXT_SELECTION ?? true;
+      }
+      if (requireCtrlForTextSelectionCheckbox) {
+        requireCtrlForTextSelectionCheckbox.checked =
+          settings.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false;
+      }
+
+      // تنظیم وضعیت اولیه API
+      const initialTranslationApi = settings.TRANSLATION_API || "gemini";
+      const initialUseMock = settings.USE_MOCK ?? CONFIG.USE_MOCK ?? false;
+      updateMockState(initialUseMock);
 
       // مقداردهی فیلدهای اصلی
       if (apiKeyInput) apiKeyInput.value = settings.API_KEY || "";
@@ -292,10 +416,6 @@ document.addEventListener("DOMContentLoaded", () => {
           settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
       }
 
-      // تنظیم وضعیت اولیه API
-      const initialTranslationApi = settings.TRANSLATION_API || "gemini";
-      const initialUseMock = settings.USE_MOCK ?? CONFIG.USE_MOCK;
-
       // نمایش اطلاعات مانیفست
       const manifest = chrome.runtime.getManifest();
       if (manifestNameElement) {
@@ -308,16 +428,24 @@ document.addEventListener("DOMContentLoaded", () => {
         manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name} - Settings`;
       }
 
-      // تنظیم تب پیش‌فرض در اینجا اتفاق می‌افتاد
-      showTab("languages");
-      updateMockState(initialUseMock);
+      // فراخوانی اولیه توابع وابستگی *بعد* از تنظیم مقادیر اولیه چک‌باکس‌ها  وضعیت های ترجمه
+      handleTextFieldsDependency(); // فراخوانی برای شورتکات
+      handleTextSelectionDependency(); // فراخوانی برای انتخاب متن
+
       if (!initialUseMock) {
-        translationApiSelect.value = initialTranslationApi;
-        toggleApiSettings();
+        const initialTranslationApi = settings.TRANSLATION_API || "gemini";
+        if (translationApiSelect)
+          translationApiSelect.value = initialTranslationApi;
+        toggleApiSettings(); // Update visibility based on loaded API
       }
 
       // بروزرسانی متن راهنمای پرامپت
       await updatePromptHelpText();
+
+      // Show default tab only if no other logic dictates it (e.g., deep linking)
+      // As loadSettings handles the initial state based on saved settings, explicitly calling showTab might be redundant
+      // unless you want to force 'languages' tab on every load regardless of previous state.
+      // showTab("languages"); // Reconsider if this is needed here or should rely on loaded state. Keep it if you want 'languages' always first.
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,

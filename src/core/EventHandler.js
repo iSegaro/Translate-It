@@ -1,5 +1,9 @@
 // src/core/EventHandler.js
-import { CONFIG, state, TranslationMode } from "../config.js";
+import {
+  getRequireCtrlForTextSelectionAsync,
+  state,
+  TranslationMode,
+} from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
 import { translateText } from "../utils/api.js";
 import {
@@ -70,17 +74,20 @@ export default class EventHandler {
        * بررسی رویداد mouseup بعد از انتخاب متن و چک کردن برای ماهیت فیلد بودن هدف
        **/
       if (this.isMouseUp(event)) {
-        if (CONFIG.CTRL_CLICK) {
+        const requireCtrl = await getRequireCtrlForTextSelectionAsync();
+
+        if (requireCtrl) {
+          // اگر تنظیم فعال بود، چک کن آیا Ctrl همزمان فشرده شده؟
           if (this.isMouseUpCtrl(event)) {
             await this.handleMouseUp(event);
-            return;
           }
+          // اگر Ctrl نیاز بود ولی فشرده نشده بود، برای mouseup کاری نکن
         } else {
-          if (this.isMouseUp(event)) {
-            await this.handleMouseUp(event);
-            return;
-          }
+          // اگر تنظیم غیرفعال بود (Ctrl نیاز نبود)، مستقیم handleMouseUp را اجرا کن
+          await this.handleMouseUp(event);
+          // نیازی به چک کردن مجدد isMouseUp در اینجا نیست چون شرط بیرونی آن را پوشش داده
         }
+        // پس از اجرای منطق mouseup یا بررسی Ctrl، از این شرط خارج شو
       }
     } catch (error) {
       error = await ErrorHandler.processError(error);
