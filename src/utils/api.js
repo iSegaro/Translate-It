@@ -382,7 +382,7 @@ class ApiService {
   }
 
   @logMethod
-  async translateText(text, translateMode) {
+  async translateText(text, translateMode, source_Lang, target_Lang) {
     if (await getUseMockAsync()) {
       await delay(MOCK_DELAY);
       const sampleTextForMock = text.substring(0, 50);
@@ -411,14 +411,13 @@ class ApiService {
       return;
     }
 
-    let sourceLang, targetLang;
     try {
       const translationApi = await getTranslationApiAsync();
-      [sourceLang, targetLang] = await Promise.all([
-        getSourceLanguageAsync(),
-        getTargetLanguageAsync(),
-      ]);
 
+      const [sourceLang, targetLang] = await Promise.all([
+        source_Lang || getSourceLanguageAsync(),
+        target_Lang || getTargetLanguageAsync(),
+      ]);
       if (translationApi === "webai" && !this.sessionContext) {
         this.resetSessionContext();
       }
