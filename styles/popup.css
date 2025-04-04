@@ -118,7 +118,7 @@ select {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  background-image: url("../icons/clear.png"); /* مسیر آیکون ضربدر */
+  background-image: url("../icons/close.png"); /* مسیر آیکون ضربدر */
   background-size: contain;
   background-repeat: no-repeat;
   cursor: pointer;
