@@ -165,7 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // استفاده از آیکون‌های صوتی با Web Speech API
   voiceSourceIcon.addEventListener("click", () => {
     const utterance = new SpeechSynthesisUtterance(sourceText.value);
-    utterance.lang = "en-US"; // تنظیم زبان مبدا
+    utterance.lang = "auto" || "en-US"; // تنظیم زبان مبدا
     speechSynthesis.speak(utterance);
   });
 
