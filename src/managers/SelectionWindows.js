@@ -89,6 +89,20 @@ export default class SelectionWindows {
 
     this.dismiss(false); // بستن پاپ‌آپ قبلی
 
+    // *** بررسی اعتبار this.translationPromise ***
+    if (
+      !this.translationPromise ||
+      typeof this.translationPromise.then !== "function" ||
+      typeof this.translationPromise.catch !== "function"
+    ) {
+      logME(
+        "[SelectionWindows]: Invalid translationPromise:",
+        this.translationPromise
+      );
+      return;
+    }
+    // *** پایان بررسی ***
+
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-display-temp");
 
