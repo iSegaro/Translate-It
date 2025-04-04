@@ -107,7 +107,10 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = sourceText.value.trim();
-    if (!text) return;
+    if (!text) {
+      sourceText.focus();
+      return;
+    }
     translationResult.textContent = "در حال ترجمه...";
     chrome.runtime.sendMessage(
       {
@@ -165,6 +168,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // استفاده از آیکون‌های صوتی با Web Speech API
   voiceSourceIcon.addEventListener("click", () => {
+    if (sourceText.value.trim() === "") {
+      sourceText.focus();
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(sourceText.value);
     utterance.lang = "auto" || "en-US"; // تنظیم زبان مبدا
     speechSynthesis.speak(utterance);
@@ -172,6 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   voiceTargetIcon.addEventListener("click", () => {
     const resultText = translationResult.textContent;
+    if (!resultText) {
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(resultText);
     // یافتن کد زبان متناظر با نام زبان انتخاب شده
     const selectedLanguage = languageList.find(
