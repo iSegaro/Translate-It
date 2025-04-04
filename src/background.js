@@ -153,6 +153,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           files: ["content.bundle.js"],
         });
       }
+    } else if (message.action === "getSelectedText") {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0 && sender.tab && sender.tab.id === tabs[0].id) {
+          chrome.tabs.sendMessage(
+            tabs[0].id,
+            { action: "getSelectedText" },
+            (response) => {
+              sendResponse(response);
+            }
+          );
+        } else {
+          sendResponse({ selectedText: "" });
+        }
+      });
+      return true; // برای نگه داشتن کانال پیام
+    }
+
+    if (message.action === "sendSelectedTextResponse") {
+      // این پیام از content script به background ارسال می‌شود.
+      // background نیازی به انجام کاری با آن ندارد و پاسخ به popup مستقیماً ارسال می‌شود.
     }
   }
   // به‌روزرسانی وضعیت انتخاب المنت

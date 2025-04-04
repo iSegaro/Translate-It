@@ -5,8 +5,8 @@ import { languageList } from "./utils/languages.js";
 import { getTargetLanguageAsync } from "./config.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  const MOUSE_OVER_TIMEOUT = 1500; // زمان تاخیر برای غیرفعال کردن حالت انتخاب
-  const MOUSE_LEAVE_TIMEOUT = 1000; // زمان تاخیر برای بستن popup
+  const MOUSE_OVER_TIMEOUT = 1000; // زمان تاخیر برای غیرفعال کردن حالت انتخاب
+  const MOUSE_LEAVE_TIMEOUT = 800; // زمان تاخیر برای بستن popup
   const form = document.getElementById("translationForm");
   const sourceText = document.getElementById("sourceText");
   const translationResult = document.getElementById("translationResult");
@@ -20,16 +20,44 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearTargetLanguageBtn = document.getElementById("clearTargetLanguage"); // دریافت دکمه ضربدر
 
   /** لود کردن آخرین ترجمه ذخیره شده */
-  chrome.storage.local.get(["lastTranslation"], async (result) => {
-    if (result.lastTranslation) {
-      sourceText.value = result.lastTranslation.sourceText || "";
-      translationResult.textContent =
-        result.lastTranslation.translatedText || "";
-      targetLanguageInput.value =
-        result.lastTranslation.targetLanguage ||
-        (await getTargetLanguageAsync());
+  const loadLastTranslation = async () => {
+    chrome.storage.local.get(["lastTranslation"], async (result) => {
+      if (result.lastTranslation) {
+        sourceText.value = result.lastTranslation.sourceText || "";
+        translationResult.textContent =
+          result.lastTranslation.translatedText || "";
+        targetLanguageInput.value =
+          result.lastTranslation.targetLanguage ||
+          (await getTargetLanguageAsync());
+      } else {
+        targetLanguageInput.value = await getTargetLanguageAsync();
+      }
+    });
+  };
+
+  // بررسی متن انتخاب شده و نمایش آن در صورت وجود
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs.length > 0) {
+      chrome.tabs.sendMessage(
+        tabs[0].id,
+        { action: "getSelectedText" },
+        (response) => {
+          if (response && response.selectedText) {
+            sourceText.value = response.selectedText;
+            translationResult.textContent = ""; // پاک کردن ترجمه قبلی
+            targetLanguageInput.value = ""; // پاک کردن زبان هدف قبلی (اختیاری)
+            getTargetLanguageAsync().then((lang) => {
+              if (!targetLanguageInput.value) {
+                targetLanguageInput.value = lang;
+              }
+            });
+          } else {
+            loadLastTranslation();
+          }
+        }
+      );
     } else {
-      targetLanguageInput.value = await getTargetLanguageAsync();
+      loadLastTranslation();
     }
   });
 
@@ -58,9 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     targetLanguageInput.focus();
   });
 
-  /**
-   * مکانیزم مربوط به مخفی شدن و یا ظاهر شدن popup
-   */
+  // *** مکانیزم مربوط به مخفی شدن و یا ظاهر شدن Popup ***
   const popupContainer = document.body;
   let selectElementIconClicked = false; // اضافه کردن پرچم
 
@@ -102,7 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
       Active_SelectElement(false);
     }
   });
-  /** پایان مکانیزم مخفی شدن و یا نمایش دادن Popup */
+  // *** پایان مکانیزم مخفی شدن و یا نمایش دادن Popup ***
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();

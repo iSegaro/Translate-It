@@ -132,12 +132,16 @@ class ContentScript {
   }
 
   @logMethod
-  handleMessage(message) {
+  handleMessage(message, sender, sendResponse) {
     try {
       // بررسی اینکه پیام یک شیء معتبر است و دارای کلیدهای action یا type می‌باشد
       if (message && (message.action || message.type)) {
         if (message.action === "TOGGLE_SELECT_ELEMENT_MODE") {
           this.updateSelectElementState(message.data);
+        } else if (message.action === "getSelectedText") {
+          const selectedText = window.getSelection().toString().trim();
+          sendResponse({ selectedText: selectedText }); // پاسخ به popup با استفاده از sendResponse
+          return true; // برای نگه داشتن کانال پیام برای پاسخ غیرهمزمان
         } else if (
           message.action === "CONTEXT_INVALID" ||
           message.type === "EXTENSION_RELOADED"
