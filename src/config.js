@@ -106,8 +106,8 @@ export const CONFIG = {
   `,
   PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
 
-  - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-  - If the input is in any other language, translate it to $_{TARGET}.
+  - If the input is in any language, translate it to $_{TARGET}.
+
 
   Return **only** the translated text without any extra words, explanations, markdown, or modifications.
 
