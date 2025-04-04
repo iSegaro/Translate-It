@@ -8,13 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("translationForm");
   const sourceText = document.getElementById("sourceText");
   const translationResult = document.getElementById("translationResult");
-  const targetLanguageSelect = document.getElementById("targetLanguage");
+  const targetLanguageInput = document.getElementById("targetLanguage");
+  const allLanguagesDatalist = document.getElementById("allLanguages");
   const voiceSourceIcon = document.getElementById("voiceSourceIcon");
   const voiceTargetIcon = document.getElementById("voiceTargetIcon");
   const translatePageIcon = document.getElementById("translatePageIcon");
   const selectElementIcon = document.getElementById("selectElementIcon");
   const clearIcon = document.getElementById("clearStorageBtn");
-  const allLanguagesDatalist = document.getElementById("allLanguages");
+  const clearTargetLanguageBtn = document.getElementById("clearTargetLanguage"); // دریافت دکمه ضربدر
 
   /** لود کردن آخرین ترجمه ذخیره شده */
   chrome.storage.local.get(["lastTranslation"], async (result) => {
@@ -22,11 +23,11 @@ document.addEventListener("DOMContentLoaded", () => {
       sourceText.value = result.lastTranslation.sourceText || "";
       translationResult.textContent =
         result.lastTranslation.translatedText || "";
-      targetLanguageSelect.value =
+      targetLanguageInput.value =
         result.lastTranslation.targetLanguage ||
         (await getTargetLanguageAsync());
     } else {
-      targetLanguageSelect.value = await getTargetLanguageAsync();
+      targetLanguageInput.value = await getTargetLanguageAsync();
     }
   });
 
@@ -38,15 +39,26 @@ document.addEventListener("DOMContentLoaded", () => {
     allLanguagesDatalist.appendChild(option);
   });
 
-  allLanguagesDatalist.addEventListener("change", (e) => {
-    translationResult.textContent = e.target.value;
-    targetLanguageSelect.value = e.target.value;
+  // نمایش تمام زبان‌ها هنگام کلیک شدن روی input
+  targetLanguageInput.addEventListener("click", () => {
+    const currentValue = targetLanguageInput.value;
+    targetLanguageInput.value = "";
+    targetLanguageInput.dispatchEvent(new Event("input"));
+    setTimeout(() => {
+      targetLanguageInput.value = currentValue;
+    }, 10);
+  });
+
+  // پاک کردن مقدار کمبوباکس زبان با کلیک روی ضربدر
+  clearTargetLanguageBtn.addEventListener("click", () => {
+    targetLanguageInput.value = "";
   });
 
   /**
    * مکانیزم مربوط به مخفی شدن و یا ظاهر شدن popup
    */
   const popupContainer = document.body;
+  let selectElementIconClicked = false; // اضافه کردن پرچم
 
   let popupMouseLeaveTimer;
   let popupInteractionTimer;
@@ -54,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // وقتی موس وارد popup می‌شود، تایمر بسته شدن لغو شود
   popupContainer.addEventListener("mouseenter", () => {
     clearTimeout(popupMouseLeaveTimer);
-    // اگر نیاز به تغییر وضعیت انتخاب المنت بعد از مدت زمان معین دارید، می‌توانید اینجا اجرا کنید
+    selectElementIconClicked = false; // ریست کردن پرچم
   });
 
   // وقتی موس از داخل popup خارج شود، در صورتی که حالت انتخاب فعال باشد، بعد از 2 ثانیه popup بسته شود
@@ -70,15 +82,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // اگر موس روی popup بماند یا کلیک شود، حالت انتخاب المنت غیرفعال شود
   popupContainer.addEventListener("mouseover", () => {
-    clearTimeout(popupInteractionTimer);
-    popupInteractionTimer = setTimeout(() => {
-      Active_SelectElement(false);
-    }, 3000);
+    if (!selectElementIconClicked) {
+      // بررسی پرچم
+      clearTimeout(popupInteractionTimer);
+      popupInteractionTimer = setTimeout(() => {
+        Active_SelectElement(false);
+      }, 3000);
+    }
   });
 
   popupContainer.addEventListener("click", () => {
-    clearTimeout(popupInteractionTimer);
-    Active_SelectElement(false);
+    if (!selectElementIconClicked) {
+      // بررسی پرچم
+      clearTimeout(popupInteractionTimer);
+      Active_SelectElement(false);
+    }
   });
   /** پایان مکانیزم مخفی شدن و یا نمایش دادن Popup */
 
@@ -92,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         action: "fetchTranslation",
         payload: {
           promptText: text,
-          targetLanguage: targetLanguageSelect.value,
+          targetLanguage: targetLanguageInput.value,
         },
       },
       (response) => {
@@ -109,8 +127,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // دکمه فعالسازی حالت انتخاب المنت
   selectElementIcon.addEventListener("click", () => {
-    Active_SelectElement(true);
-    window.close(); // بستن Popup
+    /**
+     * مکانیزم نمایش و یا مخفی شدن popup در صورتی که موس روی آن نبود
+     * باعث ایجاد تداخل با کلیک روی آیکون انتخاب المنت می‌شود
+     * و در نتیجه باعث می‌شود رویداد فعال سازی مجدد حالت انتخاب المنت
+     * به درستی کار نکند.
+     * بنابرین یک فلگش با نام selectElementIconClicked اضافه می‌شود
+     * که در صورت کلیک روی آیکون انتخاب المنت، این پرچم true می‌شود
+     * و در رویدادهای دیگر کلیک روی popup، این پرچم بررسی میشود قبل از اعمال رویدادهای خود
+     */
+    selectElementIconClicked = true; // تنظیم پرچم
+    Active_SelectElement(true, true); // فعالسازی حالت انتخاب المنت و بستن popup
   });
 
   // دکمه حذف داده‌ها از Storage - Clear Fields

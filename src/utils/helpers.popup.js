@@ -1,6 +1,6 @@
 // src/utils/helpers.popup.js
 
-export function Active_SelectElement(active = null) {
+export function Active_SelectElement(active = null, closePopup = false) {
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     if (tabs.length === 0) return;
 
@@ -18,6 +18,10 @@ export function Active_SelectElement(active = null) {
       { action: "activateSelectElementMode", data: active },
       (response) => {
         console.log("Select Mode Updated:", response);
+        // بستن popup بعد از دریافت پاسخ از background script
+        if (closePopup) {
+          window.close();
+        }
       }
     );
   });

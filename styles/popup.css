@@ -1,5 +1,9 @@
 /* src/styles/popup.css */
 
+.voice-icons-target img#voiceTargetIcon {
+  transform: rotateY(180deg); /* Mirror کردن افقی با چرخش */
+}
+
 /* استایل پایه با طراحی مینیمالیست و حرفه‌ای */
 body {
   margin: 0;
@@ -39,14 +43,25 @@ textarea {
   font-size: 13px;
 }
 
-.voice-icons {
+.voice-icons-source {
   display: flex;
-  justify-content: center;
-  gap: 20px;
+  justify-content: flex-start;
   margin: 8px 0;
 }
 
-.voice-icons img {
+.voice-icons-source img {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.voice-icons-target {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.voice-icons-target img {
   width: 24px;
   height: 24px;
   cursor: pointer;
@@ -54,6 +69,7 @@ textarea {
 
 .form-group {
   margin: 10px 0;
+  position: relative; /* برای قرارگیری دکمه ضربدر */
 }
 
 .form-group label {
@@ -93,4 +109,23 @@ select {
 
 .btn-submit:hover {
   background: #1e8449;
+}
+
+.clear-input {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-image: url("../icons/clear.png"); /* مسیر آیکون ضربدر */
+  background-size: contain;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.clear-input:hover {
+  opacity: 1;
 }

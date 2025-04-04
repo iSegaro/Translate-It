@@ -22,6 +22,7 @@ import {
   getEnableDictionaryAsync,
   state,
   TranslationMode,
+  getPromptPopupTranslateAsync,
 } from "../config.js";
 import { delay, isExtensionContextValid, logMethod, logME } from "./helpers.js";
 import { isPersianText } from "./textDetection.js";
@@ -145,7 +146,9 @@ class ApiService {
     if (isJsonMode) {
       promptBase = await getPromptBASESelectAsync();
     } else {
-      if ((await getEnableDictionaryAsync()) === true) {
+      if (translateMode === TranslationMode.Popup_Translate) {
+        promptBase = await getPromptPopupTranslateAsync();
+      } else if ((await getEnableDictionaryAsync()) === true) {
         if (translateMode === TranslationMode.Dictionary_Translation) {
           promptBase = await getPromptDictionaryAsync();
         } else {
@@ -414,12 +417,25 @@ class ApiService {
     try {
       const translationApi = await getTranslationApiAsync();
 
-      const [sourceLang, targetLang] = await Promise.all([
+      let [sourceLang, targetLang] = await Promise.all([
         source_Lang || getSourceLanguageAsync(),
         target_Lang || getTargetLanguageAsync(),
       ]);
       if (translationApi === "webai" && !this.sessionContext) {
         this.resetSessionContext();
+      }
+
+      /**
+       * در منطق ترجمه، اگر زبان مبدا و مقصد یکسان باشد، به زبان مقصد تغییر می‌کند.
+       * این شرایط فقط برای زمانی که ترجمه از طریق Popup انجام شده است، اعمال می‌شود.
+       * چون موقع ترجمه از زبان مبدا، نوع زبان را مشخص نمی کنیم تا توسط API تشخیص داده شود.
+       */
+      if (sourceLang === targetLang) {
+        if (translateMode === TranslationMode.Popup_Translate) {
+          sourceLang = await getTargetLanguageAsync();
+        } else {
+          return null;
+        }
       }
 
       switch (translationApi) {

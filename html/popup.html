@@ -33,18 +33,12 @@
           placeholder="متن خود را وارد کنید..."
           rows="3"
         ></textarea>
-        <div class="voice-icons">
+        <div class="voice-icons-source">
           <img
             src="../icons/voice.png"
             id="voiceSourceIcon"
             title="صدا مبدا"
             alt="Voice Source"
-          />
-          <img
-            src="../icons/voice.png"
-            id="voiceTargetIcon"
-            title="صدا مقصد"
-            alt="Voice Target"
           />
         </div>
         <div class="form-group">
@@ -53,6 +47,15 @@
             id="targetLanguage"
             list="allLanguages"
             placeholder="translate to ..."
+          />
+          <span id="clearTargetLanguage" class="clear-input"></span>
+        </div>
+        <div class="voice-icons-target">
+          <img
+            src="../icons/voice.png"
+            id="voiceTargetIcon"
+            title="صدا مقصد"
+            alt="Voice Target"
           />
         </div>
         <div id="translationResult" class="result"></div>

@@ -134,18 +134,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  logME("[Background] Message => ", message);
+  // logME("[Background] Message => ", message);
 
-  // به‌روزرسانی وضعیت انتخاب المنت
-  if (
-    message.action === "UPDATE_SELECT_ELEMENT_STATE" &&
-    sender.tab &&
-    sender.tab.id
-  ) {
-    selectElementStates[sender.tab.id] = message.data;
-  }
-
-  // پردازش پیام‌های مربوط به مدیریت محتوا
+  // پردازش پیام‌های مربوط به مدیریت Content Script
   if (message && (message.action || message.type)) {
     if (
       message.action === "CONTEXT_INVALID" ||
@@ -164,6 +155,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     }
   }
+  // به‌روزرسانی وضعیت انتخاب المنت
+  if (
+    message.action === "UPDATE_SELECT_ELEMENT_STATE" &&
+    sender.tab &&
+    sender.tab.id
+  ) {
+    selectElementStates[sender.tab.id] = message.data;
+  }
 
   // پردازش درخواست ترجمه
   if (message.action === "fetchTranslation") {
@@ -172,7 +171,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const { promptText, targetLanguage } = message.payload;
         let translation = await translateText(
           promptText,
-          TranslationMode.Field,
+          TranslationMode.Popup_Translate,
           null,
           targetLanguage
         );
