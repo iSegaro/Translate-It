@@ -5,6 +5,8 @@ import { languageList } from "./utils/languages.js";
 import { getTargetLanguageAsync } from "./config.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const MOUSE_OVER_TIMEOUT = 1500; // زمان تاخیر برای غیرفعال کردن حالت انتخاب
+  const MOUSE_LEAVE_TIMEOUT = 1000; // زمان تاخیر برای بستن popup
   const form = document.getElementById("translationForm");
   const sourceText = document.getElementById("sourceText");
   const translationResult = document.getElementById("translationResult");
@@ -76,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (result.selectElementState) {
       popupMouseLeaveTimer = setTimeout(() => {
         window.close();
-      }, 2000);
+      }, MOUSE_LEAVE_TIMEOUT); // زمان تاخیر برای بستن popup
     }
   });
 
@@ -87,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(popupInteractionTimer);
       popupInteractionTimer = setTimeout(() => {
         Active_SelectElement(false);
-      }, 3000);
+      }, MOUSE_OVER_TIMEOUT); // زمان تاخیر برای غیرفعال کردن حالت انتخاب
     }
   });
 
@@ -168,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
   voiceTargetIcon.addEventListener("click", () => {
     const resultText = translationResult.textContent;
     const utterance = new SpeechSynthesisUtterance(resultText);
-    utterance.lang = targetLanguageSelect.value === "fa" ? "fa-IR" : "en-US";
+    utterance.lang = targetLanguageInput.value === "fa" ? "fa-IR" : "en-US";
     speechSynthesis.speak(utterance);
   });
 });
