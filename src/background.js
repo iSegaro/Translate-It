@@ -1,8 +1,15 @@
 // src/background.js
-import { CONFIG, getApiKeyAsync, getSettingsAsync } from "./config.js";
+import {
+  CONFIG,
+  getApiKeyAsync,
+  getSettingsAsync,
+  TRANSLATION_ERRORS,
+  TranslationMode,
+} from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
 import { getTranslateWithSelectElementAsync } from "./config.js";
+import { translateText } from "./utils/api.js";
 
 const errorHandler = new ErrorHandler();
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
@@ -18,12 +25,12 @@ async function safeSendMessage(tabId, message) {
         // فقط خطای "The message port closed before a response was received." را نادیده می‌گیریم
         // احتمال داره که Context عوض شده باشه و صفحه نیاز به رفرش داشته باشه.
         if (
-          err.message ==
+          err.message ===
             "The message port closed before a response was received." ||
-          err.message ==
+          err.message ===
             "Could not establish connection. Receiving end does not exist."
         ) {
-          // resolve({ error: err.message });
+          // در این حالت resolve را انجام نمی‌دهیم
         } else {
           resolve({ error: err.message });
         }
@@ -33,92 +40,6 @@ async function safeSendMessage(tabId, message) {
     });
   });
 }
-
-/**
- * کلیک روی آیکون مترجم در نوارابزار مرورگر
- */
-chrome.action.onClicked.addListener(async () => {
-  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-    if (!tabs?.[0]?.url || !tabs[0].id) {
-      errorHandler.handle(new Error("Invalid tab"), {
-        type: ErrorTypes.INTEGRATION,
-        context: "invalid-tab",
-        statusCode: "invalid-tab",
-      });
-      return;
-    }
-
-    const tab = tabs[0];
-    const tabId = tab.id;
-
-    if (!tab.url.startsWith("http://") && !tab.url.startsWith("https://")) {
-      errorHandler.handle(new Error("Invalid protocol"), {
-        type: ErrorTypes.INTEGRATION,
-        context: "invalid-protocol",
-        statusCode: "PERMISSION_DENIED",
-      });
-      if (tabId) selectElementStates[tabId] = false;
-      return;
-    }
-
-    if (selectElementStates[tabId] === undefined) {
-      selectElementStates[tabId] = false;
-    }
-
-    const shouldTranslateWithSelectElement =
-      await getTranslateWithSelectElementAsync();
-
-    if (!shouldTranslateWithSelectElement) {
-      return;
-    }
-
-    // تغییر وضعیت انتخاب برای تب
-    selectElementStates[tabId] = !selectElementStates[tabId];
-
-    let response = await safeSendMessage(tabId, {
-      action: "TOGGLE_SELECT_ELEMENT_MODE",
-      data: selectElementStates[tabId],
-    });
-
-    if (response && response.error) {
-      logME("[Background] Retrying injection due to error:", response.error);
-
-      if (!injectionInProgress) {
-        injectionInProgress = true;
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            files: ["content.bundle.js"],
-          });
-          response = await safeSendMessage(tabId, {
-            action: "TOGGLE_SELECT_ELEMENT_MODE",
-            data: selectElementStates[tabId],
-          });
-          if (response && response.error) {
-            logME(
-              "[Background] Failed to inject content script:",
-              response.error
-            );
-            errorHandler.handle(new Error("Content script injection failed"), {
-              type: ErrorTypes.INTEGRATION,
-              context: "content-script-injection",
-              statusCode: 500,
-            });
-          }
-        } catch (scriptError) {
-          logME("[Background] Script execution failed:", scriptError);
-          errorHandler.handle(scriptError, {
-            type: ErrorTypes.SERVICE,
-            context: "script-execution",
-            statusCode: 500,
-          });
-        } finally {
-          injectionInProgress = false;
-        }
-      }
-    }
-  });
-});
 
 // پاکسازی وضعیت تب زمانی که تب بسته می‌شود
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -192,7 +113,6 @@ chrome.runtime.onInstalled.addListener((details) => {
           logME("[Background] Update settings...");
         });
       } catch (error) {
-        // TODO: Requires further review, possible bug detected
         throw await errorHandler.handle(error, {
           type: ErrorTypes.API,
           context: "background-Update-Settings",
@@ -203,21 +123,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     // ارسال پیام به content script برای اطلاع‌رسانی آپدیت
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
-        // if (
-        //   tab.url &&
-        //   [
-        //     "web.whatsapp.com",
-        //     "web.telegram.org",
-        //     "instagram.com",
-        //     "twitter.com",
-        //     "medium.com",
-        //     "x.com",
-        //   ].some((domain) => tab.url.includes(domain))
-        // ) {
-        //   chrome.tabs
-        //     .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
-        //     .catch(() => {});
-        // }
         if (tab.url && tab.id) {
           chrome.tabs
             .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
@@ -230,6 +135,8 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   logME("[Background] Message => ", message);
+
+  // به‌روزرسانی وضعیت انتخاب المنت
   if (
     message.action === "UPDATE_SELECT_ELEMENT_STATE" &&
     sender.tab &&
@@ -238,6 +145,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     selectElementStates[sender.tab.id] = message.data;
   }
 
+  // پردازش پیام‌های مربوط به مدیریت محتوا
   if (message && (message.action || message.type)) {
     if (
       message.action === "CONTEXT_INVALID" ||
@@ -246,35 +154,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       logME("[Background] Reloading extension...");
       try {
         chrome.runtime.reload();
+        sendResponse({ status: "done" });
+        return true;
       } catch (error) {
         chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id },
+          target: { tabId: sender.tab.id },
           files: ["content.bundle.js"],
         });
       }
     }
-  } else if (message.action === "fetchTranslation") {
+  }
+
+  // پردازش درخواست ترجمه
+  if (message.action === "fetchTranslation") {
     (async () => {
       try {
-        const { promptText } = message.payload;
-        const apiKey = await getApiKeyAsync();
+        const { promptText, targetLanguage } = message.payload;
+        let translation = await translateText(
+          promptText,
+          TranslationMode.Field,
+          null,
+          targetLanguage
+        );
 
-        const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-          }),
-          mode: "cors",
+        // ذخیره متن اصلی و ترجمه در Storage
+        chrome.storage.local.set({
+          lastTranslation: {
+            sourceText: promptText,
+            translatedText: translation,
+            targetLanguage: targetLanguage,
+          },
         });
 
-        if (!response.ok) {
-          // TODO: Requires further review, possible bug detected
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error?.message || response.statusText);
-        }
-
-        sendResponse({ data: await response.json() });
+        sendResponse({ data: { translatedText: translation } });
       } catch (error) {
         const handledError = errorHandler.handle(error, {
           type: ErrorTypes.API,
@@ -283,7 +195,83 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: handledError.message });
       }
     })();
-    return true;
+    return true; // برای نگه داشتن کانال پیام
+  }
+
+  // پردازش درخواست فعالسازی حالت انتخاب المنت از طریق popup
+  if (message.action === "activateSelectElementMode") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length === 0) {
+        sendResponse({ error: "No active tab found" });
+        return;
+      }
+
+      const tabId = tabs[0].id;
+
+      chrome.storage.local.get(["selectElementState"], (result) => {
+        const currentState = result.selectElementState || false;
+        const newState = message.data ?? !currentState; // اگر مقدار فرستاده شده بود، استفاده شود؛ در غیر اینصورت معکوس شود
+
+        chrome.storage.local.set({ selectElementState: newState }, () => {
+          safeSendMessage(tabId, {
+            action: "TOGGLE_SELECT_ELEMENT_MODE",
+            data: newState,
+          }).then((response) => {
+            if (response && response.error) {
+              logME(
+                "[Background] Retrying injection due to error:",
+                response.error
+              );
+              if (!injectionInProgress) {
+                injectionInProgress = true;
+                chrome.scripting
+                  .executeScript({
+                    target: { tabId },
+                    files: ["content.bundle.js"],
+                  })
+                  .then(() => {
+                    return safeSendMessage(tabId, {
+                      action: "TOGGLE_SELECT_ELEMENT_MODE",
+                      data: newState,
+                    });
+                  })
+                  .then((response2) => {
+                    if (response2 && response2.error) {
+                      logME(
+                        "[Background] Failed to inject content script:",
+                        response2.error
+                      );
+                      errorHandler.handle(
+                        new Error("Content script injection failed"),
+                        {
+                          type: ErrorTypes.INTEGRATION,
+                          context: "content-script-injection",
+                          statusCode: 500,
+                        }
+                      );
+                    }
+                  })
+                  .catch((scriptError) => {
+                    logME("[Background] Script execution failed:", scriptError);
+                    errorHandler.handle(scriptError, {
+                      type: ErrorTypes.SERVICE,
+                      context: "script-execution",
+                      statusCode: 500,
+                    });
+                  })
+                  .finally(() => {
+                    injectionInProgress = false;
+                  });
+              }
+            }
+          });
+
+          sendResponse({ status: "done" });
+        });
+      });
+    });
+
+    return true; // برای نگه داشتن کانال پیام
   }
 
   if (message.action === "restart_content_script") {
@@ -300,5 +288,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
     });
+    sendResponse({ status: "done" });
+    return true;
   }
 });

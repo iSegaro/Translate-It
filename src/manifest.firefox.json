@@ -23,6 +23,7 @@
   },
   "action": {
     "default_title": "AI Writing Companion",
+    "default_popup": "html/popup.html",
     "default_icon": {
       "16": "icons/16.png",
       "24": "icons/24.png",
