@@ -2,11 +2,66 @@
 <html lang="fa">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Writing Companion</title>
-    <script src="../popup.bundle.js" defer></script>
+    <title>Popup</title>
+    <link rel="stylesheet" href="../styles/popup.css" />
   </head>
   <body>
-    <button id="restore">بازگردانی متن اصلی</button>
+    <div class="popup-container">
+      <div class="toolbar">
+        <img
+          src="../icons/page.png"
+          id="translatePageIcon"
+          title="ترجمه کل صفحه"
+          alt="Translate Page"
+        />
+        <img
+          src="../icons/select.png"
+          id="selectElementIcon"
+          title="انتخاب المنت"
+          alt="Select Element"
+        />
+        <img
+          src="../icons/clear.png"
+          id="clearStorageBtn"
+          title="پاک کردن"
+          alt="Clear Fields"
+        />
+      </div>
+      <form id="translationForm">
+        <textarea
+          id="sourceText"
+          placeholder="متن خود را وارد کنید..."
+          rows="3"
+        ></textarea>
+        <div class="voice-icons">
+          <img
+            src="../icons/voice.png"
+            id="voiceSourceIcon"
+            title="صدا مبدا"
+            alt="Voice Source"
+          />
+          <img
+            src="../icons/voice.png"
+            id="voiceTargetIcon"
+            title="صدا مقصد"
+            alt="Voice Target"
+          />
+        </div>
+        <div class="form-group">
+          <input
+            type="text"
+            id="targetLanguage"
+            list="allLanguages"
+            placeholder="translate to ..."
+          />
+        </div>
+        <div id="translationResult" class="result"></div>
+        <button type="submit" id="translateBtn" class="btn-submit">
+          ترجمه کن
+        </button>
+      </form>
+    </div>
+    <datalist id="allLanguages"></datalist>
+    <script src="../popup.bundle.js"></script>
   </body>
 </html>
