@@ -172,12 +172,12 @@ class ApiService {
       userRules
     );
 
+    logME("Prompt : ", finalPromptWithUserRules);
+
     const finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
       Json_or_Text_ForTranslate
     );
-
-    // logME("Prompt finalPrompt : ", finalPrompt);
 
     return finalPrompt;
   }
