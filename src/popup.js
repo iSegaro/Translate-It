@@ -149,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.remove("lastTranslation", () => {
       sourceText.value = "";
       translationResult.textContent = "";
+      sourceText.focus();
     });
   });
 
