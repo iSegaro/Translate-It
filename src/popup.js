@@ -37,7 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ایجاد گزینه‌های datalist زبان به صورت پویا
   languageList.forEach((language) => {
     const option = document.createElement("option");
-    option.value = language;
+    option.textContent = language.name; // نمایش نام زبان در لیست
+    option.value = language.promptName || language.name; // مقدار promptName به عنوان value
     allLanguagesDatalist.appendChild(option);
   });
 
@@ -54,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // پاک کردن مقدار کمبوباکس زبان با کلیک روی ضربدر
   clearTargetLanguageBtn.addEventListener("click", () => {
     targetLanguageInput.value = "";
+    targetLanguageInput.focus();
   });
 
   /**
@@ -170,7 +172,11 @@ document.addEventListener("DOMContentLoaded", () => {
   voiceTargetIcon.addEventListener("click", () => {
     const resultText = translationResult.textContent;
     const utterance = new SpeechSynthesisUtterance(resultText);
-    utterance.lang = targetLanguageInput.value === "fa" ? "fa-IR" : "en-US";
+    // یافتن کد زبان متناظر با نام زبان انتخاب شده
+    const selectedLanguage = languageList.find(
+      (lang) => lang.promptName === targetLanguageInput.value
+    );
+    utterance.lang = selectedLanguage ? selectedLanguage.code : "en-US"; // استفاده از کد زبان یا انگلیسی به عنوان پیش فرض
     speechSynthesis.speak(utterance);
   });
 });
