@@ -548,7 +548,40 @@ document.addEventListener("DOMContentLoaded", async () => {
       // نمایش مجدد تولبار نتیجه در صورت خطا
       toggleInlineToolbarVisibility(translationResult);
     }
-  }); // پایان addEventListener
+  });
+
+  // --- میانبرهای کیبورد برای ترجمه ---
+  sourceText.addEventListener("keydown", (event) => {
+    // بررسی فشردن کلید Ctrl (یا Cmd در مک)
+    const isModifierPressed = event.ctrlKey || event.metaKey;
+
+    // بررسی اینکه آیا کلید Enter یا / فشرده شده است
+    const isEnterKey = event.key === "Enter";
+    const isSlashKey = event.key === "/";
+
+    // اگر کلید ترکیبی (Ctrl/Cmd + Enter) یا (Ctrl/Cmd + /) فشرده شد
+    if (isModifierPressed && (isEnterKey || isSlashKey)) {
+      // جلوگیری از رفتار پیش‌فرض کلید (مثل رفتن به خط بعد با Enter یا تایپ /)
+      event.preventDefault();
+
+      logME(
+        `[Popup]: Shortcut pressed (${event.ctrlKey ? "Ctrl" : "Cmd"}+${event.key}). Triggering translation.`
+      );
+
+      // شبیه‌سازی کلیک روی دکمه ترجمه برای شروع فرایند
+      // (با فرض اینکه translateBtn به درستی به دکمه ترجمه اشاره دارد)
+      if (translateBtn) {
+        translateBtn.click();
+      } else {
+        // اگر به هر دلیلی دکمه نبود، می‌توان مستقیما فرم را submit کرد
+        // form.requestSubmit(); // روش مدرن‌تر
+        // یا
+        // form.submit(); // روش قدیمی‌تر (ممکن است event listener submit را دوباره فعال نکند!)
+        // استفاده از click() روی دکمه معمولا امن‌تر است.
+        logME("[Popup]: Translate button not found for shortcut.");
+      }
+    }
+  });
 
   // Language Input Click (Optional: Helps show datalist)
   function handleLanguageInputClick(inputElement) {
