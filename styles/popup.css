@@ -166,11 +166,12 @@ textarea,
   padding: 28px 10px 10px 10px;
   border: 1px solid #ced4da;
   border-radius: 4px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
   resize: vertical;
   box-sizing: border-box;
-  direction: rtl;
-  text-align: right;
+  direction: ltr;
+  text-align: left;
   min-height: 60px;
   background-color: #fff;
   line-height: 1.5;
@@ -202,24 +203,6 @@ textarea:focus,
   top: 28px;
   right: 10px;
   pointer-events: none;
-}
-
-/* تولبار داخلی (روی Textarea و Result) */
-.inline-toolbar_OLD {
-  position: absolute;
-  top: 5px;
-  left: 8px; /* فاصله از لبه چپ */
-  right: 8px; /* فاصله از لبه راست */
-  width: auto; /* عرض خودکار بر اساس محتوا و فواصل چپ/راست */
-
-  display: none; /* همچنان به طور پیش فرض مخفی */
-  align-items: center; /* تراز عمودی آیتم ها */
-  justify-content: space-between; /* آیتم ها را به دو طرف فشار می دهد */
-
-  background: transparent;
-  z-index: 10;
-  padding: 2px 0; /* پدینگ عمودی، افقی لازم نیست */
-  /* حذف gap چون space-between فاصله را مدیریت می کند */
 }
 
 /* استایل عمومی تولبار داخلی */
