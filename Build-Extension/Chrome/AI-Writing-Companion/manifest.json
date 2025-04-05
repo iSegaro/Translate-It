@@ -9,7 +9,8 @@
     "storage",
     "clipboardWrite",
     "clipboardRead",
-    "notifications"
+    "notifications",
+    "tts"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
