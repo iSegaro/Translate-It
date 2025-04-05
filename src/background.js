@@ -5,11 +5,13 @@ import {
   getSettingsAsync,
   TRANSLATION_ERRORS,
   TranslationMode,
+  getTargetLanguageAsync,
+  getSourceLanguageAsync,
 } from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
-import { getTranslateWithSelectElementAsync } from "./config.js";
 import { translateText } from "./utils/api.js";
+import { getLanguageCode } from "./utils/tts.js";
 
 const errorHandler = new ErrorHandler();
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
@@ -184,6 +186,75 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     selectElementStates[sender.tab.id] = message.data;
   }
 
+  if (message.action === "playGoogleTTS") {
+    logME("[Background]: Received playGoogleTTS request", message.text);
+    // Use an async function to handle the logic
+    (async () => {
+      try {
+        const sourceLanguage = await getSourceLanguageAsync(); // Get target lang
+        const targetLanguage = await getTargetLanguageAsync(); // Get target lang
+
+        if (!targetLanguage || targetLanguage === "auto") {
+          targetLanguage = "en"; // Default to English if not set
+          // throw new Error("زبان مقصد نامعتبر یا تنظیم نشده است.");
+        }
+
+        const sourceLangCode = getLanguageCode(sourceLanguage);
+        const targetLangCode = getLanguageCode(targetLanguage);
+
+        const text = message.text;
+        const maxLengthGoogle = 200;
+
+        if (!text) {
+          throw new Error("متنی برای خواندن وجود ندارد.");
+        }
+
+        if (text.length >= maxLengthGoogle) {
+          logME(
+            "[Background]: Text too long for Google TTS, maybe use WebSpeech via Offscreen?"
+          );
+          // Decide: Either reject or try WebSpeech via Offscreen API
+          // For now, let's reject for simplicity, matching previous logic alert
+          throw new Error(
+            `متن برای خواندن توسط گوگل بیش از حد طولانی است (بیشتر از ${maxLengthGoogle} کاراکتر).`
+          );
+        }
+
+        // --- Permission Check & Request ---
+        const requiredOrigin = "https://translate.google.com/*";
+        const hasPermission = await new Promise((resolve) => {
+          chrome.permissions.contains(
+            { origins: [requiredOrigin] },
+            (result) => {
+              resolve(result);
+            }
+          );
+        });
+        if (!hasPermission) {
+          const granted = await new Promise((resolve) => {
+            chrome.permissions.request(
+              { origins: [requiredOrigin] },
+              (granted) => {
+                resolve(granted);
+              }
+            );
+          });
+          if (!granted) throw new Error("دسترسی لازم برای صدای گوگل داده نشد.");
+        }
+
+        // --- Play Audio via Offscreen API ---
+        const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${sourceLangCode}`;
+        await playAudioViaOffscreen(url); // Call helper function
+
+        sendResponse({ success: true });
+      } catch (error) {
+        logME("[Background]: Error processing playGoogleTTS:", error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true; // Indicates that the response is sent asynchronously
+  }
+
   // پردازش درخواست ترجمه
   if (message.action === "fetchTranslation") {
     (async () => {
@@ -312,3 +383,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// Helper function to manage offscreen document for audio playback
+let creatingOffscreen; // Prevent race conditions
+async function playAudioViaOffscreen(url) {
+  // Check if document exists.
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+  });
+  if (!existingContexts || existingContexts.length === 0) {
+    // Create document if it doesn't exist.
+    if (creatingOffscreen) {
+      await creatingOffscreen; // Wait for existing creation attempt
+    } else {
+      creatingOffscreen = chrome.offscreen.createDocument({
+        url: "offscreen.html",
+        reasons: ["AUDIO_PLAYBACK"],
+        justification: "Play TTS audio from Google Translate",
+      });
+      await creatingOffscreen;
+      creatingOffscreen = null; // Reset creation promise
+    }
+  }
+
+  console.warn(
+    "[Background - playAudioViaOffscreen]: Sending message to offscreen with URL:",
+    url
+  );
+
+  // Send URL to the offscreen document.
+  const success = await chrome.runtime.sendMessage({
+    action: "playOffscreenAudio",
+    url: url,
+  });
+  if (!success) {
+    throw new Error("Offscreen document failed to play audio.");
+  }
+}

@@ -64,6 +64,16 @@ const chromeDistConfig = {
             return `icons/${iconName}`;
           },
         },
+        {
+          // کپی offscreen.html
+          from: "html/offscreen.html",
+          to: "offscreen.html",
+        },
+        {
+          // کپی offscreen.js
+          from: "html/offscreen.js",
+          to: "offscreen.js",
+        },
       ],
     }),
     // new ZipPlugin({
