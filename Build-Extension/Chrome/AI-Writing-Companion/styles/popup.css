@@ -155,7 +155,7 @@ body {
 
 /* نگهدارنده Textarea و Result */
 .textarea-container {
-  position: relative; /* برای موقعیت دهی تولبار داخلی - لازم است تا بتوان paste-icon را absolute کرد */
+  position: relative; /* برای موقعیت دهی تولبار داخلی - لازم است تا بتوان paste-icon-separate را absolute کرد */
   margin: 10px 12px; /* فاصله از اطراف */
 }
 
