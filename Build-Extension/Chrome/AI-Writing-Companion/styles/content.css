@@ -5,7 +5,7 @@
    ========================================================================== */
 .AIWritingCompanion-translation-icon-extension {
   position: absolute !important;
-  z-index: 2147483647 !important; /* Ensure it's always on top */
+  z-index: 2947483647 !important; /* Ensure it's always on top */
   display: block !important;
   visibility: visible !important;
   pointer-events: all !important; /* Allows interaction with the icon */

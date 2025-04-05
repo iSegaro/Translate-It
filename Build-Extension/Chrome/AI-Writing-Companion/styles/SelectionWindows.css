@@ -4,6 +4,7 @@
      Selection Text Window Styles
      ========================================================================== */
 .aiwc-selection-display-temp {
+  z-index: 2147483637 !important; /* Ensure it's always on top */
   background-color: #f8f8f8;
   color: #333;
   border: 1px solid #ddd;
