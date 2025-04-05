@@ -188,11 +188,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "fetchTranslation") {
     (async () => {
       try {
-        const { promptText, targetLanguage } = message.payload;
+        const { promptText, targetLanguage, sourceLanguage } = message.payload;
         let translation = await translateText(
           promptText,
           TranslationMode.Popup_Translate,
-          null,
+          sourceLanguage,
           targetLanguage
         );
 
@@ -201,6 +201,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           lastTranslation: {
             sourceText: promptText,
             translatedText: translation,
+            sourceLanguage: sourceLanguage,
             targetLanguage: targetLanguage,
           },
         });
