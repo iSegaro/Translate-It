@@ -1,9 +1,9 @@
 // src/managers/SelectionWindows.js
 import { logME, isExtensionContextValid } from "../utils/helpers";
+import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { marked } from "marked";
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -42,7 +42,6 @@ export default class SelectionWindows {
     }
 
     this.isTranslationCancelled = false; // ریست کردن پرچم در هر بار نمایش
-    this.translatingText = selectedText; // ثبت متن در حال ترجمه
 
     this.translatingText = selectedText; // ثبت متن در حال ترجمه
 
@@ -127,7 +126,11 @@ export default class SelectionWindows {
         const translatedText =
           translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
         if (translatedText) {
-          this.transitionToTranslatedText(translatedText, loadingContainer);
+          this.transitionToTranslatedText(
+            translatedText,
+            loadingContainer,
+            this.translatingText
+          );
         } else {
           this.handleEmptyTranslation(loadingContainer);
         }
@@ -202,27 +205,102 @@ export default class SelectionWindows {
     });
   }
 
-  transitionToTranslatedText(translatedText, loadingContainer) {
+  transitionToTranslatedText(translatedText, loadingContainer, original_text) {
+    // متن خام را برای استفاده در TTS نگه دارید
+    const rawTranslatedText = translatedText ? translatedText.trim() : "";
+
     // 1. محو شدن نقاط لودینگ
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
-      if (this.displayElement) {
-        // 2. تنظیم شفافیت به 0.6 قبل از جایگذاری متن
+      // مطمئن شوید المان هنوز وجود دارد و قابل مشاهده است
+      if (this.displayElement && this.isVisible) {
+        // 2. تنظیم شفافیت اولیه قبل از نمایش محتوا
         this.displayElement.style.opacity = "0.6";
 
-        // 3. تنظیم متن ترجمه شده قبل از جایگذاری
-        this.applyTextDirection(this.displayElement, translatedText);
+        // 3. تنظیم جهت متن
+        this.applyTextDirection(this.displayElement, rawTranslatedText);
 
-        // 4. جایگذاری متن ترجمه شده به صورت Markdown
-        this.displayElement.innerHTML = marked.parse(translatedText);
+        // 4. پاک کردن محتوای قبلی (مهم!)
+        this.displayElement.innerHTML = "";
 
-        // 5. شروع انیمیشن Fade In با یک تاخیر کوتاه
-        setTimeout(() => {
+        // --- 5. ایجاد و افزودن آیکون TTS ---
+        // فقط اگر متنی برای خواندن وجود دارد آیکون را اضافه کن
+        if (rawTranslatedText) {
+          const ttsIcon = this.createTTSIcon(original_text);
+          this.displayElement.appendChild(ttsIcon); // آیکون اول اضافه می‌شود
+        }
+
+        // --- 6. ایجاد محفظه برای متن ترجمه شده ---
+        const textContainer = document.createElement("span");
+        textContainer.classList.add("aiwc-text-content"); // کلاس اختیاری برای استایل‌دهی
+        // متن Markdown را پردازش و در محفظه قرار بده
+        textContainer.innerHTML = marked.parse(
+          rawTranslatedText || "(ترجمه یافت نشد)"
+        ); // نمایش پیام اگر متن خالی بود
+        this.displayElement.appendChild(textContainer); // محفظه متن بعد از آیکون اضافه می‌شود
+
+        // 7. شروع انیمیشن Fade In با کمی تاخیر
+        requestAnimationFrame(() => {
           this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
           this.displayElement.style.opacity = "0.9";
-        }, 10); // تاخیر بسیار کم برای اطمینان از اعمال تغییرات
+        });
       }
-    }, 150); // مدت زمان محو شدن نقاط لودینگ (باید با CSS هماهنگ باشد)
+    }, 150); // مدت زمان محو شدن نقاط لودینگ
+  }
+
+  // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
+  createTTSIcon(textToSpeak) {
+    const icon = document.createElement("img");
+    try {
+      // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
+      icon.src = chrome.runtime.getURL("../icons/speaker.png"); // مطمئن شوید آیکون در این مسیر وجود دارد
+    } catch (e) {
+      logME("Error getting speaker icon URL:", e);
+      icon.src = "../icons/speaker.png"; // Fallback path
+    }
+    icon.alt = "خواندن ترجمه";
+    icon.title = "خواندن ترجمه";
+    icon.classList.add("aiwc-tts-icon"); // کلاس برای استایل دهی CSS
+
+    icon.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      logME("[SelectionWindows]: TTS icon clicked.");
+      // DON'T get targetLangCode here, background will handle it based on settings
+      // DON'T call playAudioGoogleTTS directly
+
+      // Send message to background
+      chrome.runtime.sendMessage(
+        {
+          action: "playGoogleTTS", // Define a new action
+          text: textToSpeak,
+          // Background script will get target language from storage
+        },
+        (response) => {
+          // Optional: Handle response from background
+          if (chrome.runtime.lastError) {
+            logME(
+              "[SelectionWindows]: Error sending TTS message:",
+              chrome.runtime.lastError.message
+            );
+            alert(
+              `خطا در ارسال درخواست صدا: ${chrome.runtime.lastError.message}`
+            );
+            return;
+          }
+          if (response && !response.success) {
+            logME(
+              "[SelectionWindows]: Background script reported TTS error:",
+              response.error
+            );
+            alert(`خطا در پخش صدا: ${response.error}`);
+          } else if (response && response.success) {
+            logME("[SelectionWindows]: TTS playback initiated by background.");
+          }
+        }
+      );
+    });
+
+    return icon;
   }
 
   handleEmptyTranslation(loadingContainer) {

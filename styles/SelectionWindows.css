@@ -131,3 +131,39 @@
   width: 80px; /* این مقدار قابل تغییر است */
   font-weight: bold;
 }
+
+/* ==========================================================================
+     TTS Icon Styles
+     ========================================================================== */
+.aiwc-tts-icon {
+  width: 14px; /* اندازه آیکون */
+  height: 14px; /* اندازه آیکون */
+  vertical-align: middle; /* تراز عمودی با متن کنارش */
+  margin-left: 5px; /* فاصله از متن (اگر متن LTR باشد) */
+  margin-right: 5px; /* فاصله از متن (اگر متن RTL باشد یا برای اطمینان) */
+  cursor: pointer; /* تغییر نشانگر موس */
+  opacity: 0.65; /* کمی شفافیت اولیه */
+  transition: opacity 0.2s ease-in-out;
+  display: inline-block; /* رفتار شبیه به متن */
+}
+
+/* هاور شدن روی آیکون */
+.aiwc-tts-icon:hover {
+  opacity: 1;
+}
+
+/* محفظه متن (برای اطمینان از رفتار inline) */
+.aiwc-text-content {
+  display: inline;
+}
+
+/* تنظیم فاصله برای زبان‌های راست به چپ */
+[dir="rtl"] .aiwc-tts-icon {
+  margin-left: 5px;
+  margin-right: 0; /* حذف فاصله راست در حالت RTL */
+}
+/* تنظیم فاصله برای زبان‌های چپ به راست (پیش‌فرض) */
+[dir="ltr"] .aiwc-tts-icon {
+  margin-left: 0; /* حذف فاصله چپ در حالت LTR */
+  margin-right: 5px;
+}
