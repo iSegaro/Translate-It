@@ -1,131 +1,331 @@
 /* src/styles/popup.css */
 
-.voice-icons-target img#voiceTargetIcon {
-  transform: rotateY(180deg); /* Mirror کردن افقی با چرخش */
-}
-
-/* استایل پایه با طراحی مینیمالیست و حرفه‌ای */
+/* استایل پایه و تنظیمات کلی */
 body {
   margin: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: #f7f9fc;
-  color: #333;
+  font-family:
+    "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* فونت استاندارد و خوانا */
+  background: #f0f2f5; /* پس زمینه کمی متفاوت برای بدنه */
+  color: #1c1e21; /* رنگ متن اصلی */
+  font-size: 13px; /* اندازه فونت پایه */
 }
 
 .popup-container {
-  width: 280px;
-  padding: 10px;
+  width: 350px; /* افزایش عرض برای جای دادن بهتر عناصر */
   background: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
-  margin: 10px auto;
-}
-
-.toolbar {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  /* حذف margin: auto برای کنترل بهتر از طریق extension API */
+  /* margin: 10px auto; */
+  overflow: hidden; /* جلوگیری از بیرون زدگی محتوا */
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 10px;
+  flex-direction: column;
 }
 
-.toolbar img {
-  width: 24px;
-  height: 24px;
+/* نوار ابزار بالا (Header) */
+.header-toolbar {
+  display: flex;
+  justify-content: flex-start; /* آیکون ها از چپ شروع شوند (چون RTL هستیم از راست) */
+  gap: 8px;
+  padding: 8px 12px;
+  background: #e9ecef; /* رنگ پس زمینه متفاوت شبیه Toolbar */
+  border-bottom: 1px solid #ced4da; /* جداکننده ظریف */
+}
+
+.toolbar-icon {
+  width: 20px; /* اندازه کوچک‌تر برای آیکون‌های تولبار */
+  height: 20px;
   cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease-in-out;
 }
 
-textarea {
+.toolbar-icon:hover {
+  opacity: 1;
+}
+
+/* بخش کنترل زبان */
+.language-controls {
+  display: flex;
+  align-items: center; /* تراز عمودی عناصر */
+  padding: 6px 12px; /* کمی کاهش پدینگ عمودی */
+  gap: 6px; /* کمی کاهش فاصله */
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* نگهدارنده Input زبان و دکمه Clear */
+.language-input-container {
+  position: relative; /* برای موقعیت دهی دکمه clear */
+  flex-grow: 1; /* اجازه می دهد فضا را پر کنند */
+}
+
+/* نمایش دکمه Clear وقتی Input مقدار دارد (با جاوااسکریپت کنترل می‌شود) */
+.language-input-container.has-value .clear-input {
+  display: block;
+}
+
+.language-input {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #dcdcdc;
+  padding: 6px 25px 6px 8px; /* تنظیم پدینگ برای تراز بهتر با دکمه‌ها */
+  font-size: 13px; /* همسان سازی اندازه فونت */
+  border: 1px solid #ced4da;
   border-radius: 4px;
-  resize: vertical;
-  font-size: 13px;
+  background-color: #fff;
+  box-sizing: border-box; /* مهم برای محاسبه درست width */
+}
+.language-input:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25); /* تغییر کوچک در shadow */
 }
 
-.voice-icons-source {
-  display: flex;
-  justify-content: flex-start;
-  margin: 8px 0;
+.language-select {
+  flex-grow: 1; /* اجازه می دهد کمبوباکس ها فضا را پر کنند */
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: #fff;
+  appearance: none; /* حذف ظاهر پیش فرض */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5" viewBox="0 0 10 5"><path fill="%236c757d" d="M0 0l5 5 5-5z"/></svg>'); /* آیکون پیکان سفارشی */
+  background-repeat: no-repeat;
+  background-position: left 8px center; /* تنظیم موقعیت پیکان برای RTL */
+  background-size: 10px 5px;
+  padding-left: 25px; /* ایجاد فضا برای پیکان */
 }
 
-.voice-icons-source img {
-  width: 24px;
-  height: 24px;
-  cursor: pointer;
-}
-
-.voice-icons-target {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.voice-icons-target img {
-  width: 24px;
-  height: 24px;
-  cursor: pointer;
-}
-
-.form-group {
-  margin: 10px 0;
-  position: relative; /* برای قرارگیری دکمه ضربدر */
-}
-
-.form-group label {
-  font-size: 13px;
-  margin-right: 5px;
-}
-
-select {
+.swap-button {
+  background: none;
+  border: none;
   padding: 4px;
-  font-size: 13px;
-  border: 1px solid #dcdcdc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 4px;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0; /* جلوگیری از کوچک شدن دکمه ها */
+}
+
+.swap-button:hover,
+.translate-button:hover {
+  background-color: #e2e6ea;
+}
+
+.swap-button img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7; /* هماهنگی با سایر آیکون ها */
+}
+
+.swap-button:hover img {
+  opacity: 1;
+}
+
+/* دکمه ترجمه (Translate) */
+.translate-button {
+  background: none; /* حذف پس زمینه */
+  border: none;
+  padding: 5px; /* پدینگ مشابه دکمه swap */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.translate-button:hover {
+  background-color: #e9ecef; /* تغییر رنگ هاور ملایم */
+}
+
+.translate-button img {
+  width: 20px; /* اندازه آیکون ترجمه */
+  height: 20px;
+  opacity: 0.7; /* هماهنگی با سایر آیکون ها */
+  filter: none; /* حذف فیلتر سفید */
+}
+.translate-button:hover img {
+  opacity: 1;
+}
+
+/* نگهدارنده Textarea و Result */
+.textarea-container {
+  position: relative; /* برای موقعیت دهی تولبار داخلی - لازم است تا بتوان paste-icon را absolute کرد */
+  margin: 10px 12px; /* فاصله از اطراف */
+}
+
+/* استایل Textarea و Result Div */
+textarea,
+.result {
+  width: 100%;
+  padding: 28px 10px 10px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+  direction: rtl;
+  text-align: right;
+  min-height: 60px;
+  background-color: #fff;
+  line-height: 1.5;
+}
+
+textarea:focus,
+.result:focus {
+  /* result focus پذیر نیست مگر اینکه tabindex داشته باشد */
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 .result {
-  min-height: 40px;
-  padding: 8px;
-  border: 1px solid #e1e1e1;
-  border-radius: 4px;
-  background: #fafafa;
-  font-size: 13px;
-  margin-top: 8px;
+  background-color: #f8f9fa;
+  min-height: 60px;
+  padding-top: 28px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
 }
 
-.btn-submit {
-  width: 100%;
-  padding: 8px;
-  background: #27ae60;
-  border: none;
-  border-radius: 4px;
-  color: #fff;
+/* استایل Placeholder برای Result Div (با استفاده از شبه المنت) */
+.result:empty::before {
+  content: attr(placeholder);
+  color: #6c757d;
   font-size: 14px;
+  position: absolute;
+  top: 28px;
+  right: 10px;
+  pointer-events: none;
+}
+
+/* تولبار داخلی (روی Textarea و Result) */
+.inline-toolbar_OLD {
+  position: absolute;
+  top: 5px;
+  left: 8px; /* فاصله از لبه چپ */
+  right: 8px; /* فاصله از لبه راست */
+  width: auto; /* عرض خودکار بر اساس محتوا و فواصل چپ/راست */
+
+  display: none; /* همچنان به طور پیش فرض مخفی */
+  align-items: center; /* تراز عمودی آیتم ها */
+  justify-content: space-between; /* آیتم ها را به دو طرف فشار می دهد */
+
+  background: transparent;
+  z-index: 10;
+  padding: 2px 0; /* پدینگ عمودی، افقی لازم نیست */
+  /* حذف gap چون space-between فاصله را مدیریت می کند */
+}
+
+/* استایل عمومی تولبار داخلی */
+.inline-toolbar {
+  position: absolute;
+  top: 5px;
+  display: none; /* مخفی به صورت پیش فرض */
+  align-items: center;
+  background: transparent;
+  z-index: 10;
+  padding: 2px;
+}
+
+/* استایل مخصوص تولبار متن مبدا */
+.inline-toolbar.source-toolbar {
+  left: 8px; /* موقعیت از چپ */
+  right: 8px; /* گسترش تا راست (برای space-between) */
+  width: auto;
+  justify-content: space-between; /* جدا کردن گروه چپ و آیکون راست */
+  /* gap حذف می شود چون space-between فاصله را تعیین می کند */
+}
+
+/* گروه آیکون های سمت چپ در تولبار مبدا */
+.source-toolbar .toolbar-left-group {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* فاصله بین آیکون های کپی و صدا مبدا */
+}
+
+/* استایل مخصوص تولبار متن مقصد (ترجمه شده) */
+.inline-toolbar.target-toolbar {
+  right: 8px; /* <<-- موقعیت از راست */
+  left: auto; /* <<-- اطمینان از عدم تداخل موقعیت چپ */
+  gap: 10px; /* <<-- فاصله بین آیکون های کپی و صدا مقصد */
+  /* justify-content پیش فرض (flex-start) مناسب است، آیکون ها کنار هم قرار می گیرند */
+}
+
+/* نمایش تولبار وقتی محتوا وجود دارد */
+.textarea-container.has-content .inline-toolbar {
+  display: flex;
+}
+
+/* استایل آیکون های داخلی */
+.inline-icon {
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  margin-top: 8px;
-  transition: background 0.3s;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
 }
 
-.btn-submit:hover {
-  background: #1e8449;
+.inline-icon:hover {
+  opacity: 1;
 }
 
+/* چرخش آیکون صدای مقصد */
+.voice-target-icon {
+  transform: rotateY(180deg); /* Mirror کردن افقی */
+}
+
+/* استایل آیکون Paste */
+.paste-icon-separate {
+  position: absolute;
+  top: 5px; /* تنظیم فاصله از بالا */
+  left: 8px; /* <<--- تغییر از right به left برای قرارگیری در سمت چپ */
+  z-index: 11; /* بالاتر از textarea ولی شاید نیاز به تنظیم باشد */
+  /* استایل‌های دیگر inline-icon را حفظ می‌کند: */
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  display: inline-block; /* یا block، بسته به نیاز */
+}
+
+.paste-icon-separate:hover {
+  opacity: 1;
+}
+
+/* استایل برای مخفی کردن دکمه Paste (توسط JS) */
+#pasteSourceBtn.hidden-by-clipboard {
+  display: none !important; /* ممکن است !important لازم باشد تا بر display:flex تولبار غلبه کند */
+}
+
+/* دکمه پاک کردن (ضربدر) برای Input های زبان */
 .clear-input {
   position: absolute;
   top: 50%;
-  right: 10px;
+  right: 8px; /* موقعیت در سمت راست input */
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 14px; /* اندازه کوچکتر */
+  height: 14px;
   background-image: url("../icons/close.png"); /* مسیر آیکون ضربدر */
   background-size: contain;
   background-repeat: no-repeat;
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.3s;
+  display: none; /* به طور پیش فرض مخفی */
 }
 
 .clear-input:hover {
   opacity: 1;
+}
+
+/* استایل های مربوط به حالت انتخاب المنت */
+body.selecting-element {
+  cursor: crosshair; /* یا هر نشانگر دیگری که مناسب است */
 }
