@@ -39,6 +39,162 @@ document.addEventListener("DOMContentLoaded", async () => {
   const selectElementIcon = document.getElementById("selectElementIcon");
   const clearStorageBtn = document.getElementById("clearStorageBtn"); // دکمه پاک کردن کلی در هدر
 
+  // --- Voice Functions ---
+  /**
+   * Plays audio using Google Translate TTS service.
+   * Requires optional permission for "https://translate.google.com/*".
+   * @param {string} text The text to speak.
+   * @param {string} lang The language code (e.g., 'en', 'fa'). Cannot be 'auto'.
+   */
+  async function playAudioGoogleTTS(text, lang) {
+    // --- ورودی‌ها را بررسی کنید ---
+    if (!text || !text.trim()) {
+      logME("[TTS]: No text provided to speak.");
+      // شاید بهتر باشد sourceText.focus() اینجا هم صدا زده شود؟
+      return;
+    }
+    if (!lang || lang === "auto") {
+      logME(`[TTS]: Invalid language code ('${lang}') for Google TTS.`);
+      // اطلاع رسانی به کاربر که زبان auto پشتیبانی نمی‌شود یا زبان نامعتبر است
+      // alert(
+      //   "برای خواندن متن با صدای گوگل، لطفاً یک زبان مشخص (غیر از Auto Detect) انتخاب کنید."
+      // );
+      // sourceLanguageInput.focus();
+      // return;
+
+      lang = "en"; // اگر زبان نامعتبر بود، به انگلیسی پیش‌فرض برمی‌گردیم
+    }
+
+    // --- محدودیت طول متن گوگل (حدود 200 کاراکتر) ---
+    // Google TTS URL can get very long and might fail for long texts.
+    const maxLength = 200;
+    if (text.length > maxLength) {
+      logME(
+        `[TTS]: Text too long for Google TTS (>${maxLength} chars). Length: ${text.length}`
+      );
+      // alert(
+      //   `متن برای خوانده شدن توسط گوگل بیش از حد طولانی است (بیشتر از ${maxLength} کاراکتر). از Web Speech API پیش‌فرض استفاده می‌شود.`
+      // );
+      // --- بازگشت به Web Speech API به عنوان جایگزین ---
+      playAudioWebSpeech(text, lang); // تابع کمکی برای Web Speech API
+      return;
+      // یا می‌توانید کلا متوقف کنید: return;
+    }
+
+    // --- ساخت URL ---
+    const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${lang}`;
+    logME("[TTS]: Requesting Google TTS URL:", url);
+
+    // --- بررسی و درخواست دسترسی (Optional Permission) ---
+    // این آدرس باید در "optional_permissions" فایل manifest.json شما اضافه شده باشد
+    const requiredOrigin = "https://translate.google.com/*";
+
+    try {
+      // 1. بررسی وجود دسترسی
+      const hasPermission = await new Promise((resolve, reject) => {
+        chrome.permissions.contains({ origins: [requiredOrigin] }, (result) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(result);
+          }
+        });
+      });
+
+      // 2. اگر دسترسی وجود نداشت، درخواست بده
+      if (!hasPermission) {
+        logME(
+          "[TTS]: Optional permission for Google TTS not granted. Requesting..."
+        );
+        const granted = await new Promise((resolve, reject) => {
+          chrome.permissions.request(
+            { origins: [requiredOrigin] },
+            (granted) => {
+              if (chrome.runtime.lastError) {
+                reject(
+                  new Error(
+                    chrome.runtime.lastError.message ||
+                      "Permission request failed."
+                  )
+                );
+              } else if (granted) {
+                logME("[TTS]: Permission granted by user.");
+                resolve(true);
+              } else {
+                logME("[TTS]: Permission denied by user.");
+                // اگر کاربر رد کرد، نمی‌توان ادامه داد
+                reject(
+                  new Error("دسترسی لازم برای استفاده از صدای گوگل داده نشد.")
+                );
+              }
+            }
+          );
+        });
+        // اگر درخواست ناموفق بود یا رد شد، تابع متوقف می‌شود (چون reject شد)
+      } else {
+        logME("[TTS]: Google TTS permission already granted.");
+      }
+
+      // --- پخش صدا ---
+      // اگر دسترسی وجود دارد یا داده شد، صدا را پخش کن
+      logME("[TTS]: Attempting to play audio...");
+      const audio = new Audio(url);
+      audio.crossOrigin = "anonymous"; // برای منابع خارجی لازم است
+
+      // گوش دادن به رویداد خطا در پخش
+      audio.addEventListener("error", (e) => {
+        logME("[TTS]: Error during audio playback:", e);
+        console.error("[TTS]: Audio playback error details:", audio.error);
+        alert(
+          `خطا در پخش صدا از گوگل: ${audio.error?.message || "Unknown error"}`
+        );
+      });
+
+      await audio.play();
+      logME("[TTS]: Google TTS playback started.");
+    } catch (error) {
+      // خطاهای مربوط به بررسی/درخواست دسترسی یا پخش اولیه
+      logME(
+        "[TTS]: Error during permission check/request or playback initiation:",
+        error.name,
+        error.message
+      );
+      console.error("[TTS]: Full error object:", error);
+      // نمایش خطا به کاربر
+      alert(`خطا در فرآیند پخش صدا: ${error.message}`);
+    }
+  }
+
+  /**
+   * Plays audio using the browser's built-in Web Speech API.
+   * (This is the previous implementation, extracted into a helper function)
+   * @param {string} text The text to speak.
+   * @param {string} langCode The language code (e.g., 'en', 'fa', 'auto').
+   */
+  function playAudioWebSpeech(text, langCode) {
+    if (!text || !text.trim()) {
+      logME("[WebSpeech]: No text provided.");
+      return;
+    }
+
+    logME(`[WebSpeech]: Playing text in lang '${langCode || "auto"}':`, text);
+    const utterance = new SpeechSynthesisUtterance(text);
+    const speechLang = getSpeechApiLangCode(langCode); // Use existing helper
+
+    if (speechLang) {
+      utterance.lang = speechLang;
+      logME(`[WebSpeech]: Setting utterance lang to: ${speechLang}`);
+    } else {
+      logME(
+        `[WebSpeech]: No specific speech lang code found for '${langCode}'. Using browser default.`
+      );
+    }
+
+    // متوقف کردن پخش قبلی (اگر وجود داشت)
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+  }
+
   // --- Helper Functions ---
   function toggleClearButtonVisibility(inputElement, clearButton) {
     const container = inputElement.parentElement;
@@ -726,44 +882,50 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Voice Source
   voiceSourceIcon.addEventListener("click", () => {
     const text = sourceText.value.trim();
+    const sourceLangIdentifier = sourceLanguageInput.value;
+    const sourceLangCode = getLanguageCode(sourceLangIdentifier); // Get 'fa', 'en', 'auto', etc.
+
     if (!text) {
       sourceText.focus();
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(text);
-    const sourceLangIdentifier = sourceLanguageInput.value;
-    const sourceLangCode = getLanguageCode(sourceLangIdentifier);
-    const speechLang = getSpeechApiLangCode(sourceLangCode); // Expects a function like 'en' -> 'en-US'
 
-    if (speechLang) {
-      utterance.lang = speechLang;
+    // اولویت با صدای گوگل، اگر زبان auto نباشد و متن کوتاه باشد
+    // if (sourceLangCode && sourceLangCode !== "auto" && text.length < 200) {
+    if (sourceLangCode && text.length < 200) {
+      playAudioGoogleTTS(text, sourceLangCode);
+    } else {
+      // در غیر این صورت (زبان auto، متن طولانی، یا خطای گوگل)، از Web Speech API استفاده کن
+      logME("[VoiceSource]: Falling back to Web Speech API.");
+      playAudioWebSpeech(text, sourceLangCode); // Pass 'auto' or specific code
     }
-    // else: let browser guess if 'auto' or invalid
-
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utterance);
   });
 
   // Voice Target
   voiceTargetIcon.addEventListener("click", () => {
     const text = translationResult.textContent?.trim();
+    const targetLangIdentifier = targetLanguageInput.value;
+    const targetLangCode = getLanguageCode(targetLangIdentifier); // Get 'fa', 'en', etc.
+
     if (!text || text === "در حال ترجمه...") {
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(text);
-    const targetLangIdentifier = targetLanguageInput.value;
-    const targetLangCode = getLanguageCode(targetLangIdentifier);
-    const speechLang = getSpeechApiLangCode(targetLangCode);
-
-    if (speechLang) {
-      utterance.lang = speechLang;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utterance);
-    } else {
+    if (!targetLangCode || targetLangCode === "auto") {
       logME(
-        `[Popup]: Cannot speak target: Invalid language ${targetLangIdentifier} (Code: ${targetLangCode})`
+        "[VoiceTarget]: Cannot play target - invalid language code:",
+        targetLangCode
       );
-      // Optional: Fallback or user feedback
+      targetLanguageInput.focus();
+      return;
+    }
+
+    // اولویت با صدای گوگل، اگر متن کوتاه باشد
+    if (text.length < 200) {
+      playAudioGoogleTTS(text, targetLangCode);
+    } else {
+      // در غیر این صورت (متن طولانی)، از Web Speech API استفاده کن
+      logME("[VoiceTarget]: Text too long, falling back to Web Speech API.");
+      playAudioWebSpeech(text, targetLangCode);
     }
   });
 
