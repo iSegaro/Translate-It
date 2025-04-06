@@ -1,6 +1,7 @@
 // src/utils/tts.js
-import { logME } from "../utils/helpers.js";
+import { logME, delay } from "../utils/helpers.js";
 import { languageList } from "./languages.js";
+import { detectTextLanguage } from "../utils/textDetection.js";
 
 // --- Voice Functions ---
 export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای تشخیص خودکار
@@ -15,114 +16,102 @@ export async function playAudioGoogleTTS(text, lang) {
   // --- ورودی‌ها را بررسی کنید ---
   if (!text || !text.trim()) {
     logME("[TTS]: No text provided to speak.");
-    // شاید بهتر باشد sourceText.focus() اینجا هم صدا زده شود؟
     return;
   }
-  if (!lang || lang === ("auto" || AUTO_DETECT_VALUE)) {
-    logME(`[TTS]: Invalid language code ('${lang}') for Google TTS.`);
-    // اطلاع رسانی به کاربر که زبان auto پشتیبانی نمی‌شود یا زبان نامعتبر است
-    // alert(
-    //   "برای خواندن متن با صدای گوگل، لطفاً یک زبان مشخص (غیر از Auto Detect) انتخاب کنید."
-    // );
-    // sourceLanguageInput.focus();
-    // return;
 
-    lang = "en"; // اگر زبان نامعتبر بود، به انگلیسی پیش‌فرض برمی‌گردیم
+  let targetLangCode = lang;
+
+  // --- تشخیص زبان در صورت نیاز ---
+  if (
+    !targetLangCode ||
+    targetLangCode === "auto" ||
+    targetLangCode === AUTO_DETECT_VALUE
+  ) {
+    logME("[TTS]: Attempting to auto-detect language...");
+    const detectedLangCode = await detectTextLanguage(text);
+    if (detectedLangCode) {
+      targetLangCode = detectedLangCode;
+      logME(`[TTS]: Auto-detected language: ${targetLangCode}`);
+    } else {
+      targetLangCode = "en"; // اگر تشخیص زبان ناموفق بود، به انگلیسی پیش‌فرض برمی‌گردیم
+      logME("[TTS]: Auto-detection failed, defaulting to English.");
+      // می‌توانید در اینجا به کاربر اطلاع دهید که تشخیص زبان ناموفق بوده است (مثلاً از طریق یک پیام لاگ یا یک notification اگر در UI قابل نمایش باشد).
+    }
+  } else {
+    logME(`[TTS]: Using provided language: ${targetLangCode}`);
   }
 
-  // --- محدودیت طول متن گوگل (حدود 200 کاراکتر) ---
-  // Google TTS URL can get very long and might fail for long texts.
+  // --- محدودیت طول متن گوگل ---
   const maxLength = 200;
   if (text.length > maxLength) {
     logME(
       `[TTS]: Text too long for Google TTS (>${maxLength} chars). Length: ${text.length}`
     );
-    // alert(
-    //   `متن برای خوانده شدن توسط گوگل بیش از حد طولانی است (بیشتر از ${maxLength} کاراکتر). از Web Speech API پیش‌فرض استفاده می‌شود.`
-    // );
-    // --- بازگشت به Web Speech API به عنوان جایگزین ---
-    playAudioWebSpeech(text, lang); // تابع کمکی برای Web Speech API
+    playAudioWebSpeech(text, targetLangCode); // استفاده از Web Speech API به عنوان جایگزین
     return;
-    // یا می‌توانید کلا متوقف کنید: return;
   }
 
   // --- ساخت URL ---
-  const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${lang}`;
+  const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${targetLangCode}`;
   logME("[TTS]: Requesting Google TTS URL:", url);
 
-  // --- بررسی و درخواست دسترسی (Optional Permission) ---
-  // این آدرس باید در "optional_permissions" فایل manifest.json شما اضافه شده باشد
   const requiredOrigin = "https://translate.google.com/*";
 
   try {
-    // 1. بررسی وجود دسترسی
-    const hasPermission = await new Promise((resolve, reject) => {
-      chrome.permissions.contains({ origins: [requiredOrigin] }, (result) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(result);
-        }
-      });
+    // --- بررسی و درخواست دسترسی ---
+    const hasPermission = await new Promise((resolve) => {
+      chrome.permissions.contains({ origins: [requiredOrigin] }, resolve);
     });
 
-    // 2. اگر دسترسی وجود نداشت، درخواست بده
     if (!hasPermission) {
       logME(
         "[TTS]: Optional permission for Google TTS not granted. Requesting..."
       );
-      const granted = await new Promise((resolve, reject) => {
-        chrome.permissions.request({ origins: [requiredOrigin] }, (granted) => {
-          if (chrome.runtime.lastError) {
-            reject(
-              new Error(
-                chrome.runtime.lastError.message || "Permission request failed."
-              )
-            );
-          } else if (granted) {
-            logME("[TTS]: Permission granted by user.");
-            resolve(true);
-          } else {
-            logME("[TTS]: Permission denied by user.");
-            // اگر کاربر رد کرد، نمی‌توان ادامه داد
-            reject(
-              new Error("دسترسی لازم برای استفاده از صدای گوگل داده نشد.")
-            );
-          }
-        });
+      const granted = await new Promise((resolve) => {
+        chrome.permissions.request({ origins: [requiredOrigin] }, resolve);
       });
-      // اگر درخواست ناموفق بود یا رد شد، تابع متوقف می‌شود (چون reject شد)
+      if (!granted) {
+        const errorMessage = "دسترسی لازم برای استفاده از صدای گوگل داده نشد.";
+        logME("[TTS]: Permission denied by user.");
+        // می‌توانید در اینجا به کاربر اطلاع دهید که دسترسی رد شده است (مثلاً از طریق یک notification).
+        console.error("[TTS]: Permission denied:", errorMessage);
+        return;
+      }
+      logME("[TTS]: Permission granted by user.");
     } else {
       logME("[TTS]: Google TTS permission already granted.");
     }
 
     // --- پخش صدا ---
-    // اگر دسترسی وجود دارد یا داده شد، صدا را پخش کن
     logME("[TTS]: Attempting to play audio...");
     const audio = new Audio(url);
     audio.crossOrigin = "anonymous"; // برای منابع خارجی لازم است
 
-    // گوش دادن به رویداد خطا در پخش
-    audio.addEventListener("error", (e) => {
-      logME("[TTS]: Error during audio playback:", e);
-      console.error("[TTS]: Audio playback error details:", audio.error);
-      alert(
-        `خطا در پخش صدا از گوگل: ${audio.error?.message || "Unknown error"}`
-      );
+    await new Promise((resolve, reject) => {
+      audio.addEventListener("ended", resolve);
+      audio.addEventListener("error", (e) => {
+        logME("[TTS]: Error during audio playback:", e);
+        console.error("[TTS]: Audio playback error details:", audio.error);
+        const errorMessage = `خطا در پخش صدا از گوگل: ${
+          audio.error?.message || "Unknown error"
+        }`;
+        // می‌توانید در اینجا به کاربر اطلاع دهید که خطایی در پخش صدا رخ داده است.
+        console.error("[TTS]: Audio playback error:", errorMessage);
+        reject(new Error(errorMessage));
+      });
+      audio.play().then(resolve).catch(reject); // مدیریت Promise مربوط به play()
     });
 
-    await audio.play();
     logME("[TTS]: Google TTS playback started.");
   } catch (error) {
-    // خطاهای مربوط به بررسی/درخواست دسترسی یا پخش اولیه
     logME(
-      "[TTS]: Error during permission check/request or playback initiation:",
+      "[TTS]: Error during Google TTS operation:",
       error.name,
       error.message
     );
     console.error("[TTS]: Full error object:", error);
-    // نمایش خطا به کاربر
-    alert(`خطا در فرآیند پخش صدا: ${error.message}`);
+    // می‌توانید در اینجا خطای کلی را به کاربر اطلاع دهید.
+    console.error("[TTS]: Google TTS Error:", error.message);
   }
 }
 
@@ -173,7 +162,9 @@ export function getLanguageCode(langIdentifier) {
   if (trimmedId === AUTO_DETECT_VALUE) return "auto";
   const lang = languageList.find(
     (l) =>
-      l.name === trimmedId || l.promptName === trimmedId || l.code === trimmedId
+      l.name === trimmedId ||
+      l.promptName === trimmedId ||
+      l.voiceCode === trimmedId
   );
-  return lang ? lang.code : null;
+  return lang ? lang.voiceCode : null;
 }

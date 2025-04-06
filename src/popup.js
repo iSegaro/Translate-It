@@ -718,15 +718,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // اولویت با صدای گوگل، اگر زبان auto نباشد و متن کوتاه باشد
-    // if (sourceLangCode && sourceLangCode !== "auto" && text.length < 200) {
-    if (sourceLangCode && text.length < 200) {
-      playAudioGoogleTTS(text, sourceLangCode);
-    } else {
-      // در غیر این صورت (زبان auto، متن طولانی، یا خطای گوگل)، از Web Speech API استفاده کن
-      logME("[VoiceSource]: Falling back to Web Speech API.");
-      playAudioWebSpeech(text, sourceLangCode); // Pass 'auto' or specific code
-    }
+    playAudioGoogleTTS(text, sourceLangCode);
   });
 
   // Voice Target
@@ -747,14 +739,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // اولویت با صدای گوگل، اگر متن کوتاه باشد
-    if (text.length < 200) {
-      playAudioGoogleTTS(text, targetLangCode);
-    } else {
-      // در غیر این صورت (متن طولانی)، از Web Speech API استفاده کن
-      logME("[VoiceTarget]: Text too long, falling back to Web Speech API.");
-      playAudioWebSpeech(text, targetLangCode);
-    }
+    playAudioGoogleTTS(text, targetLangCode);
   });
 
   // --- Header Toolbar Button Listeners ---

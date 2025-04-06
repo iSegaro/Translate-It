@@ -12,6 +12,10 @@ import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
 import { translateText } from "./utils/api.js";
 import { getLanguageCode } from "./utils/tts.js";
+import {
+  detectTextLanguage,
+  getLanguageInfoFromCode,
+} from "./utils/textDetection.js";
 
 const errorHandler = new ErrorHandler();
 // نگهداری وضعیت انتخاب برای هر تب به صورت مجزا
@@ -136,7 +140,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // logME("[Background] Message => ", message);
+  logME("[Background] Message => ", message);
 
   // پردازش پیام‌های مربوط به مدیریت Content Script
   if (message && (message.action || message.type)) {
@@ -187,22 +191,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "playGoogleTTS") {
-    logME("[Background]: Received playGoogleTTS request", message.text);
-    // Use an async function to handle the logic
+    logME("[Background]: Received playGoogleTTS request", message);
+
     (async () => {
       try {
-        const sourceLanguage = await getSourceLanguageAsync(); // Get target lang
-        const targetLanguage = await getTargetLanguageAsync(); // Get target lang
+        const text = message.text;
+        let voiceLangCode = null; // مقدار اولیه برای کد زبان صدا
 
-        if (!targetLanguage || targetLanguage === "auto") {
-          targetLanguage = "en"; // Default to English if not set
-          // throw new Error("زبان مقصد نامعتبر یا تنظیم نشده است.");
+        const detectedLang = await detectTextLanguage(text);
+
+        if (detectedLang) {
+          const languageInfo = getLanguageInfoFromCode(detectedLang);
+          if (languageInfo) {
+            voiceLangCode = languageInfo.voiceCode;
+          } else {
+            logME("اسم زبان متناظر با کد تشخیص داده شده یافت نشد.");
+            voiceLangCode = "en"; // اگر زبان نامعتبر بود، به انگلیسی پیش‌فرض برمی‌گردیم
+          }
+        } else {
+          logME("تشخیص زبان برای متن انجام نشد.");
+          voiceLangCode = "en"; // اگر تشخیص زبان ناموفق بود، به انگلیسی پیش‌فرض برمی‌گردیم
         }
 
-        const sourceLangCode = getLanguageCode(sourceLanguage);
-        const targetLangCode = getLanguageCode(targetLanguage);
+        console.warn(voiceLangCode);
 
-        const text = message.text;
         const maxLengthGoogle = 200;
 
         if (!text) {
@@ -213,11 +225,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           logME(
             "[Background]: Text too long for Google TTS, maybe use WebSpeech via Offscreen?"
           );
-          // Decide: Either reject or try WebSpeech via Offscreen API
-          // For now, let's reject for simplicity, matching previous logic alert
-          throw new Error(
-            `متن برای خواندن توسط گوگل بیش از حد طولانی است (بیشتر از ${maxLengthGoogle} کاراکتر).`
-          );
+          return;
         }
 
         // --- Permission Check & Request ---
@@ -243,7 +251,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         // --- Play Audio via Offscreen API ---
-        const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${sourceLangCode}`;
+        const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${voiceLangCode}`;
         await playAudioViaOffscreen(url); // Call helper function
 
         sendResponse({ success: true });

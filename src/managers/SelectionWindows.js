@@ -253,13 +253,13 @@ export default class SelectionWindows {
     const icon = document.createElement("img");
     try {
       // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
-      icon.src = chrome.runtime.getURL("../icons/speaker.png"); // مطمئن شوید آیکون در این مسیر وجود دارد
+      icon.src = chrome.runtime.getURL("../icons/speaker.png");
     } catch (e) {
       logME("Error getting speaker icon URL:", e);
       icon.src = "../icons/speaker.png"; // Fallback path
     }
-    icon.alt = "خواندن ترجمه";
-    icon.title = "خواندن ترجمه";
+    icon.alt = "خواندن متن";
+    icon.title = "خواندن متن";
     icon.classList.add("aiwc-tts-icon"); // کلاس برای استایل دهی CSS
 
     icon.addEventListener("click", async (event) => {
