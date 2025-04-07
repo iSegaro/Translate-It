@@ -74,7 +74,7 @@ export async function playAudioGoogleTTS(text, lang) {
         const errorMessage = "دسترسی لازم برای استفاده از صدای گوگل داده نشد.";
         logME("[TTS]: Permission denied by user.");
         // می‌توانید در اینجا به کاربر اطلاع دهید که دسترسی رد شده است (مثلاً از طریق یک notification).
-        console.error("[TTS]: Permission denied:", errorMessage);
+        // console.error("[TTS]: Permission denied:", errorMessage);
         return;
       }
       logME("[TTS]: Permission granted by user.");
@@ -91,7 +91,7 @@ export async function playAudioGoogleTTS(text, lang) {
       audio.addEventListener("ended", resolve);
       audio.addEventListener("error", (e) => {
         logME("[TTS]: Error during audio playback:", e);
-        console.error("[TTS]: Audio playback error details:", audio.error);
+        // console.error("[TTS]: Audio playback error details:", audio.error);
         const errorMessage = `خطا در پخش صدا از گوگل: ${
           audio.error?.message || "Unknown error"
         }`;
@@ -147,7 +147,8 @@ export function playAudioWebSpeech(text, langCode) {
  * @returns {string} The speech synthesis language code ('en-US', 'fa-IR', etc.) or the original code.
  */
 export function getSpeechApiLangCode(langCode) {
-  if (!langCode || langCode === ("auto" || AUTO_DETECT_VALUE)) return null; // Cannot speak 'auto'
+  if (!langCode || langCode === "auto" || langCode === AUTO_DETECT_VALUE)
+    return null; // Cannot speak 'auto'
   const lang = languageList.find((l) => l.code === langCode);
   return lang?.speechCode || lang?.code || null; // Prefer speechCode, fallback to code
 }

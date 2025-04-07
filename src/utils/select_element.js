@@ -1,4 +1,4 @@
-// src/utils/helpers.popup.js
+// src/utils/select_element.js
 
 export function Active_SelectElement(active = null, closePopup = false) {
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
