@@ -123,7 +123,7 @@ class ContentScript {
         if (message.action === "TOGGLE_SELECT_ELEMENT_MODE") {
           this.updateSelectElementState(message.data);
         } else if (message.action === "getSelectedText") {
-          const selectedText = window.getSelection().toString().trim();
+          const selectedText = window.getSelection()?.toString()?.trim() ?? "";
           sendResponse({ selectedText: selectedText }); // پاسخ به popup با استفاده از sendResponse
           return true; // برای نگه داشتن کانال پیام برای پاسخ غیرهمزمان
         } else if (
