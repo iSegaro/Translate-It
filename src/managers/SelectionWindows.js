@@ -217,27 +217,46 @@ export default class SelectionWindows {
         // 2. تنظیم شفافیت اولیه قبل از نمایش محتوا
         this.displayElement.style.opacity = "0.6";
 
-        // 3. تنظیم جهت متن
-        this.applyTextDirection(this.displayElement, rawTranslatedText);
-
         // 4. پاک کردن محتوای قبلی (مهم!)
         this.displayElement.innerHTML = "";
 
-        // --- 5. ایجاد و افزودن آیکون TTS ---
-        // فقط اگر متنی برای خواندن وجود دارد آیکون را اضافه کن
+        // --- 5. ایجاد ساختار جدید ---
+
+        // --- ردیف اول: متن اصلی و آیکون صدا ---
+        const firstLineContainer = document.createElement("div");
+        firstLineContainer.classList.add("aiwc-first-line"); // کلاس برای استایل دهی
+
+        // ایجاد و افزودن آیکون TTS (فقط اگر متنی برای خواندن وجود دارد)
         if (rawTranslatedText) {
           const ttsIcon = this.createTTSIcon(original_text);
-          this.displayElement.appendChild(ttsIcon); // آیکون اول اضافه می‌شود
+          firstLineContainer.appendChild(ttsIcon); // آیکون اول اضافه می‌شود
         }
 
-        // --- 6. ایجاد محفظه برای متن ترجمه شده ---
+        // نمایش متن اصلی
+        const originalTextSpan = document.createElement("span");
+        originalTextSpan.classList.add("aiwc-original-text"); // کلاس برای استایل دهی
+        originalTextSpan.textContent = original_text;
+        firstLineContainer.appendChild(originalTextSpan);
+
+        this.displayElement.appendChild(firstLineContainer);
+
+        // --- ردیف دوم: متن ترجمه شده و سایر اطلاعات ---
+        const secondLineContainer = document.createElement("div");
+        secondLineContainer.classList.add("aiwc-second-line"); // کلاس برای استایل دهی
+
         const textContainer = document.createElement("span");
-        textContainer.classList.add("aiwc-text-content"); // کلاس اختیاری برای استایل‌دهی
-        // متن Markdown را پردازش و در محفظه قرار بده
+        textContainer.classList.add("aiwc-text-content"); // کلاس برای استایل‌دهی متن ترجمه شده
         textContainer.innerHTML = marked.parse(
           rawTranslatedText || "(ترجمه یافت نشد)"
         ); // نمایش پیام اگر متن خالی بود
-        this.displayElement.appendChild(textContainer); // محفظه متن بعد از آیکون اضافه می‌شود
+        secondLineContainer.appendChild(textContainer);
+
+        // 3. تنظیم جهت متن *فقط برای ردیف دوم*
+        this.applyTextDirection(secondLineContainer, rawTranslatedText);
+
+        // می‌توانید در اینجا سایر اطلاعات را به secondLineContainer اضافه کنید
+
+        this.displayElement.appendChild(secondLineContainer);
 
         // 7. شروع انیمیشن Fade In با کمی تاخیر
         requestAnimationFrame(() => {
@@ -246,6 +265,56 @@ export default class SelectionWindows {
         });
       }
     }, 150); // مدت زمان محو شدن نقاط لودینگ
+  }
+
+  // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
+  createTTSIcon(textToSpeak) {
+    const icon = document.createElement("img");
+    try {
+      // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
+      icon.src = chrome.runtime.getURL("../icons/speaker.png");
+    } catch (e) {
+      logME("Error getting speaker icon URL:", e);
+      icon.src = "../icons/speaker.png"; // Fallback path
+    }
+    icon.alt = "خواندن متن";
+    icon.title = "خواندن متن";
+    icon.classList.add("aiwc-tts-icon"); // کلاس برای استایل دهی CSS
+    icon.style.cursor = "pointer"; // برای نشان دادن قابلیت کلیک
+
+    icon.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      logME("[SelectionWindows]: TTS icon clicked.");
+
+      // Send message to background
+      chrome.runtime.sendMessage(
+        {
+          action: "playGoogleTTS", // Define a new action
+          text: textToSpeak,
+          // Background script will get target language from storage
+        },
+        (response) => {
+          // Optional: Handle response from background
+          if (chrome.runtime.lastError) {
+            logME(
+              "[SelectionWindows]: Error sending TTS message:",
+              chrome.runtime.lastError.message
+            );
+            return;
+          }
+          if (response && !response.success) {
+            logME(
+              "[SelectionWindows]: Background script reported TTS error:",
+              response.error
+            );
+          } else if (response && response.success) {
+            logME("[SelectionWindows]: TTS playback initiated by background.");
+          }
+        }
+      );
+    });
+
+    return icon;
   }
 
   // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
@@ -282,9 +351,9 @@ export default class SelectionWindows {
               "[SelectionWindows]: Error sending TTS message:",
               chrome.runtime.lastError.message
             );
-            alert(
-              `خطا در ارسال درخواست صدا: ${chrome.runtime.lastError.message}`
-            );
+            // alert(
+            //   `خطا در ارسال درخواست صدا: ${chrome.runtime.lastError.message}`
+            // );
             return;
           }
           if (response && !response.success) {
@@ -292,7 +361,7 @@ export default class SelectionWindows {
               "[SelectionWindows]: Background script reported TTS error:",
               response.error
             );
-            alert(`خطا در پخش صدا: ${response.error}`);
+            // alert(`خطا در پخش صدا: ${response.error}`);
           } else if (response && response.success) {
             logME("[SelectionWindows]: TTS playback initiated by background.");
           }
