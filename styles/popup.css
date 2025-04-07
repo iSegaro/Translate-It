@@ -25,15 +25,21 @@ body {
 /* نوار ابزار بالا (Header) */
 .header-toolbar {
   display: flex;
-  justify-content: flex-start; /* آیکون ها از چپ شروع شوند (چون RTL هستیم از راست) */
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 12px;
-  background: #e9ecef; /* رنگ پس زمینه متفاوت شبیه Toolbar */
-  border-bottom: 1px solid #ced4da; /* جداکننده ظریف */
+  background: #e9ecef;
+  border-bottom: 1px solid #ced4da;
+  flex-direction: row-reverse;
+}
+
+.toolbar-right-group {
+  display: flex;
+  gap: 8px;
 }
 
 .toolbar-icon {
-  width: 20px; /* اندازه کوچک‌تر برای آیکون‌های تولبار */
+  width: 20px;
   height: 20px;
   cursor: pointer;
   opacity: 0.7;
