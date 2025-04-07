@@ -118,7 +118,9 @@ async function playAudioViaOffscreen(url) {
         );
       // Rethrow a specific error? Or just the original.
     }
-    throw error; // Re-throw the error to be handled by the caller (e.g., TTS handler)
+
+    // throw error; // Re-throw the error to be handled by the caller (e.g., TTS handler)
+    return;
   }
 }
 
