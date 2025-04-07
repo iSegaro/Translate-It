@@ -1,6 +1,8 @@
 // src/options.js
+import Browser from "webextension-polyfill";
 import { getSettingsAsync, CONFIG } from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
+import { logME } from "./utils/helpers.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const tabButtons = document.querySelectorAll(".tab-button");
@@ -274,15 +276,13 @@ document.addEventListener("DOMContentLoaded", () => {
         REQUIRE_CTRL_FOR_TEXT_SELECTION: requireCtrlForTextSelection,
       };
 
-      await new Promise((resolve, reject) => {
-        chrome.storage.local.set(settings, () => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve();
-          }
-        });
-      });
+      try {
+        await Browser.storage.local.set(settings);
+        // در صورت نیاز، کد مربوط به موفقیت عملیات را اینجا قرار دهید
+      } catch (error) {
+        logME("Error setting storage:", error);
+        // کد مربوط به مدیریت خطا را اینجا قرار دهید
+      }
 
       await updatePromptHelpText();
       showStatus("ذخیره شد!", "success");
@@ -400,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // نمایش اطلاعات مانیفست
-      const manifest = chrome.runtime.getManifest();
+      const manifest = Browser.runtime.getManifest();
       if (manifestNameElement) {
         manifestNameElement.textContent = `${manifest.name} v${manifest.version}`;
       }
@@ -491,13 +491,13 @@ document.addEventListener("DOMContentLoaded", () => {
         reader.readAsText(file);
       });
 
-      await new Promise((resolve, reject) => {
-        chrome.storage.local.set(importedSettings, () => {
-          chrome.runtime.lastError ?
-            reject(chrome.runtime.lastError)
-          : resolve();
-        });
-      });
+      try {
+        await Browser.storage.local.set(importedSettings);
+        // در صورت نیاز، کد مربوط به موفقیت را اینجا قرار دهید
+      } catch (error) {
+        logME("Error setting imported settings:", error);
+        // کد مربوط به مدیریت خطا را اینجا قرار دهید
+      }
 
       showStatus("تنظیمات وارد شدند! در حال بارگذاری مجدد...", "success");
       setTimeout(() => window.location.reload(), 1500);

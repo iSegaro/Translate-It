@@ -1,3 +1,4 @@
+import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
@@ -23,7 +24,7 @@ export async function handleFetchTranslation(
       targetLanguage
     );
 
-    await chrome.storage.local.set({
+    await Browser.storage.local.set({
       lastTranslation: {
         sourceText: promptText,
         translatedText: translation,

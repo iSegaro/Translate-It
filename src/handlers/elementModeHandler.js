@@ -1,3 +1,4 @@
+import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
@@ -14,7 +15,7 @@ export async function handleActivateSelectElementMode(
 ) {
   logME("[Handler:ElementMode] Handling activateSelectElementMode request");
 
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await Browser.tabs.query({ active: true, currentWindow: true });
 
   if (tabs.length === 0 || !tabs[0]?.id) {
     logME("[Handler:ElementMode] No active tab found.");
@@ -25,7 +26,7 @@ export async function handleActivateSelectElementMode(
 
   try {
     // Determine the new state
-    const result = await chrome.storage.local.get(["selectElementState"]);
+    const result = await Browser.storage.local.get(["selectElementState"]);
     const currentState = result.selectElementState || false;
     const newState =
       typeof message.data === "boolean" ? message.data : !currentState;
@@ -34,7 +35,7 @@ export async function handleActivateSelectElementMode(
       `[Handler:ElementMode] Toggling select element mode for tab ${tabId} to: ${newState}`
     );
 
-    await chrome.storage.local.set({ selectElementState: newState });
+    await Browser.storage.local.set({ selectElementState: newState });
 
     // Send message to content script, attempt injection if it fails
     let response = await safeSendMessage(tabId, {
@@ -50,7 +51,7 @@ export async function handleActivateSelectElementMode(
       );
       injectionState.inProgress = true; // Set flag via passed object reference
       try {
-        await chrome.scripting.executeScript({
+        await Browser.scripting.executeScript({
           target: { tabId },
           files: ["content.bundle.js"],
         });

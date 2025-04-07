@@ -1,4 +1,6 @@
 // src/listeners/onMessage.js
+
+import Browser from "webextension-polyfill";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { logME } from "../utils/helpers.js";
 import { translateText } from "../utils/api.js";
@@ -24,38 +26,34 @@ const errorHandler = new ErrorHandler();
 // These are defined here or imported from utils and passed to handlers
 
 async function safeSendMessage(tabId, message) {
-  // ... (implementation as before) ...
-  return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      const err = chrome.runtime.lastError;
-      if (err) {
-        if (
-          err.message !==
-            "The message port closed before a response was received." &&
-          err.message !==
-            "Could not establish connection. Receiving end does not exist."
-        ) {
-          logME("[Util:Messaging] safeSendMessage error:", err.message);
-          resolve({ error: err.message }); // Report other errors
-        } else {
-          logME(
-            "[Util:Messaging] safeSendMessage: Port closed or no receiver (ignored)."
-          );
-          // Don't resolve, let caller handle timeout or lack of response
-        }
-      } else {
-        resolve(response);
-      }
-    });
-  });
+  try {
+    const response = await Browser.tabs.sendMessage(tabId, message);
+    return response;
+  } catch (err) {
+    if (
+      err.message !==
+        "The message port closed before a response was received." &&
+      err.message !==
+        "Could not establish connection. Receiving end does not exist."
+    ) {
+      logME("[Util:Messaging] safeSendMessage error:", err.message);
+      return { error: err.message }; // Report other errors
+    } else {
+      logME(
+        "[Util:Messaging] safeSendMessage: Port closed or no receiver (ignored)."
+      );
+      // Don't resolve, let caller handle timeout or lack of response
+      return {}; // Or undefined, depending on how you want to signal this
+    }
+  }
 }
 
 let creatingOffscreen;
 async function playAudioViaOffscreen(url) {
-  // ... (implementation as before, potentially moved to src/utils/offscreen.js and imported) ...
-  const existingContexts = await chrome.runtime.getContexts({
+  // ... (implementation as before, potentially moved to src/offscreen.js and imported) ...
+  const existingContexts = await Browser.runtime.getContexts({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
-    documentUrls: [chrome.runtime.getURL("offscreen.html")],
+    documentUrls: [Browser.runtime.getURL("offscreen.html")],
   });
 
   if (existingContexts.length === 0) {
@@ -63,9 +61,9 @@ async function playAudioViaOffscreen(url) {
       await creatingOffscreen;
     } else {
       logME("[Util:Offscreen] Creating offscreen document.");
-      creatingOffscreen = chrome.offscreen.createDocument({
+      creatingOffscreen = Browser.offscreen.createDocument({
         url: "offscreen.html",
-        reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+        reasons: [Browser.offscreen.Reason.AUDIO_PLAYBACK],
         justification: "Play TTS audio from Google Translate",
       });
       try {
@@ -80,8 +78,8 @@ async function playAudioViaOffscreen(url) {
 
   logME("[Util:Offscreen] Sending message to offscreen with URL:", url);
   try {
-    // Use chrome.runtime.sendMessage without target for offscreen documents
-    const response = await chrome.runtime.sendMessage({
+    // Use Browser.runtime.sendMessage without target for offscreen documents
+    const response = await Browser.runtime.sendMessage({
       // No target needed when sending from background to offscreen
       action: "playOffscreenAudio",
       url: url,
@@ -108,7 +106,7 @@ async function playAudioViaOffscreen(url) {
         "[Util:Offscreen] Attempting to close existing offscreen documents due to connection error."
       );
       // Attempt to close the document, might fail if already gone
-      await chrome.offscreen
+      await Browser.offscreen
         .closeDocument()
         .catch((e) =>
           logME(
@@ -125,7 +123,7 @@ async function playAudioViaOffscreen(url) {
 }
 
 // --- Main Message Listener (Dispatcher) ---
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const action = message?.action || message?.type;
   logME(`[Background:onMessage] Received action: ${action}`, {
     message,
@@ -217,7 +215,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // --- Tab State Cleanup ---
-chrome.tabs.onRemoved.addListener((tabId) => {
+Browser.tabs.onRemoved.addListener((tabId) => {
   if (selectElementStates.hasOwnProperty(tabId)) {
     delete selectElementStates[tabId];
     logME(

@@ -1,3 +1,5 @@
+// src/handlers/getSelectedTextHandler.js
+import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 
 // This handler is responsible for managing the getSelectedText request
@@ -13,7 +15,7 @@ export function handleGetSelectedText(
   safeSendMessage
 ) {
   logME("[Handler:GetSelectedText] Handling getSelectedText request.");
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  Browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     // Ensure the message is from the active tab content script itself, or from the popup/action
     const isActiveTab = tabs.length > 0 && tabs[0].id;
     // Allow request from popup (sender.tab might be undefined or different) or the active tab's content script

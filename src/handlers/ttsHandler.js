@@ -1,3 +1,5 @@
+// src/handlers/ttsHandler.js
+import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import {
   detectTextLanguage,
@@ -50,7 +52,7 @@ export async function handlePlayGoogleTTS(
     }
 
     const requiredOrigin = "https://translate.google.com/*";
-    let hasPermission = await chrome.permissions.contains({
+    let hasPermission = await Browser.permissions.contains({
       origins: [requiredOrigin],
     });
 
@@ -58,9 +60,12 @@ export async function handlePlayGoogleTTS(
       logME("[Handler:TTS] Requesting permission for:", requiredOrigin);
       // Wrap request in a promise that resolves/rejects consistently
       const granted = await new Promise((resolve) => {
-        chrome.permissions.request({ origins: [requiredOrigin] }, (granted) => {
-          resolve(granted);
-        });
+        Browser.permissions.request(
+          { origins: [requiredOrigin] },
+          (granted) => {
+            resolve(granted);
+          }
+        );
       });
       if (!granted) {
         throw new Error(

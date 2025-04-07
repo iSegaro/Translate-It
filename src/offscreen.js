@@ -1,4 +1,4 @@
-// html/offscreen.js
+// src/offscreen.js
 
 // This script runs in the offscreen document and handles audio playback.
 
@@ -29,7 +29,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(() => {
         // console.log("[Offscreen] Audio playback initiated successfully.");
         // ارسال یک آبجکت به جای boolean
-        sendResponse({ success: true }); // <--- **تغییر اصلی اینجاست**
+        sendResponse({ success: true });
       })
       .catch((error) => {
         // console.error("[Offscreen] Audio playback error:", error);
@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           success: false,
           error: error.message || "Unknown playback error",
-        }); // <--- **تغییر اصلی اینجاست**
+        });
       });
     return true; // Indicate async response is needed
   }

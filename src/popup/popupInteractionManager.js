@@ -1,4 +1,5 @@
 // src/popup/popupInteractionManager.js
+import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import { Active_SelectElement } from "../utils/select_element.js";
 import { getTranslateWithSelectElementAsync } from "../config.js";
@@ -73,9 +74,10 @@ async function setupInteractionListeners() {
     logME("[PopupInteraction]: Mouse entered popup.");
   });
 
-  elements.popupContainer?.addEventListener("mouseleave", () => {
+  elements.popupContainer?.addEventListener("mouseleave", async () => {
     clearTimeout(popupMouseLeaveTimer);
-    chrome.storage.local.get(["selectElementState"], (result) => {
+    try {
+      const result = await Browser.storage.local.get(["selectElementState"]);
       if (result.selectElementState) {
         logME(
           "[PopupInteraction]: Mouse left while select mode active. Starting close timer."
@@ -89,7 +91,12 @@ async function setupInteractionListeners() {
           "[PopupInteraction]: Mouse left, but select mode inactive. Not closing."
         );
       }
-    });
+    } catch (error) {
+      console.error(
+        "[PopupInteraction]: Error getting selectElementState:",
+        error
+      );
+    }
   });
 
   // Handle general interaction (hovering over popup elements)

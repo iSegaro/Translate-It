@@ -1,4 +1,5 @@
 // src/popup/translationManager.js
+import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
 import {
@@ -19,30 +20,33 @@ function handleTranslationResponse(
     response
   );
 
-  if (chrome.runtime.lastError) {
+  if (Browser.runtime.lastError) {
     logME(
-      "[Translate]: Chrome runtime error during translation response:",
-      chrome.runtime.lastError.message
+      "[Translate]: Browser runtime error during translation response:",
+      Browser.runtime.lastError.message
     );
-    elements.translationResult.textContent = `خطا: ${chrome.runtime.lastError.message}`;
+    elements.translationResult.textContent = `خطا: ${Browser.runtime.lastError.message}`;
   } else if (response?.data?.translatedText) {
     elements.translationResult.textContent = response.data.translatedText;
+
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);
 
-    chrome.storage.local.set(
-      {
+    Browser.storage.local
+      .set({
         lastTranslation: {
           sourceText: textToTranslate,
           translatedText: response.data.translatedText,
           sourceLanguage: sourceLangCode || "auto",
           targetLanguage: targetLangCode,
         },
-      },
-      () => {
+      })
+      .then(() => {
         logME("[Translate]: Last translation saved to storage.");
-      }
-    );
+      })
+      .catch((error) => {
+        console.error("[Translate]: Error saving last translation:", error);
+      });
 
     // Optional: Update source language if 'auto' was detected and returned by background
     // This depends on your background script sending back `detectedSourceLang`
@@ -73,7 +77,7 @@ function handleTranslationResponse(
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 }
 
-function triggerTranslation() {
+async function triggerTranslation() {
   const textToTranslate = elements.sourceText.value.trim();
   const targetLangIdentifier = elements.targetLanguageInput.value.trim();
   const sourceLangIdentifier = elements.sourceLanguageInput.value.trim();
@@ -118,25 +122,22 @@ function triggerTranslation() {
   uiManager.toggleInlineToolbarVisibility(elements.translationResult); // Hide toolbar while translating
 
   try {
-    chrome.runtime.sendMessage(
-      {
-        action: "fetchTranslation",
-        payload: {
-          promptText: textToTranslate,
-          sourceLanguage: sourceLangCheck, // Send null or language code
-          targetLanguage: targetLangCodeCheck, // Send validated target code/promptName
-        },
+    const response = await Browser.runtime.sendMessage({
+      action: "fetchTranslation",
+      payload: {
+        promptText: textToTranslate,
+        sourceLanguage: sourceLangCheck, // Send null or language code
+        targetLanguage: targetLangCodeCheck, // Send validated target code/promptName
       },
-      (response) =>
-        handleTranslationResponse(
-          response,
-          textToTranslate,
-          sourceLangIdentifier,
-          targetLangIdentifier
-        )
+    });
+    handleTranslationResponse(
+      response,
+      textToTranslate,
+      sourceLangIdentifier,
+      targetLangIdentifier
     );
   } catch (error) {
-    logME("[Translate]: Synchronous error before sending message:", error);
+    logME("[Translate]: Error sending message to background:", error);
     elements.translationResult.textContent = "خطا در ارسال درخواست.";
     uiManager.toggleInlineToolbarVisibility(elements.translationResult);
   }

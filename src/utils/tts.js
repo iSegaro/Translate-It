@@ -1,5 +1,6 @@
 // src/utils/tts.js
-import { logME, delay } from "../utils/helpers.js";
+import Browser from "webextension-polyfill";
+import { logME } from "../utils/helpers.js";
 import { languageList } from "./languages.js";
 import { detectTextLanguage } from "../utils/textDetection.js";
 
@@ -59,8 +60,8 @@ export async function playAudioGoogleTTS(text, lang) {
 
   try {
     // --- بررسی و درخواست دسترسی ---
-    const hasPermission = await new Promise((resolve) => {
-      chrome.permissions.contains({ origins: [requiredOrigin] }, resolve);
+    const hasPermission = await Browser.permissions.contains({
+      origins: [requiredOrigin],
     });
 
     if (!hasPermission) {
@@ -68,7 +69,7 @@ export async function playAudioGoogleTTS(text, lang) {
         "[TTS]: Optional permission for Google TTS not granted. Requesting..."
       );
       const granted = await new Promise((resolve) => {
-        chrome.permissions.request({ origins: [requiredOrigin] }, resolve);
+        Browser.permissions.request({ origins: [requiredOrigin] }, resolve);
       });
       if (!granted) {
         const errorMessage = "دسترسی لازم برای استفاده از صدای گوگل داده نشد.";

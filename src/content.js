@@ -1,4 +1,5 @@
 // src/content.js
+import Browser from "webextension-polyfill";
 import { CONFIG, state } from "./config.js";
 import TranslationHandler from "./core/TranslationHandler.js";
 import { setupEventListeners } from "./core/EventRouter.js";
@@ -78,33 +79,16 @@ class ContentScript {
   }
 
   @logMethod
-  updateSelectElementState(newState) {
+  async updateSelectElementState(newState) {
     if (isExtensionContextValid()) {
       try {
         state.selectElementActive = newState;
-        chrome.runtime.sendMessage(
-          {
-            action: "UPDATE_SELECT_ELEMENT_STATE",
-            data: newState,
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              if (
-                !chrome.runtime.lastError.message.includes(
-                  "The message port closed before a response was received"
-                ) &&
-                !chrome.runtime.lastError.message.includes(
-                  "Could not establish connection. Receiving end does not exist"
-                )
-              ) {
-                console.debug(
-                  "[Content] Error sending message:",
-                  chrome.runtime.lastError.message
-                );
-              }
-            }
-          }
-        );
+        const response = await Browser.runtime.sendMessage({
+          action: "UPDATE_SELECT_ELEMENT_STATE",
+          data: newState,
+        });
+        // Optional: Handle response here if needed
+        // console.log("[Content] Select Element State Updated:", response);
         taggleLinks(newState);
         if (!newState && this.translationHandler.IconManager) {
           this.translationHandler.IconManager.cleanup();
@@ -128,7 +112,7 @@ class ContentScript {
   }
 
   setupMessageListener() {
-    chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
+    Browser.runtime.onMessage.addListener(this.handleMessage.bind(this));
   }
 
   @logMethod
@@ -151,9 +135,9 @@ class ContentScript {
             "info",
             true
           );
-          // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای chrome.runtime.reload()
+          // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای Browser.runtime.reload()
           setTimeout(() => {
-            chrome.runtime.reload();
+            Browser.runtime.reload();
           }, 2000);
         } else {
           logME("[Content] Received unknown message => ", message);

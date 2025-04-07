@@ -1,4 +1,5 @@
 // src/managers/NotificationManager.js
+import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { fadeOut, logME } from "../utils/helpers.js";
 
@@ -98,27 +99,32 @@ export default class NotificationManager {
   showBackgroundNotification(message, type = "info", onClick) {
     const config = this.typeMapping[type] || this.typeMapping.info;
 
-    chrome.notifications.create(
-      {
+    Browser.notifications
+      .create({
         type: "basic",
-        iconUrl: "icons/512.png",
+        iconUrl: Browser.runtime.getURL("icons/512.png"), // استفاده از getURL برای مسیر صحیح آیکون
         title: config.title,
         message: message,
         priority: config.priority,
-      },
-      (notificationId) => {
+      })
+      .then((notificationId) => {
         if (onClick) {
           const handleClick = (clickedId) => {
             if (clickedId === notificationId) {
               onClick();
-              chrome.notifications.clear(notificationId);
-              chrome.notifications.onClicked.removeListener(handleClick);
+              Browser.notifications.clear(notificationId);
+              Browser.notifications.onClicked.removeListener(handleClick);
             }
           };
-          chrome.notifications.onClicked.addListener(handleClick);
+          Browser.notifications.onClicked.addListener(handleClick);
         }
-      }
-    );
+      })
+      .catch((error) => {
+        console.error(
+          "NotificationManager: Error creating notification:",
+          error
+        );
+      });
   }
 
   show(message, type = "info", autoDismiss = true, duration = null, onClick) {

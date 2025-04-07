@@ -1,4 +1,5 @@
 // src/config.js
+import Browser from "webextension-polyfill";
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -156,42 +157,24 @@ export const getSettingsAsync = async () => {
     return settingsCache;
   }
   // Otherwise, fetch from storage
-  return new Promise((resolve) => {
-    try {
-      // Check if chrome.storage is available (it might not be in all contexts)
-      if (chrome && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(null, (items) => {
-          if (chrome.runtime.lastError) {
-            // Handle error (e.g., log it, return default CONFIG)
-            console.error("Error fetching settings:", chrome.runtime.lastError);
-            settingsCache = { ...CONFIG }; // Use defaults on error
-            resolve(settingsCache);
-          } else {
-            // Combine fetched items with defaults to ensure all keys exist
-            settingsCache = { ...CONFIG, ...items };
-            resolve(settingsCache);
-          }
-        });
-      } else {
-        // chrome.storage not available, use defaults
-        console.warn(
-          "chrome.storage.local not available, using default CONFIG."
-        );
-        settingsCache = { ...CONFIG };
-        resolve(settingsCache);
-      }
-    } catch (error) {
-      // Catch any synchronous errors during setup
-      console.error("Error accessing storage:", error);
+  return Browser.storage.local
+    .get(null)
+    .then((items) => {
+      // Combine fetched items with defaults to ensure all keys exist
+      settingsCache = { ...CONFIG, ...items };
+      return settingsCache;
+    })
+    .catch((error) => {
+      // Handle error (e.g., log it, return default CONFIG)
+      console.error("Error fetching settings:", error);
       settingsCache = { ...CONFIG }; // Use defaults on error
-      resolve(settingsCache);
-    }
-  });
+      return settingsCache;
+    });
 };
 
 // Listener to update cache when settings change in storage
-if (chrome && chrome.storage && chrome.storage.onChanged) {
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+if (Browser && Browser.storage && Browser.storage.onChanged) {
+  Browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && settingsCache) {
       let updated = false;
       Object.keys(changes).forEach((key) => {
@@ -216,7 +199,7 @@ if (chrome && chrome.storage && chrome.storage.onChanged) {
   });
 } else {
   console.warn(
-    "chrome.storage.onChanged not available. Settings cache might become stale."
+    "Browser.storage.onChanged not available. Settings cache might become stale."
   );
 }
 

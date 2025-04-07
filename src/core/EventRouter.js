@@ -1,4 +1,5 @@
 // src/core/EventRouter.js
+import Browser from "webextension-polyfill";
 import { CONFIG, state } from "../config.js";
 import { isEditable, logME, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
@@ -78,11 +79,11 @@ class EventRouter {
       state.selectElementActive = false;
 
       try {
-        await chrome.storage.local.set({ selectElementActive: false });
+        await Browser.storage.local.set({ selectElementActive: false });
       } catch (storageError) {
         await this.errorHandler.handle(storageError, {
           type: ErrorTypes.INTEGRATION,
-          context: "chrome-storage-set",
+          context: "Browser-storage-set",
         });
         return;
       }
@@ -90,7 +91,7 @@ class EventRouter {
       taggleLinks(false);
 
       try {
-        await chrome.runtime.sendMessage({
+        await Browser.runtime.sendMessage({
           action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });
@@ -129,9 +130,9 @@ class EventRouter {
           this.translationHandler.IconManager.cleanup();
         }
         state.selectElementActive = false;
-        chrome.storage.local.set({ selectElementActive: false });
+        Browser.storage.local.set({ selectElementActive: false });
 
-        chrome.runtime.sendMessage({
+        Browser.runtime.sendMessage({
           action: "UPDATE_SELECT_ELEMENT_STATE",
           data: false,
         });

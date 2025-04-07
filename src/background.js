@@ -1,9 +1,11 @@
 // src/background.js
+
 import { logME } from "./utils/helpers.js";
 
 // Import listeners to activate them
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 import "./listeners/onMessage.js"; // Listener for runtime messages
+import "./offscreen.js";
 // Potentially import other listeners like onCommand, onActionClicked etc. if needed
 
 logME("[Background] Main script loaded, listeners attached.");

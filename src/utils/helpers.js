@@ -1,4 +1,5 @@
 // src/utils/helpers.js
+import Browser from "webextension-polyfill";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { IsDebug } from "../config.js";
 
@@ -61,17 +62,17 @@ export const fadeOut = (element) => {
 
 export const isExtensionContextValid = () => {
   try {
-    return !!chrome?.runtime?.id && !!chrome?.storage?.local;
+    return !!Browser?.runtime?.id && !!Browser?.storage?.local;
   } catch (e) {
     return false;
   }
 };
 
 export const openOptionsPage = () => {
-  if (chrome.runtime.openOptionsPage) {
-    chrome.runtime.openOptionsPage();
+  if (Browser.runtime.openOptionsPage) {
+    Browser.runtime.openOptionsPage();
   } else {
-    window.open(chrome.runtime.getURL("html/options.html"));
+    window.open(Browser.runtime.getURL("html/options.html"));
   }
 };
 
@@ -127,7 +128,7 @@ const injectCSS = (filePath) => {
     if (!document.head) throw new Error("document.head not available");
 
     const linkElement = document.createElement("link");
-    linkElement.href = chrome.runtime.getURL(filePath);
+    linkElement.href = Browser.runtime.getURL(filePath);
     linkElement.rel = "stylesheet";
     document.head.appendChild(linkElement);
   } catch (error) {

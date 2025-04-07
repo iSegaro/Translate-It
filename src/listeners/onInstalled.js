@@ -1,11 +1,12 @@
 // src/listeners/onInstalled.js
+import Browser from "webextension-polyfill";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
 const errorHandler = new ErrorHandler();
 
-chrome.runtime.onInstalled.addListener((details) => {
+Browser.runtime.onInstalled.addListener((details) => {
   logME(`AI Writing Companion ${details.reason}d`);
 
   if (details.reason === "install") {
@@ -28,9 +29,17 @@ chrome.runtime.onInstalled.addListener((details) => {
       OPENROUTER_API_MODEL: CONFIG.OPENROUTER_API_MODEL,
     };
 
-    chrome.storage.local.set(defaultSettings, () => {
-      logME("[Background] Default settings initialized");
-    });
+    Browser.storage.local
+      .set(defaultSettings)
+      .then(() => {
+        logME("[Background] Default settings initialized");
+      })
+      .catch((error) => {
+        console.error(
+          "[Background] Error initializing default settings:",
+          error
+        );
+      });
   } else if (details.reason === "update") {
     (async () => {
       try {
@@ -68,9 +77,14 @@ chrome.runtime.onInstalled.addListener((details) => {
             settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL,
         };
 
-        chrome.storage.local.set(updatedSettings, () => {
-          logME("[Background] Update settings...");
-        });
+        Browser.storage.local
+          .set(updatedSettings)
+          .then(() => {
+            logME("[Background] Update settings...");
+          })
+          .catch((error) => {
+            console.error("[Background] Error updating settings:", error);
+          });
       } catch (error) {
         throw await errorHandler.handle(error, {
           type: ErrorTypes.API,
@@ -80,14 +94,19 @@ chrome.runtime.onInstalled.addListener((details) => {
     })();
 
     // ارسال پیام به content script برای اطلاع‌رسانی آپدیت
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach((tab) => {
-        if (tab.url && tab.id) {
-          chrome.tabs
-            .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
-            .catch(() => {});
-        }
+    Browser.tabs
+      .query({})
+      .then((tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.url && tab.id) {
+            Browser.tabs
+              .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
+              .catch(() => {});
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("[Background] Error querying tabs:", error);
       });
-    });
   }
 });

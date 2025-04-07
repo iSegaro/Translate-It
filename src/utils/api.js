@@ -1,4 +1,5 @@
 // src/utils/api.js
+import Browser from "webextension-polyfill";
 import {
   CONFIG,
   TRANSLATION_ERRORS,
@@ -351,7 +352,7 @@ class ApiService {
         "Content-Type": "application/json",
         Authorization: `Bearer ${openRouterApiKey}`,
         "HTTP-Referer": window.location.origin,
-        "X-Title": chrome.runtime.getManifest().name,
+        "X-Title": Browser.runtime.getManifest().name,
       },
       body: JSON.stringify({
         model: openRouterApiModel || "openai/gpt-3.5-turbo",

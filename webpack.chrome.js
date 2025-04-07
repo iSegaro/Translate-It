@@ -71,8 +71,11 @@ const chromeDistConfig = {
         },
         {
           // کپی offscreen.js
-          from: "html/offscreen.js",
+          from: "src/offscreen.js",
           to: "offscreen.js",
+        },
+        {
+          from: "node_modules/webextension-polyfill/dist/browser-polyfill.js",
         },
       ],
     }),

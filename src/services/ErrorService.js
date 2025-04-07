@@ -1,4 +1,5 @@
 // src/services/ErrorService.js
+import Browser from "webextension-polyfill";
 import { TRANSLATION_ERRORS, CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { openOptionsPage } from "../utils/helpers.js";
@@ -122,10 +123,10 @@ export class ErrorHandler {
   _contextInvalidated() {
     this.reloadScheduled = true;
     // پیام Context Invalid به کاربر نمایش داده شده؛ حالا پس از 2000 میلی‌ثانیه اکستنشن ریلود شود.
-    if (chrome.runtime && chrome.runtime.sendMessage) {
+    if (Browser.runtime && Browser.runtime.sendMessage) {
       setTimeout(() => {
         try {
-          chrome.runtime.sendMessage({ action: "restart_content_script" });
+          Browser.runtime.sendMessage({ action: "restart_content_script" });
         } catch (e) {
           if (e.message?.includes("context invalidated")) {
             // console.debug("[ErrorService] Extension context invalidated");

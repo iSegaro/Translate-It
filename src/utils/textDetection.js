@@ -1,4 +1,5 @@
 // src/utils/textDetection.js
+import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { languageList } from "./languages.js";
 
@@ -20,7 +21,7 @@ export const shouldApplyRtl = (text) => {
 
 export async function detectTextLanguage(text) {
   try {
-    const langInfo = await chrome.i18n.detectLanguage(text);
+    const langInfo = await Browser.i18n.detectLanguage(text);
     if (langInfo && langInfo.languages && langInfo.languages.length > 0) {
       // زبان با بالاترین درصد اطمینان را به عنوان زبان تشخیص داده شده در نظر می‌گیریم
       const detectedLanguage = langInfo.languages[0].language;
