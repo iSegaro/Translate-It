@@ -96,22 +96,18 @@ export async function playAudioGoogleTTS(text, lang) {
           audio.error?.message || "Unknown error"
         }`;
         // می‌توانید در اینجا به کاربر اطلاع دهید که خطایی در پخش صدا رخ داده است.
-        console.error("[TTS]: Audio playback error:", errorMessage);
+        logME("[TTS]: Audio playback error:", errorMessage);
         reject(new Error(errorMessage));
       });
       audio.play().then(resolve).catch(reject); // مدیریت Promise مربوط به play()
     });
-
-    logME("[TTS]: Google TTS playback started.");
   } catch (error) {
     logME(
       "[TTS]: Error during Google TTS operation:",
       error.name,
       error.message
     );
-    console.error("[TTS]: Full error object:", error);
     // می‌توانید در اینجا خطای کلی را به کاربر اطلاع دهید.
-    console.error("[TTS]: Google TTS Error:", error.message);
   }
 }
 

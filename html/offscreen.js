@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .play()
       .then(() => sendResponse(true))
       .catch((error) => {
-        console.error("Offscreen audio playback error:", error);
+        // console.error("Offscreen audio playback error:", error);
         sendResponse(false); // Indicate failure
       });
     return true; // Indicate async response
