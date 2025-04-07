@@ -6,7 +6,7 @@ import { getTargetLanguageAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js";
 import * as uiManager from "./uiManager.js";
 import * as clipboardManager from "./clipboardManager.js"; // To update paste button
-import { logME } from "../utils/helpers.js";
+import { logME, openOptionsPage } from "../utils/helpers.js";
 
 // Keep flags related to header actions local if possible
 let selectElementIconClicked = false;
@@ -44,7 +44,7 @@ function setupEventListeners() {
     });
   });
 
-  elements.translatePageIcon?.addEventListener("click", () => {
+  elements.translatePageLink?.addEventListener("click", () => {
     logME(
       "[HeaderActions]: Translate page icon clicked - using Google Translate tab."
     );
@@ -111,6 +111,12 @@ function setupEventListeners() {
         window.close();
       }
     });
+  });
+
+  // Event listener برای باز کردن صفحه Options
+  elements.settingsIcon?.addEventListener("click", () => {
+    logME("[Popup]: Opening options page.");
+    openOptionsPage();
   });
 
   elements.selectElementIcon?.addEventListener("click", () => {

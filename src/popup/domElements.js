@@ -35,9 +35,10 @@ export default {
   voiceTargetIcon: $("voiceTargetIcon"),
 
   // Header Toolbar Buttons
-  translatePageIcon: $("translatePageIcon"),
+  translatePageLink: $("translatePageLink"),
   selectElementIcon: $("selectElementIcon"),
   clearStorageBtn: $("clearStorageBtn"),
+  settingsIcon: $("settingsIcon"),
 
   // Popup Container
   popupContainer: document.body,

@@ -38,6 +38,11 @@ body {
   gap: 8px;
 }
 
+.toolbar-left-group {
+  display: flex;
+  gap: 8px;
+}
+
 .toolbar-icon {
   width: 20px;
   height: 20px;
@@ -48,6 +53,30 @@ body {
 
 .toolbar-icon:hover {
   opacity: 1;
+}
+
+/* استایل برای لینک های تولبار */
+.toolbar-link {
+  display: inline-flex; /* برای تراز عمودی متن */
+  align-items: center;
+  justify-content: center;
+  color: #2563c0;
+  font-size: 13px;
+  text-decoration: none; /* حذف زیرخط پیش فرض لینک */
+  padding: 4px 8px; /* کمی پدینگ برای ایجاد فضای دور متن */
+  border-radius: 4px; /* گوشه‌های گرد مشابه دکمه‌ها */
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 0.2s ease-in-out,
+    background-color 0.2s ease-in-out;
+  background-color: transparent; /* پس زمینه شفاف به صورت پیش فرض */
+  /* margin-left: auto; برای قرارگیری در سمت چپ (با توجه به flex-direction: row-reverse در header-toolbar) */
+}
+
+.toolbar-link:hover {
+  opacity: 1;
+  background-color: #e2e6ea; /* پس زمینه ملایم هنگام هاور */
 }
 
 /* بخش کنترل زبان */
