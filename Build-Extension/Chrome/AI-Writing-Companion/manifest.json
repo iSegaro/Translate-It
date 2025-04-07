@@ -4,15 +4,23 @@
   "version": "0.1.0",
   "description": "Translate Everywhere. Simply.",
   "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
     "clipboardWrite",
     "clipboardRead",
     "notifications",
+    "activeTab",
+    "scripting",
+    "offscreen",
+    "storage",
     "tts"
   ],
-  "host_permissions": ["<all_urls>"],
+  "optional_permissions": [],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://translate.google.com/*",
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*",
+    "http://localhost:6969/*"
+  ],
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -53,12 +61,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content.bundle.js", "styles/*"],
+      "resources": ["content.bundle.js", "styles/*", "icons/*", "html/*"],
       "matches": ["<all_urls>"],
       "use_dynamic_url": true
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

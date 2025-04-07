@@ -219,7 +219,7 @@ textarea:focus,
 /* استایل مخصوص تولبار متن مبدا */
 .inline-toolbar.source-toolbar {
   left: 8px; /* موقعیت از چپ */
-  right: 8px; /* گسترش تا راست (برای space-between) */
+  right: auto; /* گسترش تا راست (برای space-between) */
   width: auto;
   justify-content: space-between; /* جدا کردن گروه چپ و آیکون راست */
   /* gap حذف می شود چون space-between فاصله را تعیین می کند */
@@ -234,8 +234,8 @@ textarea:focus,
 
 /* استایل مخصوص تولبار متن مقصد (ترجمه شده) */
 .inline-toolbar.target-toolbar {
-  right: 8px; /* <<-- موقعیت از راست */
-  left: auto; /* <<-- اطمینان از عدم تداخل موقعیت چپ */
+  left: 8px; /* <<-- موقعیت از چپ */
+  right: auto; /* <<-- اطمینان از عدم تداخل موقعیت راست */
   gap: 10px; /* <<-- فاصله بین آیکون های کپی و صدا مقصد */
   /* justify-content پیش فرض (flex-start) مناسب است، آیکون ها کنار هم قرار می گیرند */
 }
@@ -259,15 +259,15 @@ textarea:focus,
 }
 
 /* چرخش آیکون صدای مقصد */
-.voice-target-icon {
-  transform: rotateY(180deg); /* Mirror کردن افقی */
-}
+/* .voice-target-icon {
+  transform: rotateY(180deg); Mirror کردن افقی
+} */
 
 /* استایل آیکون Paste */
 .paste-icon-separate {
   position: absolute;
   top: 5px; /* تنظیم فاصله از بالا */
-  left: 8px; /* <<--- تغییر از right به left برای قرارگیری در سمت چپ */
+  right: 8px; /* <<--- تغییر از right به left برای قرارگیری در سمت چپ */
   z-index: 11; /* بالاتر از textarea ولی شاید نیاز به تنظیم باشد */
   /* استایل‌های دیگر inline-icon را حفظ می‌کند: */
   width: 16px;
