@@ -10,7 +10,7 @@ module.exports = {
     ],
     background: "./src/background.js",
     options: "./src/options.js",
-    popup: "./src/popup.js",
+    popup: "./src/popup/main.js",
   },
   resolve: {
     extensions: [".js"],
