@@ -1,6 +1,6 @@
 // src/popup.js
 import { logME } from "./utils/helpers.js";
-import { Active_SelectElement } from "./utils/helpers.popup.js";
+import { Active_SelectElement } from "./utils/select_element.js";
 import { languageList } from "./utils/languages.js";
 import {
   getTargetLanguageAsync,
@@ -8,7 +8,6 @@ import {
 } from "./config.js";
 import {
   playAudioGoogleTTS,
-  playAudioWebSpeech,
   AUTO_DETECT_VALUE,
   getLanguageCode,
 } from "./utils/tts.js";
@@ -38,9 +37,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const resultContainer = translationResult.parentElement;
   const copySourceBtn = document.getElementById("copySourceBtn");
   const pasteSourceBtn = document.getElementById("pasteSourceBtn");
-  const voiceSourceIcon = document.getElementById("voiceSourceIcon"); // آیکون صدا در تولبار داخلی
+  const voiceSourceIcon = document.getElementById("voiceSourceIcon"); // آیکون صدای مبدا در تولبار داخلی
   const copyTargetBtn = document.getElementById("copyTargetBtn");
-  const voiceTargetIcon = document.getElementById("voiceTargetIcon"); // آیکون صدا در تولبار داخلی
+  const voiceTargetIcon = document.getElementById("voiceTargetIcon"); // آیکون صدای مقصد در تولبار داخلی
 
   // Header Toolbar Buttons
   const translatePageIcon = document.getElementById("translatePageIcon");
@@ -48,17 +47,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const clearStorageBtn = document.getElementById("clearStorageBtn"); // دکمه پاک کردن کلی در هدر
 
   // --- Helper Functions ---
+  /**
+   * Toggles visibility of the clear button based on input value.
+   * @param {HTMLInputElement} inputElement The language input element.
+   * @param {HTMLElement} clearButton The clear button element.
+   */
   function toggleClearButtonVisibility(inputElement, clearButton) {
     const container = inputElement.parentElement;
     if (!container) return;
     container.classList.toggle("has-value", !!inputElement.value);
   }
 
-  /**
-   * Toggles visibility of the clear button based on input value.
-   * @param {HTMLInputElement} inputElement The language input element.
-   * @param {HTMLElement} clearButton The clear button element.
-   */
   /**
    * Toggles visibility of the inline toolbar (excluding Paste button logic now)
    * based on content.
@@ -442,7 +441,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Source Language Validation
     let sourceLangCheck = getLanguagePromptName(sourceLangIdentifier);
-    if (!sourceLangCheck || sourceLangCheck === "auto") {
+    if (
+      !sourceLangCheck ||
+      sourceLangCheck === "auto" ||
+      sourceLangCheck === AUTO_DETECT_VALUE
+    ) {
       sourceLangCheck = null;
     }
     // --- End Validation ---
