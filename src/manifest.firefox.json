@@ -15,9 +15,7 @@
     "notifications",
     "activeTab",
     "scripting",
-    "offscreen",
-    "storage",
-    "tts"
+    "storage"
   ],
   "optional_permissions": [],
   "host_permissions": [
@@ -28,7 +26,7 @@
     "http://localhost:6969/*"
   ],
   "background": {
-    "service_worker": "background.bundle.js"
+    "scripts": ["background.bundle.js"]
   },
   "action": {
     "default_title": "AI Writing Companion",
@@ -68,8 +66,7 @@
   "web_accessible_resources": [
     {
       "resources": ["content.bundle.js", "styles/*", "icons/*", "html/*"],
-      "matches": ["<all_urls>"],
-      "use_dynamic_url": true
+      "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
