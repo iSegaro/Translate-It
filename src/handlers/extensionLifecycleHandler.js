@@ -1,3 +1,4 @@
+// src/handlers/extensionLifecycleHandler.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
