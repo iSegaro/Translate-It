@@ -7,7 +7,13 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 const errorHandler = new ErrorHandler();
 
 Browser.runtime.onInstalled.addListener((details) => {
-  logME(`AI Writing Companion ${details.reason}d`);
+  logME(
+    `AI Writing Companion ${details.reason}${
+      details.reason === "Install" ? " Installed!"
+      : details.reason === "Update" ? " Updated!"
+      : ""
+    }`
+  );
 
   if (details.reason === "install") {
     const defaultSettings = {
@@ -35,10 +41,7 @@ Browser.runtime.onInstalled.addListener((details) => {
         logME("[Background] Default settings initialized");
       })
       .catch((error) => {
-        console.error(
-          "[Background] Error initializing default settings:",
-          error
-        );
+        logME("[Background] Error initializing default settings:", error);
       });
   } else if (details.reason === "update") {
     (async () => {
@@ -83,7 +86,30 @@ Browser.runtime.onInstalled.addListener((details) => {
             logME("[Background] Update settings...");
           })
           .catch((error) => {
-            console.error("[Background] Error updating settings:", error);
+            logME("[Background] Error updating settings:", error);
+          });
+
+        // ارسال پیام به content script برای اطلاع‌رسانی آپدیت
+        Browser.tabs
+          .query({})
+          .then((tabs) => {
+            tabs.forEach((tab) => {
+              if (tab.url && tab.id) {
+                try {
+                  Browser.tabs
+                    .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
+                    .catch(() => {});
+                } catch (error) {
+                  logME(
+                    "[Background] Error sending EXTENSION_RELOADED message:",
+                    error
+                  );
+                }
+              }
+            });
+          })
+          .catch((error) => {
+            logME("[Background] Error querying tabs:", error);
           });
       } catch (error) {
         throw await errorHandler.handle(error, {
@@ -92,21 +118,5 @@ Browser.runtime.onInstalled.addListener((details) => {
         });
       }
     })();
-
-    // ارسال پیام به content script برای اطلاع‌رسانی آپدیت
-    Browser.tabs
-      .query({})
-      .then((tabs) => {
-        tabs.forEach((tab) => {
-          if (tab.url && tab.id) {
-            Browser.tabs
-              .sendMessage(tab.id, { type: "EXTENSION_RELOADED" })
-              .catch(() => {});
-          }
-        });
-      })
-      .catch((error) => {
-        console.error("[Background] Error querying tabs:", error);
-      });
   }
 });
