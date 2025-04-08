@@ -9,24 +9,23 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
 export function logMethod(target, propertyKey, descriptor) {
-  IsDebug().then((IsDebug) => {
-    if (IsDebug) {
-      console.log("Debug mode is enabled.");
-      const originalMethod = descriptor.value;
-      descriptor.value = async function (...args) {
+  const originalMethod = descriptor.value;
+  descriptor.value = async function (...args) {
+    try {
+      const isDebugEnabled = await IsDebug(); // منتظر بمانید تا وضعیت Debug مشخص شود
+      if (isDebugEnabled) {
         const className = target.constructor.name;
         console.debug(`[${className}.${propertyKey}]`, ...args);
-        try {
-          const result = await originalMethod.apply(this, args);
-          return result;
-        } catch (error) {
-          console.error(`[${className}.${propertyKey}] Error:`, error);
-          throw error;
-        }
-      };
-      return descriptor;
+      }
+      const result = await originalMethod.apply(this, args);
+      return result;
+    } catch (error) {
+      const className = target.constructor.name;
+      console.error(`[${className}.${propertyKey}] Error:`, error);
+      throw error;
     }
-  });
+  };
+  return descriptor;
 }
 
 export const logME = (...args) => {
