@@ -12,6 +12,7 @@ import { handleUpdateSelectElementState } from "../handlers/selectElementStatesH
 import { handlePlayGoogleTTS } from "../handlers/ttsHandler.js";
 import { handleFetchTranslation } from "../handlers/translationHandler.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
+import { playAudioGoogleTTS } from "../utils/tts.js";
 
 // --- State Management ---
 // State managed centrally here and passed to relevant handlers
@@ -50,30 +51,22 @@ async function safeSendMessage(tabId, message) {
 
 let creatingOffscreen;
 async function playAudioViaOffscreen(url) {
-  // ... (implementation as before, potentially moved to src/offscreen.js and imported) ...
-  const existingContexts = await Browser.runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-    documentUrls: [Browser.runtime.getURL("offscreen.html")],
-  });
-
-  if (existingContexts.length === 0) {
-    if (creatingOffscreen) {
-      await creatingOffscreen;
-    } else {
-      logME("[Util:Offscreen] Creating offscreen document.");
-      creatingOffscreen = Browser.offscreen.createDocument({
-        url: "offscreen.html",
-        reasons: [Browser.offscreen.Reason.AUDIO_PLAYBACK],
-        justification: "Play TTS audio from Google Translate",
-      });
-      try {
-        await creatingOffscreen;
-      } finally {
-        creatingOffscreen = null;
-      }
-    }
+  logME(
+    "[Util:Offscreen] Creating offscreen document (skipping existence check)."
+  );
+  if (creatingOffscreen) {
+    await creatingOffscreen;
   } else {
-    logME("[Util:Offscreen] Offscreen document already exists.");
+    creatingOffscreen = Browser.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [Browser.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: "Play TTS audio from Google Translate",
+    });
+    try {
+      await creatingOffscreen;
+    } finally {
+      creatingOffscreen = null;
+    }
   }
 
   logME("[Util:Offscreen] Sending message to offscreen with URL:", url);
@@ -93,6 +86,7 @@ async function playAudioViaOffscreen(url) {
     logME(
       "[Util:Offscreen] Audio playback initiated successfully via offscreen."
     );
+    return { success: true }; // Return a success response
   } catch (error) {
     logME(
       "[Util:Offscreen] Error sending message to offscreen or playing audio:",
@@ -118,7 +112,7 @@ async function playAudioViaOffscreen(url) {
     }
 
     // throw error; // Re-throw the error to be handled by the caller (e.g., TTS handler)
-    return;
+    return { error: error.message };
   }
 }
 
@@ -135,6 +129,7 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       "[Background:onMessage] Received message without action/type.",
       message
     );
+    sendResponse({ error: "Received message without action/type." });
     return false;
   }
 
@@ -168,44 +163,95 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "UPDATE_SELECT_ELEMENT_STATE":
       // Pass state object
-      return handleUpdateSelectElementState(
+      const result = handleUpdateSelectElementState(
         message,
         sender,
         selectElementStates
       );
 
+      sendResponse({ status: result });
+
+      return result; // Handler is async
+
     case "playGoogleTTS":
       // Pass dependencies
-      handlePlayGoogleTTS(
-        message,
-        sender,
-        sendResponse,
-        playAudioViaOffscreen,
-        errorHandler
-      );
-      return true; // Handler is async
-
-    case "fetchTranslation":
-      // Pass dependencies
-      handleFetchTranslation(
-        message,
-        sender,
-        sendResponse,
-        translateText,
-        errorHandler
-      );
+      try {
+        if (
+          typeof Browser !== "undefined" &&
+          Browser.runtime &&
+          Browser.runtime.getBrowserInfo
+        ) {
+          Browser.runtime
+            .getBrowserInfo()
+            .then((browserInfo) => {
+              const isFirefox = browserInfo.name.toLowerCase() === "firefox";
+              if (isFirefox) {
+                playAudioGoogleTTS(message.text, message.lang);
+              } else {
+                handlePlayGoogleTTS(
+                  message,
+                  sender,
+                  sendResponse,
+                  playAudioViaOffscreen,
+                  errorHandler
+                );
+              }
+            })
+            .catch((error) => {
+              console.error(
+                "[Background:onMessage] Error getting browser info:",
+                error
+              );
+              handlePlayGoogleTTS(
+                message,
+                sender,
+                sendResponse,
+                playAudioViaOffscreen,
+                errorHandler
+              );
+            });
+        } else if (typeof chrome !== "undefined" && chrome.runtime) {
+          // اگر Browser API در دسترس نبود، فرض می‌کنیم مرورگر کروم است
+          handlePlayGoogleTTS(
+            message,
+            sender,
+            sendResponse,
+            playAudioViaOffscreen,
+            errorHandler
+          );
+        } else {
+          console.error(
+            "[Background:onMessage] Could not determine browser API."
+          );
+          sendResponse({ error: "Could not determine browser API." });
+        }
+        return true; // Indicate asynchronous operation
+      } catch (error) {
+        console.error("[Background:onMessage] Error in playGoogleTTS:", error);
+        sendResponse({ error: error.message || "Failed to play TTS." });
+      }
       return true; // Handler is async
 
     case "activateSelectElementMode":
       // Pass dependencies, including the injectionState object
-      handleActivateSelectElementMode(
-        message,
-        sender,
-        sendResponse,
-        safeSendMessage,
-        errorHandler,
-        injectionState
-      );
+      try {
+        handleActivateSelectElementMode(
+          message,
+          sender,
+          sendResponse,
+          safeSendMessage,
+          errorHandler,
+          injectionState
+        );
+      } catch (error) {
+        console.error(
+          "[Background:onMessage] Error in activateSelectElementMode:",
+          error
+        );
+        sendResponse({
+          error: error.message || "Failed to activate select element mode.",
+        });
+      }
       return true; // Handler is async
 
     default:
