@@ -13,102 +13,99 @@ export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای 
  * @param {string} text The text to speak.
  * @param {string} lang The language code (e.g., 'en', 'fa'). Cannot be 'auto'.
  */
-export async function playAudioGoogleTTS(text, lang) {
-  // --- ورودی‌ها را بررسی کنید ---
+export async function playAudioGoogleTTS(text, lang, sendResponse) {
   if (!text || !text.trim()) {
     logME("[TTS]: No text provided to speak.");
+    sendResponse({ success: false, error: "No text provided." });
     return;
   }
 
   let targetLangCode = lang;
 
-  // --- تشخیص زبان در صورت نیاز ---
-  if (
-    !targetLangCode ||
-    targetLangCode === "auto" ||
-    targetLangCode === AUTO_DETECT_VALUE
-  ) {
-    logME("[TTS]: Attempting to auto-detect language...");
-    const detectedLangCode = await detectTextLanguage(text);
-    if (detectedLangCode) {
-      targetLangCode = detectedLangCode;
-      logME(`[TTS]: Auto-detected language: ${targetLangCode}`);
-    } else {
-      targetLangCode = "en"; // اگر تشخیص زبان ناموفق بود، به انگلیسی پیش‌فرض برمی‌گردیم
-      logME("[TTS]: Auto-detection failed, defaulting to English.");
-      // می‌توانید در اینجا به کاربر اطلاع دهید که تشخیص زبان ناموفق بوده است (مثلاً از طریق یک پیام لاگ یا یک notification اگر در UI قابل نمایش باشد).
-    }
-  } else {
-    logME(`[TTS]: Using provided language: ${targetLangCode}`);
-  }
-
-  // --- محدودیت طول متن گوگل ---
-  const maxLength = 200;
-  if (text.length > maxLength) {
-    logME(
-      `[TTS]: Text too long for Google TTS (>${maxLength} chars). Length: ${text.length}`
-    );
-    playAudioWebSpeech(text, targetLangCode); // استفاده از Web Speech API به عنوان جایگزین
-    return;
-  }
-
-  // --- ساخت URL ---
-  const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${targetLangCode}`;
-  logME("[TTS]: Requesting Google TTS URL:", url);
-
-  const requiredOrigin = "https://translate.google.com/*";
-
   try {
+    // --- تشخیص زبان در صورت نیاز ---
+    if (
+      !targetLangCode ||
+      targetLangCode === "auto" ||
+      targetLangCode === AUTO_DETECT_VALUE
+    ) {
+      logME("[TTS]: Attempting to auto-detect language...");
+      const detectedLangCode = await detectTextLanguage(text);
+      targetLangCode = detectedLangCode || "en";
+      logME(`[TTS]: Auto-detected or fallback language: ${targetLangCode}`);
+    } else {
+      logME(`[TTS]: Using provided language: ${targetLangCode}`);
+    }
+
+    // --- محدودیت طول متن گوگل ---
+    const maxLength = 200;
+    if (text.length > maxLength) {
+      logME(
+        `[TTS]: Text too long for Google TTS (>${maxLength}). Using Web Speech API.`
+      );
+      playAudioWebSpeech(text, targetLangCode);
+      sendResponse({ success: true, fallback: true }); // پاسخ موفق با fallback
+      return;
+    }
+
+    // --- ساخت URL ---
+    const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${targetLangCode}`;
+    logME("[TTS]: Requesting Google TTS URL:", url);
+
+    const requiredOrigin = "https://translate.google.com/*";
+
     // --- بررسی و درخواست دسترسی ---
     const hasPermission = await Browser.permissions.contains({
       origins: [requiredOrigin],
     });
 
     if (!hasPermission) {
-      logME(
-        "[TTS]: Optional permission for Google TTS not granted. Requesting..."
-      );
+      logME("[TTS]: Permission not granted. Requesting...");
       const granted = await new Promise((resolve) => {
         Browser.permissions.request({ origins: [requiredOrigin] }, resolve);
       });
       if (!granted) {
-        const errorMessage = "دسترسی لازم برای استفاده از صدای گوگل داده نشد.";
         logME("[TTS]: Permission denied by user.");
-        // می‌توانید در اینجا به کاربر اطلاع دهید که دسترسی رد شده است (مثلاً از طریق یک notification).
-        // console.error("[TTS]: Permission denied:", errorMessage);
+        sendResponse({
+          success: false,
+          error: "Permission denied for Google TTS.",
+        });
         return;
       }
-      logME("[TTS]: Permission granted by user.");
+      logME("[TTS]: Permission granted.");
     } else {
-      logME("[TTS]: Google TTS permission already granted.");
+      logME("[TTS]: Permission already granted.");
     }
 
     // --- پخش صدا ---
-    logME("[TTS]: Attempting to play audio...");
     const audio = new Audio(url);
     audio.crossOrigin = "anonymous"; // برای منابع خارجی لازم است
 
-    await new Promise((resolve, reject) => {
-      audio.addEventListener("ended", resolve);
-      audio.addEventListener("error", (e) => {
-        logME("[TTS]: Error during audio playback:", e);
-        // console.error("[TTS]: Audio playback error details:", audio.error);
-        const errorMessage = `خطا در پخش صدا از گوگل: ${
-          audio.error?.message || "Unknown error"
-        }`;
-        // می‌توانید در اینجا به کاربر اطلاع دهید که خطایی در پخش صدا رخ داده است.
-        logME("[TTS]: Audio playback error:", errorMessage);
-        reject(new Error(errorMessage));
-      });
-      audio.play().then(resolve).catch(reject); // مدیریت Promise مربوط به play()
+    audio.addEventListener("ended", () => {
+      logME("[TTS]: Audio playback finished.");
+      sendResponse({ success: true });
     });
+
+    audio.addEventListener("error", (e) => {
+      logME("[TTS]: Audio playback error:", e);
+      sendResponse({
+        success: false,
+        error: "Error during Google TTS playback.",
+      });
+    });
+
+    await audio.play();
+    logME("[TTS]: Audio started playing.");
   } catch (error) {
-    logME(
-      "[TTS]: Error during Google TTS operation:",
-      error.name,
-      error.message
-    );
-    // می‌توانید در اینجا خطای کلی را به کاربر اطلاع دهید.
+    logME("[TTS]: Error in playAudioGoogleTTS:", error.name, error.message);
+    try {
+      sendResponse({
+        success: false,
+        error: error.message || "Unknown error in TTS.",
+      });
+    } catch (e) {
+      logME("[TTS]: sendResponse failed (likely out of scope):", e.message);
+    }
   }
 }
 
