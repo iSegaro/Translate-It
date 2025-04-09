@@ -10,9 +10,12 @@ import { handleExtensionLifecycle } from "../handlers/extensionLifecycleHandler.
 import { handleGetSelectedText } from "../handlers/getSelectedTextHandler.js";
 import { handleUpdateSelectElementState } from "../handlers/selectElementStatesHandler.js";
 import { handlePlayGoogleTTS } from "../handlers/ttsHandler.js";
-import { handleFetchTranslation } from "../handlers/translationHandler.js";
+import {
+  handleFetchTranslation,
+  handleFetchTranslationBackground,
+} from "../handlers/translationHandler.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
-import { playAudioGoogleTTS } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE, playAudioGoogleTTS } from "../utils/tts.js";
 
 // --- State Management ---
 // State managed centrally here and passed to relevant handlers
@@ -146,32 +149,71 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         errorHandler
       );
 
+    case "BACKGROUND_RELOAD_EXTENSION":
+      logME("[Background:onMessage] Received request to reload extension.");
+      setTimeout(() => {
+        try {
+          // Browser.runtime.reload();
+        } catch (error) {
+          console.error("[Background:onMessage] Error during reload:", error);
+        }
+      }, 100); // Add a small delay
+
+      return false;
+
     case "getSelectedText":
+      logME(
+        "[Background:onMessage] Acknowledged sendSelectedTextResponse (no action)."
+      );
       // Pass dependencies
-      return handleGetSelectedText(
+      const selected_text = handleGetSelectedText(
         message,
         sender,
         sendResponse,
         safeSendMessage
       );
 
-    case "sendSelectedTextResponse":
-      logME(
-        "[Background:onMessage] Acknowledged sendSelectedTextResponse (no action)."
-      );
-      return false; // Synchronous handling (no-op)
+      sendResponse({ status: selected_text });
+      return false; // Handler is async
 
     case "UPDATE_SELECT_ELEMENT_STATE":
       // Pass state object
-      const result = handleUpdateSelectElementState(
+      const update_element = handleUpdateSelectElementState(
         message,
         sender,
         selectElementStates
       );
 
-      sendResponse({ status: result });
+      sendResponse({ status: update_element });
 
-      return result; // Handler is async
+      return false; // Indicate synchronous response
+
+    case "CONTENT_SCRIPT_WILL_RELOAD":
+      logME("[Background:onMessage] Content script is about to reload.");
+      // در اینجا می‌توانید هرگونه منطق مربوط به پاکسازی یا توقف انتظار برای پاسخ را انجام دهید
+      return false; // نیازی به ارسال پاسخ نیست
+
+    case "fetchTranslation":
+      // Pass dependencies
+      handleFetchTranslation(
+        message,
+        sender,
+        sendResponse,
+        translateText,
+        errorHandler
+      );
+      return true; // Handler is async
+
+    case "fetchTranslationBackground":
+      // Pass dependencies
+      handleFetchTranslationBackground(
+        message,
+        sender,
+        sendResponse,
+        translateText,
+        errorHandler
+      );
+      return true; // Handler is async
 
     case "playGoogleTTS":
       // Pass dependencies
@@ -186,7 +228,11 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .then((browserInfo) => {
               const isFirefox = browserInfo.name.toLowerCase() === "firefox";
               if (isFirefox) {
-                playAudioGoogleTTS(message.text, message.lang);
+                playAudioGoogleTTS(
+                  message.text,
+                  AUTO_DETECT_VALUE,
+                  sendResponse
+                );
               } else {
                 handlePlayGoogleTTS(
                   message,

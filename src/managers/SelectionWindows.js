@@ -1,8 +1,8 @@
 // src/managers/SelectionWindows.js
+import Browser from "webextension-polyfill";
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
-import { translateText } from "../utils/api.js";
 import { marked } from "marked";
 
 export default class SelectionWindows {
@@ -15,9 +15,9 @@ export default class SelectionWindows {
     this.errorHandler = new ErrorHandler();
     this.removeMouseDownListener = null; // برای نگهداری رفرنس تابع حذف لیستنر
     this.translationHandler = options.translationHandler;
-    this.translationPromise = null; // برای نگهداری promise مربوط به ترجمه
+    this.translatedText = null; // برای نگهداری متن ترجمه شده
     this.isTranslationCancelled = false; // پرچم برای مشخص کردن اینکه آیا ترجمه لغو شده است
-    this.translatingText = null; // نگهداری متنی که در حال ترجمه است
+    this.originalText = null; // نگهداری متنی که در حال ترجمه است
   }
 
   async show(selectedText, position) {
@@ -41,9 +41,11 @@ export default class SelectionWindows {
       return;
     }
 
+    this.dismiss(false); // بستن هر پنل قبلی
+
     this.isTranslationCancelled = false; // ریست کردن پرچم در هر بار نمایش
 
-    this.translatingText = selectedText; // ثبت متن در حال ترجمه
+    this.originalText = selectedText; // ثبت متن در حال ترجمه
 
     let translationMode = TranslationMode.Field; // پیش فرض حالت ترجمه کامل
 
@@ -84,24 +86,7 @@ export default class SelectionWindows {
       }
     }
 
-    this.translationPromise = translateText(selectedText, translationMode); // ذخیره promise ترجمه
-
-    this.dismiss(false); // بستن پاپ‌آپ قبلی
-
-    // *** بررسی اعتبار this.translationPromise ***
-    if (
-      !this.translationPromise ||
-      typeof this.translationPromise.then !== "function" ||
-      typeof this.translationPromise.catch !== "function"
-    ) {
-      logME(
-        "[SelectionWindows]: Invalid translationPromise:",
-        this.translationPromise
-      );
-      return;
-    }
-    // *** پایان بررسی ***
-
+    // نمایش لودینگ
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-display-temp");
 
@@ -109,39 +94,44 @@ export default class SelectionWindows {
     this.displayElement.appendChild(loadingContainer);
 
     this.applyInitialStyles(position);
-
     document.body.appendChild(this.displayElement);
     this.isVisible = true;
-
     this.animatePopupSize(loadingContainer);
 
-    this.translationPromise
-      .then((translated_text_untrimmed) => {
-        if (
-          this.isTranslationCancelled ||
-          selectedText !== this.translatingText
-        ) {
+    // ذخیره‌ی متن در حال ترجمه برای تطبیق بعدی
+    const currentText = selectedText;
+    this.originalText = currentText;
+    this.isTranslationCancelled = false;
+
+    // شروع async ترجمه
+    Browser.runtime
+      .sendMessage({
+        action: "fetchTranslationBackground",
+        payload: {
+          promptText: currentText,
+          translationMode: translationMode,
+        },
+      })
+      .then((response) => {
+        if (this.isTranslationCancelled || this.originalText !== currentText) {
+          this.dismiss(false);
           return;
         }
-        const translatedText =
-          translated_text_untrimmed ? translated_text_untrimmed.trim() : "";
-        if (translatedText) {
+
+        if (response && response.success === true) {
+          const translatedText = response.data?.translatedText?.trim() || "";
           this.transitionToTranslatedText(
             translatedText,
             loadingContainer,
-            this.translatingText
+            currentText
           );
         } else {
           this.handleEmptyTranslation(loadingContainer);
         }
       })
       .catch((error) => {
-        if (
-          !this.isTranslationCancelled &&
-          selectedText === this.translatingText
-        ) {
-          this.handleTranslationError(error, loadingContainer);
-        }
+        console.error("[SelectionWindow] Error fetching translation:", error);
+        this.handleEmptyTranslation(loadingContainer);
       });
 
     const removeHandler = (event) => {
@@ -151,7 +141,7 @@ export default class SelectionWindows {
         event.stopPropagation();
         return;
       }
-      this.cancelCurrentTranslation(); // فراخوانی متد جدید برای لغو ترجمه
+      this.cancelCurrentTranslation(); // فراخوانی متد برای لغو ترجمه
     };
 
     if (this.removeMouseDownListener) {
@@ -163,10 +153,10 @@ export default class SelectionWindows {
 
   // لغو ترجمه
   cancelCurrentTranslation() {
-    this.isTranslationCancelled = true;
-    this.translationPromise = null; // پاک کردن promise
-    this.translatingText = null; // پاک کردن متن در حال ترجمه
     this.dismiss(); // فراخوانی متد dismiss برای انجام fade out
+    this.isTranslationCancelled = true;
+    this.originalText = null; // پاک کردن متن در حال ترجمه
+    this.translatedText = null;
   }
 
   applyInitialStyles(position) {
@@ -272,57 +262,7 @@ export default class SelectionWindows {
     const icon = document.createElement("img");
     try {
       // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
-      icon.src = chrome.runtime.getURL("../icons/speaker.png");
-    } catch (e) {
-      logME("Error getting speaker icon URL:", e);
-      icon.src = "../icons/speaker.png"; // Fallback path
-    }
-    icon.alt = "خواندن متن";
-    icon.title = "خواندن متن";
-    icon.classList.add("aiwc-tts-icon"); // کلاس برای استایل دهی CSS
-    icon.style.cursor = "pointer"; // برای نشان دادن قابلیت کلیک
-
-    icon.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      logME("[SelectionWindows]: TTS icon clicked.");
-
-      // Send message to background
-      chrome.runtime.sendMessage(
-        {
-          action: "playGoogleTTS", // Define a new action
-          text: textToSpeak,
-          // Background script will get target language from storage
-        },
-        (response) => {
-          // Optional: Handle response from background
-          if (chrome.runtime.lastError) {
-            logME(
-              "[SelectionWindows]: Error sending TTS message:",
-              chrome.runtime.lastError.message
-            );
-            return;
-          }
-          if (response && !response.success) {
-            logME(
-              "[SelectionWindows]: Background script reported TTS error:",
-              response.error
-            );
-          } else if (response && response.success) {
-            logME("[SelectionWindows]: TTS playback initiated by background.");
-          }
-        }
-      );
-    });
-
-    return icon;
-  }
-
-  // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
-  createTTSIcon(textToSpeak) {
-    const icon = document.createElement("img");
-    try {
-      // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
-      icon.src = chrome.runtime.getURL("../icons/speaker.png");
+      icon.src = Browser.runtime.getURL("../icons/speaker.png");
     } catch (e) {
       logME("Error getting speaker icon URL:", e);
       icon.src = "../icons/speaker.png"; // Fallback path
@@ -338,7 +278,7 @@ export default class SelectionWindows {
       // DON'T call playAudioGoogleTTS directly
 
       // Send message to background
-      chrome.runtime.sendMessage(
+      Browser.runtime.sendMessage(
         {
           action: "playGoogleTTS", // Define a new action
           text: textToSpeak,
@@ -346,13 +286,13 @@ export default class SelectionWindows {
         },
         (response) => {
           // Optional: Handle response from background
-          if (chrome.runtime.lastError) {
+          if (Browser.runtime.lastError) {
             logME(
               "[SelectionWindows]: Error sending TTS message:",
-              chrome.runtime.lastError.message
+              Browser.runtime.lastError.message
             );
             // alert(
-            //   `خطا در ارسال درخواست صدا: ${chrome.runtime.lastError.message}`
+            //   `خطا در ارسال درخواست صدا: ${Browser.runtime.lastError.message}`
             // );
             return;
           }
@@ -439,9 +379,9 @@ export default class SelectionWindows {
     this.displayElement = null;
     this.isVisible = false;
     this.currentText = null;
-    this.translationPromise = null;
+    this.translatedText = null;
     this.isTranslationCancelled = false;
-    this.translatingText = null; // اطمینان از پاک شدن متن در حال ترجمه
+    this.originalText = null; // اطمینان از پاک شدن متن در حال ترجمه
   }
 
   applyTextDirection(element, text) {
