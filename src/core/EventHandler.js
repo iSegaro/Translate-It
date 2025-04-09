@@ -152,9 +152,29 @@ export default class EventHandler {
     return event.key === "Escape" && !event.repeat;
   }
 
+  _getSelectedTextWithDash() {
+    const selection = window.getSelection();
+    let selectedText = "";
+
+    if (selection.rangeCount > 1) {
+      for (let i = 0; i < selection.rangeCount; i++) {
+        const range = selection.getRangeAt(i);
+        selectedText += range.toString().trim();
+        if (i < selection.rangeCount - 1) {
+          // بررسی می‌کنیم که کلمه، آخرین کلمه نباشد
+          selectedText += " - \n";
+        }
+      }
+    } else {
+      selectedText = selection.toString().trim();
+    }
+
+    return selectedText.trim();
+  }
+
   @logMethod
   async handleMouseUp(event) {
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = this._getSelectedTextWithDash();
 
     // اول بررسی کنیم که آیا کلیک (mouseup) داخل پاپ‌آپ موجود رخ داده؟
     // اگر بله، هیچ کاری نکنیم (نه نمایش جدید، نه بستن).
