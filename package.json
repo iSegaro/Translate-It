@@ -5,9 +5,10 @@
   "scripts": {
     "build:chrome": "webpack --config webpack.chrome.js --mode production",
     "build:firefox": "webpack --config webpack.firefox.js --mode production",
-    "build:all": "npm run build:chrome && npm run build:firefox",
     "build": "npm run build:chrome",
+    "build:all": "npm run build:chrome && npm run build:firefox",
     "watch": "webpack --config webpack.chrome.js --watch --mode development",
+    "watch:all": "webpack --config webpack.chrome.js --watch --mode development && webpack --config webpack.firefox.js --watch --mode development",
     "watch:chrome": "webpack --config webpack.chrome.js --watch --mode development",
     "watch:firefox": "webpack --config webpack.firefox.js --watch --mode development",
     "lint": "eslint src/**/*.js",
