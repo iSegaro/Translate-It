@@ -12,7 +12,7 @@ export function logMethod(target, propertyKey, descriptor) {
   const originalMethod = descriptor.value;
   descriptor.value = async function (...args) {
     try {
-      const isDebugEnabled = await IsDebug(); // منتظر بمانید تا وضعیت Debug مشخص شود
+      const isDebugEnabled = await IsDebug();
       if (isDebugEnabled) {
         const className = target.constructor.name;
         console.debug(`[${className}.${propertyKey}]`, ...args);
