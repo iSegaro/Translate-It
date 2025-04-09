@@ -41,6 +41,13 @@ export default class NotificationManager {
         duration: 2000, // مدت زمان پیش فرض برای وضعیت
         className: "AIWritingCompanion-notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
       },
+      integrate: {
+        title: "اتصال به صفحه - ترجمه خودکار",
+        icon: CONFIG.ICON_INFO,
+        priority: 0,
+        duration: 2000, // مدت زمان پیش فرض برای وضعیت
+        className: "AIWritingCompanion-notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
+      },
       revert: {
         title: "بازگشت - ترجمه خودکار",
         icon: CONFIG.ICON_REVERT,
