@@ -76,9 +76,16 @@ export async function handlePlayGoogleTTS(
     }
 
     const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${voiceLangCode}`;
-    await playAudioViaOffscreen(ttsUrl); // Use the passed helper
+    const offscreenResult = await playAudioViaOffscreen(ttsUrl); // Await the offscreen operation
 
-    sendResponse({ success: true });
+    if (offscreenResult?.success) {
+      sendResponse({ success: true });
+    } else {
+      sendResponse({
+        success: false,
+        error: offscreenResult?.error || "Failed to play via offscreen.",
+      });
+    }
   } catch (error) {
     logME("[Handler:TTS] Error processing playGoogleTTS:", error);
     const handledError = errorHandler.handle(error, {
