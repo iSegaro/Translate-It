@@ -131,14 +131,16 @@ class ContentScript {
           message.type === "EXTENSION_RELOADED"
         ) {
           this.translationHandler.notifier.show(
-            "در حال بارگذاری مجدد...دوباره تلاش کنید",
-            "info",
+            "درحال بروزرسانی...",
+            "integrate",
             true
           );
+          // ارسال پیام به اسکریپت پس‌زمینه قبل از بارگذاری مجدد
+          Browser.runtime.sendMessage({ action: "CONTENT_SCRIPT_WILL_RELOAD" });
           // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای Browser.runtime.reload()
-          setTimeout(() => {
-            Browser.runtime.reload();
-          }, 2000);
+          // setTimeout(() => {
+          //   Browser.runtime.reload();
+          // }, 2000);
         } else {
           logME("[Content] Received unknown message => ", message);
         }
