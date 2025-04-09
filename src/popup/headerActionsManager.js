@@ -122,6 +122,7 @@ function setupEventListeners() {
   elements.settingsIcon?.addEventListener("click", () => {
     logME("[Popup]: Opening options page.");
     openOptionsPage();
+    window.close();
   });
 
   elements.selectElementIcon?.addEventListener("click", () => {
