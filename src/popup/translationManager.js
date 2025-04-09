@@ -8,6 +8,7 @@ import {
 } from "./languageManager.js"; // Use lookup from lang manager
 import { getLanguageCode } from "../utils/tts.js"; // For saving storage
 import { logME } from "../utils/helpers.js";
+import { marked } from "marked";
 
 function handleTranslationResponse(
   response,
@@ -27,7 +28,10 @@ function handleTranslationResponse(
     );
     elements.translationResult.textContent = `خطا: ${Browser.runtime.lastError.message}`;
   } else if (response?.data?.translatedText) {
-    elements.translationResult.textContent = response.data.translatedText;
+    // elements.translationResult.textContent = response.data.translatedText;
+    elements.translationResult.innerHTML = marked.parse(
+      response.data.translatedText || "(ترجمه یافت نشد)"
+    ); // نمایش پیام اگر متن خالی بود
 
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);

@@ -6,6 +6,7 @@ import { getTargetLanguageAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js"; // Use lookup
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { logME } from "../utils/helpers.js";
+import { marked } from "marked";
 
 async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
   return new Promise(async (resolve) => {
@@ -15,8 +16,9 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
       if (result.lastTranslation) {
         logME("[InitManager]: Loading last translation from storage.");
         elements.sourceText.value = result.lastTranslation.sourceText || "";
-        elements.translationResult.textContent =
-          result.lastTranslation.translatedText || "";
+        elements.translationResult.innerHTML = marked.parse(
+          result.lastTranslation.translatedText || ""
+        );
         elements.sourceLanguageInput.value =
           getLanguageDisplayValue(result.lastTranslation.sourceLanguage) ||
           AUTO_DETECT_VALUE;
@@ -32,7 +34,10 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
       }
 
       // Set target language only if needed (either not found in storage or forced)
-      if (setDefaultTargetLang && !targetLangValue) {
+      if (
+        (setDefaultTargetLang && !targetLangValue) ||
+        targetLangValue === AUTO_DETECT_VALUE
+      ) {
         try {
           const storedTargetLang = await getTargetLanguageAsync();
           targetLangValue =
