@@ -5,25 +5,15 @@
   "description": "Translate Everywhere. Simply.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "ai-writing-companion@amm1rr.com",
-      "strict_min_version": "91.0"
+      "id": "ai-writing-companion@amm1rr.com"
     }
   },
-  "permissions": [
+  "permissions": ["storage", "scripting"],
+  "optional_permissions": [
+    "tabs",
     "clipboardWrite",
     "clipboardRead",
-    "notifications",
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
-  "optional_permissions": [],
-  "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "https://translate.google.com/*",
-    "https://api.openai.com/*",
-    "https://openrouter.ai/*",
-    "http://localhost:6969/*"
+    "notifications"
   ],
   "background": {
     "scripts": ["background.bundle.js"]
@@ -65,11 +55,8 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content.bundle.js", "styles/*", "icons/*", "html/*"],
-      "matches": ["<all_urls>"]
+      "resources": ["icons/*", "styles/*", "html/*", "content.bundle.js"],
+      "matches": ["*://*/*"]
     }
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  ]
 }
