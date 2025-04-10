@@ -19,6 +19,33 @@ export const shouldApplyRtl = (text) => {
   return containsPersian(text) || isRtlText(text);
 };
 
+export const applyTextDirection = (element, text) => {
+  if (!element || !element.style) return;
+
+  const isRtl = isRtlText(text);
+  element.style.direction = isRtl ? "rtl" : "ltr";
+  element.style.textAlign = isRtl ? "right" : "left";
+};
+
+export const correctTextDirection = (element, text) => {
+  if (!element) return;
+
+  const isRtl = shouldApplyRtl(text);
+  const direction = isRtl ? "rtl" : "ltr";
+  const textAlign = isRtl ? "right" : "left";
+
+  if (element.style) {
+    element.style.direction = direction;
+    element.style.textAlign = textAlign;
+  } else {
+    // اگر style وجود نداشت، با setAttribute مقدار دهی کنیم
+    element.setAttribute(
+      "style",
+      `direction: ${direction}; text-align: ${textAlign};`
+    );
+  }
+};
+
 export async function detectTextLanguage(text) {
   try {
     const langInfo = await Browser.i18n.detectLanguage(text);

@@ -8,6 +8,7 @@ import {
 } from "./languageManager.js"; // Use lookup from lang manager
 import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js"; // For saving storage
 import { logME } from "../utils/helpers.js";
+import { correctTextDirection } from "../utils/textDetection.js";
 import { marked } from "marked";
 
 function handleTranslationResponse(
@@ -32,6 +33,11 @@ function handleTranslationResponse(
     elements.translationResult.innerHTML = marked.parse(
       response.data.translatedText || "(ترجمه یافت نشد)"
     ); // نمایش پیام اگر متن خالی بود
+
+    correctTextDirection(
+      elements.translationResult,
+      response.data.translatedText
+    );
 
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);
@@ -91,6 +97,8 @@ async function triggerTranslation() {
     logME("[Translate]: No text to translate.");
     return;
   }
+  correctTextDirection(elements.sourceText, textToTranslate);
+
   if (!targetLangIdentifier) {
     logME("[Translate]: Missing target language identifier.");
     elements.targetLanguageInput.focus();

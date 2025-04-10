@@ -5,6 +5,7 @@ import { languageList } from "../utils/languages.js";
 import { getTargetLanguageAsync, getSourceLanguageAsync } from "../config.js";
 import { AUTO_DETECT_VALUE, getLanguageCode } from "../utils/tts.js"; // getLanguageCode might be needed
 import { logME } from "../utils/helpers.js";
+import { correctTextDirection } from "../utils/textDetection.js";
 
 /** Gets the language promptName from a display name/identifier. */
 function getLanguagePromptName(langIdentifier) {
@@ -174,8 +175,13 @@ function setupEventListeners() {
       if (targetContent && targetContent !== "در حال ترجمه...") {
         elements.sourceText.value = targetContent;
         elements.translationResult.textContent = sourceContent;
+
+        correctTextDirection(elements.sourceText, targetContent);
+        correctTextDirection(elements.translationResult, sourceContent);
+
         uiManager.toggleInlineToolbarVisibility(elements.sourceText);
         uiManager.toggleInlineToolbarVisibility(elements.translationResult);
+
         document.dispatchEvent(new CustomEvent("translationSwapped"));
       }
     } else {
