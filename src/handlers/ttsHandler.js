@@ -76,8 +76,9 @@ export async function handlePlayGoogleTTS(
     }
 
     const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${voiceLangCode}`;
-    const offscreenResult = await playAudioViaOffscreen(ttsUrl); // Await the offscreen operation
 
+    // استفاده از offscreen برای پخش TTS در Chrome
+    const offscreenResult = await playAudioViaOffscreen(ttsUrl);
     if (offscreenResult?.success) {
       sendResponse({ success: true });
     } else {
@@ -98,5 +99,5 @@ export async function handlePlayGoogleTTS(
     });
     sendResponse({ success: false, error: handledError.message });
   }
-  return true; // Must return true because the function is async and uses sendResponse later
+  return true; // NEED to return
 }

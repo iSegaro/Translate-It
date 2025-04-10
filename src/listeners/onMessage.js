@@ -16,6 +16,8 @@ import {
 } from "../handlers/translationHandler.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
 import { AUTO_DETECT_VALUE, playAudioGoogleTTS } from "../utils/tts.js";
+import { playTTS } from "../backgrounds/tts-player.js";
+import { playAudioViaOffscreen } from "../backgrounds/tts-player.js";
 
 // --- State Management ---
 // State managed centrally here and passed to relevant handlers
@@ -49,73 +51,6 @@ async function safeSendMessage(tabId, message) {
       // Don't resolve, let caller handle timeout or lack of response
       return {}; // Or undefined, depending on how you want to signal this
     }
-  }
-}
-
-let creatingOffscreen;
-async function playAudioViaOffscreen(url) {
-  logME(
-    "[Util:Offscreen] Creating offscreen document (skipping existence check)."
-  );
-  if (creatingOffscreen) {
-    await creatingOffscreen;
-  } else {
-    creatingOffscreen = Browser.offscreen.createDocument({
-      url: "offscreen.html",
-      reasons: [Browser.offscreen.Reason.AUDIO_PLAYBACK],
-      justification: "Play TTS audio from Google Translate",
-    });
-    try {
-      await creatingOffscreen;
-    } finally {
-      creatingOffscreen = null;
-    }
-  }
-
-  logME("[Util:Offscreen] Sending message to offscreen with URL:", url);
-  try {
-    // Use Browser.runtime.sendMessage without target for offscreen documents
-    const response = await Browser.runtime.sendMessage({
-      // No target needed when sending from background to offscreen
-      action: "playOffscreenAudio",
-      url: url,
-    });
-    // Check the response format received from offscreen.js
-    if (!response || !response.success) {
-      throw new Error(
-        response?.error || "Offscreen document failed to play audio or respond."
-      );
-    }
-    logME(
-      "[Util:Offscreen] Audio playback initiated successfully via offscreen."
-    );
-    return { success: true }; // Return a success response
-  } catch (error) {
-    logME(
-      "[Util:Offscreen] Error sending message to offscreen or playing audio:",
-      error
-    );
-    if (
-      error.message.includes("Could not establish connection") ||
-      error.message.includes("Receiving end does not exist")
-    ) {
-      logME(
-        "[Util:Offscreen] Attempting to close existing offscreen documents due to connection error."
-      );
-      // Attempt to close the document, might fail if already gone
-      await Browser.offscreen
-        .closeDocument()
-        .catch((e) =>
-          logME(
-            "[Util:Offscreen] Error closing document (might be expected):",
-            e
-          )
-        );
-      // Rethrow a specific error? Or just the original.
-    }
-
-    // throw error; // Re-throw the error to be handled by the caller (e.g., TTS handler)
-    return { error: error.message };
   }
 }
 
@@ -187,6 +122,14 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ status: update_element });
 
       return false; // Indicate synchronous response
+
+    case "speak":
+      playTTS(message.text)
+        .then(() => sendResponse({ success: true }))
+        .catch((err) =>
+          sendResponse({ success: false, error: err.message || "TTS error" })
+        );
+      return true; // نگه داشتن listener تا ارسال پاسخ
 
     case "CONTENT_SCRIPT_WILL_RELOAD":
       logME("[Background:onMessage] Content script is about to reload.");

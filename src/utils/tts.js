@@ -13,10 +13,9 @@ export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای 
  * @param {string} text The text to speak.
  * @param {string} lang The language code (e.g., 'en', 'fa'). Cannot be 'auto'.
  */
-export async function playAudioGoogleTTS(text, lang, sendResponse) {
+export async function playAudioGoogleTTS(text, lang) {
   if (!text || !text.trim()) {
     logME("[TTS]: No text provided to speak.");
-    sendResponse({ success: false, error: "No text provided." });
     return;
   }
 
@@ -24,11 +23,7 @@ export async function playAudioGoogleTTS(text, lang, sendResponse) {
 
   try {
     // --- تشخیص زبان در صورت نیاز ---
-    if (
-      !targetLangCode ||
-      targetLangCode === "auto" ||
-      targetLangCode === AUTO_DETECT_VALUE
-    ) {
+    if (!targetLangCode || targetLangCode === AUTO_DETECT_VALUE) {
       logME("[TTS]: Attempting to auto-detect language...");
       const detectedLangCode = await detectTextLanguage(text);
       targetLangCode = detectedLangCode || "en";
@@ -44,7 +39,6 @@ export async function playAudioGoogleTTS(text, lang, sendResponse) {
         `[TTS]: Text too long for Google TTS (>${maxLength}). Using Web Speech API.`
       );
       playAudioWebSpeech(text, targetLangCode);
-      sendResponse({ success: true, fallback: true }); // پاسخ موفق با fallback
       return;
     }
 
@@ -66,10 +60,6 @@ export async function playAudioGoogleTTS(text, lang, sendResponse) {
       });
       if (!granted) {
         logME("[TTS]: Permission denied by user.");
-        sendResponse({
-          success: false,
-          error: "Permission denied for Google TTS.",
-        });
         return;
       }
       logME("[TTS]: Permission granted.");
@@ -83,15 +73,10 @@ export async function playAudioGoogleTTS(text, lang, sendResponse) {
 
     audio.addEventListener("ended", () => {
       logME("[TTS]: Audio playback finished.");
-      sendResponse({ success: true });
     });
 
     audio.addEventListener("error", (e) => {
       logME("[TTS]: Audio playback error:", e);
-      sendResponse({
-        success: false,
-        error: "Error during Google TTS playback.",
-      });
     });
 
     await audio.play();
@@ -99,10 +84,6 @@ export async function playAudioGoogleTTS(text, lang, sendResponse) {
   } catch (error) {
     logME("[TTS]: Error in playAudioGoogleTTS:", error.name, error.message);
     try {
-      sendResponse({
-        success: false,
-        error: error.message || "Unknown error in TTS.",
-      });
     } catch (e) {
       logME("[TTS]: sendResponse failed (likely out of scope):", e.message);
     }
@@ -121,7 +102,10 @@ export function playAudioWebSpeech(text, langCode) {
     return;
   }
 
-  logME(`[WebSpeech]: Playing text in lang '${langCode || "auto"}':`, text);
+  logME(
+    `[WebSpeech]: Playing text in lang '${langCode || AUTO_DETECT_VALUE}':`,
+    text
+  );
   const utterance = new SpeechSynthesisUtterance(text);
   const speechLang = getSpeechApiLangCode(langCode); // Use existing helper
 
@@ -145,8 +129,7 @@ export function playAudioWebSpeech(text, langCode) {
  * @returns {string} The speech synthesis language code ('en-US', 'fa-IR', etc.) or the original code.
  */
 export function getSpeechApiLangCode(langCode) {
-  if (!langCode || langCode === "auto" || langCode === AUTO_DETECT_VALUE)
-    return null; // Cannot speak 'auto'
+  if (!langCode || langCode === AUTO_DETECT_VALUE) return null; // Cannot speak 'auto'
   const lang = languageList.find((l) => l.code === langCode);
   return lang?.speechCode || lang?.code || null; // Prefer speechCode, fallback to code
 }
@@ -154,7 +137,7 @@ export function getSpeechApiLangCode(langCode) {
 export function getLanguageCode(langIdentifier) {
   if (!langIdentifier) return null;
   const trimmedId = langIdentifier.trim();
-  if (trimmedId === AUTO_DETECT_VALUE) return "auto";
+  if (trimmedId === AUTO_DETECT_VALUE) return AUTO_DETECT_VALUE;
   const lang = languageList.find(
     (l) =>
       l.name === trimmedId ||

@@ -1,43 +1,56 @@
 // src/popup/ttsManager.js
-import elements from "./domElements.js";
-import { playAudioGoogleTTS, getLanguageCode } from "../utils/tts.js";
+import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 
 function setupEventListeners() {
-  elements.voiceSourceIcon?.addEventListener("click", () => {
-    const text = elements.sourceText.value.trim();
-    const sourceLangIdentifier = elements.sourceLanguageInput.value;
-    const sourceLangCode = getLanguageCode(sourceLangIdentifier);
+  const voiceSourceIcon = document.querySelector("#voiceSourceIcon");
+  const voiceTargetIcon = document.querySelector("#voiceTargetIcon");
+  const sourceTextEl = document.querySelector("#sourceText");
+  const translationResultEl = document.querySelector("#translationResult");
 
+  voiceSourceIcon?.addEventListener("click", async () => {
+    const text = sourceTextEl?.value.trim();
     if (!text) {
-      elements.sourceText.focus();
+      sourceTextEl.focus();
       return;
     }
-    logME(`[TTS]: Playing source text. Lang: ${sourceLangCode || "auto"}`);
-    playAudioGoogleTTS(text, sourceLangCode); // Let playAudio handle 'auto' if necessary
+    logME("[Popup TTS]: Sending speak message for source text.");
+    try {
+      const response = await Browser.runtime.sendMessage({
+        action: "speak",
+        text: text,
+      });
+      if (response && response.success) {
+        logME("[Popup TTS]: TTS playback initiated successfully.");
+      } else {
+        logME("[Popup TTS]: TTS playback error:", response?.error);
+      }
+    } catch (error) {
+      logME("[Popup TTS]: Error sending speak message:", error);
+    }
   });
 
-  elements.voiceTargetIcon?.addEventListener("click", () => {
-    const text = elements.translationResult.textContent?.trim();
-    const targetLangIdentifier = elements.targetLanguageInput.value;
-    const targetLangCode = getLanguageCode(targetLangIdentifier);
-
+  voiceTargetIcon?.addEventListener("click", async () => {
+    const text = translationResultEl?.textContent?.trim();
     if (!text || text === "در حال ترجمه...") return;
-
-    if (!targetLangCode || targetLangCode === "auto") {
-      logME(
-        "[TTS]: Cannot play target - invalid language code:",
-        targetLangCode
-      );
-      elements.targetLanguageInput.focus();
-      return;
+    logME("[Popup TTS]: Sending speak message for target text.");
+    try {
+      const response = await Browser.runtime.sendMessage({
+        action: "speak",
+        text: text,
+      });
+      if (response && response.success) {
+        logME("[Popup TTS]: TTS playback initiated successfully.");
+      } else {
+        logME("[Popup TTS]: TTS playback error:", response?.error);
+      }
+    } catch (error) {
+      logME("[Popup TTS]: Error sending speak message:", error);
     }
-    logME(`[TTS]: Playing target text. Lang: ${targetLangCode}`);
-    playAudioGoogleTTS(text, targetLangCode);
   });
 }
 
 export function init() {
   setupEventListeners();
-  logME("[TTS]: Initialized.");
+  logME("[Popup TTS]: Initialized.");
 }

@@ -130,7 +130,7 @@ export default class SelectionWindows {
         }
       })
       .catch((error) => {
-        console.error("[SelectionWindow] Error fetching translation:", error);
+        logME("[SelectionWindow] Error fetching translation:", error);
         this.handleEmptyTranslation(loadingContainer);
       });
 
@@ -191,7 +191,7 @@ export default class SelectionWindows {
       this.displayElement.style.transform = "scale(1)";
       setTimeout(() => {
         loadingContainer.style.opacity = "1";
-      }, 100);
+      }, 150);
     });
   }
 
@@ -260,53 +260,42 @@ export default class SelectionWindows {
   // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
   createTTSIcon(textToSpeak) {
     const icon = document.createElement("img");
-    try {
-      // مسیر آیکون را نسبت به ریشه افزونه تنظیم کنید
-      icon.src = Browser.runtime.getURL("../icons/speaker.png");
-    } catch (e) {
-      logME("Error getting speaker icon URL:", e);
-      icon.src = "../icons/speaker.png"; // Fallback path
-    }
+    icon.src = Browser.runtime.getURL("../icons/speaker.png");
     icon.alt = "خواندن متن";
     icon.title = "خواندن متن";
-    icon.classList.add("aiwc-tts-icon"); // کلاس برای استایل دهی CSS
+    icon.classList.add("aiwc-tts-icon");
 
-    icon.addEventListener("click", async (event) => {
+    icon.addEventListener("click", (event) => {
       event.stopPropagation();
       logME("[SelectionWindows]: TTS icon clicked.");
-      // DON'T get targetLangCode here, background will handle it based on settings
-      // DON'T call playAudioGoogleTTS directly
 
-      // Send message to background
-      Browser.runtime.sendMessage(
-        {
-          action: "playGoogleTTS", // Define a new action
-          text: textToSpeak,
-          // Background script will get target language from storage
-        },
-        (response) => {
-          // Optional: Handle response from background
-          if (Browser.runtime.lastError) {
-            logME(
-              "[SelectionWindows]: Error sending TTS message:",
-              Browser.runtime.lastError.message
-            );
-            // alert(
-            //   `خطا در ارسال درخواست صدا: ${Browser.runtime.lastError.message}`
-            // );
-            return;
+      try {
+        Browser.runtime.sendMessage(
+          {
+            action: "playGoogleTTS",
+            text: textToSpeak,
+          },
+          (response) => {
+            if (Browser.runtime.lastError) {
+              logME(
+                "[SelectionWindows]: Error sending TTS message:",
+                Browser.runtime.lastError.message
+              );
+              return;
+            }
+            if (response && !response.success) {
+              logME(
+                "[SelectionWindows]: Background script reported TTS error:",
+                response.error
+              );
+            } else if (response && response.success) {
+              logME("[SelectionWindows]: TTS playback initiated.");
+            }
           }
-          if (response && !response.success) {
-            logME(
-              "[SelectionWindows]: Background script reported TTS error:",
-              response.error
-            );
-            // alert(`خطا در پخش صدا: ${response.error}`);
-          } else if (response && response.success) {
-            logME("[SelectionWindows]: TTS playback initiated by background.");
-          }
-        }
-      );
+        );
+      } catch (err) {
+        logME("[SelectionWindows]: Unhandled error sending TTS message:", err);
+      }
     });
 
     return icon;

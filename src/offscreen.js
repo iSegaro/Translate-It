@@ -1,49 +1,40 @@
 // src/offscreen.js
-
-// This script runs in the offscreen document and handles audio playback.
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "playOffscreenAudio") {
+  if (message.action === "playOffscreenAudio" && message.url) {
     // console.log(
-    //   "[Offscreen]: Received playOffscreenAudio message:",
+    //   "[Offscreen] Received playOffscreenAudio message with URL:",
     //   message.url
     // );
-    const audio = document.getElementById("tts-audio");
 
-    // بهتر است قبل از تنظیم src جدید، پخش قبلی (اگر وجود دارد) متوقف شود
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0; // Reset time
-    } else {
-      // console.error(
-      //   "[Offscreen]: Audio element with ID 'tts-audio' not found!"
-      // );
-      // ارسال پاسخ خطا اگر المنت پیدا نشد
-      sendResponse({ success: false, error: "Audio element not found" });
-      return false; // نیازی به باز نگه داشتن کانال نیست
-    }
+    // ایجاد یک المان audio و پخش URL Google TTS
+    const audio = new Audio(message.url);
+    audio.crossOrigin = "anonymous";
 
-    audio.src = message.url;
+    audio.addEventListener("ended", () => {
+      // console.log("[Offscreen] Audio playback finished.");
+      sendResponse({ success: true });
+    });
+
+    audio.addEventListener("error", (e) => {
+      // console.error("[Offscreen] Audio playback error:", e);
+      sendResponse({
+        success: false,
+        error: e.message || "Audio playback error",
+      });
+    });
+
     audio
       .play()
       .then(() => {
-        // console.log("[Offscreen] Audio playback initiated successfully.");
-        // ارسال یک آبجکت به جای boolean
-        sendResponse({ success: true });
+        // console.log("[Offscreen] Audio started playing.");
+        // منتظر رویدادهای ended یا error بمانیم
       })
-      .catch((error) => {
-        // console.error("[Offscreen] Audio playback error:", error);
-        // ارسال یک آبجکت با اطلاعات خطا
-        sendResponse({
-          success: false,
-          error: error.message || "Unknown playback error",
-        });
+      .catch((err) => {
+        // console.error("[Offscreen] Audio play() rejected:", err);
+        sendResponse({ success: false, error: err.message });
       });
-    return true; // Indicate async response is needed
-  }
-  // برای پیام‌های دیگر (اگر وجود داشته باشند) false برگردانید
-  // یا اصلا کاری نکنید اگر فقط همین یک action را دارید.
-  // return false;
-});
 
-console.log("[Offscreen] Script loaded and listener attached.");
+    // برگرداندن true برای نگه داشتن اتصال تا sendResponse فراخوانی شود
+    return true;
+  }
+});
