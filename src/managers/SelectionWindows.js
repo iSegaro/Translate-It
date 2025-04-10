@@ -260,7 +260,7 @@ export default class SelectionWindows {
   // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
   createTTSIcon(textToSpeak) {
     const icon = document.createElement("img");
-    icon.src = Browser.runtime.getURL("../icons/speaker.png");
+    icon.src = Browser.runtime.getURL("icons/speaker.png");
     icon.alt = "خواندن متن";
     icon.title = "خواندن متن";
     icon.classList.add("aiwc-tts-icon");
@@ -269,33 +269,21 @@ export default class SelectionWindows {
       event.stopPropagation();
       logME("[SelectionWindows]: TTS icon clicked.");
 
-      try {
-        Browser.runtime.sendMessage(
-          {
-            action: "playGoogleTTS",
-            text: textToSpeak,
-          },
-          (response) => {
-            if (Browser.runtime.lastError) {
-              logME(
-                "[SelectionWindows]: Error sending TTS message:",
-                Browser.runtime.lastError.message
-              );
-              return;
-            }
-            if (response && !response.success) {
-              logME(
-                "[SelectionWindows]: Background script reported TTS error:",
-                response.error
-              );
-            } else if (response && response.success) {
-              logME("[SelectionWindows]: TTS playback initiated.");
-            }
+      Browser.runtime
+        .sendMessage({
+          action: "playGoogleTTS",
+          text: textToSpeak,
+        })
+        .then((response) => {
+          if (response && !response.success) {
+            logME("[SelectionWindows]: TTS playback failed:", response.error);
+          } else {
+            logME("[SelectionWindows]: TTS playback initiated.");
           }
-        );
-      } catch (err) {
-        logME("[SelectionWindows]: Unhandled error sending TTS message:", err);
-      }
+        })
+        .catch((err) => {
+          logME("[SelectionWindows]: Error sending TTS message:", err);
+        });
     });
 
     return icon;
