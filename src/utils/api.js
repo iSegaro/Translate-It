@@ -71,14 +71,6 @@ class ApiService {
     try {
       const response = await fetch(url, fetchOptions);
 
-      // logME("API Response (Raw):", {
-      //   status: response.status,
-      //   statusText: response.statusText,
-      //   headers: Object.fromEntries(response.headers.entries()),
-      //   ok: response.ok,
-      //   url: response.url,
-      // });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage =
@@ -87,9 +79,11 @@ class ApiService {
         error.statusCode = response.status;
         error.type = ErrorTypes.API;
         // مدیریت خطای خاص session در WebAI
+
         if (response.status === 409) {
           error.sessionConflict = true;
         }
+
         await this.errorHandler.handle(error, {
           type: error.type,
           statusCode: response.status,
@@ -97,6 +91,7 @@ class ApiService {
         });
         return;
       }
+
       const data = await response.json();
       const result = extractResponse(data, response.status);
       if (result === undefined) {
@@ -108,14 +103,20 @@ class ApiService {
         });
         return;
       }
+
       return result;
     } catch (error) {
       error = await ErrorHandler.processError(error);
+
+      const isNetworkError =
+        error instanceof TypeError || error.message.includes("NetworkError");
+
       await this.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.API,
-        statusCode: error.statusCode || 500,
+        type: error.type || ErrorTypes.NETWORK,
+        statusCode: isNetworkError ? 0 : error.statusCode || 500,
         context,
       });
+
       return;
     }
   }
