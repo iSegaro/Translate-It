@@ -347,3 +347,58 @@ textarea:focus,
 body.selecting-element {
   cursor: crosshair; /* یا هر نشانگر دیگری که مناسب است */
 }
+
+/* ==========================================================================
+         Markdown Styles
+    
+         استایل‌های Markdown برای متن ترجمه شده
+         ========================================================================== */
+.result {
+  background-color: #f8f9fa;
+  min-height: 60px;
+  padding: 10px !important;
+  white-space: normal !important; /* این مهمه برای Markdown */
+  word-wrap: break-word;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.4 !important;
+}
+
+/* Markdown کلاس */
+.aiwc-popup-markdown {
+  padding: 0 !important; /* چون پدر (result) داره padding می‌ده */
+  margin: 0 !important;
+}
+
+/* تگ‌های پایه */
+.aiwc-popup-markdown p,
+.aiwc-popup-markdown ul,
+.aiwc-popup-markdown ol {
+  margin: 0.2em 0 !important;
+  padding: 0 !important;
+}
+
+/* آیتم‌های لیست */
+.aiwc-popup-markdown li {
+  margin: 0.15em 0 !important;
+  padding-inline-start: 0.4em !important;
+}
+
+/* کدهای درون متن */
+.aiwc-popup-markdown code {
+  padding: 0.1em 0.3em !important;
+  background: #f0f0f0 !important;
+  border-radius: 3px;
+  font-size: 12px !important;
+}
+
+/* بلوک‌های کد */
+.aiwc-popup-markdown pre {
+  background: #eee !important;
+  padding: 6px 8px !important;
+  font-size: 12px !important;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.3em 0 !important;
+}
