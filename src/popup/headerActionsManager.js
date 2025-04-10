@@ -63,7 +63,7 @@ function setupEventListeners() {
     let targetLangCode = getLanguageCode(targetLangIdentifier); // تبدیل نام نمایشی به کد زبان (مثلاً 'fa')
 
     // 2. اعتبارسنجی زبان مقصد
-    if (!targetLangCode || targetLangCode === "auto") {
+    if (!targetLangCode || targetLangCode === AUTO_DETECT_VALUE) {
       logME(
         `[HeaderActions]: Invalid target language for page translation: '${targetLangIdentifier}'. Defaulting to 'en'.`
       );

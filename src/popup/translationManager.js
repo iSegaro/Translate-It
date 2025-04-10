@@ -6,7 +6,7 @@ import {
   getLanguagePromptName,
   getLanguageDisplayValue,
 } from "./languageManager.js"; // Use lookup from lang manager
-import { getLanguageCode } from "../utils/tts.js"; // For saving storage
+import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js"; // For saving storage
 import { logME } from "../utils/helpers.js";
 import { marked } from "marked";
 
@@ -41,7 +41,7 @@ function handleTranslationResponse(
         lastTranslation: {
           sourceText: textToTranslate,
           translatedText: response.data.translatedText,
-          sourceLanguage: sourceLangCode || "auto",
+          sourceLanguage: sourceLangCode || AUTO_DETECT_VALUE,
           targetLanguage: targetLangCode,
         },
       })
@@ -56,7 +56,7 @@ function handleTranslationResponse(
     // This depends on your background script sending back `detectedSourceLang`
     if (
       response.data.detectedSourceLang &&
-      (sourceLangCode === "auto" || !sourceLangCode)
+      (sourceLangCode === AUTO_DETECT_VALUE || !sourceLangCode)
     ) {
       const detectedDisplay = getLanguageDisplayValue(
         response.data.detectedSourceLang
@@ -103,7 +103,7 @@ async function triggerTranslation() {
   }
 
   const targetLangCodeCheck = getLanguagePromptName(targetLangIdentifier); // Use lookup
-  if (!targetLangCodeCheck || targetLangCodeCheck === "auto") {
+  if (!targetLangCodeCheck || targetLangCodeCheck === AUTO_DETECT_VALUE) {
     logME(
       "[Translate]: Invalid target language selected:",
       targetLangIdentifier
@@ -118,7 +118,7 @@ async function triggerTranslation() {
   }
 
   let sourceLangCheck = getLanguagePromptName(sourceLangIdentifier); // Use lookup
-  if (!sourceLangCheck || sourceLangCheck === "auto") {
+  if (!sourceLangCheck || sourceLangCheck === AUTO_DETECT_VALUE) {
     sourceLangCheck = null; // Send null for auto-detect to background
   }
 

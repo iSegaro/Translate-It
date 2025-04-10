@@ -2,7 +2,7 @@
 import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
 import { languageList } from "../utils/languages.js";
-import { getTargetLanguageAsync } from "../config.js";
+import { getTargetLanguageAsync, getSourceLanguageAsync } from "../config.js";
 import { AUTO_DETECT_VALUE, getLanguageCode } from "../utils/tts.js"; // getLanguageCode might be needed
 import { logME } from "../utils/helpers.js";
 
@@ -10,7 +10,7 @@ import { logME } from "../utils/helpers.js";
 function getLanguagePromptName(langIdentifier) {
   if (!langIdentifier) return null;
   const trimmedIdentifier = langIdentifier.trim();
-  if (trimmedIdentifier === AUTO_DETECT_VALUE) return "auto";
+  if (trimmedIdentifier === AUTO_DETECT_VALUE) return AUTO_DETECT_VALUE;
   const lang = languageList.find(
     (l) => l.name === trimmedIdentifier || l.promptName === trimmedIdentifier
   );
@@ -19,7 +19,8 @@ function getLanguagePromptName(langIdentifier) {
 
 /** Gets the display value (promptName or name) for a language identifier. */
 export function getLanguageDisplayValue(langIdentifier) {
-  if (!langIdentifier || langIdentifier === "auto") return AUTO_DETECT_VALUE;
+  if (!langIdentifier || langIdentifier === AUTO_DETECT_VALUE)
+    return AUTO_DETECT_VALUE;
   const lang = languageList.find(
     (l) =>
       l.code === langIdentifier ||
@@ -35,7 +36,7 @@ function populateLists() {
     optionSource.value = lang.promptName || lang.name;
     elements.sourceLanguagesList?.appendChild(optionSource);
 
-    if (lang.code !== "auto") {
+    if (lang.code !== AUTO_DETECT_VALUE) {
       const optionTarget = document.createElement("option");
       optionTarget.value = lang.promptName || lang.name;
       elements.targetLanguagesList?.appendChild(optionTarget);
@@ -119,20 +120,45 @@ function setupEventListeners() {
     )
   );
 
-  elements.swapLanguagesBtn?.addEventListener("click", () => {
-    const sourceVal = elements.sourceLanguageInput.value;
-    const targetVal = elements.targetLanguageInput.value;
-    const sourceCode = getLanguageCode(sourceVal);
-    const targetCode = getLanguageCode(targetVal);
+  elements.swapLanguagesBtn?.addEventListener("click", async () => {
+    let sourceVal = elements.sourceLanguageInput.value;
+    let targetVal = elements.targetLanguageInput.value;
 
-    if (
-      sourceCode &&
-      sourceCode !== "auto" &&
-      targetCode &&
-      targetCode !== "auto"
-    ) {
-      elements.sourceLanguageInput.value = targetVal;
-      elements.targetLanguageInput.value = sourceVal;
+    let sourceCode = getLanguageCode(sourceVal);
+    let targetCode = getLanguageCode(targetVal);
+
+    let resolvedSourceCode = sourceCode;
+    let resolvedTargetCode = targetCode;
+
+    if (sourceCode === AUTO_DETECT_VALUE) {
+      try {
+        resolvedSourceCode = await getSourceLanguageAsync();
+      } catch (err) {
+        logME(
+          "[LangManager]: Failed to load source language from settings",
+          err
+        );
+      }
+    }
+
+    if (targetCode === AUTO_DETECT_VALUE) {
+      try {
+        resolvedTargetCode = await getTargetLanguageAsync();
+      } catch (err) {
+        logME(
+          "[LangManager]: Failed to load target language from settings",
+          err
+        );
+      }
+    }
+
+    if (resolvedSourceCode && resolvedTargetCode) {
+      const sourceDisplay = getLanguageDisplayValue(resolvedTargetCode); // وارد Source میشه
+      const targetDisplay = getLanguageDisplayValue(resolvedSourceCode); // وارد Target میشه
+
+      elements.sourceLanguageInput.value = sourceDisplay || targetVal;
+      elements.targetLanguageInput.value = targetDisplay || sourceVal;
+
       uiManager.toggleClearButtonVisibility(
         elements.sourceLanguageInput,
         elements.clearSourceLanguage
@@ -144,12 +170,12 @@ function setupEventListeners() {
 
       const sourceContent = elements.sourceText.value;
       const targetContent = elements.translationResult.textContent;
+
       if (targetContent && targetContent !== "در حال ترجمه...") {
         elements.sourceText.value = targetContent;
         elements.translationResult.textContent = sourceContent;
         uiManager.toggleInlineToolbarVisibility(elements.sourceText);
         uiManager.toggleInlineToolbarVisibility(elements.translationResult);
-        // Notify clipboard manager to re-check paste button visibility
         document.dispatchEvent(new CustomEvent("translationSwapped"));
       }
     } else {
@@ -158,7 +184,7 @@ function setupEventListeners() {
         targetCode,
       });
       if (elements.swapLanguagesBtn) {
-        uiManager.showVisualFeedback(elements.swapLanguagesBtn, "error", 500); // Example feedback
+        uiManager.showVisualFeedback(elements.swapLanguagesBtn, "error", 500);
       }
     }
   });
