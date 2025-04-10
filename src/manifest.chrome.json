@@ -3,23 +3,13 @@
   "name": "AI Writing Companion",
   "version": "0.1.0",
   "description": "Translate Everywhere. Simply.",
-  "permissions": [
+  "permissions": ["scripting", "storage", "tts"],
+  "optional_permissions": [
+    "tabs",
     "clipboardWrite",
     "clipboardRead",
     "notifications",
-    "activeTab",
-    "scripting",
-    "offscreen",
-    "storage",
-    "tts"
-  ],
-  "optional_permissions": [],
-  "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "https://translate.google.com/*",
-    "https://api.openai.com/*",
-    "https://openrouter.ai/*",
-    "http://localhost:6969/*"
+    "offscreen"
   ],
   "background": {
     "service_worker": "background.bundle.js"
