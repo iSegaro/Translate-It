@@ -356,7 +356,6 @@ body.selecting-element {
 .result {
   background-color: #f8f9fa;
   min-height: 60px;
-  padding: 10px !important;
   white-space: normal !important; /* این مهمه برای Markdown */
   word-wrap: break-word;
   overflow-y: auto;
@@ -366,7 +365,7 @@ body.selecting-element {
 
 /* Markdown کلاس */
 .aiwc-popup-markdown {
-  padding: 0 !important; /* چون پدر (result) داره padding می‌ده */
+  padding-top: 26px !important;
   margin: 0 !important;
 }
 
