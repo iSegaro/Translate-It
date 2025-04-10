@@ -22,6 +22,66 @@ import {
 import EventHandler from "./EventHandler.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 
+/**
+ * Handles translation requests from content script in a CSP-safe background context.
+ * Used by SelectionWindows and Select Element handlers.
+ *
+ * @param {object} message - Message sent from content script.
+ * @param {object} sender - Sender object from the runtime.onMessage listener.
+ * @param {function} sendResponse - Function to send the result back.
+ * @param {function} translateText - Translation method from api.js
+ * @param {ErrorHandler} errorHandler - Centralized error handler instance
+ */
+export async function handleFetchTranslationBackground(
+  message,
+  sender,
+  sendResponse,
+  translateText,
+  errorHandler
+) {
+  try {
+    const { promptText, translationMode, sourceLang, targetLang } =
+      message.payload || {};
+
+    if (!promptText || typeof promptText !== "string") {
+      throw new Error("Invalid or missing promptText.");
+    }
+
+    const translated = await translateText(
+      promptText,
+      translationMode,
+      sourceLang,
+      targetLang
+    );
+
+    if (!translated) {
+      sendResponse({
+        success: false,
+        error: "Empty or null translation received.",
+      });
+      return;
+    }
+
+    sendResponse({
+      success: true,
+      data: {
+        translatedText: translated,
+      },
+    });
+  } catch (error) {
+    const processedError = await ErrorHandler.processError(error);
+    await errorHandler.handle(processedError, {
+      type: processedError.type || ErrorTypes.SERVICE,
+      context: "handler-fetchTranslationBackground",
+    });
+
+    sendResponse({
+      success: false,
+      error: processedError.message || "Translation failed.",
+    });
+  }
+}
+
 export default class TranslationHandler {
   constructor() {
     // ابتدا notifier را ایجاد می‌کنیم تا برای ErrorHandler موجود باشد
