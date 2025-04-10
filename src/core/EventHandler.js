@@ -1,4 +1,5 @@
 // src/core/EventHandler.js
+import Browser from "webextension-polyfill";
 import {
   getTranslateOnTextFieldsAsync,
   getEnableShortcutForTextFieldsAsync,
@@ -358,21 +359,13 @@ export default class EventHandler {
   @logMethod
   async handleSelect_ElementClick(e) {
     const currentPlatform = detectPlatform();
-    switch (currentPlatform) {
-      case Platform.Twitter:
-        logME("You are on Twitter!");
-        break;
-      case Platform.WhatsApp:
-        logME("You are on WhatsApp!");
-        break;
-      default:
-        logME(`You are on ${currentPlatform}.`);
-    }
+    logME(`You are on ${currentPlatform}.`);
 
     const targetElement = e.target;
     const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
 
-    if (originalTextsMap.size === 0) return;
+    if (originalTextsMap.size === 0)
+      return { status: "empty", reason: "no_text_found" };
 
     const { textsToTranslate, cachedTranslations } =
       separateCachedAndNewTexts(originalTextsMap);
@@ -383,11 +376,16 @@ export default class EventHandler {
         IconManager: this.IconManager,
       });
       this.notifier.show("حافظه", "info", true, 2000, () => this.cleanCache());
-
-      return;
+      return {
+        status: "success",
+        source: "cache",
+        translatedCount: cachedTranslations.size,
+      };
     }
 
-    if (textsToTranslate.length === 0) return;
+    if (textsToTranslate.length === 0) {
+      return { status: "skip", reason: "no_new_texts" };
+    }
 
     let statusNotification = null;
     try {
@@ -398,15 +396,12 @@ export default class EventHandler {
       );
       state.translateMode = TranslationMode.SelectElement;
 
-      // --- مرحله 2: گسترش متن‌ها و ایجاد نگاشت ---
       const { expandedTexts, originMapping, originalToExpandedIndices } =
         expandTextsForTranslation(textsToTranslate);
 
-      // مرحله 3: ساخت JSON با متن‌های گسترش‌یافته
       const jsonPayloadArray = expandedTexts.map((text) => ({ text }));
       const jsonFormatString = JSON.stringify(jsonPayloadArray);
 
-      // --- مرحله 4: اندازه گیری حجم بار JSON ---
       const maxPayloadSize = 20000;
       if (jsonFormatString.length > maxPayloadSize) {
         this.notifier.show(
@@ -415,20 +410,25 @@ export default class EventHandler {
           true,
           3000
         );
-        return; // از ادامه کار خارج شو
+        return {
+          status: "error",
+          reason: "payload_too_large",
+          size: jsonFormatString.length,
+        };
       }
-      // --- پایان مرحله 4 ---
 
-      // ارسال به سرویس ترجمه
-      const translatedJsonString = await translateText(
-        jsonFormatString,
-        TranslationMode.SelectElement
-      );
+      const response = await Browser.runtime.sendMessage({
+        action: "fetchTranslationBackground",
+        payload: {
+          promptText: jsonFormatString,
+          translationMode: TranslationMode.SelectElement,
+        },
+      });
 
-      if (statusNotification) {
-        this.notifier.dismiss(statusNotification);
-        statusNotification = null;
-      }
+      const translatedJsonString = response?.data?.translatedText;
+
+      this.notifier.dismiss(statusNotification);
+      statusNotification = null;
 
       if (translatedJsonString && typeof translatedJsonString === "string") {
         const translatedData = parseAndCleanTranslationResponse(
@@ -436,11 +436,9 @@ export default class EventHandler {
           this.translationHandler
         );
 
-        if (!translatedData) {
-          return;
-        }
+        if (!translatedData)
+          return { status: "error", reason: "invalid_response" };
 
-        // --- مرحله 5: بررسی و مدیریت عدم تطابق طول ---
         const isLengthMismatch = handleTranslationLengthMismatch(
           translatedData,
           expandedTexts
@@ -450,50 +448,37 @@ export default class EventHandler {
           this.notifier.show(" دوباره امتحان کنید", "info", true, 1500);
         }
 
-        try {
-          // --- مرحله 6: بازسازی ترجمه‌ها ---
-          const newTranslations = reassembleTranslations(
-            translatedData,
-            expandedTexts,
-            originMapping,
-            textsToTranslate,
-            cachedTranslations
-          );
+        const newTranslations = reassembleTranslations(
+          translatedData,
+          expandedTexts,
+          originMapping,
+          textsToTranslate,
+          cachedTranslations
+        );
 
-          // مرحله 7: ترکیب و اعمال ترجمه‌ها
-          const allTranslations = new Map([
-            ...cachedTranslations,
-            ...newTranslations,
-          ]);
+        const allTranslations = new Map([
+          ...cachedTranslations,
+          ...newTranslations,
+        ]);
 
-          applyTranslationsToNodes(textNodes, allTranslations, {
-            state,
-            IconManager: this.IconManager,
-          });
-          // this.notifier.show("ترجمه شد", "success", true, 1500); // اعلان موفقیت
-        } catch (parseOrProcessError) {
-          // خطاهای مربوط به پارس JSON یا بازسازی ترجمه‌ها
-          logME("خطا در پارس JSON یا پردازش ترجمه‌ها:", parseOrProcessError);
-          logME("رشته خام پاسخ:", translatedJsonString);
-          await this.translationHandler.errorHandler.handle(
-            parseOrProcessError,
-            {
-              type: ErrorTypes.PARSE_SELECT_ELEMENT,
-              context: "EventHandler-handleSelect-JSONParseOrProcessError",
-              details: `Failed to process API response. Raw snippet: ${translatedJsonString.substring(
-                0,
-                150
-              )}...`,
-            }
-          );
-          this.notifier.show("خطا در پردازش پاسخ", "error", true, 2000);
-        }
+        applyTranslationsToNodes(textNodes, allTranslations, {
+          state,
+          IconManager: this.IconManager,
+        });
+
+        return {
+          status: "success",
+          source: "translated",
+          translatedCount: newTranslations.size,
+          fromCache: cachedTranslations.size,
+        };
       } else {
-        // ... (مدیریت پاسخ null یا غیر رشته‌ای) ...
-        logME("ترجمه یک رشته معتبر برنگرداند:", translatedJsonString);
         if (translatedJsonString === null) {
           this.notifier.show("زبان مبدا و مقصد یکسان است.", "info", true, 2000);
+          return { status: "skip", reason: "same_language" };
         }
+
+        return { status: "error", reason: "invalid_translation_type" };
       }
     } catch (error) {
       error = await ErrorHandler.processError(error);
@@ -502,6 +487,7 @@ export default class EventHandler {
         statusCode: error.statusCode,
         context: "EventHandler-handleSelect_ElementClick",
       });
+      return { status: "error", reason: "exception", message: error.message };
     } finally {
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
