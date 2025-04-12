@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "description": "__MSG_description__",
   "default_locale": "fa",
-  "permissions": ["scripting", "storage", "tts", "offscreen"],
-  "optional_permissions": [
+  "permissions": [
+    "scripting",
+    "storage",
+    "tts",
+    "offscreen",
     "tabs",
     "clipboardWrite",
     "clipboardRead",

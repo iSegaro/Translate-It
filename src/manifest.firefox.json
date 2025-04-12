@@ -9,11 +9,12 @@
       "id": "ai-writing-companion@amm1rr.com"
     }
   },
-  "permissions": ["storage", "scripting"],
-  "optional_permissions": [
-    "tabs",
+  "permissions": [
+    "storage",
+    "scripting",
     "clipboardWrite",
     "clipboardRead",
+    "tabs",
     "notifications"
   ],
   "background": {
