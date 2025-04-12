@@ -38,11 +38,48 @@ export const logME = (...args) => {
 };
 
 export const isEditable = (element) => {
-  return (
-    element?.isContentEditable ||
-    ["INPUT", "TEXTAREA"].includes(element?.tagName) ||
-    (element?.closest && element.closest('[contenteditable="true"]'))
-  );
+  // اگر element دارای isContentEditable باشد یا از نوع contenteditable باشد
+  if (element?.isContentEditable) return true;
+
+  // اگر تگ آن TEXTAREA است، فیلد متنی است
+  if (element?.tagName === "TEXTAREA") return true;
+
+  // اگر تگ INPUT است، بررسی کنید که نوع آن یکی از انواع متنی مجاز باشد
+  if (element?.tagName === "INPUT") {
+    // گرفتن مقدار type به صورت کوچک (در صورت عدم وجود، فرض بر "text" می‌شود)
+    const inputType = element.getAttribute("type")?.toLowerCase() || "text";
+    // فقط نوع‌های زیر به عنوان فیلد متنی در نظر گرفته می‌شوند
+    return ["text", "search"].includes(inputType);
+  }
+
+  // اگر المان در داخل یک المان دارای contenteditable قرار دارد
+  if (element?.closest && element.closest('[contenteditable="true"]'))
+    return true;
+
+  return false;
+};
+
+export const Is_Element_Need_to_RTL_Localize = (element) => {
+  // اگر element دارای isContentEditable باشد یا به صورت contenteditable باشد
+  if (element?.isContentEditable) return true;
+
+  // اگر تگ آن TEXTAREA است
+  if (element?.tagName === "TEXTAREA") return true;
+
+  // اگر تگ آن INPUT است، بررسی کنید نوع آن آیا متنی یا checkbox هست
+  if (element?.tagName === "INPUT") {
+    const inputType = element.getAttribute("type")?.toLowerCase() || "text";
+    return ["text", "checkbox"].includes(inputType);
+  }
+
+  // اگر تگ المان H2، LABEL یا SPAN است، true برگردانید
+  if (["H2", "LABEL", "SPAN"].includes(element?.tagName)) return true;
+
+  // اگر المان در داخل یک المان دارای contenteditable قرار دارد
+  if (element?.closest && element.closest('[contenteditable="true"]'))
+    return true;
+
+  return false;
 };
 
 export const fadeOut = (element) => {
