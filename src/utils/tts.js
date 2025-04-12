@@ -13,25 +13,35 @@ export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای 
  * @param {string} text The text to speak.
  * @param {string} lang The language code (e.g., 'en', 'fa'). Cannot be 'auto'.
  */
-export async function playAudioGoogleTTS(text, lang) {
+export function playAudioGoogleTTS(text, lang) {
   const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(
     text
   )}&tl=${lang}`;
 
-  // روش پخش ساده:
-  return new Promise((resolve, reject) => {
-    const audio = new Audio(ttsUrl);
-    audio.crossOrigin = "anonymous";
+  const audio = new Audio(ttsUrl);
+  audio.crossOrigin = "anonymous";
 
+  // برای اینکه هنگام پخش با .then بتوانیم متوجه اتمام شویم
+  const playbackPromise = new Promise((resolve, reject) => {
     audio.addEventListener("ended", () => {
       resolve({ success: true });
     });
     audio.addEventListener("error", (e) => {
       reject(e);
     });
-
-    audio.play().catch((err) => reject(err));
   });
+
+  // آغاز پخش
+  audio.play().catch((err) => {
+    // اگر play() خطا داد:
+    return Promise.reject(err);
+  });
+
+  // برگرداندن هم Audio و هم Promise
+  return {
+    audio,
+    playbackPromise,
+  };
 }
 
 /**

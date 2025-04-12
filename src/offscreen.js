@@ -1,40 +1,46 @@
 // src/offscreen.js
+
+let currentAudio = null;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "playOffscreenAudio" && message.url) {
-    // console.log(
-    //   "[Offscreen] Received playOffscreenAudio message with URL:",
-    //   message.url
-    // );
+    // اگر صدایی در حال پخش است، اول متوقفش کنیم
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+    }
 
-    // ایجاد یک المان audio و پخش URL Google TTS
-    const audio = new Audio(message.url);
-    audio.crossOrigin = "anonymous";
+    currentAudio = new Audio(message.url);
+    currentAudio.crossOrigin = "anonymous";
 
-    audio.addEventListener("ended", () => {
-      // console.log("[Offscreen] Audio playback finished.");
+    currentAudio.addEventListener("ended", () => {
       sendResponse({ success: true });
+      currentAudio = null;
     });
 
-    audio.addEventListener("error", (e) => {
-      // console.error("[Offscreen] Audio playback error:", e);
+    currentAudio.addEventListener("error", (e) => {
       sendResponse({
         success: false,
         error: e.message || "Audio playback error",
       });
+      currentAudio = null;
     });
 
-    audio
-      .play()
-      .then(() => {
-        // console.log("[Offscreen] Audio started playing.");
-        // منتظر رویدادهای ended یا error بمانیم
-      })
-      .catch((err) => {
-        // console.error("[Offscreen] Audio play() rejected:", err);
-        sendResponse({ success: false, error: err.message });
-      });
+    currentAudio.play().catch((err) => {
+      sendResponse({ success: false, error: err.message });
+      currentAudio = null;
+    });
 
-    // برگرداندن true برای نگه داشتن اتصال تا sendResponse فراخوانی شود
+    return true; // keep async channel open
+  } else if (message.action === "stopOffscreenAudio") {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      currentAudio = null;
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, error: "No offscreen audio playing" });
+    }
     return true;
   }
 });

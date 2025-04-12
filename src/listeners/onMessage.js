@@ -20,7 +20,7 @@ import {
   playAudioGoogleTTS,
   playAudioViaOffscreen,
 } from "../utils/tts.js";
-import { playTTS } from "../backgrounds/tts-player.js";
+import { playTTS, stopTTS } from "../backgrounds/tts-player.js";
 
 // --- State Management ---
 // State managed centrally here and passed to relevant handlers
@@ -56,6 +56,20 @@ async function safeSendMessage(tabId, message) {
     }
   }
 }
+
+// Popup
+Browser.runtime.onConnect.addListener((port) => {
+  if (port.name === "popup") {
+    console.log("Popup connected");
+
+    // هنگامی که Popup بسته شد، رویداد disconnect اجرا می‌شود
+    port.onDisconnect.addListener(() => {
+      console.log("Popup closed. Sending stopTTS action.");
+      // انجام عملیات توقف TTS
+      stopTTS();
+    });
+  }
+});
 
 // --- Main Message Listener (Dispatcher) ---
 Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -132,6 +146,11 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch((err) =>
           sendResponse({ success: false, error: err.message || "TTS error" })
         );
+      return true;
+
+    case "stopTTS":
+      stopTTS();
+      sendResponse({ success: true });
       return true;
 
     case "CONTENT_SCRIPT_WILL_RELOAD":

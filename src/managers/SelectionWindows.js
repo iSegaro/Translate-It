@@ -164,6 +164,11 @@ export default class SelectionWindows {
     this.isTranslationCancelled = true;
     this.originalText = null; // پاک کردن متن در حال ترجمه
     this.translatedText = null;
+    this.stoptts_playing();
+  }
+
+  stoptts_playing() {
+    Browser.runtime.sendMessage({ action: "stopTTS" });
   }
 
   applyInitialStyles(position) {

@@ -40,6 +40,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // This should run last as it might depend on the initial state being fully loaded and config checks
     await popupInteractionManager.init();
 
+    // ایجاد ارتباط مستمر با پس‌زمینه
+    const popupPort = browser.runtime.connect({ name: "popup" });
+    // (اختیاری) می‌توانید یک پیام اولیه ارسال کنید تا اطلاع دهید Popup باز شده است:
+    popupPort.postMessage({ action: "popupOpened" });
+
     logME("[Popup Main]: All modules initialized successfully.");
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
