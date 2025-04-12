@@ -11,7 +11,7 @@ import * as headerActionsManager from "./headerActionsManager.js";
 import * as initializationManager from "./initializationManager.js";
 import * as popupInteractionManager from "./popupInteractionManager.js";
 
-import { app_localize } from "../utils/i18n.js";
+import { app_localize_popup } from "../utils/i18n.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   logME("[Popup Main]: DOMContentLoaded event fired.");
@@ -36,6 +36,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.innerHTML = `<div style="padding: 10px; color: red;">Failed to initialize extension popup. Please try reloading.</div>`;
   } finally {
     // اجرای ترجمه بعد از اتمام تمام عملیات اولیه
-    app_localize();
+    app_localize_popup();
   }
 });
