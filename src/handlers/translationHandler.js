@@ -85,14 +85,16 @@ export async function handleFetchTranslationBackground(
       targetLanguage
     );
 
-    await Browser.storage.local.set({
-      lastTranslation: {
-        sourceText: promptText,
-        translatedText: translation,
-        sourceLanguage,
-        targetLanguage,
-      },
-    });
+    if (translationMode !== TranslationMode.SelectElement) {
+      await Browser.storage.local.set({
+        lastTranslation: {
+          sourceText: promptText,
+          translatedText: translation,
+          sourceLanguage,
+          targetLanguage,
+        },
+      });
+    }
 
     sendResponse({
       success: true,
