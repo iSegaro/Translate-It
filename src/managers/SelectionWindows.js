@@ -235,6 +235,11 @@ export default class SelectionWindows {
         if (rawTranslatedText) {
           const ttsIcon = this.createTTSIcon(original_text);
           firstLineContainer.appendChild(ttsIcon);
+        } else {
+          if (this.notifier) {
+            this.notifier.dismiss();
+          }
+          return;
         }
 
         if (trans_Mode === TranslationMode.Dictionary_Translation) {
