@@ -15,9 +15,12 @@ import {
   handleFetchTranslationBackground,
 } from "../handlers/translationHandler.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
-import { AUTO_DETECT_VALUE, playAudioGoogleTTS } from "../utils/tts.js";
+import {
+  AUTO_DETECT_VALUE,
+  playAudioGoogleTTS,
+  playAudioViaOffscreen,
+} from "../utils/tts.js";
 import { playTTS } from "../backgrounds/tts-player.js";
-import { playAudioViaOffscreen } from "../backgrounds/tts-player.js";
 
 // --- State Management ---
 // State managed centrally here and passed to relevant handlers
@@ -124,12 +127,12 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false; // Indicate synchronous response
 
     case "speak":
-      playTTS(message.text)
+      playTTS(message)
         .then(() => sendResponse({ success: true }))
         .catch((err) =>
           sendResponse({ success: false, error: err.message || "TTS error" })
         );
-      return true; // نگه داشتن listener تا ارسال پاسخ
+      return true;
 
     case "CONTENT_SCRIPT_WILL_RELOAD":
       logME("[Background:onMessage] Content script is about to reload.");

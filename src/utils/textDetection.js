@@ -83,3 +83,20 @@ export function getLanguageInfoFromCode(detectedLanguageCode) {
 
   return null; // اگر زبانی با این کد پیدا نشد
 }
+
+export function getLanguageInfoFromName(detectedLanguageName) {
+  if (!detectedLanguageName) {
+    return null; // یا می‌توانید یک مقدار پیش‌فرض برگردانید
+  }
+
+  // تبدیل کد تشخیص داده شده به حروف کوچک برای تطابق بهتر
+  const normalizedDetectedCode = detectedLanguageName.toLowerCase();
+
+  for (const lang of languageList) {
+    if (lang.name.toLocaleLowerCase() === normalizedDetectedCode) {
+      return lang;
+    }
+  }
+
+  return null; // اگر زبانی با این کد پیدا نشد
+}

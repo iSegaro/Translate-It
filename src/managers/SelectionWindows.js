@@ -3,6 +3,7 @@ import Browser from "webextension-polyfill";
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
+import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { marked } from "marked";
 
 export default class SelectionWindows {
@@ -18,6 +19,7 @@ export default class SelectionWindows {
     this.translatedText = null; // برای نگهداری متن ترجمه شده
     this.isTranslationCancelled = false; // پرچم برای مشخص کردن اینکه آیا ترجمه لغو شده است
     this.originalText = null; // نگهداری متنی که در حال ترجمه است
+    this.notifier = options.notifier;
   }
 
   async show(selectedText, position) {
@@ -41,14 +43,29 @@ export default class SelectionWindows {
       return;
     }
 
-    this.dismiss(false); // بستن هر پنل قبلی
+    this.dismiss(false); // *** بستن هر پنل قبلی‌ای
 
-    this.isTranslationCancelled = false; // ریست کردن پرچم در هر بار نمایش
+    this.isTranslationCancelled = false; // *** ریست کردن پرچم در هر بار نمایش
 
-    this.originalText = selectedText; // ثبت متن در حال ترجمه
+    this.originalText = selectedText; // *** ثبت متن در حال ترجمه
 
-    let translationMode = TranslationMode.Field; // پیش فرض حالت ترجمه کامل
+    let translationMode = TranslationMode.Field; // *** پیش فرض حالت ترجمه کامل
 
+    // *** نمایش لودینگ ***
+    this.displayElement = document.createElement("div");
+    this.displayElement.classList.add("aiwc-selection-display-temp");
+
+    const loadingContainer = this.createLoadingDots();
+    this.displayElement.appendChild(loadingContainer);
+
+    this.applyInitialStyles(position);
+    document.body.appendChild(this.displayElement);
+    this.isVisible = true;
+    this.animatePopupSize(loadingContainer);
+    // *** نمایش لودینگ ***
+
+    // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
+    // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است
     const maxDictionaryWords = 3; // حداکثر تعداد کلمات برای حالت دیکشنری
     const maxDictionaryChars = 30; // حداکثر تعداد کاراکترها برای حالت دیکشنری
     const stopWords = [
@@ -68,7 +85,7 @@ export default class SelectionWindows {
       "with",
       "by",
       "from",
-    ]; // لیست کلمات رایج (بسته به زبان)
+    ]; // *** لیست کلمات رایج (بسته به زبان)
 
     const words = selectedText.trim().split(/\s+/);
 
@@ -85,18 +102,7 @@ export default class SelectionWindows {
         translationMode = TranslationMode.Dictionary_Translation;
       }
     }
-
-    // نمایش لودینگ
-    this.displayElement = document.createElement("div");
-    this.displayElement.classList.add("aiwc-selection-display-temp");
-
-    const loadingContainer = this.createLoadingDots();
-    this.displayElement.appendChild(loadingContainer);
-
-    this.applyInitialStyles(position);
-    document.body.appendChild(this.displayElement);
-    this.isVisible = true;
-    this.animatePopupSize(loadingContainer);
+    // *** End of TODO ***
 
     // ذخیره‌ی متن در حال ترجمه برای تطبیق بعدی
     const currentText = selectedText;
@@ -123,7 +129,8 @@ export default class SelectionWindows {
           this.transitionToTranslatedText(
             translatedText,
             loadingContainer,
-            currentText
+            currentText,
+            translationMode
           );
         } else {
           this.handleEmptyTranslation(loadingContainer);
@@ -195,7 +202,12 @@ export default class SelectionWindows {
     });
   }
 
-  transitionToTranslatedText(translatedText, loadingContainer, original_text) {
+  transitionToTranslatedText(
+    translatedText,
+    loadingContainer,
+    original_text,
+    trans_Mode = TranslationMode.SelectionWindows
+  ) {
     // متن خام را برای استفاده در TTS نگه دارید
     const rawTranslatedText = translatedText ? translatedText.trim() : "";
 
@@ -210,45 +222,43 @@ export default class SelectionWindows {
         // 4. پاک کردن محتوای قبلی (مهم!)
         this.displayElement.innerHTML = "";
 
-        // --- 5. ایجاد ساختار جدید ---
-
-        // --- ردیف اول: متن اصلی و آیکون صدا ---
+        // ساخت سطر اول
         const firstLineContainer = document.createElement("div");
-        firstLineContainer.classList.add("aiwc-first-line"); // کلاس برای استایل دهی
+        firstLineContainer.classList.add("aiwc-first-line");
 
-        // ایجاد و افزودن آیکون TTS (فقط اگر متنی برای خواندن وجود دارد)
+        // اگر ترجمه داریم، آیکون TTS را اضافه کن
         if (rawTranslatedText) {
           const ttsIcon = this.createTTSIcon(original_text);
-          firstLineContainer.appendChild(ttsIcon); // آیکون اول اضافه می‌شود
+          firstLineContainer.appendChild(ttsIcon);
         }
 
-        // نمایش متن اصلی
-        const originalTextSpan = document.createElement("span");
-        originalTextSpan.classList.add("aiwc-original-text"); // کلاس برای استایل دهی
-        originalTextSpan.textContent = original_text;
-        firstLineContainer.appendChild(originalTextSpan);
+        if (trans_Mode === TranslationMode.Dictionary_Translation) {
+          const originalTextSpan = document.createElement("span");
+          originalTextSpan.classList.add("aiwc-original-text");
+          originalTextSpan.textContent = original_text;
+          firstLineContainer.appendChild(originalTextSpan);
+          // }
+        }
 
-        this.displayElement.appendChild(firstLineContainer);
+        // اگر چیزی در سطر اول اضافه شده، آن را به نمایش‌گر اصلی بچسبان
+        if (firstLineContainer.childNodes.length > 0) {
+          this.displayElement.appendChild(firstLineContainer);
+        }
 
-        // --- ردیف دوم: متن ترجمه شده و سایر اطلاعات ---
+        // --- سطر دوم: متن ترجمه شده ---
         const secondLineContainer = document.createElement("div");
-        secondLineContainer.classList.add("aiwc-second-line"); // کلاس برای استایل دهی
-
+        secondLineContainer.classList.add("aiwc-second-line");
         const textContainer = document.createElement("span");
-        textContainer.classList.add("aiwc-text-content"); // کلاس برای استایل‌دهی متن ترجمه شده
+        textContainer.classList.add("aiwc-text-content");
         textContainer.innerHTML = marked.parse(
           rawTranslatedText || "(ترجمه یافت نشد)"
-        ); // نمایش پیام اگر متن خالی بود
+        );
         secondLineContainer.appendChild(textContainer);
 
-        // 3. تنظیم جهت متن *فقط برای ردیف دوم*
         this.applyTextDirection(secondLineContainer, rawTranslatedText);
-
-        // می‌توانید در اینجا سایر اطلاعات را به secondLineContainer اضافه کنید
-
         this.displayElement.appendChild(secondLineContainer);
 
-        // 7. شروع انیمیشن Fade In با کمی تاخیر
+        // انیمیشن Fade In
         requestAnimationFrame(() => {
           this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
           this.displayElement.style.opacity = "0.9";
@@ -271,11 +281,12 @@ export default class SelectionWindows {
 
       Browser.runtime
         .sendMessage({
-          action: "playGoogleTTS",
+          action: "speak",
           text: textToSpeak,
+          lang: AUTO_DETECT_VALUE,
         })
         .then((response) => {
-          if (response && !response.success) {
+          if (!response.success) {
             logME("[SelectionWindows]: TTS playback failed:", response.error);
           } else {
             logME("[SelectionWindows]: TTS playback initiated.");
@@ -293,9 +304,16 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        this.displayElement.innerHTML =
-          "(متن ترجمه خالی است، دوباره امتحان کنید).";
-        this.displayElement.style.opacity = "0.9";
+        // this.displayElement.innerHTML =
+        //   "(متن ترجمه خالی است، دوباره امتحان کنید).";
+        // this.displayElement.style.opacity = "0.9";
+        this.notifier.show(
+          "متن ترجمه خالی است، دوباره امتحان کنید",
+          "info",
+          true,
+          2000
+        );
+        this.dismiss(false);
       }
     }, 300);
   }
@@ -305,8 +323,15 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        this.displayElement.innerHTML = "(خطا در ترجمه، دوباره امتحان کنید)";
-        this.displayElement.style.opacity = "0.9";
+        // this.displayElement.innerHTML = "(خطا در ترجمه، دوباره امتحان کنید)";
+        // this.displayElement.style.opacity = "0.9";
+        this.notifier.show(
+          "متن ترجمه خالی است، دوباره امتحان کنید",
+          "info",
+          true,
+          2000
+        );
+        this.dismiss(false);
       }
     }, 300);
   }

@@ -36,6 +36,7 @@ export default class EventHandler {
     this.isProcessing = translationHandler.isProcessing;
     this.SelectionWindows = new SelectionWindows({
       translationHandler: translationHandler,
+      notifier: translationHandler.notifier,
     });
 
     this.select_Element_ModeActive =

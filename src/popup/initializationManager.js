@@ -6,6 +6,7 @@ import { getTargetLanguageAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js"; // Use lookup
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { logME } from "../utils/helpers.js";
+import { correctTextDirection } from "../utils/textDetection.js";
 import { marked } from "marked";
 
 async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
@@ -15,13 +16,25 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
       let targetLangValue = "";
       if (result.lastTranslation) {
         logME("[InitManager]: Loading last translation from storage.");
+
         elements.sourceText.value = result.lastTranslation.sourceText || "";
+        correctTextDirection(
+          elements.sourceText,
+          result.lastTranslation.sourceText
+        );
+
         elements.translationResult.innerHTML = marked.parse(
           result.lastTranslation.translatedText || ""
         );
+        correctTextDirection(
+          elements.translationResult,
+          result.lastTranslation.translatedText
+        );
+
         elements.sourceLanguageInput.value =
           getLanguageDisplayValue(result.lastTranslation.sourceLanguage) ||
           AUTO_DETECT_VALUE;
+
         targetLangValue = getLanguageDisplayValue(
           result.lastTranslation.targetLanguage
         );

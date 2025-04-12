@@ -1,101 +1,105 @@
 // src/backgrounds/tts-player.js
+
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { playAudioGoogleTTS, AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { detectTextLanguage } from "../utils/textDetection.js";
+import {
+  AUTO_DETECT_VALUE,
+  playAudioWebSpeech,
+  playAudioViaOffscreen,
+  playAudioGoogleTTS,
+  playAudioChromeTTS,
+} from "../utils/tts.js";
+import { resolveLangCode } from "../utils/langUtils.js";
 
-// تابع playTTS یکپارچه (برای Chrome با offscreen و برای Firefox با SpeechSynthesis)
-export async function playTTS(text) {
-  logME("[TTS] Playing audio via offscreen with URL for text:", text);
-  if (!text || !text.trim()) {
+/**
+ * تلاش برای پخش متن ورودی با ترتیب:
+ *   1) Web Speech API (در صورت در دسترس بودن در بک‌گراند)
+ *   2) اگر مرورگر Chrome:
+ *       - تلاش با chrome.tts
+ *       - اگر نشد => پخش از طریق offscreen
+ *     اگر مرورگر Firefox:
+ *       - پخش از طریق Google TTS
+ */
+export async function playTTS(message) {
+  const text = message?.text?.trim();
+  if (!text) {
     throw new Error("No text provided for TTS.");
   }
 
-  if ("offscreen" in chrome && chrome.offscreen) {
-    // حالت Chrome: استفاده از offscreen
-    // فرض می‌کنیم در حالت Google TTS، باید URL مربوط به گوگل ساخته شود
-    // در اینجا می‌توانید تنظیمات بیشتری مانند زبان (tl) را هم اضافه کنید
-    const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=en`;
-    logME("[TTS] Playing audio via offscreen with URL:", ttsUrl);
+  // گام اول: اگر کاربر زبانی نفرستاده یا auto بود، سعی بر تشخیص.
+  let rawLang = message?.lang || AUTO_DETECT_VALUE;
+  if (rawLang === AUTO_DETECT_VALUE) {
+    try {
+      const detectedLang = await detectTextLanguage(text);
+      rawLang = detectedLang || "en";
+    } catch (err) {
+      logME("[TTS] Language detection failed. Fallback to 'en'.", err);
+      rawLang = "en";
+    }
+  }
+
+  const lang = resolveLangCode(rawLang);
+  logME("[TTS] Final language to play:", lang);
+
+  // تشخیص Firefox یا Chrome
+  let isFirefox = false;
+  try {
+    if (typeof Browser.runtime.getBrowserInfo === "function") {
+      const browserInfo = await Browser.runtime.getBrowserInfo();
+      isFirefox = browserInfo.name.toLowerCase() === "firefox";
+    }
+  } catch (e) {
+    // اگر اطلاعاتی نتوانستیم بگیریم، فرض می‌کنیم Chrome-like است
+    logME(
+      "[TTS] Could not get browser info, assuming Chrome-like environment."
+    );
+  }
+
+  // TODO: این روش نیازمندِ انتقال به UI می باشد.
+  // (1) ابتدا تلاش برای پخش توسط Web Speech API
+  // این روش در پس‌زمینه در دسترس نیست و برای هر دو مرورگر
+  // باید از طریق UI انجام شود
+  // try {
+  //   if (typeof speechSynthesis !== "undefined" && speechSynthesis) {
+  //     logME("[TTS] Trying Web Speech API first...");
+  //     await playAudioWebSpeech(text, lang);
+  //     return { success: true };
+  //   }
+  // } catch (error) {
+  //   logME("[TTS] Web Speech API playback failed, will fallback...", error);
+  // }
+  // *** End of TODO ***
+
+  // (2) اگر وب اسپیچ کار نکرد، بسته به مرورگر به سراغ فالبک‌ها می‌رویم
+  if (isFirefox) {
+    // --- فایرفاکس: google tts fallback ---
+    logME("[TTS] On Firefox, falling back to Google TTS method.");
+    await playAudioGoogleTTS(text, lang);
+    return { success: true };
+  } else {
+    // --- کروم یا شبیه کروم: ابتدا تلاش با chrome.tts، در صورت عدم موفقیت => offscreen ---
+    // اگر می‌خواهید صریحاً چک کنید که chrome.tts وجود دارد یا نه:
+    try {
+      if (typeof chrome !== "undefined" && chrome.tts) {
+        logME("[TTS] Attempting chrome.tts...");
+        await playAudioChromeTTS(text, lang);
+        return { success: true };
+      }
+    } catch (err) {
+      logME("[TTS] chrome.tts failed, will fallback to offscreen...", err);
+    }
+
+    // اگر chrome.tts وجود نداشت یا خطا داد، می‌رویم سراغ offscreen
+    logME("[TTS] Fallback to offscreen TTS in Chrome...");
+    const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(
+      text
+    )}&tl=${lang}`;
+
     const result = await playAudioViaOffscreen(ttsUrl);
     if (result.success) {
-      return result;
-    } else {
-      throw new Error(result.error || "TTS playback failed.");
-    }
-  } else {
-    // حالت Firefox: استفاده از Web Speech API
-    // const utterance = new SpeechSynthesisUtterance(text);
-    // speechSynthesis.speak(utterance);
-
-    await playAudioGoogleTTS(text, AUTO_DETECT_VALUE, null);
-
-    return { success: true };
-  }
-}
-
-export async function playAudioViaOffscreen(url) {
-  // استفاده از chrome.offscreen در Chrome
-  if ("offscreen" in chrome && chrome.offscreen) {
-    // بررسی وجود سند offscreen
-    const exists = await chrome.offscreen.hasDocument();
-    if (!exists) {
-      try {
-        await chrome.offscreen.createDocument({
-          url: "offscreen.html",
-          reasons: ["AUDIO_PLAYBACK"],
-          justification: "Play TTS audio from background script",
-        });
-        logME("[Offscreen] Offscreen document created.");
-      } catch (err) {
-        if (err.message.includes("Only a single offscreen document")) {
-          logME(
-            "[Offscreen] Document already exists (caught duplicate creation)."
-          );
-        } else {
-          throw err;
-        }
-      }
-    } else {
-      logME("[Offscreen] Offscreen document already exists, reusing it.");
-    }
-
-    logME("[Offscreen] Sending message to offscreen with URL:", url);
-    try {
-      const response = await Browser.runtime.sendMessage({
-        action: "playOffscreenAudio",
-        url: url,
-      });
-      // بعد از دریافت پاسخ یا در صورت خطا سند offscreen را ببندیم
-      await Browser.offscreen.closeDocument();
-      logME("[Offscreen] Offscreen document closed after use.");
-      if (!response || !response.success) {
-        throw new Error(
-          response?.error ||
-            "Offscreen document failed to play audio or respond."
-        );
-      }
-      logME("[Offscreen] Audio playback initiated successfully via offscreen.");
       return { success: true };
-    } catch (error) {
-      logME(
-        "[Offscreen] Error sending message to offscreen or playing audio:",
-        error
-      );
-      try {
-        await Browser.offscreen.closeDocument();
-        logME("[Offscreen] Offscreen document closed after error.");
-      } catch (e) {
-        logME("[Offscreen] Error closing offscreen document:", e);
-      }
-      return { error: error.message };
     }
-  } else {
-    // fallback برای مرورگرهایی مانند Firefox (استفاده از SpeechSynthesis)
-    // const utterance = new SpeechSynthesisUtterance(url);
-    // speechSynthesis.speak(utterance);
-
-    await playAudioGoogleTTS(text, AUTO_DETECT_VALUE, null);
-
-    return { success: true };
+    throw new Error(result.error || "TTS playback failed via offscreen.");
   }
 }

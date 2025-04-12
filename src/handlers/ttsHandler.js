@@ -18,7 +18,7 @@ export async function handlePlayGoogleTTS(
 ) {
   logME("[Handler:TTS] Handling playGoogleTTS request", message);
   try {
-    const text = message.text;
+    const text = message?.text;
     const maxLengthGoogle = 200;
 
     if (!text) throw new Error("No text provided for TTS.");
@@ -41,43 +41,32 @@ export async function handlePlayGoogleTTS(
           );
         } else {
           logME(
-            `[Handler:TTS] Language info/voice code not found for: ${detectedLang}. Falling back to 'en'.`
+            `[Handler:TTS] No voice code for: ${detectedLang}. Falling back to 'en'.`
           );
         }
-      } else {
-        logME("[Handler:TTS] Language detection failed. Falling back to 'en'.");
       }
     } catch (detectionError) {
-      logME("[Handler:TTS] Error during language detection:", detectionError);
+      logME("[Handler:TTS] Language detection failed:", detectionError);
     }
 
     const requiredOrigin = "https://translate.google.com/*";
-    let hasPermission = await Browser.permissions.contains({
+    const hasPermission = await Browser.permissions.contains({
       origins: [requiredOrigin],
     });
 
     if (!hasPermission) {
-      logME("[Handler:TTS] Requesting permission for:", requiredOrigin);
-      // Wrap request in a promise that resolves/rejects consistently
       const granted = await new Promise((resolve) => {
-        Browser.permissions.request(
-          { origins: [requiredOrigin] },
-          (granted) => {
-            resolve(granted);
-          }
-        );
+        Browser.permissions.request({ origins: [requiredOrigin] }, resolve);
       });
       if (!granted) {
-        throw new Error(
-          "Permission for Google Translate origin required for TTS was denied."
-        );
+        throw new Error("Permission for Google Translate was denied.");
       }
-      logME("[Handler:TTS] Permission granted.");
     }
 
-    const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${voiceLangCode}`;
+    const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(
+      text
+    )}&tl=${voiceLangCode}`;
 
-    // استفاده از offscreen برای پخش TTS در Chrome
     const offscreenResult = await playAudioViaOffscreen(ttsUrl);
     if (offscreenResult?.success) {
       sendResponse({ success: true });
@@ -95,9 +84,9 @@ export async function handlePlayGoogleTTS(
           ErrorTypes.PERMISSION
         : ErrorTypes.API,
       context: "handler-playGoogleTTS",
-      metadata: { textSnippet: message.text?.substring(0, 50) },
+      metadata: { textSnippet: message?.text?.substring(0, 50) || "N/A" },
     });
     sendResponse({ success: false, error: handledError.message });
   }
-  return true; // NEED to return
+  return true;
 }

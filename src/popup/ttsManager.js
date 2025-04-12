@@ -1,8 +1,12 @@
 // src/popup/ttsManager.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import { getEffectiveLanguage } from "../utils/langUtils.js";
+import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 
 function setupEventListeners() {
+  const sourceLanguageInput = document.querySelector("#sourceLanguageInput");
+  const targetLanguageInput = document.querySelector("#targetLanguageInput");
   const voiceSourceIcon = document.querySelector("#voiceSourceIcon");
   const voiceTargetIcon = document.querySelector("#voiceTargetIcon");
   const sourceTextEl = document.querySelector("#sourceText");
@@ -14,38 +18,56 @@ function setupEventListeners() {
       sourceTextEl.focus();
       return;
     }
-    logME("[Popup TTS]: Sending speak message for source text.");
+
     try {
+      const lang = sourceLanguageInput?.value || AUTO_DETECT_VALUE;
+      // اگر کاربر زبانی را وارد نکرده بود، auto
       const response = await Browser.runtime.sendMessage({
         action: "speak",
-        text: text,
+        text,
+        lang,
       });
-      if (response && response.success) {
-        logME("[Popup TTS]: TTS playback initiated successfully.");
+
+      if (!response) {
+        logME("[Popup TTS]: No response from background.");
+      } else if (response.success) {
+        logME("[Popup TTS]: TTS playback started.");
       } else {
-        logME("[Popup TTS]: TTS playback error:", response?.error);
+        logME("[Popup TTS]: TTS error:", response.error);
       }
     } catch (error) {
-      logME("[Popup TTS]: Error sending speak message:", error);
+      logME("[Popup TTS]: Error sending message:", error);
     }
   });
 
   voiceTargetIcon?.addEventListener("click", async () => {
     const text = translationResultEl?.textContent?.trim();
-    if (!text || text === "در حال ترجمه...") return;
-    logME("[Popup TTS]: Sending speak message for target text.");
+    if (!text || text === "در حال ترجمه...") {
+      translationResultEl.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return;
+    }
+
     try {
+      const lang = targetLanguageInput?.value || AUTO_DETECT_VALUE;
+
       const response = await Browser.runtime.sendMessage({
         action: "speak",
-        text: text,
+        text,
+        lang,
       });
-      if (response && response.success) {
-        logME("[Popup TTS]: TTS playback initiated successfully.");
+
+      if (!response) {
+        logME("[Popup TTS]: No response from background.");
+      } else if (response.success) {
+        logME("[Popup TTS]: TTS playback started for target text.");
       } else {
-        logME("[Popup TTS]: TTS playback error:", response?.error);
+        logME("[Popup TTS]: TTS error (target):", response.error);
       }
     } catch (error) {
-      logME("[Popup TTS]: Error sending speak message:", error);
+      logME("[Popup TTS]: Error sending message (target):", error);
     }
   });
 }

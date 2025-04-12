@@ -3,13 +3,12 @@
   "name": "AI Writing Companion",
   "version": "0.1.0",
   "description": "Translate Everywhere. Simply.",
-  "permissions": ["scripting", "storage", "tts"],
+  "permissions": ["scripting", "storage", "tts", "offscreen"],
   "optional_permissions": [
     "tabs",
     "clipboardWrite",
     "clipboardRead",
-    "notifications",
-    "offscreen"
+    "notifications"
   ],
   "background": {
     "service_worker": "background.bundle.js"
@@ -55,6 +54,7 @@
         "browser-polyfill.js",
         "offscreen.js",
         "content.bundle.js",
+        "offscreen.html",
         "styles/*",
         "icons/*",
         "html/*"

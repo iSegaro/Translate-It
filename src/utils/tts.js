@@ -14,80 +14,24 @@ export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای 
  * @param {string} lang The language code (e.g., 'en', 'fa'). Cannot be 'auto'.
  */
 export async function playAudioGoogleTTS(text, lang) {
-  if (!text || !text.trim()) {
-    logME("[TTS]: No text provided to speak.");
-    return;
-  }
+  const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(
+    text
+  )}&tl=${lang}`;
 
-  let targetLangCode = lang;
-
-  try {
-    // --- تشخیص زبان در صورت نیاز ---
-    if (!targetLangCode || targetLangCode === AUTO_DETECT_VALUE) {
-      logME("[TTS]: Attempting to auto-detect language...");
-      const detectedLangCode = await detectTextLanguage(text);
-      targetLangCode = detectedLangCode || "en";
-      logME(`[TTS]: Auto-detected or fallback language: ${targetLangCode}`);
-    } else {
-      logME(`[TTS]: Using provided language: ${targetLangCode}`);
-    }
-
-    // --- محدودیت طول متن گوگل ---
-    const maxLength = 200;
-    if (text.length > maxLength) {
-      logME(
-        `[TTS]: Text too long for Google TTS (>${maxLength}). Using Web Speech API.`
-      );
-      playAudioWebSpeech(text, targetLangCode);
-      return;
-    }
-
-    // --- ساخت URL ---
-    const url = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${targetLangCode}`;
-    logME("[TTS]: Requesting Google TTS URL:", url);
-
-    const requiredOrigin = "https://translate.google.com/*";
-
-    // --- بررسی و درخواست دسترسی ---
-    const hasPermission = await Browser.permissions.contains({
-      origins: [requiredOrigin],
-    });
-
-    if (!hasPermission) {
-      logME("[TTS]: Permission not granted. Requesting...");
-      const granted = await new Promise((resolve) => {
-        Browser.permissions.request({ origins: [requiredOrigin] }, resolve);
-      });
-      if (!granted) {
-        logME("[TTS]: Permission denied by user.");
-        return;
-      }
-      logME("[TTS]: Permission granted.");
-    } else {
-      logME("[TTS]: Permission already granted.");
-    }
-
-    // --- پخش صدا ---
-    const audio = new Audio(url);
-    audio.crossOrigin = "anonymous"; // برای منابع خارجی لازم است
+  // روش پخش ساده:
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(ttsUrl);
+    audio.crossOrigin = "anonymous";
 
     audio.addEventListener("ended", () => {
-      logME("[TTS]: Audio playback finished.");
+      resolve({ success: true });
     });
-
     audio.addEventListener("error", (e) => {
-      logME("[TTS]: Audio playback error:", e);
+      reject(e);
     });
 
-    await audio.play();
-    logME("[TTS]: Audio started playing.");
-  } catch (error) {
-    logME("[TTS]: Error in playAudioGoogleTTS:", error.name, error.message);
-    try {
-    } catch (e) {
-      logME("[TTS]: sendResponse failed (likely out of scope):", e.message);
-    }
-  }
+    audio.play().catch((err) => reject(err));
+  });
 }
 
 /**
@@ -97,30 +41,153 @@ export async function playAudioGoogleTTS(text, lang) {
  * @param {string} langCode The language code (e.g., 'en', 'fa', 'auto').
  */
 export function playAudioWebSpeech(text, langCode) {
-  if (!text || !text.trim()) {
-    logME("[WebSpeech]: No text provided.");
-    return;
-  }
+  return new Promise((resolve, reject) => {
+    if (!text || !text.trim()) {
+      return reject("No text to speak");
+    }
 
-  logME(
-    `[WebSpeech]: Playing text in lang '${langCode || AUTO_DETECT_VALUE}':`,
-    text
-  );
-  const utterance = new SpeechSynthesisUtterance(text);
-  const speechLang = getSpeechApiLangCode(langCode); // Use existing helper
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langCode;
 
-  if (speechLang) {
-    utterance.lang = speechLang;
-    logME(`[WebSpeech]: Setting utterance lang to: ${speechLang}`);
-  } else {
+    // شنونده‌های پایان و خطا
+    utterance.onend = () => resolve("Speech ended");
+    utterance.onerror = (err) => reject(err);
+
+    // تابع انتخاب Voice مناسب
+    const setVoiceAndSpeak = () => {
+      const voices = speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        // ممکن است فایرفاکس صدا نداشته باشد یا هنوز آماده نباشد
+        console.warn("No voices available");
+      } else {
+        // تلاش کنید صدای مناسب زبان langCode را بیابید
+        const matchedVoice = voices.find((v) =>
+          v.lang.toLowerCase().startsWith(langCode.toLowerCase())
+        );
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        } else {
+          // اگر پیدا نکرد، نخستین صدا را بگذارید یا fallback
+          utterance.voice = voices[0];
+        }
+      }
+      // اجرای گفتار
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    };
+
+    // اگر لیست صداها آماده است:
+    if (speechSynthesis.getVoices().length > 0) {
+      setVoiceAndSpeak();
+    } else {
+      // در فایرفاکس یا برخی مرورگرها لازم است منتظر صدور این رویداد شویم
+      speechSynthesis.onvoiceschanged = () => {
+        setVoiceAndSpeak();
+      };
+    }
+  });
+}
+
+export function playAudioChromeTTS(text, lang) {
+  return new Promise((resolve, reject) => {
+    if (!chrome?.tts) {
+      return reject(new Error("chrome.tts not available"));
+    }
+
+    chrome.tts.speak(text, {
+      lang,
+      onEvent: (event) => {
+        if (event.type === "end") {
+          resolve({ success: true });
+        } else if (event.type === "error") {
+          reject(new Error(`Chrome TTS error: ${event.errorMessage || ""}`));
+        }
+      },
+    });
+  });
+}
+
+/**
+ * Play audio using offscreen document in Chrome
+ */
+export async function playAudioViaOffscreen(url) {
+  logME("[TTS:Offscreen] Attempting to play audio via offscreen.");
+  logME("[TTS:Offscreen] Checking chrome.offscreen support...");
+
+  const hasOffscreenAPI = !!chrome?.offscreen?.createDocument;
+  logME(`[TTS:Offscreen] chrome.offscreen supported: ${hasOffscreenAPI}`);
+
+  if (!hasOffscreenAPI) {
     logME(
-      `[WebSpeech]: No specific speech lang code found for '${langCode}'. Using browser default.`
+      "[TTS:Offscreen] Offscreen API not available. Falling back to Web Speech API."
     );
+    playAudioWebSpeech(url, AUTO_DETECT_VALUE);
+    return { success: true };
   }
 
-  // متوقف کردن پخش قبلی (اگر وجود داشت)
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utterance);
+  // بررسی وجود سند offscreen
+  let exists = false;
+  try {
+    exists = await chrome.offscreen.hasDocument();
+    logME(`[TTS:Offscreen] Offscreen document exists: ${exists}`);
+  } catch (err) {
+    logME("[TTS:Offscreen] Error checking offscreen document existence:", err);
+    return { error: "Failed to check offscreen document existence." };
+  }
+
+  if (!exists) {
+    try {
+      logME("[TTS:Offscreen] Creating offscreen document...");
+      await chrome.offscreen.createDocument({
+        url: "html/offscreen.html",
+        reasons: ["AUDIO_PLAYBACK"],
+        justification: "Play TTS audio from background script",
+      });
+      logME("[TTS:Offscreen] Offscreen document created.");
+    } catch (err) {
+      if (err.message.includes("Only a single offscreen document")) {
+        logME(
+          "[TTS:Offscreen] Offscreen document already exists (caught duplication)."
+        );
+      } else {
+        logME("[TTS:Offscreen] Failed to create offscreen document:", err);
+        return { error: "Failed to create offscreen document." };
+      }
+    }
+  }
+
+  // ارسال پیام به offscreen
+  try {
+    logME("[TTS:Offscreen] Sending message to offscreen player with URL:", url);
+    const response = await Browser.runtime.sendMessage({
+      action: "playOffscreenAudio",
+      url,
+    });
+
+    logME("[TTS:Offscreen] Response from offscreen:", response);
+
+    await Browser.offscreen.closeDocument();
+    logME("[TTS:Offscreen] Offscreen document closed.");
+
+    if (!response || !response.success) {
+      logME("[TTS:Offscreen] Playback failed or response missing.");
+      return { error: response?.error || "Playback failed via offscreen." };
+    }
+
+    logME("[TTS:Offscreen] Audio playback successful via offscreen.");
+    return { success: true };
+  } catch (err) {
+    logME("[TTS:Offscreen] Error sending message or during playback:", err);
+
+    try {
+      await Browser.offscreen.closeDocument();
+      logME("[TTS:Offscreen] Offscreen document closed after error.");
+    } catch (e) {
+      logME("[TTS:Offscreen] Error closing offscreen document:", e);
+    }
+
+    return { error: err.message || "Unknown offscreen playback error." };
+  }
 }
 
 /**
@@ -129,9 +196,9 @@ export function playAudioWebSpeech(text, langCode) {
  * @returns {string} The speech synthesis language code ('en-US', 'fa-IR', etc.) or the original code.
  */
 export function getSpeechApiLangCode(langCode) {
-  if (!langCode || langCode === AUTO_DETECT_VALUE) return null; // Cannot speak 'auto'
+  if (!langCode) return null;
   const lang = languageList.find((l) => l.code === langCode);
-  return lang?.speechCode || lang?.code || null; // Prefer speechCode, fallback to code
+  return lang ? lang.voiceCode : null;
 }
 
 export function getLanguageCode(langIdentifier) {
