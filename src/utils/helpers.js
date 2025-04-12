@@ -9,6 +9,7 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
 export function logMethod(target, propertyKey, descriptor) {
+  return;
   const originalMethod = descriptor.value;
   descriptor.value = async function (...args) {
     try {
