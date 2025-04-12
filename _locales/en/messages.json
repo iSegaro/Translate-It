@@ -1,0 +1,100 @@
+{
+  "IsRTL": { "message": "false" },
+  "name": { "message": "AI Writing Companion" },
+  "nameChrome": { "message": "AI Writing for Chrome" },
+  "nameFirefox": { "message": "AI Writing for Firefox" },
+  "nameEdge": { "message": "AI Writing for Edge" },
+  "description": { "message": "Translate Everywhere. Simply." },
+  "options_page_title": { "message": "AI Writing Companion - Settings" },
+  "pageatitle": { "message": "Translate Everywhere. Simply." },
+  "languages_tab_title": { "message": "Languages" },
+  "import_export_tab_title": { "message": "Import/Export" },
+  "languages_section_title": { "message": "Languages" },
+  "source_language_label": { "message": "Source Language" },
+  "target_language_label": { "message": "Target Language" },
+  "source_language_placeholder": { "message": "Enter source language" },
+  "target_language_placeholder": { "message": "Enter target language" },
+  "translation_activation_section_title": {
+    "message": "Translation Activation Methods"
+  },
+  "translate_on_text_fields_label": {
+    "message": "Enable translation on text fields"
+  },
+  "translate_on_text_fields_description": {
+    "message": "Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut)."
+  },
+  "enable_shortcut_for_text_fields_label": {
+    "message": "Enable Ctrl+/ shortcut for text fields"
+  },
+  "enable_shortcut_for_text_fields_description": {
+    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field."
+  },
+  "translate_with_select_element_label": {
+    "message": "Enable translation via select element"
+  },
+  "translate_with_select_element_description": {
+    "message": "Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph)."
+  },
+  "translate_on_text_selection_label": {
+    "message": "Enable translation on text selection"
+  },
+  "translate_on_text_selection_description": {
+    "message": "Allow triggering translation automatically or via shortcut after selecting text on the page."
+  },
+  "require_ctrl_for_text_selection_label": {
+    "message": "Require Ctrl key for text selection translation"
+  },
+  "require_ctrl_for_text_selection_description": {
+    "message": "When text selection translation is enabled, require holding Ctrl key during selection to trigger translation."
+  },
+  "enable_dictionary_translation_label": {
+    "message": "Enable Dictionary Translation"
+  },
+  "enable_dictionary_translation_description": {
+    "message": "When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations."
+  },
+  "prompt_section_title": { "message": "Prompt Template" },
+  "prompt_template_label": { "message": "Prompt Template" },
+  "prompt_template_info": {
+    "message": "Use keywords to customize your prompt..."
+  },
+  "prompt_template_placeholder": {
+    "message": "Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
+  },
+  "prompt_template_help": {
+    "message": "You can use the following keywords in your prompt template:"
+  },
+  "api_section_title": { "message": "Translation API" },
+  "dev_api_mode_label": { "message": "Use Dev API Mode" },
+  "debug_mode_label": { "message": "Debug Mode" },
+  "translation_api_label": { "message": "API Model Choice" },
+  "webai_api_settings_title": { "message": "WebAI API Settings" },
+  "webai_api_url_label": { "message": "WebAI API URL" },
+  "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
+  "webai_api_model_label": { "message": "WebAI API Model" },
+  "webai_api_model_placeholder": { "message": "Enter WebAI API model" },
+  "gemini_api_settings_title": { "message": "Gemini API Settings" },
+  "gemini_api_settings_api_key_label": { "message": "API Key" },
+  "gemini_api_key_placeholder": { "message": "Paste your API key here" },
+  "gemini_api_settings_api_url_label": { "message": "API URL" },
+  "gemini_api_url_placeholder": { "message": "Enter API URL" },
+  "openai_api_settings_title": { "message": "OpenAI API Settings" },
+  "openai_api_settings_api_key_label": { "message": "API Key" },
+  "openai_api_key_placeholder": { "message": "Paste your OpenAI API key here" },
+  "openai_api_settings_model_label": { "message": "Model" },
+  "openai_api_model_placeholder": { "message": "Enter OpenAI model" },
+  "openrouter_api_settings_title": { "message": "OpenRouter API Settings" },
+  "openrouter_api_settings_api_key_label": { "message": "API Key" },
+  "openrouter_api_key_placeholder": {
+    "message": "Paste your OpenRouter API key here"
+  },
+  "openrouter_api_settings_model_label": { "message": "Model" },
+  "openrouter_api_model_placeholder": {
+    "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
+  },
+  "import_export_section_title": { "message": "Import/Export Settings" },
+  "export_settings_button": { "message": "Export Settings" },
+  "import_settings_label": { "message": "Import Settings" },
+  "import_settings_button": { "message": "Import Settings" },
+  "save_settings_button": { "message": "Save" }
+}

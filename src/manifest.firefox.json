@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "AI Writing Companion",
+  "name": "__MSG_nameFirefox__",
   "version": "0.1.0",
-  "description": "Translate Everywhere. Simply.",
+  "description": "__MSG_description__",
+  "default_locale": "fa",
   "browser_specific_settings": {
     "gecko": {
       "id": "ai-writing-companion@amm1rr.com"
@@ -19,7 +20,7 @@
     "scripts": ["background.bundle.js"]
   },
   "action": {
-    "default_title": "AI Writing Companion",
+    "default_title": "__MSG_name__",
     "default_popup": "html/popup.html",
     "default_icon": {
       "16": "icons/16.png",
@@ -55,7 +56,13 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "styles/*", "html/*", "content.bundle.js"],
+      "resources": [
+        "icons/*",
+        "styles/*",
+        "html/*",
+        "_locales/*",
+        "content.bundle.js"
+      ],
       "matches": ["*://*/*"]
     }
   ]

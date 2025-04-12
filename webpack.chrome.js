@@ -8,18 +8,39 @@ const { merge } = require("webpack-merge");
 // const ZipPlugin = require("zip-webpack-plugin");
 const common = require("./webpack.common.js");
 
-// خواندن manifest مربوط به کروم از فایل manifest.chrome.json
-const manifest = JSON.parse(
-  fs.readFileSync("./src/manifest.chrome.json", "utf8")
+// خواندن manifest مربوط به کروم
+const manifestFilePath = "./src/manifest.chrome.json";
+const manifestRaw = fs.readFileSync(manifestFilePath, "utf8");
+const manifest = JSON.parse(manifestRaw);
+
+const defaultLocale = "en";
+const messagesPath = path.resolve(
+  __dirname,
+  "_locales",
+  defaultLocale,
+  "messages.json"
 );
+let messages = {};
+try {
+  messages = JSON.parse(fs.readFileSync(messagesPath, "utf8"));
+} catch (error) {
+  console.error("Error reading messages file:", error);
+}
+
+// جایگزینی placeholderهای i18n در کلید name
+if (typeof manifest.name === "string") {
+  manifest.name = manifest.name.replace(/__MSG_(\w+)__/g, (match, key) => {
+    return messages[key] ? messages[key].message : match;
+  });
+}
+
 const extensionName = manifest.name.replace(/ /g, "-");
 const extensionVersion = manifest.version;
+// خروجی هر build به پوشه‌ای با نام منحصر به فرد در مسیر زیر تولید می‌شود:
 const outputFolderName = extensionName;
-const outputFullPathZIP = path.resolve(__dirname, "Build-Extension", "Chrome");
 const outputFullPath = path.resolve(
   __dirname,
   "Build-Extension",
-  "Chrome",
   outputFolderName
 );
 
@@ -48,6 +69,18 @@ const chromeDistConfig = {
         {
           from: "src/manifest.chrome.json",
           to: "manifest.json",
+          transform(content) {
+            let manifest = JSON.parse(content);
+            if (typeof manifest.name === "string") {
+              manifest.name = manifest.name.replace(
+                /__MSG_(\w+)__/g,
+                (match, key) => {
+                  return messages[key] ? messages[key].message : match;
+                }
+              );
+            }
+            return Buffer.from(JSON.stringify(manifest, null, 2));
+          },
         },
         {
           from: "html/*.html",
@@ -65,17 +98,19 @@ const chromeDistConfig = {
           },
         },
         {
-          // کپی offscreen.html
           from: "html/offscreen.html",
           to: "offscreen.html",
         },
         {
-          // کپی offscreen.js
           from: "src/offscreen.js",
           to: "offscreen.js",
         },
         {
           from: "node_modules/webextension-polyfill/dist/browser-polyfill.js",
+        },
+        {
+          from: "_locales",
+          to: "_locales",
         },
       ],
     }),
