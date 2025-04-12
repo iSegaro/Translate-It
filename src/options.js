@@ -3,6 +3,8 @@ import Browser from "webextension-polyfill";
 import { getSettingsAsync, CONFIG } from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
+import { app_localize } from "./utils/i18n.js";
+import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const tabButtons = document.querySelectorAll(".tab-button");
@@ -85,13 +87,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Elements for Status and Manifest Info
   const statusElement = document.getElementById("status");
-  const manifestNameElement = document.getElementById("MANIFEST_NAME");
-  const manifestDescriptionElement = document.getElementById(
-    "MANIFEST_DESCRIPTION"
-  );
-  const manifestTitle_OPTION_PAGE_Element = document.getElementById(
-    "MANIFEST_TITLE_OPTION_PAGE"
-  );
   const promptTemplateInput = document.getElementById("promptTemplate");
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
@@ -224,6 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings(); // Load settings when the DOM is ready
 
   saveSettingsButton.addEventListener("click", async () => {
+    const currentSettings = await getSettingsAsync();
+
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
     const webAIApiModel = webAIApiModelInput?.value?.trim();
     const apiKey = apiKeyInput?.value?.trim();
@@ -233,18 +230,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const sourceLanguage = sourceLanguageInput?.value;
     const targetLanguage = targetLanguageInput?.value;
     const promptTemplate = promptTemplateInput?.value?.trim();
-    const translationApi = translationApiSelect.value; // دریافت المنت dropdown برای مدل‌ها
+    const translationApi = translationApiSelect.value;
     const openaiApiKey = openAIApiKeyInput?.value?.trim();
     const openaiApiModel = openAIModelInput?.value?.trim();
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
-    // دریافت وضعیت چک‌باکس‌های حالت‌های ترجمه
     const enableDictionary =
       enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY;
     const translateOnTextFields =
       translateOnTextFieldsCheckbox?.checked ?? true;
     const enableShortcutForTextFields =
-      enableShortcutForTextFieldsCheckbox?.checked ?? true; // جدید - مقدار پیش‌فرض را true گذاشتم
+      enableShortcutForTextFieldsCheckbox?.checked ?? true;
     const translateWithSelectElement =
       translateWithSelectElementCheckbox?.checked ?? true;
     const translateOnTextSelection =
@@ -259,7 +255,10 @@ document.addEventListener("DOMContentLoaded", () => {
         DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
         API_URL: apiUrl || CONFIG.API_URL,
         SOURCE_LANGUAGE: sourceLanguage || "English",
-        TARGET_LANGUAGE: targetLanguage || "Persian",
+        TARGET_LANGUAGE: targetLanguage || "Farsi", // مربوط به ترجمه است
+        // زبان لوکالایز از تنظیمات قبلی (یا پیش‌فرض) گرفته می‌شود:
+        APPLICATION_LOCALIZE:
+          currentSettings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE,
         PROMPT_TEMPLATE: promptTemplate || CONFIG.PROMPT_TEMPLATE,
         TRANSLATION_API: translationApi || "gemini",
         WEBAI_API_URL: webAIApiUrl || CONFIG.WEBAI_API_URL,
@@ -278,15 +277,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       try {
         await Browser.storage.local.set(settings);
-        // در صورت نیاز، کد مربوط به موفقیت عملیات را اینجا قرار دهید
       } catch (error) {
         logME("Error setting storage:", error);
-        // کد مربوط به مدیریت خطا را اینجا قرار دهید
       }
 
       await updatePromptHelpText();
       showStatus("ذخیره شد!", "success");
-      setTimeout(() => showStatus("", ""), 2000); // پاک کردن پیام
+      setTimeout(() => showStatus("", ""), 2000);
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -298,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function updatePromptHelpText() {
     const settings = await getSettingsAsync();
     const sourceLang = settings.SOURCE_LANGUAGE || "English";
-    const targetLang = settings.TARGET_LANGUAGE || "Persian";
+    const targetLang = settings.TARGET_LANGUAGE || "Farsi";
 
     if (sourceLangNameSpan) {
       sourceLangNameSpan.textContent = `(${sourceLang})`;
@@ -358,7 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sourceLanguageInput.value = settings.SOURCE_LANGUAGE || "English";
       }
       if (targetLanguageInput) {
-        targetLanguageInput.value = settings.TARGET_LANGUAGE || "Persian";
+        targetLanguageInput.value = settings.TARGET_LANGUAGE || "Farsi";
       }
       if (promptTemplateInput) {
         promptTemplateInput.value =
@@ -399,17 +396,9 @@ document.addEventListener("DOMContentLoaded", () => {
           settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
       }
 
-      // نمایش اطلاعات مانیفست
-      const manifest = Browser.runtime.getManifest();
-      if (manifestNameElement) {
-        manifestNameElement.textContent = `${manifest.name} v${manifest.version}`;
-      }
-      if (manifestDescriptionElement) {
-        manifestDescriptionElement.textContent = manifest.description;
-      }
-      if (manifestTitle_OPTION_PAGE_Element) {
-        manifestTitle_OPTION_PAGE_Element.textContent = `${manifest.name} - Settings`;
-      }
+      app_localize(
+        settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE
+      );
 
       // فراخوانی اولیه تابع وابستگی *بعد* از تنظیم مقادیر اولیه چک‌باکس‌ها  وضعیت های ترجمه
       handleTextSelectionDependency(); // فراخوانی برای انتخاب متن

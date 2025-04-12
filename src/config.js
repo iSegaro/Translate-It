@@ -20,8 +20,9 @@ export const CONFIG = {
   // --- Core Settings ---
   USE_MOCK: false,
   DEBUG_MODE: false,
+  APPLICATION_LOCALIZE: "Farsi",
   SOURCE_LANGUAGE: "English",
-  TARGET_LANGUAGE: "Persian",
+  TARGET_LANGUAGE: "Farsi",
 
   // --- API Settings ---
   TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter
@@ -235,6 +236,13 @@ export const getApiKeyAsync = async () => {
 
 export const getApiUrlAsync = async () => {
   return getSettingValueAsync("API_URL", CONFIG.API_URL);
+};
+
+export const getApplication_LocalizeAsync = async () => {
+  return getSettingValueAsync(
+    "APPLICATION_LOCALIZE",
+    CONFIG.APPLICATION_LOCALIZE
+  );
 };
 
 export const getSourceLanguageAsync = async () => {

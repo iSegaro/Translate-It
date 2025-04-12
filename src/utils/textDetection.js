@@ -27,6 +27,14 @@ export const applyTextDirection = (element, text) => {
   element.style.textAlign = isRtl ? "right" : "left";
 };
 
+export const applyElementDirection = (element, rtl_direction = false) => {
+  if (!element || !element.style) return;
+
+  const isRtl = rtl_direction;
+  element.style.direction = isRtl ? "rtl" : "ltr";
+  element.style.textAlign = isRtl ? "right" : "left";
+};
+
 export const correctTextDirection = (element, text) => {
   if (!element) return;
 
