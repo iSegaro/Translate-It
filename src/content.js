@@ -137,10 +137,10 @@ class ContentScript {
           );
           // ارسال پیام به اسکریپت پس‌زمینه قبل از بارگذاری مجدد
           Browser.runtime.sendMessage({ action: "CONTENT_SCRIPT_WILL_RELOAD" });
-          // افزودن تأخیر 2000 میلی‌ثانیه‌ای قبل از اجرای Browser.runtime.reload()
-          // setTimeout(() => {
-          //   Browser.runtime.reload();
-          // }, 2000);
+          // افزودن تأخیر 3000 میلی‌ثانیه‌ای قبل از اجرای Browser.runtime.reload()
+          setTimeout(() => {
+            Browser.runtime.reload();
+          }, 3000);
         } else {
           logME("[Content] Received unknown message => ", message);
         }
@@ -148,6 +148,9 @@ class ContentScript {
         logME("[Content] Received unknown message => ", message);
       }
     } catch (error) {
+      if (this.translationHandler.notifier) {
+        this.translationHandler.notifier.dismiss();
+      }
       this.translationHandler.errorHandler.handle(error, {
         type: this.translationHandler.ErrorTypes.INTEGRATION,
         context: "message-listener",
