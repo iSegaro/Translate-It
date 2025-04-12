@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI Writing Companion</title>
+    <link rel="stylesheet" href="../styles/popup.css" />
+  </head>
+  <body>
+    <div class="popup-container">
+      <div class="header-toolbar">
+        <div class="toolbar-left-group">
+          <a
+            id="translatePageLink"
+            target="_blank"
+            class="toolbar-link"
+            title="ترجمه این صفحه در تب جدید"
+          >
+            ترجمه این صفحه
+          </a>
+        </div>
+        <div class="toolbar-right-group">
+          <img
+            src="../icons/select.png"
+            id="selectElementIcon"
+            title="حالت انتخاب با موس"
+            alt="Select Element"
+            class="toolbar-icon"
+          />
+          <img
+            src="../icons/clear.png"
+            id="clearStorageBtn"
+            title="پاک کردن فیلدها"
+            alt="Clear Fields"
+            class="toolbar-icon"
+          />
+          <img
+            src="../icons/settings.png"
+            id="settingsIcon"
+            title="تنظیمات"
+            alt="تنظیمات"
+            class="toolbar-icon"
+          />
+        </div>
+      </div>
+
+      <div class="language-controls">
+        <div class="language-input-container">
+          <input
+            type="text"
+            id="targetLanguageInput"
+            list="targetLanguagesList"
+            placeholder="زبان مقصد"
+            class="language-input"
+            title="زبان مقصد"
+          />
+          <span
+            id="clearTargetLanguage"
+            class="clear-input clear-input-target"
+            title="پاک کردن زبان مقصد"
+          ></span>
+          <datalist id="targetLanguagesList"></datalist>
+        </div>
+        <button
+          id="swapLanguagesBtn"
+          class="swap-button"
+          title="جابجایی زبان‌ها"
+        >
+          <img src="../icons/swap.png" alt="Swap" />
+        </button>
+
+        <div class="language-input-container">
+          <input
+            type="text"
+            id="sourceLanguageInput"
+            list="sourceLanguagesList"
+            placeholder="زبان مبدا"
+            class="language-input"
+            title="زبان مبدا"
+          />
+          <span
+            id="clearSourceLanguage"
+            class="clear-input clear-input-source"
+            title="پاک کردن زبان مبدا"
+          ></span>
+          <datalist id="sourceLanguagesList"></datalist>
+        </div>
+        <button
+          type="submit"
+          form="translationForm"
+          id="translateBtn"
+          class="translate-button"
+          title="ترجمه"
+        >
+          <img src="../icons/translate.png" alt="Translate" />
+        </button>
+      </div>
+
+      <form id="translationForm">
+        <div class="textarea-container source-container">
+          <div class="inline-toolbar source-toolbar">
+            <div class="toolbar-left-group">
+              <img
+                src="../icons/copy.png"
+                id="copySourceBtn"
+                title="کپی"
+                alt="Copy"
+                class="inline-icon"
+              />
+              <img
+                src="../icons/speaker.png"
+                id="voiceSourceIcon"
+                title="خواندن متن مبدا"
+                alt="Voice Source"
+                class="inline-icon"
+              />
+            </div>
+          </div>
+          <img
+            src="../icons/paste.png"
+            id="pasteSourceBtn"
+            title="چسباندن"
+            alt="Paste"
+            class="inline-icon paste-icon-separate"
+          />
+          <textarea
+            id="sourceText"
+            placeholder="متن را اینجا وارد کنید..."
+            rows="4"
+            tabindex="1"
+          ></textarea>
+        </div>
+
+        <div class="textarea-container result-container">
+          <div class="inline-toolbar target-toolbar">
+            <img
+              src="../icons/copy.png"
+              id="copyTargetBtn"
+              title="کپی نتیجه"
+              alt="Copy Result"
+              class="inline-icon"
+            />
+            <img
+              src="../icons/speaker.png"
+              id="voiceTargetIcon"
+              title="خواندن متن مقصد"
+              alt="Voice Target"
+              class="inline-icon voice-target-icon"
+            />
+          </div>
+          <div id="translationResult" class="result aiwc-popup-markdown"></div>
+        </div>
+      </form>
+    </div>
+    <script type="application/javascript" src="../browser-polyfill.js"></script>
+    <script src="../popup.bundle.js"></script>
+  </body>
+</html>
