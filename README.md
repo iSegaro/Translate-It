@@ -157,13 +157,25 @@ npm run watch
 
 ---
 
-## 🎨 Credits
+### Contributors
 
 - iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
 - Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
-- Icon by [Pixel perfect - Flaticon][flaticon-url]
 
-<br>
+### 🖼️ Copyright
+
+Icons used in this project are provided by [Flaticon](https://www.flaticon.com), created by the following authors:
+
+- [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) — Main icon, Select, Paste
+- [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) — Voice Command
+- [photo3idea_studio](https://www.flaticon.com/free-icons/translate) — Translate
+- [Midev](https://www.flaticon.com/free-icons/clear) — Clear
+- [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) — Close
+- [fjstudio](https://www.flaticon.com/free-icons/awareness) — Awareness
+- [Bharat Icons](https://www.flaticon.com/free-icons/volume) — Volume
+- [Freepik](https://www.flaticon.com/authors/freepik) — Swap, Translate, Settings
+- [Catalin Fertu](https://www.flaticon.com/free-icons/copy) — Copy
+  <br>
 
 ---
 

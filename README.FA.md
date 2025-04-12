@@ -160,9 +160,24 @@ npm run watch
 
 ## 🎨 اعتبارات
 
+### 👥 مشارکت‌کنندگان
+
 - iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
 - Mohammad [![محمد X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
-- آیکون توسط [Pixel perfect - Flaticon][flaticon-url]
+
+### 🖼️ حقوق آثار
+
+آیکون‌های استفاده‌شده در این پروژه از وب‌سایت [Flaticon](https://www.flaticon.com) هستند و توسط طراحان زیر ایجاد شده‌اند:
+
+- [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) — آیکون اصلی، انتخاب، چسباندن
+- [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) — فرمان صوتی
+- [photo3idea_studio](https://www.flaticon.com/free-icons/translate) — ترجمه
+- [Midev](https://www.flaticon.com/free-icons/clear) — پاک کردن
+- [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) — بستن
+- [fjstudio](https://www.flaticon.com/free-icons/awareness) — آگاهی
+- [Bharat Icons](https://www.flaticon.com/free-icons/volume) — صدا
+- [Freepik](https://www.flaticon.com/authors/freepik) — جابه‌جایی، ترجمه، تنظیمات
+- [Catalin Fertu](https://www.flaticon.com/free-icons/copy) — کپی
 
 <br>
 
