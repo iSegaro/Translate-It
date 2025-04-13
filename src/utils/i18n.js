@@ -108,16 +108,24 @@ export async function app_localize_popup(lang_code) {
   let App_Language = await getApplication_LocalizeAsync();
   let langCode = lang_code;
 
-  if (langCode?.length !== 2) {
+  if (!langCode || langCode?.length !== 2) {
     languageList.forEach((language) => {
-      if (language.name === App_Language) {
-        langCode = language.code;
+      // if (language.name === App_Language) {
+      if (language.locale === App_Language) {
+        langCode = language.locale;
       }
     });
   }
 
-  const container = document.body;
+  // در صورت ارائه زبان به عنوان ورودی، تلاش می‌کنیم فایل ترجمه مربوطه را بارگذاری کنیم
+  if (langCode) {
+    translations = await loadTranslationsForLanguage(langCode);
+    // isRtl = parseBoolean(translations["IsRTL"]?.message);
+  } else {
+    // isRtl = parseBoolean(Browser.i18n.getMessage("IsRTL"));
+  }
 
+  const container = document.body;
   container.style.display = "none";
 
   // لوکالایز کردن متون (برای المان‌هایی که data-i18n دارند)
@@ -125,21 +133,39 @@ export async function app_localize_popup(lang_code) {
   textItems.forEach((item) => {
     const key = item.getAttribute("data-i18n");
     let translation = "";
-    // اگر ترجمه برای زبان موردنظر وجود داشته باشد از آن استفاده می‌کنیم
+    // استفاده از ترجمه موجود در translations یا استفاده از ترجمه پیش‌فرض مرورگر
     if (translations && translations[key] && translations[key].message) {
       translation = translations[key].message;
     } else {
-      // در غیر این صورت از ترجمه پیش‌فرض (API i18n مرورگر) استفاده می‌شود
       translation = Browser.i18n.getMessage(key);
     }
 
     if (item.matches("input, textarea")) {
-      // برای المان‌های ورودی یا textarea مقدار value تغییر می‌کند.
+      // برای المان‌های ورودی یا textarea، مقدار value تغییر می‌کند.
       item.value = translation;
+    } else if (item.matches("img")) {
+      item.setAttribute("alt", translation);
     } else {
-      // برای سایر المان‌ها از textContent استفاده می‌شود.
+      // برای سایر المان‌ها، محتوای آن‌ها تغییر می‌کند.
       item.textContent = translation;
     }
+  });
+
+  // پردازش المان‌هایی که تنها data-i18n-title دارند
+  const titleOnlyItems = container.querySelectorAll("[data-i18n-title]");
+  titleOnlyItems.forEach((item) => {
+    const titleKey = item.getAttribute("data-i18n-title");
+    let titleTranslation = "";
+    if (
+      translations &&
+      translations[titleKey] &&
+      translations[titleKey].message
+    ) {
+      titleTranslation = translations[titleKey].message;
+    } else {
+      titleTranslation = Browser.i18n.getMessage(titleKey);
+    }
+    item.setAttribute("title", titleTranslation);
   });
 
   // لوکالایز کردن placeholderها (برای المان‌هایی که data-i18n-placeholder دارند)
@@ -162,6 +188,7 @@ export async function app_localize_popup(lang_code) {
   container.style.display = "";
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  app_localize("fa");
-});
+// document.addEventListener("DOMContentLoaded", () => {
+//   app_localize();
+//   app_localize_popup();
+// });

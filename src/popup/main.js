@@ -1,6 +1,7 @@
 // src/popup/main.js
 
 import { logME } from "../utils/helpers.js";
+import { CONFIG } from "../config.js";
 
 // Import Managers/Handlers
 import * as languageManager from "./languageManager.js";
@@ -36,6 +37,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.innerHTML = `<div style="padding: 10px; color: red;">Failed to initialize extension popup. Please try reloading.</div>`;
   } finally {
     // اجرای ترجمه بعد از اتمام تمام عملیات اولیه
-    app_localize_popup();
+    app_localize_popup(CONFIG.APPLICATION_LOCALIZE);
   }
 });
