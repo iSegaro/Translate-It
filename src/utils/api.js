@@ -26,8 +26,9 @@ import {
   getPromptPopupTranslateAsync,
 } from "../config.js";
 import { delay, isExtensionContextValid, logMethod, logME } from "./helpers.js";
-import { isPersianText } from "./textDetection.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { buildPrompt } from "./promptBuilder.js";
+import { isPersianText } from "./textDetection.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";
@@ -109,7 +110,7 @@ class ApiService {
       error = await ErrorHandler.processError(error);
 
       const isNetworkError =
-        error instanceof TypeError || error.message.includes("NetworkError");
+        error instanceof TypeError && error.message.includes("NetworkError");
 
       await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.NETWORK,
@@ -119,69 +120,6 @@ class ApiService {
 
       return;
     }
-  }
-
-  @logMethod
-  async createPrompt(
-    text,
-    sourceLang,
-    targetLang,
-    translateMode = TranslationMode.Field
-  ) {
-    const promptTemplate = await getPromptAsync(); // Fetch the user-configured prompt
-    let Json_or_Text_ForTranslate = text;
-    let isJsonMode = false;
-
-    try {
-      const parsedText = JSON.parse(text);
-      if (this._isSpecificTextJsonFormat(parsedText)) {
-        Json_or_Text_ForTranslate = text;
-        isJsonMode = true;
-      } else {
-        Json_or_Text_ForTranslate = text;
-      }
-    } catch (error) {
-      Json_or_Text_ForTranslate = text;
-    }
-
-    let promptBase;
-    if (isJsonMode) {
-      promptBase = await getPromptBASESelectAsync();
-    } else {
-      if (translateMode === TranslationMode.Popup_Translate) {
-        promptBase = await getPromptPopupTranslateAsync();
-      } else if ((await getEnableDictionaryAsync()) === true) {
-        if (translateMode === TranslationMode.Dictionary_Translation) {
-          promptBase = await getPromptDictionaryAsync();
-        } else {
-          promptBase = await getPromptBASEFieldAsync();
-        }
-      } else {
-        promptBase = await getPromptBASEFieldAsync();
-      }
-    }
-
-    const userRules = promptTemplate
-      .replace(/\$_{SOURCE}/g, sourceLang)
-      .replace(/\$_{TARGET}/g, targetLang);
-
-    const base_clean = promptBase
-      .replace(/\$_{SOURCE}/g, sourceLang)
-      .replace(/\$_{TARGET}/g, targetLang);
-
-    const finalPromptWithUserRules = base_clean.replace(
-      /\$_{USER_RULES}/g,
-      userRules
-    );
-
-    logME("Prompt : ", finalPromptWithUserRules);
-
-    const finalPrompt = finalPromptWithUserRules.replace(
-      /\$_{TEXT}/g,
-      Json_or_Text_ForTranslate
-    );
-
-    return finalPrompt;
   }
 
   @logMethod
@@ -213,12 +151,13 @@ class ApiService {
       return;
     }
 
-    const prompt = await this.createPrompt(
+    const prompt = await buildPrompt(
       text,
       sourceLang,
       targetLang,
       translateMode
     );
+
     const url = `${apiUrl}?key=${apiKey}`;
     const fetchOptions = {
       method: "POST",
@@ -240,14 +179,21 @@ class ApiService {
     text,
     sourceLang,
     targetLang,
-    isCallInsideThisMethod = false
+    isCallInsideThisMethod = false,
+    translateMode
   ) {
     const [webAIApiUrl, webAIApiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
     ]);
 
-    const prompt = await this.createPrompt(text, sourceLang, targetLang);
+    const prompt = await buildPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
+
     const url = webAIApiUrl;
     const fetchOptions = {
       method: "POST",
@@ -279,7 +225,7 @@ class ApiService {
   }
 
   @logMethod
-  async handleOpenAITranslation(text, sourceLang, targetLang) {
+  async handleOpenAITranslation(text, sourceLang, targetLang, translateMode) {
     const [openAIApiKey, openAIApiUrl, openAIModel] = await Promise.all([
       getOpenAIApiKeyAsync(),
       getOpenAIApiUrlAsync(),
@@ -306,7 +252,12 @@ class ApiService {
       return;
     }
 
-    const prompt = await this.createPrompt(text, sourceLang, targetLang);
+    const prompt = await buildPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
     const url = openAIApiUrl;
     const fetchOptions = {
       method: "POST",
@@ -329,7 +280,12 @@ class ApiService {
   }
 
   @logMethod
-  async handleOpenRouterTranslation(text, sourceLang, targetLang) {
+  async handleOpenRouterTranslation(
+    text,
+    sourceLang,
+    targetLang,
+    translateMode
+  ) {
     const [openRouterApiKey, openRouterApiModel] = await Promise.all([
       getOpenRouterApiKeyAsync(),
       getOpenRouterApiModelAsync(),
@@ -345,7 +301,12 @@ class ApiService {
       return;
     }
 
-    const prompt = await this.createPrompt(text, sourceLang, targetLang);
+    const prompt = await buildPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
     const url = CONFIG.OPENROUTER_API_URL;
     const fetchOptions = {
       method: "POST",
