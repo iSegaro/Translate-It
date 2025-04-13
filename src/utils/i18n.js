@@ -4,6 +4,7 @@ import Browser from "webextension-polyfill";
 import { applyElementDirection, isRtlText } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
+import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
 
 // تابع کمکی برای بارگذاری فایل ترجمه messages.json مربوط به زبان مشخص
 async function loadTranslationsForLanguage(lang) {
@@ -27,6 +28,7 @@ function parseBoolean(value) {
   return String(value).trim().toLowerCase() === "true";
 }
 
+// متد ترجمه صفحه تنظیمات / Settings
 export async function app_localize(lang_code) {
   let translations = null;
   let isRtl = false;
@@ -41,7 +43,6 @@ export async function app_localize(lang_code) {
     });
   }
 
-  // در صورت ارائه زبان به عنوان ورودی، تلاش می‌کنیم فایل ترجمه مربوطه را بارگذاری کنیم
   if (langCode) {
     translations = await loadTranslationsForLanguage(langCode);
     isRtl = parseBoolean(translations["IsRTL"]?.message);
@@ -49,91 +50,42 @@ export async function app_localize(lang_code) {
     isRtl = parseBoolean(Browser.i18n.getMessage("IsRTL"));
   }
 
-  const container = document.body;
+  const bodyContainer = document.body;
+  const headContainer = document.head;
 
-  container.style.display = "none";
-
-  if (isRtl) {
-    applyElementDirection(container, true);
-  } else {
-    applyElementDirection(container, false);
-  }
-
-  // لوکالایز کردن متون (برای المان‌هایی که data-i18n دارند)
-  const textItems = container.querySelectorAll("[data-i18n]");
-  textItems.forEach((item) => {
-    const key = item.getAttribute("data-i18n");
-    let translation = "";
-    // اگر ترجمه برای زبان موردنظر وجود داشته باشد از آن استفاده می‌کنیم
-    if (translations && translations[key] && translations[key].message) {
-      translation = translations[key].message;
-    } else {
-      // در غیر این صورت از ترجمه پیش‌فرض (API i18n مرورگر) استفاده می‌شود
-      translation = Browser.i18n.getMessage(key);
-    }
-
-    if (item.matches("input, textarea")) {
-      // برای المان‌های ورودی یا textarea مقدار value تغییر می‌کند.
-      item.value = translation;
-    } else {
-      // برای سایر المان‌ها از textContent استفاده می‌شود.
-      item.textContent = translation;
-    }
-  });
-
-  applyElementDirection(container.querySelector("#promptTemplate"), false);
-
-  // لوکالایز کردن placeholderها (برای المان‌هایی که data-i18n-placeholder دارند)
-  const placeholderItems = container.querySelectorAll(
-    "[data-i18n-placeholder]"
+  // استفاده از افکت fade-out/fade-in به جای display none/"" برای بدنه صفحه
+  fadeOutInElement(
+    bodyContainer,
+    () => {
+      // تنظیم جهت صفحه بر اساس isRtl
+      applyElementDirection(bodyContainer, isRtl);
+      // لوکالایز کردن محتویات body
+      localizeContainer(bodyContainer, translations);
+      // تنظیم جهت مجدد برای المان خاص "promptTemplate" در صورت وجود
+      const promptTemplate = bodyContainer.querySelector("#promptTemplate");
+      if (promptTemplate) {
+        applyElementDirection(promptTemplate, false);
+      }
+    },
+    250
   );
-  placeholderItems.forEach((item) => {
-    const key = item.getAttribute("data-i18n-placeholder");
-    let translation = "";
-    if (translations && translations[key] && translations[key].message) {
-      translation = translations[key].message;
-    } else {
-      translation = Browser.i18n.getMessage(key);
-    }
-    if (translation) {
-      item.placeholder = translation;
-    }
-  });
 
-  container.style.display = "";
+  // لوکالایز کردن المان‌های موجود در head (مثلاً <title>)
+  if (headContainer) {
+    localizeContainer(headContainer, translations);
+  }
 }
 
-export async function app_localize_popup(lang_code) {
-  let translations = null;
-  let App_Language = await getApplication_LocalizeAsync();
-  let langCode = lang_code;
-
-  if (!langCode || langCode?.length !== 2) {
-    languageList.forEach((language) => {
-      // if (language.name === App_Language) {
-      if (language.locale === App_Language) {
-        langCode = language.locale;
-      }
-    });
-  }
-
-  // در صورت ارائه زبان به عنوان ورودی، تلاش می‌کنیم فایل ترجمه مربوطه را بارگذاری کنیم
-  if (langCode) {
-    translations = await loadTranslationsForLanguage(langCode);
-    // isRtl = parseBoolean(translations["IsRTL"]?.message);
-  } else {
-    // isRtl = parseBoolean(Browser.i18n.getMessage("IsRTL"));
-  }
-
-  const container = document.body;
-  container.style.display = "none";
-
-  // لوکالایز کردن متون (برای المان‌هایی که data-i18n دارند)
+/**
+ * تابع کمکی برای لوکالایز کردن المان‌های داخل یک container.
+ * این تابع به ترتیب المان‌هایی با data-i18n، data-i18n-title و data-i18n-placeholder را پردازش می‌کند.
+ */
+function localizeContainer(container, translations) {
+  // لوکالایز کردن المان‌هایی که دارای data-i18n هستند
   const textItems = container.querySelectorAll("[data-i18n]");
   textItems.forEach((item) => {
     const key = item.getAttribute("data-i18n");
     let translation = "";
-    // استفاده از ترجمه موجود در translations یا استفاده از ترجمه پیش‌فرض مرورگر
     if (translations && translations[key] && translations[key].message) {
       translation = translations[key].message;
     } else {
@@ -141,19 +93,17 @@ export async function app_localize_popup(lang_code) {
     }
 
     if (item.matches("input, textarea")) {
-      // برای المان‌های ورودی یا textarea، مقدار value تغییر می‌کند.
       item.value = translation;
     } else if (item.matches("img")) {
       item.setAttribute("alt", translation);
     } else {
-      // برای سایر المان‌ها، محتوای آن‌ها تغییر می‌کند.
       item.textContent = translation;
     }
   });
 
-  // پردازش المان‌هایی که تنها data-i18n-title دارند
-  const titleOnlyItems = container.querySelectorAll("[data-i18n-title]");
-  titleOnlyItems.forEach((item) => {
+  // لوکالایز کردن المان‌هایی که دارای data-i18n-title هستند
+  const titleItems = container.querySelectorAll("[data-i18n-title]");
+  titleItems.forEach((item) => {
     const titleKey = item.getAttribute("data-i18n-title");
     let titleTranslation = "";
     if (
@@ -184,10 +134,47 @@ export async function app_localize_popup(lang_code) {
       item.placeholder = translation;
     }
   });
-
-  container.style.display = "";
 }
 
+// متد ترجمه برای پنجره Popup
+export async function app_localize_popup(lang_code) {
+  let translations = null;
+  let App_Language = await getApplication_LocalizeAsync();
+  let langCode = lang_code;
+
+  if (!langCode || langCode?.length !== 2) {
+    languageList.forEach((language) => {
+      if (language.locale === App_Language) {
+        langCode = language.locale;
+      }
+    });
+  }
+
+  // در صورت ارائه زبان، تلاش می‌کنیم فایل ترجمه مربوطه را بارگذاری کنیم
+  if (langCode) {
+    translations = await loadTranslationsForLanguage(langCode);
+  }
+
+  const bodyContainer = document.body;
+  const headContainer = document.head;
+
+  // به جای مخفی کردن کل body با display none،
+  // به صورت اولیه به container حالت اولیه افکت داده می‌شود.
+  // توجه کنید که نیازی به تغییر display نداریم.
+
+  // اعمال ترجمه‌ها روی body
+  localizeContainer(bodyContainer, translations);
+
+  // همچنین المان‌های موجود در head مانند <title> را نیز لوکالایز می‌کنیم
+  if (headContainer) {
+    localizeContainer(headContainer, translations);
+  }
+
+  // اعمال افکت pop-in برای نمایش نرم Popup
+  animatePopupEffect(bodyContainer, 300);
+}
+
+// در نسخه اولیه نیاز بود که تنظیمات بارگذاری شوند، ولی فعلا مطمین نیستم بهشون نیازی باشه یا خیر
 // document.addEventListener("DOMContentLoaded", () => {
 //   app_localize();
 //   app_localize_popup();
