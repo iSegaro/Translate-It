@@ -87,6 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Elements for Status and Manifest Info
   const statusElement = document.getElementById("status");
+  const manifest_Name = document.getElementById("options_app_name");
+  const manifest_Version = document.getElementById("options_app_version");
+
   const promptTemplateInput = document.getElementById("promptTemplate");
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
@@ -308,6 +311,16 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadSettings() {
     try {
       const settings = await getSettingsAsync();
+
+      // نمایش اطلاعات مانیفست
+      const manifest = Browser.runtime.getManifest();
+      if (manifest_Name) {
+        manifest_Name.textContent = CONFIG.APP_NAME;
+      }
+
+      if (manifest_Version) {
+        manifest_Version.textContent = `v${manifest.version}`;
+      }
 
       // مقداردهی اولیه تنظیمات دیباگ و ماد
       if (debugModeCheckbox) {

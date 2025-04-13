@@ -17,6 +17,7 @@ export const TRANSLATION_ERRORS = {
 
 // Shared configuration (initial defaults)
 export const CONFIG = {
+  APP_NAME: "AI Writing Companion",
   // --- Core Settings ---
   USE_MOCK: false,
   DEBUG_MODE: false,
@@ -243,6 +244,10 @@ export const getApplication_LocalizeAsync = async () => {
     "APPLICATION_LOCALIZE",
     CONFIG.APPLICATION_LOCALIZE
   );
+};
+
+export const getAppNameAsync = async () => {
+  return getSettingValueAsync("APP_NAME", CONFIG.APP_NAME);
 };
 
 export const getSourceLanguageAsync = async () => {
