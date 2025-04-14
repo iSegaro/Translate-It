@@ -26,8 +26,7 @@ function setupEventListeners() {
         elements.sourceLanguageInput.value = AUTO_DETECT_VALUE;
         try {
           const lang = await getTargetLanguageAsync();
-          elements.targetLanguageInput.value =
-            getLanguageDisplayValue(lang) || getLanguageDisplayValue("en");
+          elements.targetLanguageInput.value = getLanguageDisplayValue(lang);
         } catch {
           elements.targetLanguageInput.value = getLanguageDisplayValue("en");
         } finally {
