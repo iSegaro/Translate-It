@@ -181,18 +181,20 @@ npm run watch
 
 ### 🖼️ Copyright
 
-Icons used in this project are provided by [Flaticon](https://www.flaticon.com), created by the following authors:
+Icons used in this project are provided by [Flaticon](https://www.flaticon.com) and were created by the following authors:
 
-- [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) — Main icon, Select, Paste
-- [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) — Voice Command
-- [photo3idea_studio](https://www.flaticon.com/free-icons/translate) — Translate
-- [Midev](https://www.flaticon.com/free-icons/clear) — Clear
-- [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) — Close
-- [fjstudio](https://www.flaticon.com/free-icons/awareness) — Awareness
-- [Bharat Icons](https://www.flaticon.com/free-icons/volume) — Volume
-- [Freepik](https://www.flaticon.com/authors/freepik) — Swap, Translate, Settings
-- [Catalin Fertu](https://www.flaticon.com/free-icons/copy) — Copy
-  <br>
+- <img src="icons/page.png" alt="Main icon" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon, Select, Paste)
+- <img src="icons/select.png" alt="Select" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
+- <img src="icons/paste.png" alt="Paste" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Paste)
+- <img src="icons/speaker.png" alt="Voice Command" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (Voice Command)
+- <img src="icons/translate.png" alt="Translate" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (Translate)
+- <img src="icons/clear.png" alt="Clear" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (Clear)
+- <img src="icons/close.png" alt="Close" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (Close)
+- <img src="icons/swap.png" alt="Swap" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Swap)
+- <img src="icons/settings.png" alt="Settings" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
+- <img src="icons/copy.png" alt="Copy" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
+
+<br>
 
 ---
 
