@@ -374,7 +374,7 @@ body.selecting-element {
 .aiwc-popup-markdown ul,
 .aiwc-popup-markdown ol {
   margin: 0.2em 0 !important;
-  padding: 0 !important;
+  padding: 10px !important;
 }
 
 /* آیتم‌های لیست */
