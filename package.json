@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "description": "Smart Translation and Writing Assistant",
   "scripts": {
-    "build:chrome": "webpack --config webpack.chrome.js --mode production",
-    "build:firefox": "webpack --config webpack.firefox.js --mode production",
+    "build:chrome": "cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
+    "build:firefox": "cross-env BUILD_MODE=build webpack --config webpack.firefox.js --mode production",
     "build": "npm run build:chrome",
     "build:all": "npm run build:chrome && npm run build:firefox",
-    "watch": "webpack --config webpack.chrome.js --watch --mode development",
-    "watch:chrome": "webpack --config webpack.chrome.js --watch --mode development",
-    "watch:firefox": "webpack --config webpack.firefox.js --watch --mode development",
+    "watch:chrome": "cross-env BUILD_MODE=watch webpack --config webpack.chrome.js --watch --mode development",
+    "watch:firefox": "cross-env BUILD_MODE=watch webpack --config webpack.firefox.js --watch --mode development",
     "lint": "eslint src/**/*.js",
     "format": "prettier --write src/**/*.js"
   },
@@ -19,16 +18,17 @@
     "@babel/preset-env": "^7.26.9",
     "babel-loader": "^10.0.0",
     "copy-webpack-plugin": "^13.0.0",
+    "cross-env": "^7.0.3",
     "eslint": "^9.4.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.0",
     "rimraf": "^6.0.1",
     "webextension-polyfill": "^0.12.0",
     "webpack": "^5.98.0",
-    "webpack-cli": "^6.0.1",
-    "zip-webpack-plugin": "^4.0.3"
+    "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "core-js": "^3.41.0",
     "glob": "^11.0.1",
     "marked": "^15.0.7",
