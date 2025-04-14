@@ -17,6 +17,13 @@
     "tabs",
     "notifications"
   ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "http://localhost:6969/*",
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*",
+    "https://translate.google.com/*"
+  ],
   "background": {
     "scripts": ["background.bundle.js"]
   },
