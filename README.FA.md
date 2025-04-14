@@ -191,15 +191,16 @@ npm run watch
 
 آیکون‌های استفاده‌شده در این پروژه از وب‌سایت [Flaticon](https://www.flaticon.com) هستند و توسط طراحان زیر ایجاد شده‌اند:
 
-- [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) — آیکون اصلی، انتخاب، چسباندن
-- [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) — فرمان صوتی
-- [photo3idea_studio](https://www.flaticon.com/free-icons/translate) — ترجمه
-- [Midev](https://www.flaticon.com/free-icons/clear) — پاک کردن
-- [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) — بستن
-- [fjstudio](https://www.flaticon.com/free-icons/awareness) — آگاهی
-- [Bharat Icons](https://www.flaticon.com/free-icons/volume) — صدا
-- [Freepik](https://www.flaticon.com/authors/freepik) — جابه‌جایی، ترجمه، تنظیمات
-- [Catalin Fertu](https://www.flaticon.com/free-icons/copy) — کپی
+- <img src="icons/page.png" alt="آیکون اصلی" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (آیکون اصلی)
+- <img src="icons/select.png" alt="انتخاب" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (انتخاب)
+- <img src="icons/paste.png" alt="چسباندن" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (چسباندن)
+- <img src="icons/speaker.png" alt="فرمان صوتی" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (فرمان صوتی)
+- <img src="icons/translate.png" alt="ترجمه" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (ترجمه)
+- <img src="icons/clear.png" alt="پاک کردن" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (پاک کردن)
+- <img src="icons/close.png" alt="بستن" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (بستن)
+- <img src="icons/swap.png" alt="تغییر جای" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تغییر جای)
+- <img src="icons/settings.png" alt="تنظیمات" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تنظیمات)
+- <img src="icons/copy.png" alt="کپی" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (کپی)
 
 <br>
 
