@@ -29,6 +29,7 @@ import { delay, isExtensionContextValid, logMethod, logME } from "./helpers.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { buildPrompt } from "./promptBuilder.js";
 import { isPersianText } from "./textDetection.js";
+import { AUTO_DETECT_VALUE } from "./tts.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";
@@ -60,18 +61,51 @@ class ApiService {
   }
 
   /**
-   * A generic helper to perform API calls.
-   * @param {Object} options - Configuration options for the API call.
-   * @param {string} options.url - The API URL.
-   * @param {Object} options.fetchOptions - Options to pass to fetch (method, headers, body).
-   * @param {Function} options.extractResponse - A function to extract the desired result from the response JSON.
-   * @param {string} options.context - Context string for error handling.
-   * @returns {Promise<string|undefined>} - The extracted response or undefined in case of error.
+   * متدی برای ساخت payload پیام جهت ارسال به پس‌زمینه.
+   * تلاش می‌کند از fetchOptions.body مقدار promptText را استخراج کند.
+   * همچنین اگر اطلاعات sourceLanguage، targetLanguage و translationMode در options موجود نباشد،
+   * به صورت پیش‌فرض آن‌ها را به رشته خالی ست می‌کند.
    */
-  async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
+  _buildMessagePayload(options) {
+    let promptText = "";
     try {
-      const response = await fetch(url, fetchOptions);
+      const bodyObj = JSON.parse(options.fetchOptions.body);
+      // پشتیبانی از قالب‌های مختلف:
+      if (
+        bodyObj.contents &&
+        Array.isArray(bodyObj.contents) &&
+        bodyObj.contents[0].parts
+      ) {
+        promptText = bodyObj.contents[0].parts[0].text;
+      } else if (bodyObj.message) {
+        promptText = bodyObj.message;
+      } else if (
+        bodyObj.messages &&
+        Array.isArray(bodyObj.messages) &&
+        bodyObj.messages[0].content
+      ) {
+        promptText = bodyObj.messages[0].content;
+      }
+    } catch (e) {
+      // در صورت بروز خطا، promptText خالی می‌ماند.
+    }
+    return {
+      promptText,
+      sourceLanguage: options.sourceLanguage || AUTO_DETECT_VALUE,
+      targetLanguage: options.targetLanguage || AUTO_DETECT_VALUE,
+      translationMode: options.translationMode || "",
+    };
+  }
 
+  /**
+   * اجرای درخواست API.
+   *
+   * @param {Object} options شامل: url, fetchOptions, extractResponse, context, و اختیاری: sourceLanguage, targetLanguage, translationMode
+   * @returns {Promise<string|undefined>}
+   */
+  async _executeApiCall(options) {
+    try {
+      const response = await fetch(options.url, options.fetchOptions);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage =
@@ -79,45 +113,37 @@ class ApiService {
         const error = new Error(errorMessage);
         error.statusCode = response.status;
         error.type = ErrorTypes.API;
-        // مدیریت خطای خاص session در WebAI
-
         if (response.status === 409) {
           error.sessionConflict = true;
         }
-
         await this.errorHandler.handle(error, {
           type: error.type,
           statusCode: response.status,
-          context,
+          context: options.context,
         });
         return;
       }
-
       const data = await response.json();
-      const result = extractResponse(data, response.status);
+      const result = options.extractResponse(data, response.status);
       if (result === undefined) {
         const error = new Error("Invalid response format");
         await this.errorHandler.handle(error, {
           type: ErrorTypes.API,
           statusCode: response.status || 500,
-          context,
+          context: options.context,
         });
         return;
       }
-
       return result;
     } catch (error) {
       error = await ErrorHandler.processError(error);
-
       const isNetworkError =
         error instanceof TypeError && error.message.includes("NetworkError");
-
       await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.NETWORK,
         statusCode: isNetworkError ? 0 : error.statusCode || 500,
-        context,
+        context: options.context,
       });
-
       return;
     }
   }
