@@ -1,59 +1,71 @@
 // src/managers/NotificationManager.js
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
-import { fadeOut, logME } from "../utils/helpers.js";
+import { logME } from "../utils/helpers.js";
+
+// در صورتی که CONFIG تعریف نشده باشد یا برخی کلیدهای آن مقداردهی نشده باشند، از مقادیر پیش‌فرض استفاده می‌کنیم:
+const safeConfig = {
+  ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
+  ICON_WARNING: CONFIG?.ICON_WARNING ?? "⚠️",
+  ICON_SUCCESS: CONFIG?.ICON_SUCCESS ?? "✅",
+  ICON_INFO: CONFIG?.ICON_INFO ?? "🔵",
+  ICON_REVERT: CONFIG?.ICON_REVERT ?? "",
+  NOTIFICATION_ALIGNMENT: CONFIG?.NOTIFICATION_ALIGNMENT ?? "right",
+  NOTIFICATION_TEXT_DIRECTION: CONFIG?.NOTIFICATION_TEXT_DIRECTION ?? "rtl",
+  NOTIFICATION_TEXT_ALIGNMENT: CONFIG?.NOTIFICATION_TEXT_ALIGNMENT ?? "right",
+};
 
 export default class NotificationManager {
   constructor() {
     this.typeMapping = {
       error: {
         title: "خطا - ترجمه خودکار",
-        icon: CONFIG.ICON_ERROR,
+        icon: safeConfig.ICON_ERROR,
         priority: 2,
-        duration: 5000, // مدت زمان پیش فرض برای خطا
-        className: "AIWritingCompanion-notification-error", // اضافه کردن کلاس CSS مربوط به نوع خطا
+        duration: 5000, // مدت زمان پیش‌فرض برای خطا
+        className: "AIWritingCompanion-notification-error",
       },
       warning: {
         title: "هشدار - ترجمه خودکار",
-        icon: CONFIG.ICON_WARNING,
+        icon: safeConfig.ICON_WARNING,
         priority: 1,
-        duration: 4000, // مدت زمان پیش فرض برای هشدار
-        className: "AIWritingCompanion-notification-warning", // اضافه کردن کلاس CSS مربوط به نوع هشدار
+        duration: 4000, // مدت زمان پیش‌فرض برای هشدار
+        className: "AIWritingCompanion-notification-warning",
       },
       success: {
         title: "موفقیت - ترجمه خودکار",
-        icon: CONFIG.ICON_SUCCESS,
+        icon: safeConfig.ICON_SUCCESS,
         priority: 0,
-        duration: 3000, // مدت زمان پیش فرض برای موفقیت
-        className: "AIWritingCompanion-notification-success", // اضافه کردن کلاس CSS مربوط به نوع موفقیت
+        duration: 3000, // مدت زمان پیش‌فرض برای موفقیت
+        className: "AIWritingCompanion-notification-success",
       },
       info: {
         title: "اطلاعات - ترجمه خودکار",
-        icon: CONFIG.ICON_INFO,
+        icon: safeConfig.ICON_INFO,
         priority: 0,
-        duration: 3000, // مدت زمان پیش فرض برای اطلاعات
-        className: "AIWritingCompanion-notification-info", // اضافه کردن کلاس CSS مربوط به نوع اطلاعات
+        duration: 3000, // مدت زمان پیش‌فرض برای اطلاعات
+        className: "AIWritingCompanion-notification-info",
       },
       status: {
         title: "وضعیت - ترجمه خودکار",
-        icon: CONFIG.ICON_INFO,
+        icon: safeConfig.ICON_INFO,
         priority: 0,
-        duration: 2000, // مدت زمان پیش فرض برای وضعیت
-        className: "AIWritingCompanion-notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
+        duration: 2000, // مدت زمان پیش‌فرض برای وضعیت
+        className: "AIWritingCompanion-notification-status",
       },
       integrate: {
         title: "اتصال به صفحه - ترجمه خودکار",
-        icon: CONFIG.ICON_INFO,
+        icon: safeConfig.ICON_INFO,
         priority: 0,
-        duration: 2000, // مدت زمان پیش فرض برای وضعیت
-        className: "AIWritingCompanion-notification-status", // اضافه کردن کلاس CSS مربوط به نوع وضعیت
+        duration: 2000,
+        className: "AIWritingCompanion-notification-status",
       },
       revert: {
         title: "بازگشت - ترجمه خودکار",
-        icon: CONFIG.ICON_REVERT,
+        icon: safeConfig.ICON_REVERT,
         priority: 0,
-        duration: 600, // مدت زمان پیش فرض برای بازگشت
-        className: "AIWritingCompanion-notification-revert", // اضافه کردن کلاس CSS مربوط به نوع بازگشت
+        duration: 600,
+        className: "AIWritingCompanion-notification-revert",
       },
     };
 
@@ -83,7 +95,7 @@ export default class NotificationManager {
 
       Object.assign(container.style, commonStyles);
 
-      if (CONFIG.NOTIFICATION_ALIGNMENT === "right") {
+      if (safeConfig.NOTIFICATION_ALIGNMENT === "right") {
         container.style.right = "20px";
       } else {
         container.style.left = "20px";
@@ -92,24 +104,30 @@ export default class NotificationManager {
       document.body.appendChild(container);
     }
 
-    if (CONFIG.TEXT_DIRECTION) {
-      container.style.setProperty("--text-direction", CONFIG.TEXT_DIRECTION);
+    if (safeConfig.NOTIFICATION_TEXT_DIRECTION) {
+      container.style.setProperty(
+        "--text-direction",
+        safeConfig.NOTIFICATION_TEXT_DIRECTION
+      );
     }
-    if (CONFIG.TEXT_ALIGNMENT) {
-      container.style.setProperty("--text-alignment", CONFIG.TEXT_ALIGNMENT);
+    if (safeConfig.NOTIFICATION_TEXT_ALIGNMENT) {
+      container.style.setProperty(
+        "--text-alignment",
+        safeConfig.NOTIFICATION_TEXT_ALIGNMENT
+      );
     }
 
     return container;
   }
 
-  // نمایش اعلان در صورتی که container وجود نداشته باشد (برای پس‌زمینه)
+  // سایر متدها همانطور که در کد شما وجود دارد...
   showBackgroundNotification(message, type = "info", onClick) {
     const config = this.typeMapping[type] || this.typeMapping.info;
 
     Browser.notifications
       .create({
         type: "basic",
-        iconUrl: Browser.runtime.getURL("icons/512.png"), // استفاده از getURL برای مسیر صحیح آیکون
+        iconUrl: Browser.runtime.getURL("icons/512.png"),
         title: config.title,
         message: message,
         priority: config.priority,
@@ -141,7 +159,8 @@ export default class NotificationManager {
 
     const baseNotification = this.typeMapping[type] || this.typeMapping.info;
     const finalDuration = duration || baseNotification.duration;
-    const icon = baseNotification.icon || CONFIG[`ICON_${type.toUpperCase()}`];
+    const icon =
+      baseNotification.icon || safeConfig[`ICON_${type.toUpperCase()}`];
     const notification = document.createElement("div");
     notification.className = `AIWritingCompanion-translation-notification ${baseNotification.className || ""}`;
 
@@ -155,12 +174,11 @@ export default class NotificationManager {
       <span class="AIWritingCompanion-notification-text">${message}</span>
     `;
 
-    let timeoutId = null; // برای نگهداری شناسه تایمر autoDismiss
+    let timeoutId = null;
 
     const clickHandler = () => {
       logME(`Notification clicked: Type=${type}, Message=${message}`);
 
-      // اگر تابع onClick سفارشی وجود دارد، آن را اجرا کن
       if (typeof onClick === "function") {
         try {
           onClick();
@@ -212,6 +230,12 @@ export default class NotificationManager {
   }
 
   dismiss(notification) {
-    fadeOut(notification);
+    try {
+      notification.style.transition = "opacity 0.5s";
+      notification.style.opacity = "0";
+      setTimeout(() => notification.remove(), 500);
+    } catch (error) {
+      // logME("[NotificationManager] dismiss: error", error);
+    }
   }
 }
