@@ -1,3 +1,4 @@
+// src/handlers/translationHandler.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
@@ -68,7 +69,9 @@ export async function handleFetchTranslationBackground(
   translateText,
   errorHandler
 ) {
-  logME("[Handler:Translation-Background] Handling fetchTranslation request");
+  logME(
+    "[Handler:Translation-Background] Handling fetchTranslationBackground request"
+  );
 
   try {
     const { promptText, targetLanguage, sourceLanguage, translationMode } =

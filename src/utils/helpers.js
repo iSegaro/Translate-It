@@ -3,6 +3,8 @@ import Browser from "webextension-polyfill";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { IsDebug } from "../config.js";
 
+const errorHandler = new ErrorHandler();
+
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -80,21 +82,6 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
     return true;
 
   return false;
-};
-
-export const fadeOut = (element) => {
-  try {
-    element.style.transition = "opacity 0.5s";
-    element.style.opacity = "0";
-    setTimeout(() => element.remove(), 500);
-  } catch (error) {
-    const handlerError = errorHandler.handle(error, {
-      type: ErrorTypes.UI,
-      context: "helpers-fadeOut",
-      element: element?.tagName,
-    });
-    throw handlerError;
-  }
 };
 
 export const isExtensionContextValid = () => {
