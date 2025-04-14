@@ -1,5 +1,6 @@
 // src/config.js
 import Browser from "webextension-polyfill";
+import { logME } from "./utils/helpers";
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -168,7 +169,7 @@ export const getSettingsAsync = async () => {
     })
     .catch((error) => {
       // Handle error (e.g., log it, return default CONFIG)
-      console.error("Error fetching settings:", error);
+      logME("Error fetching settings:", error);
       settingsCache = { ...CONFIG }; // Use defaults on error
       return settingsCache;
     });
@@ -195,12 +196,12 @@ if (Browser && Browser.storage && Browser.storage.onChanged) {
       });
       // Optional: Log if cache was updated
       // if (updated) {
-      //   console.log("Settings cache updated by storage change listener.");
+      //   logME("Settings cache updated by storage change listener.");
       // }
     }
   });
 } else {
-  console.warn(
+  logME(
     "Browser.storage.onChanged not available. Settings cache might become stale."
   );
 }
