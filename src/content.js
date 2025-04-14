@@ -130,17 +130,28 @@ class ContentScript {
           message.action === "CONTEXT_INVALID" ||
           message.type === "EXTENSION_RELOADED"
         ) {
-          this.translationHandler.notifier.show(
-            "درحال بروزرسانی...",
-            "integrate",
-            true
-          );
-          // ارسال پیام به اسکریپت پس‌زمینه قبل از بارگذاری مجدد
-          Browser.runtime.sendMessage({ action: "CONTENT_SCRIPT_WILL_RELOAD" });
-          // افزودن تأخیر 3000 میلی‌ثانیه‌ای قبل از اجرای Browser.runtime.reload()
-          setTimeout(() => {
-            Browser.runtime.reload();
-          }, 3000);
+          try {
+            // ارسال پیام به اسکریپت پس‌زمینه قبل از بارگذاری مجدد
+            Browser.runtime.sendMessage({
+              action: "CONTENT_SCRIPT_WILL_RELOAD",
+            });
+
+            this.translationHandler.notifier.show(
+              "لطف صفحه را رفرش کنید",
+              "info",
+              true
+            );
+
+            // setTimeout(() => {
+            //   Browser.runtime.reload();
+            // }, 2000);
+          } catch (error) {
+            error = ErrorHandler.processError(error);
+            this.translationHandler.errorHandler.handle(error, {
+              type: this.translationHandler.ErrorTypes.INTEGRATION,
+              context: "message-listener",
+            });
+          }
         } else {
           logME("[Content] Received unknown message => ", message);
         }
