@@ -25,16 +25,16 @@ Developed exclusively for personal use, this extension ensures that smart and fa
 
 ## ⚙️ Key Features
 
-- **Free & Open Source:** 💸  
+- 💸 **Free & Open Source:**
   Always free for use, with complete open source code available.
 
-- **Word and Sentence Pronunciation:** 🔊  
+- 🔊 **Word and Sentence Pronunciation:**  
   Every translation comes with the ability to listen to the exact pronunciation of words and sentences. You can choose from various accents to hear your preferred pronunciation. Simply click the translator icon in the toolbar to access advanced pronunciation features.
 
-- **Dictionary Mode:** 📙  
+- 📙 **Dictionary Mode:**
   By selecting a word on the page with your mouse, you not only receive its translation but also comprehensive details—such as meaning, synonyms, part of speech, and practical examples—helping you build a deeper understanding of the vocabulary.
 
-- **Supports Multiple Translation Providers:** ✅  
+- ✅ **Supports Multiple Translation Providers:**
   This extension supports several AI translation services, allowing you to choose the best option for your needs:
   - [Gemini][gemini-url] (✔ Free)
   - [OpenAI][openai-url]
