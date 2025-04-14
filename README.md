@@ -14,7 +14,6 @@ This is a personal, lightweight, and efficient tool for seamless text translatio
 - **Text Selection Translation:** Simply select the text you want to translate; as soon as you release the mouse button, the translation appears right at that spot.
 - **Element Selection Translation:** Activate the "Select Element" mode via the extension icon in your browser toolbar, then click on any part of the page (such as paragraphs or buttons) to see a complete translation without altering the page layout.
 - **In-Field Translation:** When typing in any text field or form, press the `Ctrl + /` shortcut or click the small translator icon next to the field to quickly translate your text before submission.
-- **Inline Translation Display:** When you select any text, its translation is shown in a small box directly beneath your selection.
 - **Advanced Popup Translation:** Click the extension icon in the browser toolbar to open a popup window that not only translates text but also provides extra features such as pronunciation assistance and comprehensive dictionary information.
 
 Developed exclusively for personal use, this extension ensures that smart and fast translation is always at fingertips.
