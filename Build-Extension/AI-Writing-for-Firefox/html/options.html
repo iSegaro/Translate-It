@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title data-i18n="options_page_title">AIWC - Settings</title>
+    <title data-i18n="options_page_title">Settings</title>
     <link rel="stylesheet" href="../styles/options.css" />
     <script src="../options.bundle.js" defer></script>
   </head>
   <body>
     <div class="header">
-      <h1 data-i18n="options_page_title">AI Writing Companion</h1>
-      <p data-i18n="pageatitle">Translate Everywher, Simple.</p>
+      <h1 id="options_app_name">AI Writing Companion</h1><span id="options_app_version">version 0.1.0</span>
+      <p data-i18n="options_description">Translate Everywhere, Simple.</p>
     </div>
     <div class="localization">
     </div>
@@ -23,8 +23,8 @@
         >
           Languages
         </button>
-        <button class="tab-button" data-tab="prompt">Prompt</button>
-        <button class="tab-button" data-tab="api">API</button>
+        <button class="tab-button" data-tab="prompt" data-i18n="prompt_tab_title">Prompt</button>
+        <button class="tab-button" data-tab="api" data-i18n="api_tab_title">API</button>
         <button
           class="tab-button"
           data-tab="import-export"
