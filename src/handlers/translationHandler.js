@@ -16,13 +16,14 @@ export async function handleFetchTranslation(
   logME("[Handler:Translation] Handling fetchTranslation request");
 
   try {
-    const { promptText, targetLanguage, sourceLanguage } = message.payload;
+    const { promptText, targetLanguage, sourceLanguage, translateMode } =
+      message.payload;
 
     if (!promptText) throw new Error("No text provided for translation.");
 
     const translation = await translateText(
       promptText,
-      TranslationMode.Popup_Translate,
+      translateMode,
       sourceLanguage,
       targetLanguage
     );

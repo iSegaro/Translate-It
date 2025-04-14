@@ -10,6 +10,7 @@ import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js"; // For sav
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
 import { marked } from "marked";
+import { TranslationMode } from "../config.js";
 
 function handleTranslationResponse(
   response,
@@ -133,6 +134,47 @@ async function triggerTranslation() {
   elements.translationResult.textContent = "در حال ترجمه...";
   uiManager.toggleInlineToolbarVisibility(elements.translationResult); // Hide toolbar while translating
 
+  // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
+  // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است
+  const maxDictionaryWords = 2; // حداکثر تعداد کلمات برای حالت دیکشنری
+  const maxDictionaryChars = 30; // حداکثر تعداد کاراکترها برای حالت دیکشنری
+  const stopWords = [
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "in",
+    "on",
+    "at",
+    "to",
+    "of",
+    "for",
+    "with",
+    "by",
+    "from",
+  ]; // *** لیست کلمات رایج (بسته به زبان)
+
+  const words = textToTranslate.trim().split(/\s+/);
+  let translateMode = TranslationMode.Popup_Translate;
+
+  if (
+    words.length <= maxDictionaryWords &&
+    textToTranslate.length <= maxDictionaryChars
+  ) {
+    if (words.length === 1) {
+      const lowerCaseWord = words[0].toLowerCase();
+      if (!stopWords.includes(lowerCaseWord)) {
+        translateMode = TranslationMode.Dictionary_Translation;
+      }
+    } else if (words.length > 1) {
+      translateMode = TranslationMode.Dictionary_Translation;
+    }
+  }
+  // *** End of TODO ***
+
   try {
     const response = await Browser.runtime.sendMessage({
       action: "fetchTranslation",
@@ -140,6 +182,7 @@ async function triggerTranslation() {
         promptText: textToTranslate,
         sourceLanguage: sourceLangCheck, // Send null or language code
         targetLanguage: targetLangCodeCheck, // Send validated target code/promptName
+        translateMode: translateMode,
       },
     });
     handleTranslationResponse(
