@@ -9,22 +9,33 @@
 
 <br>
 
-Browser Translator Extension, a personal, lightweight, and efficient tool for easy text translation on the web. By offering four different translation and lookup methods, it provides a smooth and fast user experience: quick text translation with selection, page element translation, in-text-field translation, and dictionary information for selected words.
+This is a personal, lightweight, and efficient tool for seamless text translation on the web and in any text you type. By offering multiple distinct translation and lookup methods, it delivers a fast and hassle-free user experience:
 
-**This is a handy, small writing tool and translation assistant. Everyever**
+- **Text Selection Translation:** Simply select the text you want to translate; as soon as you release the mouse button, the translation appears right at that spot.
+- **Element Selection Translation:** Activate the "Select Element" mode via the extension icon in your browser toolbar, then click on any part of the page (such as paragraphs or buttons) to see a complete translation without altering the page layout.
+- **In-Field Translation:** When typing in any text field or form, press the `Ctrl + /` shortcut or click the small translator icon next to the field to quickly translate your text before submission.
+- **Inline Translation Display:** When you select any text, its translation is shown in a small box directly beneath your selection.
+- **Advanced Popup Translation:** Click the extension icon in the browser toolbar to open a popup window that not only translates text but also provides extra features such as pronunciation assistance and comprehensive dictionary information.
+
+Developed exclusively for personal use, this extension ensures that smart and fast translation is always at fingertips.
+
+**Smart and fast translation, anytime and everywhere.**
 
 <br>
 
 ## ⚙️ Key Features
 
-- **Translate with Selected Text (Select Text):** Simply select the text you want to translate on any website. After releasing the mouse button, the translation will quickly appear in the same place. **If a single word is selected, related dictionary information will also be displayed.**
-- **Translate with Selected Element (Select Element):** By activating the "Select Element" mode by clicking the extension icon in the browser toolbar, you can click on any desired element on the page (such as paragraphs, buttons, etc.) to translate its content into your preferred language.
-- **Translate in Text Fields (Field):** When working with forms, editors, and other text fields, you can translate your text in two ways:
-  - **Using the `Ctrl + /` shortcut:** By pressing these key combinations, the text in the active field will be translated quickly.
-  - **By clicking the translator icon:** A small translator icon appears next to text fields. By clicking on it, you can easily translate the content of the field.
-- **Dictionary Mode:** By selecting a single word on the page with the mouse, comprehensive information such as meaning, synonyms, word type, and examples (if available) will be displayed in addition to the translation. This feature helps you gain a deeper understanding of words.
-- **Supports Multiple Translation Providers:** This extension supports several different AI translation services, allowing you to choose the best option for your needs.
+- **Free & Open Source:** 💸  
+  Always free for use, with complete open source code available.
 
+- **Word and Sentence Pronunciation:** 🔊  
+  Every translation comes with the ability to listen to the exact pronunciation of words and sentences. You can choose from various accents to hear your preferred pronunciation. Simply click the translator icon in the toolbar to access advanced pronunciation features.
+
+- **Dictionary Mode:** 📙  
+  By selecting a word on the page with your mouse, you not only receive its translation but also comprehensive details—such as meaning, synonyms, part of speech, and practical examples—helping you build a deeper understanding of the vocabulary.
+
+- **Supports Multiple Translation Providers:** ✅  
+  This extension supports several AI translation services, allowing you to choose the best option for your needs:
   - [Gemini][gemini-url] (✔ Free)
   - [OpenAI][openai-url]
   - [OpenRouter][openrouter-url] (✔ Free)
@@ -34,7 +45,7 @@ Browser Translator Extension, a personal, lightweight, and efficient tool for ea
 
 ## 📋 Requirements
 
-- A modern Chromium-based browser (Chrome, Edge, Brave, etc.)
+- A modern Chromium-based browser or Firefox (Chrome, Edge, Brave, etc.)
 - A valid API key (if not using [WebAI to API][webai-to-api-url])
 
 <br>
@@ -43,25 +54,29 @@ Browser Translator Extension, a personal, lightweight, and efficient tool for ea
 
 ## 🔧 Installation
 
-We're almost done with the fine-tuning, and we'll soon publish it on the Chrome Store.
+Just a few finishing touches remain, and we'll soon release it on the Chrome Store and Firefox Add-ons.
 
-### 1. Install via CRX File
+### Install for Chrome
 
-- Download the latest version of [`AI-Writing-Companion.crx`][crx-download-url] from the [`Build-Extension/Chrome/`][chrome-build-folder-url] folder.
+- [Download the latest Chrome version here][chrome-zip-url].
+- Extract the downloaded ZIP file.
 - Open [`chrome://extensions/`][chrome-extensions-url] in Chrome and enable **Developer mode**.
-- Drag and drop the [`.CRX`][crx-download-url] file onto the `chrome://extensions/` page to install the extension.
-- Go to the **Settings** page of the extension and enter your API key.
+- Drag and drop the extracted folder onto the `chrome://extensions/` page to install the extension.
+- That's it!
 
-### 2. Install via Git
+_Note:_ After installation, click the **extension icon** in your browser to open **Settings** and enter your API key.
 
-```bash
-# Clone the repository
-git clone https://github.com/iSegaro/AIWritingCompanion.git
-cd AI-Writing-Companion
-```
+<br><br>
 
-- Instead of using the CRX file, you can use the `AI-Writing-Companion/Build-Extension/Chrome/` folder.
-- Follow the **CRX installation** steps.
+### Install for Firefox
+
+- [Download the latest Firefox version here][firefox-zip-url].
+- Extract the downloaded ZIP file.
+- Open [`about:debugging#/runtime/this-firefox/`][firefox-extensions-url] in Firefox.
+- Click the `Load Temporary Add-on...` button and select the `manifest.json` file from the extracted folder.
+- That's it!
+
+_Note:_ Once installed, click the **extension icon** in your browser to access **Settings** and enter your API key.
 
 <br>
 
@@ -101,11 +116,11 @@ If you found this project useful and can afford it, treat me to a coffee! :)
 
 <br>
 
-| 💰 Payment Method      | 🔗 Link                                                                                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🟢 **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                     |
-| 🟠 **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                     |
-| 💲 **PayPal**          | [![Donate PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE) |
+| Donations Method    | 🔗 Link                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                     |
+| **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                     |
+| **PayPal**          | [![Donate PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE) |
 
 <br>
 Thank you for your support!
@@ -116,11 +131,10 @@ Your support goes to Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(
 
 ---
 
-## 🤝 Contribute
+### Contributors
 
-- **Star the repo** to support the project. ⭐
-- **Report issues:** [GitHub Issues][github-issues-url] 🐞
-- **Submit Pull Requests (PRs)** to contribute improvements.
+- iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
+- Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
 
 <br>
 
@@ -157,10 +171,13 @@ npm run watch
 
 ---
 
-### Contributors
+## 🤝 Contribute
 
-- iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
-- Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
+- **Star the repo** to support the project. ⭐
+- **Report issues:** [GitHub Issues][github-issues-url] 🐞
+- **Submit Pull Requests (PRs)** to contribute improvements.
+
+---
 
 ### 🖼️ Copyright
 
