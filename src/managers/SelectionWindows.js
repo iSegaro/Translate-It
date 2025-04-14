@@ -8,18 +8,23 @@ import { marked } from "marked";
 
 export default class SelectionWindows {
   constructor(options = {}) {
-    this.fadeInDuration = options.fadeInDuration || 50; // مدت زمان پیش فرض برای fade-in
-    this.fadeOutDuration = options.fadeOutDuration || 125; // مدت زمان پیش فرض برای fade-out
+    this.fadeInDuration = options.fadeInDuration || 50;
+    this.fadeOutDuration = options.fadeOutDuration || 125;
     this.isVisible = false;
     this.currentText = null;
     this.displayElement = null;
     this.errorHandler = new ErrorHandler();
-    this.removeMouseDownListener = null; // برای نگهداری رفرنس تابع حذف لیستنر
+    this.removeMouseDownListener = null;
     this.translationHandler = options.translationHandler;
-    this.translatedText = null; // برای نگهداری متن ترجمه شده
-    this.isTranslationCancelled = false; // پرچم برای مشخص کردن اینکه آیا ترجمه لغو شده است
-    this.originalText = null; // نگهداری متنی که در حال ترجمه است
+    this.translatedText = null;
+    this.isTranslationCancelled = false;
+    this.originalText = null;
     this.notifier = options.notifier;
+
+    // اطمینان از حفظ context در callback ها:
+    this.show = this.show.bind(this);
+    this.cancelCurrentTranslation = this.cancelCurrentTranslation.bind(this);
+    // در صورت لزوم سایر متدهایی که از "this" استفاده می‌کنند را نیز bind کنید.
   }
 
   async show(selectedText, position) {
@@ -119,24 +124,46 @@ export default class SelectionWindows {
         },
       })
       .then((response) => {
-        if (this.isTranslationCancelled || this.originalText !== currentText) {
-          this.dismiss(false);
-          return;
-        }
+        try {
+          // اگر ترجمه کنسل شده یا متن عوض شده، پنجره را ببند
+          if (
+            this.isTranslationCancelled ||
+            this.originalText !== currentText
+          ) {
+            this.cancelCurrentTranslation();
+            return;
+          }
 
-        if (response && response.success === true) {
-          const translatedText = response.data?.translatedText?.trim() || "";
-          this.transitionToTranslatedText(
-            translatedText,
-            loadingContainer,
-            currentText,
-            translationMode
-          );
-        } else {
-          this.handleEmptyTranslation(loadingContainer);
+          // بررسی موفقیت پاسخ
+          if (response && response.success === true) {
+            const translatedText = response.data?.translatedText?.trim() || "";
+            if (translatedText) {
+              // اگر ترجمه داریم، آن را در کادر ترجمه نمایش میدهیم
+              this.transitionToTranslatedText(
+                translatedText,
+                loadingContainer,
+                currentText,
+                translationMode
+              );
+            } else {
+              // TODO: اگر پاسخ خالی باشد، یعنی خطایی پیش آمده در فرآیند ترجمه و یا خطایی در API
+              // فعلا یک پیغام خالی بودن متن ترجمه نمایش میدهیم ولی باید بهینه شود با منطق
+              // خطاهای API تا پیغام درستی به کاربر نمایش داده شود.
+              this.handleEmptyTranslation(loadingContainer);
+            }
+          } else {
+            // اگر پاسخ موفق نبود، پیامی به کاربر نمایش میدهیم
+            this.handleEmptyTranslation(loadingContainer);
+          }
+        } catch (err) {
+          // اگر هر خطای غیرمنتظره‌ای در این بلوک رخ داد،
+          // هم لاگ می‌کنیم و هم باکس را می‌بندیم
+          logME("[SelectionWindow] Error in .then block:", err);
+          this.handleTranslationError(err, loadingContainer);
         }
       })
       .catch((error) => {
+        // خطاهای promise-level
         logME("[SelectionWindow] Error fetching translation:", error);
         this.handleEmptyTranslation(loadingContainer);
       });
@@ -314,33 +341,30 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        // this.displayElement.innerHTML =
-        //   "(متن ترجمه خالی است، دوباره امتحان کنید).";
-        // this.displayElement.style.opacity = "0.9";
         this.notifier.show(
           "متن ترجمه خالی است، دوباره امتحان کنید",
           "info",
           true,
           2000
         );
+        // با false صدا بزنید تا مستقیماً remove شود
         this.dismiss(false);
       }
     }, 300);
   }
 
   handleTranslationError(error, loadingContainer) {
-    logME("Error during translation:", error);
+    // logME("Error during translation:", error);
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        // this.displayElement.innerHTML = "(خطا در ترجمه، دوباره امتحان کنید)";
-        // this.displayElement.style.opacity = "0.9";
         this.notifier.show(
-          "متن ترجمه خالی است، دوباره امتحان کنید",
+          "خطایی رخ داد، دوباره تلاش کنید",
           "info",
           true,
           2000
         );
+        // با false صدا بزنید تا مستقیماً remove شود
         this.dismiss(false);
       }
     }, 300);
@@ -348,11 +372,10 @@ export default class SelectionWindows {
 
   dismiss(withFadeOut = true) {
     if (!this.displayElement || !this.isVisible) {
-      // اضافه کردن چک isVisible
       return;
     }
 
-    // *** اطمینان از حذف listener قبل از شروع انیمیشن یا حذف ***
+    // حذف لیسنر
     if (this.removeMouseDownListener) {
       document.removeEventListener("mousedown", this.removeMouseDownListener);
       this.removeMouseDownListener = null;
@@ -361,17 +384,16 @@ export default class SelectionWindows {
     this.isVisible = false;
 
     if (withFadeOut && this.fadeOutDuration > 0) {
-      // *** استفاده از transition به جای setTimeout مستقیم برای fade-out ***
+      // حالت عادی با انیمیشن
       this.displayElement.style.transition = `opacity ${this.fadeOutDuration}ms ease-in-out`;
       this.displayElement.style.opacity = "0";
-
-      // استفاده از event listener 'transitionend' برای حذف المان بعد از پایان انیمیشن
       this.displayElement.addEventListener(
         "transitionend",
         this.removeElement.bind(this),
         { once: true }
       );
     } else {
+      // حذف بی‌درنگ
       this.removeElement();
     }
   }
