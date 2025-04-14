@@ -204,9 +204,12 @@ This project is licensed under the **MIT License**. Feel free to improve and sha
 [openai-url]: https://chat.openai.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
-[crx-download-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/AI-Writing-Companion.crx
-[chrome-build-folder-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/
+[firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Firefox-v0.1.0.zip
+[chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Chrome-v0.1.0.zip
+[crx-download-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion.crx
+[chrome-build-folder-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/
 [chrome-extensions-url]: chrome://extensions/
+[firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
