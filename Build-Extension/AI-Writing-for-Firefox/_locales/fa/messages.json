@@ -7,6 +7,7 @@
   "description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
+  "advance_tab_title": { "message": "پیش‌رفته" },
   "api_tab_title": { "message": "تنظیمات API" },
   "prompt_tab_title": { "message": "تنظیمات پرامت" },
   "languages_tab_title": { "message": "زبان‌ها" },
@@ -67,8 +68,8 @@
     "message": "می‌توانید از کلیدواژه‌های زیر در الگوی درخواست خود استفاده کنید:"
   },
   "api_section_title": { "message": "API ترجمه" },
-  "dev_api_mode_label": { "message": "استفاده از حالت API توسعه" },
-  "debug_mode_label": { "message": "حالت اشکال‌زدایی" },
+  "advance_dev_api_mode_label": { "message": "استفاده از حالت API توسعه" },
+  "advance_debug_mode_label": { "message": "حالت اشکال‌زدایی" },
   "translation_api_label": { "message": "انتخاب مدل هوش‌مصنوعی" },
   "webai_api_settings_title": { "message": "تنظیمات API WebAI" },
   "webai_api_url_label": { "message": "آدرس URL API WebAI" },

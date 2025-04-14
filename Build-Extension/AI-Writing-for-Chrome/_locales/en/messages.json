@@ -7,6 +7,7 @@
   "description": { "message": "Translate Everywhere. Simply." },
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
+  "advance_tab_title": { "message": "Advance" },
   "api_tab_title": { "message": "API Settings" },
   "prompt_tab_title": { "message": "Prompt Settings" },
   "languages_tab_title": { "message": "Languages" },
@@ -67,8 +68,8 @@
     "message": "You can use the following keywords in your prompt template:"
   },
   "api_section_title": { "message": "Translation API" },
-  "dev_api_mode_label": { "message": "Use Dev API Mode" },
-  "debug_mode_label": { "message": "Debug Mode" },
+  "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
+  "advance_debug_mode_label": { "message": "Debug Mode" },
   "translation_api_label": { "message": "API Model Choice" },
   "webai_api_settings_title": { "message": "WebAI API Settings" },
   "webai_api_url_label": { "message": "WebAI API URL" },

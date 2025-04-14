@@ -32,6 +32,7 @@
         >
           Import/Export
         </button>
+        <button class="tab-button" data-tab="advance" data-i18n="advance_tab_title">Advance</button>
       </div>
 
       <div id="languages" class="tab-content active">
@@ -164,16 +165,6 @@
       <div id="api" class="tab-content">
         <section>
           <h2 data-i18n="api_section_title"">Translation API</h2>
-          <!-- Add Dev API Mode Checkbox Here -->
-          <div class="setting-group">
-            <label data-i18n="dev_api_mode_label" for="useMock">Use Dev API Mode</label>
-            <input type="checkbox" id="useMock" />
-          </div>
-          <!-- Add Debug Mode Checkbox Here -->
-          <div class="setting-group">
-            <label for="debugMode" data-i18n="debug_mode_label">Debug Mode</label>
-            <input type="checkbox" id="debugMode" />
-          </div>
           <div class="setting-group">
             <label for="translationApi" data-i18n="translation_api_label">API Choice</label>
             <select id="translationApi">
@@ -282,6 +273,22 @@
           <div class="setting-group">
             <button id="importSettings" data-i18n="import_settings_button">Import Settings</button>
           </div>
+        </section>
+      </div>
+
+      <div id="advance" class="tab-content">
+        <section>
+          <!-- Add Dev API Mode Checkbox Here -->
+          <div class="setting-group">
+            <label data-i18n="advance_dev_api_mode_label" for="useMock">Use Dev API Mode</label>
+            <input type="checkbox" id="useMock" />
+          </div>
+          <!-- Add Debug Mode Checkbox Here -->
+          <div class="setting-group">
+            <label for="debugMode" data-i18n="advance_debug_mode_label">Debug Mode</label>
+            <input type="checkbox" id="debugMode" />
+          </div>
+          
         </section>
       </div>
 
