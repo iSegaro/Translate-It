@@ -65,13 +65,20 @@ export default function setupIconBehavior(
     e.preventDefault();
     e.stopPropagation();
 
+    let statusNotification = null;
     try {
+      // فرض بر این است که متغیر target از بستر (مثلاً در closure) یا از e.currentTarget گرفته می‌شود
       const platform = detectPlatform(target);
       const text = strategies[platform].extractText(target);
-      if (!text) return;
+      if (!text) {
+        logME("[IconBehavior] متن انتخاب شده خالی است.");
+        return;
+      }
 
+      // نمایش اعلان وضعیت ترجمه
       statusNotification = notifier.show("در حال ترجمه...", "status", false);
 
+      // فراخوانی متد translateText
       const translated = await translateText(
         text,
         TranslationMode.SelectElement
@@ -80,11 +87,14 @@ export default function setupIconBehavior(
       if (translated) {
         await translationHandler.updateTargetElement(target, translated);
       } else {
-        // logME("[IconBehavior] No translation result: ", translated);
+        // در صورت عدم دریافت ترجمه، یک اعلان هشدار نمایش داده می‌شود.
+        logME("[IconBehavior] نتیجه ترجمه دریافت نشد.");
+        notifier.show("نتیجه ترجمه دریافت نشد", "warning");
       }
     } catch (error) {
-      // const resolvedError = await Promise.resolve(error);
-      // logME("[IconBehavior] setupIconBehavior: ", resolvedError);
+      // ثبت خطا در کنسول و نمایش اعلان خطا
+      logME("[IconBehavior] خطا در فراخوانی ترجمه:", error);
+      notifier.show("خطا در ترجمه", "error");
     } finally {
       if (statusNotification) {
         notifier.dismiss(statusNotification);
