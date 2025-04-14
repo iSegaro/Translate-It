@@ -56,14 +56,69 @@ export default class SelectionWindows {
 
     let translationMode = TranslationMode.Field; // *** پیش فرض حالت ترجمه کامل
 
+    // ایجاد کانتینر اصلی برای Shadow DOM
+    const container = document.createElement("div");
+    // تنظیم موقعیت و سایر ویژگی‌ها
+    container.style.position = "absolute";
+    container.style.left = `${position.x}px`;
+    container.style.top = `${position.y}px`;
+    container.style.zIndex = "2147483637"; // یا سطح دیگری که تضمین کند بالاتر باشد
+
+    // ایجاد Shadow Root
+    const shadowRoot = container.attachShadow({ mode: "open" });
+
     // *** نمایش لودینگ ***
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-display-temp");
 
+    this.displayElement.style.opacity = "0.6";
+    this.displayElement.style.transform = "scale(0.1)";
+    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
+
+    // ایجاد المان لودینگ
     const loadingContainer = this.createLoadingDots();
     this.displayElement.appendChild(loadingContainer);
 
+    // افزودن المان displayElement به درون Shadow Root
+    shadowRoot.appendChild(this.displayElement);
+
     this.applyInitialStyles(position);
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .aiwc-selection-display-temp {
+        background-color: #f8f8f8;
+        color: #333;
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        /* سایر استایل‌های شما */
+      }
+      /* سایر کلاس‌های مربوط به داخل پنجره */
+      .aiwc-loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 1;
+        transition: opacity 0.9s ease-in-out;
+      }
+      @keyframes blink {
+        0% { opacity: 0.3; }
+        50% { opacity: 0.8; }
+        100% { opacity: 0.3; }
+      }
+      .aiwc-loading-dot {
+        font-size: 1.2em;
+        opacity: 0.3;
+        margin: 0 0.2em;
+        animation: blink 0.7s infinite;
+        color: black;
+      }
+    `;
+    shadowRoot.appendChild(style);
+
     document.body.appendChild(this.displayElement);
     this.isVisible = true;
     this.animatePopupSize(loadingContainer);

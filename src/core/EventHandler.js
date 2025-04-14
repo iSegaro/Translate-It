@@ -174,16 +174,31 @@ export default class EventHandler {
     return selectedText.trim();
   }
 
+  _getEventPath(event) {
+    let path = event.composedPath ? event.composedPath() : [];
+    if (!path || path.length === 0) {
+      // ساخت مسیر به روش دستی
+      let node = event.target;
+      path = [];
+      while (node) {
+        path.push(node);
+        node = node.parentNode;
+      }
+    }
+    return path;
+  }
+
   @logMethod
   async handleMouseUp(event) {
     const selectedText = this._getSelectedTextWithDash();
+    const path = this._getEventPath(event); // استفاده از تابع fallback
 
-    // اول بررسی کنیم که آیا کلیک (mouseup) داخل پاپ‌آپ موجود رخ داده؟
-    // اگر بله، هیچ کاری نکنیم (نه نمایش جدید، نه بستن).
+    // بررسی اینکه آیا کلیک در داخل پنجره ترجمه رخ داده است یا نه
     if (
       this.SelectionWindows?.isVisible &&
-      this.SelectionWindows?.displayElement?.contains(event.target)
+      path.includes(this.SelectionWindows?.displayElement)
     ) {
+      // اگر کلیک داخل پنجره اتفاق افتاده باشد، عملیات متوقف می‌شود
       // logME(
       //   "[EventHandler] MouseUp target is inside the selection window. Ignoring."
       // );
