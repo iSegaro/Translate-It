@@ -142,9 +142,9 @@ export async function app_localize_popup(lang_code) {
   let App_Language = await getApplication_LocalizeAsync();
   let langCode = lang_code;
 
-  if (!langCode || langCode?.length !== 2) {
+  if (!langCode || langCode?.length > 2) {
     languageList.forEach((language) => {
-      if (language.locale === App_Language) {
+      if (language.name === App_Language || language.locale === App_Language) {
         langCode = language.locale;
       }
     });
