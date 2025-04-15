@@ -213,6 +213,7 @@ _نکته:_ برای `Google Gemini` و `WebAI to API` بصورت پیش‌فر�
 | **PayPal**          | [![کمک مالی PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE) |
 
 <br>
+
 با تشکر از حمایت شما!
 
 حمایت شما می‌رسد به محمد [![محمد X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x>)][mohammad-x-url]

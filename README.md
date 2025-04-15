@@ -203,7 +203,8 @@ If this project helped you and you’d like to support it, you can buy me a coff
 
 <br>
 Thank you for your support!
-Your donation supports Mohammad [![Mohammad X](https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x)][mohammad-x-url]
+
+Your donation supports Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x>)][mohammad-x-url]
 
 <br>
 
