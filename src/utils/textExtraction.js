@@ -2,6 +2,7 @@
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { IsDebug } from "../config.js";
 import { logME } from "./helpers.js";
+import { correctTextDirection, applyTextDirection } from "./textDetection.js";
 
 const translationCache = new Map();
 
@@ -112,6 +113,9 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
     if (translatedText && trimmedOriginalText) {
       const parentElement = textNode.parentNode;
+      // ذخیره‌ی استایل‌های اولیه قبل از تغییر آن‌ها
+      storeOriginalParentStyles(parentElement);
+
       // ایجاد container برای نگهداری ترجمه
       const containerSpan = document.createElement("span");
       const uniqueId = generateUniqueId();
@@ -123,26 +127,27 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       const translatedLines = translatedText.split("\n");
 
       originalLines.forEach((originalLine, index) => {
-        // ایجاد span داخلی برای هر خط ترجمه
         const translatedLine =
           translatedLines[index] !== undefined ? translatedLines[index] : "";
         const innerSpan = document.createElement("span");
         innerSpan.textContent = translatedLine;
-        // ثبت هر خط در state برای پشتیبانی از امکانات دیگر (در صورت نیاز)
         context.state.originalTexts.set(uniqueId, {
           originalText: originalLine,
           wrapperElement: innerSpan,
         });
-        context.IconManager.applyTextDirection(innerSpan, translatedLine);
+
         containerSpan.appendChild(innerSpan);
 
-        // اضافه کردن <br> با نشانه‌گذاری برای خطوط جداگانه (جزء ترجمه چند خطی)
         if (index < originalLines.length - 1) {
           const br = document.createElement("br");
           br.setAttribute("data-aiwc-br", "true");
           containerSpan.appendChild(br);
         }
       });
+
+      // تغییر استایل المان پدر برای نمایش متن ترجمه شده
+      applyTextDirection(parentElement, true);
+      correctTextDirection(parentElement, translatedLines);
 
       try {
         parentElement.replaceChild(containerSpan, textNode);
@@ -179,13 +184,16 @@ export async function revertTranslations(context) {
     const originalText = container.getAttribute("data-aiwc-original-text");
     if (originalText !== null) {
       try {
-        // ایجاد یک گره متنی جدید با متن اصلی ذخیره شده
+        // قبل از جایگزینی، بازیابی استایل‌های اصلی المان پدر
+        const parentElement = container.parentNode;
+        restoreOriginalParentStyles(parentElement);
+
+        // ایجاد گره متنی اصلی
         const originalTextNode = document.createTextNode(originalText);
-        // جایگزینی container با گره متنی اصلی
-        container.parentNode.replaceChild(originalTextNode, container);
+        parentElement.replaceChild(originalTextNode, container);
         successfulReverts++;
 
-        // حذف گره‌های <br> مجاور که با ویژگی data-aiwc-br نشانه‌گذاری شده‌اند
+        // حذف <br> های اضافه همراه ترجمه
         let nextNode = originalTextNode.nextSibling;
         while (
           nextNode &&
@@ -214,7 +222,6 @@ export async function revertTranslations(context) {
     context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
   }
 
-  // پاکسازی state و انجام cleanup
   context.IconManager?.cleanup();
   context.state.originalTexts.clear();
 
@@ -384,6 +391,38 @@ export function handleTranslationLengthMismatch(translatedData, expandedTexts) {
   }
 
   return true;
+}
+
+/**
+ * ذخیره‌ی استایل‌های اولیه جهت (direction) و تراز متن (text-align) در المان پدر.
+ * اگر قبلاً استایلی ذخیره نشده باشد، استایل‌های موجود در المان پدر (به صورت inline) ذخیره خواهند شد.
+ * @param {HTMLElement} parentElement المان پدر مورد نظر.
+ */
+export function storeOriginalParentStyles(parentElement) {
+  if (!parentElement.dataset.aiwcOriginalDirection) {
+    parentElement.dataset.aiwcOriginalDirection =
+      parentElement.style.direction || "";
+  }
+  if (!parentElement.dataset.aiwcOriginalTextAlign) {
+    parentElement.dataset.aiwcOriginalTextAlign =
+      parentElement.style.textAlign || "";
+  }
+}
+
+/**
+ * بازیابی و بازگردانی استایل‌های اولیه جهت (direction) و تراز متن (text-align) از المان پدر.
+ * پس از بازگردانی، اطلاعات ذخیره شده پاک می‌شود.
+ * @param {HTMLElement} parentElement المان پدر مورد نظر.
+ */
+export function restoreOriginalParentStyles(parentElement) {
+  if (parentElement.dataset.aiwcOriginalDirection !== undefined) {
+    parentElement.style.direction = parentElement.dataset.aiwcOriginalDirection;
+    delete parentElement.dataset.aiwcOriginalDirection;
+  }
+  if (parentElement.dataset.aiwcOriginalTextAlign !== undefined) {
+    parentElement.style.textAlign = parentElement.dataset.aiwcOriginalTextAlign;
+    delete parentElement.dataset.aiwcOriginalTextAlign;
+  }
 }
 
 export function reassembleTranslations(
