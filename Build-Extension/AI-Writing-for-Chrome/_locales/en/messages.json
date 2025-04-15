@@ -105,7 +105,11 @@
   "import_settings_button": { "message": "Import Settings" },
   "save_settings_button": { "message": "Save" },
 
+  "popup_revert_title_icon": { "message": "Revert" },
+  "popup_revert_alt_icon": { "message": "Revert" },
+
   "popup_page_title": { "message": "AI Writing Companion" },
+
   "popup_translate_page_link": { "message": "Translate This Page" },
   "popup_translate_page_link_title": { "message": "Open translate in new tab" },
   "popup_select_element_alt_icon": { "message": "Select Element" },

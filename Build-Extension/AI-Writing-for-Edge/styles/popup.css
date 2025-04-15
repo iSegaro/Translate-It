@@ -33,6 +33,22 @@ body {
   flex-direction: row-reverse;
 }
 
+@keyframes rotate-hover {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#revertActionIcon {
+  transition: transform 0.4s ease;
+}
+#revertActionIcon:hover {
+  transform: rotate(360deg);
+}
+
 .toolbar-right-group {
   display: flex;
   gap: 8px;
