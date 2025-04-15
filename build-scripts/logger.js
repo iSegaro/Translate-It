@@ -9,6 +9,11 @@ export function logStep(name) {
       color: chalk.blue.bold,
     },
     {
+      keyword: "edge",
+      icon: "⚡",
+      color: chalk.hex("#0078D7").bold, // ابی کم رنگ
+    },
+    {
       keyword: "firefox",
       icon: "🦊",
       color: chalk.hex("#FF8800").bold, // نارنجی برای فایرفاکس
