@@ -12,19 +12,37 @@ export async function handleRevertBackground(params) {
       active: true,
       currentWindow: true,
     });
-    if (!tab?.id) {
-      logME("No active tab found for ESC revert", "error");
+
+    if (!tab || !tab.id) {
+      logME("[Handler:Revert] No active tab or tab ID found");
       return;
     }
 
-    await Browser.tabs.sendMessage(tab.id, {
-      action: "revertAllAndEscape", // یک نام واضح برای اکشن
-      source: "background",
-    });
+    try {
+      await Browser.tabs.sendMessage(tab.id, {
+        action: "revertAllAndEscape",
+        source: "background",
+      });
 
-    logME("Sent revertAllAndEscape action to content script");
-  } catch (error) {
-    logME("Error in handleRevertBackground: " + error, "error");
+      // logME(
+      //   "[Handler:Revert] Sent 'revertAllAndEscape' action to content script"
+      // );
+    } catch (sendError) {
+      const message = sendError?.message || "";
+      if (message.includes("Could not establish connection")) {
+        // خطای قابل صرف‌نظر، اغلب در زمان reload یا نبود content script
+        // یا وقت‌هایی که در صفحه تنظیمات و یا سایر موارد باشد این خطا رخ میدهد
+        return;
+      }
+      logME(
+        "[Handler:Revert] Failed to send message to tab " +
+          tab.id +
+          ": " +
+          message
+      );
+    }
+  } catch (queryError) {
+    logME("[Handler:Revert] Failed to query active tab: " + queryError.message);
   }
 }
 
