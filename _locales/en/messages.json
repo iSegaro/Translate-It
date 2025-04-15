@@ -71,6 +71,10 @@
   "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
   "advance_debug_mode_label": { "message": "Debug Mode" },
   "translation_api_label": { "message": "API Model Choice" },
+  "gemini_api_key_info": {
+    "message": "You can get your Gemini API key from Google AI Studio."
+  },
+  "gemini_api_key_link": { "message": "Get free API Key" },
   "webai_api_settings_title": { "message": "WebAI API Settings" },
   "webai_api_url_label": { "message": "WebAI API URL" },
   "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },

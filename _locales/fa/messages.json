@@ -71,6 +71,10 @@
   "advance_dev_api_mode_label": { "message": "استفاده از حالت API توسعه" },
   "advance_debug_mode_label": { "message": "حالت اشکال‌زدایی" },
   "translation_api_label": { "message": "انتخاب مدل هوش‌مصنوعی" },
+  "gemini_api_key_info": {
+    "message": "شما می‌توانید API Key خود را از Googl AI Studio دریافت کنید."
+  },
+  "gemini_api_key_link": { "message": "دریافت API Key رایگان" },
   "webai_api_settings_title": { "message": "تنظیمات API WebAI" },
   "webai_api_url_label": { "message": "آدرس URL API WebAI" },
   "webai_api_url_placeholder": {
