@@ -5,9 +5,13 @@
 > دستیار هوشمند ترجمه
 
 <p align="center">
+  <a href="#install-for-chrome">
   Chrome <img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="50" />
+  </a>
   &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;
-  <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
+  <a href="#install-for-firefox">
+    <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
+  </a>
 </p>
 
 <br>
