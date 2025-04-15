@@ -6,7 +6,7 @@
     "build:chrome": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Building Chrome extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
     "build:edge": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Building Edge extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.edge.js --mode production",
     "build:firefox": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Building Firefox extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.firefox.js --mode production",
-    "build": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Running Full Build'))\" && npm run build:firefox && npm run build:chrome && npm run build:edge",
+    "build": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Running Build for All Browsers'))\" && npm run build:chrome && npm run build:firefox && npm run build:edge",
     "watch:chrome": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Watching Chrome...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.chrome.js --watch --mode development",
     "watch:edge": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Watching Edge...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.edge.js --watch --mode development",
     "watch:firefox": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Watching Firefox...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.firefox.js --watch --mode development",
