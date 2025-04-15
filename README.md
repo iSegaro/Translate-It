@@ -4,12 +4,20 @@
 
 <p align="center">
   <a href="#install-for-chrome">
-    <img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="50" />
-  Chrome</a>
-  &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;
-  <a href="#install-for-firefox">
-    <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
+    <img src="./icons/Google_Chrome_icon.png" alt="Chrome" height="40" />
+    <span>&nbsp;Chrome&nbsp;</span>
   </a>
+  <a href="#install-for-edge">
+    <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
+    <span>&nbsp;Edge&nbsp;</span>
+  </a>
+  <a href="#install-for-firefox">
+    <img src="./icons/Mozilla_Firefox_logo.png" alt="Firefox" height="40" />
+    <span>&nbsp;Firefox&nbsp;</span>
+  </a>
+
+✅ Available now
+
 </p>
 
 <br>
@@ -74,7 +82,10 @@ You can choose from several AI-powered translation providers:
 
 We're almost done with final touches, and the extension will soon be published on the Chrome Web Store and Firefox Add-ons.
 
-### Install for Chrome
+<details id="install-for-chrome">
+<summary>
+  <h3>Install for Chrome</h3>
+</summary>
 
 - [Download the latest Chrome version here][chrome-zip-url].
 - Extract the downloaded ZIP file.
@@ -84,9 +95,14 @@ We're almost done with final touches, and the extension will soon be published o
 
 _Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
 
-<br><br>
+</details>
 
-### Install for Firefox
+<br>
+
+<details id="install-for-firefox">
+<summary>
+  <h3>Install for Firefox</h3>
+</summary>
 
 - [Download the latest Firefox version here][firefox-zip-url].
 - Extract the downloaded ZIP file.
@@ -95,6 +111,25 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 - Done!
 
 _Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
+
+</details>
+
+<br>
+
+<details id="install-for-edge">
+<summary>
+  <h3>Install for Microsoft Edge</h3>
+</summary>
+
+- [Download the latest Edge version here][edge-zip-url].
+- Extract the downloaded ZIP file.
+- Open [`edge://extensions/`][edge-extensions-url] and enable **Developer mode**.
+- Drag the extracted folder into the page to install the extension.
+- Done!
+
+_Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
+
+</details>
 
 <br>
 

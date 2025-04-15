@@ -1,22 +1,30 @@
-<div dir="rtl" style="text-align: right;">
-
 # AI Writing Companion
 
 > دستیار هوشمند ترجمه
 
 <p align="center">
-  <a href="#نصب-برای-کروم">
-  Chrome <img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="50" />
+  <a href="#install-for-chrome">
+    <img src="./icons/Google_Chrome_icon.png" alt="Chrome" height="40" />
+    <span>&nbsp;Chrome&nbsp;</span>
   </a>
-  &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;
-  <a href="#نصب-برای-فایرفاکس">
-    <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
+  <a href="#install-for-edge">
+    <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
+    <span>&nbsp;Edge&nbsp;</span>
   </a>
+  <a href="#install-for-firefox">
+    <img src="./icons/Mozilla_Firefox_logo.png" alt="Firefox" height="40" />
+    <span>&nbsp;Firefox&nbsp;</span>
+  </a>
+
+✅ در دسترس
+
 </p>
 
 <br>
 
 ---
+
+<div dir="rtl" style="text-align: right;">
 
 <br>
 
@@ -80,27 +88,52 @@
 
 یه کم ریزه‌کاری داره تموم بشه، بزودی توی Chrome Store و Firefox Add-ons هم منتشر می‌کنیم.
 
-### نصب برای کروم
+<details id="install-for-chrome">
+<summary>
+  <h3>نصب برای کروم</h3>
+</summary>
 
 - [از اینجا آخرین نسخه مخصوص کروم را دانلود کنید][chrome-zip-url]
 - فایل ZIP دانلود شده را از حالت فشرده خارج کنید.
-- آدرس [`chrome://extensions/`][chrome-extensions-url] را در کروم باز کنید و **Developer mode** را فعال کنید.
-- فولدر استخراج شده را به صفحه `chrome://extensions/` بکشید و رها کنید تا افزونه نصب شود.
+- آدرس [`chrome://extensions`][chrome-extensions-url] را در کروم باز کنید و **Developer mode** را فعال کنید.
+- فولدر استخراج شده را به صفحه `chrome://extensions` بکشید و رها کنید تا افزونه نصب شود.
 - تمام
 
 _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه** در مرورگر، به **تنظیمات** بروید و کلید **API خود** را وارد کنید.
 
-<br><br>
+</details>
+<br>
 
-### نصب برای فایرفاکس
+<details id="install-for-firefox">
+<summary>
+  <h3>نصب برای فایرفاکس</h3>
+</summary>
 
 - [از اینجا آخرین نسخه مخصوص فایرفاکس را دانلود کنید][firefox-zip-url]
 - فایل ZIP دانلود شده را از حالت فشرده خارج کنید.
-- آدرس [`about:debugging#/runtime/this-firefox/`][firefox-extensions-url] را در فایرفاکس بازکنید
+- آدرس [`about:debugging#/runtime/this-firefox`][firefox-extensions-url] را در فایرفاکس بازکنید
 - با انتخاب دکمه `Load Temporary Add-on...` آدرس مسیر `manifest.json` برای فایرفاکس در فولدر استخراج شده را بدهید.
 - تمام!
 
 _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه** در مرورگر، به **تنظیمات** بروید و کلید **API خود** را وارد کنید.
+
+</details>
+<br>
+
+<details id="install-for-edge">
+<summary>
+  <h3>نصب برای Edge</h3>
+</summary>
+
+- [از اینجا آخرین نسخه مخصوص ایج را دانلود کنید][edge-zip-url]
+- فایل ZIP دانلود شده را از حالت فشرده خارج کنید.
+- آدرس [`edge://extensions`][edge-extensions-url] را در Edge باز کنید و **Developer mode** را فعال کنید.
+- فولدر استخراج شده را به صفحه `edge://extensions` بکشید و رها کنید تا افزونه نصب شود.
+- تمام
+
+_توجه_: بعد از نصب، با کلیک روی **آیکون افزونه** در مرورگر، به **تنظیمات** بروید و کلید **API خود** را وارد کنید.
+
+</details>
 
 <br>
 
@@ -277,8 +310,9 @@ npm run watch
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Chrome-v0.1.0.zip
-[chrome-build-folder-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/
+[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Edge-v0.1.0.zip
 [chrome-extensions-url]: chrome://extensions/
+[edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
