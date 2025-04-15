@@ -1,51 +1,65 @@
 # AI Writing Companion
 
-<div align="center">
-    <strong>
-        • <a href="./README.md">English</a> |
-        • <a href="./README.FA.md">فارسی</a>
-    </strong>
+> Smart Translation Assistant
+
+<div align="center" style="display: flex; justify-content: center; gap: 20px; align-items: center; margin: 10px 0;">
+    <img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="60" />Chrome |
+    <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
 </div>
 
 <br>
 
-This is a personal, lightweight, and efficient tool for seamless text translation on the web and in any text you type. By offering multiple distinct translation and lookup methods, it delivers a fast and hassle-free user experience:
-
-- **Text Selection Translation:** Simply select the text you want to translate; as soon as you release the mouse button, the translation appears right at that spot.
-- **Element Selection Translation:** Activate the "Select Element" mode via the extension icon in your browser toolbar, then click on any part of the page (such as paragraphs or buttons) to see a complete translation without altering the page layout.
-- **In-Field Translation:** When typing in any text field or form, press the `Ctrl + /` shortcut or click the small translator icon next to the field to quickly translate your text before submission.
-- **Advanced Popup Translation:** Click the extension icon in the browser toolbar to open a popup window that not only translates text but also provides extra features such as pronunciation assistance and comprehensive dictionary information.
-
-Developed exclusively for personal use, this extension ensures that smart and fast translation is always at fingertips.
-
-**Smart and fast translation, anytime and everywhere.**
+---
 
 <br>
 
-## ⚙️ Key Features
+<div align="center">
+  <strong>
+    • <a href="./README.md">English</a> | 
+    • <a href="./README.FA.md">فارسی</a>
+  </strong>
+</div>
 
-- 💸 **Free & Open Source:**
-  Always free for use, with complete open source code available.
+<br>
 
-- 🔊 **Word and Sentence Pronunciation:**  
-  Every translation comes with the ability to listen to the exact pronunciation of words and sentences. You can choose from various accents to hear your preferred pronunciation. Simply click the translator icon in the toolbar to access advanced pronunciation features.
+This is a lightweight and efficient personal tool for translating text on websites and even the text you write yourself. With multiple methods for translation and word lookup, it offers a fast and seamless experience:
 
-- 📙 **Dictionary Mode:**
-  By selecting a word on the page with your mouse, you not only receive its translation but also comprehensive details—such as meaning, synonyms, part of speech, and practical examples—helping you build a deeper understanding of the vocabulary.
+- **Text Selection Translation:** Simply select any text, and the translation box will appear right where you selected.
+- **Element Selection Translation:** Activate “Select Element” mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
+- **In-Field Translation:** When typing inside a form or text field, press the `Ctrl + /` shortcut or click the inline translator icon to instantly translate the content before sending.
+- **Advanced Popup Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support.
 
-- ✅ **Supports Multiple Translation Providers:**
-  This extension supports several AI translation services, allowing you to choose the best option for your needs:
-  - [Gemini][gemini-url] (✔ Free)
-  - [OpenAI][openai-url]
-  - [OpenRouter][openrouter-url] (✔ Free)
-  - [WebAI to API][webai-to-api-url] (✔ Free)
+This extension is developed solely for personal use and keeps smart and fast translation always within reach.
+
+**Smart and fast translation, anytime, anywhere.**
+
+<br>
+
+## ✨ Key Features
+
+💸 **Free & Open Source:**  
+Always free, powered by open-source code.
+
+🔊 **Word and Sentence Pronunciation:**  
+Each translation comes with audio playback for accurate pronunciation. You can also choose from different accents. Click the extension icon to access advanced pronunciation options.
+
+📙 **Dictionary Mode:**  
+When selecting a word, you’ll not only get a translation but also helpful information like definitions, synonyms, word type, and usage examples.
+
+✅ **Supports Multiple Translation Providers:**  
+You can choose from several AI-powered translation providers:
+
+- [Gemini][gemini-url] (✔ Free)
+- [OpenAI][openai-url]
+- [OpenRouter][openrouter-url] (✔ Free)
+- [WebAI to API][webai-to-api-url] (✔ Free)
 
 <br>
 
 ## 📋 Requirements
 
 - A modern Chromium-based browser or Firefox (Chrome, Edge, Brave, etc.)
-- A valid API key (if not using [WebAI to API][webai-to-api-url])
+- A valid API key (unless using [WebAI to API][webai-to-api-url])
 
 <br>
 
@@ -53,17 +67,17 @@ Developed exclusively for personal use, this extension ensures that smart and fa
 
 ## 🔧 Installation
 
-Just a few finishing touches remain, and we'll soon release it on the Chrome Store and Firefox Add-ons.
+We're almost done with final touches, and the extension will soon be published on the Chrome Web Store and Firefox Add-ons.
 
 ### Install for Chrome
 
 - [Download the latest Chrome version here][chrome-zip-url].
 - Extract the downloaded ZIP file.
-- Open [`chrome://extensions/`][chrome-extensions-url] in Chrome and enable **Developer mode**.
-- Drag and drop the extracted folder onto the `chrome://extensions/` page to install the extension.
-- That's it!
+- Open [`chrome://extensions/`][chrome-extensions-url] and enable **Developer mode**.
+- Drag the extracted folder into the page to install the extension.
+- Done!
 
-_Note:_ After installation, click the **extension icon** in your browser to open **Settings** and enter your API key.
+_Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
 
 <br><br>
 
@@ -71,11 +85,11 @@ _Note:_ After installation, click the **extension icon** in your browser to open
 
 - [Download the latest Firefox version here][firefox-zip-url].
 - Extract the downloaded ZIP file.
-- Open [`about:debugging#/runtime/this-firefox/`][firefox-extensions-url] in Firefox.
-- Click the `Load Temporary Add-on...` button and select the `manifest.json` file from the extracted folder.
-- That's it!
+- Open [`about:debugging#/runtime/this-firefox/`][firefox-extensions-url].
+- Click `Load Temporary Add-on...` and select the `manifest.json` file from the extracted folder.
+- Done!
 
-_Note:_ Once installed, click the **extension icon** in your browser to access **Settings** and enter your API key.
+_Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
 
 <br>
 
@@ -83,39 +97,65 @@ _Note:_ Once installed, click the **extension icon** in your browser to access *
 
 ## 🔑 API Keys
 
-To utilize the full capabilities of AI Writing Companion, you might need API keys from the following providers:
+To use the extension, you’ll need an API key from one of the providers below:
 
-| Provider      | Get API Key                                   | Cost                     |
+| Provider      | How to Get API Key                            | Cost                     |
 | ------------- | --------------------------------------------- | ------------------------ |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]        | Free                     |
 | OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
 | OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
-| WebAI to API  | _(Doesn't Need)_                              | [Free][webai-to-api-url] |
+| WebAI to API  | _(No key needed)_                             | [Free][webai-to-api-url] |
 
-**Note:** **`WebAI to API`** is a Python server that allows you to have a local API without needing an real API key.
+**Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
+
+**Important:** If you're in Iran, you may need a VPN to access and register for free API keys.
 
 <br>
 
 ---
 
-## 🎯 Usage
+<details>
+<summary>
+  <h2>⚙️ Advanced Settings</h2>
+</summary>
 
-- **Element Selection:** Click on the translator icon in the browser toolbar, then select any element on the page that gets highlighted. The entire text within the selected element will be translated and replaced. Press ESC to revert to the original text.
-- **Writing Fields:** Click on any field to make the translation icon appear.
-- **Shortcut:** When an input field is active, press `Ctrl + /` to activate translation.
-  Type your text in your native language, and then by pressing the shortcut, the text will be automatically replaced with its translation. It's really cool, and we love it! : )
+In the API Settings page of the extension, each provider has customizable options to let you choose and configure different models:
 
-<br>
+- **Google Gemini**
+
+  You can change the `API URL` to use different Gemini models. For available models and usage info, see [Gemini official documentation][gemini-url-docs]. Choosing the right model may improve translation quality, speed, or reduce API cost.
+
+- **OpenAI**
+
+  You can select models like `gpt-4`, `gpt-3.5-turbo`, and more by entering their names in the settings. Visit [OpenAI docs][openai-url-docs] for the full list. This allows you to customize translation quality vs. cost.
+
+- **OpenRouter**
+
+  Similar to OpenAI, OpenRouter supports a variety of models. You can pick one from the list at [OpenRouter documentation][openrouter-url-docs] and use it by name.
+
+- **WebAI to API**
+
+  This is a free local backend for translation. You can configure your own model in the settings. For setup, see [WebAI to API GitHub repo][webai-to-api-url-docs].
+
+> These options let you balance between cost, quality, and speed.  
+> The extension uses default models with minimum setup required — but upgrading the model will improve translation results.
+
+**Default models used:**
+
+- For `OpenAI` and `OpenRouter`: `gpt-3.5-turbo`
+- For `Google Gemini` and `WebAI to API`: `gemini-2.0-flash`
+
+</details>
 
 ---
 
 ## ☕ Buy Me a Coffee
 
-If you found this project useful and can afford it, treat me to a coffee! :)
+If this project helped you and you’d like to support it, you can buy me a coffee ☕
 
 <br>
 
-| Donations Method    | 🔗 Link                                                                                                                                                          |
+| Donation Method     | 🔗 Link                                                                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                     |
 | **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                     |
@@ -123,14 +163,13 @@ If you found this project useful and can afford it, treat me to a coffee! :)
 
 <br>
 Thank you for your support!
-
-Your support goes to Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x>)][mohammad-x-url]
+Your donation supports Mohammad [![Mohammad X](https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x)][mohammad-x-url]
 
 <br>
 
 ---
 
-### Contributors
+### 👥 Contributors
 
 - iSegar0 [![iSegar0 X](<https://img.shields.io/badge/X%20(Twitter)-iSegar0-blue?style=flat&logo=x>)](https://x.com/iSegar0/)
 - Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-blue?style=flat&logo=x>)](https://x.com/M_Khani65/)
@@ -139,11 +178,11 @@ Your support goes to Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(
 
 ---
 
-## ⚙️ Development
+## 🥤 Development
 
 ### Prerequisites
 
-Ensure **Node.js** is installed (which includes `npm`), then type the following in the terminal:
+Make sure **Node.js** is installed (it includes `npm`). Then run:
 
 ```bash
 cd AI-Writing-Companion
@@ -152,15 +191,15 @@ npm install
 
 ### Build
 
-To generate extension files, type:
+To generate the extension files, run:
 
 ```bash
 npm run build
 ```
 
-This command creates the `AI-Writing-Companion/Build-Extension/Chrome/` folder for manual installation.
+This will create the folder `Build-Extension/Chrome/` for manual installation.
 
-But if you want to make changes, use this command which is much more useful:
+To actively develop and apply changes in real time:
 
 ```bash
 npm run watch
@@ -170,28 +209,28 @@ npm run watch
 
 ---
 
-## 🤝 Contribute
+## 🤝 Contributing
 
-- **Star the repo** to support the project. ⭐
-- **Report issues:** [GitHub Issues][github-issues-url] 🐞
-- **Submit Pull Requests (PRs)** to contribute improvements.
+- ⭐ **Star the repo** to support the project.
+- 🐞 **Report issues** via [GitHub Issues][github-issues-url].
+- 📝 **Submit a Pull Request (PR)** to help improve the extension.
 
 ---
 
-### 🖼️ Copyright
+### 🖼️ Icons Credit
 
-Icons used in this project are provided by [Flaticon](https://www.flaticon.com) and were created by the following authors:
+Icons used in this project are provided by [Flaticon](https://www.flaticon.com) and created by:
 
-- <img src="icons/page.png" alt="Main icon" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon, Select, Paste)
-- <img src="icons/select.png" alt="Select" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
-- <img src="icons/paste.png" alt="Paste" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Paste)
-- <img src="icons/speaker.png" alt="Voice Command" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (Voice Command)
-- <img src="icons/translate.png" alt="Translate" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (Translate)
-- <img src="icons/clear.png" alt="Clear" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (Clear)
-- <img src="icons/close.png" alt="Close" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (Close)
-- <img src="icons/swap.png" alt="Swap" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Swap)
-- <img src="icons/settings.png" alt="Settings" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
-- <img src="icons/copy.png" alt="Copy" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
+- <img src="icons/page.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon)
+- <img src="icons/select.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
+- <img src="icons/paste.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Paste)
+- <img src="icons/speaker.png" width="24px"> — [Tanah Basah](https://www.flaticon.com/free-icons/voice-command) (Voice Command)
+- <img src="icons/translate.png" width="24px"> — [photo3idea_studio](https://www.flaticon.com/free-icons/translate) (Translate)
+- <img src="icons/clear.png" width="24px"> — [Midev](https://www.flaticon.com/free-icons/clear) (Clear)
+- <img src="icons/close.png" width="24px"> — [Miftakhul Rizky](https://www.flaticon.com/free-icons/close) (Close)
+- <img src="icons/swap.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Swap)
+- <img src="icons/settings.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
+- <img src="icons/copy.png" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
 
 <br>
 
@@ -199,7 +238,7 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
 
 ## 📜 License
 
-This project is licensed under the **MIT License**. Feel free to improve and share!
+This project is licensed under the **MIT License** — feel free to modify and share!
 
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
@@ -216,6 +255,7 @@ This project is licensed under the **MIT License**. Feel free to improve and sha
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
 [mohammad-x-url]: https://x.com/m_khani65/
 [github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues
-[isegaro-x-url]: https://x.com/iSegar0/
-[m-khani65-x-url]: https://x.com/M_Khani65/
-[flaticon-url]: https://www.flaticon.com/free-icons/translate
+[gemini-url-docs]: https://ai.google.dev/api/all-methods/
+[openai-url-docs]: https://platform.openai.com/docs/models/
+[openrouter-url-docs]: https://openrouter.ai/models/
+[webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
