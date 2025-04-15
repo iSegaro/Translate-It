@@ -10,6 +10,7 @@ import {
   logME,
   logMethod,
 } from "./utils/helpers.js";
+import { revertTranslations } from "./utils/textExtraction.js";
 
 class ContentScript {
   constructor() {
@@ -152,6 +153,14 @@ class ContentScript {
               context: "message-listener",
             });
           }
+        } else if (message.action === "revertAllAndEscape") {
+          logME("Received revertAllAndEscape in content script");
+          revertTranslations({
+            state,
+            errorHandler: this.translationHandler.errorHandler,
+            notifier: this.translationHandler.notifier,
+            IconManager: this.translationHandler.IconManager,
+          });
         } else {
           logME("[Content] Received unknown message => ", message);
         }

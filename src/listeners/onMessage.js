@@ -9,17 +9,12 @@ import { translateText } from "../utils/api.js";
 import { handleExtensionLifecycle } from "../handlers/extensionLifecycleHandler.js";
 import { handleGetSelectedText } from "../handlers/getSelectedTextHandler.js";
 import { handleUpdateSelectElementState } from "../handlers/selectElementStatesHandler.js";
-import { handlePlayGoogleTTS } from "../handlers/ttsHandler.js";
 import {
   handleFetchTranslation,
   handleFetchTranslationBackground,
-} from "../handlers/translationHandler.js";
+  handleRevertBackground,
+} from "../handlers/backgroundHandlers.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
-import {
-  AUTO_DETECT_VALUE,
-  playAudioGoogleTTS,
-  playAudioViaOffscreen,
-} from "../utils/tts.js";
 import { playTTS, stopTTS } from "../backgrounds/tts-player.js";
 
 // --- State Management ---
@@ -179,6 +174,13 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         errorHandler
       );
       return true; // Handler is async
+
+    case "revertTranslation":
+      // Pass dependencies
+      handleRevertBackground();
+      sendResponse({ success: true });
+      return false; // Handler is async
+
     case "activateSelectElementMode":
       // Pass dependencies, including the injectionState object
       try {

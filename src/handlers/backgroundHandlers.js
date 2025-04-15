@@ -1,10 +1,32 @@
-// src/handlers/translationHandler.js
+// src/handlers/backgroundHandlers.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 
 // Dependencies passed as arguments: translateText, errorHandler
+
+export async function handleRevertBackground(params) {
+  try {
+    const [tab] = await Browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (!tab?.id) {
+      logME("No active tab found for ESC revert", "error");
+      return;
+    }
+
+    await Browser.tabs.sendMessage(tab.id, {
+      action: "revertAllAndEscape", // یک نام واضح برای اکشن
+      source: "background",
+    });
+
+    logME("Sent revertAllAndEscape action to content script");
+  } catch (error) {
+    logME("Error in handleRevertBackground: " + error, "error");
+  }
+}
 
 export async function handleFetchTranslation(
   message,
