@@ -4,10 +4,11 @@
 
 > دستیار هوشمند ترجمه
 
-<div align="center" style="display: flex; justify-content: center; gap: 20px; align-items: center; margin: 10px 0;">
-    Chrome<img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="60" />|
-    <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
-</div>
+<p align="center">
+  Chrome <img src="./icons/chrome-extensions.png" alt="Chrome Extensions" height="50" />
+  &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;
+  <img src="./icons/Firefox_Browser_Add-ons_logo.svg" alt="Firefox Add-ons" height="40" />
+</p>
 
 <br>
 
