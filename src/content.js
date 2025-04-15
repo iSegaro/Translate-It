@@ -137,15 +137,19 @@ class ContentScript {
               action: "CONTENT_SCRIPT_WILL_RELOAD",
             });
 
-            this.translationHandler.notifier.show(
+            const reload_page = this.translationHandler.notifier.show(
               "لطف صفحه را رفرش کنید",
               "info",
               true
             );
 
-            // setTimeout(() => {
-            //   Browser.runtime.reload();
-            // }, 2000);
+            setTimeout(() => {
+              if (reload_page) {
+                this.translationHandler.notifier.dismiss();
+                // Browser.runtime.reload();
+                // window.location.reload();
+              }
+            }, 3000);
           } catch (error) {
             error = ErrorHandler.processError(error);
             this.translationHandler.errorHandler.handle(error, {
