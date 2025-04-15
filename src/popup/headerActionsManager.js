@@ -130,6 +130,17 @@ function setupEventListeners() {
     Active_SelectElement(true, true); // Activate selection mode and close popup
     // Active_SelectElement should handle closing the window implicitly
   });
+
+  elements.revertIcon?.addEventListener("click", () => {
+    Browser.runtime
+      .sendMessage({ action: "revertTranslation" })
+      .catch((err) => {
+        console.warn("[Popup] Could not send revert message:", err);
+      });
+
+    // بهتره پنجره بسته بشه
+    window.close();
+  });
 }
 
 export function init() {

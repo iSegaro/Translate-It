@@ -38,6 +38,7 @@ export default {
   translatePageLink: $("translatePageLink"),
   selectElementIcon: $("selectElementIcon"),
   clearStorageBtn: $("clearStorageBtn"),
+  revertIcon: $("revertActionIcon"),
   settingsIcon: $("settingsIcon"),
 
   // Popup Container

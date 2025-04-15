@@ -109,6 +109,9 @@
   "import_settings_button": { "message": "بازیابی تنظیمات" },
   "save_settings_button": { "message": "ذخیره" },
 
+  "popup_revert_title_icon": { "message": "بازگرداندن" },
+  "popup_revert_alt_icon": { "message": "بازگرداندن" },
+
   "popup_page_title": { "message": "AI Writing Companion" },
   "popup_translate_page_link": { "message": "ترجمه این صفحه" },
   "popup_translate_page_link_title": { "message": "ترجمه این صفحه در تب جدید" },
