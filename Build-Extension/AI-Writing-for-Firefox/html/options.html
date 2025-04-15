@@ -199,6 +199,29 @@
 
           <div id="geminiApiSettings">
             <h3 data-i18n="gemini_api_settings_title">Gemini API Settings</h3>
+          
+            <!-- راهنمای دریافت API Key -->
+            <div class="setting-group api-key-info">
+              <span
+                class="setting-description"
+                data-i18n="gemini_api_key_info"
+              >
+                You can get your Gemini API key from
+              </span>
+              <a
+                class="api-link"
+                data-i18n="gemini_api_key_link"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+              Get free API Key
+              </a>
+            </div>
+            
+            
+            
+          
             <div class="setting-group">
               <label for="apiKey">API Key</label>
               <input
@@ -208,11 +231,18 @@
                 placeholder="Paste your API key here"
               />
             </div>
+          
             <div class="setting-group">
               <label for="apiUrl">API URL</label>
-              <input type="text" id="apiUrl" data-i18n-placeholder="gemini_api_url_placeholder" placeholder="Enter API URL" />
+              <input
+                type="text"
+                id="apiUrl"
+                data-i18n-placeholder="gemini_api_url_placeholder"
+                placeholder="Enter API URL"
+              />
             </div>
           </div>
+          
 
           <div id="openAIApiSettings" style="display: none">
             <h3 data-i18n="openai_api_settings_title">OpenAI API Settings</h3>

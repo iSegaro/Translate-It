@@ -61,11 +61,16 @@ body {
   border-bottom-color: #3498db;
 }
 .tab-content {
+  opacity: 0;
   display: none;
+  transition: opacity 300ms ease;
 }
+
 .tab-content.active {
   display: block;
+  opacity: 1;
 }
+
 section {
   margin-bottom: 20px;
   padding-bottom: 15px;
@@ -85,6 +90,35 @@ section h2 {
 .setting-group {
   margin-bottom: 15px;
 }
+.setting-group.api-key-info {
+  margin-bottom: 20px; /* فاصله بیشتر پایین */
+}
+
+.setting-group.api-key-info .api-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: #1a73e8;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.api-link {
+  display: inline-block;
+  margin-top: 6px;
+  margin-bottom: 16px; /* برای فاصله بیشتر از پایین */
+  color: #1a73e8;
+  font-weight: 500;
+  text-decoration: underline;
+  transition:
+    opacity 0.3s ease,
+    color 0.3s ease;
+}
+
+.api-link:hover {
+  opacity: 0.7;
+  color: #0c5dc0;
+}
+
 label {
   font-size: 0.9rem;
   font-weight: 400;
