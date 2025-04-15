@@ -61,11 +61,16 @@ body {
   border-bottom-color: #3498db;
 }
 .tab-content {
+  opacity: 0;
   display: none;
+  transition: opacity 300ms ease;
 }
+
 .tab-content.active {
   display: block;
+  opacity: 1;
 }
+
 section {
   margin-bottom: 20px;
   padding-bottom: 15px;

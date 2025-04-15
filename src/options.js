@@ -4,6 +4,7 @@ import { getSettingsAsync, CONFIG } from "./config.js";
 import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
 import { app_localize } from "./utils/i18n.js";
+import { fadeOutInElement } from "./utils/i18n.helper.js";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -123,10 +124,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showTab(tabId) {
-    tabButtons.forEach((button) => button.classList.remove("active"));
-    tabContents.forEach((content) => content.classList.remove("active"));
-    document.getElementById(tabId).classList.add("active");
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+    const activeContent = document.querySelector(".tab-content.active");
+    const targetContent = document.getElementById(tabId);
+    const container = document.querySelector(".container");
+
+    if (activeContent === targetContent) return;
+
+    tabButtons.forEach((btn) => btn.classList.remove("active"));
+    document.querySelector(`[data-tab="${tabId}"]`)?.classList.add("active");
+
+    if (activeContent) {
+      fadeOutInElement(
+        activeContent,
+        () => {
+          activeContent.classList.remove("active");
+
+          targetContent.classList.add("active");
+          targetContent.style.opacity = "0";
+          targetContent.style.transition = "opacity 300ms ease";
+
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const containerRect = container.getBoundingClientRect();
+              const contentRect = targetContent.getBoundingClientRect();
+              const paddingBottom = 40; // برای دکمه save و status و فاصله پایین
+              const newHeight =
+                contentRect.bottom - containerRect.top + paddingBottom;
+
+              container.style.transition = "height 300ms ease";
+              container.style.height = `${newHeight}px`;
+
+              targetContent.style.opacity = "1";
+            }, 0);
+          });
+        },
+        200
+      );
+    } else {
+      // بار اول
+      targetContent.classList.add("active");
+      targetContent.style.opacity = "1";
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const containerRect = container.getBoundingClientRect();
+          const contentRect = targetContent.getBoundingClientRect();
+          const paddingBottom = 40;
+          const newHeight =
+            contentRect.bottom - containerRect.top + paddingBottom;
+
+          container.style.height = `${newHeight}px`;
+        }, 0);
+      });
+    }
   }
 
   tabButtons.forEach((button) => {
@@ -430,6 +480,25 @@ document.addEventListener("DOMContentLoaded", () => {
       // As loadSettings handles the initial state based on saved settings, explicitly calling showTab might be redundant
       // unless you want to force 'languages' tab on every load regardless of previous state.
       // showTab("languages"); // Reconsider if this is needed here or should rely on loaded state. Keep it if you want 'languages' always first.
+
+      //*** تنظیم اندازه تب برای نمایش انیمیشن */
+      // بعد از اینکه همه چیز لود شد، ارتفاع تب فعال رو تنظیم کن
+      window.requestAnimationFrame(() => {
+        setTimeout(() => {
+          const container = document.querySelector(".container");
+          const activeTab = document.querySelector(".tab-content.active");
+          if (container && activeTab) {
+            const containerRect = container.getBoundingClientRect();
+            const contentRect = activeTab.getBoundingClientRect();
+            const paddingBottom = 40;
+            const newHeight =
+              contentRect.bottom - containerRect.top + paddingBottom;
+
+            container.style.height = `${newHeight}px`;
+          }
+        }, 0); // یا اگر خواستی مطمئن‌تر بشه، بذار `setTimeout(..., 100);`
+      });
+      //*** تنظیم اندازه تب برای نمایش انیمیشن */
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -518,4 +587,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // با این حال، فراخوانی showTab در اینجا به این دلیل حفظ شده است که یک تب پیش‌فرض به کاربر نشان داده شود
   // قبل از اینکه تنظیمات ذخیره شده (در صورت وجود) از حافظه بارگیری و اعمال شوند.
   showTab("languages");
+
+  const initialActive = document.querySelector(".tab-content.active");
+  if (initialActive) {
+    const container = document.querySelector(".container");
+    container.style.height = `${initialActive.offsetHeight}px`;
+  }
 });
