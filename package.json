@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "description": "Smart Translation and Writing Assistant",
   "scripts": {
-    "build:chrome": "cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
-    "build:firefox": "cross-env BUILD_MODE=build webpack --config webpack.firefox.js --mode production",
-    "build": "npm run build:chrome && npm run build:firefox",
-    "build:all": "npm run build:chrome && npm run build:firefox",
-    "watch:chrome": "cross-env BUILD_MODE=watch webpack --config webpack.chrome.js --watch --mode development",
-    "watch:firefox": "cross-env BUILD_MODE=watch webpack --config webpack.firefox.js --watch --mode development",
+    "build:chrome": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Building Chrome extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
+    "build:firefox": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Building Firefox extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.firefox.js --mode production",
+    "build": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Running Full Build'))\" && npm run build:chrome && npm run build:firefox",
+    "watch:chrome": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Watching Chrome...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.chrome.js --watch --mode development",
+    "watch:firefox": "node -e \"import('./build-scripts/logger.js').then(m => m.logStep('Watching Firefox...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.firefox.js --watch --mode development",
     "lint": "eslint src/**/*.js",
     "format": "prettier --write src/**/*.js"
   },
@@ -29,6 +28,7 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "chalk": "^5.4.1",
     "core-js": "^3.41.0",
     "glob": "^11.0.1",
     "marked": "^15.0.7",
