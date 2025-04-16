@@ -1,5 +1,5 @@
 // src/popup/uiManager.js
-import elements from "./domElements.js"; // Import DOM elements
+import { getTranslationString } from "../utils/i18n.js";
 
 /** Toggles visibility of the clear button based on input value. */
 export function toggleClearButtonVisibility(inputElement, clearButton) {
@@ -13,7 +13,11 @@ export function toggleInlineToolbarVisibility(element) {
   const container = element?.parentElement;
   if (!container) return;
   const text = (element.value || element.textContent || "").trim();
-  container.classList.toggle("has-content", text && text !== "در حال ترجمه...");
+  container.classList.toggle(
+    "has-content",
+    (text && text !== getTranslationString("popup_string_during_translate")) ||
+      "در حال ترجمه..."
+  );
 }
 
 /** Provides visual feedback, e.g., a temporary checkmark or animation. */
