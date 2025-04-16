@@ -417,3 +417,50 @@ body.selecting-element {
   overflow-x: auto;
   margin: 0.3em 0 !important;
 }
+
+/* انیمیشن و اسپینر */
+/* Spinner overlay */
+.spinner-overlay {
+  position: relative;
+  width: 100%;
+  min-height: 60px;
+}
+
+.spinner-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #dee2e6;
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Transition for replacing spinner with result */
+.result.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

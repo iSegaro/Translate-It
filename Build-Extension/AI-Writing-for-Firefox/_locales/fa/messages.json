@@ -141,5 +141,10 @@
   "popup_copy_target_alt_icon": { "message": "کپی نتیجه" },
   "popup_copy_target_title_icon": { "message": "کپی" },
   "popup_voice_target_alt_icon": { "message": "تلفظ خروجی" },
-  "popup_voice_target_title_icon": { "message": "تلفظ" }
+  "popup_voice_target_title_icon": { "message": "تلفظ" },
+
+  "popup_string_during_translate": { "message": "در حال ترجمه..." },
+  "popup_string_error_sending": { "message": "خطا در ارسال درخواست." },
+  "popup_string_error_response_empty": { "message": "(ترجمه یافت نشد)" },
+  "popup_string_translate_error": { "message": "ترجمه با خطا مواجه شد" }
 }

@@ -134,9 +134,14 @@
   "popup_voice_source_title_icon": { "message": "Speak" },
   "popup_paste_source_alt_icon": { "message": "Paste" },
   "popup_paste_source_title_icon": { "message": "Paste" },
-  "popup_source_text_placeholder": { "message": "Enter here..." },
+  "popup_source_text_placeholder": { "message": "type here..." },
   "popup_copy_target_alt_icon": { "message": "Copy target" },
   "popup_copy_target_title_icon": { "message": "Copy" },
   "popup_voice_target_alt_icon": { "message": "Speak target" },
-  "popup_voice_target_title_icon": { "message": "Speak" }
+  "popup_voice_target_title_icon": { "message": "Speak" },
+
+  "popup_string_during_translate": { "message": "translating..." },
+  "popup_string_error_sending": { "message": "Error sending request." },
+  "popup_string_error_response_empty": { "message": "(translation is empty)" },
+  "popup_string_translate_error": { "message": "error on translation" }
 }
