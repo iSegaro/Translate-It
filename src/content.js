@@ -137,14 +137,14 @@ class ContentScript {
               action: "CONTENT_SCRIPT_WILL_RELOAD",
             });
 
-            const reload_page = this.translationHandler.notifier.show(
+            const reload_page_notifier = this.translationHandler.notifier.show(
               "لطف صفحه را رفرش کنید",
               "info",
               true
             );
 
             setTimeout(() => {
-              if (reload_page) {
+              if (reload_page_notifier) {
                 this.translationHandler.notifier.dismiss();
                 // Browser.runtime.reload();
                 // window.location.reload();
