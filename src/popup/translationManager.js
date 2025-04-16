@@ -34,10 +34,16 @@ function handleTranslationResponse(
     );
     elements.translationResult.textContent = `Error: ${Browser.runtime.lastError.message}`;
   } else if (response?.data?.translatedText) {
+    // حذف اسپینر با انیمیشن نرم
+    elements.translationResult.classList.remove("fade-in"); // در صورت وجود
+    void elements.translationResult.offsetWidth; // Reflow برای ریست animation
+
     // elements.translationResult.textContent = response.data.translatedText;
     elements.translationResult.innerHTML = marked.parse(
       response.data.translatedText || "(ترجمه یافت نشد)"
     ); // نمایش پیام اگر متن خالی بود
+
+    elements.translationResult.classList.add("fade-in");
 
     correctTextDirection(
       elements.translationResult,
@@ -147,6 +153,14 @@ async function triggerTranslation() {
   elements.translationResult.textContent =
     (await getTranslationString("popup_string_during_translate")) ||
     "درحال ترجمه...";
+
+  elements.translationResult.innerHTML = `
+<div class="spinner-overlay">
+  <div class="spinner-center">
+    <div class="spinner"></div>
+  </div>
+</div>
+`;
 
   uiManager.toggleInlineToolbarVisibility(elements.translationResult); // Hide toolbar while translating
 
