@@ -8,9 +8,13 @@ import {
 } from "./languageManager.js"; // Use lookup from lang manager
 import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js"; // For saving storage
 import { logME } from "../utils/helpers.js";
-import { correctTextDirection } from "../utils/textDetection.js";
+import {
+  correctTextDirection,
+  applyElementDirection,
+} from "../utils/textDetection.js";
 import { marked } from "marked";
 import { TranslationMode } from "../config.js";
+import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 
 function handleTranslationResponse(
   response,
@@ -28,7 +32,7 @@ function handleTranslationResponse(
       "[Translate]: Browser runtime error during translation response:",
       Browser.runtime.lastError.message
     );
-    elements.translationResult.textContent = `خطا: ${Browser.runtime.lastError.message}`;
+    elements.translationResult.textContent = `Error: ${Browser.runtime.lastError.message}`;
   } else if (response?.data?.translatedText) {
     // elements.translationResult.textContent = response.data.translatedText;
     elements.translationResult.innerHTML = marked.parse(
@@ -80,9 +84,14 @@ function handleTranslationResponse(
       }
     }
   } else {
-    elements.translationResult.textContent =
-      response?.error || "ترجمه با خطا مواجه شد.";
     logME("[Translate]: Translation failed:", response?.error);
+    getTranslationString("popup_string_translate_error")
+      .then((translation) => {
+        elements.translationResult.textContent = translation;
+      })
+      .catch((error) => {
+        elements.translationResult.textContent = "ترجمه با خطا مواجه شد.";
+      });
   }
   // Show result toolbar regardless of success/failure
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
@@ -99,6 +108,10 @@ async function triggerTranslation() {
     return;
   }
   correctTextDirection(elements.sourceText, textToTranslate);
+  applyElementDirection(
+    elements.translationResult,
+    parseBoolean(await getTranslationString("IsRTL"))
+  );
 
   if (!targetLangIdentifier) {
     logME("[Translate]: Missing target language identifier.");
@@ -131,7 +144,10 @@ async function triggerTranslation() {
     sourceLangCheck = null; // Send null for auto-detect to background
   }
 
-  elements.translationResult.textContent = "در حال ترجمه...";
+  elements.translationResult.textContent =
+    (await getTranslationString("popup_string_during_translate")) ||
+    "درحال ترجمه...";
+
   uiManager.toggleInlineToolbarVisibility(elements.translationResult); // Hide toolbar while translating
 
   // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
@@ -193,7 +209,9 @@ async function triggerTranslation() {
     );
   } catch (error) {
     logME("[Translate]: Error sending message to background:", error);
-    elements.translationResult.textContent = "خطا در ارسال درخواست.";
+    elements.translationResult.textContent =
+      (await getTranslationString("popup_string_translate_error")) ||
+      "خطا در ارسال درخواست.";
     uiManager.toggleInlineToolbarVisibility(elements.translationResult);
   }
 }
