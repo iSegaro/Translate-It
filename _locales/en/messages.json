@@ -143,7 +143,12 @@
   "popup_string_during_translate": { "message": "translating..." },
   "popup_string_error_sending": { "message": "Error sending request." },
   "popup_string_error_response_empty": { "message": "(translation is empty)" },
-  "popup_string_translate_error": { "message": "error on translation" },
+  "popup_string_translate_error_trigger": {
+    "message": "error on translation trigger"
+  },
+  "popup_string_translate_error_response": {
+    "message": "error on translation response"
+  },
 
   "INVALID_CONTEXT": {
     "message": "Extension context invalid. Please refresh the page to continue."
@@ -158,5 +163,6 @@
   },
   "NETWORK_FAILURE": { "message": "Connection to server failed" },
   "INVALID_RESPONSE": { "message": "Invalid API response format" },
-  "CONTEXT_LOST": { "message": "Extension context lost" }
+  "CONTEXT_LOST": { "message": "Extension context lost" },
+  "API_KEY_ISSUE": { "message": "API Key issue" }
 }

@@ -79,7 +79,7 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
       uiManager.toggleInlineToolbarVisibility(elements.translationResult);
       resolve(); // Resolve the promise once loading and UI updates are done
     } catch (error) {
-      console.error("[InitManager]: Error loading last translation:", error);
+      logME("[InitManager]: Error loading last translation:", error);
       resolve(); // Resolve even on error to prevent blocking
     }
   });
@@ -135,7 +135,7 @@ async function loadInitialState() {
       }
       resolve(); // Resolve promise after handling response
     } catch (error) {
-      console.error("[InitManager]: Error loading initial state:", error);
+      logME("[InitManager]: Error loading initial state:", error);
       resolve(); // Resolve even on error
     }
   });

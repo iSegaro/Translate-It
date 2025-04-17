@@ -61,6 +61,7 @@ export async function handleFetchTranslation(
 
     if (!promptText) throw new Error("No text provided for translation.");
 
+    /* تماس با سرویس ترجمه */
     const translation = await translateText(
       promptText,
       translateMode,
@@ -68,6 +69,28 @@ export async function handleFetchTranslation(
       targetLanguage
     );
 
+    /* ───────── چکِ صحّت خروجی ───────── */
+    // ➊ ترجمه باید رشتهٔ غیرخالی **و فاقد عبارت خطا** باشد
+    const isErrorLike = (str) =>
+      /^ *(error|fail|invalid|خطا)/i.test(str) || str.includes("❌");
+
+    if (
+      typeof translation !== "string" ||
+      !translation.trim() ||
+      isErrorLike(translation)
+    ) {
+      const err =
+        translation instanceof Error ? translation : (
+          new Error(
+            typeof translation === "string" && translation.trim() ?
+              translation
+            : "(Translation failed.)"
+          )
+        );
+      throw err; // از مسیر catch به sendResponse(error) می‌رویم
+    }
+
+    /* ذخیرهٔ آخرین ترجمه */
     await Browser.storage.local.set({
       lastTranslation: {
         sourceText: promptText,
@@ -77,16 +100,13 @@ export async function handleFetchTranslation(
       },
     });
 
-    sendResponse({
-      success: true,
-      data: {
-        translatedText: translation,
-      },
-    });
-  } catch (error) {
-    logME("[Handler:Translation] Error processing fetchTranslation:", error);
-    const handledError = errorHandler.handle(error, {
-      type: ErrorTypes.API,
+    sendResponse({ success: true, data: { translatedText: translation } });
+  } catch (err) {
+    logME("[Handler:Translation] Error:", err);
+
+    // خطای نرمال‌شده با پیام قابل‌نمایش برمی‌گردد
+    const processed = await errorHandler.handle(err, {
+      type: err.type || ErrorTypes.API,
       context: "handler-fetchTranslation",
       metadata: {
         targetLang: message.payload?.targetLanguage,
@@ -94,13 +114,13 @@ export async function handleFetchTranslation(
       },
     });
 
-    sendResponse({
-      success: false,
-      error: handledError.message,
-    });
-  }
+    const safeMessage =
+      processed?.message?.trim() ||
+      err?.message?.trim() ||
+      "(⚠️ خطایی در ترجمه رخ داد.)";
 
-  return true; // Needed because we use sendResponse asynchronously
+    sendResponse({ success: false, error: safeMessage });
+  }
 }
 
 export async function handleFetchTranslationBackground(
@@ -110,25 +130,47 @@ export async function handleFetchTranslationBackground(
   translateText,
   errorHandler
 ) {
-  logME(
-    "[Handler:Translation-Background] Handling fetchTranslationBackground request"
-  );
+  logME("[Background] fetchTranslationBackground");
 
   try {
     const { promptText, targetLanguage, sourceLanguage, translationMode } =
       message.payload;
 
-    if (!promptText) {
-      throw new Error("[Translation-Background] No text provided.");
-    }
+    if (!promptText) throw new Error("No text provided.");
 
+    /* تماس با سرویس ترجمه */
     const translation = await translateText(
       promptText,
       translationMode,
       sourceLanguage,
       targetLanguage
     );
+    /* ــ ترجمه باید رشتهٔ غیرخالی باشد ــ */
+    if (typeof translation !== "string" || !translation.trim()) {
+      const errMsg =
+        typeof translation === "string" && translation ?
+          translation
+        : "خطای ترجمه از سرویس API";
 
+      /* لاگ و هندل خطا (اختیاری) */
+      await errorHandler.handle(new Error(errMsg), {
+        type: ErrorTypes.API,
+        context: "handler-fetchTranslation-background",
+      });
+
+      sendResponse({ success: false, error: errMsg });
+      return true;
+    }
+    /* ───────── چکِ صحّت خروجی ───────── */
+    if (typeof translation !== "string" || !translation.trim()) {
+      const errMsg =
+        translation instanceof Error ?
+          translation.message
+        : translation || "(Translation failed.)";
+      throw new Error(errMsg);
+    }
+
+    /* ذخیرهٔ آخرین ترجمه (به‌جز حالت Select‑Element) */
     if (translationMode !== TranslationMode.SelectElement) {
       await Browser.storage.local.set({
         lastTranslation: {
@@ -140,29 +182,25 @@ export async function handleFetchTranslationBackground(
       });
     }
 
-    sendResponse({
-      success: true,
-      data: {
-        translatedText: translation,
-      },
-    });
-  } catch (error) {
-    logME("[Handler:Translation-Background] Error:", error);
+    sendResponse({ success: true, data: { translatedText: translation } });
+  } catch (err) {
+    logME("[Handler:Translation] Error:", err);
 
-    const handledError = errorHandler.handle(error, {
-      type: ErrorTypes.API,
-      context: "handler-fetchTranslation-background",
+    // خطای نرمال‌شده با پیام قابل‌نمایش برمی‌گردد
+    const processed = await errorHandler.handle(err, {
+      type: err.type || ErrorTypes.API,
+      context: "handler-fetchTranslation",
       metadata: {
         targetLang: message.payload?.targetLanguage,
         sourceLang: message.payload?.sourceLanguage,
       },
     });
 
-    sendResponse({
-      success: false,
-      error: handledError.message,
-    });
-  }
+    const safeMessage =
+      processed?.message?.trim() ||
+      err?.message?.trim() ||
+      "(⚠️ خطایی در ترجمه رخ داد.)";
 
-  return true; // Needed because we use sendResponse asynchronously
+    sendResponse({ success: false, error: safeMessage });
+  }
 }

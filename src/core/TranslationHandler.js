@@ -54,12 +54,21 @@ export async function handleFetchTranslationBackground(
       targetLang
     );
 
-    if (!translated) {
-      sendResponse({
-        success: false,
-        error: "Empty or null translation received.",
+    /* ــ ترجمه باید رشتهٔ غیرخالی باشد ــ */
+    if (typeof translated !== "string" || !translated.trim()) {
+      const errMsg =
+        typeof translated === "string" && translated ?
+          translated
+        : "(خطای ترجمه از سرویس API)";
+
+      /* لاگ و هندل خطا */
+      await errorHandler.handle(new Error(errMsg), {
+        type: ErrorTypes.API,
+        context: "handler-fetchTranslation-background",
       });
-      return;
+
+      sendResponse({ success: false, error: errMsg });
+      return true;
     }
 
     sendResponse({
@@ -68,18 +77,14 @@ export async function handleFetchTranslationBackground(
         translatedText: translated,
       },
     });
-  } catch (error) {
-    const processedError = await ErrorHandler.processError(error);
-    await errorHandler.handle(processedError, {
-      type: processedError.type || ErrorTypes.SERVICE,
-      context: "handler-fetchTranslationBackground",
+  } catch (msg) {
+    await errorHandler.handle(new Error(msg), {
+      type: ErrorTypes.API,
+      context: "handler-fetchTranslation-background",
     });
-
-    sendResponse({
-      success: false,
-      error: processedError.message || "Translation failed.",
-    });
+    sendResponse({ success: false, error: msg });
   }
+  return true;
 }
 
 export default class TranslationHandler {

@@ -166,10 +166,10 @@ class ContentScript {
             IconManager: this.translationHandler.IconManager,
           });
         } else {
-          logME("[Content] Received unknown message => ", message);
+          logME("[Content] Received unknown message 1 => ", message);
         }
       } else {
-        logME("[Content] Received unknown message => ", message);
+        logME("[Content] Received unknown message 2 => ", message);
       }
     } catch (error) {
       if (this.translationHandler.notifier) {

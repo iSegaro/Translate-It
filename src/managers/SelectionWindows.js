@@ -169,18 +169,18 @@ export default class SelectionWindows {
     this.originalText = currentText;
     this.isTranslationCancelled = false;
 
-    // شروع async ترجمه
+    /* ـــــــــــــــ  ارسال درخواست و مدیریت پاسخ  ـــــــــــــــ */
     Browser.runtime
       .sendMessage({
         action: "fetchTranslationBackground",
         payload: {
           promptText: currentText,
-          translationMode: translationMode,
+          translationMode, // همان translationMode که بالاتر محاسبه شد
         },
       })
       .then((response) => {
         try {
-          // اگر ترجمه کنسل شده یا متن عوض شده، پنجره را ببند
+          /* اگر کاربر پنجره را بسته یا متن تغییر کرده است، کار را متوقف کن */
           if (
             this.isTranslationCancelled ||
             this.originalText !== currentText
@@ -189,38 +189,47 @@ export default class SelectionWindows {
             return;
           }
 
-          // بررسی موفقیت پاسخ
+          /* ---------- پاسخ موفق ---------- */
           if (response && response.success === true) {
-            const translatedText = response.data?.translatedText?.trim() || "";
-            if (translatedText) {
-              // اگر ترجمه داریم، آن را در کادر ترجمه نمایش میدهیم
-              this.transitionToTranslatedText(
-                translatedText,
-                loadingContainer,
-                currentText,
-                translationMode
-              );
-            } else {
-              // TODO: اگر پاسخ خالی باشد، یعنی خطایی پیش آمده در فرآیند ترجمه و یا خطایی در API
-              // فعلا یک پیغام خالی بودن متن ترجمه نمایش میدهیم ولی باید بهینه شود با منطق
-              // خطاهای API تا پیغام درستی به کاربر نمایش داده شود.
-              this.handleEmptyTranslation(loadingContainer);
+            const raw = response?.data?.translatedText;
+            const translatedText = typeof raw === "string" ? raw.trim() : "";
+
+            /* اگر ترجمه رشتهٔ معتبری نیست، آن را خطا تلقی کن */
+            if (!translatedText) {
+              const errMsg =
+                typeof raw === "string" && raw ?
+                  raw
+                : "(⚠️ خطایی در ترجمه رخ داد.)";
+              this.handleTranslationError(errMsg, loadingContainer);
+              return;
             }
+
+            /* نمایش ترجمه */
+            this.transitionToTranslatedText(
+              translatedText,
+              loadingContainer,
+              currentText,
+              translationMode
+            );
+
+            /* ---------- پاسخ خطادار ---------- */
           } else {
-            // اگر پاسخ موفق نبود، پیامی به کاربر نمایش میدهیم
-            this.handleEmptyTranslation(loadingContainer);
+            const errMsg =
+              typeof response?.error === "string" ?
+                response.error
+              : response?.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
+            this.handleTranslationError(errMsg, loadingContainer);
           }
         } catch (err) {
-          // اگر هر خطای غیرمنتظره‌ای در این بلوک رخ داد،
-          // هم لاگ می‌کنیم و هم باکس را می‌بندیم
+          /* خطای پیش‌بینی‌نشده در بلاک then */
           logME("[SelectionWindow] Error in .then block:", err);
           this.handleTranslationError(err, loadingContainer);
         }
       })
       .catch((error) => {
-        // خطاهای promise-level
+        /* خطای Promise‑level (مثلاً اتصال با پس‌زمینه قطع شد) */
         logME("[SelectionWindow] Error fetching translation:", error);
-        this.handleEmptyTranslation(loadingContainer);
+        this.handleTranslationError(error, loadingContainer);
       });
 
     const removeHandler = (event) => {
@@ -296,7 +305,8 @@ export default class SelectionWindows {
     trans_Mode = TranslationMode.SelectionWindows
   ) {
     // متن خام را برای استفاده در TTS نگه دارید
-    const rawTranslatedText = translatedText ? translatedText.trim() : "";
+    const rawTranslatedText =
+      typeof translatedText === "string" ? translatedText.trim() : "";
 
     // 1. محو شدن نقاط لودینگ
     loadingContainer.style.opacity = "0";
@@ -392,35 +402,55 @@ export default class SelectionWindows {
     return icon;
   }
 
-  handleEmptyTranslation(loadingContainer) {
-    loadingContainer.style.opacity = "0";
+  /* ------------------------------------------------------------------ */
+  /* ❶ پیام وقتی هیچ ترجمه‌ای برنگشته است                               */
+  /* ------------------------------------------------------------------ */
+  handleEmptyTranslation(loadingContainer, extra = "") {
+    // نقاط لودینگ را محو کن
+    if (loadingContainer) loadingContainer.style.opacity = "0";
+
+    // متن مناسب برای کاربر
+    const msg =
+      extra && typeof extra === "string" ?
+        extra
+      : "(⚠️ هیچ متنی از سرویس ترجمه دریافت نشد.)";
+
+    // کمی تأخیر برای هماهنگی با انیمیشن fade‑out لودینگ
     setTimeout(() => {
+      // اگر هنوز پنجره وجود دارد
       if (this.displayElement) {
-        logME("متن ترجمه خالی است، دوباره امتحان کنید.");
-        // this.notifier.show(
-        //   "متن ترجمه خالی است، دوباره امتحان کنید",
-        //   "info",
-        //   true,
-        //   2000
-        // );
-        // با false صدا بزنید تا مستقیماً remove شود
+        if (this.notifier) {
+          // نوتیفیکیشن اخطار با auto‑dismiss ۲٫۵ ثانیه
+          this.notifier.show(msg, "warning", true, 2500);
+        } else {
+          logME("[SelectionWindow] " + msg);
+        }
+        // بستن پنجره ترجمه (بدون انیمیشن اضافه)
         this.dismiss(false);
       }
     }, 300);
   }
 
+  /* ------------------------------------------------------------------ */
+  /* ❷ پیام وقتی خطای واقعی رخ داده است                                */
+  /* ------------------------------------------------------------------ */
   handleTranslationError(error, loadingContainer) {
-    // logME("Error during translation:", error);
-    loadingContainer.style.opacity = "0";
+    if (loadingContainer) loadingContainer.style.opacity = "0";
+
+    // استخراج پیام قابل‌خواندن
+    const msg =
+      typeof error === "string" ? error : (
+        error?.message || "(خطای ناشناخته هنگام ترجمه)."
+      );
+
     setTimeout(() => {
       if (this.displayElement) {
-        this.notifier.show(
-          "خطایی رخ داد، دوباره تلاش کنید",
-          "info",
-          true,
-          2000
-        );
-        // با false صدا بزنید تا مستقیماً remove شود
+        if (this.notifier) {
+          // نوتیفیکیشن خطا با auto‑dismiss ۳٫۵ ثانیه
+          this.notifier.show(msg, "error", true, 3500);
+        } else {
+          logME("[SelectionWindow] " + msg);
+        }
         this.dismiss(false);
       }
     }, 300);

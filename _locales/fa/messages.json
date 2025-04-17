@@ -146,7 +146,12 @@
   "popup_string_during_translate": { "message": "در حال ترجمه..." },
   "popup_string_error_sending": { "message": "خطا در ارسال درخواست." },
   "popup_string_error_response_empty": { "message": "(ترجمه یافت نشد)" },
-  "popup_string_translate_error": { "message": "ترجمه با خطا مواجه شد" },
+  "popup_string_translate_error_trigger": {
+    "message": "خطا در اعمال ترجمه"
+  },
+  "popup_string_translate_error_response": {
+    "message": "خطا در بازگشت ترجمه"
+  },
 
   "INVALID_CONTEXT": {
     "message": "زمینهٔ افزونه نامعتبر است. لطفاً صفحه را تازه‌سازی کنید."
@@ -161,5 +166,6 @@
   },
   "NETWORK_FAILURE": { "message": "اتصال به سرور برقرار نشد" },
   "INVALID_RESPONSE": { "message": "فرمت پاسخ API نامعتبر است" },
-  "CONTEXT_LOST": { "message": "زمینهٔ افزونه از بین رفته است" }
+  "CONTEXT_LOST": { "message": "زمینهٔ افزونه از بین رفته است" },
+  "API_KEY_ISSUE": { "message": "API Key مشکل در" }
 }

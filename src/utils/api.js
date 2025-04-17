@@ -103,48 +103,41 @@ class ApiService {
    * @param {Object} options شامل: url, fetchOptions, extractResponse, context, و اختیاری: sourceLanguage, targetLanguage, translationMode
    * @returns {Promise<string|undefined>}
    */
-  async _executeApiCall(options) {
+  /** اجرای درخواست API و برگرداندن خطا به لایهٔ بالاتر */
+  async _executeApiCall(opts) {
     try {
-      const response = await fetch(options.url, options.fetchOptions);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.detail || errorData.error?.message || response.statusText;
-        const error = new Error(errorMessage);
-        error.statusCode = response.status;
-        error.type = ErrorTypes.API;
-        if (response.status === 409) {
-          error.sessionConflict = true;
-        }
-        await this.errorHandler.handle(error, {
-          type: error.type,
-          statusCode: response.status,
-          context: options.context,
-        });
-        return;
+      const res = await fetch(opts.url, opts.fetchOptions);
+
+      /* ───── خطای HTTP ───── */
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = body.detail || body.error?.message || res.statusText;
+
+        const apiErr = new Error(msg);
+        apiErr.statusCode = res.status;
+        apiErr.type = ErrorTypes.API;
+        apiErr.sessionConflict = res.status === 409;
+
+        /* ⬅️ فقط پرتاب می‌کنیم؛
+         هیچ اعلان UI در این لایه ساخته نمی‌شود */
+        throw apiErr;
       }
-      const data = await response.json();
-      const result = options.extractResponse(data, response.status);
+
+      /* ───── واکشی موفق ───── */
+      const data = await res.json();
+      const result = opts.extractResponse(data, res.status);
       if (result === undefined) {
-        const error = new Error("Invalid response format");
-        await this.errorHandler.handle(error, {
-          type: ErrorTypes.API,
-          statusCode: response.status || 500,
-          context: options.context,
-        });
-        return;
+        const fmtErr = new Error("Invalid response format");
+        fmtErr.type = ErrorTypes.API;
+        fmtErr.statusCode = res.status || 500;
+        throw fmtErr;
       }
       return result;
-    } catch (error) {
-      error = await ErrorHandler.processError(error);
-      const isNetworkError =
-        error instanceof TypeError && error.message.includes("NetworkError");
-      await this.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.NETWORK,
-        statusCode: isNetworkError ? 0 : error.statusCode || 500,
-        context: options.context,
-      });
-      return;
+    } catch (err) {
+      /* network / هر خطای دیگر */
+      const e = await ErrorHandler.processError(err);
+      /* فقط پرتاب؛ نمایش اعلان در لایهٔ بالاتر */
+      throw e;
     }
   }
 
@@ -159,22 +152,20 @@ class ApiService {
 
     if (!apiKey) {
       const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
-      await this.errorHandler.handle(error, {
+      return await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 601,
         context: "api-gemini-translation-apikey",
       });
-      return;
     }
 
     if (!apiUrl) {
       const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
-      await this.errorHandler.handle(error, {
+      return await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 602,
         context: "api-gemini-translation-apiurl",
       });
-      return;
     }
 
     const prompt = await buildPrompt(
@@ -464,24 +455,33 @@ class ApiService {
           );
           return;
       }
-    } catch (error) {
-      error = await ErrorHandler.processError(error);
-      if (error.sessionConflict && sourceLang && targetLang) {
-        logME("[API] Session conflict, retrying WebAI...");
+    } catch (err) {
+      /* ----------------------------------
+         اگر رشته‌ای از _executeApiCall آمده،
+         دست نزنیم و همان را پرتاب کنیم
+      ----------------------------------- */
+      if (typeof err === "string") {
+        throw err; // 🔴 همانی که _executeApiCall ساخته بود
+      }
+
+      /* اگر واقعاً Error است (مثلاً SessionConflict) */
+      if (err.sessionConflict && source_Lang && target_Lang) {
         this.resetSessionContext();
         return await this.handleWebAITranslation(
           text,
-          sourceLang,
-          targetLang,
+          source_Lang,
+          target_Lang,
           true
         );
       }
-      await this.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.SERVICE,
-        statusCode: error.statusCode || 500,
+
+      await this.errorHandler.handle(err, {
+        type: err.type || ErrorTypes.SERVICE,
+        statusCode: err.statusCode || 500,
         context: "api-translateText-translation-service",
       });
-      return undefined;
+
+      throw err.message || "Unknown translation error"; // فقط متن خطا
     }
   }
 }

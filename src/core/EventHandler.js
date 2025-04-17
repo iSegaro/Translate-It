@@ -373,141 +373,163 @@ export default class EventHandler {
   }
 
   @logMethod
+  /* ------------------------------------------------------------------
+   EventHandler.handleSelect_ElementClick
+------------------------------------------------------------------ */
   async handleSelect_ElementClick(e) {
-    const currentPlatform = detectPlatform();
-    logME(`You are on ${currentPlatform}.`);
+    const platform = detectPlatform();
+    logME(`Select‑Element on «${platform}»`);
 
+    /* 1) جمع‌آوری متن‌ها از عنصرِ انتخاب‌شده */
     const targetElement = e.target;
     const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
-
-    if (originalTextsMap.size === 0)
+    if (!originalTextsMap.size)
       return { status: "empty", reason: "no_text_found" };
 
+    /* 2) تفکیک کش و متن‌های جدید */
     const { textsToTranslate, cachedTranslations } =
       separateCachedAndNewTexts(originalTextsMap);
 
-    if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
+    /* ـــ فقط کش ـــ */
+    if (!textsToTranslate.length && cachedTranslations.size) {
       applyTranslationsToNodes(textNodes, cachedTranslations, {
         state,
         IconManager: this.IconManager,
       });
-      this.notifier.show("حافظه", "info", true, 2000, () => this.cleanCache());
+      this.notifier.show("از حافظه", "info", true, 2000, () =>
+        this.cleanCache()
+      );
       return {
         status: "success",
         source: "cache",
         translatedCount: cachedTranslations.size,
       };
     }
-
-    if (textsToTranslate.length === 0) {
+    /* هیچ متن جدیدی هم نیست */
+    if (!textsToTranslate.length)
       return { status: "skip", reason: "no_new_texts" };
-    }
 
-    let statusNotification = null;
+    /* 3) اعلانِ درحال‌ترجمه */
+    let statusNotif = this.notifier.show("در حال ترجمه…", "status", false);
+    state.translateMode = TranslationMode.SelectElement;
+
     try {
-      statusNotification = this.notifier.show(
-        "در حال ترجمه...",
-        "status",
-        false
-      );
-      state.translateMode = TranslationMode.SelectElement;
-
-      const { expandedTexts, originMapping, originalToExpandedIndices } =
+      /* 3‑۱) فشرده‌سازی متن‌ها */
+      const { expandedTexts, originMapping } =
         expandTextsForTranslation(textsToTranslate);
 
-      const jsonPayloadArray = expandedTexts.map((text) => ({ text }));
-      const jsonFormatString = JSON.stringify(jsonPayloadArray);
-
-      const maxPayloadSize = 20000;
-      if (jsonFormatString.length > maxPayloadSize) {
-        this.notifier.show(
-          `متن انتخابی خیلی بزرگ است. ${jsonFormatString.length}`,
-          "warning",
-          true,
-          3000
-        );
-        return {
-          status: "error",
-          reason: "payload_too_large",
-          size: jsonFormatString.length,
-        };
+      const jsonPayload = JSON.stringify(
+        expandedTexts.map((t) => ({ text: t }))
+      );
+      if (jsonPayload.length > 20_000) {
+        const m = `متن انتخابی بسیار بزرگ است (${jsonPayload.length} بایت)`;
+        this.notifier.show(m, "warning", true, 3000);
+        return { status: "error", reason: "payload_large", message: m };
       }
 
+      /* 4) درخواستِ ترجمه به پس‌زمینه */
       const response = await Browser.runtime.sendMessage({
         action: "fetchTranslationBackground",
         payload: {
-          promptText: jsonFormatString,
+          promptText: jsonPayload,
           translationMode: TranslationMode.SelectElement,
         },
       });
 
+      /* ---------- ❶ پاسخِ خطادار ---------- */
+      if (!response?.success) {
+        const msg = response?.error || "(⚠️ خطایی در ترجمه رخ داد.)";
+        return { status: "error", reason: "backend_error", message: msg };
+      }
+
+      /* ---------- ❷ پاسخِ موفق ---------- */
+      /* -------------------------------------------------------------
+  | اگر سرویس با success:false جواب داد متن خطا را مستقیماً نشان بده
+  | (کروم این حالت را به‌جای throw برمی‌گرداند)
+ * ------------------------------------------------------------- */
+      if (response && response.success === false) {
+        const err =
+          typeof response.error === "string" ?
+            response.error
+          : response.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
+
+        await this.translationHandler.errorHandler.handle(
+          new Error(err), // یا آبجکت Error اختصاصى
+          { type: ErrorTypes.API, context: "select-element-response" }
+        );
+        return { status: "error", reason: "api_error", message: err };
+      }
+
       const translatedJsonString = response?.data?.translatedText;
 
-      this.notifier.dismiss(statusNotification);
-      statusNotification = null;
-
-      if (translatedJsonString && typeof translatedJsonString === "string") {
-        const translatedData = parseAndCleanTranslationResponse(
-          translatedJsonString,
-          this.translationHandler
-        );
-
-        if (!translatedData)
-          return { status: "error", reason: "invalid_response" };
-
-        const isLengthMismatch = handleTranslationLengthMismatch(
-          translatedData,
-          expandedTexts
-        );
-
-        if (!isLengthMismatch) {
-          this.notifier.show(" دوباره امتحان کنید", "info", true, 1500);
-        }
-
-        const newTranslations = reassembleTranslations(
-          translatedData,
-          expandedTexts,
-          originMapping,
-          textsToTranslate,
-          cachedTranslations
-        );
-
-        const allTranslations = new Map([
-          ...cachedTranslations,
-          ...newTranslations,
-        ]);
-
-        applyTranslationsToNodes(textNodes, allTranslations, {
-          state,
-          IconManager: this.IconManager,
-        });
-
-        return {
-          status: "success",
-          source: "translated",
-          translatedCount: newTranslations.size,
-          fromCache: cachedTranslations.size,
-        };
-      } else {
-        if (translatedJsonString === null) {
-          this.notifier.show("زبان مبدا و مقصد یکسان است.", "info", true, 2000);
-          return { status: "skip", reason: "same_language" };
-        }
-
-        return { status: "error", reason: "invalid_translation_type" };
+      if (
+        typeof translatedJsonString !== "string" ||
+        !translatedJsonString.trim()
+      ) {
+        const m = "(⚠️ ترجمه‌ای دریافت نشد.)";
+        this.notifier.show(m, "warning", true, 3000);
+        return { status: "error", reason: "empty_translation", message: m };
       }
-    } catch (error) {
-      error = await ErrorHandler.processError(error);
-      await this.translationHandler.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.SERVICE,
-        statusCode: error.statusCode,
+
+      /* 5) پردازش رشتهٔ JSONِ ترجمه‌شده */
+      const translatedData = parseAndCleanTranslationResponse(
+        translatedJsonString,
+        this.translationHandler
+      );
+      if (!translatedData) {
+        const m = "(فرمت پاسخ نامعتبر است.)";
+        await this.translationHandler.errorHandler.handle(
+          new Error(err), // یا آبجکت Error اختصاصى
+          { type: ErrorTypes.API, context: "select-element-response-format" }
+        );
+        return { status: "error", reason: "api_error", message: err };
+      }
+
+      /* 6) تطابق طول (هشدار فقط) */
+      handleTranslationLengthMismatch(translatedData, expandedTexts) ||
+        this.notifier.show(
+          "(طول پاسخ ناهمخوان؛ مجدداً امتحان کنید.)",
+          "info",
+          true,
+          1500
+        );
+
+      /* 7) چسباندن ترجمه‌ها به نودها */
+      const newTranslations = reassembleTranslations(
+        translatedData,
+        expandedTexts,
+        originMapping,
+        textsToTranslate,
+        cachedTranslations
+      );
+      const allTranslations = new Map([
+        ...cachedTranslations,
+        ...newTranslations,
+      ]);
+      applyTranslationsToNodes(textNodes, allTranslations, {
+        state,
+        IconManager: this.IconManager,
+      });
+
+      return {
+        status: "success",
+        source: "translated",
+        translatedCount: newTranslations.size,
+        fromCache: cachedTranslations.size,
+      };
+    } catch (err) {
+      const processed = await ErrorHandler.processError(err);
+      await this.translationHandler.errorHandler.handle(processed, {
+        type: processed.type || ErrorTypes.SERVICE,
         context: "EventHandler-handleSelect_ElementClick",
       });
-      return { status: "error", reason: "exception", message: error.message };
+      return {
+        status: "error",
+        reason: "exception",
+        message: processed.message,
+      };
     } finally {
-      if (statusNotification) {
-        this.notifier.dismiss(statusNotification);
-      }
+      if (statusNotif) this.notifier.dismiss(statusNotif);
     }
   }
 

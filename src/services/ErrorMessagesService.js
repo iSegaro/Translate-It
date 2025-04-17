@@ -19,10 +19,19 @@ const errorCache = {};
 export async function getErrorMessage(key) {
   if (errorCache[key]) return errorCache[key];
 
-  const message =
-    (await getTranslationString(errorKeys[key])) || getFallbackMessage(key);
-  errorCache[key] = message;
-  return message;
+  // کلید ترجمه را از i18n بگیر
+  let translated = await getTranslationString(errorKeys[key]);
+
+  // اگر i18n رشتهٔ خالی یا فقط whitespace برگرداند یعنی کلید پیدا نشده است
+  if (!translated || !translated.trim()) {
+    translated = getFallbackMessage(key);
+  }
+
+  // فقط مقدار معتبر را کش کن تا در صورت اضافه شدن فایل locale، متنِ درست نمایش داده شود
+  if (translated && translated.trim()) {
+    errorCache[key] = translated;
+  }
+  return translated;
 }
 
 function getFallbackMessage(key) {

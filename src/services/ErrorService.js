@@ -17,6 +17,18 @@ export class ErrorTypes {
   static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
 }
 
+function extractErrorMessage(error) {
+  if (!error) return "خطای نامشخص";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (typeof error.message === "string") return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "خطای ناشناخته";
+  }
+}
+
 export class ErrorHandler {
   constructor(notificationManager = new NotificationManager()) {
     this.notifier = notificationManager;
@@ -52,6 +64,10 @@ export class ErrorHandler {
   }
 
   async handle(error, customMeta = {}) {
+    if (error?._isHandled) {
+      logME("[ErrorService] Skipping already-handled error.");
+      return error;
+    }
     // اگر error یک Promise باشد، منتظر تکمیل آن شود (resolve یا reject)
     if (typeof error.then === "function") {
       error = await error;
@@ -68,8 +84,7 @@ export class ErrorHandler {
 
     try {
       // نرمال‌سازی خطا
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error));
+      const normalizedError = error instanceof Error ? error : new Error(extractErrorMessage(error));
 
       // ادغام متادیتاها
       const mergedMeta = {
@@ -196,6 +211,10 @@ export class ErrorHandler {
         400: {
           code: "api-key-wrong",
           message: await getErrorMessage("API_KEY_WRONG"),
+        },
+        401: {
+          code: "api-key-unauthorized",
+          message: await getErrorMessage("API_KEY_ISSUE"),
         },
         601: {
           code: "api-key-missing",
@@ -391,4 +410,13 @@ Context: ${errorDetails.context}`);
     };
     return typeMap[errorType] || "error";
   }
+}
+
+
+export async function handleUIError(error, context = "") {
+  const handler = new ErrorHandler();
+  return await handler.handle(error, {
+    type: ErrorTypes.UI,
+    context,
+  });
 }

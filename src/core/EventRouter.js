@@ -1,4 +1,5 @@
 // src/core/EventRouter.js
+import { handleUIError } from "../services/ErrorService.js";
 import Browser from "webextension-polyfill";
 import { CONFIG, state } from "../config.js";
 import { isEditable, logME, taggleLinks } from "../utils/helpers.js";
@@ -16,7 +17,7 @@ class EventRouter {
         try {
           return handler.apply(this, args); // اطمینان از درستی context
         } catch (error) {
-          this.errorHandler.handle(error, {
+          handleUIError(error, {
             type: ErrorTypes.UI,
             context: "event-router-handleEventWithErrorHandling",
             eventType: args[0]?.type,
@@ -74,50 +75,39 @@ class EventRouter {
 
   @logMethod
   async handleClickMethod(e) {
-    if (state?.selectElementActive) {
-      this.translationHandler.IconManager?.cleanup();
-      state.selectElementActive = false;
+    if (!state?.selectElementActive) return;
 
+    /* خاموش کردن حالت Select‑Element مثل قبل … */
+    this.translationHandler.IconManager?.cleanup();
+    state.selectElementActive = false;
+    await Browser.storage.local.set({ selectElementActive: false });
+    taggleLinks(false);
+    await Browser.runtime.sendMessage({
+      action: "UPDATE_SELECT_ELEMENT_STATE",
+      data: false,
+    });
+
+    /* یک تأخیر کوچک براى اطمینان */
+    setTimeout(async () => {
       try {
-        await Browser.storage.local.set({ selectElementActive: false });
-      } catch (storageError) {
-        await this.errorHandler.handle(storageError, {
-          type: ErrorTypes.INTEGRATION,
-          context: "Browser-storage-set",
-        });
-        return;
-      }
-
-      taggleLinks(false);
-
-      try {
-        await Browser.runtime.sendMessage({
-          action: "UPDATE_SELECT_ELEMENT_STATE",
-          data: false,
-        });
-      } catch (messageError) {
-        await this.errorHandler.handle(messageError, {
-          type: ErrorTypes.INTEGRATION,
-          context: "runtime-sendMessage",
-        });
-        taggleLinks(true);
-        return;
-      }
-
-      setTimeout(async () => {
-        try {
+        const result =
           await this.translationHandler.eventHandler.handleSelect_ElementModeClick(
             e
           );
-        } catch (timeoutError) {
-          await this.errorHandler.handle(timeoutError, {
-            type: ErrorTypes.UI,
-            context: "handleSelect_ElementModeClick-timeout",
-          });
-          taggleLinks(true);
+
+        /* اگر پس‑از ترجمه خطایی برگشت، به کاربر بگو */
+        if (result?.status === "error") {
+          const msg = result.message || "(⚠️ خطایی در ترجمه رخ داد.)";
+          this.translationHandler.notifier.show(msg, "error", true, 4000);
         }
-      }, 100);
-    }
+      } catch (err) {
+        await handleUIError(err, {
+          type: ErrorTypes.UI,
+          context: "handleSelect_ElementModeClick",
+        });
+        taggleLinks(true);
+      }
+    }, 100);
   }
 
   @logMethod
@@ -140,7 +130,7 @@ class EventRouter {
         return;
       }
     } catch (error) {
-      this.errorHandler.handle(error, {
+      handleUIError(error, {
         type: ErrorTypes.UI,
         context: "event-router-handleKeyDown",
         eventType: e.type,
@@ -168,7 +158,7 @@ class EventRouter {
           e.target.style.opacity = "0.9";
         }
       } catch (error) {
-        this.errorHandler.handle(error, {
+        handleUIError(error, {
           type: ErrorTypes.UI,
           context: "mouseover-style-update",
           element: e.target?.tagName,
