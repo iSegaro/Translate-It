@@ -150,19 +150,40 @@
     "message": "error on translation response"
   },
 
-  "INVALID_CONTEXT": {
+  "ERRORS_INVALID_CONTEXT": {
     "message": "Extension context invalid. Please refresh the page to continue."
   },
-  "API_KEY_MISSING": { "message": "API Key is missing" },
-  "API_KEY_WRONG": { "message": "API Key is wrong" },
-  "API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
-  "API_URL_MISSING": { "message": "API URL is missing" },
-  "AI_MODEL_MISSING": { "message": "AI Model is missing" },
-  "SERVICE_OVERLOADED": {
+  "ERRORS_API_KEY_MISSING": { "message": "API Key is missing" },
+  "ERRORS_API_KEY_WRONG": { "message": "API Key is wrong" },
+  "ERRORS_API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
+  "ERRORS_API_URL_MISSING": { "message": "API URL is missing" },
+  "ERRORS_AI_MODEL_MISSING": { "message": "AI Model is missing" },
+  "ERRORS_SERVICE_OVERLOADED": {
     "message": "Translation service overloaded, Try later"
   },
-  "NETWORK_FAILURE": { "message": "Connection to server failed" },
-  "INVALID_RESPONSE": { "message": "Invalid API response format" },
-  "CONTEXT_LOST": { "message": "Extension context lost" },
-  "API_KEY_ISSUE": { "message": "API Key issue" }
+  "ERRORS_NETWORK_FAILURE": { "message": "Connection to server failed" },
+  "ERRORS_INVALID_RESPONSE": { "message": "Invalid API response format" },
+  "ERRORS_CONTEXT_LOST": { "message": "Extension context lost" },
+  "ERRORS_API_KEY_ISSUE": { "message": "API Key issue." },
+
+  "ERRORS_BACKGROUND_ERROR": { "message": "Error API Service." },
+
+  "ERRORS_DURING_TRANSLATE": { "message": "Error in translating." },
+  "ERRORS_DURING_TRANSLATE_Fetch": { "message": "Error in translate." },
+  "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND": {
+    "message": "Error during translation."
+  },
+  "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED_RESPONSE": {
+    "message": "Translation Failed."
+  },
+  "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED": {
+    "message": "Error in translaion."
+  },
+  "ERRORS_EMPTY_PROMPT": { "message": "Invalid or missing promptText." },
+
+  "STATUS_TRANSLATING_CTRLSLASH": { "message": "Translate..." },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "Translate..." },
+  "STATUS_TRANSLATING_ICON": { "message": "Translate..." },
+  "STATUS_FROM_MEMORY": { "message": "Memory" },
+  "STATUS_REMOVE_MEMORY": { "message": "Memory Cleaned" }
 }
