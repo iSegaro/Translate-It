@@ -1,10 +1,6 @@
 // src/core/EventHandler.js
 import Browser from "webextension-polyfill";
 import {
-  getTranslateOnTextFieldsAsync,
-  getEnableShortcutForTextFieldsAsync,
-  getTranslateWithSelectElementAsync,
-  getTranslateOnTextSelectionAsync,
   getRequireCtrlForTextSelectionAsync,
   state,
   TranslationMode,
@@ -77,10 +73,10 @@ export default class EventHandler {
       /**
        * enableShortcutForTextFields
        *
-       * بررسی فعال بودن شرتکات Ctrl+/ در اینجا انجام می‌شود
+       * رویداد keydown فقط وقتی فلگ SHORTCUT_TEXT_FIELDS روشن است ارسال می‌شود
+       *
        */
-      const shouldEnableShortcut = await getEnableShortcutForTextFieldsAsync();
-      if (shouldEnableShortcut && this.isCtrlSlashEvent(event)) {
+      if (this.isCtrlSlashEvent(event)) {
         await this.handleCtrlSlash(event);
         return;
       }
@@ -105,29 +101,18 @@ export default class EventHandler {
        * در اینجا شرط مربوط به فعال بودن و یا نبودن این سرویس
        * بررسی می شود.
        *
+       * mouseup فقط وقتی فلگ TEXT_SELECTION روشن است ارسال می‌شود
+       *
        * نکته:
        * بررسی رویداد mouseup بعد از انتخاب متن و چک کردن برای ماهیت فیلد بودن هدف
        **/
-      const shouldTranslateOnTextSelection =
-        await getTranslateOnTextSelectionAsync();
-      if (shouldTranslateOnTextSelection && this.isMouseUp(event)) {
+      if (this.isMouseUp(event)) {
         /** requireCtrlForTextSelection
          *  در اینجا شرط مربوط به نیاز بودن به نگه‌داشتن کلید کنترل بررسی می‌شود
          */
         const requireCtrl = await getRequireCtrlForTextSelectionAsync();
-
-        if (requireCtrl) {
-          // اگر تنظیم فعال بود، چک کن آیا Ctrl همزمان فشرده شده؟
-          if (this.isMouseUpCtrl(event)) {
-            await this.handleMouseUp(event);
-          }
-          // اگر Ctrl نیاز بود ولی فشرده نشده بود، برای mouseup کاری نکن
-        } else {
-          // اگر تنظیم غیرفعال بود (Ctrl نیاز نبود)، مستقیم handleMouseUp را اجرا کن
-          await this.handleMouseUp(event);
-          // نیازی به چک کردن مجدد isMouseUp در اینجا نیست چون شرط بیرونی آن را پوشش داده
-        }
-        // پس از اجرای منطق mouseup یا بررسی Ctrl، از این شرط خارج شو
+        if (requireCtrl && !this.isMouseUpCtrl(event)) return;
+        await this.handleMouseUp(event);
       }
     } catch (error) {
       error = await ErrorHandler.processError(error);
@@ -296,53 +281,43 @@ export default class EventHandler {
       (target?.closest && target.closest('[contenteditable="true"]'))
     );
   }
+
   _processEditableElement(element) {
-    getTranslateOnTextFieldsAsync().then((shouldTranslateOnTextFields) => {
-      if (!shouldTranslateOnTextFields) {
-        return;
-      }
+    /* اگر مدیریت آیکون موجود نیست، کاری نکن */
+    if (!this.IconManager) return null;
 
-      if (this.IconManager) {
-        this.IconManager.cleanup();
+    /* ابتدا هر آیکون قبلی را پاک کن */
+    this.IconManager.cleanup();
 
-        // TODO: Platform-specific handling for YouTube (Temporary Solution - Requires Refinement)
-        if (detectPlatform() === Platform.Youtube) {
-          const youtubeStrategies = this.strategies["youtube"];
-          // Skip processing for recognized special fields on YouTube (search query or end field).
-          // This is a temporary implementation and may need a more robust and scalable approach in the future.
-          if (youtubeStrategies.isYoutube_ExtraField(element)) {
-            return;
-          }
-        }
-        // TODO: End of platform-specific handling for YouTube (Temporary Solution)
+    // TODO: Platform-specific handling for YouTube (Temporary Solution - Requires Refinement)
+    /* ---- استثنای خاص یوتیوب ---- */
+    if (detectPlatform() === Platform.Youtube) {
+      const yt = this.strategies["youtube"];
+      // Skip processing for recognized special fields on YouTube (search query or end field).
+      // This is a temporary implementation and may need a more robust and scalable approach in the future.
+      if (yt?.isYoutube_ExtraField?.(element)) return null; // فیلدهای سرچ و غیره
+    }
+    /* --------------------------------------------- */
+    // TODO: End of platform-specific handling for YouTube (Temporary Solution)
 
-        const icon = this.IconManager.createTranslateIcon(element);
-        if (icon) {
-          setupIconBehavior(
-            icon,
-            element,
-            this.translationHandler,
-            this.notifier,
-            this.strategies
-          );
-          return icon;
-        } else {
-          logME("[EventHandler] Icon not created");
-          return null;
-        }
-      }
-      return null;
-    });
+    const icon = this.IconManager.createTranslateIcon(element);
+    if (icon) {
+      setupIconBehavior(
+        icon,
+        element,
+        this.translationHandler,
+        this.notifier,
+        this.strategies
+      );
+      return icon;
+    }
+    logME("[EventHandler] Icon not created");
+    return null;
   }
 
   handleEditableFocus(element) {
     if (state.activeTranslateIcon) return;
-    getTranslateOnTextFieldsAsync().then((shouldTranslateOnTextFields) => {
-      if (!shouldTranslateOnTextFields) {
-        return;
-      }
-      this._processEditableElement(element);
-    });
+    this._processEditableElement(element);
   }
 
   async handleEditableElement(event) {
