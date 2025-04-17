@@ -143,5 +143,20 @@
   "popup_string_during_translate": { "message": "translating..." },
   "popup_string_error_sending": { "message": "Error sending request." },
   "popup_string_error_response_empty": { "message": "(translation is empty)" },
-  "popup_string_translate_error": { "message": "error on translation" }
+  "popup_string_translate_error": { "message": "error on translation" },
+
+  "INVALID_CONTEXT": {
+    "message": "Extension context invalid. Please refresh the page to continue."
+  },
+  "API_KEY_MISSING": { "message": "API Key is missing" },
+  "API_KEY_WRONG": { "message": "API Key is wrong" },
+  "API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
+  "API_URL_MISSING": { "message": "API URL is missing" },
+  "AI_MODEL_MISSING": { "message": "AI Model is missing" },
+  "SERVICE_OVERLOADED": {
+    "message": "Translation service overloaded, Try later"
+  },
+  "NETWORK_FAILURE": { "message": "Connection to server failed" },
+  "INVALID_RESPONSE": { "message": "Invalid API response format" },
+  "CONTEXT_LOST": { "message": "Extension context lost" }
 }
