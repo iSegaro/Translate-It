@@ -6,6 +6,7 @@ import { getTargetLanguageAsync, getSourceLanguageAsync } from "../config.js";
 import { AUTO_DETECT_VALUE, getLanguageCode } from "../utils/tts.js"; // getLanguageCode might be needed
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 /** Gets the language promptName from a display name/identifier. */
 function getLanguagePromptName(langIdentifier) {
@@ -172,7 +173,11 @@ function setupEventListeners() {
       const sourceContent = elements.sourceText.value;
       const targetContent = elements.translationResult.textContent;
 
-      if (targetContent && targetContent !== "در حال ترجمه...") {
+      if (
+        targetContent &&
+        targetContent !==
+          (await getTranslationString("popup_string_during_translate"))
+      ) {
         elements.sourceText.value = targetContent;
         elements.translationResult.textContent = sourceContent;
 

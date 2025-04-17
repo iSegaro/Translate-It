@@ -170,8 +170,7 @@ async function triggerTranslation() {
 
   elements.translationResult.textContent =
     (await getTranslationString("popup_string_during_translate")) ||
-    "translating..." ||
-    "درحال ترجمه...";
+    "translating...";
 
   elements.translationResult.innerHTML = `
 <div class="spinner-overlay">
@@ -249,7 +248,7 @@ async function triggerTranslation() {
     elements.translationResult.innerHTML = "";
     const fallback =
       (await getTranslationString("popup_string_translate_error_trigger")) ||
-      "(⚠️ خطایی در ترجمه رخ داد.)T";
+      "(⚠️ خطایی در ترجمه پر پاپ‌آپ رخ داد.)";
     const errMsg = extractErrorMessage(error) || fallback;
     elements.translationResult.textContent = errMsg;
     correctTextDirection(elements.translationResult, errMsg);

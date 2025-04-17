@@ -117,6 +117,7 @@ export async function handleFetchTranslation(
     const safeMessage =
       processed?.message?.trim() ||
       err?.message?.trim() ||
+      (await getTranslationString("ERRORS_DURING_TRANSLATE_Fetch")) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 
     sendResponse({ success: false, error: safeMessage });
@@ -150,7 +151,9 @@ export async function handleFetchTranslationBackground(
       const errMsg =
         typeof translation === "string" && translation ?
           translation
-        : "خطای ترجمه از سرویس API";
+        : await getTranslationString(
+            "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND"
+          );
 
       /* لاگ و هندل خطا (اختیاری) */
       await errorHandler.handle(new Error(errMsg), {
@@ -166,7 +169,11 @@ export async function handleFetchTranslationBackground(
       const errMsg =
         translation instanceof Error ?
           translation.message
-        : translation || "(Translation failed.)";
+        : translation ||
+          (await getTranslationString(
+            "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED_RESPONSE"
+          )) ||
+          "(Translation failed.)";
       throw new Error(errMsg);
     }
 
@@ -199,6 +206,9 @@ export async function handleFetchTranslationBackground(
     const safeMessage =
       processed?.message?.trim() ||
       err?.message?.trim() ||
+      (await getTranslationString(
+        "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED"
+      )) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 
     sendResponse({ success: false, error: safeMessage });

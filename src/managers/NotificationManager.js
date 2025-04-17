@@ -18,37 +18,37 @@ export default class NotificationManager {
   constructor() {
     this.map = {
       error: {
-        title: "خطا - ترجمه خودکار",
+        title: "AI Writing Companion - Error",
         icon: safe.ICON_ERROR,
         cls: "AIWC-error",
         dur: 5000,
       },
       warning: {
-        title: "هشدار - ترجمه خودکار",
+        title: "AI Writing Companion - Warning",
         icon: safe.ICON_WARNING,
         cls: "AIWC-warning",
         dur: 4000,
       },
       success: {
-        title: "موفقیت - ترجمه خودکار",
+        title: "AI Writing Companion - Success",
         icon: safe.ICON_SUCCESS,
         cls: "AIWC-success",
         dur: 3000,
       },
       info: {
-        title: "اطلاعات - ترجمه خودکار",
+        title: "AI Writing Companion - Info",
         icon: safe.ICON_INFO,
         cls: "AIWC-info",
         dur: 3000,
       },
       status: {
-        title: "در حال انجام - ترجمه خودکار",
+        title: "AI Writing Companion - Status",
         icon: safe.ICON_INFO,
         cls: "AIWC-status",
         dur: 2000,
       },
       revert: {
-        title: "بازگشت - ترجمه خودکار",
+        title: "AI Writing Companion - Revert",
         icon: safe.ICON_REVERT,
         cls: "AIWC-revert",
         dur: 800,

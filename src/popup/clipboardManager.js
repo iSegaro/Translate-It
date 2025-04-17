@@ -1,5 +1,6 @@
 // src/popup/clipboardManager.js
 import { logME } from "../utils/helpers.js";
+import { getTranslationString } from "../utils/i18n.js";
 import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
 
@@ -101,7 +102,11 @@ function setupEventListeners() {
 
   elements.copyTargetBtn?.addEventListener("click", async () => {
     const text = elements.translationResult.textContent;
-    if (!text || text === "در حال ترجمه...") return;
+    if (
+      !text ||
+      text === (await getTranslationString("popup_string_during_translate"))
+    )
+      return;
 
     try {
       await navigator.clipboard.writeText(text);

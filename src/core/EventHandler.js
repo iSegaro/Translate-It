@@ -10,7 +10,7 @@ import {
   TranslationMode,
 } from "../config.js";
 import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
-import { translateText } from "../utils/api.js";
+
 import {
   separateCachedAndNewTexts,
   collectTextNodes,
@@ -26,6 +26,7 @@ import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
 import SelectionWindows from "../managers/SelectionWindows.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 export default class EventHandler {
   constructor(translationHandler) {
@@ -366,9 +367,14 @@ export default class EventHandler {
     }, 100);
   }
 
-  cleanCache() {
+  async cleanCache() {
     clearAllCaches({ state });
-    this.notifier.show("حافظه پاک شد", "info", true, 2000);
+    this.notifier.show(
+      (await getTranslationString("STATUS_REMOVE_MEMORY")) || "حافظه پاک شد",
+      "info",
+      true,
+      2000
+    );
     logME("حافظه پاک شد.");
   }
 
@@ -396,8 +402,12 @@ export default class EventHandler {
         state,
         IconManager: this.IconManager,
       });
-      this.notifier.show("از حافظه", "info", true, 2000, () =>
-        this.cleanCache()
+      this.notifier.show(
+        (await getTranslationString("STATUS_FROM_MEMORY")) || "از حافظه",
+        "info",
+        true,
+        2000,
+        () => this.cleanCache()
       );
       return {
         status: "success",
@@ -410,7 +420,13 @@ export default class EventHandler {
       return { status: "skip", reason: "no_new_texts" };
 
     /* 3) اعلانِ درحال‌ترجمه */
-    let statusNotif = this.notifier.show("در حال ترجمه…", "status", false);
+
+    let statusNotif = this.notifier.show(
+      (await getTranslationString("STATUS_TRANSLATING_SELECT_ELEMENT")) ||
+        "در حال ترجمه…",
+      "status",
+      false
+    );
     state.translateMode = TranslationMode.SelectElement;
 
     try {

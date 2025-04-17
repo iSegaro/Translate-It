@@ -5,6 +5,7 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { marked } from "marked";
+import { getTranslationString } from "../utils/i18n.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -434,13 +435,15 @@ export default class SelectionWindows {
   /* ------------------------------------------------------------------ */
   /* ❷ پیام وقتی خطای واقعی رخ داده است                                */
   /* ------------------------------------------------------------------ */
-  handleTranslationError(error, loadingContainer) {
+  async handleTranslationError(error, loadingContainer) {
     if (loadingContainer) loadingContainer.style.opacity = "0";
 
     // استخراج پیام قابل‌خواندن
     const msg =
       typeof error === "string" ? error : (
-        error?.message || "(خطای ناشناخته هنگام ترجمه)."
+        error?.message ||
+        (await getTranslationString("popup_string_translate_error_response")) ||
+        "(خطای ناشناخته هنگام ترجمه)."
       );
 
     setTimeout(() => {

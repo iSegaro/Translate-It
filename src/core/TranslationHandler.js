@@ -21,6 +21,7 @@ import {
 } from "../utils/platformDetector.js";
 import EventHandler from "./EventHandler.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 /**
  * Handles translation requests from content script in a CSP-safe background context.
@@ -44,7 +45,10 @@ export async function handleFetchTranslationBackground(
       message.payload || {};
 
     if (!promptText || typeof promptText !== "string") {
-      throw new Error("Invalid or missing promptText.");
+      throw new Error(
+        (await getTranslationString("ERRORS_EMPTY_PROMPT")) ||
+          "(Invalid or missing promptText.)"
+      );
     }
 
     const translated = await translateText(
@@ -59,7 +63,8 @@ export async function handleFetchTranslationBackground(
       const errMsg =
         typeof translated === "string" && translated ?
           translated
-        : "(خطای ترجمه از سرویس API)";
+        : (await getTranslationString("ERRORS_BACKGROUND_ERROR")) ||
+          "(خطای ترجمه از سرویس API)";
 
       /* لاگ و هندل خطا */
       await errorHandler.handle(new Error(errMsg), {
@@ -194,11 +199,15 @@ export default class TranslationHandler {
 
   @logMethod
   async processTranslation_with_CtrlSlash(params) {
-    const statusNotification = this.notifier.show("در حال ترجمه...", "status");
+    const statusNotification = this.notifier.show(
+      (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
+        "(translating...)",
+      "status"
+    );
     try {
       if (!isExtensionContextValid()) {
         this.errorHandler.handle(
-          new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
+          new Error(await getTranslationString("ERRORS_INVALID_CONTEXT")),
           {
             type: ErrorTypes.CONTEXT,
             context: "TranslationHandler-processTranslation-context",

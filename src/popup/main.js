@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
     console.error("Popup initialization failed:", error);
-    document.body.innerHTML = `<div style="padding: 10px; color: red;">Failed to initialize extension popup. Please try reloading.</div>`;
+    document.body.innerHTML = `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`;
   } finally {
     // اجرای ترجمه بعد از اتمام تمام عملیات اولیه
     app_localize_popup(CONFIG.APPLICATION_LOCALIZE);

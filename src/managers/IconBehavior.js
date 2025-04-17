@@ -4,6 +4,7 @@ import { translateText } from "../utils/api.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 import { logME } from "../utils/helpers.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 export default function setupIconBehavior(
   icon,
@@ -73,8 +74,12 @@ export default function setupIconBehavior(
         logME("[IconBehavior] متن انتخاب شده خالی است.");
         return;
       }
-
-      notif = notifier.show("در حال ترجمه...", "status", false);
+      notif = notifier.show(
+        (await getTranslationString("STATUS_TRANSLATING_ICON")) ||
+          "در حال ترجمه...",
+        "status",
+        false
+      );
 
       const translated = await translateText(
         text,

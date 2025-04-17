@@ -43,6 +43,7 @@ export class ErrorHandler {
       "promise-error-in-translateText",
       "parsing-response-error",
       "context-invalid",
+      "api-error-response",
     ]);
     this.suppressed_ErrorsConsole = new Set([
       "invalid-protocol",
@@ -53,6 +54,7 @@ export class ErrorHandler {
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
       "context-invalid",
+      "api-error-response",
     ]);
   }
 
@@ -84,7 +86,8 @@ export class ErrorHandler {
 
     try {
       // نرمال‌سازی خطا
-      const normalizedError = error instanceof Error ? error : new Error(extractErrorMessage(error));
+      const normalizedError =
+        error instanceof Error ? error : new Error(extractErrorMessage(error));
 
       // ادغام متادیتاها
       const mergedMeta = {
@@ -210,47 +213,47 @@ export class ErrorHandler {
       [ErrorTypes.API]: {
         400: {
           code: "api-key-wrong",
-          message: await getErrorMessage("API_KEY_WRONG"),
+          message: await getErrorMessage("ERRORS_API_KEY_WRONG"),
         },
         401: {
           code: "api-key-unauthorized",
-          message: await getErrorMessage("API_KEY_ISSUE"),
+          message: await getErrorMessage("ERRORS_API_KEY_ISSUE"),
         },
         601: {
           code: "api-key-missing",
-          message: await getErrorMessage("API_KEY_MISSING"),
+          message: await getErrorMessage("ERRORS_API_KEY_MISSING"),
         },
         403: {
           code: "api-forbidden",
-          message: await getErrorMessage("API_KEY_FORBIDDEN"),
+          message: await getErrorMessage("ERRORS_API_KEY_FORBIDDEN"),
         },
         604: {
           code: "api-url-missing",
-          message: await getErrorMessage("API_URL_MISSING"),
+          message: await getErrorMessage("ERRORS_API_URL_MISSING"),
         },
         605: {
           code: "api-model-missing",
-          message: await getErrorMessage("AI_MODEL_MISSING"),
+          message: await getErrorMessage("ERRORS_AI_MODEL_MISSING"),
         },
         429: {
           code: "service-overloaded",
-          message: await getErrorMessage("SERVICE_OVERLOADED"),
+          message: await getErrorMessage("ERRORS_SERVICE_OVERLOADED"),
         },
         default: {
-          code: "api-error",
-          message: await getErrorMessage("INVALID_RESPONSE"),
+          code: "api-error-response",
+          message: await getErrorMessage("ERRORS_INVALID_RESPONSE"),
         },
       },
       [ErrorTypes.NETWORK]: {
         default: {
           code: "network-failure",
-          message: await getErrorMessage("NETWORK_FAILURE"),
+          message: await getErrorMessage("ERRORS_NETWORK_FAILURE"),
         },
       },
       [ErrorTypes.CONTEXT]: {
         default: {
           code: "context-lost",
-          message: await getErrorMessage("CONTEXT_LOST"),
+          message: await getErrorMessage("ERRORS_CONTEXT_LOST"),
         },
       },
       [ErrorTypes.UI]: {
@@ -411,7 +414,6 @@ Context: ${errorDetails.context}`);
     return typeMap[errorType] || "error";
   }
 }
-
 
 export async function handleUIError(error, context = "") {
   const handler = new ErrorHandler();

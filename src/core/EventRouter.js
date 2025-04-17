@@ -5,6 +5,7 @@ import { CONFIG, state } from "../config.js";
 import { isEditable, logME, taggleLinks } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 import { logMethod } from "../utils/helpers.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 class EventRouter {
   constructor(translationHandler) {
@@ -97,7 +98,10 @@ class EventRouter {
 
         /* اگر پس‑از ترجمه خطایی برگشت، به کاربر بگو */
         if (result?.status === "error") {
-          const msg = result.message || "(⚠️ خطایی در ترجمه رخ داد.)";
+          const msg =
+            result.message ||
+            (await getTranslationString("ERRORS_DURING_TRANSLATE")) ||
+            "(⚠️ خطایی در ترجمه رخ داد.)";
           this.translationHandler.notifier.show(msg, "error", true, 4000);
         }
       } catch (err) {

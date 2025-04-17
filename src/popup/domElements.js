@@ -4,7 +4,7 @@
 function $(selector) {
   const element = document.getElementById(selector);
   if (!element) {
-    console.warn(`[DOM] Element not found for selector: ${selector}`);
+    console.warn(`[AIWC-DOM] Element not found for selector: ${selector}`);
   }
   return element;
 }
