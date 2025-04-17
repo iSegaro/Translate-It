@@ -5,6 +5,7 @@ import { applyElementDirection, isRtlText } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
+import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {
   return String(value).trim().toLowerCase() === "true";
@@ -30,7 +31,7 @@ async function loadTranslationsForLanguageCached(lang) {
     const response = await fetch(url);
 
     if (!response.ok) {
-      console.error(
+      logME(
         `خطا در بارگذاری ترجمه‌ها برای زبان "${lang}". کد HTTP: ${response.status}`
       );
       return null;
@@ -41,7 +42,7 @@ async function loadTranslationsForLanguageCached(lang) {
     translationsCache.set(lang, translations);
     return translations;
   } catch (error) {
-    console.error(`خطا در دریافت ترجمه‌ها برای زبان "${lang}":`, error);
+    logME(`خطا در دریافت ترجمه‌ها برای زبان "${lang}":`, error);
     return null;
   }
 }

@@ -2,7 +2,8 @@
 import Browser from "webextension-polyfill";
 import { TRANSLATION_ERRORS, CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
-import { openOptionsPage } from "../utils/helpers.js";
+import { logME, openOptionsPage } from "../utils/helpers.js";
+import { getErrorMessage } from "./ErrorMessagesService";
 
 export class ErrorTypes {
   static API = "API";
@@ -58,7 +59,7 @@ export class ErrorHandler {
 
     // if (this.isHandling || this.displayedErrors.has(error.message)) {
     if (this.isHandling) {
-      console.debug("[ErrorService] Ignoring duplicate error:", error);
+      logME("[ErrorService] Ignoring duplicate error:", error);
       return error;
     }
     this.isHandling = true;
@@ -86,7 +87,7 @@ export class ErrorHandler {
       );
 
       // تولید پیام خطا
-      const { message, code } = this._getErrorMessage(
+      const { message, code } = await this._getErrorMessage(
         normalizedError,
         mergedMeta.type,
         mergedMeta.statusCode,
@@ -113,7 +114,7 @@ export class ErrorHandler {
       normalizedError._isHandled = true;
       return normalizedError;
     } catch (finalError) {
-      console.error("[ErrorService] Critical Unknown Error:", finalError);
+      logME("[ErrorService] Critical Unknown Error:", finalError);
       return finalError;
     } finally {
       this.isHandling = false;
@@ -129,14 +130,14 @@ export class ErrorHandler {
           Browser.runtime.sendMessage({ action: "restart_content_script" });
         } catch (e) {
           if (e.message?.includes("context invalidated")) {
-            // console.debug("[ErrorService] Extension context invalidated");
+            // logME("[ErrorService] Extension context invalidated");
           } else {
-            console.error("[ErrorService] Cannot send restart message.");
+            logME("[ErrorService] Cannot send restart message.");
           }
         }
       }, 2000);
     } else {
-      console.warn(
+      logME(
         "[ErrorService] Extension context invalid, cannot send restart message."
       );
     }
@@ -144,7 +145,7 @@ export class ErrorHandler {
 
   _reviewErrorType(error, currentType, meta) {
     let type = currentType;
-    console.debug("[ErrorService] Reviewing error type:", error.message);
+    logME("[ErrorService] Reviewing error type:", error.message);
 
     // بررسی خطاهای مربوط به API Key
     if (
@@ -180,8 +181,9 @@ export class ErrorHandler {
     return type;
   }
 
-  _getErrorMessage(error, type, statusCode, meta) {
-    console.debug("[ErrorService] getErrorMessage => ", error);
+  async _getErrorMessage(error, type, statusCode, meta) {
+    logME("[ErrorService] getErrorMessage => ", error);
+
     if (meta.suppressSystemError) {
       return { code: "suppressed-error", message: "" };
     }
@@ -193,53 +195,44 @@ export class ErrorHandler {
       [ErrorTypes.API]: {
         400: {
           code: "api-key-wrong",
-          message: `400: ${TRANSLATION_ERRORS.API_KEY_WRONG}`,
+          message: await getErrorMessage("API_KEY_WRONG"),
         },
         601: {
           code: "api-key-missing",
-          message: `401: ${TRANSLATION_ERRORS.API_KEY_MISSING}`,
+          message: await getErrorMessage("API_KEY_MISSING"),
         },
         403: {
           code: "api-forbidden",
-          message: `403: ${TRANSLATION_ERRORS.API_KEY_FORBIDDEN}`,
+          message: await getErrorMessage("API_KEY_FORBIDDEN"),
         },
         604: {
           code: "api-url-missing",
-          message: `604: ${TRANSLATION_ERRORS.API_URL_MISSING}`,
+          message: await getErrorMessage("API_URL_MISSING"),
         },
         605: {
           code: "api-model-missing",
-          message: `605: ${TRANSLATION_ERRORS.API_URL_MISSING}`,
+          message: await getErrorMessage("AI_MODEL_MISSING"),
         },
         429: {
           code: "service-overloaded",
-          message: `429: ${TRANSLATION_ERRORS.SERVICE_OVERLOADED}`,
+          message: await getErrorMessage("SERVICE_OVERLOADED"),
         },
-        500: { code: "internal-server-error", message: "500: خطای داخلی سرور" },
-        600: {
-          code: "internal-server-error",
-          message: "600: خطای سرور API",
+        default: {
+          code: "api-error",
+          message: await getErrorMessage("INVALID_RESPONSE"),
         },
-        default: { code: "api-error", message: "خطای سرویس API" },
       },
       [ErrorTypes.NETWORK]: {
         default: {
           code: "network-failure",
-          message: TRANSLATION_ERRORS.NETWORK_FAILURE,
-        },
-      },
-      [ErrorTypes.SERVICE]: {
-        503: {
-          code: "service-unavailable",
-          message: "سرویس موقتاً در دسترس نیست",
-        },
-        default: {
-          code: "translation-service-error",
-          message: "خطای سرویس ترجمه",
+          message: await getErrorMessage("NETWORK_FAILURE"),
         },
       },
       [ErrorTypes.CONTEXT]: {
-        default: { code: "context-lost", message: "لطفا صفحه را رفرش کنید." },
+        default: {
+          code: "context-lost",
+          message: await getErrorMessage("CONTEXT_LOST"),
+        },
       },
       [ErrorTypes.UI]: {
         "text-direction-error": {
@@ -342,22 +335,24 @@ Context: ${errorDetails.context}`);
       if (error.stack)
         console.error("[ErrorService] Stack Trace:", error.stack);
     } else {
-      console.error(`[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}
+      logME(`[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}
 Type: ${errorDetails.type}
 Status: ${errorDetails.statusCode}
 Context: ${errorDetails.context}`);
-      if (error.stack)
-        console.error("[ErrorService] Stack Trace:", error.stack);
+      if (error.stack) logME("[ErrorService] Stack Trace:", error.stack);
     }
   }
 
   _notifyUser(message, type, errorCode) {
+    logME("[ErrorService] Showing notification for error", message);
     if (errorCode === "suppressed" || errorCode === "suppressed-error") return;
     if (
       this.suppressed_Errors.has(errorCode) ||
       this.displayedErrors.has(message)
-    )
+    ) {
+      logME("[ErrorService] Silent Error. Don't need to show notification.");
       return;
+    }
 
     const notificationType = this._getNotificationType(type);
 

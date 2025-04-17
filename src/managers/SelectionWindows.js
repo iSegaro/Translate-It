@@ -396,12 +396,13 @@ export default class SelectionWindows {
     loadingContainer.style.opacity = "0";
     setTimeout(() => {
       if (this.displayElement) {
-        this.notifier.show(
-          "متن ترجمه خالی است، دوباره امتحان کنید",
-          "info",
-          true,
-          2000
-        );
+        logME("متن ترجمه خالی است، دوباره امتحان کنید.");
+        // this.notifier.show(
+        //   "متن ترجمه خالی است، دوباره امتحان کنید",
+        //   "info",
+        //   true,
+        //   2000
+        // );
         // با false صدا بزنید تا مستقیماً remove شود
         this.dismiss(false);
       }
