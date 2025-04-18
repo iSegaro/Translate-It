@@ -476,7 +476,7 @@ class ApiService {
       }
 
       await this.errorHandler.handle(err, {
-        type: err.type || ErrorTypes.SERVICE,
+        type: err.type || ErrorTypes.NETWORK,
         statusCode: err.statusCode || 500,
         context: "api-translateText-translation-service",
       });
