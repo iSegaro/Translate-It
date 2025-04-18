@@ -2,7 +2,7 @@
 import Browser from "webextension-polyfill";
 import { CONFIG, state } from "./config.js";
 import TranslationHandler from "./core/TranslationHandler.js";
-import { setupEventListeners } from "./core/EventRouter.js";
+// import { setupEventListeners } from "./core/EventRouter.js";
 import {
   isExtensionContextValid,
   taggleLinks,
@@ -50,10 +50,10 @@ class ContentScript {
     if (isExtensionContextValid()) {
       console.info("AI Writing Extension initialized successfully!");
       this.setupUpdateSelectElementState();
-      setupEventListeners(
-        this.translationHandler,
-        this.translationHandler.featureManager
-      );
+      // setupEventListeners(
+      //   this.translationHandler,
+      //   this.translationHandler.featureManager
+      // );
       Object.freeze(CONFIG);
       this.setupPagehideListener();
       this.setupMessageListener();

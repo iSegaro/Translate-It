@@ -1,7 +1,7 @@
 // src/core/FeatureManager.js
-// مدیریت وضعیت ویژگی‌های قابل‌فعال/غیرفعال در افزونه
-
 import Browser from "webextension-polyfill";
+
+// مدیریت وضعیت ویژگی‌های قابل‌فعال/غیرفعال در افزونه
 
 /**
  * @typedef {"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
@@ -17,13 +17,8 @@ export default class FeatureManager {
    * @param {FeatureFlagMap} initialFlags
    */
   constructor(initialFlags) {
-    /** @type {FeatureFlagMap} */
     this.flags = { ...initialFlags };
-
-    /** @type {Partial<Record<FeatureKey, Array<() => void>>>} */
     this._subscribers = {};
-
-    /* نگاشتِ کلیدهای Storage به نام فلگ داخلی */
     this.keyMap = {
       TRANSLATE_ON_TEXT_FIELDS: "TEXT_FIELDS",
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: "SHORTCUT_TEXT_FIELDS",
@@ -31,8 +26,30 @@ export default class FeatureManager {
       TRANSLATE_ON_TEXT_SELECTION: "TEXT_SELECTION",
       ENABLE_DICTIONARY: "DICTIONARY",
     };
-
+    // ۱) لیسنر تغییرات آینده
     Browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
+
+    // ۲) بارگذاریِ مقادیر جاری از storage
+    Browser.storage.local
+      .get(Object.keys(this.keyMap))
+      .then((stored) => {
+        Object.entries(stored).forEach(([storageKey, newValue]) => {
+          const flag = this.keyMap[storageKey];
+          if (!flag) return;
+          // اگر کلید در storage موجود باشد، مقدار را جایگزین کن
+          if (
+            typeof newValue !== "undefined" &&
+            this.flags[flag] !== newValue
+          ) {
+            this.flags[flag] = newValue;
+            // نوتیفای ساب‌اسکرایبرها (مثلاً EventRouter)
+            this._subscribers[flag]?.forEach((fn) => fn());
+          }
+        });
+      })
+      .catch((err) => {
+        console.warn("[FeatureManager] failed to load initial flags", err);
+      });
   }
 
   /** @param {FeatureKey} flag */

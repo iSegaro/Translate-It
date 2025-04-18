@@ -23,6 +23,7 @@ import EventHandler from "./EventHandler.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
+import EventRouter from "./EventRouter.js";
 
 /**
  * Handles translation requests from content script in a CSP-safe background context.
@@ -137,6 +138,7 @@ export default class TranslationHandler {
     });
 
     this.eventHandler = new EventHandler(this, this.featureManager);
+    this.eventRouter = new EventRouter(this, this.featureManager);
   }
 
   @logMethod
