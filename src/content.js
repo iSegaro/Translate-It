@@ -75,6 +75,13 @@ class ContentScript {
       state.selectElementActive = false;
       this.updateSelectElementState(false);
     });
+
+    window.addEventListener("blur", () => {
+      if (state.selectElementActive) {
+        state.selectElementActive = false;
+        this.updateSelectElementState(false);
+      }
+    });
   }
 
   setupUpdateSelectElementState() {
