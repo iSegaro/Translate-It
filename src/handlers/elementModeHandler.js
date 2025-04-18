@@ -53,7 +53,7 @@ export async function handleActivateSelectElementMode(
       try {
         await Browser.scripting.executeScript({
           target: { tabId },
-          files: ["content.bundle.js"],
+          files: ["browser-polyfill.js", "content.bundle.js"],
         });
         logME(
           "[Handler:ElementMode] Script injected successfully, resending toggle command."

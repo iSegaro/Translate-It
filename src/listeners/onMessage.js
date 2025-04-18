@@ -203,6 +203,39 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return true; // Handler is async
 
+    case "TRY_INJECT_IF_NEEDED":
+      (async () => {
+        const { tabId, url } = message;
+
+        try {
+          const parsedUrl = new URL(url);
+          if (!["http:", "https:"].includes(parsedUrl.protocol)) return;
+
+          const result = await Browser.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              return !!window.__AI_WRITING_EXTENSION_ACTIVE__;
+            },
+          });
+
+          const alreadyInjected = result?.[0]?.result;
+          if (!alreadyInjected) {
+            await Browser.scripting.executeScript({
+              target: { tabId },
+              files: ["browser-polyfill.js", "content.bundle.js"],
+            });
+            logME(`[Background] Injected content script to tab ${tabId}`);
+          } else {
+            logME(`[Background] Script already present in tab ${tabId}`);
+          }
+        } catch (e) {
+          logME("[Background] Injection error:", e.message);
+        }
+
+        sendResponse({ status: "done" });
+      })();
+      return true;
+
     default:
       logME("[Background:onMessage] Unhandled action:", action);
       return false;

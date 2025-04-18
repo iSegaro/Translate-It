@@ -3,6 +3,7 @@
 import { logME } from "./utils/helpers.js";
 
 // Import listeners to activate them
+import "./listeners/Injection.js";
 import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./offscreen.js";
 import "./listeners/onInstalled.js"; // Listener for extension installation/update

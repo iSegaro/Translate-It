@@ -42,7 +42,7 @@ export class ErrorHandler {
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
       "parsing-response-error",
-      "context-invalid",
+      // "context-invalid",
       "api-error-response",
     ]);
     this.suppressed_ErrorsConsole = new Set([
@@ -53,7 +53,7 @@ export class ErrorHandler {
       "text-direction-error",
       "promise-rejection-in-translateText",
       "promise-error-in-translateText",
-      "context-invalid",
+      // "context-invalid",
       "api-error-response",
     ]);
   }

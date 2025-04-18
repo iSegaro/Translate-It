@@ -365,6 +365,19 @@ document.addEventListener("DOMContentLoaded", () => {
         logME("Error setting storage:", error);
       }
 
+      if (settings.EXTENSION_ENABLED) {
+        const tabs = await Browser.tabs.query({ url: "<all_urls>" });
+        for (const tab of tabs) {
+          if (!tab.id || !tab.url) continue;
+
+          await Browser.runtime.sendMessage({
+            action: "TRY_INJECT_IF_NEEDED",
+            tabId: tab.id,
+            url: tab.url,
+          });
+        }
+      }
+
       await updatePromptHelpText();
       showStatus("ذخیره شد!", "success");
       setTimeout(() => showStatus("", ""), 2000);

@@ -18,6 +18,11 @@ class ContentScript {
     this.translationHandler = new TranslationHandler();
     this.initPolyfills();
     this.init();
+    this.markScriptAsInjected();
+  }
+
+  markScriptAsInjected() {
+    window.__AI_WRITING_EXTENSION_ACTIVE__ = true;
   }
 
   initPolyfills() {
