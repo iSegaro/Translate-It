@@ -9,7 +9,7 @@ import { logMethod } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 
 export default class EventRouter {
-  constructor(translationHandler) {
+  constructor(translationHandler, featureManager) {
     this.translationHandler = translationHandler;
     this.errorHandler = translationHandler.errorHandler;
 
@@ -43,7 +43,10 @@ export default class EventRouter {
       TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
       DICTIONARY: CONFIG.ENABLE_DICTIONARY,
     };
-    this.featureManager = new FeatureManager(initialFlags);
+    this.featureManager =
+      featureManager instanceof FeatureManager ? featureManager : (
+        new FeatureManager(initialFlags)
+      ); // fallback
 
     /* ---------- ۳) جدولِ رویدادها ---------- */
     /** @type {Record<string, Array<{target:EventTarget,type:string,listener:EventListener,options?:any}>>} */
@@ -202,5 +205,5 @@ export default class EventRouter {
 }
 
 /* Helper برای ایجاد/ازبین بردن */
-export const setupEventListeners = (th) => new EventRouter(th);
+export const setupEventListeners = (th, fm) => new EventRouter(th, fm);
 export const teardownEventListeners = async (router) => router?.dispose?.();

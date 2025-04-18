@@ -25,8 +25,11 @@ import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
 
 export default class EventHandler {
-  constructor(translationHandler) {
+  /** @param {object} translationHandler
+   *  @param {FeatureManager} featureManager */
+  constructor(translationHandler, featureManager) {
     this.translationHandler = translationHandler;
+    this.featureManager = featureManager;
     this.IconManager = translationHandler.IconManager;
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
@@ -48,6 +51,9 @@ export default class EventHandler {
     this.selectionTimeoutId = null; // شناسه تایمر برای تاخیر در ترجمه انتخاب متن
     this.cancelSelectionTranslation =
       this.cancelSelectionTranslation.bind(this);
+  }
+  setFeatureManager(fm) {
+    this.featureManager = fm;
   }
 
   @logMethod
@@ -88,8 +94,12 @@ export default class EventHandler {
        * داخل متد handleEditableElement انجام می‌شود.
        * جایی که موقع ساخت آیکون مترجم روی فیلد متنی میخواهد پردازش
        * صورت بگیرد
+       * آیکون فقط اگر فلگ TEXT_FIELDS روشن باشد
        */
-      if (this.isEditableTarget(event.target)) {
+      if (
+        this.isEditableTarget(event.target) &&
+        this.featureManager?.isOn("TEXT_FIELDS")
+      ) {
         await this.handleEditableElement(event);
         return;
       }
@@ -317,7 +327,9 @@ export default class EventHandler {
 
   handleEditableFocus(element) {
     if (state.activeTranslateIcon) return;
-    this._processEditableElement(element);
+    if (this.featureManager?.isOn("TEXT_FIELDS")) {
+      this._processEditableElement(element);
+    }
   }
 
   async handleEditableElement(event) {
@@ -325,7 +337,9 @@ export default class EventHandler {
 
     event.stopPropagation();
     const target = event.target;
-    this._processEditableElement(target);
+    if (this.featureManager?.isOn("TEXT_FIELDS")) {
+      this._processEditableElement(target);
+    }
   }
 
   handleEditableBlur() {

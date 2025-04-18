@@ -50,7 +50,10 @@ class ContentScript {
     if (isExtensionContextValid()) {
       console.info("AI Writing Extension initialized successfully!");
       this.setupUpdateSelectElementState();
-      setupEventListeners(this.translationHandler);
+      setupEventListeners(
+        this.translationHandler,
+        this.translationHandler.featureManager
+      );
       Object.freeze(CONFIG);
       this.setupPagehideListener();
       this.setupMessageListener();

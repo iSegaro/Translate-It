@@ -11,7 +11,7 @@ import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
-import { state, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
+import { state, TranslationMode, CONFIG } from "../config.js";
 import { translateText } from "../utils/api.js";
 import { logMethod, isExtensionContextValid, logME } from "../utils/helpers.js";
 import {
@@ -22,6 +22,7 @@ import {
 import EventHandler from "./EventHandler.js";
 import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { getTranslationString } from "../utils/i18n.js";
+import FeatureManager from "./FeatureManager.js";
 
 /**
  * Handles translation requests from content script in a CSP-safe background context.
@@ -126,7 +127,16 @@ export default class TranslationHandler {
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
-    this.eventHandler = new EventHandler(this);
+
+    this.featureManager = new FeatureManager({
+      TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS,
+      SHORTCUT_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
+      SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT,
+      TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
+      DICTIONARY: CONFIG.ENABLE_DICTIONARY,
+    });
+
+    this.eventHandler = new EventHandler(this, this.featureManager);
   }
 
   @logMethod
