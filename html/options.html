@@ -327,6 +327,18 @@
             <label for="debugMode" data-i18n="advance_debug_mode_label">Debug Mode</label>
             <input type="checkbox" id="debugMode" />
           </div>
+          <!-- Add Exclude -->
+          <div class="setting-group">
+            <label for="excludedSites">Exclude these sites (comma separated)</label>
+            <textarea
+              id="excludedSites"
+              rows="3"
+              placeholder="example.com, anotherdomain.org"
+            ></textarea>
+            <span class="setting-description" data-i18n="excluded_sites_description">
+              These domains will be ignored from script injection.
+            </span>
+          </div>
           
         </section>
       </div>

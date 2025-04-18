@@ -5,6 +5,7 @@ import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
 import { logME } from "./utils/helpers.js";
 import { app_localize } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
+import { shouldInject } from "./utils/injector.js";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -96,6 +97,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const promptTemplateInput = document.getElementById("promptTemplate");
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
+
+  const excludedSites = document.getElementById("excludedSites");
 
   // وابستگی انتخاب متن
   function handleTextSelectionDependency() {
@@ -300,6 +303,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // فراخوانی اولیه loadSettings
   loadSettings(); // Load settings when the DOM is ready
 
+  // Browser.runtime.sendMessage({ ping: true });
+
   saveSettingsButton.addEventListener("click", async () => {
     const currentSettings = await getSettingsAsync();
 
@@ -331,6 +336,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const requireCtrlForTextSelection =
       requireCtrlForTextSelectionCheckbox?.checked ?? false;
 
+    const excludedList =
+      excludedSites?.value
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [];
+
     try {
       const settings = {
         API_KEY: apiKey || "",
@@ -357,6 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
         TRANSLATE_WITH_SELECT_ELEMENT: translateWithSelectElement,
         TRANSLATE_ON_TEXT_SELECTION: translateOnTextSelection,
         REQUIRE_CTRL_FOR_TEXT_SELECTION: requireCtrlForTextSelection,
+        EXCLUDED_SITES: excludedList,
       };
 
       try {
@@ -367,15 +379,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (settings.EXTENSION_ENABLED) {
         const tabs = await Browser.tabs.query({ url: "<all_urls>" });
-        for (const tab of tabs) {
-          if (!tab.id || !tab.url) continue;
 
-          await Browser.runtime.sendMessage({
-            action: "TRY_INJECT_IF_NEEDED",
-            tabId: tab.id,
-            url: tab.url,
-          });
-        }
+        await Promise.allSettled(
+          tabs.map(async (tab) => {
+            if (!tab.id || !tab.url) return;
+
+            if (await shouldInject(tab.url)) {
+              try {
+                const res = await Browser.runtime.sendMessage({
+                  action: "TRY_INJECT_IF_NEEDED",
+                  tabId: tab.id,
+                  url: tab.url,
+                });
+                logME("Injected?", tab.url, res);
+              } catch (e) {
+                logME("Injection failed for", tab.url, e);
+              }
+            }
+          })
+        );
       }
 
       await updatePromptHelpText();
@@ -454,14 +476,15 @@ document.addEventListener("DOMContentLoaded", () => {
         enableDictionraryCheckbox.checked = settings.ENABLE_DICTIONARY ?? true;
       }
 
-      // تنظیم وضعیت اولیه API
-      const initialTranslationApi = settings.TRANSLATION_API || "gemini";
+      /** مقدار دهی اولیه exclude */
+      if (excludedSites) {
+        excludedSites.value = (settings.EXCLUDED_SITES || []).join(", ");
+      }
+
+      /** Mock Mode */
       const initialUseMock = settings.USE_MOCK ?? CONFIG.USE_MOCK ?? false;
       updateMockState(initialUseMock);
 
-      // مقداردهی فیلدهای اصلی
-      if (apiKeyInput) apiKeyInput.value = settings.API_KEY || "";
-      if (apiUrlInput) apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
       if (sourceLanguageInput) {
         sourceLanguageInput.value = settings.SOURCE_LANGUAGE || "English";
       }
@@ -472,6 +495,10 @@ document.addEventListener("DOMContentLoaded", () => {
         promptTemplateInput.value =
           settings.PROMPT_TEMPLATE || CONFIG.PROMPT_TEMPLATE;
       }
+
+      // تنظیم وضعیت اولیه API
+      if (apiKeyInput) apiKeyInput.value = settings.API_KEY || "";
+      if (apiUrlInput) apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
 
       // مقداردهی انتخاب API
       if (translationApiSelect) {

@@ -5,6 +5,8 @@ import { ErrorHandler } from "../services/ErrorService.js";
 import { logME } from "../utils/helpers.js";
 import { translateText } from "../utils/api.js";
 
+import { tryInjectIfNeeded } from "../utils/injector.js";
+
 // --- Import Handlers ---
 import { handleExtensionLifecycle } from "../handlers/extensionLifecycleHandler.js";
 import { handleGetSelectedText } from "../handlers/getSelectedTextHandler.js";
@@ -55,11 +57,11 @@ async function safeSendMessage(tabId, message) {
 // Popup
 Browser.runtime.onConnect.addListener((port) => {
   if (port.name === "popup") {
-    console.log("Popup connected");
+    logME("Popup connected");
 
     // هنگامی که Popup بسته شد، رویداد disconnect اجرا می‌شود
     port.onDisconnect.addListener(() => {
-      console.log("Popup closed. Sending stopTTS action.");
+      logME("Popup closed. Sending stopTTS action.");
       // انجام عملیات توقف TTS
       stopTTS();
     });
@@ -82,6 +84,12 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ error: "Received message without action/type." });
     return false;
   }
+
+  // if (message?.ping) {
+  //   logME("[Background] Ping received to keep service worker alive");
+  //   sendResponse({ pong: true }); // جواب بده تا error نده
+  //   return true;
+  // }
 
   // --- Action Router ---
   switch (action) {
@@ -204,37 +212,38 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // Handler is async
 
     case "TRY_INJECT_IF_NEEDED":
-      (async () => {
-        const { tabId, url } = message;
-
-        try {
-          const parsedUrl = new URL(url);
-          if (!["http:", "https:"].includes(parsedUrl.protocol)) return;
-
-          const result = await Browser.scripting.executeScript({
-            target: { tabId },
-            func: () => {
-              return !!window.__AI_WRITING_EXTENSION_ACTIVE__;
-            },
+      // کروم نیاز داره اینجا به وضوح return Promise کنیم
+      return new Promise((resolveOuter) => {
+        tryInjectIfNeeded({
+          tabId: message.tabId,
+          url: message.url,
+        })
+          .then((result) => {
+            try {
+              sendResponse({ success: result });
+            } catch (e) {
+              logME("[onMessage] sendResponse failed:", e);
+            }
+            resolveOuter(); // بدون هیچ شرطی resolve بده
+          })
+          .catch((err) => {
+            logME("[onMessage] tryInjectIfNeeded failed:", err);
+            try {
+              sendResponse({ success: false });
+            } catch (e) {
+              logME("[onMessage] sendResponse failed in catch:", e);
+            }
+            resolveOuter(); // حتما resolve
           });
 
-          const alreadyInjected = result?.[0]?.result;
-          if (!alreadyInjected) {
-            await Browser.scripting.executeScript({
-              target: { tabId },
-              files: ["browser-polyfill.js", "content.bundle.js"],
-            });
-            logME(`[Background] Injected content script to tab ${tabId}`);
-          } else {
-            logME(`[Background] Script already present in tab ${tabId}`);
-          }
-        } catch (e) {
-          logME("[Background] Injection error:", e.message);
-        }
-
-        sendResponse({ status: "done" });
-      })();
-      return true;
+        // کلاً یه timeout fail-safe برای Chrome بذاریم
+        setTimeout(() => {
+          try {
+            sendResponse({ success: false, timeout: true });
+          } catch (e) {}
+          resolveOuter();
+        }, 100); // اگه با این مقدار تاخیر جزیی sendResponse نشد، به زور بفرست
+      });
 
     default:
       logME("[Background:onMessage] Unhandled action:", action);

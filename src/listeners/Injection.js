@@ -25,6 +25,15 @@ async function injectContentScript(tabId, url) {
 Browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
 
+  const settings = await Browser.storage.local.get(["EXCLUDED_SITES"]);
+  const excludedSites = settings.EXCLUDED_SITES ?? [];
+
+  const isExcluded = excludedSites.some((site) => tab.url.includes(site));
+  if (isExcluded) {
+    console.log("Injection skipped for excluded site:", tab.url);
+    return;
+  }
+
   const { EXTENSION_ENABLED } =
     await Browser.storage.local.get("EXTENSION_ENABLED");
 

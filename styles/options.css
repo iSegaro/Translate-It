@@ -323,20 +323,17 @@ button:hover {
   transition: opacity 0.3s ease; /* Smooth transition for enable/disable */
 }
 
-/* Style disabled sub-setting labels for better visual feedback */
-.sub-setting-group label {
-  /* Opacity is handled by JS on the group now, but you can style label specifically */
-  /* color: #999; /* Example: Lighter text color when disabled */
-}
-
 /* Ensure checkbox and label alignment is good */
 .setting-group input[type="checkbox"] {
   order: 2; /* Position checkbox after label */
   margin-top: 1px; /* Fine-tune vertical alignment */
 }
 
+/* Style disabled sub-setting labels for better visual feedback */
 .setting-group label {
   order: 1; /* Position label first */
+  /* Opacity is handled by JS on the group now, but you can style label specifically */
+  /* color: #999; /* Example: Lighter text color when disabled */
 }
 
 .setting-group.disabled {

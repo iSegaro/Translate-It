@@ -1,5 +1,4 @@
 // src/core/EventRouter.js
-import Browser from "webextension-polyfill";
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes, handleUIError } from "../services/ErrorService.js";
 

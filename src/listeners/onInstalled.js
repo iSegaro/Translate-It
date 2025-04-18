@@ -46,6 +46,20 @@ Browser.runtime.onInstalled.addListener((details) => {
       .catch((error) => {
         logME("[Background] Error initializing default settings:", error);
       });
+
+    Browser.tabs.query({ url: "<all_urls>" }).then(async (tabs) => {
+      const settings = await Browser.storage.local.get("EXTENSION_ENABLED");
+      if (!settings.EXTENSION_ENABLED) return;
+
+      for (const tab of tabs) {
+        if (!tab.id || !tab.url) continue;
+        await Browser.runtime.sendMessage({
+          action: "TRY_INJECT_IF_NEEDED",
+          tabId: tab.id,
+          url: tab.url,
+        });
+      }
+    });
   } else if (details.reason === "update") {
     (async () => {
       try {
