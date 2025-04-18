@@ -143,7 +143,8 @@ class ContentScript {
             const reload_page_notifier = this.translationHandler.notifier.show(
               "لطف صفحه را رفرش کنید",
               "info",
-              true
+              true,
+              2000
             );
 
             setTimeout(() => {
