@@ -3,6 +3,7 @@ import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
 import { ErrorTypes } from "../services/ErrorService.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 // Dependencies passed as arguments: translateText, errorHandler
 
