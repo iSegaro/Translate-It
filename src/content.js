@@ -92,14 +92,15 @@ class ContentScript {
   @logMethod
   async updateSelectElementState(newState) {
     if (isExtensionContextValid()) {
+      if (!this.translationHandler.featureManager.isOn("EXTENSION_ENABLED")) {
+        newState = false; // Disable select element if the extension is globally disabled
+      }
       try {
         state.selectElementActive = newState;
-        const response = await Browser.runtime.sendMessage({
+        await Browser.runtime.sendMessage({
           action: "UPDATE_SELECT_ELEMENT_STATE",
           data: newState,
         });
-        // Optional: Handle response here if needed
-        // console.log("[Content] Select Element State Updated:", response);
         taggleLinks(newState);
         if (!newState && this.translationHandler.IconManager) {
           this.translationHandler.IconManager.cleanup();

@@ -338,3 +338,8 @@ button:hover {
 .setting-group label {
   order: 1; /* Position label first */
 }
+
+.setting-group.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

@@ -1,48 +1,51 @@
 // src/core/FeatureManager.js
 import Browser from "webextension-polyfill";
-
-// مدیریت وضعیت ویژگی‌های قابل‌فعال/غیرفعال در افزونه
+import { CONFIG } from "../config.js";
 
 /**
- * @typedef {"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
+ * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
  *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"} FeatureKey
- */
-
-/**
- * @typedef {Record<FeatureKey, boolean>} FeatureFlagMap
  */
 
 export default class FeatureManager {
   /**
-   * @param {FeatureFlagMap} initialFlags
+   * @param {Object.<FeatureKey, boolean>} initialFlags
    */
-  constructor(initialFlags) {
-    this.flags = { ...initialFlags };
-    this._subscribers = {};
+  constructor(initialFlags = {}) {
     this.keyMap = {
+      EXTENSION_ENABLED: "EXTENSION_ENABLED",
       TRANSLATE_ON_TEXT_FIELDS: "TEXT_FIELDS",
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: "SHORTCUT_TEXT_FIELDS",
       TRANSLATE_WITH_SELECT_ELEMENT: "SELECT_ELEMENT",
       TRANSLATE_ON_TEXT_SELECTION: "TEXT_SELECTION",
       ENABLE_DICTIONARY: "DICTIONARY",
     };
-    // ۱) لیسنر تغییرات آینده
-    Browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
 
-    // ۲) بارگذاریِ مقادیر جاری از storage
+    // استفاده از initialFlags ارسال شده به constructor و fallback به مقادیر CONFIG
+    this.flags = {
+      EXTENSION_ENABLED: initialFlags.EXTENSION_ENABLED ?? true,
+      TEXT_FIELDS: initialFlags.TEXT_FIELDS ?? CONFIG.TRANSLATE_ON_TEXT_FIELDS,
+      SHORTCUT_TEXT_FIELDS:
+        initialFlags.SHORTCUT_TEXT_FIELDS ??
+        CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
+      SELECT_ELEMENT:
+        initialFlags.SELECT_ELEMENT ?? CONFIG.TRANSLATE_WITH_SELECT_ELEMENT,
+      TEXT_SELECTION:
+        initialFlags.TEXT_SELECTION ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION,
+      DICTIONARY: initialFlags.DICTIONARY ?? CONFIG.ENABLE_DICTIONARY,
+    };
+
+    this._subscribers = {};
+
+    // بارگذاری مقادیر فعلی از storage
     Browser.storage.local
       .get(Object.keys(this.keyMap))
       .then((stored) => {
         Object.entries(stored).forEach(([storageKey, newValue]) => {
           const flag = this.keyMap[storageKey];
           if (!flag) return;
-          // اگر کلید در storage موجود باشد، مقدار را جایگزین کن
-          if (
-            typeof newValue !== "undefined" &&
-            this.flags[flag] !== newValue
-          ) {
+          if (typeof newValue !== "undefined") {
             this.flags[flag] = newValue;
-            // نوتیفای ساب‌اسکرایبرها (مثلاً EventRouter)
             this._subscribers[flag]?.forEach((fn) => fn());
           }
         });
@@ -50,6 +53,9 @@ export default class FeatureManager {
       .catch((err) => {
         console.warn("[FeatureManager] failed to load initial flags", err);
       });
+
+    // افزودن listener برای تغییرات آینده
+    Browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
   }
 
   /** @param {FeatureKey} flag */
@@ -67,10 +73,9 @@ export default class FeatureManager {
 
   /** @private */
   _onStorageChanged(changes) {
-    /** @type {FeatureKey[]} */
     Object.entries(changes).forEach(([storageKey, { newValue }]) => {
       const flag = this.keyMap[storageKey];
-      if (!flag) return; // کلید بی‌ربط
+      if (!flag) return;
 
       const next = newValue ?? this.flags[flag];
       if (this.flags[flag] !== next) {

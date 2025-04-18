@@ -1,12 +1,7 @@
 // src/core/EventRouter.js
 import Browser from "webextension-polyfill";
 import { CONFIG, state } from "../config.js";
-import FeatureManager from "./FeatureManager.js";
-import { isEditable, logME, taggleLinks } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorService.js";
-import { handleUIError } from "../services/ErrorService.js";
-import { logMethod } from "../utils/helpers.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { ErrorTypes, handleUIError } from "../services/ErrorService.js";
 
 export default class EventRouter {
   constructor(translationHandler, featureManager) {
@@ -14,6 +9,8 @@ export default class EventRouter {
     this.errorHandler = translationHandler.errorHandler;
 
     /* ---------- ۱) ساخت هندلرهای بسته‑بندی شده ---------- */
+
+    // Wrap برای جلوگیری از تکرار try/catch
     const wrap =
       (method) =>
       (...args) => {
@@ -36,20 +33,12 @@ export default class EventRouter {
     this.handleMouseUp = wrap(this.handleMouseUpMethod);
 
     /* ---------- ۲) FeatureManager ---------- */
-    const initialFlags = {
-      TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS,
-      SHORTCUT_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
-      SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT,
-      TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
-      DICTIONARY: CONFIG.ENABLE_DICTIONARY,
-    };
-    this.featureManager =
-      featureManager instanceof FeatureManager ? featureManager : (
-        new FeatureManager(initialFlags)
-      ); // fallback
 
+    this.featureManager = featureManager;
+
+    // نگهداری وضعیت listenerهای attach شده
+    this._attached = new Set();
     /* ---------- ۳) جدولِ رویدادها ---------- */
-    /** @type {Record<string, Array<{target:EventTarget,type:string,listener:EventListener,options?:any}>>} */
     this.featureEventMap = {
       TEXT_FIELDS: [
         {
@@ -78,16 +67,38 @@ export default class EventRouter {
     };
 
     /* ---------- ۴) اتصال اولیه و ساب‌اسکرایب ---------- */
-    this._attached = new Set(); // "type_flag"
+
+    // بررسی اولیه
+    this.initEventListeners();
+
+    // بررسی تغییرات EXTENSION_ENABLED
+    this.featureManager.on("EXTENSION_ENABLED", () =>
+      this.initEventListeners()
+    );
+
+    // بررسی تغییرات بقیه ویژگی‌ها
     Object.keys(this.featureEventMap).forEach((flag) => {
-      this._toggle(flag); // بار نخست
-      this.featureManager.on(flag, () => this._toggle(flag));
+      this.featureManager.on(flag, () => this.updateListeners(flag));
     });
   }
 
-  /** روشن/خاموش کردن لیستنرهای مربوط به فلگ */
-  _toggle(flag) {
-    const enabled = this.featureManager.isOn(flag);
+  // اضافه یا حذف listenerها بر اساس EXTENSION_ENABLED
+  initEventListeners() {
+    const extensionEnabled = this.featureManager.isOn("EXTENSION_ENABLED");
+
+    Object.keys(this.featureEventMap).forEach((flag) => {
+      if (extensionEnabled) {
+        this.updateListeners(flag);
+      } else {
+        this.removeListeners(flag);
+      }
+    });
+  }
+
+  updateListeners(flag) {
+    const enabled =
+      this.featureManager.isOn(flag) &&
+      this.featureManager.isOn("EXTENSION_ENABLED");
     this.featureEventMap[flag].forEach(
       ({ target, type, listener, options }) => {
         const key = `${type}_${flag}`;
@@ -102,108 +113,60 @@ export default class EventRouter {
     );
   }
 
-  /* ---------- ۵) هندلرهای رویداد ---------- */
+  removeListeners(flag) {
+    this.featureEventMap[flag].forEach(
+      ({ target, type, listener, options }) => {
+        const key = `${type}_${flag}`;
+        if (this._attached.has(key)) {
+          target.removeEventListener(type, listener, options);
+          this._attached.delete(key);
+        }
+      }
+    );
+  }
 
-  @logMethod
+  // Handlers
   async handleFocusMethod(e) {
-    if (isEditable(e.target)) {
-      this.translationHandler?.handleEditableFocus?.(e.target);
+    if (this.featureManager.isOn("TEXT_FIELDS") && e.target.isContentEditable) {
+      this.translationHandler.handleEditableFocus(e.target);
     }
   }
 
-  @logMethod
   async handleBlurMethod(e) {
-    if (isEditable(e.target)) {
-      this.translationHandler?.handleEditableBlur?.(e.target);
+    if (this.featureManager.isOn("TEXT_FIELDS") && e.target.isContentEditable) {
+      this.translationHandler.handleEditableBlur(e.target);
     }
   }
 
-  @logMethod
   async handleClickMethod(e) {
     if (!state.selectElementActive) return;
-
-    this.translationHandler.IconManager?.cleanup();
-    state.selectElementActive = false;
-    await Browser.storage.local.set({ selectElementActive: false });
-    taggleLinks(false);
-    await Browser.runtime.sendMessage({
-      action: "UPDATE_SELECT_ELEMENT_STATE",
-      data: false,
-    });
-
-    setTimeout(async () => {
-      try {
-        const res =
-          await this.translationHandler.eventHandler.handleSelect_ElementModeClick(
-            e
-          );
-        if (res?.status === "error") {
-          const msg =
-            res.message ||
-            (await getTranslationString("ERRORS_DURING_TRANSLATE")) ||
-            "(⚠️ خطایی در ترجمه رخ داد)";
-          this.translationHandler.notifier.show(msg, "error", true, 4000);
-        }
-      } catch (err) {
-        handleUIError(err, {
-          type: ErrorTypes.UI,
-          context: "handleSelect_ElementModeClick",
-        });
-        taggleLinks(true);
-      }
-    }, 100);
+    await this.translationHandler.eventHandler.handleSelect_ElementClick(e);
   }
 
-  @logMethod
   async handleKeyDownMethod(e) {
     this.translationHandler.handleEvent(e);
-    if (e.key === "Escape" && state.selectElementActive) {
-      taggleLinks(true);
-      this.translationHandler.IconManager?.cleanup();
-      state.selectElementActive = false;
-      await Browser.storage.local.set({ selectElementActive: false });
-      Browser.runtime.sendMessage({
-        action: "UPDATE_SELECT_ELEMENT_STATE",
-        data: false,
-      });
-      logME("[EventRouter] Select‑Element deactivated via Esc.");
-    }
   }
 
   async handleMouseOverMethod(e) {
     if (!state.selectElementActive) return;
-
     const target = e.composedPath?.()[0] || e.target;
     if (!target?.innerText?.trim()) return;
-
-    if (state.highlightedElement !== target) {
-      state.highlightedElement?.style &&
-        (state.highlightedElement.style.outline = "");
-      state.highlightedElement?.style &&
-        (state.highlightedElement.style.opacity = "");
-      state.highlightedElement = target;
-      target.style.outline = CONFIG.HIGHLIGHT_STYLE;
-      target.style.opacity = "0.9";
-    }
+    state.highlightedElement?.style?.outline &&
+      (state.highlightedElement.style.outline = "");
+    state.highlightedElement = target;
+    target.style.outline = CONFIG.HIGHLIGHT_STYLE;
   }
 
   async handleMouseUpMethod(e) {
-    this.translationHandler?.handleEvent?.(e);
+    this.translationHandler.handleEvent(e);
   }
 
-  /* ---------- ۶) تمیزکاری نهایی ---------- */
   async dispose() {
-    Object.keys(this.featureEventMap).forEach((flag) => {
-      this.featureEventMap[flag].forEach(
-        ({ target, type, listener, options }) => {
-          target.removeEventListener(type, listener, options);
-        }
-      );
-    });
-    this._attached.clear();
+    Object.keys(this.featureEventMap).forEach((flag) =>
+      this.removeListeners(flag)
+    );
   }
 }
 
-/* Helper برای ایجاد/ازبین بردن */
 export const setupEventListeners = (th, fm) => new EventRouter(th, fm);
-export const teardownEventListeners = async (router) => router?.dispose?.();
+export const teardownEventListeners = (router) => router?.dispose?.();

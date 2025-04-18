@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const importExportTabContent = document.getElementById("importExport");
 
   // Elements for Language Tab - Activation Settings
+  const extensionEnabledCheckbox = document.getElementById("extensionEnabled");
+
   const translateOnTextFieldsCheckbox = document.getElementById(
     "translateOnTextFields"
   );
@@ -179,6 +181,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function updateOverallExtensionDependency() {
+    const isEnabled = extensionEnabledCheckbox.checked;
+
+    [
+      translateOnTextFieldsCheckbox,
+      enableShortcutForTextFieldsCheckbox,
+      translateWithSelectElementCheckbox,
+      translateOnTextSelectionCheckbox,
+      requireCtrlForTextSelectionCheckbox,
+      enableDictionraryCheckbox,
+    ].forEach((el) => {
+      if (el) {
+        el.disabled = !isEnabled;
+        const group = el.closest(".setting-group");
+        if (group) group.classList.toggle("disabled", !isEnabled);
+      }
+    });
+  }
+
+  // در لود اولیه و هنگام تغییر این تابع را فراخوانی کن
+  if (extensionEnabledCheckbox) {
+    extensionEnabledCheckbox.addEventListener(
+      "change",
+      updateOverallExtensionDependency
+    );
+  }
+
   tabButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       const tabId = event.target.getAttribute("data-tab");
@@ -288,6 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const openaiApiModel = openAIModelInput?.value?.trim();
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
+    const extensionEnabled = extensionEnabledCheckbox?.checked ?? true;
     const enableDictionary =
       enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY;
     const translateOnTextFields =
@@ -306,6 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
         API_KEY: apiKey || "",
         USE_MOCK: useMock,
         DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
+        EXTENSION_ENABLED: extensionEnabled,
         API_URL: apiUrl || CONFIG.API_URL,
         SOURCE_LANGUAGE: sourceLanguage || "English",
         TARGET_LANGUAGE: targetLanguage || "Farsi", // مربوط به ترجمه است
@@ -381,6 +412,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // مقداردهی اولیه تنظیمات حالت‌های مختلف ترجمه
+      if (extensionEnabledCheckbox) {
+        extensionEnabledCheckbox.checked = settings.EXTENSION_ENABLED ?? true;
+      }
+
       if (translateOnTextFieldsCheckbox) {
         translateOnTextFieldsCheckbox.checked =
           settings.TRANSLATE_ON_TEXT_FIELDS ?? true;
@@ -472,6 +507,8 @@ document.addEventListener("DOMContentLoaded", () => {
           translationApiSelect.value = initialTranslationApi;
         toggleApiSettings(); // Update visibility based on loaded API
       }
+
+      updateOverallExtensionDependency();
 
       // بروزرسانی متن راهنمای پرامپت
       await updatePromptHelpText();

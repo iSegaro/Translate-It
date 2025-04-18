@@ -293,7 +293,9 @@ export default class EventHandler {
   }
 
   _processEditableElement(element) {
-    /* اگر مدیریت آیکون موجود نیست، کاری نکن */
+    /* اگر مدیریت آیکون موجود نیست و تنظیمات فعال نیست کاری نکن */
+    if (!this.IconManager || !this.featureManager.isOn("EXTENSION_ENABLED"))
+      return null;
     if (!this.IconManager) return null;
 
     /* ابتدا هر آیکون قبلی را پاک کن */
@@ -321,7 +323,7 @@ export default class EventHandler {
       );
       return icon;
     }
-    logME("[EventHandler] Icon not created");
+
     return null;
   }
 
