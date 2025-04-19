@@ -377,6 +377,14 @@ export default class EventHandler {
     const platform = detectPlatform();
     logME(`Select‑Element on «${platform}»`);
 
+    // غیرفعال‌سازی حالت انتخاب المنت
+    taggleLinks(false);
+    this.translationHandler.select_Element_ModeActive = false;
+    state.selectElementActive = false;
+    if (this.IconManager) {
+      this.IconManager.cleanup();
+    }
+
     /* 1) جمع‌آوری متن‌ها از عنصرِ انتخاب‌شده */
     const targetElement = e.target;
     const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
