@@ -23,6 +23,7 @@ import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
 import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
+import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler
@@ -613,11 +614,11 @@ export default class EventHandler {
 
       if (!text) return;
 
-      await this.translationHandler.processTranslation_with_CtrlSlash({
+      await translateFieldViaSmartHandler({
         text,
         originalText: text,
-        target: activeElement,
-        selectionRange: null,
+        translationHandler: this.translationHandler,
+        selectionRange: null, // چون با Ctrl+/ اجرا شده
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
