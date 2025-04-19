@@ -5,7 +5,11 @@ import { getEventRouterInstance } from "../core/InstanceManager.js";
 
 getEventRouterInstance();
 
-export async function Active_SelectElement(active = null, closePopup = false) {
+export async function Active_SelectElement(
+  active = null,
+  closePopup = false,
+  force = false
+) {
   try {
     const tabs = await Browser.tabs.query({
       active: true,
@@ -14,27 +18,31 @@ export async function Active_SelectElement(active = null, closePopup = false) {
     if (tabs.length === 0) return;
 
     const tabId = tabs[0].id;
+    let currentState = false;
 
-    if (active !== null) {
-      await Browser.storage.local.set({ selectElementState: active });
-    } else {
-      const result = await Browser.storage.local.get(["selectElementState"]);
-      active = !result.selectElementState; // تغییر وضعیت به معکوس
-      await Browser.storage.local.set({ selectElementState: active });
+    const result = await Browser.storage.local.get(["selectElementState"]);
+    currentState = result.selectElementState;
+
+    if (active === null) {
+      active = !currentState;
     }
 
-    const response = await Browser.runtime.sendMessage({
-      action: "activateSelectElementMode",
-      data: active,
-    });
+    // فقط وقتی تغییر می‌کنه یا force=true است
+    if (force || active !== currentState) {
+      await Browser.storage.local.set({ selectElementState: active });
 
-    console.log("Select Mode Updated:", response);
-    // بستن popup بعد از دریافت پاسخ از background script
+      const response = await Browser.runtime.sendMessage({
+        action: "activateSelectElementMode",
+        data: active,
+      });
+
+      console.log("Select Mode Updated:", response);
+    }
+
     if (closePopup) {
       window.close();
     }
   } catch (error) {
     console.error("Error in Active_SelectElement:", error);
-    // می‌توانید در صورت نیاز، مدیریت خطای بیشتری اینجا اضافه کنید
   }
 }

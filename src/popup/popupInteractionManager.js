@@ -2,117 +2,130 @@
 import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import { Active_SelectElement } from "../utils/select_element.js";
-import { getTranslateWithSelectElementAsync } from "../config.js";
-import { wasSelectElementIconClicked } from "./headerActionsManager.js"; // Import check function
+import {
+  getTranslateWithSelectElementAsync,
+  getExtensionEnabledAsync,
+} from "../config.js";
+import { wasSelectElementIconClicked } from "./headerActionsManager.js";
 import { logME } from "../utils/helpers.js";
 
-const MOUSE_OVER_TIMEOUT = 1000;
-const MOUSE_LEAVE_TIMEOUT = 800;
+const HOVER_TIMEOUT = 1000;
+const AUTO_CLOSE_TIMEOUT = 800;
 
-let popupMouseLeaveTimer;
-let popupInteractionTimer;
+let isMouseOverPopup = false;
+let hoverStayTimer = null;
+let autoCloseTimer = null;
+let initialEntryTimer = null;
+let interactionLocked = false;
 
-function handlePopupInteraction() {
-  // Check flag from header manager *before* clearing timer
-  if (wasSelectElementIconClicked()) {
-    logME(
-      "[PopupInteraction]: Interaction detected, but select icon was the trigger. Ignoring."
-    );
-    return; // Don't deactivate if click was the interaction
-  }
-
-  clearTimeout(popupInteractionTimer);
-  popupInteractionTimer = setTimeout(() => {
-    logME(
-      "[PopupInteraction]: User interacted (mouseover timeout). Deactivating select mode."
-    );
-    Active_SelectElement(false); // Deactivate element selection mode
-  }, MOUSE_OVER_TIMEOUT);
+function logPopupEvent(message, data = null) {
+  console.log(`📦[PopupDebug]: ${message}`, data || "");
 }
 
-function handleMouseDown(event) {
-  // Check flag from header manager
-  const selectIconClicked = wasSelectElementIconClicked();
-
-  // Prevent deactivation if the click target was the select icon itself
-  // OR if the click action originated from the select icon click sequence
-  if (event.target === elements.selectElementIcon || selectIconClicked) {
-    logME(
-      "[PopupInteraction]: Mousedown related to select icon. Preventing deactivation."
-    );
-    return;
+function cancelAutoClose(reason = "") {
+  if (autoCloseTimer) {
+    clearTimeout(autoCloseTimer);
+    logPopupEvent("⛔ Auto-close timer canceled", reason);
+    autoCloseTimer = null;
   }
-
-  clearTimeout(popupInteractionTimer); // Cancel delayed deactivation
-  logME(
-    "[PopupInteraction]: Mousedown interaction. Deactivating select mode immediately."
-  );
-  Active_SelectElement(false);
 }
 
-async function setupInteractionListeners() {
-  const isSelectionModeActiveInitially =
-    await getTranslateWithSelectElementAsync();
-  if (!isSelectionModeActiveInitially) {
-    logME(
-      "[PopupInteraction]: Select element on hover/interaction disabled by config."
-    );
-    return; // Don't attach listeners if the feature is off
+function cancelHoverTimer() {
+  if (hoverStayTimer) {
+    clearTimeout(hoverStayTimer);
+    hoverStayTimer = null;
+  }
+}
+
+function cancelInitialEntryTimer() {
+  if (initialEntryTimer) {
+    clearTimeout(initialEntryTimer);
+    logPopupEvent("⛔ Initial entry timer canceled");
+    initialEntryTimer = null;
+  }
+}
+
+async function ensureSelectElementActive() {
+  const isEnabled = await getExtensionEnabledAsync();
+  const isSelectAllowed = await getTranslateWithSelectElementAsync();
+
+  logPopupEvent("🔍 Extension enabled?", isEnabled);
+  logPopupEvent("🔍 Select element allowed?", isSelectAllowed);
+
+  if (isEnabled && isSelectAllowed) {
+    setTimeout(() => {
+      logPopupEvent("🕒 Delayed activation of Select Mode");
+      Active_SelectElement(true, false, true); // force = true
+    }, 100);
+    return true;
   }
 
-  logME(
-    "[PopupInteraction]: Select element interaction mode is enabled. Attaching listeners."
-  );
+  logPopupEvent("❌ Conditions not met – Select mode not activated");
+  return false;
+}
 
-  // Activate selection mode on initial load (don't close popup yet)
-  Active_SelectElement(true, false);
-
+function setupInteractionListeners() {
   elements.popupContainer?.addEventListener("mouseenter", () => {
-    clearTimeout(popupMouseLeaveTimer);
-    // Reset flag in header manager might be needed here if not reset after check
-    // wasSelectElementIconClicked(); // Call to potentially reset if designed that way
-    logME("[PopupInteraction]: Mouse entered popup.");
-  });
+    isMouseOverPopup = true;
+    cancelAutoClose("mouseenter");
+    cancelInitialEntryTimer();
 
-  elements.popupContainer?.addEventListener("mouseleave", async () => {
-    clearTimeout(popupMouseLeaveTimer);
-    try {
-      const result = await Browser.storage.local.get(["selectElementState"]);
-      if (result.selectElementState) {
-        logME(
-          "[PopupInteraction]: Mouse left while select mode active. Starting close timer."
+    if (!interactionLocked) {
+      hoverStayTimer = setTimeout(() => {
+        interactionLocked = true;
+        logPopupEvent(
+          "⏱️ Hover timeout passed – locking interaction & deactivating select"
         );
-        popupMouseLeaveTimer = setTimeout(() => {
-          logME("[PopupInteraction]: Closing popup (mouse leave timeout).");
-          window.close();
-        }, MOUSE_LEAVE_TIMEOUT);
-      } else {
-        logME(
-          "[PopupInteraction]: Mouse left, but select mode inactive. Not closing."
-        );
-      }
-    } catch (error) {
-      console.error(
-        "[PopupInteraction]: Error getting selectElementState:",
-        error
-      );
+        Active_SelectElement(false);
+      }, HOVER_TIMEOUT);
     }
   });
 
-  // Handle general interaction (hovering over popup elements)
-  elements.popupContainer?.addEventListener(
-    "mouseover",
-    handlePopupInteraction
-  );
+  elements.popupContainer?.addEventListener("mouseleave", () => {
+    isMouseOverPopup = false;
+    cancelHoverTimer();
 
-  // Handle direct clicks (more immediate deactivation)
-  elements.popupContainer?.addEventListener("mousedown", handleMouseDown);
+    if (!interactionLocked) {
+      autoCloseTimer = setTimeout(() => {
+        logPopupEvent(
+          "🚪 Mouse left early – closing popup (select remains active)"
+        );
+        Active_SelectElement(true, true);
+      }, AUTO_CLOSE_TIMEOUT);
+    } else {
+      logPopupEvent("🧷 Interaction locked – popup stays open");
+    }
+  });
 
-  logME("[PopupInteraction]: Listeners attached.");
+  elements.popupContainer?.addEventListener("mousedown", () => {
+    if (!interactionLocked) {
+      interactionLocked = true;
+      cancelHoverTimer();
+      cancelAutoClose("mousedown");
+      cancelInitialEntryTimer();
+      logPopupEvent("🖱️ User clicked – locking & deactivating select");
+      Active_SelectElement(false);
+    }
+  });
+
+  // ✅ شروع تایمر اولیه برای تشخیص اینکه موس اصلاً وارد popup شده یا نه
+  initialEntryTimer = setTimeout(() => {
+    if (!isMouseOverPopup && !interactionLocked) {
+      logPopupEvent(
+        "🚪 Initial mouse entry timeout – closing popup (no interaction)"
+      );
+      Active_SelectElement(true, true);
+    } else {
+      logPopupEvent("✅ Mouse entered or interacted – popup stays open");
+    }
+  }, AUTO_CLOSE_TIMEOUT);
+
+  logPopupEvent("🎯 Popup interaction listeners attached");
 }
 
 export async function init() {
-  // This needs to run after config is checked and potentially after header manager setup
-  await setupInteractionListeners();
-  logME("[PopupInteraction]: Initialized.");
+  logPopupEvent("🟢 popupInteractionManager INIT");
+  const success = await ensureSelectElementActive();
+  if (success) setupInteractionListeners();
+  logPopupEvent("✅ popupInteractionManager READY");
 }
