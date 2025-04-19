@@ -8,11 +8,15 @@ Browser.runtime.onStartup.addListener(() => {
 
     for (const tab of tabs) {
       if (!tab.id || !tab.url) continue;
-      await Browser.runtime.sendMessage({
-        action: "TRY_INJECT_IF_NEEDED",
-        tabId: tab.id,
-        url: tab.url,
-      });
+      try {
+        await Browser.runtime.sendMessage({
+          action: "TRY_INJECT_IF_NEEDED",
+          tabId: tab.id,
+          url: tab.url,
+        });
+      } catch (err) {
+        console.warn("[onStartup] sendMessage failed:", err.message);
+      }
     }
   });
 });
