@@ -24,6 +24,7 @@ import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
 import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
 import EventRouter from "./EventRouter.js";
+import { smartTranslate } from "../backgrounds/bridgeIntegration.js";
 
 /**
  * Handles translation requests from content script in a CSP-safe background context.
@@ -216,6 +217,7 @@ export default class TranslationHandler {
         "(translating...)",
       "status"
     );
+
     try {
       if (!isExtensionContextValid()) {
         this.errorHandler.handle(
@@ -228,24 +230,7 @@ export default class TranslationHandler {
           }
         );
         return;
-
-        // OR
-        // throw new Error(
-        //   "TranslationHandler: Translation failed: Context Invalid",
-        //   {
-        //     type: ErrorTypes.CONTEXT,
-        //     translationParams: params,
-        //   }
-        // );
       }
-
-      // if (!params.text || !params.target) {
-      //   console.warn("[TranslationHandler] Invalid parameter", params);
-      //   throw new Error("TranslationHandler: Translation failed, Invalid parameter", {
-      //     type: ErrorTypes.CONTEXT,
-      //     translationParams: params,
-      //   });
-      // }
 
       const platform =
         params.target ? detectPlatform(params.target) : detectPlatformByURL();
@@ -255,37 +240,33 @@ export default class TranslationHandler {
           TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      const translated = await translateText(
-        params.text,
-        TranslationMode.Field
-      );
-      if (!translated) {
-        return;
-      }
+      const response = await smartTranslate(params.text, state.translateMode);
+      const translated =
+        response?.data?.translatedText || response?.translatedText;
 
-      // اگر کاربر متنی را انتخاب کرده باشد، آن را ترجمه کن
+      if (!translated) return;
+
       if (params.selectionRange) {
-        this.handleSelect_ElementTranslation(platform, params, translated);
-      }
-      // در غیر این صورت، ترجمه را در عنصر هدف نمایش بده
-      else if (params.target) {
-        this.updateTargetElement(params.target, translated);
+        await this.handleSelect_ElementTranslation(
+          platform,
+          params,
+          translated
+        );
+      } else if (params.target) {
+        await this.updateTargetElement(params.target, translated);
       }
     } catch (error) {
-      // TODO: Requires further review, possible bug detected
-      error = await ErrorHandler.processError(error);
+      const processed = await ErrorHandler.processError(error);
 
-      // هندل اولیه خطا توسط ErrorHandler (instance)
-      const handlerError = await this.errorHandler.handle(error, {
-        type: error.type || ErrorTypes.CONTEXT,
+      const handlerError = await this.errorHandler.handle(processed, {
+        type: processed.type || ErrorTypes.CONTEXT,
         context: "TranslationHandler-processTranslation",
         translationParams: params,
         isPrimary: true,
       });
 
-      // اگر خطا به عنوان نهایی علامت‌گذاری شده باشد، دیگر نیازی به throw نیست
       if (handlerError.isFinal || handlerError.suppressSecondary) {
-        return; // یا می‌توانید null برگردانید
+        return;
       }
 
       const finalError = new Error(handlerError.message);

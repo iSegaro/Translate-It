@@ -245,6 +245,37 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }, 100); // اگه با این مقدار تاخیر جزیی sendResponse نشد، به زور بفرست
       });
 
+    case "applyTranslationToActiveElement":
+      logME(
+        "[Background:onMessage] Forwarding to content script: applyTranslationToActiveElement"
+      );
+
+      // ارسال مستقیم به تب جاری که درخواست داده
+      if (sender?.tab?.id) {
+        safeSendMessage(sender.tab.id, message)
+          .then((res) => {
+            sendResponse(res);
+          })
+          .catch((err) => {
+            logME(
+              "[Background:onMessage] Error forwarding to content script:",
+              err
+            );
+            sendResponse({
+              success: false,
+              error: err?.message || "Failed to apply translation.",
+            });
+          });
+
+        return true;
+      } else {
+        sendResponse({
+          success: false,
+          error: "No valid tab to send message.",
+        });
+        return false;
+      }
+
     default:
       logME("[Background:onMessage] Unhandled action:", action);
       return false;

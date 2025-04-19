@@ -1,6 +1,10 @@
 // src/utils/select_element.js
 import Browser from "webextension-polyfill";
 
+import { getEventRouterInstance } from "../core/InstanceManager.js";
+
+getEventRouterInstance();
+
 export async function Active_SelectElement(active = null, closePopup = false) {
   try {
     const tabs = await Browser.tabs.query({

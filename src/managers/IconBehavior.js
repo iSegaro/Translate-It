@@ -1,10 +1,11 @@
 // src/managers/IconBehavior.js
 import { state, TranslationMode } from "../config.js";
-import { translateText } from "../utils/api.js";
+
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorService.js";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
+import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 export default function setupIconBehavior(
   icon,
@@ -81,16 +82,11 @@ export default function setupIconBehavior(
         false
       );
 
-      const translated = await translateText(
+      await translateFieldViaSmartHandler({
         text,
-        TranslationMode.SelectElement
-      );
-
-      if (translated) {
-        await translationHandler.updateTargetElement(target, translated);
-      } else {
-        logME("[IconBehavior] نتیجه ترجمه دریافت نشد.");
-      }
+        target,
+        translationHandler,
+      });
 
       if (notif) {
         notifier.dismiss(notif);
