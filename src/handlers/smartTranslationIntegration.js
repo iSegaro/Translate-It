@@ -24,21 +24,16 @@ export async function translateFieldViaSmartHandler({
   const mode =
     selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
 
+  const platform =
+    translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
+
+  console.log("[SmartTranslateHandler] Platform detected:", platform);
+
   try {
-    console.log("[SmartTranslateHandler] Injecting bridge (if needed)");
     injectPageBridge();
 
-    console.log("[SmartTranslateHandler] Calling smartTranslate() with:", {
-      text,
-      mode,
-    });
-
     const response = await smartTranslate(text, mode);
-
-    console.log(
-      "[SmartTranslateHandler] Response received from smartTranslate:",
-      response
-    );
+    console.log("[SmartTranslateHandler] Bridge used:", response?.viaBridge);
 
     let translated =
       response?.data?.translatedText ??
@@ -51,75 +46,60 @@ export async function translateFieldViaSmartHandler({
     }
 
     if (!translated) {
-      console.warn(
-        "[SmartTranslateHandler] No valid translation found in response."
-      );
       throw new Error("ترجمه اعمال نشد.");
     }
 
-    console.log("[SmartTranslateHandler] Final translated text:", translated);
+    console.log("[SmartTranslateHandler] Translated text:", translated);
 
-    // ✅ پلتفرم را تشخیص بده همیشه، چه restricted چه نه
-    const platform =
-      translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
-    console.log("[SmartTranslateHandler] Detected platform:", platform);
-
-    // ✅ فقط در حالت restricted پیام بفرست، نه آپدیت مستقیم
-    if (isRestrictedDomain()) {
-      console.log(
-        "[SmartTranslateHandler] Restricted domain → sending message only"
-      );
-
-      // ✅ اطمینان از focus بودن روی target
-      if (target && typeof target.focus === "function") {
-        console.log(
-          "[SmartTranslateHandler] Focusing target before sending message"
-        );
-        target.focus();
-        await new Promise((r) => setTimeout(r, 20)); // کمی زمان برای sync
-      }
-
-      const res = await Browser.runtime.sendMessage({
-        action: "applyTranslationToActiveElement",
-        payload: {
-          translatedText: translated,
-        },
-      });
-
-      console.log(
-        "[SmartTranslateHandler] applyTranslationToActiveElement response:",
-        res
-      );
-
-      const isSuccess =
-        res === true || (typeof res === "object" && res.success === true);
-
-      if (!isSuccess) {
-        throw new Error(res?.error || "ترجمه اعمال نشد.");
-      }
-
-      return;
-    }
-
-    // ✅ در حالت عادی (non-restricted)
+    // 🔁 حالت عادی (non-restricted)
     if (
       selectionRange &&
       translationHandler.strategies[platform]?.updateElement
     ) {
-      console.log("[SmartTranslateHandler] Updating selected range");
       await translationHandler.strategies[platform].updateElement(
         selectionRange,
         translated
       );
     } else if (target) {
-      console.log("[SmartTranslateHandler] Updating target element");
       await translationHandler.updateTargetElement(target, translated);
     }
+
+    return; // ✅ موفقیت‌آمیز
   } catch (error) {
-    console.error("[SmartTranslateHandler] Translation failed:", error);
-    translationHandler.errorHandler.handle(error, {
+    console.warn(
+      "[SmartTranslateHandler] Direct update failed. Retrying with fallback via content message."
+    );
+  }
+
+  // 🧠 fallback → ارسال پیام به content script
+  try {
+    if (target?.focus) {
+      target.focus();
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const res = await Browser.runtime.sendMessage({
+      action: "applyTranslationToActiveElement",
+      payload: {
+        translatedText: text, // ← متن ترجمه‌شده، چون خطای بالا فقط از update بود
+      },
+    });
+
+    const isSuccess =
+      res === true || (typeof res === "object" && res.success === true);
+
+    if (!isSuccess) {
+      throw new Error(res?.error || "ترجمه اعمال نشد.");
+    }
+
+    console.log(
+      "[SmartTranslateHandler] Translation applied via fallback bridge."
+    );
+  } catch (fallbackErr) {
+    console.error("[SmartTranslateHandler] Fallback failed:", fallbackErr);
+    translationHandler.errorHandler.handle(fallbackErr, {
       type: translationHandler.ErrorTypes.API,
-      context: "smartTranslate-field-handler",
+      context: "smartTranslate-fallback-handler",
     });
   }
 }
