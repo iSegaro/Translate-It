@@ -18,13 +18,7 @@
     "notifications",
     "alarms"
   ],
-  "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "http://localhost:6969/*",
-    "https://api.openai.com/*",
-    "https://openrouter.ai/*",
-    "https://translate.google.com/*"
-  ],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "scripts": ["background.bundle.js"]
   },
@@ -54,13 +48,12 @@
         "offscreen.js",
         "content.bundle.js",
         "offscreen.html",
-        "styles/*",
-        "icons/*",
+        "styles/*.css",
+        "icons/*.png",
         "html/*",
         "_locales/*"
       ],
-      "matches": ["<all_urls>"],
-      "use_dynamic_url": true
+      "matches": ["<all_urls>"]
     }
   ]
 }

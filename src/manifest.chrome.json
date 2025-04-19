@@ -15,7 +15,7 @@
     "notifications",
     "alarms"
   ],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -41,12 +41,13 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "pageBridge.js",
         "browser-polyfill.js",
         "offscreen.js",
         "content.bundle.js",
         "offscreen.html",
-        "styles/*",
-        "icons/*",
+        "styles/*.css",
+        "icons/*.png",
         "html/*",
         "_locales/*"
       ],
