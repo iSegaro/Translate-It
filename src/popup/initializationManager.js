@@ -95,9 +95,17 @@ async function loadInitialState() {
       if (tabs.length > 0 && tabs[0].id != null) {
         const activeTabId = tabs[0].id;
         try {
-          const response = await Browser.tabs.sendMessage(activeTabId, {
-            action: "getSelectedText",
-          });
+          let response = {};
+          try {
+            response = await Browser.tabs.sendMessage(activeTabId, {
+              action: "getSelectedText",
+            });
+          } catch (err) {
+            logME(
+              `[InitManager]: Failed to sendMessage to content script: ${err.message}`
+            );
+          }
+
           if (response?.selectedText) {
             logME("[InitManager]: Received selected text from content script.");
             elements.sourceText.value = response.selectedText;

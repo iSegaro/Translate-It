@@ -110,7 +110,7 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           // Browser.runtime.reload();
         } catch (error) {
-          console.error("[Background:onMessage] Error during reload:", error);
+          logME("[Background:onMessage] Error during reload:", error);
         }
       }, 100); // Add a small delay
 
@@ -201,7 +201,7 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           injectionState
         );
       } catch (error) {
-        console.error(
+        logME(
           "[Background:onMessage] Error in activateSelectElementMode:",
           error
         );

@@ -45,10 +45,7 @@ function setupEventListeners() {
         clipboardManager.updatePasteButtonVisibility(); // Re-check clipboard
       })
       .catch((error) => {
-        console.error(
-          "[HeaderActions]: Error removing last translation:",
-          error
-        );
+        logME("[HeaderActions]: Error removing last translation:", error);
       });
   });
 
@@ -135,7 +132,7 @@ function setupEventListeners() {
     Browser.runtime
       .sendMessage({ action: "revertTranslation" })
       .catch((err) => {
-        console.warn("[Popup] Could not send revert message:", err);
+        logME("[Popup-Header] Could not send revert message:", err);
       });
 
     // بهتره پنجره بسته بشه

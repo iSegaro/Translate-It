@@ -18,7 +18,7 @@ let translationHandler = null;
 
 export function initContentScript() {
   if (window.__AI_WRITING_EXTENSION_ACTIVE__) {
-    console.debug("[AIWriting] Skipping double init.");
+    logME("[AIWriting] Skipping double init.");
     return;
   }
 
@@ -61,7 +61,9 @@ export function initContentScript() {
 
     init() {
       if (!isExtensionContextValid()) {
-        console.warn("[AIWriting:Content] Extension context is not valid");
+        console.warn(
+          "[AI Writing Companion:Content] Extension context is not valid"
+        );
         this.translationHandler.notifier.show(
           "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
           "error",
@@ -70,7 +72,9 @@ export function initContentScript() {
         return;
       }
 
-      console.info("[AIWriting:Content] Extension initialized successfully!");
+      console.info(
+        "[AI Writing Companion:Content] Extension initialized successfully!"
+      );
       Object.freeze(CONFIG);
       this.setupUpdateSelectElementState();
       this.setupPagehideListener();
@@ -173,19 +177,11 @@ export function initContentScript() {
             const active = document.activeElement;
             const translated = message.payload?.translatedText;
 
-            console.log("[Content] activeElement is:", active);
-            console.log("[Content] translated text is:", translated);
-
             if (active && typeof translated === "string") {
               try {
                 const platform =
                   this.translationHandler.detectPlatform?.(active) ??
                   detectPlatform(active);
-
-                console.log(
-                  "[Content] Detected platform for applyTranslation:",
-                  platform
-                );
 
                 if (
                   this.translationHandler.strategies[platform]?.updateElement &&
@@ -195,14 +191,13 @@ export function initContentScript() {
                   await this.translationHandler.strategies[
                     platform
                   ].updateElement(active, translated);
-                  console.log("[Content] Applied via platform strategy");
                 } else {
                   if (active.isContentEditable) {
                     active.innerText = translated;
                   } else if ("value" in active) {
                     active.value = translated;
                   }
-                  console.log("[Content] Applied via fallback method");
+                  logME("[Content] Applied via fallback method");
                 }
 
                 active.dispatchEvent(new Event("input", { bubbles: true }));
@@ -210,7 +205,7 @@ export function initContentScript() {
 
                 sendResponse({ success: true });
               } catch (err) {
-                console.warn("[Content] Strategy failed", err);
+                logME("[Content] Strategy failed", err);
                 sendResponse({
                   success: false,
                   error: err?.message || "Strategy failed",

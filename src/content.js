@@ -1,5 +1,7 @@
 // src/content.js
 
+import { logME } from "./utils/helpers.js";
+
 (function () {
   // جلوگیری از اجرای افزونه داخل iframeهایی که مجاز نیستند
   const allowInIframes = ["docs.google.com", "x.com"];
@@ -9,16 +11,13 @@
   );
 
   if (!isTopWindow && !isAllowedIframe) {
-    console.debug(
-      "[AIWriting] Skipping injection inside iframe:",
-      location.hostname
-    );
+    logME("[AIWriting] Skipping injection inside iframe:", location.hostname);
     return;
   }
 
   // ✅ اگر از قبل فعال شده بود، دوباره اجرا نکن
   if (window.__AI_WRITING_EXTENSION_ACTIVE__) {
-    console.debug("[AIWriting] Skipping double init.");
+    logME("[AIWriting] Skipping double init.");
     return;
   }
 
@@ -28,10 +27,10 @@
       if (typeof initContentScript === "function") {
         initContentScript();
       } else {
-        console.error("[AIWriting] initContentScript is not a function");
+        logME("[AIWriting] initContentScript is not a function");
       }
     })
     .catch((err) => {
-      console.error("[AIWriting] Failed to import contentMain.js", err);
+      logME("[AIWriting] Failed to import contentMain.js", err);
     });
 })();

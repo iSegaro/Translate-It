@@ -2,6 +2,7 @@
 import Browser from "webextension-polyfill";
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
+import { logME } from "./helpers.js";
 
 getEventRouterInstance();
 
@@ -36,13 +37,13 @@ export async function Active_SelectElement(
         data: active,
       });
 
-      console.log("Select Mode Updated:", response);
+      logME("Select Mode Updated:", response);
     }
 
     if (closePopup) {
       window.close();
     }
   } catch (error) {
-    console.error("Error in Active_SelectElement:", error);
+    logME("Error in Active_SelectElement:", error);
   }
 }

@@ -1,5 +1,6 @@
 // src/listeners/onStartup.js
 import Browser from "webextension-polyfill";
+import { logME } from "../utils/helpers";
 
 Browser.runtime.onStartup.addListener(() => {
   Browser.tabs.query({ url: "<all_urls>" }).then(async (tabs) => {
@@ -15,7 +16,7 @@ Browser.runtime.onStartup.addListener(() => {
           url: tab.url,
         });
       } catch (err) {
-        console.warn("[onStartup] sendMessage failed:", err.message);
+        logME("[onStartup] sendMessage failed:", err.message);
       }
     }
   });

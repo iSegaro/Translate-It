@@ -27,13 +27,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initializationManager.init();
     await popupInteractionManager.init();
 
-    const popupPort = browser.runtime.connect({ name: "popup" });
-    popupPort.postMessage({ action: "popupOpened" });
+    try {
+      const popupPort = browser.runtime.connect({ name: "popup" });
+      popupPort.postMessage({ action: "popupOpened" });
+    } catch (err) {
+      logME("[Popup Main]: Failed to connect popup port:", err.message);
+    }
 
     logME("[Popup Main]: All modules initialized successfully.");
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
-    console.error("Popup initialization failed:", error);
+    logME("Popup initialization failed:", error);
     document.body.innerHTML = `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`;
   } finally {
     // اجرای ترجمه بعد از اتمام تمام عملیات اولیه

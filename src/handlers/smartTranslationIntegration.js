@@ -12,6 +12,7 @@ import {
 } from "../utils/platformDetector.js";
 import { getTranslationString } from "../utils/i18n.js";
 import Browser from "webextension-polyfill";
+import { logME } from "../utils/helpers.js";
 
 export async function translateFieldViaSmartHandler({
   text,
@@ -27,13 +28,13 @@ export async function translateFieldViaSmartHandler({
   const platform =
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
-  console.log("[SmartTranslateHandler] Platform detected:", platform);
+  logME("[SmartTranslateHandler] Platform detected:", platform);
 
   try {
     injectPageBridge();
 
     const response = await smartTranslate(text, mode);
-    console.log("[SmartTranslateHandler] Bridge used:", response?.viaBridge);
+    logME("[SmartTranslateHandler] Bridge used:", response?.viaBridge);
 
     let translated =
       response?.data?.translatedText ??
@@ -48,8 +49,6 @@ export async function translateFieldViaSmartHandler({
     if (!translated) {
       throw new Error("ترجمه اعمال نشد.");
     }
-
-    console.log("[SmartTranslateHandler] Translated text:", translated);
 
     // 🔁 حالت عادی (non-restricted)
     if (
@@ -66,7 +65,7 @@ export async function translateFieldViaSmartHandler({
 
     return; // ✅ موفقیت‌آمیز
   } catch (error) {
-    console.warn(
+    logME(
       "[SmartTranslateHandler] Direct update failed. Retrying with fallback via content message."
     );
   }
@@ -92,11 +91,9 @@ export async function translateFieldViaSmartHandler({
       throw new Error(res?.error || "ترجمه اعمال نشد.");
     }
 
-    console.log(
-      "[SmartTranslateHandler] Translation applied via fallback bridge."
-    );
+    logME("[SmartTranslateHandler] Translation applied via fallback bridge.");
   } catch (fallbackErr) {
-    console.error("[SmartTranslateHandler] Fallback failed:", fallbackErr);
+    logME("[SmartTranslateHandler] Fallback failed:", fallbackErr);
     translationHandler.errorHandler.handle(fallbackErr, {
       type: translationHandler.ErrorTypes.API,
       context: "smartTranslate-fallback-handler",

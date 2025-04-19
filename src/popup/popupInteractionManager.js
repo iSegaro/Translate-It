@@ -19,7 +19,7 @@ let initialEntryTimer = null;
 let interactionLocked = false;
 
 function logPopupEvent(message, data = null) {
-  console.log(`📦[PopupDebug]: ${message}`, data || "");
+  logME(`📦[PopupDebug]: ${message}`, data || "");
 }
 
 function cancelAutoClose(reason = "") {
