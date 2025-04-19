@@ -4,7 +4,7 @@ import { logME } from "./utils/helpers.js";
 
 (function () {
   // جلوگیری از اجرای افزونه داخل iframeهایی که مجاز نیستند
-  const allowInIframes = ["docs.google.com", "x.com"];
+  const allowInIframes = [];
   const isTopWindow = window.top === window.self;
   const isAllowedIframe = allowInIframes.some((host) =>
     location.hostname.includes(host)
