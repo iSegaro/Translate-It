@@ -2,6 +2,7 @@
 import { CONFIG, state } from "../config.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorService.js";
+import injectIconStyle from "../utils/helpers.js";
 
 export default class IconManager {
   constructor(errorHandler) {
@@ -59,19 +60,9 @@ export default class IconManager {
       }
       icon.className = "AIWritingCompanion-translation-icon-extension";
 
-      // تنظیمات ضروری CSS
-      Object.assign(icon.style, {
-        position: "absolute",
-        display: "none", // ابتدا مخفی باشد
-        background: "white",
-        border: "1px solid gray",
-        borderRadius: "4px",
-        padding: "2px 5px",
-        fontSize: "12px",
-        cursor: "pointer",
-        zIndex: "9999999999",
-        pointerEvents: "auto",
-      });
+      injectIconStyle("styles/icon.css");
+
+      icon.className = "AIWritingCompanion-translation-icon-extension";
 
       icon.textContent = CONFIG.ICON_TRANSLATION;
       icon.title = CONFIG.TRANSLATION_ICON_TITLE;

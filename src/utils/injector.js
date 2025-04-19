@@ -34,8 +34,6 @@ export async function tryInjectIfNeeded({ tabId, url }) {
         target: { tabId },
         files: ["browser-polyfill.js", "content.bundle.js"],
       });
-      logME(`[Injector] Injected content script to tab ${tabId}`);
-      return true;
     } else {
       logME(`[Injector] Script already active in tab ${tabId}`);
       return false;

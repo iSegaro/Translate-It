@@ -185,3 +185,11 @@ export const injectStyle = () => {
     throw handlerError;
   }
 };
+
+export default function injectIconStyle(cssFileName) {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = Browser.runtime.getURL(cssFileName);
+  document.head.appendChild(link);
+}
