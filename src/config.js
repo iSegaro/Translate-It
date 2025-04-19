@@ -22,6 +22,7 @@ export const CONFIG = {
   // --- Core Settings ---
   USE_MOCK: false,
   DEBUG_MODE: false,
+  EXTENSION_ENABLED: true,
   APPLICATION_LOCALIZE: "Farsi",
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
@@ -249,6 +250,10 @@ export const getApplication_LocalizeAsync = async () => {
 
 export const getAppNameAsync = async () => {
   return getSettingValueAsync("APP_NAME", CONFIG.APP_NAME);
+};
+
+export const getExtensionEnabledAsync = async () => {
+  return getSettingValueAsync("EXTENSION_ENABLED", CONFIG.EXTENSION_ENABLED);
 };
 
 export const getSourceLanguageAsync = async () => {
