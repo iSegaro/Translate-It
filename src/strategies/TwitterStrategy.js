@@ -111,7 +111,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
 */
 
-  async pasteText(tweetField, text) {
+  async pasteText_OLD(tweetField, text) {
     if (!tweetField) {
       return;
     }
@@ -151,6 +151,61 @@ export default class TwitterStrategy extends PlatformStrategy {
       const handlerError = this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
 
+        context: "twitter-strategy-pasteText",
+      });
+
+      throw handlerError;
+    }
+  }
+
+  async pasteText(tweetField, text) {
+    if (!tweetField) return;
+
+    try {
+      if (text && typeof text === "string") {
+        const lines = text.split("\n").filter((l) => l.trim() !== "");
+        const trimmedText = lines.join("\n");
+
+        // فوکوس روی فیلد
+        tweetField.focus();
+        await delay(20);
+
+        // اعمال انتخاب (selection) انتهای فیلد برای paste
+        const range = document.createRange();
+        range.selectNodeContents(tweetField);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        // ساخت DataTransfer
+        const dt = new DataTransfer();
+        dt.setData("text/plain", trimmedText);
+        dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
+
+        // ساخت و dispatch ClipboardEvent برای paste
+        const pasteEvent = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt,
+        });
+
+        const success = tweetField.dispatchEvent(pasteEvent);
+
+        // اگر paste موفق نبود، fallback
+        if (!success || tweetField.innerText.trim() === "") {
+          tweetField.innerText = trimmedText;
+
+          tweetField.dispatchEvent(new Event("beforeinput", { bubbles: true }));
+          tweetField.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        // اطمینان از اینکه focus و cursor در انتها قرار داره
+        this.setCursorToEnd(tweetField);
+      }
+    } catch (error) {
+      const handlerError = this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
         context: "twitter-strategy-pasteText",
       });
 
@@ -207,7 +262,6 @@ export default class TwitterStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       // 1. پردازش فیلد جستجو
-
       const searchInput = document.querySelector(
         '[data-testid="SearchBox_Search_Input"]'
       );
@@ -279,6 +333,7 @@ export default class TwitterStrategy extends PlatformStrategy {
           }
 
           dmField.focus();
+
           this.applyVisualFeedback(dmField);
 
           this.clearTweetField(dmField);
@@ -297,6 +352,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         }
       }
 
+      return;
       // 3. پردازش فیلدهای توییت
 
       let tweetField = null;
@@ -326,26 +382,18 @@ export default class TwitterStrategy extends PlatformStrategy {
       if (tweetField) {
         if (this.validateField(tweetField)) {
           // First we clear any selection that might exist
-
           try {
             window.getSelection().removeAllRanges();
           } catch (err) {
             //
           }
-
           tweetField.focus();
           this.applyVisualFeedback(tweetField);
-
           this.clearTweetField(tweetField);
-
           await delay(50);
-
           this.pasteText(tweetField, translatedText);
-
           this.applyTextDirection(tweetField, translatedText);
-
           await delay(100);
-
           this.setCursorToEnd(tweetField);
         }
       }

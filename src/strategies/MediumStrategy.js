@@ -35,6 +35,7 @@ export default class MediumStrategy extends PlatformStrategy {
       return;
     }
 
+    return;
     // 2. برای فیلدهای contenteditable (کامنت‌ها و نظرسنجی‌ها) - کپی به کلیپبورد
     const mediumField = this.findMediumTextField(element);
     if (!mediumField) {
@@ -48,7 +49,7 @@ export default class MediumStrategy extends PlatformStrategy {
     // کپی متن ترجمه شده به کلیپبورد
     try {
       await navigator.clipboard.writeText(translatedText);
-      console.debug(
+      logME(
         "MediumStrategy: clipboard write SUCCESS for:",
         translatedText.substring(0, 20) + "..."
       ); // Log clipboard write success
