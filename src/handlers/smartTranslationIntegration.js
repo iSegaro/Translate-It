@@ -13,6 +13,7 @@ import {
 import { getTranslationString } from "../utils/i18n.js";
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import TranslationHandler from "../core/TranslationHandler.js";
 
 export async function translateFieldViaSmartHandler({
   text,
@@ -28,15 +29,13 @@ export async function translateFieldViaSmartHandler({
   const platform =
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
-  logME("[SmartTranslateHandler] Platform detected:", platform);
-
+  let translated = "";
   try {
     injectPageBridge();
 
     const response = await smartTranslate(text, mode);
-    logME("[SmartTranslateHandler] Bridge used:", response?.viaBridge);
 
-    let translated =
+    translated =
       response?.data?.translatedText ??
       response?.translatedText ??
       response?.result?.data?.translatedText ??
@@ -50,7 +49,14 @@ export async function translateFieldViaSmartHandler({
       throw new Error("ترجمه اعمال نشد.");
     }
 
-    // 🔁 حالت عادی (non-restricted)
+    // 🔎 ذخیره مقدار قبلی
+    let previousValue = "";
+    if (target?.isContentEditable) {
+      previousValue = target.innerText?.trim();
+    } else if ("value" in target) {
+      previousValue = target.value?.trim();
+    }
+
     if (
       selectionRange &&
       translationHandler.strategies[platform]?.updateElement
@@ -63,7 +69,21 @@ export async function translateFieldViaSmartHandler({
       await translationHandler.updateTargetElement(target, translated);
     }
 
-    return; // ✅ موفقیت‌آمیز
+    // 🔎 بررسی اینکه واقعاً تغییر کرده یا نه
+    const newValue =
+      target?.isContentEditable ? target.innerText?.trim()
+      : "value" in target ? target.value?.trim()
+      : null;
+
+    const updated = newValue !== null && newValue === translated;
+
+    if (updated) {
+      return; // ✅ با موفقیت تغییر کرد، نیاز به fallback نیست
+    }
+
+    logME(
+      "[SmartTranslateHandler] Update skipped or blocked, falling back to bridge"
+    );
   } catch (error) {
     logME(
       "[SmartTranslateHandler] Direct update failed. Retrying with fallback via content message."
@@ -80,7 +100,7 @@ export async function translateFieldViaSmartHandler({
     const res = await Browser.runtime.sendMessage({
       action: "applyTranslationToActiveElement",
       payload: {
-        translatedText: text, // ← متن ترجمه‌شده، چون خطای بالا فقط از update بود
+        translatedText: translated,
       },
     });
 
@@ -89,6 +109,21 @@ export async function translateFieldViaSmartHandler({
 
     if (!isSuccess) {
       throw new Error(res?.error || "ترجمه اعمال نشد.");
+    }
+    // کپی متن ترجمه شده به کلیپبورد
+    try {
+      await navigator.clipboard.writeText(translated);
+      translationHandler.notifier.show(
+        "ترجمه در حافظه کپی شد. (Ctrl+V)",
+        "success",
+        true,
+        3000
+      );
+    } catch (error) {
+      translationHandler.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "smartTranslation-Integration-Clipbord",
+      });
     }
 
     logME("[SmartTranslateHandler] Translation applied via fallback bridge.");
