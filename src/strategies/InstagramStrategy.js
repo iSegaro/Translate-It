@@ -89,10 +89,28 @@ export default class InstagramStrategy extends PlatformStrategy {
   }
 
   extractText(target) {
-    if (target.isContentEditable) {
-      return target.innerText.trim();
+    try {
+      if (!target) return "";
+
+      // اگر contenteditable باشد (مثلاً دایرکت)
+      if (target?.isContentEditable) {
+        return target?.innerText?.trim?.() || "";
+      }
+
+      // حالت فیلد ورودی (مثلاً جستجو یا کامنت)
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") {
+        return target?.value?.trim?.() || "";
+      }
+
+      // حالت fallback
+      return target?.textContent?.trim?.() || "";
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "instagram-strategy-extractText",
+      });
+      return "";
     }
-    return target.value || target.textContent.trim();
   }
 
   async safeFocus(element) {
