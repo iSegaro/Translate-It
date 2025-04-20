@@ -14,7 +14,6 @@ export default class SelectionWindows {
     this.isVisible = false;
     this.currentText = null;
     this.displayElement = null;
-    this.errorHandler = new ErrorHandler();
     this.removeMouseDownListener = null;
     this.translationHandler = options.translationHandler;
     this.translatedText = null;
@@ -30,7 +29,7 @@ export default class SelectionWindows {
 
   async show(selectedText, position) {
     if (!isExtensionContextValid()) {
-      await this.errorHandler.handle(
+      await this.translationHandler.errorHandler.handle(
         new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
         {
           type: ErrorTypes.CONTEXT,
@@ -39,6 +38,7 @@ export default class SelectionWindows {
           statusCode: "context-invalid",
         }
       );
+
       return;
     }
 
@@ -438,25 +438,23 @@ export default class SelectionWindows {
   async handleTranslationError(error, loadingContainer) {
     if (loadingContainer) loadingContainer.style.opacity = "0";
 
-    // استخراج پیام قابل‌خواندن
-    const msg =
-      typeof error === "string" ? error : (
-        error?.message ||
-        (await getTranslationString("popup_string_translate_error_response")) ||
-        "(خطای ناشناخته هنگام ترجمه)."
-      );
+    const errorObj = typeof error === "string" ? new Error(error) : error;
 
-    setTimeout(() => {
-      if (this.displayElement) {
-        if (this.notifier) {
-          // نوتیفیکیشن خطا با auto‑dismiss ۳٫۵ ثانیه
-          this.notifier.show(msg, "error", true, 3500);
-        } else {
-          logME("[SelectionWindow] " + msg);
-        }
-        this.dismiss(false);
-      }
-    }, 300);
+    if (this.translationHandler?.errorHandler) {
+      await this.translationHandler.errorHandler.handle(errorObj, {
+        type: ErrorTypes.API,
+        context: "selection-window-translate",
+      });
+    } else {
+      // Fallback نمایش ساده در صورت نبود handler
+      const msg =
+        errorObj?.message ||
+        (await getTranslationString("popup_string_translate_error_response")) ||
+        "(خطای ناشناخته هنگام ترجمه).";
+      logME("[SelectionWindow] " + msg);
+    }
+
+    this.dismiss(false);
   }
 
   dismiss(withFadeOut = true) {
