@@ -161,7 +161,7 @@ export async function translateFieldViaSmartHandler({
   } catch (err) {
     await translationHandler.errorHandler.handle(err, {
       type: ErrorTypes.API,
-      context: "smartTranslate-handler-main",
+      context: "smartTranslate-handler-main-second",
     });
   }
 }
