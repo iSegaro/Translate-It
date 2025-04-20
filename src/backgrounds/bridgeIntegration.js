@@ -1,5 +1,4 @@
 // src/backgrounds/bridgeIntegration.js
-// src/backgrounds/bridgeIntegration.js
 import Browser from "webextension-polyfill";
 
 // ✅ Inject the page bridge script into the page (only once)
