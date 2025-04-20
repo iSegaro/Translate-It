@@ -77,10 +77,34 @@ export default class WhatsAppStrategy extends PlatformStrategy {
   }
 
   extractText(target) {
-    const whatsappField = target.closest(
-      '[role="textbox"], .copyable-text.selectable-text'
-    );
-    return whatsappField?.innerText.trim() || "";
+    try {
+      if (!target) return "";
+      if (target.isContentEditable) return target.innerText.trim();
+      if (target.value) return target.value.trim();
+      if (target.textContent) return target.textContent.trim();
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "WhatsApp-strategy-extractText-fallback",
+      });
+    }
+    return "";
+    
+    try {
+      const whatsappField = target?.closest?.(
+        '[role="textbox"], .copyable-text.selectable-text'
+      );
+
+      if (!whatsappField || !this.validateField(whatsappField)) return "";
+
+      return whatsappField.innerText?.trim?.() || "";
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "whatsapp-strategy-extractText",
+      });
+      return "";
+    }
   }
 
   async safeFocus(element) {
