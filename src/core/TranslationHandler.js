@@ -25,6 +25,7 @@ import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
 import EventRouter from "./EventRouter.js";
 import { smartTranslate } from "../backgrounds/bridgeIntegration.js";
+import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 /**
  * Handles translation requests from content script in a CSP-safe background context.
@@ -232,29 +233,18 @@ export default class TranslationHandler {
         return;
       }
 
-      const platform =
-        params.target ? detectPlatform(params.target) : detectPlatformByURL();
-
       state.translateMode =
         params.selectionRange ?
           TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      const response = await smartTranslate(params.text, state.translateMode);
-      const translated =
-        response?.data?.translatedText || response?.translatedText;
-
-      if (!translated) return;
-
-      if (params.selectionRange) {
-        await this.handleSelect_ElementTranslation(
-          platform,
-          params,
-          translated
-        );
-      } else if (params.target) {
-        await this.updateTargetElement(params.target, translated);
-      }
+      // ✅ ارسال دقیق target برای جلوگیری از undefined
+      await translateFieldViaSmartHandler({
+        text: params.text,
+        translationHandler: this,
+        target: params.target,
+        selectionRange: params.selectionRange,
+      });
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
 
@@ -265,9 +255,7 @@ export default class TranslationHandler {
         isPrimary: true,
       });
 
-      if (handlerError.isFinal || handlerError.suppressSecondary) {
-        return;
-      }
+      if (handlerError.isFinal || handlerError.suppressSecondary) return;
 
       const finalError = new Error(handlerError.message);
       Object.assign(finalError, {
@@ -340,7 +328,15 @@ export default class TranslationHandler {
     try {
       if (typeof translated === "string" && translated) {
         const platform = detectPlatform(target);
-        await this.strategies[platform].updateElement(target, translated);
+        if (
+          this.strategies[platform]?.updateElement &&
+          typeof this.strategies[platform].updateElement === "function"
+        ) {
+          return await this.strategies[platform].updateElement(
+            target,
+            translated
+          );
+        }
       }
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -349,6 +345,7 @@ export default class TranslationHandler {
         platform: detectPlatform(target),
       });
     }
+    return false;
   }
 
   getSelectElementContext() {

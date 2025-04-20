@@ -23,7 +23,6 @@ import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
 import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
-import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler
@@ -586,9 +585,12 @@ export default class EventHandler {
       const { select_element, activeElement } =
         this.translationHandler.getSelectElementContext();
 
-      if (!isEditable(activeElement)) {
-        return;
-      }
+      if (!isEditable(activeElement)) return;
+
+      const text =
+        this.translationHandler.extractFromActiveElement(activeElement);
+
+      if (!text) return;
 
       /**
        * اگر متنی داخل انتخاب شده باشد، آن را برای ترجمه انتخاب میکند می کند
@@ -609,27 +611,19 @@ export default class EventHandler {
       //   selectionRange: isTextSelected ? select_element.getRangeAt(0) : null,
       // });
 
-      const text =
-        this.translationHandler.extractFromActiveElement(activeElement);
-
-      if (!text) return;
-
-      await translateFieldViaSmartHandler({
+      // ✅ پارامتر کامل با target و range
+      await this.translationHandler.processTranslation_with_CtrlSlash({
         text,
         originalText: text,
-        translationHandler: this.translationHandler,
+        target: activeElement,
         selectionRange: null, // چون با Ctrl+/ اجرا شده
       });
     } catch (error) {
       error = await ErrorHandler.processError(error);
       logME("[EventHandler] Ctrl+/ Error: ", error);
-      // تعیین نوع خطا با اولویت دادن به نوع موجود در خطا
-      // بررسی خطاهای پردازش شده و پرچم suppressSystemError
-      if (error.isFinal) {
-        return;
-      }
 
-      // فقط خطاهای اصلی را نمایش بده
+      if (error.isFinal) return;
+
       if (!error.originalError?.isPrimary) {
         const errorType = error.type || ErrorTypes.API;
         const statusCode = error.statusCode || 500;
@@ -638,7 +632,7 @@ export default class EventHandler {
           type: errorType,
           statusCode: statusCode,
           context: "ctrl-slash",
-          suppressSecondary: true, // جلوگیری از نمایش خطاهای ثانویه
+          suppressSecondary: true,
         });
       }
     } finally {

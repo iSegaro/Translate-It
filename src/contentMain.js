@@ -183,27 +183,33 @@ export function initContentScript() {
                   this.translationHandler.detectPlatform?.(active) ??
                   detectPlatform(active);
 
+                // استفاده از خروجی استراتژی برای تعیین موفقیت
+                let didApply = false;
+
                 if (
                   this.translationHandler.strategies[platform]?.updateElement &&
                   typeof this.translationHandler.strategies[platform]
                     .updateElement === "function"
                 ) {
-                  await this.translationHandler.strategies[
+                  didApply = await this.translationHandler.strategies[
                     platform
                   ].updateElement(active, translated);
                 } else {
                   if (active.isContentEditable) {
                     active.innerText = translated;
+                    didApply = true;
                   } else if ("value" in active) {
                     active.value = translated;
+                    didApply = true;
                   }
                   logME("[Content] Applied via fallback method");
                 }
 
+                // اطلاع‌رسانی به فرم برای بروزرسانی
                 active.dispatchEvent(new Event("input", { bubbles: true }));
                 active.dispatchEvent(new Event("change", { bubbles: true }));
 
-                sendResponse({ success: true });
+                sendResponse({ success: !!didApply }); // ارسال نتیجه واقعی
               } catch (err) {
                 logME("[Content] Strategy failed", err);
                 sendResponse({

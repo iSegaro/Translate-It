@@ -20,11 +20,12 @@ export async function translateFieldViaSmartHandler({
   target,
   selectionRange = null,
 }) {
+  logME("[SmartTranslateHandler] Received target:", target);
+
   if (!text || !translationHandler) return;
 
   const mode =
     selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
-
   const platform =
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
@@ -35,19 +36,15 @@ export async function translateFieldViaSmartHandler({
 
     const response = await smartTranslate(text, mode);
 
-    // ✅ بررسی خطای مستقیم از پاسخ API (مانند missing API Key)
     if (response?.success === false) {
-      const msg = response?.error || "(خطایی رخ داد)";
-
-      const err = new Error(msg);
+      const err = new Error(response?.error || "(خطایی رخ داد)");
       await translationHandler.errorHandler.handle(err, {
         type: ErrorTypes.API,
         context: "smartTranslate-response-handler",
         statusCode: response?.statusCode || 400,
         isPrimary: true,
       });
-
-      return; // جلوگیری از ادامه fallback
+      return;
     }
 
     translated =
@@ -56,13 +53,9 @@ export async function translateFieldViaSmartHandler({
       response?.result?.data?.translatedText ??
       response?.result?.translatedText;
 
-    if (typeof translated === "string") {
-      translated = translated.trim();
-    }
-
-    if (!translated) {
+    if (!translated || typeof translated !== "string") {
       await translationHandler.errorHandler.handle(
-        Error("(Translation not found)"),
+        new Error("(Translation not found)"),
         {
           type: ErrorTypes.API,
           context: "smartTranslate-handler-main",
@@ -72,60 +65,70 @@ export async function translateFieldViaSmartHandler({
       return;
     }
 
-    let previousValue = "";
-    if (target?.isContentEditable) {
-      previousValue = target.innerText?.trim();
-    } else if (target && "value" in target) {
-      previousValue = target.value?.trim();
-    }
+    translated = translated.trim();
+
+    // اگر target موجود باشد، مقدار اولیه را نگه‌دار
+    const beforeValue =
+      target?.isContentEditable ? target.innerText?.trim()
+      : target && "value" in target ? target.value?.trim()
+      : null;
+
+    logME("[SmartTranslateHandler] Initial value:", beforeValue);
+
+    // اجرای strategy
+    let didApply = false;
 
     if (
       selectionRange &&
       translationHandler.strategies[platform]?.updateElement
     ) {
-      await translationHandler.strategies[platform].updateElement(
+      didApply = await translationHandler.strategies[platform].updateElement(
         selectionRange,
         translated
       );
     } else if (target) {
-      await translationHandler.updateTargetElement(target, translated);
+      didApply = await translationHandler.updateTargetElement(
+        target,
+        translated
+      );
     }
 
-    const newValue =
-      target?.isContentEditable ? target.innerText?.trim()
-      : target && "value" in target ? target.value?.trim()
-      : null;
+    logME("[SmartTranslateHandler] updateElement result:", didApply);
 
-    const updated = newValue !== null && newValue === translated;
-
-    if (updated) {
+    // اگر استراتژی گفته که موفق بوده، کافیه!
+    if (didApply === true) {
+      logME("[SmartTranslateHandler] ✅ Strategy applied successfully");
       return;
     }
 
-    logME(
-      "[SmartTranslateHandler] Update skipped or blocked, falling back to bridge"
-    );
-  } catch (error) {
-    await translationHandler.errorHandler.handle(error, {
-      type: ErrorTypes.API,
-      context: "smartTranslate-handler-main",
-      isPrimary: true,
-    });
-    return;
-  }
+    // بررسی نهایی: آیا مقدار تغییر کرده؟
 
-  // ✅ fallback فقط اگر بالایی موفق نبود
-  try {
-    if (target?.focus) {
-      target.focus();
-      await new Promise((r) => setTimeout(r, 20));
+    const initialValue =
+      target?.isContentEditable ? target.innerText?.trim()
+      : typeof target === "object" && target !== null && "value" in target ?
+        target.value?.trim()
+      : null;
+    logME("[SmartTranslateHandler] Initial value:", initialValue);
+
+    logME("[SmartTranslateHandler] Direct DOM check:", {
+      before: beforeValue,
+      after: initialValue,
+      expected: translated,
+    });
+
+    if (initialValue === translated) {
+      logME(
+        "[SmartTranslateHandler] ✅ DOM updated correctly. No fallback needed."
+      );
+      return;
     }
 
+    logME("[SmartTranslateHandler] ❗ Fallback required");
+
+    // --- fallback ---
     const res = await Browser.runtime.sendMessage({
       action: "applyTranslationToActiveElement",
-      payload: {
-        translatedText: translated,
-      },
+      payload: { translatedText: translated },
     });
 
     const isSuccess =
@@ -139,6 +142,9 @@ export async function translateFieldViaSmartHandler({
       );
     }
 
+    logME("[SmartTranslateHandler] ✅ Fallback applied successfully");
+
+    // فقط اگر fallback اجرا شد → کپی به حافظه
     try {
       await navigator.clipboard.writeText(translated);
       translationHandler.notifier.show(
@@ -154,12 +160,10 @@ export async function translateFieldViaSmartHandler({
         context: "smartTranslation-clipboard",
       });
     }
-
-    logME("[SmartTranslateHandler] Translation applied via fallback bridge.");
-  } catch (fallbackErr) {
-    await translationHandler.errorHandler.handle(fallbackErr, {
+  } catch (err) {
+    await translationHandler.errorHandler.handle(err, {
       type: ErrorTypes.API,
-      context: "smartTranslate-fallback-handler",
+      context: "smartTranslate-handler-main",
     });
   }
 }
