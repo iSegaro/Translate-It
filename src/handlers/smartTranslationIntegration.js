@@ -20,8 +20,6 @@ export async function translateFieldViaSmartHandler({
   target,
   selectionRange = null,
 }) {
-  logME("[SmartTranslateHandler] Received target:", target);
-
   if (!text || !translationHandler) return;
 
   const mode =
