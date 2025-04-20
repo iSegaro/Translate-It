@@ -201,5 +201,11 @@
   },
   "STATUS_SMART_TRANSLATE_COPIED": {
     "message": "Translation copied to clipboard (Ctrl+V)."
+  },
+  "OPTIONS_STATUS_SAVED_SUCCESS": {
+    "message": "Saved successfully : )"
+  },
+  "OPTIONS_STATUS_SAVED_FAILED": {
+    "message": "Saved failed :("
   }
 }
