@@ -1,5 +1,6 @@
 // src/backgrounds/bridgeIntegration.js
 import Browser from "webextension-polyfill";
+import { logME } from "../utils/helpers";
 
 // ✅ Inject the page bridge script into the page (only once)
 export function injectPageBridge() {
