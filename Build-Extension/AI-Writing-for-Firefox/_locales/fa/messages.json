@@ -203,5 +203,11 @@
   },
   "STATUS_SMARTTRANSLATE_COPIED": {
     "message": "ترجمه در حافظه کپی شد. (Ctrl+V)"
+  },
+  "OPTIONS_STATUS_SAVED_SUCCESS": {
+    "message": "با موفقیت ذخیره شد : )"
+  },
+  "OPTIONS_STATUS_SAVED_FAILED": {
+    "message": "ذخیره نشد :("
   }
 }
