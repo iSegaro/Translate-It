@@ -70,14 +70,24 @@ export default class MediumStrategy extends PlatformStrategy {
   }
 
   extractText(target) {
-    // برای فیلدهای جستجو
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-      return target.value.trim();
-    }
+    try {
+      if (!target) return "";
 
-    // برای فیلدهای contenteditable
-    const mediumField = this.findMediumTextField(target);
-    return mediumField?.innerText.trim() || "";
+      // اگر input یا textarea باشد
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return target?.value?.trim?.() || "";
+      }
+
+      // تلاش برای یافتن فیلد معتبر مدیوم
+      const mediumField = this.findMediumTextField(target);
+      return mediumField?.innerText?.trim?.() || "";
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "medium-strategy-extractText",
+      });
+      return "";
+    }
   }
 
   async safeFocus(element) {
