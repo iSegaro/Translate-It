@@ -3,7 +3,6 @@
 import { CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { logME, openOptionsPage } from "../utils/helpers.js";
-import { translateErrorMessage } from "./ErrorMessagesLocalize.js";
 import { matchErrorToKey } from "./ErrorMessages.js";
 import { getTranslationString } from "../utils/i18n.js";
 
@@ -45,8 +44,6 @@ async function extractError(error) {
       })();
 
   const errorKey = matchErrorToKey(raw);
-  const errorCode = errorKey ? errorKey.toUpperCase() : "UNKNOWN-ERROR";
-
   const translated = errorKey ? await getTranslationString(errorKey) : null;
 
   const wrapped = new Error(translated || raw);
