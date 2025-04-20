@@ -44,6 +44,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "pageBridge.js",
         "browser-polyfill.js",
         "offscreen.js",
         "content.bundle.js",
