@@ -19,6 +19,16 @@ export class ErrorTypes {
   static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
 }
 
+const SILENT_ERRORS = new Set(["ERRORS_CONTEXT_LOST"]);
+
+const SUPPRESS_CONSOLE_LOG_ERRORS = new Set([
+  "ERRORS_CONTEXT_LOST",
+  "ERRORS_API_KEY_WRONG",
+  "ERRORS_API_KEY_MISSING",
+  "ERRORS_API_URL_MISSING",
+  "ERRORS_API_KEY_FORBIDDEN",
+]);
+
 async function extractError(error) {
   if (!error) return new Error("(Unknown Error)");
 
@@ -34,9 +44,14 @@ async function extractError(error) {
         }
       })();
 
-  const translated = await translateErrorMessage(raw);
+  const errorKey = matchErrorToKey(raw);
+  const errorCode = errorKey ? errorKey.toUpperCase() : "UNKNOWN-ERROR";
+
+  const translated = errorKey ? await getTranslationString(errorKey) : null;
+
   const wrapped = new Error(translated || raw);
   wrapped._originalMessage = raw;
+  wrapped._errorKey = errorKey || null;
   return wrapped;
 }
 
@@ -61,7 +76,6 @@ export class ErrorHandler {
 
     try {
       const normalizedError = await extractError(error);
-      const raw = normalizedError._originalMessage || normalizedError.message;
 
       const mergedMeta = {
         ...(normalizedError.meta || {}),
@@ -71,26 +85,32 @@ export class ErrorHandler {
         context: meta.context || "",
       };
 
-      const errorKey = matchErrorToKey(raw);
-      const errorCode = errorKey ? errorKey.toLowerCase() : "unknown-error";
+      const errorKey = normalizedError._errorKey;
+      const errorCode = errorKey ? errorKey.toUpperCase() : "UNKNOWN-ERROR";
+
+      const isDebugMode = await getDebugModeAsync().catch(
+        () => CONFIG.DEBUG_MODE
+      );
+
+      const shouldLogToConsole =
+        isDebugMode && !SUPPRESS_CONSOLE_LOG_ERRORS.has(errorCode);
+
+      if (shouldLogToConsole) {
+        this._logError(normalizedError, mergedMeta);
+      }
+
+      if (SILENT_ERRORS.has(errorCode)) {
+        normalizedError._isHandled = true;
+        return normalizedError;
+      }
 
       const finalMessage =
         errorKey ?
           await getTranslationString(errorKey)
         : normalizedError.message;
 
-      const isDebugMode = await getDebugModeAsync().catch(
-        () => CONFIG.DEBUG_MODE
-      );
-
-      // فقط اگر خطا ناشناخته است لاگ کن
-      const shouldLogToConsole = !errorKey && isDebugMode;
-
-      if (shouldLogToConsole) {
-        this._logError(normalizedError, mergedMeta);
-      }
-
       this._notifyUser(finalMessage, mergedMeta.type, errorCode);
+
       normalizedError._isHandled = true;
       return normalizedError;
     } catch (finalError) {
@@ -133,9 +153,10 @@ export class ErrorHandler {
     const notificationType = typeMap[type] || "error";
 
     const openSettingsErrors = new Set([
-      "errors_api_key_wrong",
-      "errors_api_key_missing",
-      "errors_api_url_missing",
+      "ERRORS_API_KEY_WRONG",
+      "ERRORS_API_KEY_MISSING",
+      "ERRORS_API_URL_MISSING",
+      "ERRORS_API_KEY_FORBIDDEN",
     ]);
 
     const action =
@@ -143,9 +164,9 @@ export class ErrorHandler {
         openOptionsPage
       : undefined;
 
-    this.notifier.show(message, notificationType, true, 5000, action);
+    this.notifier.show(message, notificationType, true, 4000, action);
     this.displayedErrors.add(message);
-    setTimeout(() => this.displayedErrors.delete(message), 5000);
+    setTimeout(() => this.displayedErrors.delete(message), 4000);
   }
 }
 

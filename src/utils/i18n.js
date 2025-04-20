@@ -30,7 +30,7 @@ async function loadTranslationsForLanguageCached(lang) {
     const url = Browser.runtime.getURL(`_locales/${lang}/messages.json`);
     const response = await fetch(url);
     if (!response.ok) {
-      logME(`⚠️ ترجمه برای زبان "${lang}" یافت نشد.`);
+      // logME(`⚠️ ترجمه برای زبان "${lang}" یافت نشد.`);
       return null;
     }
     const translations = await response.json();
@@ -38,7 +38,7 @@ async function loadTranslationsForLanguageCached(lang) {
     translationsCache.set(lang, translations);
     return translations;
   } catch (error) {
-    logME(`⚠️ خطا در بارگذاری ترجمه‌های "${lang}":`, error);
+    // logME(`⚠️ خطا در بارگذاری ترجمه‌های "${lang}":`, error);
     return null;
   }
 }

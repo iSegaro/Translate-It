@@ -20,27 +20,44 @@ export async function getErrorMessageByKey(key) {
 }
 
 export function matchErrorToKey(message = "") {
-  const normalized = message.toLowerCase();
+  const normalized = message
+    .toLowerCase()
+    .replace(/[.,!?؛،ء]/g, "")
+    .trim();
+
   if (
     normalized.includes("api key not valid") ||
-    normalized.includes("wrong api key")
+    normalized.includes("wrong api key") ||
+    normalized.includes("api key is wrong")
   ) {
     return "ERRORS_API_KEY_WRONG";
   }
+
   if (normalized.includes("api key is missing")) {
     return "ERRORS_API_KEY_MISSING";
   }
-  if (normalized.includes("context invalidated")) {
+
+  if (
+    normalized.includes("context invalidated") ||
+    normalized.includes("extension context lost") ||
+    normalized.includes("context lost") ||
+    normalized.includes("context invalid") ||
+    normalized.includes("context invalid. please refresh")
+  ) {
     return "ERRORS_CONTEXT_LOST";
   }
+
   if (normalized.includes("failed to fetch")) {
     return "ERRORS_NETWORK_FAILURE";
   }
+
   if (normalized.includes("invalid api response")) {
     return "ERRORS_INVALID_RESPONSE";
   }
+
   if (normalized.includes("translation failed")) {
     return "ERRORS_SMARTTRANSLATE_FAILED";
   }
+
   return null;
 }
