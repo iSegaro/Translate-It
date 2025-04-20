@@ -34,18 +34,26 @@ export default class ChatGPTStrategy extends PlatformStrategy {
         return "";
       }
 
-      if (this.isChatGPTElement(target)) {
-        return Array.from(target.querySelectorAll("p"))
-          .map((p) => p.textContent.trim())
-          .join("\n");
+      let resolvedTarget = target;
+
+      // اگر target معتبر نیست، خودش دنبال فیلد بگردد
+      if (!resolvedTarget || !this.isChatGPTElement(resolvedTarget)) {
+        resolvedTarget = document.querySelector("#prompt-textarea");
       }
-      return super.extractText(target);
+
+      if (!resolvedTarget) {
+        throw new Error("عنصر ChatGPT برای استخراج متن شناسایی نشد.");
+      }
+
+      return Array.from(resolvedTarget.querySelectorAll("p"))
+        .map((p) => p.textContent.trim())
+        .join("\n");
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "chatgpt-strategy-extractText",
       });
-      return ""; // Return an empty string or handle as needed
+      return "";
     }
   }
 
