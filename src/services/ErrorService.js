@@ -1,10 +1,13 @@
 // src/services/ErrorService.js
-import Browser from "webextension-polyfill";
-import { TRANSLATION_ERRORS, CONFIG, getDebugModeAsync } from "../config.js";
+
+import { CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { logME, openOptionsPage } from "../utils/helpers.js";
-import { getErrorMessage } from "./ErrorMessagesService";
-import { translateErrorMessage } from "./ErrorTranslationService.js";
+import {
+  translateErrorMessage,
+  matchErrorToKey,
+} from "./ErrorTranslationError.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 export class ErrorTypes {
   static API = "API";
@@ -18,11 +21,10 @@ export class ErrorTypes {
   static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
 }
 
-async function extractErrorMessage(error) {
-  if (!error) return "(Unknown Error)";
+async function extractError(error) {
+  if (!error) return new Error("(Unknown Error)");
 
-  // استخراج پیام اولیه
-  let rawMessage =
+  let raw =
     typeof error === "string" ? error
     : error instanceof Error ? error.message
     : typeof error.message === "string" ? error.message
@@ -34,9 +36,10 @@ async function extractErrorMessage(error) {
         }
       })();
 
-  // ✅ ترجمه خطا
-  const translated = await translateErrorMessage(rawMessage);
-  return translated || rawMessage;
+  const translated = await translateErrorMessage(raw);
+  const wrapped = new Error(translated || raw);
+  wrapped._originalMessage = raw;
+  return wrapped;
 }
 
 export class ErrorHandler {
@@ -44,315 +47,61 @@ export class ErrorHandler {
     this.notifier = notificationManager;
     this.displayedErrors = new Set();
     this.isHandling = false;
-    // خطاهایی که نیاز به نمایش یا لاگ کردن آن‌ها نداریم
-    this.suppressed_Errors = new Set([
-      "invalid-protocol",
-      "invalid-tab",
-      "text-direction-error",
-      "promise-rejection-in-translateText",
-      "promise-error-in-translateText",
-      "parsing-response-error",
-      // "context-invalid",
-      "api-error-response",
-    ]);
-    this.suppressed_ErrorsConsole = new Set([
-      "invalid-protocol",
-      "invalid-tab",
-      "icon-position-error",
-      "icon-creation-error",
-      "text-direction-error",
-      "promise-rejection-in-translateText",
-      "promise-error-in-translateText",
-      // "context-invalid",
-      "api-error-response",
-    ]);
   }
 
   static async processError(error) {
-    if (typeof error.then === "function") {
-      error = await error;
-    }
+    if (typeof error?.then === "function") return await error;
     return error;
   }
 
-  async handle(error, customMeta = {}) {
-    if (error?._isHandled) {
-      logME("[ErrorService] Skipping already-handled error.");
-      return error;
-    }
-    // اگر error یک Promise باشد، منتظر تکمیل آن شود (resolve یا reject)
-    if (typeof error.then === "function") {
-      error = await error;
-    }
+  async handle(error, meta = {}) {
+    if (error?._isHandled) return error;
+    if (typeof error?.then === "function") error = await error;
+    if (this.isHandling) return error;
 
-    // if (this.isHandling || this.displayedErrors.has(error.message)) {
-    if (this.isHandling) {
-      logME("[ErrorService] Ignoring duplicate error:", error);
-      return error;
-    }
     this.isHandling = true;
-    // Add the error message to the set to prevent duplicate notifications
-    this.displayedErrors.add(error.message);
 
     try {
-      // نرمال‌سازی خطا
-      const rawTranslated = await extractErrorMessage(error);
-      const normalizedError =
-        error instanceof Error ? error : new Error(rawTranslated);
+      const normalizedError = await extractError(error);
+      const raw = normalizedError._originalMessage || normalizedError.message;
 
-      // ادغام متادیتاها
       const mergedMeta = {
         ...(normalizedError.meta || {}),
-        ...customMeta,
-        type: customMeta.type || normalizedError.type || ErrorTypes.SERVICE,
-        statusCode: normalizedError.statusCode || customMeta.statusCode || 500,
+        ...meta,
+        type: meta.type || ErrorTypes.SERVICE,
+        statusCode: meta.statusCode || 500,
+        context: meta.context || "",
       };
 
-      // تعیین نهایی نوع خطا
-      mergedMeta.type = this._reviewErrorType(
-        normalizedError,
-        mergedMeta.type,
-        mergedMeta
-      );
+      const errorKey = matchErrorToKey(raw);
+      const errorCode = errorKey ? errorKey.toLowerCase() : "unknown-error";
 
-      // تولید پیام خطا
-      const { message, code } = await this._getErrorMessage(
-        normalizedError,
-        mergedMeta.type,
-        mergedMeta.statusCode,
-        mergedMeta
-      );
+      const finalMessage =
+        errorKey ?
+          await getTranslationString(errorKey)
+        : normalizedError.message;
 
-      // بررسی حالت دیباگ
       const isDebugMode = await getDebugModeAsync().catch(
         () => CONFIG.DEBUG_MODE
       );
 
-      // ثبت خطا در کنسول
-      this._logError(normalizedError, mergedMeta, code, isDebugMode);
-
-      // نمایش پیام به کاربر
-      this._notifyUser(message, mergedMeta.type, code);
-
-      // در صورت خطای CONTEXT، ریلود مرکزی انجام شود
-      if (mergedMeta.type === ErrorTypes.CONTEXT && !this.reloadScheduled) {
-        this._contextInvalidated();
+      if (errorCode === "unknown-error" && isDebugMode) {
+        this._logError(normalizedError, mergedMeta);
       }
 
-      // علامت‌گذاری خطا به عنوان هندل شده
+      this._notifyUser(finalMessage, mergedMeta.type, errorCode);
       normalizedError._isHandled = true;
       return normalizedError;
     } catch (finalError) {
-      logME("[ErrorService] Critical Unknown Error:", finalError);
+      logME("[ErrorService] Critical error:", finalError);
       return finalError;
     } finally {
       this.isHandling = false;
     }
   }
 
-  _contextInvalidated() {
-    this.reloadScheduled = true;
-    // پیام Context Invalid به کاربر نمایش داده شده؛ حالا پس از 2000 میلی‌ثانیه اکستنشن ریلود شود.
-    if (Browser.runtime && Browser.runtime.sendMessage) {
-      setTimeout(() => {
-        try {
-          Browser.runtime.sendMessage({ action: "restart_content_script" });
-        } catch (e) {
-          if (e.message?.includes("context invalidated")) {
-            // logME("[ErrorService] Extension context invalidated");
-          } else {
-            logME("[ErrorService] Cannot send restart message.");
-          }
-        }
-      }, 2000);
-    } else {
-      logME(
-        "[ErrorService] Extension context invalid, cannot send restart message."
-      );
-    }
-  }
-
-  _reviewErrorType(error, currentType, meta) {
-    let type = currentType;
-    logME("[ErrorService] Reviewing error type:", error.message);
-
-    // بررسی خطاهای مربوط به API Key
-    if (
-      error.message.includes("API key") ||
-      error.message.includes("API_KEY") ||
-      error.message === TRANSLATION_ERRORS.MISSING_API_KEY
-    ) {
-      type = ErrorTypes.API;
-    }
-
-    // بررسی خطاهای مربوط به Context
-    if (
-      error.message.includes("context invalidated") ||
-      error.message.includes("Extension context invalid")
-    ) {
-      type = ErrorTypes.CONTEXT;
-      error.code = "context-invalidated";
-    }
-
-    // بررسی خطاهای Integration در شرایط خاص
-    if (
-      error.message.includes("reading 'handle'") &&
-      meta.context === "ctrl-slash"
-    ) {
-      type = ErrorTypes.INTEGRATION;
-    }
-
-    // بررسی خطاهای شبکه
-    if (error.message.includes("Failed to fetch")) {
-      type = ErrorTypes.NETWORK;
-    }
-
-    return type;
-  }
-
-  async _getErrorMessage(error, type, statusCode, meta) {
-    logME("[ErrorService] getErrorMessage => ", error);
-
-    if (meta.suppressSystemError) {
-      return { code: "suppressed-error", message: "" };
-    }
-    if (meta.suppressSecondary) {
-      return { code: "suppressed", message: "" };
-    }
-
-    const errorMap = {
-      [ErrorTypes.API]: {
-        400: {
-          code: "api-key-wrong",
-          message: await getErrorMessage("ERRORS_API_KEY_WRONG"),
-        },
-        401: {
-          code: "api-key-unauthorized",
-          message: await getErrorMessage("ERRORS_API_KEY_ISSUE"),
-        },
-        601: {
-          code: "api-key-missing",
-          message: await getErrorMessage("ERRORS_API_KEY_MISSING"),
-        },
-        403: {
-          code: "api-forbidden",
-          message: await getErrorMessage("ERRORS_API_KEY_FORBIDDEN"),
-        },
-        604: {
-          code: "api-url-missing",
-          message: await getErrorMessage("ERRORS_API_URL_MISSING"),
-        },
-        605: {
-          code: "api-model-missing",
-          message: await getErrorMessage("ERRORS_AI_MODEL_MISSING"),
-        },
-        429: {
-          code: "service-overloaded",
-          message: await getErrorMessage("ERRORS_SERVICE_OVERLOADED"),
-        },
-        default: {
-          code: "api-error-response",
-          message: await getErrorMessage("ERRORS_INVALID_RESPONSE"),
-        },
-      },
-      [ErrorTypes.NETWORK]: {
-        default: {
-          code: "network-failure",
-          message: await getErrorMessage("ERRORS_NETWORK_FAILURE"),
-        },
-      },
-      [ErrorTypes.CONTEXT]: {
-        default: {
-          code: "context-lost",
-          message: await getErrorMessage("ERRORS_CONTEXT_LOST"),
-        },
-      },
-      [ErrorTypes.UI]: {
-        "text-direction-error": {
-          code: "text-direction-error",
-          message: "خطا در تنظیم جهت متن",
-        },
-        default: { code: "system-error", message: "خطای سیستمی رخ داده است" },
-      },
-      [ErrorTypes.VALIDATIONMODEL]: {
-        default: {
-          code: "model-validation-error",
-          message: "خطا در مدلِ انتخاب شده",
-        },
-      },
-      [ErrorTypes.PARSE_SELECT_ELEMENT]: {
-        default: {
-          code: "parsing-response-error",
-          message: "خطا در پردازش پاسخ",
-        },
-      },
-      [ErrorTypes.INTEGRATION]: {
-        "ctrl-slash": {
-          code: "shortcut-connection-error",
-          message: "⚠️ خطا در اتصال شورتکات به صفحه",
-        },
-        "invalid-tab": {
-          code: "invalid-tab",
-          message: "⚠️ تب جاری معتبر نیست",
-        },
-        "invalid-protocol": {
-          code: "invalid-protocol",
-          message:
-            "❌ این قابلیت فقط در آدرس‌های وب معمولی (http/https) کار می‌کند",
-        },
-        "content-injection-error": {
-          code: "content-injection-error",
-          message: "⚠️ خطا در تزریق کد به صفحه",
-        },
-        "api-unavailable": {
-          code: "api-unavailable",
-          message:
-            "امکانات ضروری افزونه در دسترس نیستند. لطفا مرورگر را آپدیت کنید.",
-        },
-        default: {
-          code: "integration-error",
-          message: "⚠️ خطا در اتصال به این صفحه",
-        },
-      },
-    };
-
-    const effectiveStatusCode = meta.statusCode || statusCode;
-    if (type === ErrorTypes.API) {
-      return (
-        errorMap[ErrorTypes.API][effectiveStatusCode] ||
-        errorMap[ErrorTypes.API].default
-      );
-    }
-
-    let messageObject = {
-      code: "unknown-error",
-      message: "خطای ناشناخته رخ داده است",
-    };
-    if (type && errorMap[type]) {
-      const typeErrors = errorMap[type];
-      if (statusCode && typeErrors[statusCode]) {
-        messageObject = typeErrors[statusCode];
-      } else if (type === ErrorTypes.INTEGRATION) {
-        const errorKey = Object.keys(typeErrors).find(
-          (key) => error.message.includes(key) || meta.context === key
-        );
-        messageObject = errorKey ? typeErrors[errorKey] : typeErrors.default;
-      } else {
-        messageObject = typeErrors.default || messageObject;
-      }
-    }
-    return messageObject;
-  }
-
-  _logError(error, meta, errorCode, isDebugMode) {
-    if (this.suppressed_ErrorsConsole.has(errorCode)) {
-      return;
-    }
-    if (meta.type === ErrorTypes.CONTEXT) {
-      return;
-    }
-
-    const errorDetails = {
+  _logError(error, meta) {
+    const details = {
       name: error.name,
       message: error.message,
       type: meta.type,
@@ -360,69 +109,42 @@ export class ErrorHandler {
       context: meta.context,
       stack: error.stack,
     };
-    if (isDebugMode) {
-      console.error(`[ErrorService] ${errorDetails.name}: ${errorDetails.message}
-Type: ${errorDetails.type}
-Status: ${errorDetails.statusCode}
-Context: ${errorDetails.context}`);
-      if (error.stack)
-        console.error("[ErrorService] Stack Trace:", error.stack);
-    } else {
-      logME(`[ErrorHandler] ${errorDetails.name}: ${errorDetails.message}
-Type: ${errorDetails.type}
-Status: ${errorDetails.statusCode}
-Context: ${errorDetails.context}`);
-      if (error.stack) logME("[ErrorService] Stack Trace:", error.stack);
-    }
+
+    console.error(
+      `[ErrorService] ${details.name}: ${details.message}\nType: ${details.type}\nStatus: ${details.statusCode}\nContext: ${details.context}`
+    );
+    if (details.stack) console.error("[Stack Trace]", details.stack);
   }
 
   _notifyUser(message, type, errorCode) {
-    logME("[ErrorService] Showing notification for error", message);
-    if (errorCode === "suppressed" || errorCode === "suppressed-error") return;
-    if (
-      this.suppressed_Errors.has(errorCode) ||
-      this.displayedErrors.has(message)
-    ) {
-      logME("[ErrorService] Silent Error. Don't need to show notification.");
-      return;
-    }
+    if (this.displayedErrors.has(message)) return;
 
-    const notificationType = this._getNotificationType(type);
-
-    // تعریف مجموعه خطاهایی که نیاز به ارسال openOptionsPage دارند
-    const errorsWithOptions = new Set([
-      "api-key-wrong", // برای خطای 400
-      "api-key-missing", // برای خطای 601
-      "api-url-missing", // برای خطای 604
-    ]);
-
-    if (type === ErrorTypes.API && errorsWithOptions.has(errorCode)) {
-      this.notifier.show(
-        message,
-        notificationType,
-        true,
-        5000,
-        openOptionsPage
-      );
-    } else {
-      this.notifier.show(message, notificationType, true, 5000);
-    }
-
-    this.displayedErrors.add(message);
-    setTimeout(() => this.displayedErrors.delete(message), 5000);
-  }
-
-  _getNotificationType(errorType) {
     const typeMap = {
-      [ErrorTypes.UI]: "error",
       [ErrorTypes.API]: "error",
+      [ErrorTypes.UI]: "error",
       [ErrorTypes.NETWORK]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
       [ErrorTypes.VALIDATIONMODEL]: "warning",
       [ErrorTypes.INTEGRATION]: "warning",
     };
-    return typeMap[errorType] || "error";
+
+    const notificationType = typeMap[type] || "error";
+
+    const openSettingsErrors = new Set([
+      "errors_api_key_wrong",
+      "errors_api_key_missing",
+      "errors_api_url_missing",
+    ]);
+
+    const action =
+      type === ErrorTypes.API && openSettingsErrors.has(errorCode) ?
+        openOptionsPage
+      : undefined;
+
+    this.notifier.show(message, notificationType, true, 5000, action);
+    this.displayedErrors.add(message);
+    setTimeout(() => this.displayedErrors.delete(message), 5000);
   }
 }
 
