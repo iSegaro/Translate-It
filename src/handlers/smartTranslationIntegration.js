@@ -1,6 +1,5 @@
 // src/handlers/smartTranslationIntegration.js
 import {
-  isRestrictedDomain,
   smartTranslate,
   injectPageBridge,
 } from "../backgrounds/bridgeIntegration.js";
@@ -13,7 +12,7 @@ import {
 import { getTranslationString } from "../utils/i18n.js";
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import TranslationHandler from "../core/TranslationHandler.js";
+import { ErrorTypes } from "../services/ErrorService.js";
 
 export async function translateFieldViaSmartHandler({
   text,
@@ -30,10 +29,26 @@ export async function translateFieldViaSmartHandler({
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
   let translated = "";
+
   try {
     injectPageBridge();
 
     const response = await smartTranslate(text, mode);
+
+    // ✅ بررسی خطای مستقیم از پاسخ API (مانند missing API Key)
+    if (response?.success === false) {
+      const msg = response?.error || "(خطایی رخ داد)";
+
+      const err = new Error(msg);
+      await translationHandler.errorHandler.handle(err, {
+        type: ErrorTypes.API,
+        context: "smartTranslate-response-handler",
+        statusCode: response?.statusCode || 400,
+        isPrimary: true,
+      });
+
+      return; // جلوگیری از ادامه fallback
+    }
 
     translated =
       response?.data?.translatedText ??
@@ -46,14 +61,21 @@ export async function translateFieldViaSmartHandler({
     }
 
     if (!translated) {
-      throw new Error("ترجمه اعمال نشد.");
+      await translationHandler.errorHandler.handle(
+        Error("(Translation not found)"),
+        {
+          type: ErrorTypes.API,
+          context: "smartTranslate-handler-main",
+          isPrimary: true,
+        }
+      );
+      return;
     }
 
-    // 🔎 ذخیره مقدار قبلی
     let previousValue = "";
     if (target?.isContentEditable) {
       previousValue = target.innerText?.trim();
-    } else if ("value" in target) {
+    } else if (target && "value" in target) {
       previousValue = target.value?.trim();
     }
 
@@ -69,28 +91,30 @@ export async function translateFieldViaSmartHandler({
       await translationHandler.updateTargetElement(target, translated);
     }
 
-    // 🔎 بررسی اینکه واقعاً تغییر کرده یا نه
     const newValue =
       target?.isContentEditable ? target.innerText?.trim()
-      : "value" in target ? target.value?.trim()
+      : target && "value" in target ? target.value?.trim()
       : null;
 
     const updated = newValue !== null && newValue === translated;
 
     if (updated) {
-      return; // ✅ با موفقیت تغییر کرد، نیاز به fallback نیست
+      return;
     }
 
     logME(
       "[SmartTranslateHandler] Update skipped or blocked, falling back to bridge"
     );
   } catch (error) {
-    logME(
-      "[SmartTranslateHandler] Direct update failed. Retrying with fallback via content message."
-    );
+    await translationHandler.errorHandler.handle(error, {
+      type: ErrorTypes.API,
+      context: "smartTranslate-handler-main",
+      isPrimary: true,
+    });
+    return;
   }
 
-  // 🧠 fallback → ارسال پیام به content script
+  // ✅ fallback فقط اگر بالایی موفق نبود
   try {
     if (target?.focus) {
       target.focus();
@@ -108,29 +132,33 @@ export async function translateFieldViaSmartHandler({
       res === true || (typeof res === "object" && res.success === true);
 
     if (!isSuccess) {
-      throw new Error(res?.error || "ترجمه اعمال نشد.");
+      throw new Error(
+        res?.error ||
+          (await getTranslationString("ERRORS_SMARTTRANSLATE_APPLY_FAILED")) ||
+          "(خطایی در جایگذاری.)"
+      );
     }
-    // کپی متن ترجمه شده به کلیپبورد
+
     try {
       await navigator.clipboard.writeText(translated);
       translationHandler.notifier.show(
-        "ترجمه در حافظه کپی شد. (Ctrl+V)",
+        (await getTranslationString("STATUS_SMARTTRANSLATE_COPIED")) ||
+          "ترجمه در حافظه کپی شد. (Ctrl+V)",
         "success",
         true,
         3000
       );
     } catch (error) {
-      translationHandler.errorHandler.handle(error, {
+      await translationHandler.errorHandler.handle(error, {
         type: ErrorTypes.UI,
-        context: "smartTranslation-Integration-Clipbord",
+        context: "smartTranslation-clipboard",
       });
     }
 
     logME("[SmartTranslateHandler] Translation applied via fallback bridge.");
   } catch (fallbackErr) {
-    logME("[SmartTranslateHandler] Fallback failed:", fallbackErr);
-    translationHandler.errorHandler.handle(fallbackErr, {
-      type: translationHandler.ErrorTypes.API,
+    await translationHandler.errorHandler.handle(fallbackErr, {
+      type: ErrorTypes.API,
       context: "smartTranslate-fallback-handler",
     });
   }
