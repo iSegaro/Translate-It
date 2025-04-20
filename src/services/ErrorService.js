@@ -3,10 +3,8 @@
 import { CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { logME, openOptionsPage } from "../utils/helpers.js";
-import {
-  translateErrorMessage,
-  matchErrorToKey,
-} from "./ErrorTranslationError.js";
+import { translateErrorMessage } from "./ErrorMessagesLocalize.js";
+import { matchErrorToKey } from "./ErrorMessages.js";
 import { getTranslationString } from "../utils/i18n.js";
 
 export class ErrorTypes {

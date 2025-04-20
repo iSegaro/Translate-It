@@ -1,4 +1,4 @@
-// src/services/ErrorMessagesService.js
+// src/services/ErrorMessages.js
 import { getTranslationString } from "../utils/i18n.js";
 
 export const errorKeys = {
