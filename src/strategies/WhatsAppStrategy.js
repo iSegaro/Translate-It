@@ -38,15 +38,18 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       if (!isValidField) {
         logME("فیلد واتساپ نامعتبر است");
-        return;
+        return false; // ✅ مهم
       }
 
       const isWhatsApp = this.isWhatsAppElement(element);
-      if (!isWhatsApp) return;
+      if (!isWhatsApp) {
+        return false; // ✅ مهم
+      }
 
       // اعتبارسنجی وجود المان در DOM
       if (!document.body.contains(element)) {
-        throw new Error("Element removed from DOM");
+        logME("Element removed from DOM");
+        return false; // ✅ مهم
       }
 
       // اعمال فوکوس با تنظیمات ایمن
@@ -62,11 +65,14 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       // به روزرسانی state واتس‌اپ
       this.triggerStateUpdate(whatsappField);
+
+      return true; // ✅ مهم
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.PARSE_INPUT,
         context: "whatsapp-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

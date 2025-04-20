@@ -65,18 +65,20 @@ export default class ChatGPTStrategy extends PlatformStrategy {
         //   cancelable: true,
         // });
         // shortcutsModal.dispatchEvent(escapeEvent);
-        return;
+        return false; // ✅ مهم
       }
 
       element.innerHTML = translated.replace(/\n/g, "<br>");
       this.applyBaseStyling(element, translated);
       setCursorToEnd(element);
       this.applyVisualFeedback(element);
+      return true; // ✅ مهم
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "chatgpt-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

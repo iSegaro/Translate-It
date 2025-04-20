@@ -32,10 +32,10 @@ export default class MediumStrategy extends PlatformStrategy {
       element.value = translatedText;
       element.dispatchEvent(new Event("input", { bubbles: true }));
       this.applyVisualFeedback(element);
-      return;
+      return true;
     }
 
-    return;
+    return false;
     // 2. برای فیلدهای contenteditable (کامنت‌ها و نظرسنجی‌ها) - کپی به کلیپبورد
     const mediumField = this.findMediumTextField(element);
     if (!mediumField) {

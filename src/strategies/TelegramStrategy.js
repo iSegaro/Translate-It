@@ -146,10 +146,10 @@ export default class TelegramStrategy extends PlatformStrategy {
 
   async updateElement(element, translatedText) {
     if (!translatedText) {
-      return;
+      return false; // ✅ مهم
     }
     if (!element) {
-      return;
+      return false; // ✅ مهم
     }
     const SELECTORS =
       '[aria-label="Message input"], .composer_rich_textarea, .public_DraftEditor-content, [contenteditable="true"]';
@@ -166,13 +166,13 @@ export default class TelegramStrategy extends PlatformStrategy {
       // 2. اعتبارسنجی پیشرفته
       if (!this.validateField(telegramField)) {
         logME("فیلد تلگرام یافت نشد");
-        return;
+        return false; // ✅ مهم
       }
 
       // 3. جلوگیری از پردازش المان‌های غیرفعال
       if (element !== telegramField && !telegramField.contains(element)) {
         // console.warn("Element is not part of Telegram field. Skipping...");
-        return;
+        return false; // ✅ مهم
       }
 
       await this.safeFocus(telegramField);
@@ -192,11 +192,14 @@ export default class TelegramStrategy extends PlatformStrategy {
       }
 
       this.setCursorToEnd(telegramField);
+
+      return true; // ✅ مهم
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.SERVICE,
         context: "telegram-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

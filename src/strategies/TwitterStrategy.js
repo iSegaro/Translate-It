@@ -295,7 +295,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
           this.applyTextDirection(searchInput, translatedText);
 
-          return;
+          return true; // ✅ مهم
         }
       }
 
@@ -348,11 +348,11 @@ export default class TwitterStrategy extends PlatformStrategy {
 
           this.setCursorToEnd(dmField);
 
-          return;
+          return true; // ✅ مهم
         }
       }
 
-      return;
+      return false; // ✅ مهم
       // 3. پردازش فیلدهای توییت
 
       let tweetField = null;
@@ -405,6 +405,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
         context: "twitter-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

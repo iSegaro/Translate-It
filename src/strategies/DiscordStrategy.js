@@ -35,7 +35,7 @@ export default class DiscordStrategy extends PlatformStrategy {
         //   cancelable: true,
         // });
         // shortcutsModal.dispatchEvent(escapeEvent);
-        return;
+        return false; // ✅ مهم
       }
 
       if (translatedText !== undefined && translatedText !== null) {
@@ -58,12 +58,14 @@ export default class DiscordStrategy extends PlatformStrategy {
           this.pasteText(element, translatedText);
           this.applyTextDirection(element, translatedText);
         }
+        return true; // ✅ مهم
       }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "Discord-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

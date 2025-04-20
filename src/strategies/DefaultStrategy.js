@@ -31,12 +31,15 @@ export default class DefaultStrategy extends PlatformStrategy {
           this.applyVisualFeedback(element);
           this.applyTextDirection(element, translatedText);
         }
+
+        return true; // ✅ مهم
       }
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "default-strategy-updateElement",
       });
+      return false; // ✅ مهم
     }
   }
 

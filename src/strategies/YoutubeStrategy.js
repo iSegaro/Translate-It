@@ -2,6 +2,7 @@
 import { ErrorTypes } from "../services/ErrorService.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
+import { logME } from "../utils/helpers.js";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -42,8 +43,8 @@ export default class YoutubeStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (!element || !element.isConnected) {
-        // throw new Error("عنصر معتبر برای به‌روزرسانی وجود ندارد");
-        return;
+        logME("عنصر معتبر برای به‌روزرسانی وجود ندارد");
+        return false; // ✅ مهم
       }
 
       if (translatedText !== undefined && translatedText !== null) {
@@ -60,12 +61,14 @@ export default class YoutubeStrategy extends PlatformStrategy {
           this.applyTextDirection(element, translatedText);
         }
       }
+      return true; // ✅ مهم
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "youtube-strategy-updateElement",
         element: element?.tagName,
       });
+      return false; // ✅ مهم
     }
   }
 
