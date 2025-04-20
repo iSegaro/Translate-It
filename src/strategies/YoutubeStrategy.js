@@ -22,14 +22,39 @@ export default class YoutubeStrategy extends PlatformStrategy {
 
   extractText(target) {
     try {
-      if (!target) {
-        // console.debug("عنصر هدف برای استخراج متن وجود ندارد");
+      if (!target) return "";
+
+      // حالت ۱: المان دارای contenteditable
+      if (target?.isContentEditable) {
+        return target?.innerText?.trim?.() || "";
       }
 
-      if (target.isContentEditable) {
-        return target.innerText.trim();
+      // حالت ۲: المان‌های input و textarea
+      if (
+        target?.tagName &&
+        (target.tagName === "TEXTAREA" || target.tagName === "INPUT")
+      ) {
+        return target?.value?.trim?.() || "";
       }
-      return target.value || target.textContent.trim();
+
+      // حالت ۳: fallback → استفاده از textContent
+      return target?.textContent?.trim?.() || "";
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "youtube-strategy-extractText",
+      });
+      return "";
+    }
+
+    try {
+      if (!target || !target.isConnected) return "";
+
+      if (target.isContentEditable) {
+        return target.innerText?.trim?.() || "";
+      }
+
+      return target.value || target.textContent?.trim?.() || "";
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
