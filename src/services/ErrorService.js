@@ -83,7 +83,10 @@ export class ErrorHandler {
         () => CONFIG.DEBUG_MODE
       );
 
-      if (errorCode === "unknown-error" && isDebugMode) {
+      // فقط اگر خطا ناشناخته است لاگ کن
+      const shouldLogToConsole = !errorKey && isDebugMode;
+
+      if (shouldLogToConsole) {
         this._logError(normalizedError, mergedMeta);
       }
 
