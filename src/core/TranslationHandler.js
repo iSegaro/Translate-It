@@ -221,16 +221,15 @@ export default class TranslationHandler {
 
     try {
       if (!isExtensionContextValid()) {
-        this.errorHandler.handle(
-          new Error(await getTranslationString("ERRORS_INVALID_CONTEXT")),
-          {
+        if (!params.target) {
+          this.errorHandler.handle(new Error(ErrorTypes.CONTEXT), {
             type: ErrorTypes.CONTEXT,
             context: "TranslationHandler-processTranslation-context",
             code: "context-invalid",
             statusCode: "context-invalid",
-          }
-        );
-        return;
+          });
+          return;
+        }
       }
 
       state.translateMode =
@@ -357,7 +356,20 @@ export default class TranslationHandler {
 
   extractFromActiveElement(element) {
     const platform = detectPlatform(element);
-    return this.strategies[platform].extractText(element);
+    const strategy = this.strategies[platform];
+
+    if (!strategy || typeof strategy.extractText !== "function") {
+      this.errorHandler.handle(
+        new Error("extractText method not implemented for this platform"),
+        {
+          type: ErrorTypes.SERVICE,
+          context: `TranslationHandler-extractFromActiveElement-${platform}`,
+        }
+      );
+      return "";
+    }
+
+    return strategy.extractText(element);
   }
 
   @logMethod
