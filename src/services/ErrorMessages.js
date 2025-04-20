@@ -10,15 +10,12 @@ export const errorKeys = {
   ERRORS_SMARTTRANSLATE_FAILED: "Translation failed",
 };
 
-const errorCache = {};
-
 export async function getErrorMessageByKey(key) {
-  if (errorCache[key]) return errorCache[key];
+  // ترجمه فقط از کش پیام‌ها انجام می‌شود، نه کش زبان
   let translated = await getTranslationString(key);
   if (!translated || !translated.trim()) {
     translated = errorKeys[key] || "Unknown error";
   }
-  errorCache[key] = translated;
   return translated;
 }
 

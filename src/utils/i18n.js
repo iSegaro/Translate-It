@@ -29,20 +29,16 @@ async function loadTranslationsForLanguageCached(lang) {
   try {
     const url = Browser.runtime.getURL(`_locales/${lang}/messages.json`);
     const response = await fetch(url);
-
     if (!response.ok) {
-      logME(
-        `خطا در بارگذاری ترجمه‌ها برای زبان "${lang}". کد HTTP: ${response.status}`
-      );
+      logME(`⚠️ ترجمه برای زبان "${lang}" یافت نشد.`);
       return null;
     }
-
     const translations = await response.json();
     // ذخیره ترجمه‌ها در کش برای دفعات بعدی
     translationsCache.set(lang, translations);
     return translations;
   } catch (error) {
-    logME(`خطا در دریافت ترجمه‌ها برای زبان "${lang}":`, error);
+    logME(`⚠️ خطا در بارگذاری ترجمه‌های "${lang}":`, error);
     return null;
   }
 }
@@ -58,27 +54,24 @@ async function loadTranslationsForLanguageCached(lang) {
 export async function getTranslationString(key, lang) {
   let langCode = lang;
 
-  if (langCode?.length !== 2) {
-    // تعیین کد زبان از تنظیمات اپلیکیشن
+  if (!langCode || langCode.length !== 2) {
     const App_Language = await getApplication_LocalizeAsync();
-    let langFind = false;
-    languageList.forEach((language) => {
-      if (language.name === App_Language || language.locale === App_Language) {
-        langCode = language.code;
-        langFind = true;
-      }
-    });
+
+    const foundLang = languageList.find(
+      (language) =>
+        language.name === App_Language || language.locale === App_Language
+    );
+
     // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم.
-    if (!langFind) {
-      langCode =
-        App_Language && App_Language.length === 2 ? App_Language : "en";
-    }
+    langCode =
+      foundLang?.code || (App_Language?.length === 2 ? App_Language : "en");
   }
 
   const translations = await loadTranslationsForLanguageCached(langCode);
-  if (translations && translations[key] && translations[key].message) {
+  if (translations && translations[key]?.message) {
     return translations[key].message;
   }
+
   return null;
 }
 
