@@ -514,15 +514,18 @@ export default class TwitterStrategy extends PlatformStrategy {
     let result = "";
 
     if (tweetField.tagName === "DIV") {
-      let contentDiv = tweetField.querySelector('[data-contents="true"]');
-      let lines = Array.from(contentDiv.querySelectorAll(":scope > div"));
-      result = lines
-        .map((line) => line.textContent)
-        .join("\n")
-        .trim();
+      const contentDiv = tweetField.querySelector('[data-contents="true"]');
+      if (contentDiv) {
+        const lines = Array.from(contentDiv.querySelectorAll(":scope > div"));
+        result = lines
+          .map((line) => line.textContent)
+          .join("\n")
+          .trim();
+      } else {
+        result = tweetField.textContent.trim(); // اگر contentDiv پیدا نشد از fallback استفاده کن
+      }
     } else {
       result = (tweetField.value || "").trim();
-      logME("Twitter:Value", result);
     }
 
     return result;
