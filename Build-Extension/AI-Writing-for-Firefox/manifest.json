@@ -16,14 +16,11 @@
     "clipboardWrite",
     "clipboardRead",
     "tabs",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "http://localhost:6969/*",
-    "https://api.openai.com/*",
-    "https://openrouter.ai/*",
-    "https://translate.google.com/*"
+    "<all_urls>"
   ],
   "background": {
     "scripts": [
@@ -48,30 +45,22 @@
     "page": "html/options.html",
     "open_in_tab": true
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "content.bundle.js"
-      ],
-      "all_frames": true,
-      "match_about_blank": true,
-      "run_at": "document_idle"
-    }
-  ],
+  "content_scripts": [],
   "web_accessible_resources": [
     {
       "resources": [
-        "icons/*",
-        "styles/*",
+        "pageBridge.js",
+        "browser-polyfill.js",
+        "offscreen.js",
+        "content.bundle.js",
+        "offscreen.html",
+        "styles/*.css",
+        "icons/*.png",
         "html/*",
-        "_locales/*",
-        "content.bundle.js"
+        "_locales/*"
       ],
       "matches": [
-        "*://*/*"
+        "<all_urls>"
       ]
     }
   ]

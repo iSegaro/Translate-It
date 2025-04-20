@@ -63,6 +63,15 @@
         <section class="translation-activation">
           <h2 data-i18n="translation_activation_section_title">Translation Activation Methods</h2>
 
+          <div class="setting-group extension-enabled-group">
+            <label for="extensionEnabled">Enable Extension</label>
+            <input type="checkbox" id="extensionEnabled" />
+            <span class="setting-description">
+              Enable or disable the entire extension functionality except Popup.
+            </span>
+          </div>
+          
+
           <div class="setting-group">
             <label for="translateOnTextFields"
               data-i18n="translate_on_text_fields_label">Enable translation on text fields</label
@@ -317,6 +326,18 @@
           <div class="setting-group">
             <label for="debugMode" data-i18n="advance_debug_mode_label">Debug Mode</label>
             <input type="checkbox" id="debugMode" />
+          </div>
+          <!-- Add Exclude -->
+          <div class="setting-group">
+            <label for="excludedSites">Exclude these sites (comma separated)</label>
+            <textarea
+              id="excludedSites"
+              rows="3"
+              placeholder="example.com, anotherdomain.org"
+            ></textarea>
+            <span class="setting-description" data-i18n="excluded_sites_description">
+              These domains will be ignored from script injection.
+            </span>
           </div>
           
         </section>

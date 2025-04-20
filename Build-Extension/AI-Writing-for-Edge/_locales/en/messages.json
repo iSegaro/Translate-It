@@ -185,5 +185,21 @@
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "Translate..." },
   "STATUS_TRANSLATING_ICON": { "message": "Translate..." },
   "STATUS_FROM_MEMORY": { "message": "Memory" },
-  "STATUS_REMOVE_MEMORY": { "message": "Memory Cleaned" }
+  "STATUS_REMOVE_MEMORY": { "message": "Memory Cleaned" },
+
+  "ERRORS_SMARTTRANSLATE_FAILED": {
+    "message": "Translation failed."
+  },
+  "ERRORS_SMART_TRANSLATE_MISSING_API_KEY": {
+    "message": "API key is missing. Please set it in the settings."
+  },
+  "ERRORS_SMART_TRANSLATE_TEXT_RESPONSE_EMPTY": {
+    "message": "Translation response is empty."
+  },
+  "ERRORS_SMART_TRANSLATE_APPLY_FAILED": {
+    "message": "Error applying translation."
+  },
+  "STATUS_SMART_TRANSLATE_COPIED": {
+    "message": "Translation copied to clipboard (Ctrl+V)."
+  }
 }
