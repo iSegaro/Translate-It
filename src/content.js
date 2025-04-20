@@ -1,6 +1,7 @@
 // src/content.js
 
 import { logME } from "./utils/helpers.js";
+import { initContentScript } from "./contentMain.js";
 
 (function () {
   // جلوگیری از اجرای افزونه داخل iframeهایی که مجاز نیستند
@@ -22,15 +23,17 @@ import { logME } from "./utils/helpers.js";
   }
 
   // ✅ اینجا importهای ESM انجام می‌شن بدون مشکل
-  import("./contentMain.js")
-    .then(({ initContentScript }) => {
-      if (typeof initContentScript === "function") {
-        initContentScript();
-      } else {
-        logME("[AIWriting] initContentScript is not a function");
-      }
-    })
-    .catch((err) => {
-      logME("[AIWriting] Failed to import contentMain.js", err);
-    });
+  // import("./contentMain.js")
+  //   .then(({ initContentScript }) => {
+  //     if (typeof initContentScript === "function") {
+  //       initContentScript();
+  //     } else {
+  //       logME("[AIWriting] initContentScript is not a function");
+  //     }
+  //   })
+  //   .catch((err) => {
+  //     logME("[AIWriting] Failed to import contentMain.js", err);
+  //   });
+
+  initContentScript();
 })();
