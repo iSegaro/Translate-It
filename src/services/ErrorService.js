@@ -4,6 +4,7 @@ import { TRANSLATION_ERRORS, CONFIG, getDebugModeAsync } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { logME, openOptionsPage } from "../utils/helpers.js";
 import { getErrorMessage } from "./ErrorMessagesService";
+import { translateErrorMessage } from "./ErrorTranslationService.js";
 
 export class ErrorTypes {
   static API = "API";
@@ -17,16 +18,25 @@ export class ErrorTypes {
   static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
 }
 
-function extractErrorMessage(error) {
-  if (!error) return "خطای نامشخص";
-  if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
-  if (typeof error.message === "string") return error.message;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return "خطای ناشناخته";
-  }
+async function extractErrorMessage(error) {
+  if (!error) return "(Unknown Error)";
+
+  // استخراج پیام اولیه
+  let rawMessage =
+    typeof error === "string" ? error
+    : error instanceof Error ? error.message
+    : typeof error.message === "string" ? error.message
+    : (() => {
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return "(Unknown Error)";
+        }
+      })();
+
+  // ✅ ترجمه خطا
+  const translated = await translateErrorMessage(rawMessage);
+  return translated || rawMessage;
 }
 
 export class ErrorHandler {
@@ -86,8 +96,9 @@ export class ErrorHandler {
 
     try {
       // نرمال‌سازی خطا
+      const rawTranslated = await extractErrorMessage(error);
       const normalizedError =
-        error instanceof Error ? error : new Error(extractErrorMessage(error));
+        error instanceof Error ? error : new Error(rawTranslated);
 
       // ادغام متادیتاها
       const mergedMeta = {
