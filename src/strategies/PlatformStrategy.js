@@ -9,7 +9,19 @@ export default class PlatformStrategy {
   }
 
   extractText(target) {
-    throw new Error("متد extractText باید در کلاس فرزند پیاده‌سازی شود");
+    try {
+      if (!target) return "";
+      if (target.isContentEditable) {
+        return target.innerText?.trim() || "";
+      }
+      return target.value?.trim() || target.textContent?.trim() || "";
+    } catch (error) {
+      this.errorHandler?.handle(error, {
+        type: ErrorTypes.UI,
+        context: "platform-strategy-extractText",
+      });
+      return "";
+    }
   }
 
   findField(startElement, selectors, maxDepth = 5) {
@@ -43,7 +55,7 @@ export default class PlatformStrategy {
         }, 300);
       });
     } catch (error) {
-      this.errorHandler.handle(error, {
+      this.errorHandler?.handle(error, {
         type: ErrorTypes.UI,
         context: "platform-strategy-animation",
       });
@@ -57,14 +69,12 @@ export default class PlatformStrategy {
       // برای input/textarea
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
         element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-      }
-      // برای سایر المان‌ها
-      else {
+      } else {
         element.style.direction = isRtl ? "rtl" : "ltr";
         element.style.textAlign = isRtl ? "right" : "left";
       }
     } catch (error) {
-      const handleError = this.errorHandler.handle(error, {
+      const handleError = this.errorHandler?.handle(error, {
         type: ErrorTypes.UI,
         code: "text-direction-error",
         context: "platform-strategy-TextDirection",
