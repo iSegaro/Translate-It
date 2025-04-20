@@ -454,6 +454,12 @@ export default class EventHandler {
       /* ---------- ❶ پاسخِ خطادار ---------- */
       if (!response?.success) {
         const msg = response?.error || "(⚠️ خطایی در ترجمه رخ داد.)";
+        await this.translationHandler.errorHandler.handle(new Error(msg), {
+          type: ErrorTypes.API,
+          statusCode: response?.statusCode || 401,
+          context: "select-element-response",
+        });
+
         return { status: "error", reason: "backend_error", message: msg };
       }
 
