@@ -152,20 +152,22 @@ class ApiService {
 
     if (!apiKey) {
       const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
-      return await this.errorHandler.handle(error, {
+      const handled = await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 601,
         context: "api-gemini-translation-apikey",
       });
+      throw handled;
     }
 
     if (!apiUrl) {
       const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
-      return await this.errorHandler.handle(error, {
+      const handled = await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 602,
         context: "api-gemini-translation-apiurl",
       });
+      throw handled;
     }
 
     const prompt = await buildPrompt(
@@ -196,13 +198,33 @@ class ApiService {
     text,
     sourceLang,
     targetLang,
-    isCallInsideThisMethod = false,
-    translateMode
+    translateMode,
+    isRetrying = false
   ) {
     const [webAIApiUrl, webAIApiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
     ]);
+
+    if (!webAIApiUrl) {
+      const error = new Error("WebAI API URL is missing");
+      const handled = await this.errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: 404,
+        context: "api-webai-url-missing",
+      });
+      throw handled;
+    }
+
+    if (!webAIApiModel) {
+      const error = new Error("WebAI Model is missing");
+      const handled = await this.errorHandler.handle(error, {
+        type: ErrorTypes.API,
+        statusCode: 603,
+        context: "api-webai-model-missing",
+      });
+      throw handled;
+    }
 
     const prompt = await buildPrompt(
       text,
@@ -251,22 +273,22 @@ class ApiService {
 
     if (!openAIApiKey) {
       const error = new Error("OpenAI API key is missing");
-      await this.errorHandler.handle(error, {
+      const handled = await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 601,
         context: "api-openai-translation-apikey",
       });
-      return;
+      throw handled;
     }
 
     if (!openAIApiUrl) {
       const error = new Error(TRANSLATION_ERRORS.API_URL_MISSING);
-      await this.errorHandler.handle(error, {
+      const handled = await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
-        statusCode: 602,
+        statusCode: 404,
         context: "api-openai-translation-apiurl",
       });
-      return;
+      throw handled;
     }
 
     const prompt = await buildPrompt(
@@ -310,12 +332,12 @@ class ApiService {
 
     if (!openRouterApiKey) {
       const error = new Error(TRANSLATION_ERRORS.API_KEY_MISSING);
-      await this.errorHandler.handle(error, {
+      const handled = await this.errorHandler.handle(error, {
         type: ErrorTypes.API,
         statusCode: 601,
         context: "api-openrouter-translation-apikey",
       });
-      return;
+      throw handled;
     }
 
     const prompt = await buildPrompt(
@@ -330,7 +352,7 @@ class ApiService {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${openRouterApiKey}`,
-        "HTTP-Referer": window.location.origin,
+        "HTTP-Referer": Browser.runtime.getURL("/"),
         "X-Title": Browser.runtime.getManifest().name,
       },
       body: JSON.stringify({
@@ -401,6 +423,7 @@ class ApiService {
         source_Lang || getSourceLanguageAsync(),
         target_Lang || getTargetLanguageAsync(),
       ]);
+
       if (translationApi === "webai" && !this.sessionContext) {
         this.resetSessionContext();
       }
@@ -430,22 +453,26 @@ class ApiService {
           return await this.handleWebAITranslation(
             text,
             sourceLang,
-            targetLang
+            targetLang,
+            false,
+            translateMode
           );
         case "openai":
           return await this.handleOpenAITranslation(
             text,
             sourceLang,
-            targetLang
+            targetLang,
+            translateMode
           );
         case "openrouter":
           return await this.handleOpenRouterTranslation(
             text,
             sourceLang,
-            targetLang
+            targetLang,
+            translateMode
           );
         default:
-          await this.errorHandler.handle(
+          throw await this.errorHandler.handle(
             new Error("Invalid translation API selected"),
             {
               type: ErrorTypes.VALIDATIONMODEL,
@@ -453,7 +480,6 @@ class ApiService {
               context: "api-translateText-api-model",
             }
           );
-          return;
       }
     } catch (err) {
       /* ----------------------------------
@@ -463,15 +489,15 @@ class ApiService {
       if (typeof err === "string") {
         throw err; // 🔴 همانی که _executeApiCall ساخته بود
       }
-
       /* اگر واقعاً Error است (مثلاً SessionConflict) */
-      if (err.sessionConflict && source_Lang && target_Lang) {
+      if (err.sessionConflict && !isRetrying && source_Lang && target_Lang) {
         this.resetSessionContext();
         return await this.handleWebAITranslation(
           text,
           source_Lang,
           target_Lang,
-          true
+          translateMode,
+          tru // isCallInsideThisMethod
         );
       }
 
@@ -481,7 +507,7 @@ class ApiService {
         context: "api-translateText-translation-service",
       });
 
-      throw err.message || "Unknown translation error"; // فقط متن خطا
+      throw err;
     }
   }
 }
