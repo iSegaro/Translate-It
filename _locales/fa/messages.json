@@ -162,6 +162,9 @@
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "از محدودیت کلید API استفاده کردید، کلید را بررسی کنید."
   },
+  "ERRORS_GEMINI_GENERATE_QUOTA": {
+    "message": "محدودیت Gemini به سر رسید، کلید خود را بررسی کنید."
+  },
   "ERRORS_API_URL_MISSING": { "message": "آدرس API وارد نشده است" },
   "ERRORS_AI_MODEL_MISSING": { "message": "مدل هوش مصنوعی وارد نشده است" },
   "ERRORS_SERVICE_OVERLOADED": {

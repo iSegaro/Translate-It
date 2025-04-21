@@ -9,6 +9,8 @@ export const errorKeys = {
   ERRORS_NETWORK_FAILURE: "Connection to server failed",
   ERRORS_INVALID_RESPONSE: "Invalid API response format",
   ERRORS_SMARTTRANSLATE_FAILED: "Translation failed",
+  ERRORS_GEMINI_GENERATE_QUOTA:
+    "You reached the Gemini quota for content generation.",
 };
 
 export async function getErrorMessageByKey(key) {
@@ -68,6 +70,13 @@ export function matchErrorToKey(message = "") {
 
   if (normalized.includes("translation failed")) {
     return "ERRORS_SMARTTRANSLATE_FAILED";
+  }
+
+  if (
+    normalized.includes("quota exceeded") &&
+    normalized.includes("generate content api requests per minute")
+  ) {
+    return "ERRORS_GEMINI_GENERATE_QUOTA";
   }
 
   return null;

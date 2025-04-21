@@ -27,6 +27,7 @@ const SUPPRESS_CONSOLE_LOG_ERRORS = new Set([
   "ERRORS_QUOTA_EXCEEDED",
   "ERRORS_API_URL_MISSING",
   "ERRORS_API_KEY_FORBIDDEN",
+  "ERRORS_GEMINI_GENERATE_QUOTA",
 ]);
 
 async function extractError(error) {
@@ -156,6 +157,7 @@ export class ErrorHandler {
       "ERRORS_API_URL_MISSING",
       "ERRORS_API_KEY_FORBIDDEN",
       "ERRORS_QUOTA_EXCEEDED",
+      "ERRORS_GEMINI_GENERATE_QUOTA",
     ]);
 
     const action =
