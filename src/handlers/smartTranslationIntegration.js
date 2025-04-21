@@ -95,7 +95,7 @@ export async function translateFieldViaSmartHandler({
 
     // اگر استراتژی گفته که موفق بوده، کافیه!
     if (didApply === true) {
-      logME("[SmartTranslateHandler] ✅ Strategy applied successfully");
+      logME("[SmartTranslateHandler] Strategy applied successfully");
       return;
     }
 
