@@ -24,13 +24,14 @@ const SUPPRESS_CONSOLE_LOG_ERRORS = new Set([
   "ERRORS_CONTEXT_LOST",
   "ERRORS_API_KEY_WRONG",
   "ERRORS_API_KEY_MISSING",
+  "ERRORS_MODEL_MISSING",
   "ERRORS_QUOTA_EXCEEDED",
   "ERRORS_API_URL_MISSING",
   "ERRORS_API_KEY_FORBIDDEN",
   "ERRORS_GEMINI_GENERATE_QUOTA",
 ]);
 
-async function extractError(error) {
+export async function extractError(error) {
   if (!error) return new Error("(Unknown Error)");
 
   let raw =
@@ -154,8 +155,9 @@ export class ErrorHandler {
     const openSettingsErrors = new Set([
       "ERRORS_API_KEY_WRONG",
       "ERRORS_API_KEY_MISSING",
-      "ERRORS_API_URL_MISSING",
       "ERRORS_API_KEY_FORBIDDEN",
+      "ERRORS_API_URL_MISSING",
+      "ERRORS_MODEL_MISSING",
       "ERRORS_QUOTA_EXCEEDED",
       "ERRORS_GEMINI_GENERATE_QUOTA",
     ]);

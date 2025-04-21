@@ -4,6 +4,7 @@ import { getTranslationString } from "../utils/i18n.js";
 export const errorKeys = {
   ERRORS_API_KEY_WRONG: "API Key is wrong",
   ERRORS_API_KEY_MISSING: "API Key is missing",
+  ERRORS_MODEL_MISSING: "AI Model is missing or invalid",
   ERRORS_QUOTA_EXCEEDED: "You exceeded your current quota",
   ERRORS_CONTEXT_LOST: "Extension context lost",
   ERRORS_NETWORK_FAILURE: "Connection to server failed",
@@ -67,6 +68,24 @@ export function matchErrorToKey(message = "") {
     normalized.includes("generate content api requests per minute")
   ) {
     return "ERRORS_GEMINI_GENERATE_QUOTA";
+  }
+
+  if (
+    normalized.includes("api key not valid") ||
+    normalized.includes("wrong api key") ||
+    normalized.includes("api key is wrong") ||
+    normalized.includes("incorrect api key provided")
+  ) {
+    return "ERRORS_API_KEY_WRONG";
+  }
+
+  if (
+    normalized.includes("is not a valid model id") ||
+    normalized.includes("invalid model") ||
+    normalized.includes("model is not available") ||
+    normalized.includes("model not found")
+  ) {
+    return "ERRORS_MODEL_MISSING";
   }
 
   if (
