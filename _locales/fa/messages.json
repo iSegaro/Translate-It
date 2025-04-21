@@ -156,6 +156,9 @@
   "ERRORS_INVALID_CONTEXT": {
     "message": "زمینهٔ افزونه نامعتبر است. لطفاً صفحه را تازه‌سازی کنید."
   },
+  "ERRORS_MODEL_MISSING": {
+    "message": "خطا در مدل انتخاب شده، تنظیمات APّّI را بررسی کنید."
+  },
   "ERRORS_API_KEY_MISSING": { "message": "کلید API وارد نشده است" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با کلید API ممنوع است" },
