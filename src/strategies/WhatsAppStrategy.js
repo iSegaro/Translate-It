@@ -38,18 +38,18 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       if (!isValidField) {
         logME("فیلد واتساپ نامعتبر است");
-        return false; // ✅ مهم
+        return false;
       }
 
       const isWhatsApp = this.isWhatsAppElement(element);
       if (!isWhatsApp) {
-        return false; // ✅ مهم
+        return false;
       }
 
       // اعتبارسنجی وجود المان در DOM
       if (!document.body.contains(element)) {
         logME("Element removed from DOM");
-        return false; // ✅ مهم
+        return false;
       }
 
       // اعمال فوکوس با تنظیمات ایمن
@@ -66,13 +66,13 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       // به روزرسانی state واتس‌اپ
       this.triggerStateUpdate(whatsappField);
 
-      return true; // ✅ مهم
+      return true;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.PARSE_INPUT,
         context: "whatsapp-strategy-updateElement",
       });
-      return false; // ✅ مهم
+      return false;
     }
   }
 
@@ -89,7 +89,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       });
     }
     return "";
-    
+
     try {
       const whatsappField = target?.closest?.(
         '[role="textbox"], .copyable-text.selectable-text'

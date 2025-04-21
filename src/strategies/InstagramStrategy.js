@@ -39,13 +39,13 @@ export default class InstagramStrategy extends PlatformStrategy {
         this.applyVisualFeedback(element);
       }
 
-      return true; // ✅ مهم
+      return true;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "instagram-strategy-updateElement",
       });
-      return false; // ✅ مهم
+      return false;
     }
   }
 

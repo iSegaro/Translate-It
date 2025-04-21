@@ -62,7 +62,7 @@ export function initContentScript() {
     init() {
       if (!isExtensionContextValid()) {
         console.warn(
-          "[AI Writing Companion:Content] Extension context is not valid"
+          "[AI Writing Companion] ❌ Extension context is not valid"
         );
         this.translationHandler.notifier.show(
           "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
@@ -73,7 +73,7 @@ export function initContentScript() {
       }
 
       console.info(
-        "[AI Writing Companion:Content] Extension initialized successfully!"
+        "[AI Writing Companion] ✅ Extension initialized successfully!"
       );
       Object.freeze(CONFIG);
       this.setupUpdateSelectElementState();

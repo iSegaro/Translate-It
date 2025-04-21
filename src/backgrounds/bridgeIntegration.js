@@ -58,7 +58,7 @@ export function sendTranslationViaBridge(
       if (event.data.error) {
         reject(new Error(event.data.error));
       } else {
-        // ✅ برگشت به‌همراه viaBridge
+        // برگشت به‌همراه viaBridge
         resolve({
           ...event.data.result,
           viaBridge: true,

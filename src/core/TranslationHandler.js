@@ -237,7 +237,7 @@ export default class TranslationHandler {
           TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      // ✅ ارسال دقیق target برای جلوگیری از undefined
+      //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
         text: params.text,
         translationHandler: this,

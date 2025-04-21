@@ -26,7 +26,10 @@ function logPopupEvent(message, data = null) {
 function cancelAutoClose(reason = "") {
   if (autoCloseTimer) {
     clearTimeout(autoCloseTimer);
-    logPopupEvent("⛔ Auto-close timer canceled", reason);
+    logPopupEvent(
+      "[popupInteractionManager] Auto-close timer canceled",
+      reason
+    );
     autoCloseTimer = null;
   }
 }
@@ -41,7 +44,7 @@ function cancelHoverTimer() {
 function cancelInitialEntryTimer() {
   if (initialEntryTimer) {
     clearTimeout(initialEntryTimer);
-    logPopupEvent("⛔ Initial entry timer canceled");
+    logPopupEvent("[popupInteractionManager] Initial entry timer canceled");
     initialEntryTimer = null;
   }
 }
@@ -50,18 +53,25 @@ async function ensureSelectElementActive() {
   const isEnabled = await getExtensionEnabledAsync();
   const isSelectAllowed = await getTranslateWithSelectElementAsync();
 
-  logPopupEvent("🔍 Extension enabled?", isEnabled);
-  logPopupEvent("🔍 Select element allowed?", isSelectAllowed);
+  logPopupEvent("[popupInteractionManager] Extension enabled?", isEnabled);
+  logPopupEvent(
+    "[popupInteractionManager] Select element allowed?",
+    isSelectAllowed
+  );
 
   if (isEnabled && isSelectAllowed) {
     setTimeout(() => {
-      logPopupEvent("🕒 Delayed activation of Select Mode");
+      logPopupEvent(
+        "[popupInteractionManager]  Delayed activation of Select Mode"
+      );
       Active_SelectElement(true, false, true); // force = true
     }, 100);
     return true;
   }
 
-  logPopupEvent("❌ Conditions not met – Select mode not activated");
+  logPopupEvent(
+    "[popupInteractionManager] Conditions not met – Select mode not activated"
+  );
   return false;
 }
 
@@ -75,7 +85,7 @@ function setupInteractionListeners() {
       hoverStayTimer = setTimeout(() => {
         interactionLocked = true;
         logPopupEvent(
-          "⏱️ Hover timeout passed – locking interaction & deactivating select"
+          "[popupInteractionManager]  Hover timeout passed – locking interaction & deactivating select"
         );
         Active_SelectElement(false);
       }, HOVER_TIMEOUT);
@@ -89,12 +99,14 @@ function setupInteractionListeners() {
     if (!interactionLocked) {
       autoCloseTimer = setTimeout(() => {
         logPopupEvent(
-          "🚪 Mouse left early – closing popup (select remains active)"
+          "[popupInteractionManager] Mouse left early – closing popup (select remains active)"
         );
         Active_SelectElement(true, true);
       }, AUTO_CLOSE_TIMEOUT);
     } else {
-      logPopupEvent("🧷 Interaction locked – popup stays open");
+      logPopupEvent(
+        "[popupInteractionManager] Interaction locked – popup stays open"
+      );
     }
   });
 
@@ -104,19 +116,23 @@ function setupInteractionListeners() {
       cancelHoverTimer();
       cancelAutoClose("mousedown");
       cancelInitialEntryTimer();
-      logPopupEvent("🖱️ User clicked – locking & deactivating select");
+      logPopupEvent(
+        "[popupInteractionManager] User clicked – locking & deactivating select"
+      );
       Active_SelectElement(false);
     }
   });
 
-  // ✅ شروع تایمر اولیه برای تشخیص اینکه موس اصلاً وارد popup شده یا نه
+  // شروع تایمر اولیه برای تشخیص اینکه موس اصلاً وارد popup شده یا نه
   initialEntryTimer = setTimeout(() => {
     if (!isMouseOverPopup && !interactionLocked) {
       logPopupEvent();
       // "🚪 Initial mouse entry timeout – closing popup (no interaction)"
       Active_SelectElement(true, true);
     } else {
-      logPopupEvent("✅ Mouse entered or interacted – popup stays open");
+      logPopupEvent(
+        "[popupInteractionManager] Mouse entered or interacted – popup stays open"
+      );
     }
   }, AUTO_CLOSE_TIMEOUT);
 

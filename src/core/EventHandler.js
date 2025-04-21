@@ -617,7 +617,7 @@ export default class EventHandler {
       //   selectionRange: isTextSelected ? select_element.getRangeAt(0) : null,
       // });
 
-      // ✅ پارامتر کامل با target و range
+      // پارامتر کامل با target و range
       await this.translationHandler.processTranslation_with_CtrlSlash({
         text,
         originalText: text,

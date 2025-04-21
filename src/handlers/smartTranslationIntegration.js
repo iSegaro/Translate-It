@@ -116,7 +116,7 @@ export async function translateFieldViaSmartHandler({
 
     if (initialValue === translated) {
       logME(
-        "[SmartTranslateHandler] ✅ DOM updated correctly. No fallback needed."
+        "[SmartTranslateHandler] DOM updated correctly. No fallback needed."
       );
       return;
     }
@@ -140,7 +140,7 @@ export async function translateFieldViaSmartHandler({
       );
     }
 
-    logME("[SmartTranslateHandler] ✅ Fallback applied successfully");
+    logME("[SmartTranslateHandler] Fallback applied successfully");
 
     // فقط اگر fallback اجرا شد → کپی به حافظه
     try {

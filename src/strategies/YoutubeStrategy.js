@@ -69,7 +69,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
     try {
       if (!element || !element.isConnected) {
         logME("عنصر معتبر برای به‌روزرسانی وجود ندارد");
-        return false; // ✅ مهم
+        return false;
       }
 
       if (translatedText !== undefined && translatedText !== null) {
@@ -86,14 +86,14 @@ export default class YoutubeStrategy extends PlatformStrategy {
           this.applyTextDirection(element, translatedText);
         }
       }
-      return true; // ✅ مهم
+      return true;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "youtube-strategy-updateElement",
         element: element?.tagName,
       });
-      return false; // ✅ مهم
+      return false;
     }
   }
 
