@@ -74,7 +74,9 @@ export function matchErrorToKey(message = "") {
     normalized.includes("api key not valid") ||
     normalized.includes("wrong api key") ||
     normalized.includes("api key is wrong") ||
-    normalized.includes("incorrect api key provided")
+    normalized.includes("incorrect api key provided") ||
+    normalized.includes("no auth credentials found") ||
+    normalized.includes("invalid api key")
   ) {
     return "ERRORS_API_KEY_WRONG";
   }
