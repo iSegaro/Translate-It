@@ -54,16 +54,6 @@ export function matchErrorToKey(message = "") {
     return "ERRORS_NETWORK_FAILURE";
   }
 
-  if (
-    normalized.includes(
-      "you exceeded your current quota, please check your plan and billing details."
-    ) ||
-    normalized.includes("you exceeded your current quota, please") ||
-    normalized.includes("exceeded your current quota")
-  ) {
-    return "ERRORS_QUOTA_EXCEEDED";
-  }
-
   if (normalized.includes("invalid api response")) {
     return "ERRORS_INVALID_RESPONSE";
   }
@@ -77,6 +67,16 @@ export function matchErrorToKey(message = "") {
     normalized.includes("generate content api requests per minute")
   ) {
     return "ERRORS_GEMINI_GENERATE_QUOTA";
+  }
+
+  if (
+    normalized.includes("you exceeded your current quota") ||
+    normalized.includes("check your plan and billing") ||
+    normalized.includes("exceeded your quota limit") ||
+    normalized.includes("quota exceeded") ||
+    normalized.includes("quota has been exceeded")
+  ) {
+    return "ERRORS_QUOTA_EXCEEDED";
   }
 
   return null;
