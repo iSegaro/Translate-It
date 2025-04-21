@@ -156,6 +156,12 @@
   "ERRORS_API_KEY_MISSING": { "message": "API Key is missing" },
   "ERRORS_API_KEY_WRONG": { "message": "API Key is wrong" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
+  "ERRORS_QUOTA_EXCEEDED": {
+    "message": "You exceeded your current quota, Please check API Key"
+  },
+  "ERRORS_GEMINI_GENERATE_QUOTA": {
+    "message": "Gemini quota exceeded for API key. Check your usage in Google AI Studio."
+  },
   "ERRORS_API_URL_MISSING": { "message": "API URL is missing" },
   "ERRORS_AI_MODEL_MISSING": { "message": "AI Model is missing" },
   "ERRORS_SERVICE_OVERLOADED": {
