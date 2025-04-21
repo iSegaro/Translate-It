@@ -19,6 +19,7 @@ let initialEntryTimer = null;
 let interactionLocked = false;
 
 function logPopupEvent(message, data = null) {
+  return;
   logME(`📦[PopupDebug]: ${message}`, data || "");
 }
 
@@ -111,21 +112,22 @@ function setupInteractionListeners() {
   // ✅ شروع تایمر اولیه برای تشخیص اینکه موس اصلاً وارد popup شده یا نه
   initialEntryTimer = setTimeout(() => {
     if (!isMouseOverPopup && !interactionLocked) {
-      logPopupEvent(
-        "🚪 Initial mouse entry timeout – closing popup (no interaction)"
-      );
+      logPopupEvent();
+      // "🚪 Initial mouse entry timeout – closing popup (no interaction)"
       Active_SelectElement(true, true);
     } else {
       logPopupEvent("✅ Mouse entered or interacted – popup stays open");
     }
   }, AUTO_CLOSE_TIMEOUT);
 
-  logPopupEvent("🎯 Popup interaction listeners attached");
+  logPopupEvent(
+    "[popupInteractionManager] Popup interaction listeners attached"
+  );
 }
 
 export async function init() {
-  logPopupEvent("🟢 popupInteractionManager INIT");
+  logPopupEvent("[popupInteractionManager] INIT");
   const success = await ensureSelectElementActive();
   if (success) setupInteractionListeners();
-  logPopupEvent("✅ popupInteractionManager READY");
+  logPopupEvent("[popupInteractionManager] READY");
 }
