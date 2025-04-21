@@ -159,6 +159,9 @@
   "ERRORS_API_KEY_MISSING": { "message": "کلید API وارد نشده است" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با کلید API ممنوع است" },
+  "ERRORS_QUOTA_EXCEEDED": {
+    "message": "از محدودیت کلید API استفاده کردید، کلید را بررسی کنید."
+  },
   "ERRORS_API_URL_MISSING": { "message": "آدرس API وارد نشده است" },
   "ERRORS_AI_MODEL_MISSING": { "message": "مدل هوش مصنوعی وارد نشده است" },
   "ERRORS_SERVICE_OVERLOADED": {
