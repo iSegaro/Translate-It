@@ -1,7 +1,7 @@
 // src/managers/SelectionWindows.js
 import Browser from "webextension-polyfill";
 import { logME, isExtensionContextValid } from "../utils/helpers";
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes, extractError } from "../services/ErrorService.js";
 import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { marked } from "marked";
@@ -438,7 +438,10 @@ export default class SelectionWindows {
   async handleTranslationError(error, loadingContainer) {
     if (loadingContainer) loadingContainer.style.opacity = "0";
 
-    const errorObj = typeof error === "string" ? new Error(error) : error;
+    const errorObj =
+      typeof error === "string" ? await extractError(error)
+      : error instanceof Error ? await extractError(error.message)
+      : await extractError(error);
 
     if (this.translationHandler?.errorHandler) {
       await this.translationHandler.errorHandler.handle(errorObj, {
