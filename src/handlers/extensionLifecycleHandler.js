@@ -1,7 +1,7 @@
 // src/handlers/extensionLifecycleHandler.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 // Note: errorHandler is passed as an argument
 

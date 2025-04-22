@@ -1,7 +1,6 @@
-
 // src/strategies/DefaultStrategy.js
 
-import { ErrorTypes } from "../services/ErrorService";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 
 export default class DefaultStrategy extends PlatformStrategy {

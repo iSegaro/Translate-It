@@ -12,7 +12,7 @@ export const TRANSLATION_ERRORS = {
   AI_MODEL_MISSING: "AI Model is missing",
   SERVICE_OVERLOADED: "Translation service overloaded, Try later",
   NETWORK_FAILURE: "Connection to server failed",
-  INVALID_RESPONSE: "Invalid API response format",
+  API_RESPONSE_INVALID: "Invalid API response format",
   CONTEXT_LOST: "Extension context lost",
 };
 

@@ -157,7 +157,9 @@
   "ERRORS_MODEL_MISSING": {
     "message": "The AI Model is missing or invalid."
   },
+  "ERRORS_TAB_AVAILABILITY": { "message": "Tab is not available" },
   "ERRORS_API_KEY_WRONG": { "message": "API Key is wrong" },
+  "ERRORS_API_KEY_INVALID": { "message": "API Key is invalid" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "You exceeded your current quota, Please check API Key"
@@ -173,20 +175,21 @@
   "ERRORS_NETWORK_FAILURE": { "message": "Connection to server failed" },
   "ERRORS_INVALID_RESPONSE": { "message": "Invalid API response format" },
   "ERRORS_CONTEXT_LOST": { "message": "Extension context lost" },
-  "ERRORS_API_KEY_ISSUE": { "message": "API Key issue." },
+  "ERRORS_API_KEY_ISSUE": { "message": "API Key issue" },
+  "ERRORS_UNKNOWN": { "message": "Unknown Error" },
 
   "ERRORS_BACKGROUND_ERROR": { "message": "Error API Service." },
 
-  "ERRORS_DURING_TRANSLATE": { "message": "Error in translating." },
-  "ERRORS_DURING_TRANSLATE_Fetch": { "message": "Error in translate." },
+  "ERRORS_DURING_TRANSLATE": { "message": "Error in translating" },
+  "ERRORS_DURING_TRANSLATE_Fetch": { "message": "Error in translate" },
   "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND": {
-    "message": "Error during translation."
+    "message": "Error during translation"
   },
   "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED_RESPONSE": {
-    "message": "Translation Failed."
+    "message": "Translation Failed"
   },
   "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED": {
-    "message": "Error in translaion."
+    "message": "Error in translaion"
   },
   "ERRORS_EMPTY_PROMPT": { "message": "Invalid or missing promptText." },
 

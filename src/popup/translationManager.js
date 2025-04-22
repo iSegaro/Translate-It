@@ -1,4 +1,5 @@
 // src/popup/translationManager.js
+
 import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
@@ -16,9 +17,16 @@ import { marked } from "marked";
 import { TranslationMode } from "../config.js";
 import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 
+/**
+ * Always return the original error message (untranslated).
+ */
 function extractErrorMessage(err) {
   if (!err) return "";
   if (typeof err === "string") return err;
+  // If normalized Error has original message stored
+  if (err._originalMessage && typeof err._originalMessage === "string") {
+    return err._originalMessage;
+  }
   if (typeof err.message === "string") return err.message;
   try {
     return JSON.stringify(err);
@@ -34,9 +42,7 @@ async function handleTranslationResponse(
   sourceLangIdentifier,
   targetLangIdentifier
 ) {
-  /* --------------------------------------------------------- *
-   *           ❶ خطاى WebExtension (channel)                   *
-   * --------------------------------------------------------- */
+  // ❶ WebExtension channel error
   if (Browser.runtime.lastError) {
     const msg = Browser.runtime.lastError.message;
     elements.translationResult.textContent = msg;
@@ -45,9 +51,7 @@ async function handleTranslationResponse(
     return;
   }
 
-  /* --------------------------------------------------------- *
-   *           ❷ موفقيتِ ترجمه                                 *
-   * --------------------------------------------------------- */
+  // ❷ Successful translation
   if (response?.success && response.data?.translatedText) {
     const translated = response.data.translatedText;
     elements.translationResult.classList.remove("fade-in");
@@ -56,19 +60,15 @@ async function handleTranslationResponse(
     elements.translationResult.classList.add("fade-in");
     correctTextDirection(elements.translationResult, translated);
 
-    correctTextDirection(
-      elements.translationResult,
-      response.data.translatedText
-    );
-
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);
 
+    // Persist last translation
     Browser.storage.local
       .set({
         lastTranslation: {
           sourceText: textToTranslate,
-          translatedText: response.data.translatedText,
+          translatedText: translated,
           sourceLanguage: sourceLangCode || AUTO_DETECT_VALUE,
           targetLanguage: targetLangCode,
         },
@@ -80,11 +80,11 @@ async function handleTranslationResponse(
         console.error("[Translate]: Error saving last translation:", error);
       });
 
-    // Optional: Update source language if 'auto' was detected and returned by background
+    // Optional: auto-detected source language update
     // This depends on your background script sending back `detectedSourceLang`
     if (
       response.data.detectedSourceLang &&
-      (sourceLangCode === AUTO_DETECT_VALUE || !sourceLangCode)
+      (!sourceLangCode || sourceLangCode === AUTO_DETECT_VALUE)
     ) {
       const detectedDisplay = getLanguageDisplayValue(
         response.data.detectedSourceLang
@@ -101,23 +101,22 @@ async function handleTranslationResponse(
       }
     }
   } else {
-    /* --------------------------------------------------------- *
-     *           ❸ خطاى برگردانده شده از API                     *
-     * --------------------------------------------------------- */
-
+    // ❸ API error: always show original error
     const fallback =
       (await getTranslationString("popup_string_translate_error_response")) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
+
     const msg = extractErrorMessage(response?.error) || fallback;
 
-    elements.translationResult.innerHTML = ""; // پاکسازی کامل
+    // Clear and display error
+    elements.translationResult.innerHTML = "";
     elements.translationResult.textContent = msg;
     correctTextDirection(elements.translationResult, msg);
 
     logME("[Translate-Popup] API error:", msg);
   }
 
-  // در همه حال نوار ابزار را نشان بده
+  // Always show toolbar after result/error
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 }
 
@@ -148,7 +147,7 @@ async function triggerTranslation() {
     return;
   }
 
-  const targetLangCodeCheck = getLanguagePromptName(targetLangIdentifier); // Use lookup
+  const targetLangCodeCheck = getLanguagePromptName(targetLangIdentifier);
   if (!targetLangCodeCheck || targetLangCodeCheck === AUTO_DETECT_VALUE) {
     logME(
       "[Translate-Popup]: Invalid target language selected:",
@@ -163,15 +162,12 @@ async function triggerTranslation() {
     return;
   }
 
-  let sourceLangCheck = getLanguagePromptName(sourceLangIdentifier); // Use lookup
+  let sourceLangCheck = getLanguagePromptName(sourceLangIdentifier);
   if (!sourceLangCheck || sourceLangCheck === AUTO_DETECT_VALUE) {
-    sourceLangCheck = null; // Send null for auto-detect to background
+    sourceLangCheck = null;
   }
 
-  elements.translationResult.textContent =
-    (await getTranslationString("popup_string_during_translate")) ||
-    "translating...";
-
+  // Show spinner
   elements.translationResult.innerHTML = `
 <div class="spinner-overlay">
   <div class="spinner-center">
@@ -179,13 +175,15 @@ async function triggerTranslation() {
   </div>
 </div>
 `;
-
-  uiManager.toggleInlineToolbarVisibility(elements.translationResult); // Hide toolbar while translating
+  uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
   // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
   // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است
-  const maxDictionaryWords = 2; // حداکثر تعداد کلمات برای حالت دیکشنری
-  const maxDictionaryChars = 30; // حداکثر تعداد کاراکترها برای حالت دیکشنری
+  // Determine translateMode (dictionary vs full)
+  const words = textToTranslate.trim().split(/\s+/);
+  let translateMode = TranslationMode.Popup_Translate;
+  const maxDictionaryWords = 2;
+  const maxDictionaryChars = 30;
   const stopWords = [
     "the",
     "a",
@@ -203,39 +201,28 @@ async function triggerTranslation() {
     "with",
     "by",
     "from",
-  ]; // *** لیست کلمات رایج (بسته به زبان)
-
-  const words = textToTranslate.trim().split(/\s+/);
-  let translateMode = TranslationMode.Popup_Translate;
-
+  ];
   if (
-    words.length <= maxDictionaryWords &&
-    textToTranslate.length <= maxDictionaryChars
+    (words.length === 1 &&
+      !stopWords.includes(words[0].toLowerCase()) &&
+      textToTranslate.length <= maxDictionaryChars) ||
+    (words.length > 1 && textToTranslate.length <= maxDictionaryChars)
   ) {
-    if (words.length === 1) {
-      const lowerCaseWord = words[0].toLowerCase();
-      if (!stopWords.includes(lowerCaseWord)) {
-        translateMode = TranslationMode.Dictionary_Translation;
-      }
-    } else if (words.length > 1) {
-      translateMode = TranslationMode.Dictionary_Translation;
-    }
+    translateMode = TranslationMode.Dictionary_Translation;
   }
-  // *** End of TODO ***
 
   try {
     const response = await Browser.runtime.sendMessage({
       action: "fetchTranslation",
       payload: {
         promptText: textToTranslate,
-        sourceLanguage: sourceLangCheck, // Send null or language code
-        targetLanguage: targetLangCodeCheck, // Send validated target code/promptName
-        translateMode: translateMode,
+        sourceLanguage: sourceLangCheck,
+        targetLanguage: targetLangCodeCheck,
+        translateMode,
       },
     });
 
     logME("[Translate-Popup]: Response from background:", response);
-
     await handleTranslationResponse(
       response,
       textToTranslate,
@@ -245,11 +232,12 @@ async function triggerTranslation() {
   } catch (error) {
     logME("[Translate-Popup]: Error sending message to background:", error);
 
-    elements.translationResult.innerHTML = "";
     const fallback =
       (await getTranslationString("popup_string_translate_error_trigger")) ||
-      "(⚠️ خطایی در ترجمه پر پاپ‌آپ رخ داد.)";
+      "(⚠️ خطایی در ترجمه پاپ‌آپ رخ داد.)";
     const errMsg = extractErrorMessage(error) || fallback;
+
+    elements.translationResult.innerHTML = "";
     elements.translationResult.textContent = errMsg;
     correctTextDirection(elements.translationResult, errMsg);
 

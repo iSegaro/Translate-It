@@ -156,14 +156,16 @@
   "ERRORS_INVALID_CONTEXT": {
     "message": "زمینهٔ افزونه نامعتبر است. لطفاً صفحه را تازه‌سازی کنید."
   },
+  "ERRORS_TAB_AVAILABILITY": { "message": "تب در دسترس نیست." },
   "ERRORS_MODEL_MISSING": {
-    "message": "خطا در مدل انتخاب شده، تنظیمات APّّI را بررسی کنید."
+    "message": "خطا در تنظیمات مدل انتخاب شده."
   },
-  "ERRORS_API_KEY_MISSING": { "message": "کلید API وارد نشده است" },
+  "ERRORS_API_KEY_INVALID": { "message": "کلید API صحیح نیست" },
+  "ERRORS_API_KEY_MISSING": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
-  "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با کلید API ممنوع است" },
+  "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با این کلید API ممنوع است" },
   "ERRORS_QUOTA_EXCEEDED": {
-    "message": "از محدودیت کلید API استفاده کردید، کلید را بررسی کنید."
+    "message": "محدودیت استفاده از این API به پایان رسیده است."
   },
   "ERRORS_GEMINI_GENERATE_QUOTA": {
     "message": "محدودیت Gemini به سر رسید، کلید خود را بررسی کنید."
@@ -175,6 +177,7 @@
   },
   "ERRORS_NETWORK_FAILURE": { "message": "اتصال به سرور برقرار نشد" },
   "ERRORS_INVALID_RESPONSE": { "message": "فرمت پاسخ API نامعتبر است" },
+  "ERRORS_UNKNOWN": { "message": "خطای ناشناخته" },
   "ERRORS_CONTEXT_LOST": { "message": "زمینهٔ افزونه از بین رفته است" },
   "ERRORS_API_KEY_ISSUE": { "message": "API Key مشکل در" },
 

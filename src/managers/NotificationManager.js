@@ -1,7 +1,9 @@
 // src/managers/NotificationManager.js
+//
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { logME } from "../utils/helpers.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 const safe = {
   ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
@@ -15,7 +17,8 @@ const safe = {
 };
 
 export default class NotificationManager {
-  constructor() {
+  constructor(errorHandler) {
+    this.errorHandler = errorHandler || { handle: () => {} };
     this.map = {
       error: {
         title: "AI Writing Companion - Error",
@@ -56,13 +59,12 @@ export default class NotificationManager {
     };
 
     if (typeof document !== "undefined") {
-      this.container = this._makeContainer(); // فقط در محیط صفحه
+      this.container = this._makeContainer();
     } else {
-      this.container = null; // در background
+      this.container = null;
     }
   }
 
-  /* =============================== UI (درون صفحه) ============================== */
   _makeContainer() {
     const id = "AIWritingCompanion-notifications";
     let el = document.getElementById(id);
@@ -85,23 +87,26 @@ export default class NotificationManager {
     return el;
   }
 
-  /* =============================== متد عمومی ============================== */
   show(msg, type = "info", auto = true, dur = null, onClick) {
     const cfg = this.map[type] || this.map.info;
-    const finalDur = dur || cfg.dur;
+    const finalDur = dur ?? cfg.dur;
 
-    /* ـــــ محیط صفحه: Toast عادی ـــــ */
+    // In-page notification
     if (this.container && document.body.contains(this.container)) {
-      return this._toastInPage(msg, cfg, auto, finalDur, onClick);
+      try {
+        return this._toastInPage(msg, cfg, auto, finalDur, onClick);
+      } catch (err) {
+        this.errorHandler.handle?.(err, {
+          type: ErrorTypes.UI,
+          context: "NotificationManager-show",
+        });
+        return null;
+      }
     }
 
-    /* ـــــ محیط background: ابتدا تلاش برای ارسال به تب فعال ـــــ */
-    this._sendToActiveTab(msg, type, auto, finalDur, onClick).catch(() => {
-      // اگر شکست خورد، آخرین راهکار: OS‑Notification
-      this._osNotification(msg, type, onClick);
-    });
-
-    return null; // در background شئ DOM نداریم
+    // Background notification fallback
+    this._sendToActiveTab(msg, type, auto, finalDur, onClick);
+    return null;
   }
 
   dismiss(node) {
@@ -110,14 +115,15 @@ export default class NotificationManager {
     setTimeout(() => node.remove(), 500);
   }
 
-  /* =============================== Toast داخل صفحه ============================== */
   _toastInPage(message, cfg, auto, dur, onClick) {
     const n = document.createElement("div");
     n.className = `AIWC-notification ${cfg.cls}`;
     n.style.cssText = `
-      background:#fff;color:#333;padding:10px 15px;border-radius:6px;font-size:14px;
-      border:1px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;
-      align-items:center;cursor:pointer;opacity:1;transition:opacity .5s`;
+      background:#fff;color:#333;padding:10px 15px;
+      border-radius:6px;font-size:14px;border:1px solid #ddd;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;
+      align-items:center;cursor:pointer;opacity:1;
+      transition:opacity .5s`;
     n.innerHTML = `<span style="margin-inline-end:6px;">${cfg.icon}</span><span>${message}</span>`;
 
     n.addEventListener("click", () => {
@@ -130,46 +136,41 @@ export default class NotificationManager {
     });
 
     this.container.appendChild(n);
-    if (auto && cfg.cls !== "AIWC-status")
+    if (auto && cfg.cls !== "AIWC-status") {
       setTimeout(() => this.dismiss(n), dur);
+    }
     return n;
   }
 
-  /* =============================== ارسال به تب فعال ============================== */
   _sendToActiveTab(message, type, auto, duration, onClick) {
     return Browser.tabs
       .query({ active: true, currentWindow: true })
       .then((tabs) => {
         const tabId = tabs?.[0]?.id;
-        if (!tabId) throw new Error("No active tab");
-
-        return (
-          Browser.tabs
-            .sendMessage(tabId, {
-              action: "show_notification",
-              payload: { message, type, autoDismiss: auto, duration },
-            })
-            /* اگر content‑script پاسخ دهد، فرض می‌کنیم نوتیفیکیشن نمایش داده شده است */
-            .catch((err) => {
-              throw err;
-            })
-        );
+        if (!tabId) return; // no-op if no active tab
+        return Browser.tabs.sendMessage(tabId, {
+          action: "show_notification",
+          payload: { message, type, autoDismiss: auto, duration },
+        });
       })
-      .then(() => {
-        // در صورت موفقیت، اگر callback داریم نگه می‌داریم در تب
-        if (onClick) {
-          // چون toast داخل محتواست، callback را دوباره ثبت می‌کنیم
-          Browser.runtime.onMessage.addListener(function listener(msg) {
+      .then((res) => {
+        // attach click callback only if res indicates listener present
+        if (onClick && res !== undefined) {
+          const clickListener = (msg) => {
             if (msg?.action === "notification_clicked") {
               onClick();
-              Browser.runtime.onMessage.removeListener(listener);
+              Browser.runtime.onMessage.removeListener(clickListener);
             }
-          });
+          };
+          Browser.runtime.onMessage.addListener(clickListener);
         }
+      })
+      .catch((err) => {
+        // fallback to OS notification
+        this._osNotification(message, type, onClick);
       });
   }
 
-  /* =============================== OS Notification (fallback) ============================== */
   _osNotification(message, type, onClick) {
     const cfg = this.map[type] || this.map.info;
     Browser.notifications
@@ -190,6 +191,8 @@ export default class NotificationManager {
         };
         Browser.notifications.onClicked.addListener(click);
       })
-      .catch((err) => logME("OS‑notification error:", err));
+      .catch(() => {
+        // ignore OS notification errors
+      });
   }
 }

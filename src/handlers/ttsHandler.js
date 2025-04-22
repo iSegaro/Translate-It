@@ -5,7 +5,7 @@ import {
   detectTextLanguage,
   getLanguageInfoFromCode,
 } from "../utils/textDetection.js";
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 // Dependencies passed as arguments: playAudioViaOffscreen, errorHandler
 

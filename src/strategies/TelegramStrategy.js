@@ -1,5 +1,5 @@
 // src/strategies/TelegramStrategy.js
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay, logME } from "../utils/helpers";

@@ -1,5 +1,4 @@
-
-import { ErrorTypes } from "../services/ErrorService";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 

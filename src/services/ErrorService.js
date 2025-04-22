@@ -1,182 +1,143 @@
-// src/services/ErrorService.js
-
-import { CONFIG, getDebugModeAsync } from "../config.js";
+import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { logME, openOptionsPage } from "../utils/helpers.js";
-import { matchErrorToKey } from "./ErrorMessages.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { matchErrorToType } from "./ErrorMatcher.js";
+import { getErrorMessage } from "./ErrorMessages.js";
+import { ErrorTypes } from "./ErrorTypes.js";
 
-export class ErrorTypes {
-  static API = "API";
-  static NETWORK = "NETWORK";
-  static SERVICE = "SERVICE";
-  static VALIDATIONMODEL = "VALIDATIONMODEL";
-  static CONTEXT = "CONTEXT";
-  static UI = "UI";
-  static INTEGRATION = "INTEGRATION";
-  static PARSE_SELECT_ELEMENT = "PARSING_RESPONSE";
-  static PARSE_INPUT = "PARSING_EXTRACT_FIELD";
-}
-
-const SILENT_ERRORS = new Set(["ERRORS_CONTEXT_LOST"]);
-
-const SUPPRESS_CONSOLE_LOG_ERRORS = new Set([
-  "ERRORS_CONTEXT_LOST",
-  "ERRORS_API_KEY_WRONG",
-  "ERRORS_API_KEY_MISSING",
-  "ERRORS_MODEL_MISSING",
-  "ERRORS_QUOTA_EXCEEDED",
-  "ERRORS_API_URL_MISSING",
-  "ERRORS_API_KEY_FORBIDDEN",
-  "ERRORS_GEMINI_GENERATE_QUOTA",
+const SILENT = new Set([ErrorTypes.CONTEXT]);
+const SUPPRESS_CONSOLE = new Set([
+  ErrorTypes.CONTEXT,
+  ErrorTypes.API,
+  ErrorTypes.API_KEY_INVALID,
+  ErrorTypes.API_KEY_MISSING,
+  ErrorTypes.API_URL_MISSING,
+  ErrorTypes.MODEL_MISSING,
+  ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.NETWORK,
+  ErrorTypes.INTEGRATION,
+  ErrorTypes.SERVICE,
+  ErrorTypes.VALIDATION,
+  ErrorTypes.UI,
+  ErrorTypes.PROMPT_INVALID,
+  ErrorTypes.TEXT_EMPTY,
+  ErrorTypes.TEXT_TOO_LONG,
+  ErrorTypes.TRANSLATION_NOT_FOUND,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.TAB_AVAILABILITY,
+]);
+const OPEN_SETTINGS = new Set([
+  ErrorTypes.API_KEY_INVALID,
+  ErrorTypes.API_KEY_MISSING,
+  ErrorTypes.MODEL_MISSING,
+  ErrorTypes.API_URL_MISSING,
+  ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.GEMINI_QUOTA,
 ]);
 
-export async function extractError(error) {
-  if (!error) return new Error("(Unknown Error)");
-
-  let raw =
-    typeof error === "string" ? error
-    : error instanceof Error ? error.message
-    : typeof error.message === "string" ? error.message
-    : (() => {
-        try {
-          return JSON.stringify(error);
-        } catch {
-          return "(Unknown Error)";
-        }
-      })();
-
-  const errorKey = matchErrorToKey(raw);
-  const translated = errorKey ? await getTranslationString(errorKey) : null;
-
-  const wrapped = new Error(translated || raw);
-  wrapped._originalMessage = raw;
-  wrapped._errorKey = errorKey || null;
-  return wrapped;
-}
-
 export class ErrorHandler {
-  constructor(notificationManager = new NotificationManager()) {
-    this.notifier = notificationManager;
-    this.displayedErrors = new Set();
-    this.isHandling = false;
+  constructor() {
+    this.notifier = new NotificationManager();
+    this.shown = new Set();
+    this.handling = false;
+  }
+  static async processError(err) {
+    return err?.then ? await err : err;
+  }
+  async handle(err, meta = {}) {
+    if (this.handling) return err;
+    this.handling = true;
+    try {
+      const raw = err instanceof Error ? err.message : String(err);
+      const type = matchErrorToType(raw);
+      const msg = await getErrorMessage(type);
+      const debug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
+      if (debug && !SUPPRESS_CONSOLE.has(type)) {
+        console.error(`[${type}] ${raw}`, err.stack);
+      }
+      if (SILENT.has(type)) return err;
+      const action = OPEN_SETTINGS.has(type) ? openOptionsPage : undefined;
+      if (!this.shown.has(msg)) {
+        this.notifier.show(
+          msg,
+          type === ErrorTypes.NETWORK ? "warning" : "error",
+          true,
+          4000,
+          action
+        );
+        this.shown.add(msg);
+        setTimeout(() => this.shown.delete(msg), 4500);
+      }
+      return err;
+    } finally {
+      this.handling = false;
+    }
   }
 
-  static async processError(error) {
-    if (typeof error?.then === "function") return await error;
-    return error;
-  }
-
-  async handle(error, meta = {}) {
+  async handle_OLD(error, meta = {}) {
     if (error?._isHandled) return error;
-    if (typeof error?.then === "function") error = await error;
     if (this.isHandling) return error;
-
     this.isHandling = true;
 
     try {
-      const normalizedError = await extractError(error);
+      const normalized = await extractError(error);
+      const key = normalized._errorKey;
+      const code = key.toUpperCase();
 
-      const mergedMeta = {
-        ...(normalizedError.meta || {}),
-        ...meta,
-        type: meta.type || ErrorTypes.SERVICE,
-        statusCode: meta.statusCode || 500,
-        context: meta.context || "",
-      };
-
-      const errorKey = normalizedError._errorKey;
-      const errorCode = errorKey ? errorKey.toUpperCase() : "UNKNOWN-ERROR";
-
-      const isDebugMode = await getDebugModeAsync().catch(
-        () => CONFIG.DEBUG_MODE
-      );
-
-      const shouldLogToConsole =
-        isDebugMode && !SUPPRESS_CONSOLE_LOG_ERRORS.has(errorCode);
-
-      if (shouldLogToConsole) {
-        this._logError(normalizedError, mergedMeta);
+      const isDebug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
+      const shouldLog = isDebug && !SUPPRESS_CONSOLE_LOG_ERRORS.has(code);
+      if (shouldLog) {
+        this._logError(normalized, meta);
       }
 
-      if (SILENT_ERRORS.has(errorCode)) {
-        normalizedError._isHandled = true;
-        return normalizedError;
+      if (SILENT_ERRORS.has(code)) {
+        normalized._isHandled = true;
+        return normalized;
       }
 
-      const finalMessage =
-        errorKey ?
-          await getTranslationString(errorKey)
-        : normalizedError.message;
+      // prepare user message and optional action
+      const userMsg = await getErrorMessageByKey(key);
+      let action;
+      if (OPEN_SETTINGS_ERRORS.has(code)) {
+        action = () => openOptionsPage();
+      }
 
-      this._notifyUser(finalMessage, mergedMeta.type, errorCode);
-
-      normalizedError._isHandled = true;
-      return normalizedError;
-    } catch (finalError) {
-      logME("[ErrorService] Critical error:", finalError);
-      return finalError;
+      this._notifyUser(userMsg, meta.type || ErrorTypes.SERVICE, action);
+      normalized._isHandled = true;
+      return normalized;
+    } catch (fatal) {
+      logME("[ErrorService] Fatal error in handler:", fatal);
+      return fatal;
     } finally {
       this.isHandling = false;
     }
   }
 
   _logError(error, meta) {
-    const details = {
-      name: error.name,
-      message: error.message,
-      type: meta.type,
-      statusCode: meta.statusCode,
-      context: meta.context,
-      stack: error.stack,
-    };
-
     console.error(
-      `[ErrorService] ${details.name}: ${details.message}\nType: ${details.type}\nStatus: ${details.statusCode}\nContext: ${details.context}`
+      `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`
     );
-    if (details.stack) console.error("[Stack Trace]", details.stack);
   }
 
-  _notifyUser(message, type, errorCode) {
+  _notifyUser(message, type, action) {
     if (this.displayedErrors.has(message)) return;
-
     const typeMap = {
       [ErrorTypes.API]: "error",
       [ErrorTypes.UI]: "error",
       [ErrorTypes.NETWORK]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
-      [ErrorTypes.VALIDATIONMODEL]: "warning",
+      [ErrorTypes.VALIDATION]: "warning",
       [ErrorTypes.INTEGRATION]: "warning",
     };
-
-    const notificationType = typeMap[type] || "error";
-
-    const openSettingsErrors = new Set([
-      "ERRORS_API_KEY_WRONG",
-      "ERRORS_API_KEY_MISSING",
-      "ERRORS_API_KEY_FORBIDDEN",
-      "ERRORS_API_URL_MISSING",
-      "ERRORS_MODEL_MISSING",
-      "ERRORS_QUOTA_EXCEEDED",
-      "ERRORS_GEMINI_GENERATE_QUOTA",
-    ]);
-
-    const action =
-      type === ErrorTypes.API && openSettingsErrors.has(errorCode) ?
-        openOptionsPage
-      : undefined;
-
-    this.notifier.show(message, notificationType, true, 4000, action);
+    const toastType = typeMap[type] || "error";
+    this.notifier.show(message, toastType, true, 4000, action);
     this.displayedErrors.add(message);
-    setTimeout(() => this.displayedErrors.delete(message), 4000);
+    setTimeout(() => this.displayedErrors.delete(message), 4500);
   }
 }
 
-export async function handleUIError(error, context = "") {
+export async function handleUIError(err, context = "") {
   const handler = new ErrorHandler();
-  return await handler.handle(error, {
-    type: ErrorTypes.UI,
-    context,
-  });
+  return handler.handle(err, { type: ErrorTypes.UI, context });
 }

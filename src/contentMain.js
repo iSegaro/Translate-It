@@ -13,6 +13,7 @@ import {
 import { revertTranslations } from "./utils/textExtraction.js";
 import { getTranslationHandlerInstance } from "./core/InstanceManager.js";
 import { detectPlatform } from "./utils/platformDetector.js";
+import { ErrorTypes } from "./services/ErrorTypes.js";
 
 let translationHandler = null;
 
@@ -128,7 +129,7 @@ export function initContentScript() {
       } catch (error) {
         logME("[Content] Error in updateSelectElementState => ", error);
         this.translationHandler.errorHandler.handle(error, {
-          type: this.translationHandler.ErrorTypes.CONTEXT,
+          type: ErrorTypes.CONTEXT,
           context: "updateSelectElementState",
         });
       }
@@ -244,7 +245,7 @@ export function initContentScript() {
       } catch (error) {
         this.translationHandler.notifier?.dismiss();
         this.translationHandler.errorHandler.handle(error, {
-          type: this.translationHandler.ErrorTypes.INTEGRATION,
+          type: ErrorTypes.INTEGRATION,
           context: "message-listener",
         });
         return false;

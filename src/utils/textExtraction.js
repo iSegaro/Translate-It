@@ -1,5 +1,6 @@
 // src/utils/textExtraction.js
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 import { logME } from "./helpers.js";
 import { correctTextDirection, applyTextDirection } from "./textDetection.js";

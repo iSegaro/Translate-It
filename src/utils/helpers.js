@@ -1,6 +1,7 @@
 // src/utils/helpers.js
 import Browser from "webextension-polyfill";
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 
 const errorHandler = new ErrorHandler();

@@ -5,7 +5,8 @@ import {
   state,
   TranslationMode,
 } from "../config.js";
-import { ErrorTypes, ErrorHandler } from "../services/ErrorService.js";
+import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 import {
   separateCachedAndNewTexts,
@@ -124,11 +125,12 @@ export default class EventHandler {
         if (requireCtrl && !this.isMouseUpCtrl(event)) return;
         await this.handleMouseUp(event);
       }
-    } catch (error) {
-      error = await ErrorHandler.processError(error);
-      this.translationHandler.errorHandler.handle(error, {
+    } catch (rawError) {
+      const error = await ProcessError.processError(rawError);
+      await this.translationHandler.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-handling",
+        eventType: event.type,
       });
     }
   }
@@ -532,6 +534,10 @@ export default class EventHandler {
         IconManager: this.IconManager,
       });
 
+      if (statusNotif) {
+        this.notifier.dismiss(statusNotif);
+      }
+
       return {
         status: "success",
         source: "translated",
@@ -550,7 +556,9 @@ export default class EventHandler {
         message: processed.message,
       };
     } finally {
-      if (statusNotif) this.notifier.dismiss(statusNotif);
+      if (statusNotif) {
+        this.notifier.dismiss(statusNotif);
+      }
     }
   }
 

@@ -1,7 +1,8 @@
 // src/options.js
 import Browser from "webextension-polyfill";
 import { getSettingsAsync, CONFIG } from "./config.js";
-import { ErrorHandler, ErrorTypes } from "./services/ErrorService.js";
+import { ErrorHandler } from "./services/ErrorService.js";
+import { ErrorTypes } from "./services/ErrorTypes.js";
 import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";

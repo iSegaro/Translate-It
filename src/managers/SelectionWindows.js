@@ -1,260 +1,162 @@
 // src/managers/SelectionWindows.js
+
 import Browser from "webextension-polyfill";
 import { logME, isExtensionContextValid } from "../utils/helpers";
-import { ErrorTypes, extractError } from "../services/ErrorService.js";
-import { CONFIG, TranslationMode, TRANSLATION_ERRORS } from "../config.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
+import { CONFIG, TranslationMode } from "../config.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { marked } from "marked";
-import { getTranslationString } from "../utils/i18n.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
     this.fadeInDuration = options.fadeInDuration || 50;
     this.fadeOutDuration = options.fadeOutDuration || 125;
     this.isVisible = false;
-    this.currentText = null;
-    this.displayElement = null;
+    this.displayElement = null; // host element
+    this.innerContainer = null; // content inside shadow
     this.removeMouseDownListener = null;
     this.translationHandler = options.translationHandler;
-    this.translatedText = null;
-    this.isTranslationCancelled = false;
-    this.originalText = null;
     this.notifier = options.notifier;
+    this.originalText = null;
+    this.isTranslationCancelled = false;
 
-    // اطمینان از حفظ context در callback ها:
     this.show = this.show.bind(this);
     this.cancelCurrentTranslation = this.cancelCurrentTranslation.bind(this);
-    // در صورت لزوم سایر متدهایی که از "this" استفاده می‌کنند را نیز bind کنید.
   }
 
   async show(selectedText, position) {
     if (!isExtensionContextValid()) {
-      await this.translationHandler.errorHandler.handle(
-        new Error(TRANSLATION_ERRORS.INVALID_CONTEXT),
-        {
-          type: ErrorTypes.CONTEXT,
-          context: "SelectionWindows-show-context",
-          code: "context-invalid",
-          statusCode: "context-invalid",
-        }
-      );
-
+      const err = new Error(ErrorTypes.CONTEXT);
+      err.type = ErrorTypes.CONTEXT;
+      await this.translationHandler.errorHandler.handle(err, {
+        type: ErrorTypes.CONTEXT,
+        context: "SelectionWindows-show-context",
+        statusCode: "context-invalid",
+      });
       return;
     }
 
     if (
       !selectedText ||
-      (this.isVisible && selectedText === this.currentText)
+      (this.isVisible && selectedText === this.originalText)
     ) {
       return;
     }
 
-    this.dismiss(false); // *** بستن هر پنل قبلی‌ای
+    this.dismiss(false);
+    this.originalText = selectedText;
+    this.isTranslationCancelled = false;
 
-    this.isTranslationCancelled = false; // *** ریست کردن پرچم در هر بار نمایش
+    // Determine mode
+    let translationMode = TranslationMode.Field;
+    const words = selectedText.trim().split(/\s+/);
+    if (
+      ((words.length === 1 &&
+        !["the", "a", "an", "is", "are"].includes(words[0].toLowerCase())) ||
+        words.length > 1) &&
+      selectedText.length <= 30
+    ) {
+      translationMode = TranslationMode.Dictionary_Translation;
+    }
 
-    this.originalText = selectedText; // *** ثبت متن در حال ترجمه
-
-    let translationMode = TranslationMode.Field; // *** پیش فرض حالت ترجمه کامل
-
-    // ایجاد کانتینر اصلی برای Shadow DOM
-    const container = document.createElement("div");
-    // تنظیم موقعیت و سایر ویژگی‌ها
-    container.style.position = "absolute";
-    container.style.left = `${position.x}px`;
-    container.style.top = `${position.y}px`;
-    container.style.zIndex = "2147483637"; // یا سطح دیگری که تضمین کند بالاتر باشد
-
-    // ایجاد Shadow Root
-    const shadowRoot = container.attachShadow({ mode: "open" });
-
-    // *** نمایش لودینگ ***
+    // Host element
     this.displayElement = document.createElement("div");
-    this.displayElement.classList.add("aiwc-selection-display-temp");
-
-    this.displayElement.style.opacity = "0.6";
-    this.displayElement.style.transform = "scale(0.1)";
-    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
-
-    // ایجاد المان لودینگ
-    const loadingContainer = this.createLoadingDots();
-    this.displayElement.appendChild(loadingContainer);
-
-    // افزودن المان displayElement به درون Shadow Root
-    shadowRoot.appendChild(this.displayElement);
-
+    this.displayElement.classList.add("aiwc-selection-popup-host");
     this.applyInitialStyles(position);
 
+    // Shadow root + inner container
+    const shadowRoot = this.displayElement.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
-      .aiwc-selection-display-temp {
+      .popup-container {
         background-color: #f8f8f8;
         color: #333;
         border: 1px solid #ddd;
-        padding: 8px 12px;
         border-radius: 4px;
+        padding: 8px 12px;
         font-size: 14px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        /* سایر استایل‌های شما */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        max-width: 300px;
+        overflow-wrap: break-word;
       }
-      /* سایر کلاس‌های مربوط به داخل پنجره */
-      .aiwc-loading-container {
+      .loading-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        opacity: 1;
-        transition: opacity 0.9s ease-in-out;
       }
       @keyframes blink {
         0% { opacity: 0.3; }
         50% { opacity: 0.8; }
         100% { opacity: 0.3; }
       }
-      .aiwc-loading-dot {
+      .loading-dot {
         font-size: 1.2em;
-        opacity: 0.3;
-        margin: 0 0.2em;
+        margin: 0 2px;
         animation: blink 0.7s infinite;
-        color: black;
       }
+      .first-line { margin-bottom: 6px; display: flex; align-items: center; }
+      .original-text { font-weight: bold; margin-left: 6px; }
+      .second-line { margin-top: 4px; }
+      .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; }
     `;
     shadowRoot.appendChild(style);
 
+    this.innerContainer = document.createElement("div");
+    this.innerContainer.classList.add("popup-container");
+    shadowRoot.appendChild(this.innerContainer);
+
+    // Loading indicator
+    const loading = this.createLoadingDots();
+    this.innerContainer.appendChild(loading);
+
     document.body.appendChild(this.displayElement);
     this.isVisible = true;
-    this.animatePopupSize(loadingContainer);
-    // *** نمایش لودینگ ***
 
-    // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
-    // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است
-    const maxDictionaryWords = 3; // حداکثر تعداد کلمات برای حالت دیکشنری
-    const maxDictionaryChars = 30; // حداکثر تعداد کاراکترها برای حالت دیکشنری
-    const stopWords = [
-      "the",
-      "a",
-      "an",
-      "is",
-      "are",
-      "was",
-      "were",
-      "in",
-      "on",
-      "at",
-      "to",
-      "of",
-      "for",
-      "with",
-      "by",
-      "from",
-    ]; // *** لیست کلمات رایج (بسته به زبان)
+    requestAnimationFrame(() => {
+      this.displayElement.style.opacity = "0.9";
+      this.displayElement.style.transform = "scale(1)";
+    });
 
-    const words = selectedText.trim().split(/\s+/);
-
-    if (
-      words.length <= maxDictionaryWords &&
-      selectedText.length <= maxDictionaryChars
-    ) {
-      if (words.length === 1) {
-        const lowerCaseWord = words[0].toLowerCase();
-        if (!stopWords.includes(lowerCaseWord)) {
-          translationMode = TranslationMode.Dictionary_Translation;
-        }
-      } else if (words.length > 1) {
-        translationMode = TranslationMode.Dictionary_Translation;
-      }
-    }
-    // *** End of TODO ***
-
-    // ذخیره‌ی متن در حال ترجمه برای تطبیق بعدی
-    const currentText = selectedText;
-    this.originalText = currentText;
-    this.isTranslationCancelled = false;
-
-    /* ـــــــــــــــ  ارسال درخواست و مدیریت پاسخ  ـــــــــــــــ */
+    // Fetch translation
     Browser.runtime
       .sendMessage({
         action: "fetchTranslationBackground",
-        payload: {
-          promptText: currentText,
-          translationMode, // همان translationMode که بالاتر محاسبه شد
-        },
+        payload: { promptText: selectedText, translationMode },
       })
       .then((response) => {
-        try {
-          /* اگر کاربر پنجره را بسته یا متن تغییر کرده است، کار را متوقف کن */
-          if (
-            this.isTranslationCancelled ||
-            this.originalText !== currentText
-          ) {
-            this.cancelCurrentTranslation();
-            return;
-          }
-
-          /* ---------- پاسخ موفق ---------- */
-          if (response && response.success === true) {
-            const raw = response?.data?.translatedText;
-            const translatedText = typeof raw === "string" ? raw.trim() : "";
-
-            /* اگر ترجمه رشتهٔ معتبری نیست، آن را خطا تلقی کن */
-            if (!translatedText) {
-              const errMsg =
-                typeof raw === "string" && raw ?
-                  raw
-                : "(⚠️ خطایی در ترجمه رخ داد.)";
-              this.handleTranslationError(errMsg, loadingContainer);
-              return;
-            }
-
-            /* نمایش ترجمه */
-            this.transitionToTranslatedText(
-              translatedText,
-              loadingContainer,
-              currentText,
-              translationMode
-            );
-
-            /* ---------- پاسخ خطادار ---------- */
-          } else {
-            const errMsg =
-              typeof response?.error === "string" ?
-                response.error
-              : response?.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
-            this.handleTranslationError(errMsg, loadingContainer);
-          }
-        } catch (err) {
-          /* خطای پیش‌بینی‌نشده در بلاک then */
-          logME("[SelectionWindow] Error in .then block:", err);
-          this.handleTranslationError(err, loadingContainer);
+        if (this.isTranslationCancelled || this.originalText !== selectedText)
+          return;
+        if (response?.success) {
+          const txt = (response.data.translatedText || "").trim();
+          if (!txt) throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
+          this.transitionToTranslatedText(
+            txt,
+            loading,
+            selectedText,
+            translationMode
+          );
+        } else {
+          throw new Error(response.error || ErrorTypes.SERVICE);
         }
       })
-      .catch((error) => {
-        /* خطای Promise‑level (مثلاً اتصال با پس‌زمینه قطع شد) */
-        logME("[SelectionWindow] Error fetching translation:", error);
-        this.handleTranslationError(error, loadingContainer);
+      .catch(async (err) => {
+        await this.handleTranslationError(err, loading);
       });
 
-    const removeHandler = (event) => {
-      if (!this.isVisible || !this.displayElement) return;
-      const target = event.target;
-      if (this.displayElement.contains(target)) {
-        event.stopPropagation();
-        return;
+    // Outside click to dismiss
+    const onOutsideClick = (e) => {
+      if (!this.displayElement.contains(e.target)) {
+        this.cancelCurrentTranslation();
       }
-      this.cancelCurrentTranslation(); // فراخوانی متد برای لغو ترجمه
     };
-
-    if (this.removeMouseDownListener) {
-      document.removeEventListener("mousedown", this.removeMouseDownListener);
-    }
-    document.addEventListener("mousedown", removeHandler);
-    this.removeMouseDownListener = removeHandler;
+    document.addEventListener("mousedown", onOutsideClick);
+    this.removeMouseDownListener = onOutsideClick;
   }
 
-  // لغو ترجمه
   cancelCurrentTranslation() {
-    this.dismiss(); // فراخوانی متد dismiss برای انجام fade out
+    this.dismiss();
     this.isTranslationCancelled = true;
-    this.originalText = null; // پاک کردن متن در حال ترجمه
+    this.originalText = null;
     this.translatedText = null;
     this.stoptts_playing();
   }
@@ -264,253 +166,125 @@ export default class SelectionWindows {
   }
 
   applyInitialStyles(position) {
-    this.displayElement.style.position = "absolute";
-    this.displayElement.style.zIndex = "1000";
-    this.displayElement.style.maxWidth = "300px";
-    this.displayElement.style.overflowWrap = "break-word";
-    this.displayElement.style.fontFamily = "sans-serif";
-    this.displayElement.style.opacity = "0.6";
-    this.displayElement.style.transform = "scale(0.1)";
-    this.displayElement.style.transformOrigin = "top left";
-    this.displayElement.style.transition = `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`;
-    this.displayElement.style.left = `${position.x}px`;
-    this.displayElement.style.top = `${position.y}px`;
-    this.displayElement.dataset.aiwcSelectionPopup = "true";
+    Object.assign(this.displayElement.style, {
+      position: "absolute",
+      zIndex: "2147483637",
+      left: `${position.x}px`,
+      top: `${position.y}px`,
+      transform: "scale(0.1)",
+      transformOrigin: "top left",
+      opacity: "0.6",
+      transition: `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`,
+    });
   }
 
   createLoadingDots() {
-    const loadingContainer = document.createElement("div");
-    loadingContainer.classList.add("aiwc-loading-container");
-    for (let i = 0; i < 3; i++) {
+    const container = document.createElement("div");
+    container.classList.add("loading-container");
+    [0, 1, 2].forEach(() => {
       const dot = document.createElement("span");
-      dot.classList.add("aiwc-loading-dot");
-      dot.innerText = ".";
-      loadingContainer.appendChild(dot);
-    }
-    return loadingContainer;
-  }
-
-  animatePopupSize(loadingContainer) {
-    requestAnimationFrame(() => {
-      this.displayElement.style.transform = "scale(1)";
-      setTimeout(() => {
-        loadingContainer.style.opacity = "1";
-      }, 150);
+      dot.classList.add("loading-dot");
+      dot.textContent = ".";
+      container.appendChild(dot);
     });
+    return container;
   }
 
   transitionToTranslatedText(
     translatedText,
     loadingContainer,
-    original_text,
-    trans_Mode = TranslationMode.SelectionWindows
+    originalText,
+    trans_Mode
   ) {
-    // متن خام را برای استفاده در TTS نگه دارید
-    const rawTranslatedText =
-      typeof translatedText === "string" ? translatedText.trim() : "";
+    loadingContainer.remove();
+    this.innerContainer.innerHTML = "";
 
-    // 1. محو شدن نقاط لودینگ
-    loadingContainer.style.opacity = "0";
-    setTimeout(() => {
-      // مطمئن شوید المان هنوز وجود دارد و قابل مشاهده است
-      if (this.displayElement && this.isVisible) {
-        // 2. تنظیم شفافیت اولیه قبل از نمایش محتوا
-        this.displayElement.style.opacity = "0.6";
+    const firstLine = document.createElement("div");
+    firstLine.classList.add("first-line");
+    const ttsIcon = this.createTTSIcon(originalText);
+    firstLine.appendChild(ttsIcon);
+    if (trans_Mode === TranslationMode.Dictionary_Translation) {
+      const orig = document.createElement("span");
+      orig.classList.add("original-text");
+      orig.textContent = originalText;
+      firstLine.appendChild(orig);
+    }
+    this.innerContainer.appendChild(firstLine);
 
-        // 4. پاک کردن محتوای قبلی (مهم!)
-        this.displayElement.innerHTML = "";
+    const secondLine = document.createElement("div");
+    secondLine.classList.add("second-line");
+    const textSpan = document.createElement("span");
+    textSpan.classList.add("text-content");
+    textSpan.innerHTML = marked.parse(translatedText);
+    secondLine.appendChild(textSpan);
+    this.applyTextDirection(secondLine, translatedText);
+    this.innerContainer.appendChild(secondLine);
 
-        // ساخت سطر اول
-        const firstLineContainer = document.createElement("div");
-        firstLineContainer.classList.add("aiwc-first-line");
-
-        // اگر ترجمه داریم، آیکون TTS را اضافه کن
-        if (rawTranslatedText) {
-          const ttsIcon = this.createTTSIcon(original_text);
-          firstLineContainer.appendChild(ttsIcon);
-        } else {
-          if (this.notifier) {
-            this.notifier.dismiss();
-          }
-          return;
-        }
-
-        if (trans_Mode === TranslationMode.Dictionary_Translation) {
-          const originalTextSpan = document.createElement("span");
-          originalTextSpan.classList.add("aiwc-original-text");
-          originalTextSpan.textContent = original_text;
-          firstLineContainer.appendChild(originalTextSpan);
-          // }
-        }
-
-        // اگر چیزی در سطر اول اضافه شده، آن را به نمایش‌گر اصلی بچسبان
-        if (firstLineContainer.childNodes.length > 0) {
-          this.displayElement.appendChild(firstLineContainer);
-        }
-
-        // --- سطر دوم: متن ترجمه شده ---
-        const secondLineContainer = document.createElement("div");
-        secondLineContainer.classList.add("aiwc-second-line");
-        const textContainer = document.createElement("span");
-        textContainer.classList.add("aiwc-text-content");
-        textContainer.innerHTML = marked.parse(
-          rawTranslatedText || "(ترجمه یافت نشد)"
-        );
-        secondLineContainer.appendChild(textContainer);
-
-        this.applyTextDirection(secondLineContainer, rawTranslatedText);
-        this.displayElement.appendChild(secondLineContainer);
-
-        // انیمیشن Fade In
-        requestAnimationFrame(() => {
-          this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
-          this.displayElement.style.opacity = "0.9";
-        });
-      }
-    }, 150); // مدت زمان محو شدن نقاط لودینگ
+    requestAnimationFrame(() => {
+      this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
+      this.displayElement.style.opacity = "0.9";
+    });
   }
 
-  // --- 8. متد جدید برای ساخت آیکون TTS و Listener آن ---
   createTTSIcon(textToSpeak) {
     const icon = document.createElement("img");
     icon.src = Browser.runtime.getURL("icons/speaker.png");
-    icon.alt = "خواندن متن";
-    icon.title = "خواندن متن";
-    icon.classList.add("aiwc-tts-icon");
-
-    icon.addEventListener("click", (event) => {
-      event.stopPropagation();
+    icon.classList.add("tts-icon");
+    icon.addEventListener("click", (e) => {
+      e.stopPropagation();
       logME("[SelectionWindows]: TTS icon clicked.");
-
-      Browser.runtime
-        .sendMessage({
-          action: "speak",
-          text: textToSpeak,
-          lang: AUTO_DETECT_VALUE,
-        })
-        .then((response) => {
-          if (!response.success) {
-            logME("[SelectionWindows]: TTS playback failed:", response.error);
-          } else {
-            logME("[SelectionWindows]: TTS playback initiated.");
-          }
-        })
-        .catch((err) => {
-          logME("[SelectionWindows]: Error sending TTS message:", err);
-        });
+      Browser.runtime.sendMessage({
+        action: "speak",
+        text: textToSpeak,
+        lang: AUTO_DETECT_VALUE,
+      });
     });
-
     return icon;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* ❶ پیام وقتی هیچ ترجمه‌ای برنگشته است                               */
-  /* ------------------------------------------------------------------ */
-  handleEmptyTranslation(loadingContainer, extra = "") {
-    // نقاط لودینگ را محو کن
-    if (loadingContainer) loadingContainer.style.opacity = "0";
-
-    // متن مناسب برای کاربر
-    const msg =
-      extra && typeof extra === "string" ?
-        extra
-      : "(⚠️ هیچ متنی از سرویس ترجمه دریافت نشد.)";
-
-    // کمی تأخیر برای هماهنگی با انیمیشن fade‑out لودینگ
-    setTimeout(() => {
-      // اگر هنوز پنجره وجود دارد
-      if (this.displayElement) {
-        if (this.notifier) {
-          // نوتیفیکیشن اخطار با auto‑dismiss ۲٫۵ ثانیه
-          this.notifier.show(msg, "warning", true, 2500);
-        } else {
-          logME("[SelectionWindow] " + msg);
-        }
-        // بستن پنجره ترجمه (بدون انیمیشن اضافه)
-        this.dismiss(false);
-      }
-    }, 300);
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* ❷ پیام وقتی خطای واقعی رخ داده است                                */
-  /* ------------------------------------------------------------------ */
   async handleTranslationError(error, loadingContainer) {
-    if (loadingContainer) loadingContainer.style.opacity = "0";
-
-    const errorObj =
-      typeof error === "string" ? await extractError(error)
-      : error instanceof Error ? await extractError(error.message)
-      : await extractError(error);
-
-    if (this.translationHandler?.errorHandler) {
-      await this.translationHandler.errorHandler.handle(errorObj, {
-        type: ErrorTypes.API,
-        context: "selection-window-translate",
-      });
-    } else {
-      // Fallback نمایش ساده در صورت نبود handler
-      const msg =
-        errorObj?.message ||
-        (await getTranslationString("popup_string_translate_error_response")) ||
-        "(خطای ناشناخته هنگام ترجمه).";
-      logME("[SelectionWindow] " + msg);
-    }
-
+    loadingContainer.remove();
+    const errObj = error instanceof Error ? error : new Error(String(error));
+    await this.translationHandler.errorHandler.handle(errObj, {
+      type: errObj.type || ErrorTypes.API,
+      context: "selection-window-translate",
+    });
     this.dismiss(false);
   }
 
   dismiss(withFadeOut = true) {
-    if (!this.displayElement || !this.isVisible) {
-      return;
-    }
-
-    // حذف لیسنر
+    if (!this.displayElement || !this.isVisible) return;
     if (this.removeMouseDownListener) {
       document.removeEventListener("mousedown", this.removeMouseDownListener);
       this.removeMouseDownListener = null;
     }
-
     this.isVisible = false;
-
     if (withFadeOut && this.fadeOutDuration > 0) {
-      // حالت عادی با انیمیشن
       this.displayElement.style.transition = `opacity ${this.fadeOutDuration}ms ease-in-out`;
       this.displayElement.style.opacity = "0";
       this.displayElement.addEventListener(
         "transitionend",
-        this.removeElement.bind(this),
+        () => this.removeElement(),
         { once: true }
       );
     } else {
-      // حذف بی‌درنگ
       this.removeElement();
     }
   }
 
   removeElement() {
-    // *** اطمینان بیشتر از حذف listener حتی اگر dismiss به روش دیگری فراخوانی شده باشد ***
-    if (this.removeMouseDownListener) {
-      document.removeEventListener("mousedown", this.removeMouseDownListener);
-      this.removeMouseDownListener = null;
-    }
-
     if (this.displayElement && this.displayElement.parentNode) {
       this.displayElement.remove();
     }
-
-    // Reset state
     this.displayElement = null;
+    this.innerContainer = null;
     this.isVisible = false;
-    this.currentText = null;
-    this.translatedText = null;
+    this.originalText = null;
     this.isTranslationCancelled = false;
-    this.originalText = null; // اطمینان از پاک شدن متن در حال ترجمه
   }
 
   applyTextDirection(element, text) {
-    if (!element || !element.style) return;
-
+    if (!element) return;
     const isRtl = CONFIG.RTL_REGEX.test(text);
     element.style.direction = isRtl ? "rtl" : "ltr";
     element.style.textAlign = isRtl ? "right" : "left";

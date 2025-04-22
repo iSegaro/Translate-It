@@ -1,4 +1,4 @@
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 import PlatformStrategy from "./PlatformStrategy.js";
 

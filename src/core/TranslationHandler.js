@@ -12,15 +12,11 @@ import NotificationManager from "../managers/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
 import { state, TranslationMode, CONFIG } from "../config.js";
-import { translateText } from "../utils/api.js";
 import { logMethod, isExtensionContextValid, logME } from "../utils/helpers.js";
-import {
-  detectPlatform,
-  detectPlatformByURL,
-  Platform,
-} from "../utils/platformDetector.js";
+import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import EventHandler from "./EventHandler.js";
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
 import EventRouter from "./EventRouter.js";
@@ -28,14 +24,7 @@ import { smartTranslate } from "../backgrounds/bridgeIntegration.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 /**
- * Handles translation requests from content script in a CSP-safe background context.
- * Used by SelectionWindows and Select Element handlers.
- *
- * @param {object} message - Message sent from content script.
- * @param {object} sender - Sender object from the runtime.onMessage listener.
- * @param {function} sendResponse - Function to send the result back.
- * @param {function} translateText - Translation method from api.js
- * @param {ErrorHandler} errorHandler - Centralized error handler instance
+ * Background handler for fetching translations.
  */
 export async function handleFetchTranslationBackground(
   message,
@@ -48,13 +37,14 @@ export async function handleFetchTranslationBackground(
     const { promptText, translationMode, sourceLang, targetLang } =
       message.payload || {};
 
+    // Validation
     if (!promptText || typeof promptText !== "string") {
-      throw new Error(
-        (await getTranslationString("ERRORS_EMPTY_PROMPT")) ||
-          "(Invalid or missing promptText.)"
-      );
+      const err = new Error(ErrorTypes.PROMPT_INVALID);
+      err.type = ErrorTypes.PROMPT_INVALID;
+      throw err;
     }
 
+    // Call API
     const translated = await translateText(
       promptText,
       translationMode,
@@ -62,45 +52,40 @@ export async function handleFetchTranslationBackground(
       targetLang
     );
 
-    /* ــ ترجمه باید رشتهٔ غیرخالی باشد ــ */
+    // Check result
     if (typeof translated !== "string" || !translated.trim()) {
-      const errMsg =
-        typeof translated === "string" && translated ?
-          translated
-        : (await getTranslationString("ERRORS_BACKGROUND_ERROR")) ||
-          "(خطای ترجمه از سرویس API)";
-
-      /* لاگ و هندل خطا */
-      await errorHandler.handle(new Error(errMsg), {
-        type: ErrorTypes.API,
-        context: "handler-fetchTranslation-background",
-      });
-
-      sendResponse({ success: false, error: errMsg });
-      return true;
+      const err = new Error(ErrorTypes.TRANSLATION_FAILED);
+      err.type = ErrorTypes.API;
+      throw err;
     }
 
     sendResponse({
       success: true,
-      data: {
-        translatedText: translated,
-      },
+      data: { translatedText: translated.trim() },
     });
-  } catch (msg) {
-    await errorHandler.handle(new Error(msg), {
-      type: ErrorTypes.API,
+  } catch (err) {
+    // Centralized error handling
+    const processed = await errorHandler.handle(err, {
+      type: err.type || ErrorTypes.API,
       context: "handler-fetchTranslation-background",
     });
-    sendResponse({ success: false, error: msg });
+
+    const safeMessage =
+      processed?.message ||
+      err.message ||
+      (await getTranslationString("ERRORS_UNKNOWN"));
+
+    sendResponse({ success: false, error: safeMessage });
   }
   return true;
 }
 
 export default class TranslationHandler {
   constructor() {
-    // ابتدا notifier را ایجاد می‌کنیم تا برای ErrorHandler موجود باشد
+    // ابتدا notifier سپس errorHandler
     this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
+
     this.ErrorTypes = ErrorTypes;
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
@@ -145,20 +130,11 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-    logME(
-      "[TranslationHandler] Reinitializing TranslationHandler state after update..."
-    );
+    logME("[TranslationHandler] Reinitializing state after update...");
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
-    // در صورت نیاز، متغیرهای داخلی دیگر مانند caches یا stateهای دیگر را هم ریست کنید
-    // برای مثال:
-    // state.originalTexts.clear();
-    // this.IconManager.cleanup();
   }
 
-  /**
-   * Main event handler router
-   */
   @logMethod
   async handleEvent(event) {
     try {
@@ -174,6 +150,16 @@ export default class TranslationHandler {
 
   @logMethod
   handleError(error, meta = {}) {
+    const normalized =
+      error instanceof Error ? error : new Error(String(error));
+    this.errorHandler.handle(normalized, {
+      ...meta,
+      origin: "TranslationHandler",
+    });
+  }
+
+  @logMethod
+  handleError_OLD(error, meta = {}) {
     try {
       const normalizedError =
         error instanceof Error ? error : new Error(String(error));
@@ -213,12 +199,7 @@ export default class TranslationHandler {
 
   @logMethod
   async processTranslation_with_CtrlSlash(params) {
-    const statusNotification = this.notifier.show(
-      (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
-        "(translating...)",
-      "status"
-    );
-
+    let statusNotification = null;
     try {
       if (!isExtensionContextValid()) {
         if (!params.target) {
@@ -231,6 +212,12 @@ export default class TranslationHandler {
           return;
         }
       }
+
+      statusNotification = this.notifier.show(
+        (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
+          "(translating...)",
+        "status"
+      );
 
       state.translateMode =
         params.selectionRange ?
@@ -253,6 +240,10 @@ export default class TranslationHandler {
         translationParams: params,
         isPrimary: true,
       });
+
+      if (statusNotification) {
+        this.notifier.dismiss(statusNotification);
+      }
 
       if (handlerError.isFinal || handlerError.suppressSecondary) return;
 

@@ -2,7 +2,8 @@
 import Browser from "webextension-polyfill";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { logME } from "../utils/helpers.js";
-import { ErrorHandler, ErrorTypes } from "../services/ErrorService.js";
+import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 const errorHandler = new ErrorHandler();
 

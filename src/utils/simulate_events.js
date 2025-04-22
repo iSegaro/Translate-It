@@ -1,3 +1,7 @@
+// src/utils/simulate_events.js
+
+import { ErrorTypes } from "../services/ErrorTypes";
+
 export const setCursorToEnd = (element) => {
   try {
     if (!element?.isConnected) {

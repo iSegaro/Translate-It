@@ -1,104 +1,56 @@
 // src/services/ErrorMessages.js
-import { getTranslationString } from "../utils/i18n.js";
 
-export const errorKeys = {
-  ERRORS_API_KEY_WRONG: "API Key is wrong",
-  ERRORS_API_KEY_MISSING: "API Key is missing",
-  ERRORS_MODEL_MISSING: "AI Model is missing or invalid",
-  ERRORS_QUOTA_EXCEEDED: "You exceeded your current quota",
-  ERRORS_CONTEXT_LOST: "Extension context lost",
-  ERRORS_NETWORK_FAILURE: "Connection to server failed",
-  ERRORS_INVALID_RESPONSE: "Invalid API response format",
-  ERRORS_SMARTTRANSLATE_FAILED: "Translation failed",
-  ERRORS_GEMINI_GENERATE_QUOTA:
-    "You reached the Gemini quota for content generation.",
+import { getTranslationString } from "../utils/i18n.js";
+import { ErrorTypes } from "./ErrorTypes.js";
+
+export const errorMessages = {
+  // Validation errors
+  [ErrorTypes.TEXT_EMPTY]: "Text is empty",
+  [ErrorTypes.PROMPT_INVALID]: "Prompt is invalid",
+  [ErrorTypes.TEXT_TOO_LONG]: "Text is too long",
+  [ErrorTypes.TRANSLATION_NOT_FOUND]: "Translation not found",
+  [ErrorTypes.TRANSLATION_FAILED]: "Translation failed",
+
+  // API settings errors
+  [ErrorTypes.API]: "API error",
+  [ErrorTypes.API_KEY_MISSING]: "API Key is missing",
+  [ErrorTypes.API_KEY_INVALID]: "API Key is wrong or invalid",
+  [ErrorTypes.API_URL_MISSING]: "API URL is missing",
+  [ErrorTypes.MODEL_MISSING]: "AI Model is missing or invalid",
+  [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
+  [ErrorTypes.GEMINI_QUOTA]:
+    "You reached the Gemini quota for content generation",
+
+  // General errors
+  [ErrorTypes.NETWORK]: "Connection to server failed",
+  [ErrorTypes.CONTEXT]: "Extension context lost",
+  [ErrorTypes.UNKNOWN]: "An unknown error occurred",
+  [ErrorTypes.TAB_AVAILABILITY]: "Tab not available",
+  [ErrorTypes.UI]: "User Interface error",
+  [ErrorTypes.INTEGRATION]: "Integration error",
+  [ErrorTypes.SERVICE]: "Service error",
+  [ErrorTypes.VALIDATION]: "Validation error",
 };
 
-export async function getErrorMessageByKey(key) {
-  // ترجمه فقط از کش پیام‌ها انجام می‌شود، نه کش زبان
-  let translated = await getTranslationString(key);
-  if (!translated || !translated.trim()) {
-    translated = errorKeys[key] || "Unknown error";
+/**
+ * Returns a localized message for a given error type.
+ * It prefixes the type with 'ERRORS_' when looking up in translations.
+ */
+export async function getErrorMessage(type) {
+  // construct translation key (e.g. 'ERRORS_API_KEY_MISSING')
+  const translationKey = type.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
+  // attempt to get localized string
+  let msg = await getTranslationString(translationKey);
+  // fallback to default message or unknown
+  if (!msg || !msg.trim()) {
+    msg = errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
   }
-  return translated;
+  return msg;
 }
 
-export function matchErrorToKey(message = "") {
-  const normalized = message
-    .toLowerCase()
-    .replace(/[.,!?؛،ء]/g, "")
-    .trim();
-
-  if (
-    normalized.includes("api key not valid") ||
-    normalized.includes("wrong api key") ||
-    normalized.includes("api key is wrong")
-  ) {
-    return "ERRORS_API_KEY_WRONG";
-  }
-
-  if (normalized.includes("api key is missing")) {
-    return "ERRORS_API_KEY_MISSING";
-  }
-
-  if (
-    normalized.includes("context invalidated") ||
-    normalized.includes("extension context lost") ||
-    normalized.includes("context lost") ||
-    normalized.includes("context invalid") ||
-    normalized.includes("context invalid. please refresh")
-  ) {
-    return "ERRORS_CONTEXT_LOST";
-  }
-
-  if (normalized.includes("failed to fetch")) {
-    return "ERRORS_NETWORK_FAILURE";
-  }
-
-  if (normalized.includes("invalid api response")) {
-    return "ERRORS_INVALID_RESPONSE";
-  }
-
-  if (normalized.includes("translation failed")) {
-    return "ERRORS_SMARTTRANSLATE_FAILED";
-  }
-
-  if (
-    normalized.includes("quota exceeded") &&
-    normalized.includes("generate content api requests per minute")
-  ) {
-    return "ERRORS_GEMINI_GENERATE_QUOTA";
-  }
-
-  if (
-    normalized.includes("api key not valid") ||
-    normalized.includes("wrong api key") ||
-    normalized.includes("api key is wrong") ||
-    normalized.includes("incorrect api key provided") ||
-    normalized.includes("no auth credentials found") ||
-    normalized.includes("invalid api key")
-  ) {
-    return "ERRORS_API_KEY_WRONG";
-  }
-
-  if (
-    normalized.includes("is not a valid model id") ||
-    normalized.includes("invalid model") ||
-    normalized.includes("model is not available") ||
-    normalized.includes("model not found")
-  ) {
-    return "ERRORS_MODEL_MISSING";
-  }
-
-  if (
-    normalized.includes("you exceeded your current quota") ||
-    normalized.includes("check your plan and billing") ||
-    normalized.includes("exceeded your quota limit") ||
-    normalized.includes("quota exceeded") ||
-    normalized.includes("quota has been exceeded")
-  ) {
-    return "ERRORS_QUOTA_EXCEEDED";
-  }
-
-  return null;
+export async function getErrorMessage_OLD(type) {
+  let msg = await getTranslationString(type);
+  if (!msg || !msg.trim())
+    msg = errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
+  return msg;
 }

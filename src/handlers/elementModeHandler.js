@@ -1,10 +1,19 @@
+// This handler is responsible for managing the select element mode.
+// It toggles the mode on or off based on the message received from the popup.
+
+// src/handlers/elementModeHandler.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
-// Dependencies passed: safeSendMessage, errorHandler
-// State needed: injectionInProgress (passed as an object to allow modification)
-
+/**
+ * Toggle “select element” mode in the content script, with automatic injection fallback.
+ *
+ * Dependencies (passed in):
+ *  - safeSendMessage(tabId, message)
+ *  - errorHandler (instance of ErrorHandler)
+ *  - injectionState: { inProgress: boolean }
+ */
 export async function handleActivateSelectElementMode(
   message,
   sender,
@@ -13,103 +22,77 @@ export async function handleActivateSelectElementMode(
   errorHandler,
   injectionState
 ) {
-  logME("[Handler:ElementMode] Handling activateSelectElementMode request");
-
-  const tabs = await Browser.tabs.query({ active: true, currentWindow: true });
-
-  if (tabs.length === 0 || !tabs[0]?.id) {
-    logME("[Handler:ElementMode] No active tab found.");
-    sendResponse({ error: "No active tab found" });
-    return; // Exit early
-  }
-  const tabId = tabs[0].id;
-
+  logME("[Handler:ElementMode] Toggling select-element-mode…");
+  let tabId;
   try {
-    // Determine the new state
-    const result = await Browser.storage.local.get(["selectElementState"]);
-    const currentState = result.selectElementState || false;
+    // 1) Find active tab
+    const tabs = await Browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (!tabs[0]?.id) {
+      const err = new Error(ErrorTypes.TAB_AVAILABILITY);
+      err.type = ErrorTypes.TAB_AVAILABILITY;
+      throw err;
+    }
+    tabId = tabs[0].id;
+
+    // 2) Determine new state
+    const { selectElementState = false } =
+      await Browser.storage.local.get("selectElementState");
     const newState =
-      typeof message.data === "boolean" ? message.data : !currentState;
+      typeof message.data === "boolean" ? message.data : !selectElementState;
 
-    logME(
-      `[Handler:ElementMode] Toggling select element mode for tab ${tabId} to: ${newState}`
-    );
-
+    logME(`[Handler:ElementMode] Setting selectElementState → ${newState}`);
     await Browser.storage.local.set({ selectElementState: newState });
 
-    // Send message to content script, attempt injection if it fails
+    // 3) Send toggle command
     let response = await safeSendMessage(tabId, {
       action: "TOGGLE_SELECT_ELEMENT_MODE",
       data: newState,
     });
 
-    // If sending failed and no injection is currently in progress
+    // 4) If that fails and we’re not already injecting, inject and retry
     if (response?.error && !injectionState.inProgress) {
-      logME(
-        "[Handler:ElementMode] Initial message failed, attempting script injection:",
-        response.error
-      );
-      injectionState.inProgress = true; // Set flag via passed object reference
+      injectionState.inProgress = true;
       try {
         await Browser.scripting.executeScript({
           target: { tabId },
           files: ["browser-polyfill.js", "content.bundle.js"],
         });
-        logME(
-          "[Handler:ElementMode] Script injected successfully, resending toggle command."
-        );
         response = await safeSendMessage(tabId, {
           action: "TOGGLE_SELECT_ELEMENT_MODE",
           data: newState,
         });
-
         if (response?.error) {
-          throw new Error(
-            `Failed to communicate with content script after injection: ${response.error}`
-          );
+          const err = new Error(response.error);
+          err.type = ErrorTypes.INTEGRATION;
+          throw err;
         }
-      } catch (scriptError) {
-        logME(
-          "[Handler:ElementMode] Script injection or re-sending failed:",
-          scriptError
-        );
-        errorHandler.handle(scriptError, {
+      } catch (injectionErr) {
+        await errorHandler.handle(injectionErr, {
           type: ErrorTypes.INTEGRATION,
           context: "handler-elementMode-injection",
-          statusCode: 500,
         });
         sendResponse({
-          error: "Failed to activate mode: content script issue.",
+          success: false,
+          error: "Could not inject content script.",
         });
-        // Reset flag on failure before returning
-        injectionState.inProgress = false;
-        return; // Exit early on failure
+        return;
       } finally {
-        // Reset flag once this attempt (injection + resend) is done
         injectionState.inProgress = false;
       }
-    } else if (response?.error && injectionState.inProgress) {
-      logME(
-        "[Handler:ElementMode] Injection already in progress, skipping duplicate attempt."
-      );
     }
 
-    logME(
-      "[Handler:ElementMode] Select element mode toggle command sent successfully."
-    );
-    sendResponse({ status: "done", newState: newState });
-  } catch (error) {
-    logME("[Handler:ElementMode] Error activating select element mode:", error);
-    errorHandler.handle(error, {
-      type: ErrorTypes.INTEGRATION,
+    // 5) Done
+    sendResponse({ success: true, newState });
+  } catch (err) {
+    // Normalize and report
+    await errorHandler.handle(err, {
+      type: err.type || ErrorTypes.INTEGRATION,
       context: "handler-activateSelectElementMode",
     });
-    sendResponse({
-      error: error.message || "Failed to toggle select element mode.",
-    });
-    // Ensure flag is reset if an error occurs outside the injection block
-    injectionState.inProgress = false;
+    sendResponse({ success: false, error: err.message });
+    if (injectionState.inProgress) injectionState.inProgress = false;
   }
-  // No explicit return needed here as sendResponse is called in all paths,
-  // but we need 'return true' in the main listener to keep the channel open.
 }

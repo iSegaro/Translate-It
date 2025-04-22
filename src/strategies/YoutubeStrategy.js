@@ -1,5 +1,5 @@
 // src/strategies/YoutubeStrategy.js
-import { ErrorTypes } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { logME } from "../utils/helpers.js";
