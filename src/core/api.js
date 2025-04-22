@@ -80,30 +80,62 @@ class ApiService {
     };
   }
 
+  /**
+   * Executes a fetch call and normalizes HTTP, API-response-invalid, and network errors.
+   * @param {Object} params
+   * @param {string} params.url - The endpoint URL
+   * @param {RequestInit} params.fetchOptions - Fetch options
+   * @param {Function} params.extractResponse - Function to extract/transform JSON + status
+   * @param {string} params.context - Context for error reporting
+   * @returns {Promise<any>} - Transformed result
+   * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
+   */
   async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
-    const response = await fetch(url, fetchOptions);
-    if (!response.ok) {
-      let body = {};
-      try {
-        body = await response.json();
-      } catch {}
-      const msg = body.detail || body.error?.message || response.statusText;
-      const err = new Error(msg);
-      err.type = ErrorTypes.API;
-      err.statusCode = response.status;
-      err.context = context;
+    try {
+      const response = await fetch(url, fetchOptions);
+      if (!response.ok) {
+        // Extract error details if available
+        let body = {};
+        try {
+          body = await response.json();
+        } catch {}
+        // Use detail or error.message or statusText, fallback to HTTP status
+        const msg =
+          body.detail ||
+          body.error?.message ||
+          response.statusText ||
+          `HTTP ${response.status}`;
+        const err = new Error(msg);
+        // Mark as HTTP error (status codes 4xx/5xx)
+        err.type = ErrorTypes.HTTP_ERROR;
+        err.statusCode = response.status;
+        err.context = context;
+        throw err;
+      }
+
+      // Parse successful response
+      const data = await response.json();
+      const result = extractResponse(data, response.status);
+      if (result === undefined) {
+        const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+        err.type = ErrorTypes.API;
+        err.statusCode = response.status;
+        err.context = context;
+        throw err;
+      }
+
+      return result;
+    } catch (err) {
+      // Handle fetch network errors (e.g., offline)
+      if (err instanceof TypeError && /NetworkError/.test(err.message)) {
+        const networkErr = new Error(err.message);
+        networkErr.type = ErrorTypes.NETWORK_ERROR;
+        networkErr.context = context;
+        throw networkErr;
+      }
+      // Rethrow existing HTTP/API errors or others
       throw err;
     }
-    const data = await response.json();
-    const result = extractResponse(data, response.status);
-    if (result === undefined) {
-      const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
-      err.type = ErrorTypes.API;
-      err.statusCode = response.status;
-      err.context = context;
-      throw err;
-    }
-    return result;
   }
 
   async handleGeminiTranslation(text, sourceLang, targetLang, translateMode) {
