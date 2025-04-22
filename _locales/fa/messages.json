@@ -164,6 +164,8 @@
   "ERRORS_API_KEY_MISSING": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با این کلید API ممنوع است" },
+  "ERRORS_NETWORK_ERROR": { "message": "خطای شبکه" },
+  "ERRORS_HTTP_ERROR": { "message": "خطای HTTP" },
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "محدودیت استفاده از این API به پایان رسیده است."
   },

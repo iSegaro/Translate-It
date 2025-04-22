@@ -161,6 +161,8 @@
   "ERRORS_API_KEY_WRONG": { "message": "API Key is wrong" },
   "ERRORS_API_KEY_INVALID": { "message": "API Key is invalid" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "API Key is forbidden" },
+  "ERRORS_NETWORK_ERROR": { "message": "Network Error" },
+  "ERRORS_HTTP_ERROR": { "message": "HTTP Error" },
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "You exceeded your current quota, Please check API Key"
   },
