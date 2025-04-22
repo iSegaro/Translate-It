@@ -11,6 +11,11 @@ import { getErrorMessageByKey, matchErrorToKey } from "./ErrorMessages.js";
  * @returns {Promise<string>}
  */
 export async function translateErrorMessage(error) {
+  if (error?.type) {
+    const translated = await getErrorMessageByKey(error.type);
+    if (translated) return translated;
+  }
+
   const raw =
     typeof error === "string" ? error
     : error instanceof Error ? error.message
