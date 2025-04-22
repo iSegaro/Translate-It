@@ -238,7 +238,7 @@ export default class SelectionWindows {
     icon.classList.add("tts-icon");
     icon.addEventListener("click", (e) => {
       e.stopPropagation();
-      logME("[SelectionWindows]: TTS icon clicked.");
+      // logME("[SelectionWindows]: TTS icon clicked.");
       if (isExtensionContextValid()) {
         Browser.runtime.sendMessage({
           action: "speak",
