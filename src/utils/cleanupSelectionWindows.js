@@ -1,6 +1,7 @@
 // src/utils/cleanupSelectionWindows.js
 
 import Browser from "webextension-polyfill";
+import { logME } from "./helpers";
 
 /**
  * Injects and runs a DOM cleanup script in the given tab to remove
@@ -14,7 +15,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
         try {
           el.remove();
         } catch (e) {
-          console.error("[SelectionWindows] remove failed:", e);
+          logME("[SelectionWindows] remove failed:", e);
         }
       });
     };
@@ -31,7 +32,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
       });
     }
   } catch (err) {
-    console.error(`[SelectionWindows] dismissAll in tab ${tabId} failed:`, err);
+    // logME(`[SelectionWindows] dismissAll in tab ${tabId} failed:`, err);
   }
 }
 
@@ -46,6 +47,6 @@ export async function dismissAllSelectionWindows() {
       await dismissAllSelectionWindowsInTab(tab.id);
     }
   } catch (err) {
-    console.error("[SelectionWindows] dismissAllSelectionWindows failed:", err);
+    logME("[SelectionWindows] dismissAllSelectionWindows failed:", err);
   }
 }

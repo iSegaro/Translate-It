@@ -148,6 +148,7 @@ export default class EventHandler {
       (event.ctrlKey || event.metaKey) && event.key === "/" && !event.repeat
     );
   }
+
   isEscapeEvent(event) {
     return event.key === "Escape" && !event.repeat;
   }
