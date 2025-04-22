@@ -4,6 +4,7 @@ import { CONFIG, getSettingsAsync } from "../config.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { dismissAllSelectionWindows } from "../utils/cleanupSelectionWindows.js";
 
 const errorHandler = new ErrorHandler();
 
@@ -52,6 +53,8 @@ Browser.runtime.onInstalled.addListener((details) => {
   };
 
   if (details.reason === "install" || details.reason === "update") {
-    initOrUpdate();
+    initOrUpdate().then(() => {
+      dismissAllSelectionWindows();
+    });
   }
 });

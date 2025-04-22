@@ -298,3 +298,29 @@ export default class SelectionWindows {
     element.style.textAlign = isRtl ? "right" : "left";
   }
 }
+
+/**
+ * Dismisses all selection popups created by this script.
+ * Finds every element with the host class, removes it, and logs unexpected errors.
+ */
+export function dismissAllSelectionWindows() {
+  logME("[SelectionWindows] Dismissing all selection windows");
+  try {
+    const hosts = document.querySelectorAll(".aiwc-selection-popup-host");
+    hosts.forEach((host) => {
+      try {
+        // Remove any attached event listeners if you stored them on the element:
+        // e.g. if host._outsideClickListener exists, do:
+        //   document.removeEventListener("mousedown", host._outsideClickListener);
+        host.remove();
+      } catch (innerErr) {
+        logME("[SelectionWindows] Failed to remove a host:", innerErr);
+      }
+    });
+  } catch (err) {
+    logME(
+      "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
+      err
+    );
+  }
+}
