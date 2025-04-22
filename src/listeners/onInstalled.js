@@ -46,7 +46,7 @@ Browser.runtime.onInstalled.addListener((details) => {
       }
     } catch (error) {
       throw await errorHandler.handle(error, {
-        type: ErrorTypes.API,
+        type: ErrorTypes.SERVICE,
         context: "background-onInstalled-initOrUpdate",
       });
     }
