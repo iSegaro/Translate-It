@@ -364,12 +364,11 @@ export default class EventHandler {
   async cleanCache() {
     clearAllCaches({ state });
     this.notifier.show(
-      (await getTranslationString("STATUS_REMOVE_MEMORY")) || "حافظه پاک شد",
+      (await getTranslationString("STATUS_REMOVE_MEMORY")) || "Memory Cleared",
       "info",
       true,
       2000
     );
-    logME("حافظه پاک شد.");
   }
 
   @logMethod
@@ -585,7 +584,7 @@ export default class EventHandler {
   }
 
   async handleCtrlSlash(event) {
-    logME("[EventHandler] Handling Ctrl+/ event");
+    // logME("[EventHandler] Handling Ctrl+/ event");
 
     event.preventDefault();
     event.stopPropagation();
