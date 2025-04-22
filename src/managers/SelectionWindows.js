@@ -28,12 +28,12 @@ export default class SelectionWindows {
     if (!isExtensionContextValid()) {
       const err = new Error(ErrorTypes.CONTEXT);
       err.type = ErrorTypes.CONTEXT;
-      await this.translationHandler.errorHandler.handle(err, {
+
+      return await this.translationHandler.errorHandler.handle(err, {
         type: ErrorTypes.CONTEXT,
         context: "SelectionWindows-show-context",
         statusCode: "context-invalid",
       });
-      return;
     }
 
     if (
@@ -144,13 +144,15 @@ export default class SelectionWindows {
       });
 
     // Outside click to dismiss
-    const onOutsideClick = (e) => {
-      if (!this.displayElement.contains(e.target)) {
-        this.cancelCurrentTranslation();
-      }
-    };
-    document.addEventListener("mousedown", onOutsideClick);
-    this.removeMouseDownListener = onOutsideClick;
+    if (isExtensionContextValid()) {
+      const onOutsideClick = (e) => {
+        if (!this.displayElement.contains(e.target)) {
+          this.cancelCurrentTranslation();
+        }
+      };
+      document.addEventListener("mousedown", onOutsideClick);
+      this.removeMouseDownListener = onOutsideClick;
+    }
   }
 
   cancelCurrentTranslation() {
@@ -162,7 +164,9 @@ export default class SelectionWindows {
   }
 
   stoptts_playing() {
-    Browser.runtime.sendMessage({ action: "stopTTS" });
+    if (isExtensionContextValid()) {
+      Browser.runtime.sendMessage({ action: "stopTTS" });
+    }
   }
 
   applyInitialStyles(position) {
@@ -233,11 +237,13 @@ export default class SelectionWindows {
     icon.addEventListener("click", (e) => {
       e.stopPropagation();
       logME("[SelectionWindows]: TTS icon clicked.");
-      Browser.runtime.sendMessage({
-        action: "speak",
-        text: textToSpeak,
-        lang: AUTO_DETECT_VALUE,
-      });
+      if (isExtensionContextValid()) {
+        Browser.runtime.sendMessage({
+          action: "speak",
+          text: textToSpeak,
+          lang: AUTO_DETECT_VALUE,
+        });
+      }
     });
     return icon;
   }
