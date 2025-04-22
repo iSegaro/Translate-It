@@ -73,14 +73,13 @@ export function initContentScript() {
         return;
       }
 
-      console.info(
-        "[AI Writing Companion] ✅ Extension initialized successfully!"
-      );
       Object.freeze(CONFIG);
       this.setupUpdateSelectElementState();
       this.setupPagehideListener();
       this.setupMessageListener();
       this.setupBridgeListener();
+
+      logME("[AI Writing Companion] ✅ Extension initialized successfully!");
     }
 
     setupPagehideListener() {
