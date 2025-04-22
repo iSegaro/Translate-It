@@ -3,7 +3,9 @@
 export class ErrorTypes {
   // سطوح عمومی که برای لاگ و تصمیم‌گیری استفاده می‌شوند
   static API = "API";
-  static NETWORK = "NETWORK";
+  static HTTP_ERROR = "HTTP_ERROR";
+  static NETWORK_ERROR = "NETWORK_ERROR";
+  static API_RESPONSE_INVALID = "API_RESPONSE_INVALID";
   static SERVICE = "SERVICE";
   static VALIDATION = "VALIDATION";
   static TAB_AVAILABILITY = "TAB";

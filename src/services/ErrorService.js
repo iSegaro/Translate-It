@@ -14,7 +14,8 @@ const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
-  ErrorTypes.NETWORK,
+  ErrorTypes.NETWORK_ERROR,
+  ErrorTypes.HTTP_ERROR,
   ErrorTypes.INTEGRATION,
   ErrorTypes.SERVICE,
   ErrorTypes.VALIDATION,
@@ -32,13 +33,14 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.HTTP_ERROR,
   ErrorTypes.GEMINI_QUOTA,
 ]);
 
 export class ErrorHandler {
   constructor() {
     this.notifier = new NotificationManager();
-    this.shown = new Set();
+    this.displayedErrors = new Set();
     this.handling = false;
   }
   static async processError(err) {
@@ -57,17 +59,7 @@ export class ErrorHandler {
       }
       if (SILENT.has(type)) return err;
       const action = OPEN_SETTINGS.has(type) ? openOptionsPage : undefined;
-      if (!this.shown.has(msg)) {
-        this.notifier.show(
-          msg,
-          type === ErrorTypes.NETWORK ? "warning" : "error",
-          true,
-          4000,
-          action
-        );
-        this.shown.add(msg);
-        setTimeout(() => this.shown.delete(msg), 4500);
-      }
+      this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
       return err;
     } finally {
       this.handling = false;
@@ -124,11 +116,17 @@ export class ErrorHandler {
     const typeMap = {
       [ErrorTypes.API]: "error",
       [ErrorTypes.UI]: "error",
-      [ErrorTypes.NETWORK]: "warning",
+      [ErrorTypes.NETWORK_ERROR]: "warning",
+      [ErrorTypes.HTTP_ERROR]: "warning",
       [ErrorTypes.SERVICE]: "error",
       [ErrorTypes.CONTEXT]: "warning",
       [ErrorTypes.VALIDATION]: "warning",
       [ErrorTypes.INTEGRATION]: "warning",
+      [ErrorTypes.API_KEY_INVALID]: "error",
+      [ErrorTypes.API_KEY_MISSING]: "error",
+      [ErrorTypes.API_URL_MISSING]: "error",
+      [ErrorTypes.MODEL_MISSING]: "error",
+      [ErrorTypes.QUOTA_EXCEEDED]: "warning",
     };
     const toastType = typeMap[type] || "error";
     this.notifier.show(message, toastType, true, 4000, action);
