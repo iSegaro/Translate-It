@@ -10,9 +10,9 @@ const errorHandler = new ErrorHandler();
 
 Browser.runtime.onInstalled.addListener((details) => {
   logME(
-    `AI Writing Companion ${details.reason}${
-      details.reason === "install" ? " Installed!"
-      : details.reason === "update" ? " Updated!"
+    `[AI Writing Companion] 🌟 Successfully ${
+      details.reason === "install" ? "Installed!"
+      : details.reason === "update" ? "Updated!"
       : ""
     }`
   );
@@ -27,7 +27,7 @@ Browser.runtime.onInstalled.addListener((details) => {
       };
 
       await Browser.storage.local.set(defaultSettings);
-      logME("[Background] Settings initialized");
+      // logME("[Background] Settings initialized");
 
       const tabs = await Browser.tabs.query({ url: "<all_urls>" });
 
@@ -41,7 +41,7 @@ Browser.runtime.onInstalled.addListener((details) => {
             url: tab.url,
           });
         } catch (err) {
-          logME("[onInstalled] sendMessage failed:", tab.url, err.message);
+          // logME("[onInstalled] sendMessage failed:", tab.url, err.message);
         }
       }
     } catch (error) {

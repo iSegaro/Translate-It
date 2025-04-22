@@ -16,9 +16,9 @@ async function injectContentScript(tabId, url) {
       target: { tabId, allFrames: true },
       files: ["browser-polyfill.js", "content.bundle.js"],
     });
-    logME("[Background] Content script injected successfully to tab:", tabId);
+    // logME("[Background] Content script injected successfully to tab:", tabId);
   } catch (error) {
-    logME("[Background] Failed to inject content script:", error);
+    logME("[Background-Injection] Failed to inject content script:", error);
   }
 }
 

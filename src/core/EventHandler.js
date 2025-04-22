@@ -376,9 +376,6 @@ export default class EventHandler {
    EventHandler.handleSelect_ElementClick
 ------------------------------------------------------------------ */
   async handleSelect_ElementClick(e) {
-    const platform = detectPlatform();
-    logME(`Select‑Element on «${platform}»`);
-
     // غیرفعال‌سازی حالت انتخاب المنت
     taggleLinks(false);
     this.translationHandler.select_Element_ModeActive = false;

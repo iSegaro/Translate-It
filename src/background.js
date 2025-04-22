@@ -11,7 +11,7 @@ import "./listeners/onAlarm_chrome.js";
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 // Potentially import other listeners like onCommand, onActionClicked etc. if needed
 
-logME("[Background] Main script loaded, listeners attached.");
+logME("[AI Writing Companion] ✅ Main script loaded, listeners attached.");
 
 // Global error handling setup or other initializations can stay here if needed
 // For instance, if ErrorHandler needs to be a singleton accessible everywhere:

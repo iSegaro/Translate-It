@@ -221,5 +221,3 @@ Browser.tabs.onRemoved.addListener((tabId) => {
     logME(`[onMessage] Cleaned state for tab ${tabId}`);
   }
 });
-
-logME("Background onMessage listener attached.");
