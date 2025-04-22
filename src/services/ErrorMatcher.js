@@ -48,7 +48,13 @@ export function matchErrorToType(rawMessage = "") {
     return ErrorTypes.NETWORK;
 
   // Context
-  if (msg.includes("context invalid") || msg.includes("extension context"))
+  if (
+    msg.includes("context") ||
+    msg.includes("context invalid") ||
+    msg.includes("extension context") ||
+    msg.includes("context invalidated.") ||
+    msg.includes("extension context invalidated.")
+  )
     return ErrorTypes.CONTEXT;
 
   return ErrorTypes.UNKNOWN;

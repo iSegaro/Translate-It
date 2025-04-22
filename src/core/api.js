@@ -313,7 +313,7 @@ class ApiService {
     }
 
     if (!isExtensionContextValid()) {
-      const err = new Error(ErrorTypes.INVALID_CONTEXT);
+      const err = new Error(ErrorTypes.CONTEXT);
       err.type = ErrorTypes.CONTEXT;
       err.context = "api-translateText-context";
       throw err;
