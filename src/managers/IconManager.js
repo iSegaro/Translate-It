@@ -1,7 +1,6 @@
 // src/managers/IconManager.js
 
 import { CONFIG, state } from "../config.js";
-import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import injectIconStyle from "../utils/helpers.js";
 
@@ -36,7 +35,6 @@ export default class IconManager {
   createTranslateIcon(target) {
     try {
       if (!target?.isConnected) {
-        logME("[IconManager] Target is not in DOM.");
         return null;
       }
       injectIconStyle("styles/icon.css");
