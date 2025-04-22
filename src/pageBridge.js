@@ -5,18 +5,18 @@
 
 (function () {
   if (window.__AI_WRITING_BRIDGE_READY__) {
-    console.warn("[AIWriting:bridge] Already initialized.");
+    // console.log("[AIWriting:bridge] Already initialized.");
     return;
   }
 
   window.__AI_WRITING_BRIDGE_READY__ = true;
-  console.log("[AIWriting:bridge] Bridge script injected into page.");
+  // console.log("[AIWriting:bridge] Bridge script injected into page.");
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
     if (event.data?.type !== "AI_WRITING_TRANSLATE_REQUEST") return;
 
-    console.log("[AIWriting:bridge] Received translate request:", event.data);
+    // console.log("[AIWriting:bridge] Received translate request:", event.data);
 
     // ✅ ارسال به content script
     window.postMessage(

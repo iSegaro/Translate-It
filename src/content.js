@@ -12,13 +12,13 @@ import { initContentScript } from "./contentMain.js";
   );
 
   if (!isTopWindow && !isAllowedIframe) {
-    logME("[AIWriting] Skipping injection inside iframe:", location.hostname);
+    // logME("[AIWriting] Skipping injection inside iframe:", location.hostname);
     return;
   }
 
   // ✅ اگر از قبل فعال شده بود، دوباره اجرا نکن
   if (window.__AI_WRITING_EXTENSION_ACTIVE__) {
-    logME("[AIWriting] Skipping double init.");
+    // logME("[AIWriting] Skipping double init.");
     return;
   }
 
