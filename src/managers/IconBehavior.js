@@ -3,7 +3,7 @@
 import { state, TranslationMode } from "../config.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { logME } from "../utils/helpers.js";
+import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
@@ -46,6 +46,13 @@ export default function setupIconBehavior(
   const clickHandler = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!isExtensionContextValid()) {
+      const err = new Error(ErrorTypes.CONTEXT);
+      err.type = ErrorTypes.CONTEXT;
+      err.context = "iconbehavior-click-context";
+      throw err;
+    }
 
     let statusNode = null;
     try {

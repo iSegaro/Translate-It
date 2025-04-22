@@ -2,7 +2,7 @@
 //
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
-import { logME } from "../utils/helpers.js";
+import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 
 const safe = {
@@ -148,10 +148,12 @@ export default class NotificationManager {
       .then((tabs) => {
         const tabId = tabs?.[0]?.id;
         if (!tabId) return; // no-op if no active tab
-        return Browser.tabs.sendMessage(tabId, {
-          action: "show_notification",
-          payload: { message, type, autoDismiss: auto, duration },
-        });
+        if (isExtensionContextValid()) {
+          return Browser.tabs.sendMessage(tabId, {
+            action: "show_notification",
+            payload: { message, type, autoDismiss: auto, duration },
+          });
+        }
       })
       .then((res) => {
         // attach click callback only if res indicates listener present

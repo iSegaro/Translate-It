@@ -2,7 +2,7 @@
 import Browser from "webextension-polyfill";
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
-import { logME } from "./helpers.js";
+import { isExtensionContextValid, logME } from "./helpers.js";
 
 getEventRouterInstance();
 
@@ -17,6 +17,8 @@ export async function Active_SelectElement(
       currentWindow: true,
     });
     if (tabs.length === 0) return;
+
+    if (!isExtensionContextValid()) return;
 
     const tabId = tabs[0].id;
     let currentState = false;
