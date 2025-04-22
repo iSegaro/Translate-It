@@ -5,6 +5,7 @@ import { logME } from "../utils/helpers.js";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { dismissAllSelectionWindows } from "../utils/cleanupSelectionWindows.js";
+import { teardownEventListeners } from "../core/EventRouter.js";
 
 const errorHandler = new ErrorHandler();
 
@@ -16,6 +17,8 @@ Browser.runtime.onInstalled.addListener((details) => {
       : ""
     }`
   );
+
+  teardownEventListeners();
 
   const initOrUpdate = async () => {
     try {
