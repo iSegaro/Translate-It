@@ -79,8 +79,6 @@ export async function handleFetchTranslation(
 
     sendResponse({ success: true, data: { translatedText: translation } });
   } catch (err) {
-    logME("[Handler:Translation] Error:", err);
-
     const processed = await errorHandler.handle(err, {
       type: err.type || ErrorTypes.API,
       context: "handler-fetchTranslation",
@@ -146,7 +144,7 @@ export async function handleFetchTranslationBackground(
 
     sendResponse({ success: true, data: { translatedText: translation } });
   } catch (err) {
-    logME("[Handler:TranslationBackground] Error:", err);
+    // logME("[Handler:TranslationBackground] Error:", err);
 
     const processed = await errorHandler.handle(err, {
       type: err.type || ErrorTypes.API,
