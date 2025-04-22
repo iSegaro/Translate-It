@@ -22,7 +22,8 @@ export const errorMessages = {
     "You reached the Gemini quota for content generation",
 
   // General errors
-  [ErrorTypes.NETWORK]: "Connection to server failed",
+  [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
+  [ErrorTypes.HTTP_ERROR]: "HTTP error",
   [ErrorTypes.CONTEXT]: "Extension context lost",
   [ErrorTypes.UNKNOWN]: "An unknown error occurred",
   [ErrorTypes.TAB_AVAILABILITY]: "Tab not available",
@@ -48,9 +49,12 @@ export async function getErrorMessage(type) {
   return msg;
 }
 
-export async function getErrorMessage_OLD(type) {
-  let msg = await getTranslationString(type);
-  if (!msg || !msg.trim())
-    msg = errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
-  return msg;
+/**
+ * Retrieves a localized error message by its key.
+ * @param {string} key - The error type or message key
+ * @returns {string|null} - Localized message or null if not found
+ */
+export function getErrorMessageByKey(key) {
+  if (typeof key !== "string") return null;
+  return messages[key] ?? null;
 }
