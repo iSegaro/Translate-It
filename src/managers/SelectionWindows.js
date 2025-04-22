@@ -64,6 +64,8 @@ export default class SelectionWindows {
     this.displayElement.classList.add("aiwc-selection-popup-host");
     this.applyInitialStyles(position);
 
+    if (!this.displayElement) return;
+
     // Shadow root + inner container
     const shadowRoot = this.displayElement.attachShadow({ mode: "open" });
     const style = document.createElement("style");
