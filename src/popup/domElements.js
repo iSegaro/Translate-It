@@ -2,11 +2,7 @@
 
 // Helper function for querying elements
 function $(selector) {
-  const element = document.getElementById(selector);
-  if (!element) {
-    console.warn(`[AIWC-DOM] Element not found for selector: ${selector}`);
-  }
-  return element;
+  return document.getElementById(selector);
 }
 
 export default {
