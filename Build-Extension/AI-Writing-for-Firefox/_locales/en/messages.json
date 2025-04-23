@@ -164,8 +164,8 @@
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "You exceeded your current quota, Please check API Key"
   },
-  "ERRORS_GEMINI_GENERATE_QUOTA": {
-    "message": "Gemini quota exceeded for API key. Check your usage in Google AI Studio."
+  "ERRORS_GEMINI_QUOTA_REGION": {
+    "message": "Gemini quota exceeded for API key. (Region issue)"
   },
   "ERRORS_API_URL_MISSING": { "message": "API URL is missing" },
   "ERRORS_AI_MODEL_MISSING": { "message": "AI Model is missing" },
