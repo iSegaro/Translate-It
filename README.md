@@ -225,8 +225,6 @@ If this project helped you and you’d like to support it, you can buy me a coff
 <br>
 Thank you for your support!
 
-Your donation supports Mohammad [![Mohammad X](<https://img.shields.io/badge/X%20(Twitter)-M_Khani65-green?style=flat&logo=x>)][mohammad-x-url]
-
 <br>
 
 ---
@@ -244,7 +242,9 @@ Your donation supports Mohammad [![Mohammad X](<https://img.shields.io/badge/X%2
 
 ### Prerequisites
 
-Make sure **Node.js** is installed (it includes `npm`). Then run:
+Make sure [**Node.js**][node-js-url] is installed (it includes `npm`). Then run:
+
+_Note: I am using [`pnpm`][pnpm-url] in this project instead `npm`._
 
 ```bash
 cd AI-Writing-Companion
@@ -257,14 +257,22 @@ To generate the extension files, run:
 
 ```bash
 npm run build
+
+npm run build:chrome
+npm run build:firefox
+npm run build:edge
+
 ```
 
-This will create the folder `Build-Extension/Chrome/` for manual installation.
+This will create `zip` files in the `Build-Extension/` directory for each browser, intended for manual installation.
 
-To actively develop and apply changes in real time:
+To actively develop and apply changes in real time, use one of follwing commands:
 
 ```bash
 npm run watch
+
+npm run watch:chrome
+npm run watch:firefox
 ```
 
 <br>
@@ -322,3 +330,5 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [openrouter-url-docs]: https://openrouter.ai/models/
 [webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
+[pnpm-url]: https://pnpm.io/
+[node-js-url]: https://nodejs.org/
