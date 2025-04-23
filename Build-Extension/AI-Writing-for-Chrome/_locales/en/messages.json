@@ -203,9 +203,9 @@
     "message": "Error applying translation."
   },
 
-  "STATUS_TRANSLATING_CTRLSLASH": { "message": "Translate..." },
-  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "Translate..." },
-  "STATUS_TRANSLATING_ICON": { "message": "Translate..." },
+  "STATUS_TRANSLATING_CTRLSLASH": { "message": "translating..." },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "translating..." },
+  "STATUS_TRANSLATING_ICON": { "message": "translating..." },
   "STATUS_Revert_Number": { "message": "Reverted" },
   "STATUS_REVERT_NOT_FOUND": { "message": "No text found to revert." },
   "STATUS_FROM_MEMORY": { "message": "Memory" },
