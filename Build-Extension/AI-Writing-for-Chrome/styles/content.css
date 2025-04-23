@@ -91,19 +91,6 @@
 }
 
 /* ==========================================================================
-     Disable Hyperlinks Styles
-     ========================================================================== */
-.AIWritingCompanion-disable-links a,
-.AIWritingCompanion-disable-links button,
-.AIWritingCompanion-disable-links [onclick],
-.AIWritingCompanion-disable-links [role="link"],
-.AIWritingCompanion-disable-links div[role="link"] {
-  pointer-events: none !important;
-  cursor: crosshair !important;
-  color: inherit;
-}
-
-/* ==========================================================================
      Selection Text Window Styles
      ========================================================================== */
 .aiwc-selection-display-temp {

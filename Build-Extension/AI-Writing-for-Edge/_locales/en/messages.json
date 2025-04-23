@@ -125,6 +125,7 @@
   "popup_clear_source_language_title": { "message": "Clear source language" },
   "popup_translate_button_title": { "message": "Translate" },
   "popup_translate_button_alt_icon": { "message": "Translate" },
+  "popup_exclude_toggle_title": { "message": "Enable/Disable on this site" },
   "popup_copy_source_alt_icon": { "message": "Copy" },
   "popup_copy_source_title_icon": { "message": "Copy" },
   "popup_voice_source_alt_icon": { "message": "Speak source" },
