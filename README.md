@@ -38,9 +38,30 @@
 This is a lightweight and efficient personal tool for translating text on websites and even the text you write yourself. With multiple methods for translation and word lookup, it offers a fast and seamless experience:
 
 - **Text Selection Translation:** Simply select any text, and the translation box will appear right where you selected.
+
+  <p align="center">
+    <img src="./docs/Selection.png" alt="Popup showing translation of selected text" height="280" />
+  </p>
+
 - **Element Selection Translation:** Activate “Select Element” mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
+
+<p align="center">
+  <img src="./docs/Select_Element_Item.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
+  <img src="./docs/Select_Element_Before.png" alt="Webpage before element-selection mode is activated" height="120" />
+  <img src="./docs/Select_Element_After.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
+</p>
+
 - **In-Field Translation:** When typing inside a form or text field, press the `Ctrl + /` shortcut or click the inline translator icon to instantly translate the content before sending.
+
+<p align="center">
+  <img src="./docs/Icon.png" alt="Small translation icon next to text input field" height="240" />
+</p>
+
 - **Advanced Popup Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support.
+
+<p align="center">
+  <img src="./docs/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
+</p>
 
 This extension is developed solely for personal use and keeps smart and fast translation always within reach.
 
