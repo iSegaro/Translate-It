@@ -16,6 +16,7 @@ import {
 import { marked } from "marked";
 import { TranslationMode } from "../config.js";
 import { getTranslationString, parseBoolean } from "../utils/i18n.js";
+import { getErrorMessageByKey } from "../services/ErrorMessages.js";
 
 /**
  * Always return the original error message (untranslated).
@@ -106,7 +107,15 @@ async function handleTranslationResponse(
       (await getTranslationString("popup_string_translate_error_response")) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 
-    const msg = extractErrorMessage(response?.error) || fallback;
+    let msg = extractErrorMessage(response?.error) || fallback;
+
+    // Translate default errors created manually
+    // If not translated, the error key itself will be shown
+    // So before displaying, we check and replace it with the actual error message if available
+    const error_msg = getErrorMessageByKey(msg);
+    if (error_msg) {
+      msg = error_msg;
+    }
 
     // Clear and display error
     elements.translationResult.innerHTML = "";
