@@ -3,6 +3,7 @@
 
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 // Helper to extract origin from a URL
 function getOrigin(url) {
@@ -44,7 +45,9 @@ export async function init() {
   toggle.disabled = !isHttp;
   if (!isHttp) {
     toggle.checked = false;
-    toggle.title = "فعال/غیرفعال در این صفحه";
+    toggle.title =
+      (await getTranslationString("popup_exclude_toggle_title")) ||
+      "(فعال/غیرفعال در این صفحه)";
   }
 
   // Read existing excluded sites
