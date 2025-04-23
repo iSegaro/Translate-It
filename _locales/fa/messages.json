@@ -124,6 +124,7 @@
   "popup_target_language_title": { "message": "زبان خروجی" },
   "popup_target_language_placeholder": { "message": "زبان خروجی" },
   "popup_clear_target_language_title": { "message": "پاک کردن خروجی" },
+  "popup_exclude_toggle_title": { "message": "فعال/غیرفعال کردن در این سایت." },
   "popup_swap_languages_title": { "message": "جابجایی زبان‌ها" },
   "popup_swap_languages_alt_icon": { "message": "جابجایی" },
   "popup_source_language_placeholder": { "message": "زبان ورودی" },

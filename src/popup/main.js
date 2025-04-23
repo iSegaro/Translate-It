@@ -11,8 +11,8 @@ import * as translationManager from "./translationManager.js";
 import * as headerActionsManager from "./headerActionsManager.js";
 import * as initializationManager from "./initializationManager.js";
 import * as popupInteractionManager from "./popupInteractionManager.js";
-
 import { app_localize_popup } from "../utils/i18n.js";
+import * as excludeManager from "./excludeManager.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   logME("[Popup Main]: DOMContentLoaded event fired.");
@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     headerActionsManager.init();
     await initializationManager.init();
     await popupInteractionManager.init();
+    await excludeManager.init();
 
     try {
       const popupPort = browser.runtime.connect({ name: "popup" });
@@ -40,7 +41,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     logME("Popup initialization failed:", error);
     document.body.innerHTML = `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`;
   } finally {
-    // اجرای ترجمه بعد از اتمام تمام عملیات اولیه
+    // اجرای ترجمه بعد از اتمام کامل عملیات اولیه
     app_localize_popup(CONFIG.APPLICATION_LOCALIZE);
   }
 });
