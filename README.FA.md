@@ -16,8 +16,6 @@
     <span>&nbsp;Firefox&nbsp;</span>
   </a>
 
-✅ در دسترس
-
 </p>
 
 <br>

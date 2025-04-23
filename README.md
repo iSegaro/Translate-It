@@ -16,8 +16,6 @@
     <span>&nbsp;Firefox&nbsp;</span>
   </a>
 
-✅ Available now
-
 </p>
 
 <br>
@@ -317,15 +315,18 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Chrome-v0.1.0.zip
-[crx-download-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion.crx
-[chrome-build-folder-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/
+[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-for-Edge-v0.1.0.zip
 [chrome-extensions-url]: chrome://extensions/
+[edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
 [mohammad-x-url]: https://x.com/m_khani65/
-[github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues
+[github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues/
+[isegaro-x-url]: https://x.com/iSegar0/
+[m-khani65-x-url]: https://x.com/M_Khani65/
+[flaticon-url]: https://www.flaticon.com/free-icons/translate/
 [gemini-url-docs]: https://ai.google.dev/api/all-methods/
 [openai-url-docs]: https://platform.openai.com/docs/models/
 [openrouter-url-docs]: https://openrouter.ai/models/
