@@ -69,39 +69,42 @@ export default class SelectionWindows {
     // Shadow root + inner container
     const shadowRoot = this.displayElement.attachShadow({ mode: "open" });
     const style = document.createElement("style");
-    style.textContent = `
-      .popup-container {
-        background-color: #f8f8f8;
-        color: #333;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 8px 12px;
-        font-size: 14px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        max-width: 300px;
-        overflow-wrap: break-word;
-      }
-      .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      @keyframes blink {
-        0% { opacity: 0.3; }
-        50% { opacity: 0.8; }
-        100% { opacity: 0.3; }
-      }
-      .loading-dot {
-        font-size: 1.2em;
-        margin: 0 2px;
-        animation: blink 0.7s infinite;
-      }
-      .first-line { margin-bottom: 6px; display: flex; align-items: center; }
-      .original-text { font-weight: bold; margin-left: 6px; }
-      .second-line { margin-top: 4px; }
-      .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; }
-    `;
-    shadowRoot.appendChild(style);
+
+    if (style) {
+      style.textContent = `
+        .popup-container {
+          background-color: #f8f8f8;
+          color: #333;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 8px 12px;
+          font-size: 14px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          max-width: 300px;
+          overflow-wrap: break-word;
+        }
+        .loading-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        @keyframes blink {
+          0% { opacity: 0.3; }
+          50% { opacity: 0.8; }
+          100% { opacity: 0.3; }
+        }
+        .loading-dot {
+          font-size: 1.2em;
+          margin: 0 2px;
+          animation: blink 0.7s infinite;
+        }
+        .first-line { margin-bottom: 6px; display: flex; align-items: center; }
+        .original-text { font-weight: bold; margin-left: 6px; }
+        .second-line { margin-top: 4px; }
+        .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; }
+      `;
+      shadowRoot.appendChild(style);
+    }
 
     this.innerContainer = document.createElement("div");
     this.innerContainer.classList.add("popup-container");
