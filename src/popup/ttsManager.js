@@ -42,7 +42,7 @@ function setupEventListeners() {
 
   voiceTargetIcon?.addEventListener("click", async () => {
     const text = translationResultEl?.textContent?.trim();
-    if (!text || text === "در حال ترجمه...") {
+    if (!text) {
       translationResultEl.scrollIntoView({
         behavior: "smooth",
         block: "center",
