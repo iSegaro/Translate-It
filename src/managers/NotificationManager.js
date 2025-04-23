@@ -1,9 +1,10 @@
 // src/managers/NotificationManager.js
-//
+
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
 const safe = {
   ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
@@ -13,9 +14,6 @@ const safe = {
   ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
   ICON_INFO: CONFIG?.ICON_INFO ?? "🔵",
   ICON_REVERT: CONFIG?.ICON_REVERT ?? "↩️",
-  NOTIF_ALIGN: CONFIG?.NOTIFICATION_ALIGNMENT ?? "right",
-  TEXT_DIR: CONFIG?.NOTIFICATION_TEXT_DIRECTION ?? "rtl",
-  TEXT_ALIGN: CONFIG?.NOTIFICATION_TEXT_ALIGNMENT ?? "right",
 };
 
 export default class NotificationManager {
@@ -48,7 +46,7 @@ export default class NotificationManager {
       },
       status: {
         title: "AI Writing Companion - Status",
-        icon: safe.ICON_INFO,
+        icon: safe.ICON_STATUS,
         cls: "AIWC-status",
         dur: 2000,
       },
@@ -60,33 +58,85 @@ export default class NotificationManager {
       },
     };
 
+    this.container = null;
     if (typeof document !== "undefined") {
-      this.container = this._makeContainer();
-    } else {
-      this.container = null;
+      if (document.readyState === "loading") {
+        document.addEventListener(
+          "DOMContentLoaded",
+          () => this._makeContainer(),
+          { once: true }
+        );
+      } else {
+        this._makeContainer();
+      }
     }
   }
 
   _makeContainer() {
-    const id = "AIWritingCompanion-notifications";
-    let el = document.getElementById(id);
-    if (el) return el;
+    let el = null;
+    try {
+      const id = "AIWritingCompanion-notifications";
+      // Return existing container
+      el = document.getElementById(id);
+      if (el) {
+        this.container = el;
+        return el;
+      }
 
-    el = document.createElement("div");
-    el.id = id;
-    Object.assign(el.style, {
-      position: "fixed",
-      top: "20px",
-      zIndex: "2147483646",
-      display: "flex",
-      flexDirection: "column",
-      gap: "10px",
-      [safe.NOTIF_ALIGN === "right" ? "right" : "left"]: "20px",
-      direction: safe.TEXT_DIR,
-      textAlign: safe.TEXT_ALIGN,
-    });
-    document.body.appendChild(el);
-    return el;
+      // Ensure body exists
+      if (!document.body) {
+        logME("[NotificationManager] document.body not available.");
+        return null;
+      }
+
+      // Create new container element
+      el = document.createElement("div");
+      if (!el) {
+        logME("[NotificationManager] document.createElement failed.");
+        return null;
+      }
+      el.id = id;
+
+      // Apply base styles
+      Object.assign(el.style, {
+        position: "fixed",
+        top: "20px",
+        zIndex: "2147483646",
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+      });
+
+      document.body.appendChild(el);
+      this.container = el;
+
+      // Async i18n adjustment
+      (async () => {
+        try {
+          const rtlMsg = await getTranslationString("IsRTL");
+          const isRTL = parseBoolean(rtlMsg);
+          if (isRTL) {
+            el.style.right = "20px";
+            el.style.left = "";
+          } else {
+            el.style.left = "20px";
+            el.style.right = "";
+          }
+          el.style.direction = isRTL ? "rtl" : "ltr";
+          el.style.textAlign = isRTL ? "right" : "left";
+        } catch (e) {
+          logME("[NotificationManager] i18n adjust failed:", e);
+        }
+      })();
+
+      return el;
+    } catch (error) {
+      logME("[NotificationManager] _makeContainer error:", error);
+      if (el && el.remove) {
+        el.remove();
+      }
+      return null;
+    }
   }
 
   show(msg, type = "info", auto = true, dur = null, onClick) {
@@ -130,7 +180,7 @@ export default class NotificationManager {
 
     n.addEventListener("click", () => {
       try {
-        if (typeof onClick === "function") onClick();
+        onClick?.();
       } catch (e) {
         logME(e);
       }
@@ -138,41 +188,36 @@ export default class NotificationManager {
     });
 
     this.container.appendChild(n);
-    if (auto && cfg.cls !== "AIWC-status") {
+    if (auto && cfg.cls !== "AIWC-status")
       setTimeout(() => this.dismiss(n), dur);
-    }
     return n;
   }
 
   _sendToActiveTab(message, type, auto, duration, onClick) {
     return Browser.tabs
       .query({ active: true, currentWindow: true })
-      .then((tabs) => {
-        const tabId = tabs?.[0]?.id;
-        if (!tabId) return; // no-op if no active tab
-        if (isExtensionContextValid()) {
-          return Browser.tabs.sendMessage(tabId, {
+      .then((tabs) =>
+        tabs?.[0]?.id && isExtensionContextValid() ?
+          Browser.tabs.sendMessage(tabs[0].id, {
             action: "show_notification",
             payload: { message, type, autoDismiss: auto, duration },
-          });
-        }
-      })
+          })
+        : null
+      )
       .then((res) => {
         // attach click callback only if res indicates listener present
         if (onClick && res !== undefined) {
-          const clickListener = (msg) => {
+          const listener = (msg) => {
             if (msg?.action === "notification_clicked") {
               onClick();
-              Browser.runtime.onMessage.removeListener(clickListener);
+              Browser.runtime.onMessage.removeListener(listener);
             }
           };
-          Browser.runtime.onMessage.addListener(clickListener);
+          Browser.runtime.onMessage.addListener(listener);
         }
       })
-      .catch((err) => {
-        // fallback to OS notification
-        this._osNotification(message, type, onClick);
-      });
+      .catch(() => this._osNotification(message, type, onClick));
+    // fallback to OS notification
   }
 
   _osNotification(message, type, onClick) {
