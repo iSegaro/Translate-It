@@ -169,7 +169,7 @@ const injectCSS = (filePath) => {
 
 export const injectStyle = () => {
   try {
-    const hostname = window.location.hostname;
+    const hostname = window?.location.hostname;
     injectCSS("styles/content.css");
     injectCSS("styles/disable_links.css");
     injectCSS("styles/SelectionWindows.css");
