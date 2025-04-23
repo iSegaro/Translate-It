@@ -4,6 +4,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 import { logME } from "./helpers.js";
 import { correctTextDirection, applyTextDirection } from "./textDetection.js";
+import { getTranslationString } from "./i18n.js";
 
 const translationCache = new Map();
 
@@ -218,9 +219,16 @@ export async function revertTranslations(context) {
   });
 
   if (successfulReverts > 0) {
-    context.notifier.show(`${successfulReverts} مورد بازگردانی شد`, "revert");
+    context.notifier.show(
+      `${successfulReverts} ${(await getTranslationString("STATUS_Revert_Number")) || "(مورد بازگردانی شد)"}`,
+      "revert"
+    );
   } else if (await IsDebug()) {
-    context.notifier.show("هیچ متنی برای بازگردانی یافت نشد", "warning");
+    context.notifier.show(
+      (await getTranslationString("STATUS_REVERT_NOT_FOUND")) ||
+        "(هیچ متنی برای بازگردانی یافت نشد)",
+      "warning"
+    );
   }
 
   context.IconManager?.cleanup();
@@ -456,7 +464,7 @@ export function reassembleTranslations(
       }
       translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
     } else {
-      console.warn(
+      logME(
         `داده ترجمه نامعتبر یا گمشده برای آیتم در اندیس ${i}.`,
         "آیتم دریافتی:",
         translatedItem,
