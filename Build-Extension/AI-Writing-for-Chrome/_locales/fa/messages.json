@@ -201,24 +201,14 @@
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_ICON": { "message": "درحال ترجمه..." },
+  "STATUS_Revert_Number": { "message": "بازگردانی شد" },
+  "STATUS_REVERT_NOT_FOUND": { "message": "هیچ متنی برای بازگردانی یافت نشد" },
   "STATUS_FROM_MEMORY": { "message": "از حافظه" },
   "STATUS_REMOVE_MEMORY": { "message": "حافظه پاک شد" },
-
-  "ERRORS_SMARTTRANSLATE_FAILED": {
-    "message": "خطا در ترجمه."
-  },
-  "ERRORS_SMARTTRANSLATE_MISSING_API_KEY": {
-    "message": "کلید API را وارد کنید از صفحه تنظیمات وارد کنید."
-  },
-  "ERRORS_SMARTTRANSLATE_TEXT_RESPONSE_EMPTY": {
-    "message": "ترجمه دریافتی خالی است!"
-  },
-  "ERRORS_SMARTTRANSLATE_APPLY_FAILED": {
-    "message": "خطایی در جایگذاری ترجمه رخ داده است."
-  },
   "STATUS_SMARTTRANSLATE_COPIED": {
     "message": "ترجمه در حافظه کپی شد. (Ctrl+V)"
   },
+
   "OPTIONS_STATUS_SAVED_SUCCESS": {
     "message": "با موفقیت ذخیره شد : )"
   },
