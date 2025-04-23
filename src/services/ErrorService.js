@@ -14,6 +14,7 @@ const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.GEMINI_QUOTA_REGION,
   ErrorTypes.NETWORK_ERROR,
   ErrorTypes.HTTP_ERROR,
   ErrorTypes.INTEGRATION,
@@ -34,7 +35,7 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
   ErrorTypes.HTTP_ERROR,
-  ErrorTypes.GEMINI_QUOTA,
+  ErrorTypes.GEMINI_QUOTA_REGION,
 ]);
 
 export class ErrorHandler {

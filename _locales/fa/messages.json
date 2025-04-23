@@ -170,8 +170,8 @@
   "ERRORS_QUOTA_EXCEEDED": {
     "message": "محدودیت استفاده از این API به پایان رسیده است."
   },
-  "ERRORS_GEMINI_GENERATE_QUOTA": {
-    "message": "محدودیت Gemini به سر رسید، کلید خود را بررسی کنید."
+  "ERRORS_GEMINI_QUOTA_REGION": {
+    "message": "محدودیت دسترسی به Gemini. (مشکل جغرفایایی)"
   },
   "ERRORS_API_URL_MISSING": { "message": "آدرس API وارد نشده است" },
   "ERRORS_AI_MODEL_MISSING": { "message": "مدل هوش مصنوعی وارد نشده است" },

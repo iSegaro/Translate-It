@@ -1,5 +1,6 @@
 // src/services/ErrorMatcher.js
 
+import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 
 /**
@@ -75,9 +76,17 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.MODEL_MISSING;
 
+  // Quota with region indicates Gemini-specific quota
+  if (msg.includes("quota exceeded") && msg.includes("region")) {
+    logME(
+      "[ErrorMatcher] Quota exceeded with region, indicating Gemini-specific quota."
+    );
+    return ErrorTypes.GEMINI_QUOTA_REGION;
+  }
+
   // Quota
-  if (msg.includes("quota exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
-  if (msg.includes("gemini quota")) return ErrorTypes.GEMINI_QUOTA;
+  if (msg.includes("quota exceeded") || msg.includes("gemini quota"))
+    return ErrorTypes.QUOTA_EXCEEDED;
 
   // Network issues
   if (

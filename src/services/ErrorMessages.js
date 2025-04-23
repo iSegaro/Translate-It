@@ -18,8 +18,8 @@ export const errorMessages = {
   [ErrorTypes.API_URL_MISSING]: "API URL is missing",
   [ErrorTypes.MODEL_MISSING]: "AI Model is missing or invalid",
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
-  [ErrorTypes.GEMINI_QUOTA]:
-    "You reached the Gemini quota for content generation",
+  [ErrorTypes.GEMINI_QUOTA_REGION]:
+    "You reached the Gemini quota. (Region issue)",
 
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
