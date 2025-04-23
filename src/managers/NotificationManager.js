@@ -59,6 +59,8 @@ export default class NotificationManager {
     };
 
     this.container = null;
+
+    // Create container when DOM ready
     if (typeof document !== "undefined") {
       if (document.readyState === "loading") {
         document.addEventListener(
@@ -70,34 +72,58 @@ export default class NotificationManager {
         this._makeContainer();
       }
     }
+
+    // Listen for locale changes to update alignment dynamically
+    if (Browser.storage && Browser.storage.onChanged) {
+      Browser.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes.APPLICATION_LOCALIZE) {
+          this._applyAlignment();
+        }
+      });
+    }
+  }
+
+  async _applyAlignment() {
+    if (!this.container) return;
+    try {
+      const rtlMsg = await getTranslationString("IsRTL");
+      const isRTL = parseBoolean(rtlMsg);
+      if (isRTL) {
+        this.container.style.right = "20px";
+        this.container.style.left = "";
+      } else {
+        this.container.style.left = "20px";
+        this.container.style.right = "";
+      }
+      this.container.style.direction = isRTL ? "rtl" : "ltr";
+      this.container.style.textAlign = isRTL ? "right" : "left";
+    } catch (e) {
+      logME("[NotificationManager] _applyAlignment failed:", e);
+    }
   }
 
   _makeContainer() {
     let el = null;
     try {
       const id = "AIWritingCompanion-notifications";
-      // Return existing container
       el = document.getElementById(id);
       if (el) {
         this.container = el;
+        this._applyAlignment();
         return el;
       }
 
-      // Ensure body exists
       if (!document.body) {
         logME("[NotificationManager] document.body not available.");
         return null;
       }
 
-      // Create new container element
       el = document.createElement("div");
       if (!el) {
-        logME("[NotificationManager] document.createElement failed.");
+        logME("[NotificationManager] createElement failed.");
         return null;
       }
       el.id = id;
-
-      // Apply base styles
       Object.assign(el.style, {
         position: "fixed",
         top: "20px",
@@ -106,35 +132,13 @@ export default class NotificationManager {
         flexDirection: "column",
         gap: "10px",
       });
-
       document.body.appendChild(el);
       this.container = el;
-
-      // Async i18n adjustment
-      (async () => {
-        try {
-          const rtlMsg = await getTranslationString("IsRTL");
-          const isRTL = parseBoolean(rtlMsg);
-          if (isRTL) {
-            el.style.right = "20px";
-            el.style.left = "";
-          } else {
-            el.style.left = "20px";
-            el.style.right = "";
-          }
-          el.style.direction = isRTL ? "rtl" : "ltr";
-          el.style.textAlign = isRTL ? "right" : "left";
-        } catch (e) {
-          logME("[NotificationManager] i18n adjust failed:", e);
-        }
-      })();
-
+      this._applyAlignment();
       return el;
     } catch (error) {
       logME("[NotificationManager] _makeContainer error:", error);
-      if (el && el.remove) {
-        el.remove();
-      }
+      if (el && el.remove) el.remove();
       return null;
     }
   }
@@ -143,7 +147,6 @@ export default class NotificationManager {
     const cfg = this.map[type] || this.map.info;
     const finalDur = dur ?? cfg.dur;
 
-    // In-page notification
     if (this.container && document.body.contains(this.container)) {
       try {
         return this._toastInPage(msg, cfg, auto, finalDur, onClick);
@@ -155,8 +158,6 @@ export default class NotificationManager {
         return null;
       }
     }
-
-    // Background notification fallback
     this._sendToActiveTab(msg, type, auto, finalDur, onClick);
     return null;
   }
@@ -205,7 +206,6 @@ export default class NotificationManager {
         : null
       )
       .then((res) => {
-        // attach click callback only if res indicates listener present
         if (onClick && res !== undefined) {
           const listener = (msg) => {
             if (msg?.action === "notification_clicked") {
@@ -217,7 +217,6 @@ export default class NotificationManager {
         }
       })
       .catch(() => this._osNotification(message, type, onClick));
-    // fallback to OS notification
   }
 
   _osNotification(message, type, onClick) {
@@ -240,8 +239,6 @@ export default class NotificationManager {
         };
         Browser.notifications.onClicked.addListener(click);
       })
-      .catch(() => {
-        // ignore OS notification errors
-      });
+      .catch(() => {});
   }
 }
