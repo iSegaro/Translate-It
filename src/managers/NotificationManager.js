@@ -6,10 +6,12 @@ import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 
 const safe = {
-  ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
-  ICON_WARNING: CONFIG?.ICON_WARNING ?? "⚠️",
+  ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
   ICON_SUCCESS: CONFIG?.ICON_SUCCESS ?? "✅",
-  ICON_INFO: CONFIG?.ICON_INFO ?? "ℹ️",
+  ICON_WARNING: CONFIG?.ICON_WARNING ?? "⚠️",
+  ICON_STATUS: CONFIG?.ICON_STATUS ?? "⏳",
+  ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
+  ICON_INFO: CONFIG?.ICON_INFO ?? "🔵",
   ICON_REVERT: CONFIG?.ICON_REVERT ?? "↩️",
   NOTIF_ALIGN: CONFIG?.NOTIFICATION_ALIGNMENT ?? "right",
   TEXT_DIR: CONFIG?.NOTIFICATION_TEXT_DIRECTION ?? "rtl",
