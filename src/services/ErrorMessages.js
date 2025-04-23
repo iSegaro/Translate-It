@@ -56,5 +56,5 @@ export async function getErrorMessage(type) {
  */
 export function getErrorMessageByKey(key) {
   if (typeof key !== "string") return null;
-  return messages[key] ?? null;
+  return errorMessages[key] ?? null;
 }
