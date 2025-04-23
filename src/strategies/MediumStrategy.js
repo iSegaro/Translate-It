@@ -39,8 +39,6 @@ export default class MediumStrategy extends PlatformStrategy {
     // 2. برای فیلدهای contenteditable (کامنت‌ها و نظرسنجی‌ها) - کپی به کلیپبورد
     const mediumField = this.findMediumTextField(element);
     if (!mediumField) {
-      console.error("Medium text field not found for element:", element);
-      logME("فیلد متن مدیوم یافت نشد"); // انتقال خطا به TranslationHandler
       return;
     }
 
@@ -93,7 +91,6 @@ export default class MediumStrategy extends PlatformStrategy {
   async safeFocus(element) {
     try {
       if (!element.isConnected) {
-        console.warn("Element not in DOM:", element);
         return null;
       }
 
@@ -102,7 +99,6 @@ export default class MediumStrategy extends PlatformStrategy {
 
       // بررسی وضعیت فوکوس
       if (document.activeElement !== element) {
-        console.warn("Focus failed, retrying...");
         element.focus({ preventScroll: true });
         await delay(100);
       }

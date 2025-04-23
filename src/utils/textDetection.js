@@ -61,16 +61,16 @@ export async function detectTextLanguage(text) {
       // زبان با بالاترین درصد اطمینان را به عنوان زبان تشخیص داده شده در نظر می‌گیریم
       const detectedLanguage = langInfo.languages[0].language;
       // const confidencePercentage = langInfo.languages[0].percentage;
-      // console.log(
+      // logME(
       //   `زبان تشخیص داده شده: ${detectedLanguage} (اطمینان: ${confidencePercentage}%)`
       // );
       return detectedLanguage; // برگرداندن کد زبان تشخیص داده شده
     } else {
-      // console.log("امکان تشخیص زبان وجود ندارد.");
+      // logME("امکان تشخیص زبان وجود ندارد.");
       return null;
     }
   } catch (error) {
-    // console.error("خطا در تشخیص زبان:", error);
+    // logME("خطا در تشخیص زبان:", error);
     return null;
   }
 }

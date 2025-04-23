@@ -1,6 +1,7 @@
 // src/core/FeatureManager.js
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
+import { logME } from "../utils/helpers.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
@@ -51,7 +52,7 @@ export default class FeatureManager {
         });
       })
       .catch((err) => {
-        console.warn("[FeatureManager] failed to load initial flags", err);
+        logME("[FeatureManager] failed to load initial flags", err);
       });
 
     // افزودن listener برای تغییرات آینده

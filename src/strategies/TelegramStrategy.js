@@ -171,7 +171,6 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       // 3. جلوگیری از پردازش المان‌های غیرفعال
       if (element !== telegramField && !telegramField.contains(element)) {
-        // console.warn("Element is not part of Telegram field. Skipping...");
         return false;
       }
 

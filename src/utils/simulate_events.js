@@ -5,7 +5,6 @@ import { ErrorTypes } from "../services/ErrorTypes";
 export const setCursorToEnd = (element) => {
   try {
     if (!element?.isConnected) {
-      // console.debug("[helpers] Element not connected to DOM: ", element);
       return;
     }
 

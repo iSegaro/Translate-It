@@ -68,7 +68,7 @@ export function playAudioWebSpeech(text, langCode) {
       const voices = speechSynthesis.getVoices();
       if (!voices || voices.length === 0) {
         // ممکن است فایرفاکس صدا نداشته باشد یا هنوز آماده نباشد
-        console.warn("No voices available");
+        logME("No voices available");
       } else {
         // تلاش کنید صدای مناسب زبان langCode را بیابید
         const matchedVoice = voices.find((v) =>

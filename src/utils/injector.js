@@ -59,10 +59,7 @@ export async function shouldInject(url) {
     const excluded = settings.EXCLUDED_SITES ?? [];
     return !excluded.some((site) => url.includes(site));
   } catch (err) {
-    console.warn(
-      "[InjectionGuard] Failed to evaluate injection permission:",
-      err
-    );
+    logME("[InjectionGuard] Failed to evaluate injection permission:", err);
     return false;
   }
 }

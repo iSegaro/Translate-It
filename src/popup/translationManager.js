@@ -78,7 +78,7 @@ async function handleTranslationResponse(
         logME("[Translate]: Last translation saved to storage.");
       })
       .catch((error) => {
-        console.error("[Translate]: Error saving last translation:", error);
+        logME("[Translate]: Error saving last translation:", error);
       });
 
     // Optional: auto-detected source language update

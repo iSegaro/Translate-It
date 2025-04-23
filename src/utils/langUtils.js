@@ -20,7 +20,6 @@ export function resolveLangCode(inputLang) {
 
   // تلاش برای پیدا کردن توسط name، promptName یا code
   const langInfo = getLanguageInfoFromName(lower);
-  console.warn(langInfo);
   if (langInfo?.code) return langInfo.code;
 
   return "en"; // اگر پیدا نشد fallback
