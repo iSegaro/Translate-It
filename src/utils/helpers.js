@@ -150,7 +150,8 @@ export function taggleLinks(enable = true) {
  */
 const injectCSS = (filePath) => {
   try {
-    if (!document.head) throw new Error("document.head not available");
+    if (!document.head)
+      throw new Error(ErrorTypes.INTEGRATION || "document.head not available");
 
     const linkElement = document.createElement("link");
     linkElement.href = Browser.runtime.getURL(filePath);
@@ -170,6 +171,7 @@ export const injectStyle = () => {
   try {
     const hostname = window.location.hostname;
     injectCSS("styles/content.css");
+    injectCSS("styles/disable_links.css");
     injectCSS("styles/SelectionWindows.css");
 
     if (hostname.includes("whatsapp.com")) {
@@ -180,7 +182,7 @@ export const injectStyle = () => {
     }
   } catch (error) {
     const handlerError = errorHandler.handle(error, {
-      type: ErrorTypes.UI,
+      type: ErrorTypes.INTEGRATION,
       context: "injectStyle",
     });
     throw handlerError;
