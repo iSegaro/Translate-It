@@ -171,7 +171,7 @@
     "message": "محدودیت استفاده از این API به پایان رسیده است."
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
-    "message": "محدودیت دسترسی به Gemini. (مشکل جغرفایایی)"
+    "message": "محدودیت دسترسی به Gemini. (مشکل منطقه‌ای)"
   },
   "ERRORS_API_URL_MISSING": { "message": "آدرس API وارد نشده است" },
   "ERRORS_AI_MODEL_MISSING": { "message": "مدل هوش مصنوعی وارد نشده است" },
