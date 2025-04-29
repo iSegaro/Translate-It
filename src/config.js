@@ -65,7 +65,8 @@ export const CONFIG = {
   NOTIFICATION_TEXT_ALIGNMENT: "right",
 
   // --- Regex & Language Specific ---
-  RTL_REGEX: /[\u0600-\u06FF]/,
+  // Matches Hebrew, Arabic and Persian ranges
+  RTL_REGEX: /[\u0591-\u07FF\u0600-\u06FF]/,
   PERSIAN_REGEX:
     /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
 
