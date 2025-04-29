@@ -96,16 +96,15 @@ export async function translateFieldViaSmartHandler({
 
     logME("[SmartTranslateHandler] updateElement result:", didApply);
 
-    if (didApply) {
-      logME("[SmartTranslateHandler] Strategy applied successfully");
-      return;
-    }
-
-    // بررسی نهایی در DOM
     const afterValue =
       target?.isContentEditable ? target.innerText.trim()
       : target && "value" in target ? target.value.trim()
       : null;
+
+    if (didApply && beforeValue !== afterValue) {
+      logME("[SmartTranslateHandler] Strategy applied successfully");
+      return;
+    }
 
     if (afterValue === translated) {
       logME("[SmartTranslateHandler] DOM already updated");
