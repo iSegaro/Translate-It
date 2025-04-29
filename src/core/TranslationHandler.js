@@ -283,35 +283,35 @@ export default class TranslationHandler {
     }
   }
 
-  @logMethod
-  async handleSelect_ElementTranslation(platform, params, translated) {
-    try {
-      if (typeof translated !== "string" && !translated) {
-        return;
-      }
-      if (this.strategies[platform]?.updateElement) {
-        await this.strategies[platform].updateElement(
-          params.selectionRange,
-          translated
-        );
-      } else {
-        this.errorHandler.handle(
-          new Error(`متد updateElement برای ${platform} تعریف نشده`),
-          {
-            type: ErrorTypes.UI,
-            context: "select-element-translation-updateElement",
-            platform: platform,
-          }
-        );
-      }
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: "select-element-translation",
-        platform: platform,
-      });
-    }
-  }
+  // @logMethod
+  // async handleSelect_ElementTranslation(platform, params, translated) {
+  //   try {
+  //     if (typeof translated !== "string" && !translated) {
+  //       return;
+  //     }
+  //     if (this.strategies[platform]?.updateElement) {
+  //       await this.strategies[platform].updateElement(
+  //         params.selectionRange,
+  //         translated
+  //       );
+  //     } else {
+  //       this.errorHandler.handle(
+  //         new Error(`متد updateElement برای ${platform} تعریف نشده`),
+  //         {
+  //           type: ErrorTypes.UI,
+  //           context: "select-element-translation-updateElement",
+  //           platform: platform,
+  //         }
+  //       );
+  //     }
+  //   } catch (error) {
+  //     this.errorHandler.handle(error, {
+  //       type: ErrorTypes.SERVICE,
+  //       context: "select-element-translation",
+  //       platform: platform,
+  //     });
+  //   }
+  // }
 
   @logMethod
   async updateTargetElement(target, translated) {
