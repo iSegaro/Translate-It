@@ -375,7 +375,7 @@ export default class EventHandler {
   /* ------------------------------------------------------------------
    EventHandler.handleSelect_ElementClick
 ------------------------------------------------------------------ */
-  async handleSelect_ElementClick(e) {
+  async handleSelect_ElementClick(event) {
     // غیرفعال‌سازی حالت انتخاب المنت
     taggleLinks(false);
     this.translationHandler.select_Element_ModeActive = false;
@@ -385,7 +385,7 @@ export default class EventHandler {
     }
 
     /* 1) جمع‌آوری متن‌ها از عنصرِ انتخاب‌شده */
-    const targetElement = e.target;
+    const targetElement = event.target;
     const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
     if (!originalTextsMap.size)
       return { status: "empty", reason: "no_text_found" };
