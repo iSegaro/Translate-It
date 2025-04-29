@@ -17,6 +17,10 @@
   "target_language_label": { "message": "زبان مقصد" },
   "source_language_placeholder": { "message": "زبان مبدا را وارد کنید" },
   "target_language_placeholder": { "message": "زبان مقصد را وارد کنید" },
+  "extension_enabled_label": { "message": "فعال بودن افزونه" },
+  "extension_enabled_description": {
+    "message": "فعال‌سازی یا غیرفعال‌سازی تمام عملکردهای افزونه به جز Popup."
+  },
   "translation_activation_section_title": {
     "message": "روش‌های فعال‌سازی ترجمه"
   },
@@ -163,6 +167,7 @@
   },
   "ERRORS_API_KEY_INVALID": { "message": "کلید API صحیح نیست" },
   "ERRORS_API_KEY_MISSING": { "message": "کلید API اشتباه است" },
+  "ERRORS_MODEL_OVERLOADED": { "message": "محدودیت استفاده از مدل انتخابی" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با این کلید API ممنوع است" },
   "ERRORS_NETWORK_ERROR": { "message": "خطای شبکه" },
@@ -171,7 +176,7 @@
     "message": "محدودیت استفاده از این API به پایان رسیده است."
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
-    "message": "محدودیت دسترسی به Gemini. (مشکل جغرفایایی)"
+    "message": "محدودیت دسترسی به Gemini. (مشکل منطقه‌ای)"
   },
   "ERRORS_API_URL_MISSING": { "message": "آدرس API وارد نشده است" },
   "ERRORS_AI_MODEL_MISSING": { "message": "مدل هوش مصنوعی وارد نشده است" },
