@@ -163,6 +163,7 @@
   },
   "ERRORS_API_KEY_INVALID": { "message": "کلید API صحیح نیست" },
   "ERRORS_API_KEY_MISSING": { "message": "کلید API اشتباه است" },
+  "ERRORS_MODEL_OVERLOADED": { "message": "محدودیت استفاده از مدل انتخابی" },
   "ERRORS_API_KEY_WRONG": { "message": "کلید API اشتباه است" },
   "ERRORS_API_KEY_FORBIDDEN": { "message": "دسترسی با این کلید API ممنوع است" },
   "ERRORS_NETWORK_ERROR": { "message": "خطای شبکه" },

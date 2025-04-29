@@ -76,6 +76,9 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.MODEL_MISSING;
 
+  if (msg.includes("the model is overloaded") || msg.includes("overloaded"))
+    return ErrorTypes.MODEL_OVERLOADED;
+
   // Quota with region indicates Gemini-specific quota
   if (msg.includes("quota exceeded") && msg.includes("region")) {
     logME(

@@ -13,6 +13,7 @@ const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.API_KEY_MISSING,
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.MODEL_MISSING,
+  ErrorTypes.MODEL_OVERLOADED,
   ErrorTypes.QUOTA_EXCEEDED,
   ErrorTypes.GEMINI_QUOTA_REGION,
   ErrorTypes.NETWORK_ERROR,
@@ -31,6 +32,7 @@ const SUPPRESS_CONSOLE = new Set([
 const OPEN_SETTINGS = new Set([
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_KEY_MISSING,
+  ErrorTypes.MODEL_OVERLOADED,
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
@@ -127,7 +129,9 @@ export class ErrorHandler {
       [ErrorTypes.API_KEY_MISSING]: "error",
       [ErrorTypes.API_URL_MISSING]: "error",
       [ErrorTypes.MODEL_MISSING]: "error",
+      [ErrorTypes.MODEL_OVERLOADED]: "warning",
       [ErrorTypes.QUOTA_EXCEEDED]: "warning",
+      [ErrorTypes.GEMINI_QUOTA_REGION]: "warning",
     };
     const toastType = typeMap[type] || "error";
     this.notifier.show(message, toastType, true, 4000, action);

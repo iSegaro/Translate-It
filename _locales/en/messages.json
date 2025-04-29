@@ -169,6 +169,7 @@
   },
   "ERRORS_API_URL_MISSING": { "message": "API URL is missing" },
   "ERRORS_AI_MODEL_MISSING": { "message": "AI Model is missing" },
+  "ERRORS_MODEL_OVERLOADED": { "message": "AI Model is overloaded" },
   "ERRORS_SERVICE_OVERLOADED": {
     "message": "Translation service overloaded, Try later"
   },

@@ -17,6 +17,7 @@ export const errorMessages = {
   [ErrorTypes.API_KEY_INVALID]: "API Key is wrong or invalid",
   [ErrorTypes.API_URL_MISSING]: "API URL is missing",
   [ErrorTypes.MODEL_MISSING]: "AI Model is missing or invalid",
+  [ErrorTypes.MODEL_OVERLOADED]: "The Model is overloaded",
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
   [ErrorTypes.GEMINI_QUOTA_REGION]:
     "You reached the Gemini quota. (Region issue)",
