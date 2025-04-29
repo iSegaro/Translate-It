@@ -2,6 +2,7 @@
 
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
+import { delay } from "../utils/helpers.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -40,16 +41,17 @@ export default class DefaultStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (translatedText !== undefined && translatedText !== null) {
+        this.applyVisualFeedback(element);
         if (element.isContentEditable) {
           const htmlText = translatedText.replace(/\n/g, "<br>");
           element.innerHTML = htmlText;
-          this.applyVisualFeedback(element);
           this.applyTextDirection(element, htmlText);
         } else {
           element.value = translatedText;
-          this.applyVisualFeedback(element);
           this.applyTextDirection(element, translatedText);
         }
+
+        await delay(500);
 
         return true;
       }
