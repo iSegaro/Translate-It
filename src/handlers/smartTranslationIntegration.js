@@ -1,3 +1,5 @@
+// src/handlers/smartTranslationIntegration.js
+
 // Description: This file contains the background handlers for the extension.
 // It includes functions to handle translation requests, revert translations, and manage errors.
 //       type: ErrorTypes.UI,
@@ -7,8 +9,6 @@
 //     }
 //   }
 // It also includes functions to copy translations to the clipboard and manage notifications.
-
-// src/handlers/smartTranslationIntegration.js
 
 import {
   smartTranslate,
