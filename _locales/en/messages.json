@@ -17,6 +17,10 @@
   "target_language_label": { "message": "Target Language" },
   "source_language_placeholder": { "message": "Enter source language" },
   "target_language_placeholder": { "message": "Enter target language" },
+  "extension_enabled_label": { "message": "Enable Extension" },
+  "extension_enabled_description": {
+    "message": "Enable or disable the entire extension functionality except Popup."
+  },
   "translation_activation_section_title": {
     "message": "Translation Activation Methods"
   },

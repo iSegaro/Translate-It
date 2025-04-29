@@ -17,6 +17,10 @@
   "target_language_label": { "message": "زبان مقصد" },
   "source_language_placeholder": { "message": "زبان مبدا را وارد کنید" },
   "target_language_placeholder": { "message": "زبان مقصد را وارد کنید" },
+  "extension_enabled_label": { "message": "فعال بودن افزونه" },
+  "extension_enabled_description": {
+    "message": "فعال‌سازی یا غیرفعال‌سازی تمام عملکردهای افزونه به جز Popup."
+  },
   "translation_activation_section_title": {
     "message": "روش‌های فعال‌سازی ترجمه"
   },
