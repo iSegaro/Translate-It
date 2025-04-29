@@ -17,6 +17,7 @@ import { marked } from "marked";
 import { TranslationMode } from "../config.js";
 import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 import { getErrorMessageByKey } from "../services/ErrorMessages.js";
+import { determineTranslationMode } from "../utils/translationModeHelper.js";
 
 /**
  * Always return the original error message (untranslated).
@@ -186,39 +187,11 @@ async function triggerTranslation() {
 `;
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
-  // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
-  // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است
   // Determine translateMode (dictionary vs full)
-  const words = textToTranslate.trim().split(/\s+/);
-  let translateMode = TranslationMode.Popup_Translate;
-  const maxDictionaryWords = 2;
-  const maxDictionaryChars = 30;
-  const stopWords = [
-    "the",
-    "a",
-    "an",
-    "is",
-    "are",
-    "was",
-    "were",
-    "in",
-    "on",
-    "at",
-    "to",
-    "of",
-    "for",
-    "with",
-    "by",
-    "from",
-  ];
-  if (
-    (words.length === 1 &&
-      !stopWords.includes(words[0].toLowerCase()) &&
-      textToTranslate.length <= maxDictionaryChars) ||
-    (words.length > 1 && textToTranslate.length <= maxDictionaryChars)
-  ) {
-    translateMode = TranslationMode.Dictionary_Translation;
-  }
+  const translateMode = determineTranslationMode(
+    textToTranslate,
+    TranslationMode.Popup_Translate
+  );
 
   try {
     const response = await Browser.runtime.sendMessage({

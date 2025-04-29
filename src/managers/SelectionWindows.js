@@ -5,6 +5,7 @@ import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { CONFIG, TranslationMode } from "../config.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { marked } from "marked";
 
 export default class SelectionWindows {
@@ -48,16 +49,10 @@ export default class SelectionWindows {
     this.isTranslationCancelled = false;
 
     // Determine mode
-    let translationMode = TranslationMode.Field;
-    const words = selectedText.trim().split(/\s+/);
-    if (
-      ((words.length === 1 &&
-        !["the", "a", "an", "is", "are"].includes(words[0].toLowerCase())) ||
-        words.length > 1) &&
-      selectedText.length <= 30
-    ) {
-      translationMode = TranslationMode.Dictionary_Translation;
-    }
+    const translationMode = determineTranslationMode(
+      selectedText,
+      TranslationMode.Field
+    );
 
     // Host element
     this.displayElement = document.createElement("div");
