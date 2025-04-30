@@ -1,0 +1,182 @@
+/* src/styles/SelectionWindows.css */
+
+/* ==========================================================================
+     Selection Text Window Styles
+     ========================================================================== */
+.aiwc-selection-display-temp {
+  z-index: 2147483637 !important; /* Ensure it's always on top */
+  background-color: #f8f8f8;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  opacity: 0.6; /* Initial opacity of the popup */
+  transform: scale(0.1); /* Initial scale, starts small */
+  transform-origin: top left; /* Transformation origin for scaling */
+  transition:
+    transform 0.1s ease-out,
+    /* Faster scaling animation */ opacity 0.1s ease-in-out; /* Faster fade-in animation */
+}
+
+.aiwc-selection-display-temp.fade-out {
+  opacity: 0 !important;
+  transition: opacity 0.1s ease-in-out; /* Fade out animation when dismissing */
+}
+
+.aiwc-first-line {
+  display: flex; /* برای قرار دادن عناصر در یک خط */
+  align-items: center; /* برای تراز عمودی عناصر */
+  margin-bottom: 5px; /* فاصله از ردیف بعدی */
+  padding-bottom: 3px; /* کمی فاصله برای خط جداکننده */
+  border-bottom: 1px solid #eee; /* خط جداکننده بسیار کمرنگ */
+}
+
+.aiwc-original-text {
+  font-weight: bold; /* نمایش متن اصلی به صورت Bold */
+  flex-grow: 1; /* اجازه می‌دهد متن اصلی فضا را اشغال کند و به چپ بچسبد */
+}
+
+/* ==========================================================================
+         Loading Animation Container Styles
+         ========================================================================== */
+.aiwc-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 1; /* Initially visible */
+  transition: opacity 0.9s ease-in-out; /* Transition for fading out before text appears */
+}
+
+/* ==========================================================================
+         Loading Dots Animation Styles
+         ========================================================================== */
+@keyframes blink {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+.aiwc-loading-dot {
+  font-size: 1.2em;
+  opacity: 0.3;
+  margin: 0 0.2em;
+  animation: blink 0.7s infinite;
+  color: black;
+}
+
+.aiwc-loading-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.aiwc-loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.aiwc-loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ==========================================================================
+         Markdown Styles
+    
+         استایل‌های Markdown برای متن ترجمه شده
+         ========================================================================== */
+.aiwc-selection-display-temp ul,
+.aiwc-selection-display-temp ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+
+.aiwc-selection-display-temp li {
+  margin-bottom: 0.2em;
+}
+
+.aiwc-selection-display-temp strong {
+  font-weight: bold;
+}
+
+.aiwc-selection-display-temp em {
+  font-style: italic;
+}
+
+.aiwc-selection-display-temp p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.aiwc-selection-display-temp pre {
+  background-color: #eee;
+  border: 1px solid #ccc;
+  padding: 0.5em;
+  overflow: auto;
+  border-radius: 3px;
+}
+
+.aiwc-selection-display-temp code {
+  font-family: monospace, monospace;
+  font-size: 0.9em;
+  background-color: #f0f0f0;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+/* استایل‌های خاص برای خروجی دیکشنری */
+.aiwc-selection-display-temp ul {
+  list-style-type: none; /* حذف نشانه‌های پیش‌فرض لیست */
+  padding-left: 0;
+}
+
+.aiwc-selection-display-temp li {
+  margin-bottom: 0.5em;
+}
+
+.aiwc-selection-display-temp li strong {
+  display: inline-block;
+  width: 80px; /* این مقدار قابل تغییر است */
+  font-weight: bold;
+}
+
+/* ==========================================================================
+         TTS Icon Styles
+         ========================================================================== */
+.aiwc-tts-icon {
+  width: 14px; /* اندازه آیکون */
+  height: 14px; /* اندازه آیکون */
+  vertical-align: middle; /* تراز عمودی با متن کنارش */
+  margin-left: 5px; /* فاصله از متن (اگر متن LTR باشد) */
+  margin-right: 5px; /* فاصله از متن (اگر متن RTL باشد یا برای اطمینان) */
+  cursor: pointer; /* تغییر نشانگر موس */
+  opacity: 0.65; /* کمی شفافیت اولیه */
+  transition: opacity 0.2s ease-in-out;
+  display: inline-block; /* رفتار شبیه به متن */
+}
+
+/* هاور شدن روی آیکون */
+.aiwc-tts-icon:hover {
+  opacity: 1;
+}
+
+/* محفظه متن (برای اطمینان از رفتار inline) */
+.aiwc-text-content {
+  display: inline;
+}
+
+/* تنظیم فاصله برای زبان‌های راست به چپ */
+[dir="rtl"] .aiwc-tts-icon {
+  margin-left: 5px;
+  margin-right: 0; /* حذف فاصله راست در حالت RTL */
+}
+/* تنظیم فاصله برای زبان‌های چپ به راست (پیش‌فرض) */
+[dir="ltr"] .aiwc-tts-icon {
+  margin-left: 0; /* حذف فاصله چپ در حالت LTR */
+  margin-right: 5px;
+}
