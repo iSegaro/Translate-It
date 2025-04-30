@@ -3,7 +3,7 @@
   "name": "__MSG_nameEdge__",
   "version": "0.1.0",
   "description": "__MSG_description__",
-  "default_locale": "fa",
+  "default_locale": "en",
   "permissions": [
     "scripting",
     "storage",
