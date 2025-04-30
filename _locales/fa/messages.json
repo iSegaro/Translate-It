@@ -1,9 +1,9 @@
 {
   "IsRTL": { "message": "true" },
   "name": { "message": "AI Writing Companion" },
-  "nameChrome": { "message": "AI Writing for Chrome" },
-  "nameFirefox": { "message": "AI Writing for Firefox" },
-  "nameEdge": { "message": "AI Writing for Edge" },
+  "nameChrome": { "message": "AI Writing Companion for Chrome" },
+  "nameFirefox": { "message": "AI Writing Companion for Firefox" },
+  "nameEdge": { "message": "AI Writing Companion for Edge" },
   "description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
