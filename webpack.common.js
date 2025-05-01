@@ -47,6 +47,7 @@ module.exports = {
       new TerserPlugin({
         terserOptions: {
           compress: {
+            evaluate: false,
             drop_console: process.env.NODE_ENV === "production", // حذف console.log در حالت production
           },
         },
