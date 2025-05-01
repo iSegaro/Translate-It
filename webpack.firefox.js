@@ -107,7 +107,7 @@ const firefoxDistConfig = {
             manifest.browser_specific_settings = {
               gecko: {
                 id: "ai-writing-companion@amm1rr.com",
-                strict_min_version: "91.0",
+                strict_min_version: "109.0",
               },
             };
             if (typeof manifest.name === "string") {
