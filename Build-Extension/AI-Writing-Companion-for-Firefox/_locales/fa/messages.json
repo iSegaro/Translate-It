@@ -112,6 +112,9 @@
   "import_settings_label": { "message": "بازیابی تنظیمات" },
   "import_settings_button": { "message": "بازیابی تنظیمات" },
   "save_settings_button": { "message": "ذخیره" },
+  "excluded_sites_label": {
+    "message": "نادیده گرفتن در این سایت‌ها (با کاما از یکدیگر جدا کنید)"
+  },
 
   "popup_revert_title_icon": { "message": "بازگرداندن (Esc کلید)" },
   "popup_revert_alt_icon": { "message": "بازگرداندن" },

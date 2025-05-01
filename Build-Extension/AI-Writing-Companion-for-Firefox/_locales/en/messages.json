@@ -108,6 +108,9 @@
   "import_settings_label": { "message": "Import Settings" },
   "import_settings_button": { "message": "Import Settings" },
   "save_settings_button": { "message": "Save" },
+  "excluded_sites_label": {
+    "message": "Exclude these sites (comma separated)"
+  },
   "popup_page_title": { "message": "AI Writing Companion" },
   "popup_translate_page_link": { "message": "Translate This Page" },
   "popup_translate_page_link_title": { "message": "Open translate in new tab" },
