@@ -11,9 +11,9 @@
     <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
     <span>&nbsp;Edge&nbsp;</span>
   </a>
-  <a href="#install-for-firefox">
+  <a href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
     <img src="./icons/Mozilla_Firefox_logo.png" alt="Firefox" height="40" />
-    <span>&nbsp;Firefox&nbsp;</span>
+    <span>&nbsp;Download via Firefox&nbsp;</span>
   </a>
 
 </p>
@@ -97,9 +97,9 @@ You can choose from several AI-powered translation providers:
 
 ---
 
-## 🔧 Installation
+## 🔧 Manual Installation
 
-We're almost done with final touches, and the extension will soon be published on the Chrome Web Store and Firefox Add-ons.
+We're almost done, and the extension will soon be published on the Chrome Web Store and Edge Extension store.
 
 <details id="install-for-chrome">
 <summary>
@@ -314,6 +314,9 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [openai-url]: https://chat.openai.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
+[firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
+[chrome-store]: https://chrome.google.com/webstore/
+[edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Chrome-v0.1.0.zip
 [edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Edge-v0.1.0.zip

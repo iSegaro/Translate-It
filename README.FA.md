@@ -11,9 +11,9 @@
     <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
     <span>&nbsp;Edge&nbsp;</span>
   </a>
-  <a href="#install-for-firefox">
+  <a href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
     <img src="./icons/Mozilla_Firefox_logo.png" alt="Firefox" height="40" />
-    <span>&nbsp;Firefox&nbsp;</span>
+    <span>&nbsp;Firefox دانلود برای&nbsp;</span>
   </a>
 
 </p>
@@ -102,9 +102,9 @@
 
 ---
 
-## 🔧 نصب
+## 🔧 نصب دستی
 
-یه کم ریزه‌کاری داره تموم بشه، بزودی توی Chrome Store و Firefox Add-ons هم منتشر می‌کنیم.
+بزودی در Chrome Store و Edge Store.
 
 <details id="install-for-chrome">
 <summary>
@@ -124,7 +124,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 <details id="install-for-firefox">
 <summary>
-  <h3>نصب برای فایرفاکس</h3>
+  <h3>نصب دستی برای فایرفاکس</h3>
 </summary>
 
 - [از اینجا آخرین نسخه مخصوص فایرفاکس را دانلود کنید][firefox-zip-url]
@@ -337,6 +337,9 @@ npm run watch:firefox
 [openai-url]: https://chat.openai.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
+[firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
+[chrome-store]: https://chrome.google.com/webstore/
+[edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Chrome-v0.1.0.zip
 [edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Edge-v0.1.0.zip
