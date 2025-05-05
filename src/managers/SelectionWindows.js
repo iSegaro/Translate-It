@@ -7,6 +7,7 @@ import { CONFIG, TranslationMode } from "../config.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -219,7 +220,8 @@ export default class SelectionWindows {
     secondLine.classList.add("second-line");
     const textSpan = document.createElement("span");
     textSpan.classList.add("text-content");
-    textSpan.innerHTML = marked.parse(translatedText);
+    /* eslint-disable no-unsanitized/property */
+    textSpan.innerHTML = DOMPurify.sanitize(marked.parse(translatedText));
     secondLine.appendChild(textSpan);
     this.applyTextDirection(secondLine, translatedText);
     this.innerContainer.appendChild(secondLine);

@@ -5,6 +5,7 @@ import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
+import DOMPurify from "dompurify";
 
 const safe = {
   ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
@@ -177,7 +178,10 @@ export default class NotificationManager {
       box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;
       align-items:center;cursor:pointer;opacity:1;
       transition:opacity .5s`;
-    n.innerHTML = `<span style="margin-inline-end:6px;">${cfg.icon}</span><span>${message}</span>`;
+    /* eslint-disable no-unsanitized/property */
+    n.innerHTML = DOMPurify.sanitize(
+      `<span>${cfg.icon}</span><span>${message}</span>`
+    );
 
     n.addEventListener("click", () => {
       try {

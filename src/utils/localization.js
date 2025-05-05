@@ -4,6 +4,7 @@ import Browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 import { logME } from "./helpers.js";
+import DOMPurify from "dompurify";
 
 /**
  * Initializes the language selection UI and handles dynamic localization.
@@ -40,7 +41,10 @@ function initLocalizationUI() {
       alignItems: "center",
       background: "#fff",
     });
-    li.innerHTML = `<span style=\"margin-right:5px;\">${lang.flag}</span>${lang.name}`;
+    // eslint-disable-next-line no-unsanitized/property
+    li.innerHTML = DOMPurify.sanitize(
+      `<span style="margin-right:5px;">${lang.flag}</span>${lang.name}`
+    );
 
     li.addEventListener("click", async () => {
       await setLanguage(lang.locale);

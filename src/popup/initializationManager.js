@@ -8,6 +8,7 @@ import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
   return new Promise(async (resolve) => {
@@ -23,8 +24,8 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
           result.lastTranslation.sourceText
         );
 
-        elements.translationResult.innerHTML = marked.parse(
-          result.lastTranslation.translatedText || ""
+        elements.translationResult.innerHTML = DOMPurify.sanitize(
+          marked.parse(result.lastTranslation.translatedText || "")
         );
         correctTextDirection(
           elements.translationResult,

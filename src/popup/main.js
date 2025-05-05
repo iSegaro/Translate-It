@@ -2,6 +2,7 @@
 
 import { logME } from "../utils/helpers.js";
 import { CONFIG } from "../config.js";
+import DOMPurify from "dompurify";
 
 // Import Managers/Handlers
 import * as languageManager from "./languageManager.js";
@@ -13,6 +14,7 @@ import * as initializationManager from "./initializationManager.js";
 import * as popupInteractionManager from "./popupInteractionManager.js";
 import { app_localize_popup } from "../utils/i18n.js";
 import * as excludeManager from "./excludeManager.js";
+import Browser from "webextension-polyfill";
 
 document.addEventListener("DOMContentLoaded", async () => {
   logME("[Popup Main]: DOMContentLoaded event fired.");
@@ -29,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await excludeManager.init();
 
     try {
-      const popupPort = browser.runtime.connect({ name: "popup" });
+      const popupPort = Browser.runtime.connect({ name: "popup" });
       popupPort.postMessage({ action: "popupOpened" });
     } catch (err) {
       logME("[Popup Main]: Failed to connect popup port:", err.message);
@@ -39,7 +41,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
     logME("Popup initialization failed:", error);
-    document.body.innerHTML = `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`;
+    /* eslint-disable no-unsanitized/property */
+    document.body.innerHTML = DOMPurify.sanitize(
+      `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`
+    );
   } finally {
     // اجرای ترجمه بعد از اتمام کامل عملیات اولیه
     app_localize_popup(CONFIG.APPLICATION_LOCALIZE);

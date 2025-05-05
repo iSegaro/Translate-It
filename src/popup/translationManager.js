@@ -18,6 +18,7 @@ import { TranslationMode } from "../config.js";
 import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 import { getErrorMessageByKey } from "../services/ErrorMessages.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
+import DOMPurify from "dompurify";
 
 /**
  * Always return the original error message (untranslated).
@@ -58,7 +59,10 @@ async function handleTranslationResponse(
     const translated = response.data.translatedText;
     elements.translationResult.classList.remove("fade-in");
     void elements.translationResult.offsetWidth;
-    elements.translationResult.innerHTML = marked.parse(translated);
+    /* eslint-disable no-unsanitized/property */
+    elements.translationResult.innerHTML = DOMPurify.sanitize(
+      marked.parse(translated)
+    );
     elements.translationResult.classList.add("fade-in");
     correctTextDirection(elements.translationResult, translated);
 
@@ -178,13 +182,14 @@ async function triggerTranslation() {
   }
 
   // Show spinner
-  elements.translationResult.innerHTML = `
+  /* eslint-disable no-unsanitized/property */
+  elements.translationResult.innerHTML = DOMPurify.sanitize(`
 <div class="spinner-overlay">
   <div class="spinner-center">
     <div class="spinner"></div>
   </div>
 </div>
-`;
+`);
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
   // Determine translateMode (dictionary vs full)
