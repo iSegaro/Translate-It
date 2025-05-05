@@ -1,0 +1,12 @@
+.AIWritingCompanion-translation-icon-extension {
+  position: absolute;
+  display: none;
+  background: white;
+  border: 1px solid gray;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 9999999999;
+  pointer-events: auto;
+}

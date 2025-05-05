@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Translate It for Edge",
+  "version": "0.1.0",
+  "description": "__MSG_description__",
+  "default_locale": "en",
+  "permissions": [
+    "scripting",
+    "storage",
+    "tts",
+    "offscreen",
+    "tabs",
+    "clipboardWrite",
+    "clipboardRead",
+    "notifications",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.bundle.js"
+  },
+  "action": {
+    "default_title": "__MSG_name__",
+    "default_popup": "html/popup.html",
+    "default_icon": {
+      "16": "icons/extension_icon_16.png",
+      "32": "icons/extension_icon_32.png",
+      "48": "icons/extension_icon_48.png",
+      "64": "icons/extension_icon_64.png",
+      "128": "icons/extension_icon_128.png",
+      "256": "icons/extension_icon_256.png",
+      "512": "icons/extension_icon_512.png"
+    }
+  },
+  "icons": {
+    "16": "icons/extension_icon_16.png",
+    "32": "icons/extension_icon_32.png",
+    "48": "icons/extension_icon_48.png",
+    "64": "icons/extension_icon_64.png",
+    "128": "icons/extension_icon_128.png",
+    "256": "icons/extension_icon_256.png",
+    "512": "icons/extension_icon_512.png"
+  },
+  "options_ui": {
+    "page": "html/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "pageBridge.js",
+        "browser-polyfill.js",
+        "offscreen.js",
+        "content.bundle.js",
+        "offscreen.html",
+        "styles/*.css",
+        "icons/*.png",
+        "html/*",
+        "_locales/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ],
+      "use_dynamic_url": true
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
