@@ -274,6 +274,16 @@ npm run watch:chrome
 npm run watch:firefox
 ```
 
+### Lint Check
+
+To ensure code quality and catch potential issues early, you can run ESLint:
+
+```bash
+npm run lint
+```
+
+This command will scan all src/\*_/_.js files and report any syntax errors, unsafe patterns or unused variables.
+
 <br>
 
 ---
