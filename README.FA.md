@@ -1,4 +1,4 @@
-# AI Writing Companion
+# Translate It!
 
 > دستیار هوشمند ترجمه
 
@@ -259,7 +259,7 @@ _نکته: من در این پروژه از [`pnpm`][pnpm-url] استفاده م
 <div dir="ltf" style="text-align: left;">
 
 ```bash
-cd AI-Writing-Companion
+cd Translate-It
 npm install
 ```
 
@@ -282,7 +282,7 @@ npm run build:edge
 
 </div>
 
-این دستور فایل‌های `zip` مربوط به هر مرورگر را برای نصب به صورت دستی، در مسیر `AI-Writing-Companion/Build-Extension/` آماده میکنه.
+این دستور فایل‌های `zip` مربوط به هر مرورگر را برای نصب به صورت دستی، در مسیر `Translate-It/Build-Extension/` آماده میکنه.
 
 ولی اگه میخواهید تو لحظه تغییراتی بدهید، یکی از ۳ دستور زیر بیشتر به کارتون میاد:
 
@@ -350,9 +350,9 @@ npm run lint
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chrome.google.com/webstore/
 [edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
-[firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Firefox-v0.1.0.zip
-[chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Chrome-v0.1.0.zip
-[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/AI-Writing-Companion-for-Edge-v0.1.0.zip
+[firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Firefox-v0.1.0.zip
+[chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Chrome-v0.1.0.zip
+[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Edge-v0.1.0.zip
 [chrome-extensions-url]: chrome://extensions/
 [edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
