@@ -48,9 +48,18 @@ module.exports = {
         terserOptions: {
           compress: {
             evaluate: false,
-            drop_console: process.env.NODE_ENV === "production", // حذف console.log در حالت production
+            drop_console: process.env.NODE_ENV === "production",
+            unsafe: false,
+          },
+          mangle: {
+            keep_classnames: true,
+            keep_fnames: true,
+          },
+          format: {
+            comments: false,
           },
         },
+        extractComments: false,
       }),
     ],
   },
