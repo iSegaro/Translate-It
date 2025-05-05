@@ -17,6 +17,7 @@ let autoCloseTimer = null;
 let initialEntryTimer = null;
 let interactionLocked = false;
 
+// eslint-disable-next-line no-unused-vars
 function logPopupEvent(message, data = null) {
   // logME(`📦[PopupDebug]: ${message}`, data || "");
   return;
