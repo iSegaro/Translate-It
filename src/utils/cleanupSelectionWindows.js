@@ -31,7 +31,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
         func: cleanupFn,
       });
     }
-  } catch (err) {
+  } catch {
     // logME(`[SelectionWindows] dismissAll in tab ${tabId} failed:`, err);
   }
 }

@@ -22,7 +22,7 @@ export default class TwitterStrategy extends PlatformStrategy {
       );
 
       return result;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -38,7 +38,7 @@ export default class TwitterStrategy extends PlatformStrategy {
       );
 
       return result;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -275,7 +275,7 @@ export default class TwitterStrategy extends PlatformStrategy {
           if (element && typeof element.contains === "function") {
             containsSearchInput = element.contains(searchInput);
           }
-        } catch (err) {
+        } catch {
           //
         }
 
@@ -355,48 +355,48 @@ export default class TwitterStrategy extends PlatformStrategy {
       return false;
       // 3. پردازش فیلدهای توییت
 
-      let tweetField = null;
+      // let tweetField = null;
 
-      let isTwitterElementActive = false;
+      // let isTwitterElementActive = false;
 
-      isTwitterElementActive = this.isTwitterElement(document.activeElement);
+      // isTwitterElementActive = this.isTwitterElement(document.activeElement);
 
-      let isElementTwitter = false;
+      // let isElementTwitter = false;
 
-      if (element) {
-        isElementTwitter = this.isTwitterElement(element);
-      }
+      // if (element) {
+      //   isElementTwitter = this.isTwitterElement(element);
+      // }
 
-      if (isTwitterElementActive) {
-        tweetField = document.activeElement;
-      } else if (isElementTwitter) {
-        tweetField = element;
-      } else {
-        tweetField = this.findField(
-          element || document.body,
+      // if (isTwitterElementActive) {
+      //   tweetField = document.activeElement;
+      // } else if (isElementTwitter) {
+      //   tweetField = element;
+      // } else {
+      //   tweetField = this.findField(
+      //     element || document.body,
 
-          '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
-        );
-      }
+      //     '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
+      //   );
+      // }
 
-      if (tweetField) {
-        if (this.validateField(tweetField)) {
-          // First we clear any selection that might exist
-          try {
-            window.getSelection().removeAllRanges();
-          } catch (err) {
-            //
-          }
-          tweetField.focus();
-          this.applyVisualFeedback(tweetField);
-          this.clearTweetField(tweetField);
-          await delay(50);
-          this.pasteText(tweetField, translatedText);
-          this.applyTextDirection(tweetField, translatedText);
-          await delay(100);
-          this.setCursorToEnd(tweetField);
-        }
-      }
+      // if (tweetField) {
+      //   if (this.validateField(tweetField)) {
+      //     // First we clear any selection that might exist
+      //     try {
+      //       window.getSelection().removeAllRanges();
+      //     } catch (err) {
+      //       //
+      //     }
+      //     tweetField.focus();
+      //     this.applyVisualFeedback(tweetField);
+      //     this.clearTweetField(tweetField);
+      //     await delay(50);
+      //     this.pasteText(tweetField, translatedText);
+      //     this.applyTextDirection(tweetField, translatedText);
+      //     await delay(100);
+      //     this.setCursorToEnd(tweetField);
+      //   }
+      // }
     } catch (error) {
       logME("[DEBUG] Critical error in updateElement:", error);
 
@@ -536,7 +536,7 @@ export default class TwitterStrategy extends PlatformStrategy {
   validateField(field) {
     try {
       return !!field && field instanceof Element;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -568,7 +568,7 @@ export default class TwitterStrategy extends PlatformStrategy {
       const field = document.querySelector(selector);
 
       return field;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

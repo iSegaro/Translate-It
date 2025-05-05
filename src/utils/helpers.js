@@ -88,7 +88,7 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
 export const isExtensionContextValid = () => {
   try {
     return !!Browser?.runtime?.id && !!Browser?.storage?.local;
-  } catch (e) {
+  } catch {
     return false;
   }
 };

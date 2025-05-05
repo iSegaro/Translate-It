@@ -56,7 +56,7 @@ export async function buildPrompt(
       isJsonMode = true;
       textForTranslation = text;
     }
-  } catch (error) {
+  } catch {
     // در صورت عدم امکان پارس، متن اصلی استفاده می‌شود
     textForTranslation = text;
   }

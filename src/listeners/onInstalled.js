@@ -43,7 +43,7 @@ Browser.runtime.onInstalled.addListener((details) => {
             tabId: tab.id,
             url: tab.url,
           });
-        } catch (err) {
+        } catch {
           // logME("[onInstalled] sendMessage failed:", tab.url, err.message);
         }
       }

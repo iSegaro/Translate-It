@@ -8,7 +8,7 @@ import { getTranslationString } from "../utils/i18n.js";
 
 // Dependencies passed as arguments: translateText, errorHandler
 
-export async function handleRevertBackground(params) {
+export async function handleRevertBackground() {
   try {
     const [tab] = await Browser.tabs.query({
       active: true,

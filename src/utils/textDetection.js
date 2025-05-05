@@ -2,6 +2,7 @@
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { languageList } from "./languages.js";
+// import { logME } from "./helpers.js";
 
 export const isPersianText = (text) => {
   return CONFIG.PERSIAN_REGEX.test(text);
@@ -69,7 +70,7 @@ export async function detectTextLanguage(text) {
       // logME("امکان تشخیص زبان وجود ندارد.");
       return null;
     }
-  } catch (error) {
+  } catch {
     // logME("خطا در تشخیص زبان:", error);
     return null;
   }

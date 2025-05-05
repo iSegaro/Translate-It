@@ -3,7 +3,6 @@ import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import {
   AUTO_DETECT_VALUE,
-  playAudioWebSpeech,
   playAudioViaOffscreen,
   playAudioGoogleTTS,
   playAudioChromeTTS,
@@ -57,7 +56,7 @@ export async function playTTS(message) {
       const browserInfo = await Browser.runtime.getBrowserInfo();
       isFirefox = browserInfo.name.toLowerCase() === "firefox";
     }
-  } catch (e) {
+  } catch {
     // اگر اطلاعاتی نتوانستیم بگیریم، فرض می‌کنیم Chrome-like است
     logME(
       "[TTS] Could not get browser info, assuming Chrome-like environment."

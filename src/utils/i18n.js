@@ -1,11 +1,11 @@
 // src/utils/i18n.js
 
 import Browser from "webextension-polyfill";
-import { applyElementDirection, isRtlText } from "./textDetection.js";
+import { applyElementDirection } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
-import { logME } from "./helpers.js";
+// import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {
   return String(value).trim().toLowerCase() === "true";
@@ -37,7 +37,7 @@ async function loadTranslationsForLanguageCached(lang) {
     // ذخیره ترجمه‌ها در کش برای دفعات بعدی
     translationsCache.set(lang, translations);
     return translations;
-  } catch (error) {
+  } catch {
     // logME(`⚠️ خطا در بارگذاری ترجمه‌های "${lang}":`, error);
     return null;
   }

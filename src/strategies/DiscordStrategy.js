@@ -151,7 +151,9 @@ export default class DiscordStrategy extends PlatformStrategy {
   simulateInputInsertion(field, text) {
     try {
       if (document.execCommand("insertText", false, text)) return;
-    } catch (_) {}
+    } catch {
+      //
+    }
 
     if (field.tagName === "INPUT" || field.tagName === "TEXTAREA") {
       const start = field.selectionStart || 0;

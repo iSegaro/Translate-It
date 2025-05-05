@@ -1,6 +1,6 @@
 // src/managers/IconBehavior.js
 
-import { state, TranslationMode } from "../config.js";
+import { state } from "../config.js";
 import { detectPlatform } from "../utils/platformDetector.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";

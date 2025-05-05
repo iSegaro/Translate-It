@@ -20,7 +20,6 @@ export async function Active_SelectElement(
 
     if (!isExtensionContextValid()) return;
 
-    const tabId = tabs[0].id;
     let currentState = false;
 
     const result = await Browser.storage.local.get(["selectElementState"]);

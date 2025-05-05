@@ -20,7 +20,6 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
 import EventRouter from "./EventRouter.js";
-import { smartTranslate } from "../backgrounds/bridgeIntegration.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 /**

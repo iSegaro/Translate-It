@@ -15,13 +15,7 @@ import {
   getOpenAIModelAsync,
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
-  state,
   TranslationMode,
-  getPromptBASEFieldAsync,
-  getPromptBASESelectAsync,
-  getPromptPopupTranslateAsync,
-  getPromptDictionaryAsync,
-  getEnableDictionaryAsync,
 } from "../config.js";
 import { delay, isExtensionContextValid } from "../utils/helpers.js";
 import { buildPrompt } from "../utils/promptBuilder.js";
@@ -98,7 +92,9 @@ class ApiService {
         let body = {};
         try {
           body = await response.json();
-        } catch {}
+        } catch {
+          //
+        }
         // Use detail or error.message or statusText, fallback to HTTP status
         const msg =
           body.detail ||

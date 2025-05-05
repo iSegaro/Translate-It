@@ -1,13 +1,12 @@
 // src/popup/popupInteractionManager.js
-import Browser from "webextension-polyfill";
+
 import elements from "./domElements.js";
 import { Active_SelectElement } from "../utils/select_element.js";
 import {
   getTranslateWithSelectElementAsync,
   getExtensionEnabledAsync,
 } from "../config.js";
-import { wasSelectElementIconClicked } from "./headerActionsManager.js";
-import { logME } from "../utils/helpers.js";
+// import { wasSelectElementIconClicked } from "./headerActionsManager.js";
 
 const HOVER_TIMEOUT = 1000;
 const AUTO_CLOSE_TIMEOUT = 800;
@@ -19,8 +18,8 @@ let initialEntryTimer = null;
 let interactionLocked = false;
 
 function logPopupEvent(message, data = null) {
+  // logME(`📦[PopupDebug]: ${message}`, data || "");
   return;
-  logME(`📦[PopupDebug]: ${message}`, data || "");
 }
 
 function cancelAutoClose(reason = "") {

@@ -27,7 +27,7 @@ export async function smartTranslate(text, translateMode = "Popup_Translate") {
       ...response,
       viaBridge: false, // ← حالت عادی موفق بود
     };
-  } catch (error) {
+  } catch {
     logME(
       "[BridgeIntegration] Normal translate failed. Falling back to bridge."
     );

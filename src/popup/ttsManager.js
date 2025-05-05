@@ -1,7 +1,6 @@
 // src/popup/ttsManager.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { getEffectiveLanguage } from "../utils/langUtils.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 
 function setupEventListeners() {
