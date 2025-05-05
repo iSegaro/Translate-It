@@ -126,7 +126,7 @@ export default class EventHandler {
         await this.handleMouseUp(event);
       }
     } catch (rawError) {
-      const error = await ProcessError.processError(rawError);
+      const error = await this.translationHandler.processError(rawError);
       await this.translationHandler.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-handling",
@@ -243,13 +243,13 @@ export default class EventHandler {
           "mousedown",
           this.cancelSelectionTranslation
         );
-      } catch (error) {
+      } catch {
         // خطا در حذف
       }
     }
   }
 
-  async processSelectedText(selectedText, event) {
+  async processSelectedText(selectedText) {
     const selection = window.getSelection();
     let position = { x: 0, y: 0 };
     if (selection.rangeCount > 0) {
@@ -491,18 +491,22 @@ export default class EventHandler {
         return { status: "error", reason: "empty_translation", message: m };
       }
 
-      /* 5) پردازش رشتهٔ JSONِ ترجمه‌شده */
+      /* 5) پردازش رشتهٔ JSON ترجمه‌شده */
       const translatedData = parseAndCleanTranslationResponse(
         translatedJsonString,
         this.translationHandler
       );
       if (!translatedData) {
-        const m = "(فرمت پاسخ نامعتبر است.)";
+        // const m = "(فرمت پاسخ نامعتبر است.)";
         await this.translationHandler.errorHandler.handle(
-          new Error(err), // یا آبجکت Error اختصاصى
+          new Error(ErrorTypes.API_RESPONSE_INVALID),
           { type: ErrorTypes.API, context: "select-element-response-format" }
         );
-        return { status: "error", reason: "api_error", message: err };
+        return {
+          status: "error",
+          reason: "api_error",
+          message: ErrorTypes.API_RESPONSE_INVALID,
+        };
       }
 
       /* 6) تطابق طول (هشدار فقط) */
@@ -559,7 +563,7 @@ export default class EventHandler {
     }
   }
 
-  handleEscape(event) {
+  handleEscape() {
     taggleLinks(false);
 
     this.cancelSelectionTranslation();
@@ -593,7 +597,7 @@ export default class EventHandler {
     this.isProcessing = true;
 
     try {
-      const { select_element, activeElement } =
+      const { activeElement } =
         this.translationHandler.getSelectElementContext();
 
       if (!isEditable(activeElement)) return;
@@ -630,16 +634,16 @@ export default class EventHandler {
         selectionRange: null, // چون با Ctrl+/ اجرا شده
       });
     } catch (error) {
-      error = await ErrorHandler.processError(error);
-      logME("[EventHandler] Ctrl+/ Error: ", error);
+      const errorHandle = await ErrorHandler.processError(error);
+      logME("[EventHandler] Ctrl+/ Error: ", errorHandle);
 
-      if (error.isFinal) return;
+      if (errorHandle.isFinal) return;
 
-      if (!error.originalError?.isPrimary) {
-        const errorType = error.type || ErrorTypes.API;
-        const statusCode = error.statusCode || 500;
+      if (!errorHandle.originalError?.isPrimary) {
+        const errorType = errorHandle.type || ErrorTypes.API;
+        const statusCode = errorHandle.statusCode || 500;
 
-        this.translationHandler.errorHandler.handle(error, {
+        this.translationHandler.errorHandler.handle(errorHandle, {
           type: errorType,
           statusCode: statusCode,
           context: "ctrl-slash",
