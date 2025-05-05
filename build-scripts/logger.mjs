@@ -1,4 +1,5 @@
-// scripts/logger.js
+// build-scripts/logger.js
+
 import chalk from "chalk";
 
 export function logStep(name) {
