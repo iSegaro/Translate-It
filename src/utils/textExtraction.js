@@ -154,14 +154,19 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       try {
         parentElement.replaceChild(containerSpan, textNode);
       } catch (error) {
-        logME("AIWC Error replacing text node with container:", error, {
-          textNode,
-          containerSpan,
-          parentElement,
-        });
+        logME(
+          "[AIWC-textExtraction] Error replacing text node with container:",
+          error,
+          {
+            textNode,
+            containerSpan,
+            parentElement,
+          }
+        );
         context.state.originalTexts.delete(uniqueId);
-        error = ErrorHandler.processError(error);
-        context.errorHandler.handle(error, {
+
+        const processedError = ErrorHandler.processError(error);
+        context.errorHandler.handle(processedError, {
           type: ErrorTypes.PARSE_SELECT_ELEMENT,
           context: "textExtraction-apply-translations-replace",
           elementId: "multiple",
