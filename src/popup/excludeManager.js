@@ -9,7 +9,7 @@ import { getTranslationString } from "../utils/i18n.js";
 function getOrigin(url) {
   try {
     return new URL(url).origin;
-  } catch (e) {
+  } catch {
     logME("[excludeManager]: Invalid URL for origin extraction:", url);
     return url;
   }
@@ -27,7 +27,7 @@ export async function init() {
   let tabs;
   try {
     tabs = await Browser.tabs.query({ active: true, currentWindow: true });
-  } catch (err) {
+  } catch {
     // logME("[excludeManager]: Error querying tabs:", err);
     return;
   }
@@ -38,7 +38,7 @@ export async function init() {
   let protocol;
   try {
     protocol = new URL(currentTab.url).protocol;
-  } catch (e) {
+  } catch {
     protocol = null;
   }
   const isHttp = protocol === "http:" || protocol === "https:";
