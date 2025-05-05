@@ -1,6 +1,6 @@
 import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
-import { logME, openOptionsPage } from "../utils/helpers.js";
+import { openOptionsPage } from "../utils/helpers.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
@@ -66,45 +66,6 @@ export class ErrorHandler {
       return err;
     } finally {
       this.handling = false;
-    }
-  }
-
-  async handle_OLD(error, meta = {}) {
-    if (error?._isHandled) return error;
-    if (this.isHandling) return error;
-    this.isHandling = true;
-
-    try {
-      const normalized = await extractError(error);
-      const key = normalized._errorKey;
-      const code = key.toUpperCase();
-
-      const isDebug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
-      const shouldLog = isDebug && !SUPPRESS_CONSOLE_LOG_ERRORS.has(code);
-      if (shouldLog) {
-        this._logError(normalized, meta);
-      }
-
-      if (SILENT_ERRORS.has(code)) {
-        normalized._isHandled = true;
-        return normalized;
-      }
-
-      // prepare user message and optional action
-      const userMsg = await getErrorMessageByKey(key);
-      let action;
-      if (OPEN_SETTINGS_ERRORS.has(code)) {
-        action = () => openOptionsPage();
-      }
-
-      this._notifyUser(userMsg, meta.type || ErrorTypes.SERVICE, action);
-      normalized._isHandled = true;
-      return normalized;
-    } catch (fatal) {
-      logME("[ErrorService] Fatal error in handler:", fatal);
-      return fatal;
-    } finally {
-      this.isHandling = false;
     }
   }
 
