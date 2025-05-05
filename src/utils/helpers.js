@@ -11,25 +11,26 @@ export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /**
  * Decorator برای افزودن لاگینگ به ابتدای متد
  */
+// eslint-disable-next-line no-unused-vars
 export function logMethod(target, propertyKey, descriptor) {
   return;
-  const originalMethod = descriptor.value;
-  descriptor.value = async function (...args) {
-    try {
-      const isDebugEnabled = await IsDebug();
-      if (isDebugEnabled) {
-        const className = target.constructor.name;
-        console.debug(`[${className}.${propertyKey}]`, ...args);
-      }
-      const result = await originalMethod.apply(this, args);
-      return result;
-    } catch (error) {
-      const className = target.constructor.name;
-      console.error(`[${className}.${propertyKey}] Error:`, error);
-      throw error;
-    }
-  };
-  return descriptor;
+  // const originalMethod = descriptor.value;
+  // descriptor.value = async function (...args) {
+  //   try {
+  //     const isDebugEnabled = await IsDebug();
+  //     if (isDebugEnabled) {
+  //       const className = target.constructor.name;
+  //       console.debug(`[${className}.${propertyKey}]`, ...args);
+  //     }
+  //     const result = await originalMethod.apply(this, args);
+  //     return result;
+  //   } catch (error) {
+  //     const className = target.constructor.name;
+  //     console.error(`[${className}.${propertyKey}] Error:`, error);
+  //     throw error;
+  //   }
+  // };
+  // return descriptor;
 }
 
 export const logME = (...args) => {
