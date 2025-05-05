@@ -1,7 +1,3 @@
 node_modules/
 .vscode/
 *.pem
-# Build-Extension/Chrome/AI-Writing-Companion/
-Build-Extension/Chrome/*.zip
-Build-Extension/Firefox/AI-Writing-Companion/
-Build-Extension/Firefox/*.zip
