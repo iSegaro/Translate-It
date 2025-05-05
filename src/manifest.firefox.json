@@ -4,11 +4,6 @@
   "version": "0.1.0",
   "description": "__MSG_description__",
   "default_locale": "en",
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "ai-writing-companion@amm1rr.com"
-    }
-  },
   "permissions": [
     "storage",
     "scripting",
