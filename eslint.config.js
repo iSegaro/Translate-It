@@ -10,10 +10,10 @@ export default [
   {
     files: ["src/**/*.js"],
     languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
       parser: babelParser,
       parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
         requireConfigFile: false,
         babelOptions: {
           plugins: [
@@ -25,7 +25,29 @@ export default [
       globals: {
         window: "readonly",
         document: "readonly",
-        DOMPurify: "readonly",
+        Node: "readonly",
+        NodeFilter: "readonly",
+        Audio: "readonly",
+        SpeechSynthesisUtterance: "readonly",
+        speechSynthesis: "readonly",
+        chrome: "readonly",
+        URL: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        DataTransfer: "readonly",
+        ClipboardEvent: "readonly",
+        InputEvent: "readonly",
+        Element: "readonly",
+        Event: "readonly",
+        requestAnimationFrame: "readonly",
+        navigator: "readonly",
+        HTMLElement: "readonly",
+        KeyboardEvent: "readonly",
+        console: "readonly",
+        CustomEvent: "readonly",
+        cancelAnimationFrame: "readonly",
+        ResizeObserver: "readonly",
       },
     },
     plugins: {
