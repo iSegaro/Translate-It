@@ -220,9 +220,3 @@ export async function app_localize_popup(lang_code) {
   // اعمال افکت pop-in برای نمایش نرم Popup
   animatePopupEffect(bodyContainer, 300);
 }
-
-// در نسخه اولیه نیاز بود که تنظیمات بارگذاری شوند، ولی فعلا مطمین نیستم بهشون نیازی باشه یا خیر
-// document.addEventListener("DOMContentLoaded", () => {
-//   app_localize();
-//   app_localize_popup();
-// });
