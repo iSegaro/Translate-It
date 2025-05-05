@@ -4,7 +4,7 @@ import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { parseBoolean, getTranslationString } from "../utils/i18n.js";
+// import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 import DOMPurify from "dompurify";
 
 const safe = {
@@ -87,8 +87,8 @@ export default class NotificationManager {
   async _applyAlignment() {
     if (!this.container) return;
     try {
-      const rtlMsg = await getTranslationString("IsRTL");
-      const isRTL = parseBoolean(rtlMsg);
+      // const rtlMsg = await getTranslationString("IsRTL");
+      const isRTL = true; // parseBoolean(rtlMsg);
       if (isRTL) {
         this.container.style.right = "20px";
         this.container.style.left = "";
