@@ -56,7 +56,11 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("wrong api key") ||
     msg.includes("api key not valid") ||
     msg.includes("no auth credentials") ||
-    msg.includes("incorrect api key provided")
+    msg.includes("incorrect api key provided") ||
+    msg.includes("api key expired") ||
+    msg.includes("renew the api key") ||
+    msg.includes("API key expired") ||
+    msg.includes("renew the api key")
   )
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
