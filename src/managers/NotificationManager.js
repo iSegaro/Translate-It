@@ -4,7 +4,7 @@ import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-// import { parseBoolean, getTranslationString } from "../utils/i18n.js";
+import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
 const safe = {
   ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
@@ -21,37 +21,37 @@ export default class NotificationManager {
     this.errorHandler = errorHandler || { handle: () => {} };
     this.map = {
       error: {
-        title: "AI Writing Companion - Error",
+        title: "Translate It! - Error",
         icon: safe.ICON_ERROR,
         cls: "AIWC-error",
         dur: 5000,
       },
       warning: {
-        title: "AI Writing Companion - Warning",
+        title: "Translate It! - Warning",
         icon: safe.ICON_WARNING,
         cls: "AIWC-warning",
         dur: 4000,
       },
       success: {
-        title: "AI Writing Companion - Success",
+        title: "Translate It! - Success",
         icon: safe.ICON_SUCCESS,
         cls: "AIWC-success",
         dur: 3000,
       },
       info: {
-        title: "AI Writing Companion - Info",
+        title: "Translate It! - Info",
         icon: safe.ICON_INFO,
         cls: "AIWC-info",
         dur: 3000,
       },
       status: {
-        title: "AI Writing Companion - Status",
+        title: "Translate It! - Status",
         icon: safe.ICON_STATUS,
         cls: "AIWC-status",
         dur: 2000,
       },
       revert: {
-        title: "AI Writing Companion - Revert",
+        title: "Translate It! - Revert",
         icon: safe.ICON_REVERT,
         cls: "AIWC-revert",
         dur: 800,
@@ -86,17 +86,17 @@ export default class NotificationManager {
   async _applyAlignment() {
     if (!this.container) return;
     try {
-      // const rtlMsg = await getTranslationString("IsRTL");
-      const isRTL = true; // parseBoolean(rtlMsg);
+      const rtlMsg = await getTranslationString("IsRTL");
+      const isRTL = parseBoolean(rtlMsg);
       if (isRTL) {
         this.container.style.right = "20px";
         this.container.style.left = "";
       } else {
-        this.container.style.left = "20px";
-        this.container.style.right = "";
+        this.container.style.left = "";
+        this.container.style.right = "20px";
       }
       this.container.style.direction = isRTL ? "rtl" : "ltr";
-      this.container.style.textAlign = isRTL ? "right" : "left";
+      this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
     } catch (e) {
       logME("[NotificationManager] _applyAlignment failed:", e);
     }
