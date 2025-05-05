@@ -11,7 +11,7 @@
     <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
     <span>&nbsp;Download for Edge&nbsp;</span>
   </a>
-  <a href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
     <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
   </a>
 
