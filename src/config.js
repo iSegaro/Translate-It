@@ -102,7 +102,7 @@ export const CONFIG = {
   - Include synonyms, word type (noun, verb, adjective, etc.), and a brief definition.
   - If applicable, provide example sentences using the word or phrase in context.
   - If the input is ambiguous, return the most common meanings.
-  - If no definition is found, return "No definition available."
+  - If no definition is found, return translation only.
 
   Return in $_{TARGET} language, and **ONLY** the dictionary entry without any extra words, explanations, markdown, or modifications.
 
