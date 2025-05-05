@@ -208,20 +208,32 @@ export default class SelectionWindows {
     firstLine.classList.add("first-line");
     const ttsIcon = this.createTTSIcon(originalText);
     firstLine.appendChild(ttsIcon);
+
     if (trans_Mode === TranslationMode.Dictionary_Translation) {
       const orig = document.createElement("span");
       orig.classList.add("original-text");
       orig.textContent = originalText;
       firstLine.appendChild(orig);
     }
+
     this.innerContainer.appendChild(firstLine);
 
     const secondLine = document.createElement("div");
     secondLine.classList.add("second-line");
+
     const textSpan = document.createElement("span");
     textSpan.classList.add("text-content");
-    /* eslint-disable no-unsanitized/property */
-    textSpan.innerHTML = DOMPurify.sanitize(marked.parse(translatedText));
+
+    // تبدیل Markdown به HTML، پاکسازی، سپس تبدیل امن به Node:
+    const rawHtml = marked.parse(translatedText);
+    const trusted = DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: true });
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(trusted.toString(), "text/html");
+
+    Array.from(doc.body.childNodes).forEach((node) => {
+      textSpan.appendChild(node);
+    });
+
     secondLine.appendChild(textSpan);
     this.applyTextDirection(secondLine, translatedText);
     this.innerContainer.appendChild(secondLine);

@@ -59,17 +59,27 @@ async function handleTranslationResponse(
     const translated = response.data.translatedText;
     elements.translationResult.classList.remove("fade-in");
     void elements.translationResult.offsetWidth;
-    /* eslint-disable no-unsanitized/property */
-    elements.translationResult.innerHTML = DOMPurify.sanitize(
-      marked.parse(translated)
-    );
+
+    // ساخت و درج امن با DOM API بجای innerHTML
+    const rawHtml = marked.parse(translated);
+    const sanitized = DOMPurify.sanitize(rawHtml, {
+      RETURN_TRUSTED_TYPE: true,
+    });
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized.toString(), "text/html");
+
+    elements.translationResult.textContent = ""; // پاک‌سازی قبلی
+    Array.from(doc.body.childNodes).forEach((node) => {
+      elements.translationResult.appendChild(node);
+    });
     elements.translationResult.classList.add("fade-in");
+
     correctTextDirection(elements.translationResult, translated);
 
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);
 
-    // Persist last translation
     Browser.storage.local
       .set({
         lastTranslation: {
@@ -86,8 +96,6 @@ async function handleTranslationResponse(
         logME("[Translate]: Error saving last translation:", error);
       });
 
-    // Optional: auto-detected source language update
-    // This depends on your background script sending back `detectedSourceLang`
     if (
       response.data.detectedSourceLang &&
       (!sourceLangCode || sourceLangCode === AUTO_DETECT_VALUE)
@@ -182,14 +190,26 @@ async function triggerTranslation() {
   }
 
   // Show spinner
-  /* eslint-disable no-unsanitized/property */
-  elements.translationResult.innerHTML = DOMPurify.sanitize(`
+  const spinnerHTML = `
 <div class="spinner-overlay">
   <div class="spinner-center">
     <div class="spinner"></div>
   </div>
 </div>
-`);
+`;
+
+  const sanitized = DOMPurify.sanitize(spinnerHTML, {
+    RETURN_TRUSTED_TYPE: true,
+  });
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(sanitized.toString(), "text/html");
+
+  elements.translationResult.textContent = "";
+  Array.from(doc.body.childNodes).forEach((node) => {
+    elements.translationResult.appendChild(node);
+  });
+
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
   // Determine translateMode (dictionary vs full)

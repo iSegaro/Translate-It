@@ -5,7 +5,6 @@ import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 // import { parseBoolean, getTranslationString } from "../utils/i18n.js";
-import DOMPurify from "dompurify";
 
 const safe = {
   ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
@@ -178,10 +177,16 @@ export default class NotificationManager {
       box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;
       align-items:center;cursor:pointer;opacity:1;
       transition:opacity .5s`;
-    /* eslint-disable no-unsanitized/property */
-    n.innerHTML = DOMPurify.sanitize(
-      `<span>${cfg.icon}</span><span>${message}</span>`
-    );
+
+    // ✅ DOM-safe API instead replace:
+    const iconSpan = document.createElement("span");
+    iconSpan.textContent = cfg.icon;
+
+    const msgSpan = document.createElement("span");
+    msgSpan.textContent = message;
+
+    n.appendChild(iconSpan);
+    n.appendChild(msgSpan);
 
     n.addEventListener("click", () => {
       try {
@@ -195,6 +200,7 @@ export default class NotificationManager {
     this.container.appendChild(n);
     if (auto && cfg.cls !== "AIWC-status")
       setTimeout(() => this.dismiss(n), dur);
+
     return n;
   }
 

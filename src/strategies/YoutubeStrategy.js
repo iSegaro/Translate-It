@@ -76,8 +76,21 @@ export default class YoutubeStrategy extends PlatformStrategy {
         if (element.isContentEditable) {
           // برای عناصر contentEditable از <br> استفاده کنید
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          /* eslint-disable no-unsanitized/property */
-          element.innerHTML = DOMPurify.sanitize(htmlText);
+          const trustedHTML = DOMPurify.sanitize(htmlText, {
+            RETURN_TRUSTED_TYPE: true,
+          });
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(
+            trustedHTML.toString(),
+            "text/html"
+          );
+
+          element.textContent = "";
+          Array.from(doc.body.childNodes).forEach((node) => {
+            element.appendChild(node);
+          });
+
           this.applyVisualFeedback(element);
           this.applyTextDirection(element, htmlText);
         } else {

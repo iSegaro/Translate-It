@@ -77,8 +77,19 @@ export default class ChatGPTStrategy extends PlatformStrategy {
         return false;
       }
 
-      /* eslint-disable no-unsanitized/property */
-      element.innerHTML = DOMPurify.sanitize(translated.replace(/\n/g, "<br>"));
+      const htmlWithBreaks = translated.replace(/\n/g, "<br>");
+      const sanitized = DOMPurify.sanitize(htmlWithBreaks, {
+        RETURN_TRUSTED_TYPE: true,
+      });
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitized.toString(), "text/html");
+
+      element.textContent = "";
+      Array.from(doc.body.childNodes).forEach((node) => {
+        element.appendChild(node);
+      });
+
       this.applyBaseStyling(element, translated);
       setCursorToEnd(element);
       this.applyVisualFeedback(element);

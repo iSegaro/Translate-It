@@ -43,10 +43,24 @@ export default class DefaultStrategy extends PlatformStrategy {
     try {
       if (translatedText !== undefined && translatedText !== null) {
         this.applyVisualFeedback(element);
+
         if (element.isContentEditable) {
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          /* eslint-disable no-unsanitized/property */
-          element.innerHTML = DOMPurify.sanitize(htmlText);
+          const trustedHTML = DOMPurify.sanitize(htmlText, {
+            RETURN_TRUSTED_TYPE: true,
+          });
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(
+            trustedHTML.toString(),
+            "text/html"
+          );
+
+          element.textContent = "";
+          Array.from(doc.body.childNodes).forEach((node) => {
+            element.appendChild(node);
+          });
+
           this.applyTextDirection(element, htmlText);
         } else {
           element.value = translatedText;

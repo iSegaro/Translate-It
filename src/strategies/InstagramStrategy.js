@@ -30,8 +30,18 @@ export default class InstagramStrategy extends PlatformStrategy {
         this.triggerStateUpdate(element);
         this.applyVisualFeedback(element);
       } else if (element.isContentEditable) {
-        /* eslint-disable no-unsanitized/property */
-        element.innerHTML = DOMPurify.sanitize(translatedText);
+        const trustedHTML = DOMPurify.sanitize(translatedText, {
+          RETURN_TRUSTED_TYPE: true,
+        });
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(trustedHTML.toString(), "text/html");
+
+        element.textContent = "";
+        Array.from(doc.body.childNodes).forEach((node) => {
+          element.appendChild(node);
+        });
+
         this.applyTextDirection(element, translatedText);
         this.applyVisualFeedback(element);
       } else {

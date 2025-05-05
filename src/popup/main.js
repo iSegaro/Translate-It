@@ -41,9 +41,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
     logME("Popup initialization failed:", error);
-    /* eslint-disable no-unsanitized/property */
-    document.body.innerHTML = DOMPurify.sanitize(
-      `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`
+    const safeHtml = DOMPurify.sanitize(
+      `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`,
+      { RETURN_TRUSTED_TYPE: true }
+    );
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(safeHtml.toString(), "text/html");
+
+    document.body.textContent = "";
+    Array.from(doc.body.childNodes).forEach((node) =>
+      document.body.appendChild(node)
     );
   } finally {
     // اجرای ترجمه بعد از اتمام کامل عملیات اولیه

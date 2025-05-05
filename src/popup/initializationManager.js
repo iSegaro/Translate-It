@@ -25,10 +25,19 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
         result.lastTranslation.sourceText
       );
 
-      /* eslint-disable no-unsanitized/property */
-      elements.translationResult.innerHTML = DOMPurify.sanitize(
-        marked.parse(result.lastTranslation.translatedText || "")
-      );
+      const rawHtml = marked.parse(result.lastTranslation.translatedText || "");
+      const sanitized = DOMPurify.sanitize(rawHtml, {
+        RETURN_TRUSTED_TYPE: true,
+      });
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitized.toString(), "text/html");
+
+      elements.translationResult.textContent = "";
+      Array.from(doc.body.childNodes).forEach((node) => {
+        elements.translationResult.appendChild(node);
+      });
+
       correctTextDirection(
         elements.translationResult,
         result.lastTranslation.translatedText
