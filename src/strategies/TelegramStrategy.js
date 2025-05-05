@@ -216,31 +216,31 @@ export default class TelegramStrategy extends PlatformStrategy {
     }
     return "";
 
-    let content = "";
-    try {
-      const telegramField = this.getTelegramField(target);
-      if (!telegramField || !(telegramField instanceof HTMLElement)) return "";
+    // let content = "";
+    // try {
+    //   const telegramField = this.getTelegramField(target);
+    //   if (!telegramField || !(telegramField instanceof HTMLElement)) return "";
 
-      if (telegramField.isContentEditable) {
-        content = telegramField.textContent || telegramField.innerText || "";
-      } else if (
-        telegramField.tagName &&
-        ["INPUT", "TEXTAREA"].includes(telegramField.tagName.toUpperCase())
-      ) {
-        content = telegramField.value || "";
-      } else {
-        content = telegramField.textContent || telegramField.innerText || "";
-      }
+    //   if (telegramField.isContentEditable) {
+    //     content = telegramField.textContent || telegramField.innerText || "";
+    //   } else if (
+    //     telegramField.tagName &&
+    //     ["INPUT", "TEXTAREA"].includes(telegramField.tagName.toUpperCase())
+    //   ) {
+    //     content = telegramField.value || "";
+    //   } else {
+    //     content = telegramField.textContent || telegramField.innerText || "";
+    //   }
 
-      return content.trim();
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "telegram-strategy-extractText",
-        content,
-      });
-      return "";
-    }
+    //   return content.trim();
+    // } catch (error) {
+    //   this.errorHandler.handle(error, {
+    //     type: ErrorTypes.UI,
+    //     context: "telegram-strategy-extractText",
+    //     content,
+    //   });
+    //   return "";
+    // }
   }
 
   validateField(element) {

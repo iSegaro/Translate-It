@@ -1,8 +1,8 @@
 // src/strategies/InstagramStrategy.js
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
+import DOMPurify from "dompurify";
 
 export default class InstagramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -30,7 +30,8 @@ export default class InstagramStrategy extends PlatformStrategy {
         this.triggerStateUpdate(element);
         this.applyVisualFeedback(element);
       } else if (element.isContentEditable) {
-        element.innerHTML = translatedText;
+        /* eslint-disable no-unsanitized/property */
+        element.innerHTML = DOMPurify.sanitize(translatedText);
         this.applyTextDirection(element, translatedText);
         this.applyVisualFeedback(element);
       } else {

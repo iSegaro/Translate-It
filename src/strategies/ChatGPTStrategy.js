@@ -3,6 +3,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { setCursorToEnd } from "../utils/simulate_events.js";
 import { CONFIG } from "../config";
+import DOMPurify from "dompurify";
 
 export default class ChatGPTStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -76,7 +77,8 @@ export default class ChatGPTStrategy extends PlatformStrategy {
         return false;
       }
 
-      element.innerHTML = translated.replace(/\n/g, "<br>");
+      /* eslint-disable no-unsanitized/property */
+      element.innerHTML = DOMPurify.sanitize(translated.replace(/\n/g, "<br>"));
       this.applyBaseStyling(element, translated);
       setCursorToEnd(element);
       this.applyVisualFeedback(element);

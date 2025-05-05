@@ -1,8 +1,8 @@
 // src/strategies/YoutubeStrategy.js
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { logME } from "../utils/helpers.js";
+import DOMPurify from "dompurify";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -47,22 +47,22 @@ export default class YoutubeStrategy extends PlatformStrategy {
       return "";
     }
 
-    try {
-      if (!target || !target.isConnected) return "";
+    // try {
+    //   if (!target || !target.isConnected) return "";
 
-      if (target.isContentEditable) {
-        return target.innerText?.trim?.() || "";
-      }
+    //   if (target.isContentEditable) {
+    //     return target.innerText?.trim?.() || "";
+    //   }
 
-      return target.value || target.textContent?.trim?.() || "";
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "youtube-strategy-extractText",
-        element: target?.tagName,
-      });
-      return "";
-    }
+    //   return target.value || target.textContent?.trim?.() || "";
+    // } catch (error) {
+    //   this.errorHandler.handle(error, {
+    //     type: ErrorTypes.UI,
+    //     context: "youtube-strategy-extractText",
+    //     element: target?.tagName,
+    //   });
+    //   return "";
+    // }
   }
 
   async updateElement(element, translatedText) {
@@ -76,7 +76,8 @@ export default class YoutubeStrategy extends PlatformStrategy {
         if (element.isContentEditable) {
           // برای عناصر contentEditable از <br> استفاده کنید
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          element.innerHTML = htmlText;
+          /* eslint-disable no-unsanitized/property */
+          element.innerHTML = DOMPurify.sanitize(htmlText);
           this.applyVisualFeedback(element);
           this.applyTextDirection(element, htmlText);
         } else {

@@ -1,7 +1,7 @@
 // src/strategies/MediumStrategy.js
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/helpers.js";
+import { delay } from "../utils/helpers.js";
 
 export default class MediumStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -37,34 +37,34 @@ export default class MediumStrategy extends PlatformStrategy {
 
     return false;
     // 2. برای فیلدهای contenteditable (کامنت‌ها و نظرسنجی‌ها) - کپی به کلیپبورد
-    const mediumField = this.findMediumTextField(element);
-    if (!mediumField) {
-      return;
-    }
+    // const mediumField = this.findMediumTextField(element);
+    // if (!mediumField) {
+    //   return;
+    // }
 
-    this.safeFocus(mediumField); // فوکوس روی فیلد
+    // this.safeFocus(mediumField); // فوکوس روی فیلد
 
-    // کپی متن ترجمه شده به کلیپبورد
-    try {
-      await navigator.clipboard.writeText(translatedText);
-      logME(
-        "MediumStrategy: clipboard write SUCCESS for:",
-        translatedText.substring(0, 20) + "..."
-      ); // Log clipboard write success
-      this.notifier.show(
-        "✅ ترجمه در حافظه کپی شد. (Ctrl+V)",
-        "success",
-        true,
-        3000
-      );
-      // اعمال انیمیشن
-      this.applyVisualFeedback(mediumField);
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "medium-strategy-updateElement",
-      });
-    }
+    // // کپی متن ترجمه شده به کلیپبورد
+    // try {
+    //   await navigator.clipboard.writeText(translatedText);
+    //   logME(
+    //     "MediumStrategy: clipboard write SUCCESS for:",
+    //     translatedText.substring(0, 20) + "..."
+    //   ); // Log clipboard write success
+    //   this.notifier.show(
+    //     "✅ ترجمه در حافظه کپی شد. (Ctrl+V)",
+    //     "success",
+    //     true,
+    //     3000
+    //   );
+    //   // اعمال انیمیشن
+    //   this.applyVisualFeedback(mediumField);
+    // } catch (error) {
+    //   this.errorHandler.handle(error, {
+    //     type: ErrorTypes.UI,
+    //     context: "medium-strategy-updateElement",
+    //   });
+    // }
   }
 
   extractText(target) {

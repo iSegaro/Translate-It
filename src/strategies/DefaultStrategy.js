@@ -3,6 +3,7 @@
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers.js";
+import DOMPurify from "dompurify";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -44,7 +45,8 @@ export default class DefaultStrategy extends PlatformStrategy {
         this.applyVisualFeedback(element);
         if (element.isContentEditable) {
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          element.innerHTML = htmlText;
+          /* eslint-disable no-unsanitized/property */
+          element.innerHTML = DOMPurify.sanitize(htmlText);
           this.applyTextDirection(element, htmlText);
         } else {
           element.value = translatedText;

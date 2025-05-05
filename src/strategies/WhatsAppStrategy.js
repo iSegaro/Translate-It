@@ -90,21 +90,21 @@ export default class WhatsAppStrategy extends PlatformStrategy {
     }
     return "";
 
-    try {
-      const whatsappField = target?.closest?.(
-        '[role="textbox"], .copyable-text.selectable-text'
-      );
+    // try {
+    //   const whatsappField = target?.closest?.(
+    //     '[role="textbox"], .copyable-text.selectable-text'
+    //   );
 
-      if (!whatsappField || !this.validateField(whatsappField)) return "";
+    //   if (!whatsappField || !this.validateField(whatsappField)) return "";
 
-      return whatsappField.innerText?.trim?.() || "";
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "whatsapp-strategy-extractText",
-      });
-      return "";
-    }
+    //   return whatsappField.innerText?.trim?.() || "";
+    // } catch (error) {
+    //   this.errorHandler.handle(error, {
+    //     type: ErrorTypes.UI,
+    //     context: "whatsapp-strategy-extractText",
+    //   });
+    //   return "";
+    // }
   }
 
   async safeFocus(element) {
