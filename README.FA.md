@@ -5,15 +5,14 @@
 <p align="center">
   <a href="#install-for-chrome">
     <img src="./icons/Google_Chrome_icon.png" alt="Chrome" height="40" />
-    <span>&nbsp;Chrome&nbsp;</span>
+    <span>&nbsp;Chrome دانلود برای&nbsp;</span>
   </a>
   <a href="#install-for-edge">
     <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
-    <span>&nbsp;Edge&nbsp;</span>
+    <span>&nbsp;Edge دانلود برای&nbsp;</span>
   </a>
   <a href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./icons/Mozilla_Firefox_logo.png" alt="Firefox" height="40" />
-    <span>&nbsp;Firefox دانلود برای&nbsp;</span>
+    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
   </a>
 
 </p>
