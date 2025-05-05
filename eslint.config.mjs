@@ -48,6 +48,7 @@ export default [
         CustomEvent: "readonly",
         cancelAnimationFrame: "readonly",
         ResizeObserver: "readonly",
+        DOMParser: "readonly",
       },
     },
     plugins: {
@@ -58,7 +59,7 @@ export default [
       "no-unsanitized/method": "error",
       "no-unsanitized/property": "error",
 
-      // سایر قوانین مفید (اختیاری)
+      // سایر قوانین
       "no-console": "off",
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },
