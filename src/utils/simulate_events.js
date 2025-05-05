@@ -1,6 +1,7 @@
 // src/utils/simulate_events.js
 
 import { ErrorTypes } from "../services/ErrorTypes";
+import { ErrorHandler } from "../services/ErrorService.js";
 
 export const setCursorToEnd = (element) => {
   try {
@@ -23,11 +24,11 @@ export const setCursorToEnd = (element) => {
     // Optional: Scroll to cursor position
     element.scrollTop = element.scrollHeight;
   } catch (error) {
-    const handlerError = errorHandler.handle(error, {
+    const handlerError = new ErrorHandler();
+    throw handlerError.handle(error, {
       type: ErrorTypes.UI,
       context: "helpers-setCursorToEnd",
     });
-    throw handlerError;
   }
 };
 
@@ -62,11 +63,10 @@ export const setCursorPosition = (element, position = "end", offset = 0) => {
     element.scrollTop = element.scrollHeight;
   } catch (error) {
     const handlerError = new ErrorHandler();
-    errorHandler.handle(error, {
+    throw handlerError.handle(error, {
       type: ErrorTypes.UI,
       context: "helpers-setCursorPosition",
       element: element?.tagName,
     });
-    throw handlerError;
   }
 };
