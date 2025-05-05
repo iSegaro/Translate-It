@@ -1,9 +1,9 @@
 {
   "IsRTL": { "message": "false" },
-  "name": { "message": "AI Writing Companion" },
-  "nameChrome": { "message": "AI Writing Companion for Chrome" },
-  "nameFirefox": { "message": "AI Writing Companion for Firefox" },
-  "nameEdge": { "message": "AI Writing Companion for Edge" },
+  "name": { "message": "Translate It!" },
+  "nameChrome": { "message": "Translate It for Chrome" },
+  "nameFirefox": { "message": "Translate It for Firefox" },
+  "nameEdge": { "message": "Translate It for Edge" },
   "description": { "message": "Translate Everywhere. Simply." },
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
@@ -111,7 +111,7 @@
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
   },
-  "popup_page_title": { "message": "AI Writing Companion" },
+  "popup_page_title": { "message": "Translate It!" },
   "popup_translate_page_link": { "message": "Translate This Page" },
   "popup_translate_page_link_title": { "message": "Open translate in new tab" },
   "popup_select_element_alt_icon": { "message": "Select Element" },

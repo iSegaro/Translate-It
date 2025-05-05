@@ -1,9 +1,9 @@
 {
   "IsRTL": { "message": "true" },
-  "name": { "message": "AI Writing Companion" },
-  "nameChrome": { "message": "AI Writing Companion for Chrome" },
-  "nameFirefox": { "message": "AI Writing Companion for Firefox" },
-  "nameEdge": { "message": "AI Writing Companion for Edge" },
+  "name": { "message": "Translate It!" },
+  "nameChrome": { "message": "Translate It for Chrome" },
+  "nameFirefox": { "message": "Translate It for Firefox" },
+  "nameEdge": { "message": "Translate It for Edge" },
   "description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی" },
@@ -119,7 +119,7 @@
   "popup_revert_title_icon": { "message": "بازگرداندن (Esc کلید)" },
   "popup_revert_alt_icon": { "message": "بازگرداندن" },
 
-  "popup_page_title": { "message": "AI Writing Companion" },
+  "popup_page_title": { "message": "Translate It!" },
   "popup_translate_page_link": { "message": "ترجمه این صفحه" },
   "popup_translate_page_link_title": { "message": "ترجمه این صفحه در تب جدید" },
   "popup_select_element_alt_icon": { "message": "انتخاب عنصر" },

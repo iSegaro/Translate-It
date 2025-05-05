@@ -18,7 +18,7 @@ export const TRANSLATION_ERRORS = {
 
 // Shared configuration (initial defaults)
 export const CONFIG = {
-  APP_NAME: "AI Writing Companion",
+  APP_NAME: "Translate It",
   // --- Core Settings ---
   USE_MOCK: false,
   DEBUG_MODE: false,
