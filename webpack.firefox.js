@@ -3,7 +3,6 @@ const path = require("path");
 const fs = require("fs");
 const rimraf = require("rimraf");
 const CopyPlugin = require("copy-webpack-plugin");
-const TerserPlugin = require("terser-webpack-plugin");
 const { merge } = require("webpack-merge");
 const common = require("./webpack.common.js");
 const archiver = require("archiver");
