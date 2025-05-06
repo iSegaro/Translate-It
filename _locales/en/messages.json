@@ -1,9 +1,9 @@
 {
   "IsRTL": { "message": "false" },
-  "name": { "message": "Translate It!" },
-  "nameChrome": { "message": "Translate It for Chrome" },
-  "nameFirefox": { "message": "Translate It for Firefox" },
-  "nameEdge": { "message": "Translate It for Edge" },
+  "name": { "message": "Translate It" },
+  "nameChrome": { "message": "Translate It" },
+  "nameFirefox": { "message": "Translate It" },
+  "nameEdge": { "message": "Translate It" },
   "description": { "message": "Translate Everywhere. Simply." },
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },

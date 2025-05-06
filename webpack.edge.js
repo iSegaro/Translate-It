@@ -42,11 +42,13 @@ const extensionVersion = manifest.version;
 const outputFolderPath = path.resolve(
   __dirname,
   "Build-Extension",
-  extensionName
+  "Edge",
+  `${extensionName}-v${extensionVersion}`
 );
 const zipFilePath = path.resolve(
   __dirname,
   "Build-Extension",
+  "Edge",
   `${extensionName}-v${extensionVersion}.zip`
 );
 

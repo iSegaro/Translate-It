@@ -42,11 +42,13 @@ const extensionVersion = manifest.version;
 const outputFolderPath = path.resolve(
   __dirname,
   "Build-Extension",
-  extensionName
+  "Firefox",
+  `${extensionName}-v${extensionVersion}`
 );
 const zipFilePath = path.resolve(
   __dirname,
   "Build-Extension",
+  "Firefox",
   `${extensionName}-v${extensionVersion}.zip`
 );
 
