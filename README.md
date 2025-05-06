@@ -3,13 +3,8 @@
 > Smart Translation Assistant
 
 <p align="center">
-  <a href="#install-for-chrome">
-    <img src="./icons/Google_Chrome_icon.png" alt="Chrome" height="40" />
-    <span>&nbsp;Download for Chrome&nbsp;</span>
-  </a>
-  <a href="#install-for-edge">
-    <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
-    <span>&nbsp;Download for Edge&nbsp;</span>
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="60" />
   </a>
   <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
     <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
@@ -96,9 +91,22 @@ You can choose from several AI-powered translation providers:
 
 ---
 
-## 🔧 Manual Installation
+## 🔧 Download & Install
 
-We're almost done, and the extension will soon be published on the Chrome Web Store and Edge Extension store.
+<p align="center">
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="60" />
+  </a>
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
+  </a>
+
+</p>
+
+<details id="manual-install">
+<summary>
+Manual Installation
+</summary>
 
 <details id="install-for-chrome">
 <summary>
@@ -146,6 +154,8 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 - Done!
 
 _Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
+
+</details>
 
 </details>
 
@@ -324,7 +334,7 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
-[chrome-store]: https://chrome.google.com/webstore/
+[chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
 [edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Chrome-v0.1.0.zip

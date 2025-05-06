@@ -3,13 +3,8 @@
 > دستیار هوشمند ترجمه
 
 <p align="center">
-  <a href="#install-for-chrome">
-    <img src="./icons/Google_Chrome_icon.png" alt="Chrome" height="40" />
-    <span>&nbsp;Chrome دانلود برای&nbsp;</span>
-  </a>
-  <a href="#install-for-edge">
-    <img src="./icons/Microsoft_Edge_logo.svg" alt="Edge" height="40" />
-    <span>&nbsp;Edge دانلود برای&nbsp;</span>
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="60" />
   </a>
   <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
     <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
@@ -101,13 +96,25 @@
 
 ---
 
-## 🔧 نصب دستی
+## 🔧 دانلود و نصب
 
-بزودی در Chrome Store و Edge Store.
+<p align="center">
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="60" />
+  </a>
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
+  </a>
+</p>
+
+<details id="manual-install">
+<summary>
+نصب دستی
+</summary>
 
 <details id="install-for-chrome">
 <summary>
-  <h3>نصب برای کروم</h3>
+  <h3>نصب دستی برای کروم</h3>
 </summary>
 
 - [از اینجا آخرین نسخه مخصوص کروم را دانلود کنید][chrome-zip-url]
@@ -139,7 +146,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 <details id="install-for-edge">
 <summary>
-  <h3>نصب برای Edge</h3>
+  <h3>نصب دستی برای Edge</h3>
 </summary>
 
 - [از اینجا آخرین نسخه مخصوص ایج را دانلود کنید][edge-zip-url]
@@ -152,6 +159,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 </details>
 
+</details>
 <br>
 
 ---
@@ -347,7 +355,7 @@ npm run lint
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
-[chrome-store]: https://chrome.google.com/webstore/
+[chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
 [edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Firefox-v0.1.0.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Translate-It-for-Chrome-v0.1.0.zip
