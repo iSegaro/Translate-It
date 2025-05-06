@@ -119,6 +119,13 @@ const firefoxDistConfig = {
             return `icons/${iconName}`;
           },
         },
+        {
+          from: "icons/*.svg",
+          to: ({ absoluteFilename }) => {
+            const iconName = path.basename(absoluteFilename);
+            return `icons/${iconName}`;
+          },
+        },
         { from: "html/offscreen.html", to: "offscreen.html" },
         { from: "src/offscreen.js", to: "offscreen.js" },
         { from: "node_modules/webextension-polyfill/dist/browser-polyfill.js" },
