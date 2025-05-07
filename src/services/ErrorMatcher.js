@@ -60,7 +60,9 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
     msg.includes("API key expired") ||
-    msg.includes("renew the api key")
+    msg.includes("renew the api key") ||
+    msg.includes("resource has been exhausted") ||
+    msg.includes("check quota")
   )
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
