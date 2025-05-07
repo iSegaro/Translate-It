@@ -60,9 +60,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
     msg.includes("API key expired") ||
-    msg.includes("renew the api key") ||
-    msg.includes("resource has been exhausted") ||
-    msg.includes("check quota")
+    msg.includes("renew the api key")
   )
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
@@ -94,7 +92,12 @@ export function matchErrorToType(rawOrError = "") {
   }
 
   // Quota
-  if (msg.includes("quota exceeded") || msg.includes("gemini quota"))
+  if (
+    msg.includes("quota exceeded") ||
+    msg.includes("gemini quota") ||
+    msg.includes("resource has been exhausted") ||
+    msg.includes("check quota")
+  )
     return ErrorTypes.QUOTA_EXCEEDED;
 
   // Network issues
