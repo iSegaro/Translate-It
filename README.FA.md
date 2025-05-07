@@ -346,6 +346,16 @@ npm run lint
 
 ---
 
+## تاریخچه محبوبیت
+
+<a href="https://www.star-history.com/#iSegaro/Translate-It&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=iSegaro/Translate-It&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=iSegaro/Translate-It&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=iSegaro/Translate-It&type=Date" />
+ </picture>
+</a>
+
 ## 📜 مجوز
 
 این پروژه تحت **مجوز MIT** است. آزادانه بهبود دهید و به اشتراک بگذارید!
