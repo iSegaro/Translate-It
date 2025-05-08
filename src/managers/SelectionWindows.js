@@ -78,6 +78,7 @@ export default class SelectionWindows {
           box-shadow: 0 2px 5px rgba(0,0,0,0.1);
           max-width: 300px;
           overflow-wrap: break-word;
+          font-family: Vazirmatn, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         }
         .loading-container {
           display: flex;
