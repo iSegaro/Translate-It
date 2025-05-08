@@ -84,7 +84,10 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.MODEL_OVERLOADED;
 
   // Quota with region indicates Gemini-specific quota
-  if (msg.includes("quota exceeded") && msg.includes("region")) {
+  if (
+    (msg.includes("quota exceeded") && msg.includes("region")) ||
+    msg.includes("location is not supported")
+  ) {
     logME(
       "[ErrorMatcher] Quota exceeded with region, indicating Gemini-specific quota."
     );
