@@ -26,6 +26,7 @@ export const CONFIG = {
   APPLICATION_LOCALIZE: "Farsi",
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
+  THEME: "auto",
 
   // --- API Settings ---
   TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter
@@ -181,18 +182,19 @@ export const getSettingsAsync = async () => {
 if (Browser && Browser.storage && Browser.storage.onChanged) {
   Browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && settingsCache) {
-      let updated = false;
+      // let updated = false;
       Object.keys(changes).forEach((key) => {
         // Check if the key exists in our CONFIG or was already in cache
         if (
-          CONFIG.hasOwnProperty(key) ||
-          (settingsCache && settingsCache.hasOwnProperty(key))
+          Object.prototype.hasOwnProperty.call(CONFIG, key) ||
+          (settingsCache &&
+            Object.prototype.hasOwnProperty.call(settingsCache, key))
         ) {
           const newValue = changes[key].newValue;
           // Update cache only if the value actually changed
           if (settingsCache[key] !== newValue) {
             settingsCache[key] = newValue;
-            updated = true;
+            // updated = true;
           }
         }
       });
@@ -223,6 +225,10 @@ export const getUseMockAsync = async () => {
 
 export const getDebugModeAsync = async () => {
   return getSettingValueAsync("DEBUG_MODE", CONFIG.DEBUG_MODE);
+};
+
+export const getThemeAsync = async () => {
+  return getSettingValueAsync("THEME", CONFIG.THEME);
 };
 
 // Function to check debug mode potentially faster if cache is warm
