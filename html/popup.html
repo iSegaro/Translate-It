@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title data-i18n="popup_page_title">Translate It!</title>
     <link rel="stylesheet" href="../styles/popup.css" />
+    <link rel="stylesheet" href="../styles/theme.css" />
   </head>
   <body>
     <div class="popup-container">
@@ -57,7 +58,11 @@
             title="تنظیمات"
             class="toolbar-icon"
           />
-          <label class="switch" data-i18n-title="popup_exclude_toggle_title" title="فعال/غیرفعال در این صفحه">
+          <label
+            class="switch"
+            data-i18n-title="popup_exclude_toggle_title"
+            title="فعال/غیرفعال در این صفحه"
+          >
             <input type="checkbox" id="excludeCurrentPageToggle" />
             <span class="slider round"></span>
           </label>
@@ -88,9 +93,13 @@
           id="swapLanguagesBtn"
           class="swap-button"
           title="جابجایی زبان‌ها"
-          data-i18n-title="popup_swap_languages_title""
+          data-i18n-title="popup_swap_languages_title"
         >
-          <img src="../icons/swap.png" alt="Swap" data-i18n="popup_swap_languages_alt_icon" />
+          <img
+            src="../icons/swap.png"
+            alt="Swap"
+            data-i18n="popup_swap_languages_alt_icon"
+          />
         </button>
 
         <div class="language-input-container">
@@ -120,7 +129,11 @@
           title="ترجمه"
           data-i18n-title="popup_translate_button_title"
         >
-          <img src="../icons/translate.png" alt="Translate" data-i18n="popup_translate_button_alt_icon" />
+          <img
+            src="../icons/translate.png"
+            alt="Translate"
+            data-i18n="popup_translate_button_alt_icon"
+          />
         </button>
       </div>
 
@@ -135,7 +148,7 @@
                 alt="Copy"
                 class="inline-icon"
                 data-i18n="popup_copy_source_alt_icon"
-                data-i18n-title="popup_copy_source_title_icon""
+                data-i18n-title="popup_copy_source_title_icon"
               />
               <img
                 src="../icons/speaker.png"

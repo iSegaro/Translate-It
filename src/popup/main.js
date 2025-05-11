@@ -1,7 +1,7 @@
 // src/popup/main.js
 
 import { logME } from "../utils/helpers.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, getSettingsAsync } from "../config.js";
 import DOMPurify from "dompurify";
 
 // Import Managers/Handlers
@@ -15,6 +15,7 @@ import * as popupInteractionManager from "./popupInteractionManager.js";
 import { app_localize_popup } from "../utils/i18n.js";
 import * as excludeManager from "./excludeManager.js";
 import Browser from "webextension-polyfill";
+import { applyTheme } from "../utils/theme.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   logME("[Popup Main]: DOMContentLoaded event fired.");
@@ -56,5 +57,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   } finally {
     // اجرای ترجمه بعد از اتمام کامل عملیات اولیه
     app_localize_popup(CONFIG.APPLICATION_LOCALIZE);
+
+    // TODO: This is a quick implementation — consider refactoring or adding error handling
+    const settings = await getSettingsAsync();
+    applyTheme(settings.THEME);
   }
 });
