@@ -97,8 +97,8 @@ export default class NotificationManager {
       }
       this.container.style.direction = isRTL ? "rtl" : "ltr";
       this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
-    } catch (e) {
-      logME("[NotificationManager] _applyAlignment failed:", e);
+    } catch {
+      // logME("[NotificationManager] _applyAlignment failed:", error);
     }
   }
 
