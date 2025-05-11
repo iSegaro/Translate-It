@@ -40,10 +40,12 @@ export function initContentScript() {
           Element.prototype.msMatchesSelector ||
           function (selector) {
             const matches = (
-                this.document || this.ownerDocument
-              ).querySelectorAll(selector),
-              i = matches.length;
-            while (--i >= 0 && matches.item(i) !== this) {}
+              this.document || this.ownerDocument
+            ).querySelectorAll(selector);
+            let i = matches.length;
+            while (--i >= 0 && matches.item(i) !== this) {
+              // ignore error
+            }
             return i > -1;
           };
       }
@@ -148,14 +150,15 @@ export function initContentScript() {
             this.updateSelectElementState(message.data);
             return false;
 
-          case "getSelectedText":
+          case "getSelectedText": {
             const selectedText =
               window.getSelection()?.toString()?.trim() ?? "";
             sendResponse({ selectedText });
             return true;
+          }
 
           case "CONTEXT_INVALID":
-          case "EXTENSION_RELOADED":
+          case "EXTENSION_RELOADED": {
             Browser.runtime.sendMessage({
               action: "CONTENT_SCRIPT_WILL_RELOAD",
             });
@@ -172,6 +175,7 @@ export function initContentScript() {
             }, 3000);
 
             return false;
+          }
 
           case "applyTranslationToActiveElement": {
             const active = document.activeElement;
