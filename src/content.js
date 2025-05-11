@@ -1,7 +1,7 @@
 // src/content.js
 
-import { logME } from "./utils/helpers.js";
 import { initContentScript } from "./contentMain.js";
+// import { logME } from "./utils/helpers.js";
 
 (function () {
   // جلوگیری از اجرای افزونه داخل iframeهایی که مجاز نیستند
