@@ -116,6 +116,19 @@
     "message": "نادیده گرفتن در این سایت‌ها (با کاما از یکدیگر جدا کنید)"
   },
 
+  "theme": {
+    "message": "پوسته"
+  },
+  "theme_auto": {
+    "message": "خودکار"
+  },
+  "theme_light": {
+    "message": "روشن"
+  },
+  "theme_dark": {
+    "message": "تاریک"
+  },
+
   "popup_revert_title_icon": { "message": "بازگرداندن (Esc کلید)" },
   "popup_revert_alt_icon": { "message": "بازگرداندن" },
 

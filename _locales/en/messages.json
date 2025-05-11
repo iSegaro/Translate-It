@@ -111,6 +111,20 @@
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
   },
+
+  "theme": {
+    "message": "Theme"
+  },
+  "theme_auto": {
+    "message": "Auto"
+  },
+  "theme_light": {
+    "message": "Light"
+  },
+  "theme_dark": {
+    "message": "Dark"
+  },
+  
   "popup_page_title": { "message": "Translate It!" },
   "popup_translate_page_link": { "message": "Translate This Page" },
   "popup_translate_page_link_title": { "message": "Open translate in new tab" },
