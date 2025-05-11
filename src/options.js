@@ -7,25 +7,38 @@ import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { shouldInject } from "./utils/injector.js";
+import { applyTheme } from "./utils/theme.js";
 import "./utils/localization.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const tabButtons = document.querySelectorAll(".tab-button");
-  const tabContents = document.querySelectorAll(".tab-content");
+  // const tabContents = document.querySelectorAll(".tab-content");
 
   const errorHandler = new ErrorHandler(); // ایجاد یک نمونه از ErrorHandler
+  
+  const themeSelect = document.getElementById('theme-select');
+
+  if (themeSelect) {
+    // Save Theme
+    themeSelect.addEventListener('change', async () => {
+      const newThemeValue = themeSelect.value;
+      await Browser.storage.local.set({ THEME: newThemeValue });
+      applyTheme(newThemeValue);
+      // logME('Theme changed and saved:', newThemeValue);
+    });
+  }
 
   // Elements for Tab Navigation
-  const languagesTabButton = document.querySelector('[data-tab="languages"]');
-  const apiSettingsTabButton = document.querySelector(
-    '[data-tab="apiSettings"]'
-  );
-  const importExportTabButton = document.querySelector(
-    '[data-tab="importExport"]'
-  );
-  const languagesTabContent = document.getElementById("languages");
-  const apiSettingsTabContent = document.getElementById("apiSettings");
-  const importExportTabContent = document.getElementById("importExport");
+  // const languagesTabButton = document.querySelector('[data-tab="languages"]');
+  // const apiSettingsTabButton = document.querySelector(
+  //   '[data-tab="apiSettings"]'
+  // );
+  // const importExportTabButton = document.querySelector(
+  //   '[data-tab="importExport"]'
+  // );
+  // const languagesTabContent = document.getElementById("languages");
+  // const apiSettingsTabContent = document.getElementById("apiSettings");
+  // const importExportTabContent = document.getElementById("importExport");
 
   // Elements for Language Tab - Activation Settings
   const extensionEnabledCheckbox = document.getElementById("extensionEnabled");
@@ -36,9 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const enableShortcutForTextFieldsCheckbox = document.getElementById(
     "enableShortcutForTextFields"
   );
-  const textFieldShortcutGroup = document.getElementById(
-    "textFieldShortcutGroup"
-  );
+  // const textFieldShortcutGroup = document.getElementById(
+  //   "textFieldShortcutGroup"
+  // );
 
   const translateWithSelectElementCheckbox = document.getElementById(
     "translateWithSelectElement"
@@ -60,9 +73,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Elements for API Settings
   const translationApiSelect = document.getElementById("translationApi");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
-  const apiKeySettingGroup = document
-    .getElementById("apiKey")
-    ?.closest(".setting-group");
+  // const apiKeySettingGroup = document
+  //   .getElementById("apiKey")
+  //   ?.closest(".setting-group");
   const apiUrlSettingGroup = document
     .getElementById("apiUrl")
     ?.closest(".setting-group");
@@ -88,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Elements for Import/Export
   const exportSettingsButton = document.getElementById("exportSettings");
   const importFile = document.getElementById("importFile");
-  const importSettingsButton = document.getElementById("importSettings");
+  // const importSettingsButton = document.getElementById("importSettings");
 
   // Elements for Status and Manifest Info
   const statusElement = document.getElementById("status");
@@ -302,13 +315,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // فراخوانی اولیه loadSettings
-  loadSettings(); // Load settings when the DOM is ready
+  await loadSettings(); // Load settings when the DOM is ready
 
   // Browser.runtime.sendMessage({ ping: true });
 
   saveSettingsButton.addEventListener("click", async () => {
     const currentSettings = await getSettingsAsync();
 
+    const themeValue = themeSelect?.value?.trim();
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
     const webAIApiModel = webAIApiModelInput?.value?.trim();
     const apiKey = apiKeyInput?.value?.trim();
@@ -349,6 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
         USE_MOCK: useMock,
         DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
         EXTENSION_ENABLED: extensionEnabled,
+        THEME: themeValue || CONFIG.THEME || 'auto',
         API_URL: apiUrl || CONFIG.API_URL,
         SOURCE_LANGUAGE: sourceLanguage || "English",
         TARGET_LANGUAGE: targetLanguage || "Farsi", // مربوط به ترجمه است
@@ -441,6 +456,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (manifest_Name) {
         manifest_Name.textContent = CONFIG.APP_NAME;
       }
+
+      // بارگذاری و اعمال Theme
+
+      // اولویت با تنظیمات ذخیره شده کاربر، سپس مقدار پیش‌فرض از CONFIG، و در نهایت 'auto'
+      const loadedTheme = settings.THEME || CONFIG.THEME || 'auto';
+      if (themeSelect) {
+        themeSelect.value = loadedTheme;
+      }
+      applyTheme(loadedTheme);
 
       if (manifest_Version) {
         manifest_Version.textContent = `v${manifest.version}`;
