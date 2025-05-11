@@ -49,6 +49,10 @@ export default [
         cancelAnimationFrame: "readonly",
         ResizeObserver: "readonly",
         DOMParser: "readonly",
+        Blob: "readonly",
+        FileReader: "readonly",
+        location: "readonly",
+        alert: "readonly",
       },
     },
     plugins: {
