@@ -13,6 +13,9 @@
   --icon-hover-opacity: 1;
   --language-controls-bg-color: #f8f9fa; /* رنگ پس زمینه هدر انتخاب زبان ها */
   --language-controls-border-color: #dee2e6;
+  --language-select-bg-color: #fff; /* رنگ پس زمینه کمبوباکس زبان ها */
+  --language-select-text-color: #000; /* رنگ متن کمبوباکس زبان ها */
+  --language-select-border-color: #ced4da; /* رنگ بوردر کمبوباکس زبان ها */
 }
 
 :root.theme-dark {
@@ -28,6 +31,9 @@
   --icon-hover-opacity: 0.9;
   --language-controls-bg-color: lab(45.6% -1.56 -3.7); /* رنگ پس زمینه هدر انتخاب زبان ها */
   --language-controls-border-color: hsl(73, 35%, 24%);
+  --language-select-bg-color: #333; /* رنگ پس زمینه کمبوباکس زبان ها */
+  --language-select-text-color: #fff; /* رنگ متن کمبوباکس زبان ها */
+  --language-select-border-color: hsl(73, 35%, 24%); /* رنگ بوردر کمبوباکس زبان ها */
 }
 
 /* استایل پایه و تنظیمات کلی */
@@ -165,13 +171,19 @@ body {
   box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25); /* تغییر کوچک در shadow */
 }
 
+#targetLanguageInput, #sourceLanguageInput, #translationResult {
+  background-color: var(--language-select-bg-color);
+  color: var(--language-select-text-color);
+}
+
 .language-select {
   flex-grow: 1; /* اجازه می دهد کمبوباکس ها فضا را پر کنند */
   padding: 5px 8px;
   font-size: 12px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--language-select-border-color);
   border-radius: 4px;
-  background-color: #fff;
+  background-color: var(--language-select-bg-color);
+  color: var(--language-select-text-color);
   appearance: none; /* حذف ظاهر پیش فرض */
   -webkit-appearance: none;
   -moz-appearance: none;
