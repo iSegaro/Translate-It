@@ -5,6 +5,14 @@
   --text-color: #000000;
   --bg-textbox-color: #fff;
   --bg-result-color: #f8f9fa;
+  --header-bg-color: #e9ecef; /* رنگ پس زمینه هدر */
+  --header-border-color: #ced4da; /* رنگ بوردر هدر */
+  --toolbar-link-color: #2563c0; /* رنگ لینک در تولبار، ترجمه این صفحه */
+  --toolbar-link-hover-bg-color: #e2e6ea; /* رنگ پس زمینه هاور لینک، ترجمه این صفحه */
+  --icon-opacity: 0.7;
+  --icon-hover-opacity: 1;
+  --language-controls-bg-color: #f8f9fa; /* رنگ پس زمینه هدر انتخاب زبان ها */
+  --language-controls-border-color: #dee2e6;
 }
 
 :root.theme-dark {
@@ -12,6 +20,14 @@
   --text-color: #ffffff;
   --bg-textbox-color: #0e0e0e;
   --bg-result-color: #0e0e0e;
+  --header-bg-color: lab(45.6% -1.56 -3.7); /* رنگ پس زمینه هدر */
+  --header-border-color: hsl(60, 7%, 42%); /* بوردر بوردر هدر */
+  --toolbar-link-color: lch(83.98% 24.38 250.24); /* رنگ لینک در تولبار، ترجمه این صفحه */
+  --toolbar-link-hover-bg-color: #404040; /* رنگ پس زمینه هاور لینک، ترجمه این صفحه */
+  --icon-opacity: 0.6;
+  --icon-hover-opacity: 0.9;
+  --language-controls-bg-color: lab(45.6% -1.56 -3.7); /* رنگ پس زمینه هدر انتخاب زبان ها */
+  --language-controls-border-color: hsl(73, 35%, 24%);
 }
 
 /* استایل پایه و تنظیمات کلی */
@@ -20,10 +36,9 @@ body {
   font-family:
     "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* فونت استاندارد و خوانا */
   background-color: var(--bg-color); /* پس زمینه کمی متفاوت برای بدنه */
-  color: var(--text-color);  /* رنگ متن اصلی */
+  color: var(--text-color); /* رنگ متن اصلی */
   font-size: 13px; /* اندازه فونت پایه */
 }
-
 
 .popup-container {
   width: 350px; /* افزایش عرض برای جای دادن بهتر عناصر */
@@ -43,7 +58,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #e9ecef;
+  background-color: var(--header-bg-color);
   border-bottom: 1px solid #ced4da;
   flex-direction: row-reverse;
 }
@@ -78,12 +93,14 @@ body {
   width: 20px;
   height: 20px;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: var(--icon-opacity); /* استفاده از متغیر شفافیت */
   transition: opacity 0.2s ease-in-out;
+  /* برای آیکون‌های SVG یا فونت‌آیکون، می‌توانید رنگ را هم با متغیر تنظیم کنید: */
+  filter: invert(var(--icon-invert-amount, 0)); /* روشی برای تغییر رنگ آیکون‌های PNG ساده */
 }
 
 .toolbar-icon:hover {
-  opacity: 1;
+  opacity: var(--icon-hover-opacity); /* استفاده از متغیر شفافیت هاور */
 }
 
 /* استایل برای لینک های تولبار */
@@ -91,33 +108,35 @@ body {
   display: inline-flex; /* برای تراز عمودی متن */
   align-items: center;
   justify-content: center;
-  color: #2563c0;
-  font-size: 13px;
+
+  color: var(--toolbar-link-color); /* استفاده از متغیر رنگ لینک */
   text-decoration: none; /* حذف زیرخط پیش فرض لینک */
   padding: 4px 8px; /* کمی پدینگ برای ایجاد فضای دور متن */
   border-radius: 4px; /* گوشه‌های گرد مشابه دکمه‌ها */
   cursor: pointer;
-  opacity: 0.7;
+  opacity: var(--icon-opacity); /* استفاده از متغیر شفافیت (مانند آیکون‌ها) */
   transition:
     opacity 0.2s ease-in-out,
     background-color 0.2s ease-in-out;
-  background-color: transparent; /* پس زمینه شفاف به صورت پیش فرض */
+  background-color: transparent;
+
+  /* font-size: 13px; */
   /* margin-left: auto; برای قرارگیری در سمت چپ (با توجه به flex-direction: row-reverse در header-toolbar) */
 }
 
 .toolbar-link:hover {
-  opacity: 1;
-  background-color: #e2e6ea; /* پس زمینه ملایم هنگام هاور */
+  opacity: var(--icon-hover-opacity);
+  background-color: var(--toolbar-link-hover-bg-color);
 }
 
 /* بخش کنترل زبان */
 .language-controls {
   display: flex;
-  align-items: center; /* تراز عمودی عناصر */
+  align-items: center; /* تراز عموی عناصر */
   padding: 6px 12px; /* کمی کاهش پدینگ عمودی */
   gap: 6px; /* کمی کاهش فاصله */
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
+  background: var(--language-controls-bg-color);
+  border-bottom: 1px solid var(--language-controls-border-color);
 }
 
 /* نگهدارنده Input زبان و دکمه Clear */
@@ -206,7 +225,7 @@ body {
 }
 
 .translate-button:hover {
-  background-color: #e9ecef; /* تغییر رنگ هاور ملایم */
+  background-color: var(--toolbar-link-hover-bg-color); /* رنگ هاور دکمه ترجمه */
 }
 
 .translate-button img {
@@ -230,7 +249,6 @@ textarea,
 .result {
   width: 100%;
   padding: 28px 10px 10px 10px;
-  border: 1px solid #ced4da;
   border-radius: 4px;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
@@ -239,8 +257,11 @@ textarea,
   direction: ltr;
   text-align: left;
   min-height: 60px;
+
   background-color: var(--bg-textbox-color);
   color: var(--text-color);
+  border: 1px solid var(--header-border-color);
+
   line-height: 1.5;
 }
 
