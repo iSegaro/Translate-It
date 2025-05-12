@@ -1,18 +1,33 @@
 /* src/styles/popup.css */
 
+:root.theme-light {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --bg-textbox-color: #fff;
+  --bg-result-color: #f8f9fa;
+}
+
+:root.theme-dark {
+  --bg-color: #1e1e1e;
+  --text-color: #ffffff;
+  --bg-textbox-color: #0e0e0e;
+  --bg-result-color: #0e0e0e;
+}
+
 /* استایل پایه و تنظیمات کلی */
 body {
   margin: 0;
   font-family:
     "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* فونت استاندارد و خوانا */
-  background: #f0f2f5; /* پس زمینه کمی متفاوت برای بدنه */
-  color: #1c1e21; /* رنگ متن اصلی */
+  background-color: var(--bg-color); /* پس زمینه کمی متفاوت برای بدنه */
+  color: var(--text-color);  /* رنگ متن اصلی */
   font-size: 13px; /* اندازه فونت پایه */
 }
 
+
 .popup-container {
   width: 350px; /* افزایش عرض برای جای دادن بهتر عناصر */
-  background: #ffffff;
+  background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
   /* حذف margin: auto برای کنترل بهتر از طریق extension API */
@@ -224,7 +239,8 @@ textarea,
   direction: ltr;
   text-align: left;
   min-height: 60px;
-  background-color: #fff;
+  background-color: var(--bg-textbox-color);
+  color: var(--text-color);
   line-height: 1.5;
 }
 
@@ -237,7 +253,7 @@ textarea:focus,
 }
 
 .result {
-  background-color: #f8f9fa;
+  color: var(--text-color);
   min-height: 60px;
   padding-top: 28px;
   white-space: pre-wrap;
@@ -423,13 +439,16 @@ input:checked + .slider:before {
          استایل‌های Markdown برای متن ترجمه شده
          ========================================================================== */
 .result {
-  background-color: #f8f9fa;
+  background-color: var(--bg-result-color);
+  color: var(--text-color);
   min-height: 60px;
   white-space: normal !important; /* این مهمه برای Markdown */
   word-wrap: break-word;
   overflow-y: auto;
   font-size: 13px;
   line-height: 1.4 !important;
+  /* padding-top: 28px !important;  از .aiwc-popup-markdown می‌آید */
+  /* margin: 0 !important;          از .aiwc-popup-markdown می‌آید */
 }
 
 /* Markdown کلاس */
@@ -443,29 +462,33 @@ input:checked + .slider:before {
 .aiwc-popup-markdown ul,
 .aiwc-popup-markdown ol {
   margin: 0.2em 0 !important;
-  padding: 10px !important;
+  padding: 0 10px !important; /* پدینگ چپ و راست */
+  color: var(--text-color); /* اعمال رنگ متن */
 }
 
 /* آیتم‌های لیست */
 .aiwc-popup-markdown li {
   margin: 0.15em 0 !important;
   padding-inline-start: 0.4em !important;
+  color: var(--text-color);
 }
 
 /* کدهای درون متن */
 .aiwc-popup-markdown code {
   padding: 0.1em 0.3em !important;
-  background: #f0f0f0 !important;
+  background: var(--bg-textbox-color, #f0f0f0) !important; /* fallback */
+  color: var(--text-color, #333) !important; /* fallback */
   border-radius: 3px;
   font-size: 12px !important;
 }
 
 /* بلوک‌های کد */
 .aiwc-popup-markdown pre {
-  background: #eee !important;
+  background: var(--bg-textbox-color, #eee) !important; /* fallback */
+  color: var(--text-color, #333) !important; /* fallback */
+  border: 1px solid var(--text-color, #ccc); /* fallback */
   padding: 6px 8px !important;
   font-size: 12px !important;
-  border: 1px solid #ccc;
   border-radius: 4px;
   overflow-x: auto;
   margin: 0.3em 0 !important;
