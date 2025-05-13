@@ -20,29 +20,14 @@ function initLocalizationUI() {
 
   const ul = document.createElement("ul");
   ul.classList.add("language-list");
-  Object.assign(ul.style, {
-    listStyle: "none",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "10px",
-    padding: "0",
-  });
 
   filtered.forEach((lang) => {
     const li = document.createElement("li");
     li.dataset.locale = lang.locale;
-    Object.assign(li.style, {
-      cursor: "pointer",
-      padding: "5px 10px",
-      border: "1px solid #ccc",
-      borderRadius: "4px",
-      display: "flex",
-      alignItems: "center",
-      background: "#fff",
-    });
+    li.classList.add("language-list-item");
 
     const span = document.createElement("span");
-    span.style.marginRight = "5px";
+    span.classList.add("language-flag");
     span.textContent = lang.flag;
 
     li.appendChild(span);
@@ -51,10 +36,10 @@ function initLocalizationUI() {
     li.addEventListener("click", async () => {
       await setLanguage(lang.locale);
       // Visual feedback
-      ul.querySelectorAll("li").forEach(
-        (item) => (item.style.background = "#fff")
-      );
-      li.style.background = "#e2e6ea";
+      ul.querySelectorAll(".language-list-item").forEach((item) => {
+        item.classList.remove("selected");
+      });
+      li.classList.add("selected");
       // Persist selection
       // ذخیره زبان انتخاب‌شده برای لوکالایز
       await Browser.storage.local.set({ APPLICATION_LOCALIZE: lang.locale });
