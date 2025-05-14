@@ -31,6 +31,7 @@
   --language-list-item-text-color: #333;
   --language-list-item-hover-bg-color: #e2e6ea;
   --github-icon-filter: none;
+  --theme-icon-filter: none;
 }
 
 :root.theme-dark {
@@ -64,6 +65,7 @@
   --language-list-item-text-color: #eee;
   --language-list-item-hover-bg-color: #555;
   --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+  --theme-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
 }
 
 body {
@@ -85,8 +87,11 @@ body {
   width: 100%;
   max-width: 960px;
 }
-.header a img[src$="github.svg"] {
+#githubIcon {
   filter: var(--github-icon-filter);
+}
+#themeIcon {
+  filter: var(--theme-icon-filter);
 }
 .header h1 {
   font-size: 1.5rem;
@@ -445,4 +450,58 @@ button:hover {
 
 .language-list-item.selected {
   background-color: var(--language-list-item-hover-bg-color);
+}
+
+
+/* استایل برای سوئیچ Theme */
+/* Toggle Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.2s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4caf50;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #4caf50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
 }

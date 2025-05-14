@@ -19,20 +19,41 @@
           alt="GitHub"
           title="Home Page"
           height="20"
+          id="githubIcon"
         />
       </a>
-    </div>
-    <div class="localization"></div>
-    <div class="container">
+
       <div class="setting-row">
-        <label for="theme-select" data-i18n="theme">Theme:</label>
-        <select id="theme-select">
+        <img
+          src="../icons/theme.png"
+          alt="Light/Dark"
+          title="System Theme"
+          data-i18n-title="theme_auto"
+          height="20"
+          id="themeIcon"
+        />
+
+        <label
+          class="switch"
+          data-i18n-title="theme_toggle_title"
+          title="روشن / تیره"
+        >
+          <input type="checkbox" id="theme-Switch" />
+          <span class="slider round"></span>
+          
+        </label>
+        <input type="checkbox" id="theme-Auto" />
+        <span>System Theme</span>
+
+        <!-- <select id="theme-select">
           <option value="auto" data-i18n="theme_auto">Auto</option>
           <option value="light" data-i18n="theme_light">Light</option>
           <option value="dark" data-i18n="theme_dark">Dark</option>
-        </select>
+        </select> -->
       </div>
-
+    </div>
+    <div class="localization"></div>
+    <div class="container">
       <div class="tabs">
         <button
           class="tab-button active"

@@ -116,11 +116,8 @@
     "message": "نادیده گرفتن در این سایت‌ها (با کاما از یکدیگر جدا کنید)"
   },
 
-  "theme": {
-    "message": "پوسته"
-  },
   "theme_auto": {
-    "message": "خودکار"
+    "message": "سیستم"
   },
   "theme_light": {
     "message": "روشن"

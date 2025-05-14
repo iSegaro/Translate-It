@@ -112,11 +112,8 @@
     "message": "Exclude these sites (comma separated)"
   },
 
-  "theme": {
-    "message": "Theme"
-  },
   "theme_auto": {
-    "message": "Auto"
+    "message": "System Theme"
   },
   "theme_light": {
     "message": "Light"

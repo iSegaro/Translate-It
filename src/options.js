@@ -15,16 +15,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   // const tabContents = document.querySelectorAll(".tab-content");
 
   const errorHandler = new ErrorHandler(); // ایجاد یک نمونه از ErrorHandler
-  
-  const themeSelect = document.getElementById('theme-select');
 
-  if (themeSelect) {
+  // const themeSelect = document.getElementById("theme-select");
+  // const themeIcon = document.getElementById("themeIcon");
+  const themeSwitch = document.getElementById("theme-Switch");
+  const themeAuto = document.getElementById("theme-Auto");
+
+  if (themeSwitch) {
+    // Load saved theme and set initial state of the switch
+    Browser.storage.local.get("THEME").then((result) => {
+      const savedTheme = result.THEME || "auto"; // Default to auto if nothing saved
+      applyTheme(savedTheme);
+
+      if (savedTheme === "light") {
+        themeAuto.checked = false;
+        themeSwitch.checked = false; // Set switch to off for light theme
+        themeSwitch.disabled = false;
+      } else if (savedTheme === "dark") {
+        themeAuto.checked = false;
+        themeSwitch.checked = true; // Set switch to on for dark theme
+        themeSwitch.disabled = false;
+      } else {
+        themeAuto.checked = true;
+        themeSwitch.disabled = true;
+      }
+    });
+
     // Save Theme
-    themeSelect.addEventListener('change', async () => {
-      const newThemeValue = themeSelect.value;
+    themeSwitch.addEventListener("change", async () => {
+      const newThemeValue = themeSwitch.checked ? "dark" : "light";
       await Browser.storage.local.set({ THEME: newThemeValue });
       applyTheme(newThemeValue);
-      // logME('Theme changed and saved:', newThemeValue);
+      themeAuto.checked = false; // Uncheck auto when manually switching
+      themeSwitch.disabled = false; // Ensure themeSwitch is enabled
+    });
+  }
+
+  if (themeAuto) {
+    // Save Theme and disable/enable themeSwitch when themeAuto changes
+    themeAuto.addEventListener("change", async () => {
+      await Browser.storage.local.set({ THEME: "auto" });
+      applyTheme("auto");
+      themeSwitch.checked = false;
+      themeSwitch.disabled = themeAuto.checked;
     });
   }
 
@@ -322,7 +355,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   saveSettingsButton.addEventListener("click", async () => {
     const currentSettings = await getSettingsAsync();
 
-    const themeValue = themeSelect?.value?.trim();
+    const themeValue = themeSwitch?.checked ? "dark" : "light";
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
     const webAIApiModel = webAIApiModelInput?.value?.trim();
     const apiKey = apiKeyInput?.value?.trim();
@@ -363,7 +396,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         USE_MOCK: useMock,
         DEBUG_MODE: debugMode ?? CONFIG.DEBUG_MODE,
         EXTENSION_ENABLED: extensionEnabled,
-        THEME: themeValue || CONFIG.THEME || 'auto',
+        THEME: themeValue || CONFIG.THEME || "auto",
+        THEME_AUTO: themeAuto,
         API_URL: apiUrl || CONFIG.API_URL,
         SOURCE_LANGUAGE: sourceLanguage || "English",
         TARGET_LANGUAGE: targetLanguage || "Farsi", // مربوط به ترجمه است
@@ -457,14 +491,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         manifest_Name.textContent = CONFIG.APP_NAME;
       }
 
-      // بارگذاری و اعمال Theme
+      /*------ بارگذاری و اعمال Theme ------*/
 
       // اولویت با تنظیمات ذخیره شده کاربر، سپس مقدار پیش‌فرض از CONFIG، و در نهایت 'auto'
-      const loadedTheme = settings.THEME || CONFIG.THEME || 'auto';
-      if (themeSelect) {
-        themeSelect.value = loadedTheme;
-      }
-      applyTheme(loadedTheme);
+      // const loadedTheme = settings.THEME || CONFIG.THEME || "auto";
+      // if (themeSelect) {
+      //   themeSelect.value = loadedTheme;
+      // }
+
+      // if (themeAuto.checked) {
+      //     themeSwitch.disabled = false;
+      //     applyTheme("auto");
+      //   }else{
+      //   themeSwitch.disabled = true;
+      //   applyTheme(loadedTheme);
+      // }
+
+      /*------ بارگذاری و اعمال Theme ------*/
 
       if (manifest_Version) {
         manifest_Version.textContent = `v${manifest.version}`;
