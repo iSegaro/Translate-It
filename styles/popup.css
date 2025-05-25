@@ -16,6 +16,7 @@
   --language-select-bg-color: #fff; /* رنگ پس زمینه کمبوباکس زبان ها */
   --language-select-text-color: #000; /* رنگ متن کمبوباکس زبان ها */
   --language-select-border-color: #ced4da; /* رنگ بوردر کمبوباکس زبان ها */
+  --icon-filter: none; /* فیلتر آیکون برای تم روشن */
 }
 
 :root.theme-dark {
@@ -34,6 +35,7 @@
   --language-select-bg-color: #333; /* رنگ پس زمینه کمبوباکس زبان ها */
   --language-select-text-color: #fff; /* رنگ متن کمبوباکس زبان ها */
   --language-select-border-color: hsl(73, 35%, 24%); /* رنگ بوردر کمبوباکس زبان ها */
+  --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%); /* فیلتر آیکون برای تم تیره */
 }
 
 /* استایل پایه و تنظیمات کلی */
@@ -65,7 +67,7 @@ body {
   align-items: center;
   padding: 8px 12px;
   background-color: var(--header-bg-color);
-  border-bottom: 1px solid #ced4da;
+  border-bottom: 1px solid var(--header-border-color); /* استفاده از متغیر رنگ بوردر هدر */
   flex-direction: row-reverse;
 }
 
@@ -100,9 +102,8 @@ body {
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity); /* استفاده از متغیر شفافیت */
-  transition: opacity 0.2s ease-in-out;
-  /* برای آیکون‌های SVG یا فونت‌آیکون، می‌توانید رنگ را هم با متغیر تنظیم کنید: */
-  filter: invert(var(--icon-invert-amount, 0)); /* روشی برای تغییر رنگ آیکون‌های PNG ساده */
+  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  filter: var(--icon-filter); /* اعمال فیلتر آیکون */
 }
 
 .toolbar-icon:hover {
@@ -160,21 +161,19 @@ body {
   width: 100%;
   padding: 6px 25px 6px 8px; /* تنظیم پدینگ برای تراز بهتر با دکمه‌ها */
   font-size: 13px; /* همسان سازی اندازه فونت */
-  border: 1px solid #ced4da;
+  border: 1px solid var(--language-select-border-color); /* استفاده از متغیر بوردر زبان */
   border-radius: 4px;
-  background-color: #fff;
+  background-color: var(--language-select-bg-color); /* استفاده از متغیر پس زمینه زبان */
+  color: var(--language-select-text-color); /* استفاده از متغیر رنگ متن زبان */
   box-sizing: border-box; /* مهم برای محاسبه درست width */
 }
 .language-input:focus {
-  border-color: #80bdff;
+  border-color: #80bdff; /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
   outline: 0;
-  box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25); /* تغییر کوچک در shadow */
+  box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25); /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
 }
 
-#targetLanguageInput, #sourceLanguageInput, #translationResult {
-  background-color: var(--language-select-bg-color);
-  color: var(--language-select-text-color);
-}
+/* #targetLanguageInput, #sourceLanguageInput, #translationResult در بخش textarea استایل‌دهی شده‌اند */
 
 .language-select {
   flex-grow: 1; /* اجازه می دهد کمبوباکس ها فضا را پر کنند */
@@ -192,6 +191,7 @@ body {
   background-position: left 8px center; /* تنظیم موقعیت پیکان برای RTL */
   background-size: 10px 5px;
   padding-left: 25px; /* ایجاد فضا برای پیکان */
+  filter: var(--icon-filter); /* اعمال فیلتر به آیکون پیکان SVG */
 }
 
 .swap-button {
@@ -203,23 +203,24 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   flex-shrink: 0; /* جلوگیری از کوچک شدن دکمه ها */
 }
 
-.swap-button:hover,
-.translate-button:hover {
-  background-color: #e2e6ea;
+.swap-button:hover {
+  background-color: var(--toolbar-link-hover-bg-color); /* استفاده از متغیر برای هاور */
 }
 
 .swap-button img {
   width: 16px;
   height: 16px;
-  opacity: 0.7; /* هماهنگی با سایر آیکون ها */
+  opacity: var(--icon-opacity); /* هماهنگی با سایر آیکون ها */
+  filter: var(--icon-filter); /* اعمال فیلتر آیکون */
+  transition: opacity 0.2s ease-in-out;
 }
 
 .swap-button:hover img {
-  opacity: 1;
+  opacity: var(--icon-hover-opacity);
 }
 
 /* دکمه ترجمه (Translate) */
@@ -232,7 +233,7 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   flex-shrink: 0;
 }
 
@@ -243,11 +244,12 @@ body {
 .translate-button img {
   width: 20px; /* اندازه آیکون ترجمه */
   height: 20px;
-  opacity: 0.7; /* هماهنگی با سایر آیکون ها */
-  filter: none; /* حذف فیلتر سفید */
+  opacity: var(--icon-opacity); /* هماهنگی با سایر آیکون ها */
+  filter: none; /* var(--icon-filter); /* اعمال فیلتر آیکون */
+  transition: opacity 0.2s ease-in-out;
 }
 .translate-button:hover img {
-  opacity: 1;
+  opacity: var(--icon-hover-opacity);
 }
 
 /* نگهدارنده Textarea و Result */
@@ -272,7 +274,7 @@ textarea,
 
   background-color: var(--bg-textbox-color);
   color: var(--text-color);
-  border: 1px solid var(--header-border-color);
+  border: 1px solid var(--header-border-color); /* استفاده از متغیر رنگ بوردر */
 
   line-height: 1.5;
 }
@@ -280,15 +282,15 @@ textarea,
 textarea:focus,
 .result:focus {
   /* result focus پذیر نیست مگر اینکه tabindex داشته باشد */
-  border-color: #80bdff;
+  border-color: #80bdff; /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
 }
 
 .result {
-  color: var(--text-color);
+  /* color: var(--text-color); در بالا تعریف شده */
   min-height: 60px;
-  padding-top: 28px;
+  /* padding-top: 28px; در بالا تعریف شده */
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
@@ -297,13 +299,19 @@ textarea:focus,
 /* استایل Placeholder برای Result Div (با استفاده از شبه المنت) */
 .result:empty::before {
   content: attr(placeholder);
-  color: #6c757d;
+  color: #6c757d; /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
   font-size: 14px;
   position: absolute;
-  top: 28px;
-  right: 10px;
+  top: 28px; /* باید با padding-top هماهنگ باشد */
+  left: 10px; /* برای هماهنگی با padding متن اصلی (اگر متن چپ‌چین است) */
+  right: auto; /* اطمینان از عدم تداخل با left (برای RTL placeholder: right: 10px; left: auto;) */
   pointer-events: none;
 }
+html[dir="rtl"] .result:empty::before { /* تنظیمات خاص برای RTL placeholder */
+    right: 10px;
+    left: auto;
+}
+
 
 /* استایل عمومی تولبار داخلی */
 .inline-toolbar {
@@ -320,7 +328,7 @@ textarea:focus,
 .inline-toolbar.source-toolbar {
   left: 8px; /* موقعیت از چپ */
   right: auto; /* گسترش تا راست (برای space-between) */
-  width: auto;
+  width: auto; /* calc(100% - 16px); */ /* برای اینکه paste-icon جداگانه در سمت راست فضا داشته باشد اگر لازم بود */
   justify-content: space-between; /* جدا کردن گروه چپ و آیکون راست */
   /* gap حذف می شود چون space-between فاصله را تعیین می کند */
 }
@@ -335,8 +343,8 @@ textarea:focus,
 /* استایل مخصوص تولبار متن مقصد (ترجمه شده) */
 .inline-toolbar.target-toolbar {
   left: 8px; /* <<-- موقعیت از چپ */
-  right: auto; /* <<-- اطمینان از عدم تداخل موقعیت راست */
-  gap: 10px; /* <<-- فاصله بین آیکون های کپی و صدا مقصد */
+  right: auto; /* اطمینان از عدم تداخل موقعیت راست */
+  gap: 10px; /* فاصله بین آیکون های کپی و صدا مقصد */
   /* justify-content پیش فرض (flex-start) مناسب است، آیکون ها کنار هم قرار می گیرند */
 }
 
@@ -350,12 +358,13 @@ textarea:focus,
   width: 16px;
   height: 16px;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  opacity: var(--icon-opacity, 0.6); /* اضافه کردن فال‌بک برای اطمینان */
+  transition: opacity 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  filter: var(--icon-filter); /* اعمال فیلتر آیکون */
 }
 
 .inline-icon:hover {
-  opacity: 1;
+  opacity: var(--icon-hover-opacity, 1); /* اضافه کردن فال‌بک برای اطمینان */
 }
 
 /* چرخش آیکون صدای مقصد */
@@ -365,22 +374,17 @@ textarea:focus,
 
 /* استایل آیکون Paste */
 .paste-icon-separate {
+  /* position, top, right, z-index از قبل تعریف شده و مناسب هستند */
+  /* .inline-icon کلاس اصلی استایل‌های پایه (width, height, filter, etc.) را فراهم می‌کند */
   position: absolute;
   top: 5px; /* تنظیم فاصله از بالا */
-  right: 8px; /* <<--- تغییر از right به left برای قرارگیری در سمت چپ */
-  z-index: 11; /* بالاتر از textarea ولی شاید نیاز به تنظیم باشد */
-  /* استایل‌های دیگر inline-icon را حفظ می‌کند: */
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  display: inline-block; /* یا block، بسته به نیاز */
+  /* موقعیت paste-icon-separate با توجه به dir صفحه تنظیم می‌شود */
+}
+html[dir="rtl"] .paste-icon-separate {
+    right: 8px;
 }
 
-.paste-icon-separate:hover {
-  opacity: 1;
-}
+
 
 /* استایل برای مخفی کردن دکمه Paste (توسط JS) */
 #pasteSourceBtn.hidden-by-clipboard {
@@ -391,7 +395,7 @@ textarea:focus,
 .clear-input {
   position: absolute;
   top: 50%;
-  right: 8px; /* موقعیت در سمت راست input */
+  /* موقعیت دکمه clear با توجه به dir صفحه تنظیم می‌شود */
   transform: translateY(-50%);
   width: 14px; /* اندازه کوچکتر */
   height: 14px;
@@ -399,13 +403,21 @@ textarea:focus,
   background-size: contain;
   background-repeat: no-repeat;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.3s;
+  opacity: var(--icon-opacity, 0.6); /* استفاده از متغیر و فال‌بک */
+  transition: opacity 0.3s, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   display: none; /* به طور پیش فرض مخفی */
+  filter: var(--icon-filter); /* اعمال فیلتر آیکون */
+}
+html[dir="ltr"] .clear-input {
+    right: 8px;
+}
+html[dir="rtl"] .clear-input {
+    left: 8px;
 }
 
+
 .clear-input:hover {
-  opacity: 1;
+  opacity: var(--icon-hover-opacity, 1); /* استفاده از متغیر و فال‌بک */
 }
 
 /* استایل های مربوط به حالت انتخاب المنت */
@@ -418,8 +430,8 @@ body.selecting-element {
 .switch {
   position: relative;
   display: inline-block;
-  width: 40px;
-  height: 20px;
+  width: 40px; /* عرض کمتر */
+  height: 20px; /* ارتفاع کمتر */
   margin-left: 8px;
   vertical-align: middle;
 }
@@ -437,34 +449,35 @@ body.selecting-element {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
-  transition: 0.2s;
-  border-radius: 20px;
+  background-color: #ccc; /* رنگ پیش‌فرض در حالت خاموش */
+  transition: 0.2s; /* کاهش زمان انیمیشن */
+  border-radius: 20px; /* گرد کردن کامل */
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
+  height: 16px; /* کمی کوچکتر */
+  width: 16px;  /* کمی کوچکتر */
+  left: 2px;    /* تنظیم موقعیت */
+  bottom: 2px;  /* تنظیم موقعیت */
   background-color: white;
-  transition: 0.2s;
+  transition: 0.2s; /* کاهش زمان انیمیشن */
   border-radius: 50%;
 }
 
 input:checked + .slider {
-  background-color: #4caf50;
+  background-color: #4caf50; /* رنگ سبز برای حالت روشن */
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #4caf50;
+  box-shadow: 0 0 1px #4caf50; /* تغییر کوچک در shadow */
 }
 
 input:checked + .slider:before {
-  transform: translateX(20px);
+  transform: translateX(20px); /* تنظیم مقدار حرکت برای عرض جدید */
 }
+
 
 /* ==========================================================================
          Markdown Styles
@@ -473,7 +486,7 @@ input:checked + .slider:before {
          ========================================================================== */
 .result {
   background-color: var(--bg-result-color);
-  color: var(--text-color);
+  /* color: var(--text-color); در بالا تعریف شده */
   min-height: 60px;
   white-space: normal !important; /* این مهمه برای Markdown */
   word-wrap: break-word;
@@ -486,7 +499,7 @@ input:checked + .slider:before {
 
 /* Markdown کلاس */
 .aiwc-popup-markdown {
-  padding-top: 26px !important;
+  padding-top: 26px !important; /* هماهنگ با پدینگ قبلی textarea و result */
   margin: 0 !important;
 }
 
@@ -502,7 +515,7 @@ input:checked + .slider:before {
 /* آیتم‌های لیست */
 .aiwc-popup-markdown li {
   margin: 0.15em 0 !important;
-  padding-inline-start: 0.4em !important;
+  padding-inline-start: 0.4em !important; /* پدینگ استاندارد برای آیتم‌های لیست */
   color: var(--text-color);
 }
 
@@ -519,7 +532,7 @@ input:checked + .slider:before {
 .aiwc-popup-markdown pre {
   background: var(--bg-textbox-color, #eee) !important; /* fallback */
   color: var(--text-color, #333) !important; /* fallback */
-  border: 1px solid var(--text-color, #ccc); /* fallback */
+  border: 1px solid var(--header-border-color, #ccc); /* fallback and using theme variable */
   padding: 6px 8px !important;
   font-size: 12px !important;
   border-radius: 4px;
@@ -532,7 +545,7 @@ input:checked + .slider:before {
 .spinner-overlay {
   position: relative;
   width: 100%;
-  min-height: 60px;
+  min-height: 60px; /* باید با min-height نتیجه و textarea هماهنگ باشد */
 }
 
 .spinner-center {
@@ -545,12 +558,17 @@ input:checked + .slider:before {
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #dee2e6;
-  border-top: 3px solid #007bff;
+  border: 3px solid var(--header-border-color, #dee2e6); /* استفاده از متغیر تم با فال‌بک */
+  border-top: 3px solid #007bff; /* این رنگ می‌تواند در تم تیره نیاز به بازبینی داشته باشد */
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin: auto;
 }
+:root.theme-dark .spinner { /* تنظیم رنگ اسپینر برای تم تیره */
+    border: 3px solid var(--header-border-color, #555);
+    border-top: 3px solid var(--toolbar-link-color, #58a6ff); /* استفاده از رنگ لینک تم تیره */
+}
+
 
 @keyframes spin {
   to {
