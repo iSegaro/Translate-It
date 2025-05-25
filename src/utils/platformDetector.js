@@ -12,7 +12,7 @@ export const Platform = {
   Medium: "medium",
   ChatGPT: "chatgpt",
   Youtube: "youtube",
-  Discord: "discrod",
+  Discord: "discord",
 };
 
 /**

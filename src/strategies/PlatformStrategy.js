@@ -43,22 +43,34 @@ export default class PlatformStrategy {
     );
   }
 
-  async applyVisualFeedback(element) {
-    if (!element) return;
+    async applyVisualFeedback(element) {
+    if (!element || !element.style) return; // بررسی بیشتر برای اطمینان
+
+    const originalBackgroundColor = element.style.backgroundColor;
+    const originalTransition = element.style.transition;
+
     try {
-      const originalBackgroundColor = element.style.backgroundColor;
-      element.style.transition = "background-color 0.5s ease";
-      element.style.backgroundColor = "#d4f8d4";
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          element.style.backgroundColor = originalBackgroundColor;
-        }, 300);
-      });
+      element.style.transition = "background-color 0.3s ease"; // زمان انتقال
+      element.style.backgroundColor = "#d4f8d4"; // رنگ سبز برای نشان دادن پردازش/موفقیت
+
+      // منتظر میمونه تا رنگ سبز قابل مشاهده باشد و سپس به حالت اولیه بازمیگردد
+      await new Promise(resolve => setTimeout(resolve, 300)); // مدت زمان نمایش رنگ سبز
+
+      element.style.backgroundColor = originalBackgroundColor;
+
+      // منتظر میمونه تا انیمیشن بازگشت به پایان برسد
+      await new Promise(resolve => setTimeout(resolve, 300)); // باید با زمان transition هماهنگ باشد
+
     } catch (error) {
+      // در صورت بروز خطا، سعی میکنه استایل‌ها را فوراً به حالت اولیه بازگردند
+      element.style.backgroundColor = originalBackgroundColor;
       this.errorHandler?.handle(error, {
         type: ErrorTypes.UI,
         context: "platform-strategy-animation",
       });
+    } finally {
+      // همیشه ویژگی transition اصلی را بازمی‌گرداند
+      element.style.transition = originalTransition;
     }
   }
 
