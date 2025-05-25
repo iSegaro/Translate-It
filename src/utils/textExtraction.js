@@ -115,15 +115,19 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
 
     if (translatedText && trimmedOriginalText) {
       const parentElement = textNode.parentNode;
-      // ذخیره‌ی استایل‌های اولیه قبل از تغییر آن‌ها
+      // ذخیره‌ی استایل‌های اولیه جهت (direction) و تراز متن (text-align) در المان پدر (در صورت نیاز).
+      // اگر این تابع برای جلوگیری از تغییر ناخواسته استایل والد پس از حذف کدهای قبلی جهت‌دهی به والد است، نگه داشتن آن مفید است.
       storeOriginalParentStyles(parentElement);
 
-      // ایجاد container برای نگهداری ترجمه
+      // ایجاد containerSpan برای نگهداری ترجمه
       const containerSpan = document.createElement("span");
       const uniqueId = generateUniqueId();
       containerSpan.setAttribute("data-aiwc-original-id", uniqueId);
       // ذخیره کامل متن اصلی در attribute برای revert
       containerSpan.setAttribute("data-aiwc-original-text", originalText);
+
+      // <<<< اعمال جهت‌دهی صحیح به خود containerSpan بر اساس کل متن ترجمه شده >>>>
+      correctTextDirection(containerSpan, translatedText);
 
       const originalLines = originalText.split("\n");
       const translatedLines = translatedText.split("\n");
@@ -133,23 +137,29 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
           translatedLines[index] !== undefined ? translatedLines[index] : "";
         const innerSpan = document.createElement("span");
         innerSpan.textContent = translatedLine;
+
+        // معمولاً نیازی به تنظیم direction برای هر innerSpan نیست اگر dir والد (containerSpan) صحیح باشد.
+        // مرورگر باید جریان متن را درون جهت‌دهی والد به درستی مدیریت کند.
+
+        // این قسمت به نظر می‌رسد متن اصلی را برای بازگردانی ذخیره می‌کند.
         context.state.originalTexts.set(uniqueId, {
-          originalText: originalLine,
-          wrapperElement: innerSpan,
+          originalText: originalLine, // متن اصلی خط
+          wrapperElement: innerSpan, // span ای که حاوی خط ترجمه شده است
         });
 
         containerSpan.appendChild(innerSpan);
 
         if (index < originalLines.length - 1) {
           const br = document.createElement("br");
-          br.setAttribute("data-aiwc-br", "true");
+          br.setAttribute("data-aiwc-br", "true"); // برای شناسایی و حذف احتمالی هنگام بازگردانی
           containerSpan.appendChild(br);
         }
       });
 
-      // تغییر استایل المان پدر برای نمایش متن ترجمه شده
-      applyTextDirection(parentElement, true);
-      correctTextDirection(parentElement, translatedLines);
+      // -- روش قدیمی برای نمایش راستچین و چپ چین متن‌ها --
+      // کدهای قبلی که جهت‌دهی را به parentElement اعمال می‌کردند حذف شده‌اند:
+      // applyTextDirection(parentElement, true);
+      // correctTextDirection(parentElement, translatedLines); // <<<< (به containerSpan منتقل شد) >>>>
 
       try {
         parentElement.replaceChild(containerSpan, textNode);
@@ -163,14 +173,21 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
             parentElement,
           }
         );
-        context.state.originalTexts.delete(uniqueId);
+        // اگر خطایی رخ داد، اطلاعات ذخیره شده برای این uniqueId را حذف کنید
+        if(context.state.originalTexts.has(uniqueId)){
+            context.state.originalTexts.delete(uniqueId);
+        }
+
 
         const processedError = ErrorHandler.processError(error);
-        context.errorHandler.handle(processedError, {
-          type: ErrorTypes.PARSE_SELECT_ELEMENT,
-          context: "textExtraction-apply-translations-replace",
-          elementId: "multiple",
-        });
+        // اطمینان از اینکه context.errorHandler موجود است
+        if (context.errorHandler && typeof context.errorHandler.handle === 'function') {
+          context.errorHandler.handle(processedError, {
+            type: ErrorTypes.PARSE_SELECT_ELEMENT,
+            context: "textExtraction-apply-translations-replace",
+            elementId: "multiple", // یا uniqueId اگر مربوط به یک المنت خاص است
+          });
+        }
       }
     }
   });

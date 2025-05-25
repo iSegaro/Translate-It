@@ -39,20 +39,27 @@ export const applyElementDirection = (element, rtl_direction = false) => {
 export const correctTextDirection = (element, text) => {
   if (!element) return;
 
-  const isRtl = shouldApplyRtl(text);
+  // اگر 'text' آرایه‌ای از خطوط است، آن‌ها را برای بررسی جهت کلی به هم متصل کنید.
+  const textToCheck = Array.isArray(text) ? text.join("\n") : text;
+
+  const isRtl = shouldApplyRtl(textToCheck);
   const direction = isRtl ? "rtl" : "ltr";
-  const textAlign = isRtl ? "right" : "left";
+  // استفاده از "start" یا "end" برای textAlign می‌تواند گزینه بهتری باشد،
+  // اما "left" و "right" رایج هستند.
+  const textAlign = isRtl ? "right" : "left"; // یا "start"
 
   if (element.style) {
     element.style.direction = direction;
     element.style.textAlign = textAlign;
   } else {
-    // اگر style وجود نداشت، با setAttribute مقدار دهی کنیم
+    // این حالت ممکن است برای spanها کمتر رایج باشد اما برای استحکام کد خوب است
     element.setAttribute(
       "style",
       `direction: ${direction}; text-align: ${textAlign};`
     );
   }
+  // بسیار مهم: ویژگی 'dir' را برای مدیریت صحیح bidi توسط مرورگر تنظیم می شود
+  element.setAttribute("dir", direction);
 };
 
 export async function detectTextLanguage(text) {
