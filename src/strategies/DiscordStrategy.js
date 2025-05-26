@@ -1,6 +1,8 @@
+// src/strategies/DiscordStrategy.js
+
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers";
+import { delay, logME } from "../utils/helpers.js";
 
 export default class DiscordStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -8,21 +10,12 @@ export default class DiscordStrategy extends PlatformStrategy {
     this.errorHandler = errorHandler;
   }
 
-  /**
-   * استخراج امن متن از المان‌های استاندارد دیسکورد
-   * - بررسی null بودن
-   * - بررسی قابلیت contentEditable
-   * - بررسی value یا textContent
-   * - محافظت با try/catch در برابر DOMException
-   */
   extractText(target) {
     try {
       if (!target || !(target instanceof HTMLElement)) return "";
-
       if (target.isContentEditable) {
         return target.innerText?.trim?.() || "";
       }
-
       return target.value?.trim?.() || target.textContent?.trim?.() || "";
     } catch (error) {
       this.errorHandler.handle(error, {
@@ -33,151 +26,372 @@ export default class DiscordStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
-    try {
-      const shortcutsModal = document.querySelector(
-        ".keyboardShortcutsModal_f061f6"
-      );
-      if (shortcutsModal) return false;
+  /**
+   * تشخیص ادیتور Slate.js دیسکورد
+   */
+  _isSlateEditor(element) {
+    return element.hasAttribute('data-slate-editor') && 
+           element.hasAttribute('data-slate-node') && 
+           element.getAttribute('data-slate-node') === 'value';
+  }
 
-      if (translatedText !== undefined && translatedText !== null) {
-        if (element.isContentEditable) {
-          element.focus();
-          element.value = translatedText;
-          this.applyVisualFeedback(element);
-          this.clearField(element);
-          await delay(200);
-          this.pasteText(element, translatedText);
-          this.applyTextDirection(element, translatedText);
-        } else {
-          element.focus();
-          element.value = translatedText;
-          this.applyVisualFeedback(element);
-          this.clearField(element);
-          await delay(200);
-          this.pasteText(element, translatedText);
-          this.applyTextDirection(element, translatedText);
+  /**
+   * پیدا کردن React Fiber برای دسترسی به instance کامپوننت
+   */
+  _getReactFiber(element) {
+    const fiberKey = Object.keys(element).find(key => 
+      key.startsWith('__reactInternalInstance') || 
+      key.startsWith('__reactFiber')
+    );
+    return fiberKey ? element[fiberKey] : null;
+  }
+
+  /**
+   * پیدا کردن Slate editor instance از React
+   */
+  _getSlateEditor(element) {
+    try {
+      const fiber = this._getReactFiber(element);
+      if (!fiber) return null;
+
+      // جستجو در fiber tree برای پیدا کردن Slate editor
+      let currentFiber = fiber;
+      let attempts = 0;
+      const maxAttempts = 50;
+
+      while (currentFiber && attempts < maxAttempts) {
+        attempts++;
+        
+        // بررسی props و state برای Slate editor
+        if (currentFiber.memoizedProps) {
+          const props = currentFiber.memoizedProps;
+          if (props.editor && typeof props.editor === 'object') {
+            if (props.editor.children || props.editor.operations) {
+              return props.editor;
+            }
+          }
         }
+
+        if (currentFiber.stateNode && currentFiber.stateNode.editor) {
+          return currentFiber.stateNode.editor;
+        }
+
+        // ادامه جستجو در والدین
+        currentFiber = currentFiber.return || currentFiber._debugOwner || currentFiber.parent;
+      }
+
+      return null;
+    } catch (error) {
+      logME("[DiscordStrategy] خطا در _getSlateEditor:", error);
+      return null;
+    }
+  }
+
+  /**
+   * به‌روزرسانی محتوا از طریق Slate API
+   */
+  async _updateViaSlateAPI(element, translatedText) {
+    try {
+      const slateEditor = this._getSlateEditor(element);
+      if (!slateEditor) {
+        logME("[DiscordStrategy] Slate editor instance پیدا نشد");
+        return false;
+      }
+
+      logME("[DiscordStrategy] Slate editor instance پیدا شد");
+
+      // تلاش برای استفاده از Slate Transforms
+      if (window.Slate && window.Slate.Transforms) {
+        const { Transforms, Editor } = window.Slate;
+        
+        // انتخاب تمام محتوا
+        Transforms.select(slateEditor, {
+          anchor: Editor.start(slateEditor, []),
+          focus: Editor.end(slateEditor, [])
+        });
+
+        // حذف محتوای فعلی
+        Transforms.delete(slateEditor);
+
+        // درج متن جدید
+        Transforms.insertText(slateEditor, translatedText);
+
+        logME("[DiscordStrategy] محتوا از طریق Slate API به‌روزرسانی شد");
         return true;
       }
+
+      return false;
     } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "Discord-strategy-updateElement",
-      });
+      logME("[DiscordStrategy] خطا در _updateViaSlateAPI:", error);
       return false;
     }
   }
 
-  clearField(Field) {
-    if (!Field) return;
-
+  /**
+   * شبیه‌سازی تایپ طبیعی کاربر
+   */
+  async _simulateNaturalTyping(element, translatedText) {
     try {
-      Field.focus();
-      const selection = window.getSelection();
-      const isTextSelected = selection.toString().length > 0;
+      element.focus();
+      await delay(50);
 
-      if (!isTextSelected) {
+      // انتخاب تمام محتوا
+      const selection = window.getSelection();
+      if (selection) {
         const range = document.createRange();
-        range.selectNodeContents(Field);
+        range.selectNodeContents(element);
         selection.removeAllRanges();
         selection.addRange(range);
       }
 
-      const dt = new DataTransfer();
-      dt.setData("text/plain", "");
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      Field.dispatchEvent(pasteEvent);
+      // شبیه‌سازی کلید حذف برای پاک کردن محتوا
+      const deleteEvents = [
+        new KeyboardEvent('keydown', { 
+          key: 'Backspace', 
+          keyCode: 8, 
+          bubbles: true, 
+          cancelable: true 
+        }),
+        new KeyboardEvent('keyup', { 
+          key: 'Backspace', 
+          keyCode: 8, 
+          bubbles: true, 
+          cancelable: true 
+        })
+      ];
+
+      for (const event of deleteEvents) {
+        element.dispatchEvent(event);
+        await delay(10);
+      }
+
+      // شبیه‌سازی تایپ کردن متن جدید
+      for (let i = 0; i < translatedText.length; i++) {
+        const char = translatedText[i];
+        
+        // رویداد keydown
+        element.dispatchEvent(new KeyboardEvent('keydown', {
+          key: char,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        // رویداد beforeinput
+        element.dispatchEvent(new InputEvent('beforeinput', {
+          inputType: 'insertText',
+          data: char,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        // رویداد input
+        element.dispatchEvent(new InputEvent('input', {
+          inputType: 'insertText',
+          data: char,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        // رویداد keyup
+        element.dispatchEvent(new KeyboardEvent('keyup', {
+          key: char,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        // تاخیر کوتاه برای شبیه‌سازی واقعی‌تر
+        if (i % 5 === 0) await delay(10);
+      }
+
+      return true;
     } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "Discord-strategy-clearField",
-      });
+      logME("[DiscordStrategy] خطا در _simulateNaturalTyping:", error);
+      return false;
     }
   }
 
-  async pasteText(field, text) {
-    if (!field || !text || typeof text !== "string") return;
-
+  /**
+   * روش بهینه‌شده با استفاده از clipboard و سیگنال‌های مناسب
+   */
+  async _updateViaClipboard(element, translatedText) {
     try {
-      let lines = text.split("\n");
-      while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-        lines.pop();
-      }
-      const trimmedText = lines.join("\n");
+      element.focus();
+      await delay(50);
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        const selection = window.getSelection();
-        const range = selection.getRangeAt(0).cloneRange();
-        await navigator.clipboard.writeText(trimmedText);
-        field.focus();
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        if (document.execCommand("paste")) return;
-        this.simulateInputInsertion(field, trimmedText);
-        return;
-      }
-
-      const dt = new DataTransfer();
-      dt.setData("text/plain", trimmedText);
-      dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
-
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-
-      field.focus();
-      field.dispatchEvent(pasteEvent);
-
-      setTimeout(() => {
-        this.simulateInputInsertion(field, trimmedText);
-      }, 100);
-    } catch (error) {
-      const handlerError = this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "Discord-strategy-pasteText",
-      });
-      throw handlerError;
-    }
-  }
-
-  simulateInputInsertion(field, text) {
-    try {
-      if (document.execCommand("insertText", false, text)) return;
-    } catch {
-      //
-    }
-
-    if (field.tagName === "INPUT" || field.tagName === "TEXTAREA") {
-      const start = field.selectionStart || 0;
-      const end = field.selectionEnd || 0;
-      const beforeText = field.value.substring(0, start);
-      const afterText = field.value.substring(end);
-      field.value = beforeText + text + afterText;
-      field.selectionStart = field.selectionEnd = start + text.length;
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-      return;
-    }
-
-    if (field.isContentEditable) {
+      // انتخاب تمام محتوا
       const selection = window.getSelection();
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      const textNode = document.createTextNode(text);
-      range.insertNode(textNode);
-      range.setStartAfter(textNode);
-      range.setEndAfter(textNode);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-      field.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      // کپی متن جدید در کلیپ‌بورد
+      await navigator.clipboard.writeText(translatedText);
+      
+      // ارسال رویداد beforeinput برای paste
+      const beforeInputEvent = new InputEvent('beforeinput', {
+        inputType: 'insertFromPaste',
+        bubbles: true,
+        cancelable: true
+      });
+      element.dispatchEvent(beforeInputEvent);
+
+      // ارسال رویداد paste
+      const pasteEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: new DataTransfer()
+      });
+      
+      // تنظیم داده‌های clipboard
+      pasteEvent.clipboardData.setData('text/plain', translatedText);
+      pasteEvent.clipboardData.setData('text/html', translatedText);
+      
+      element.dispatchEvent(pasteEvent);
+
+      // تاخیر برای اعمال تغییرات
+      await delay(100);
+
+      // تأیید نهایی با input event
+      element.dispatchEvent(new InputEvent('input', {
+        inputType: 'insertFromPaste',
+        bubbles: true,
+        cancelable: true
+      }));
+
+      return true;
+    } catch (error) {
+      logME("[DiscordStrategy] خطا در _updateViaClipboard:", error);
+      return false;
     }
+  }
+
+  /**
+   * روش fallback با execCommand
+   */
+  async _fallbackExecCommand(element, translatedText) {
+    try {
+      element.focus();
+      
+      // انتخاب تمام محتوا
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      // استفاده از execCommand
+      if (document.queryCommandSupported('insertText')) {
+        const success = document.execCommand('insertText', false, translatedText);
+        if (success) {
+          element.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logME("[DiscordStrategy] خطا در _fallbackExecCommand:", error);
+      return false;
+    }
+  }
+
+  async updateElement(element, translatedText) {
+    if (translatedText === undefined || translatedText === null) {
+      return false;
+    }
+
+    // بررسی وجود modal shortcuts
+    const shortcutsModal = document.querySelector(".keyboardShortcutsModal_f061f6");
+    if (shortcutsModal) {
+      return false;
+    }
+
+    let success = false;
+
+
+    try {
+      logME("[DiscordStrategy] شروع به‌روزرسانی element با متن:", translatedText.substring(0, 50) + "...");
+
+      // روش 1: استفاده از Slate API (بهترین روش)
+      if (this._isSlateEditor(element)) {
+        logME("[DiscordStrategy] تلاش با Slate API...");
+        success = await this._updateViaSlateAPI(element, translatedText);
+      }
+
+      // روش 2: شبیه‌سازی clipboard paste
+      if (!success) {
+        logME("[DiscordStrategy] تلاش با clipboard paste...");
+        success = await this._updateViaClipboard(element, translatedText);
+      }
+
+      // روش 3: شبیه‌سازی تایپ طبیعی
+      if (!success) {
+        logME("[DiscordStrategy] تلاش با شبیه‌سازی تایپ...");
+        success = await this._simulateNaturalTyping(element, translatedText);
+      }
+
+      // روش 4: fallback با execCommand
+      if (!success) {
+        logME("[DiscordStrategy] تلاش با execCommand...");
+        success = await this._fallbackExecCommand(element, translatedText);
+      }
+
+      // تأیید نهایی و تنظیمات
+      if (success) {
+        await delay(100);
+        
+        // بررسی صحت به‌روزرسانی
+        const finalText = this.extractText(element);
+        if (finalText.trim() === translatedText.trim()) {
+          logME("[DiscordStrategy] به‌روزرسانی با موفقیت تأیید شد");
+          
+          // اعمال direction
+          this.applyTextDirection(element, translatedText);
+          
+          // اعمال visual feedback
+          await this.applyVisualFeedback(element);
+          
+          // فوکوس مجدد برای حفظ حالت ادیتور
+          element.focus();
+          
+          // تنظیم cursor در انتهای متن
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            const textNode = element.querySelector('[data-slate-string="true"]');
+            if (textNode && textNode.firstChild) {
+              range.setStart(textNode.firstChild, textNode.textContent.length);
+              range.setEnd(textNode.firstChild, textNode.textContent.length);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+          }
+          
+        } else {
+          logME("[DiscordStrategy] متن نهایی مطابقت نداشت. انتظار:", translatedText.trim(), "دریافت:", finalText.trim());
+          success = false;
+        }
+      }
+
+    } catch (error) {
+      logME("[DiscordStrategy] خطای عمومی در updateElement:", error);
+      success = false;
+      await this.errorHandler.handle(error, {
+        type: error.type || ErrorTypes.UI,
+        context: "Discord-strategy-updateElement",
+        errorMessage: error.message,
+      });
+    }
+
+    if (!success) {
+      logME("[DiscordStrategy] همه روش‌ها ناموفق بودند");
+    }
+
+    return success;
   }
 }
