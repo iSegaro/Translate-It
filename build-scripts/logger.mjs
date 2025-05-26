@@ -1,5 +1,7 @@
 // build-scripts/logger.js
 
+/* eslint-disable no-undef */
+
 import chalk from "chalk";
 
 export function logStep(name) {
