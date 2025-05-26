@@ -1,4 +1,7 @@
 // webpack.common.js
+
+/* eslint-disable no-undef */
+
 const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = {

@@ -4,7 +4,7 @@ import js from "@eslint/js";
 import babelParser from "@babel/eslint-parser";
 import noUnsanitized from "eslint-plugin-no-unsanitized";
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 export default [
   js.configs.recommended,
   {
