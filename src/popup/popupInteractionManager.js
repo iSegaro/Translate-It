@@ -9,7 +9,7 @@ import {
 // import { wasSelectElementIconClicked } from "./headerActionsManager.js";
 
 const HOVER_TIMEOUT = 1000;
-const AUTO_CLOSE_TIMEOUT = 800;
+const AUTO_CLOSE_TIMEOUT = 800; // زمان انتظار برای بررسی اولیه ورود موس به پاپ‌آپ
 
 let isMouseOverPopup = false;
 let hoverStayTimer = null;
@@ -64,7 +64,7 @@ async function ensureSelectElementActive() {
       logPopupEvent(
         "[popupInteractionManager]  Delayed activation of Select Mode"
       );
-      Active_SelectElement(true, false, true); // force = true
+      Active_SelectElement(true, false, true); // force = true, closePopupIfNoInteraction = false
     }, 100);
     return true;
   }
@@ -79,7 +79,7 @@ function setupInteractionListeners() {
   elements.popupContainer?.addEventListener("mouseenter", () => {
     isMouseOverPopup = true;
     cancelAutoClose("mouseenter");
-    cancelInitialEntryTimer();
+    cancelInitialEntryTimer(); // موس وارد پاپ‌آپ شده، تایمر اولیه دیگر لازم نیست
 
     if (!interactionLocked) {
       hoverStayTimer = setTimeout(() => {
@@ -87,21 +87,23 @@ function setupInteractionListeners() {
         logPopupEvent(
           "[popupInteractionManager]  Hover timeout passed – locking interaction & deactivating select"
         );
-        Active_SelectElement(false);
+        Active_SelectElement(false); // غیرفعال کردن حالت انتخاب چون کاربر با پاپ‌آپ تعامل کرده
       }, HOVER_TIMEOUT);
     }
   });
 
   elements.popupContainer?.addEventListener("mouseleave", () => {
     isMouseOverPopup = false;
-    cancelHoverTimer();
+    cancelHoverTimer(); // لغو تایمر هاور چون موس خارج شده
 
     if (!interactionLocked) {
+      // اگر تعامل هنوز قفل نشده (کاربر کلیک نکرده یا به اندازه کافی هاور نکرده)
       autoCloseTimer = setTimeout(() => {
         logPopupEvent(
           "[popupInteractionManager] Mouse left early – closing popup (select remains active)"
         );
-        Active_SelectElement(true, true);
+        // اگر موس پاپ‌آپ را ترک کرد و به صفحه رفت، حالت انتخاب فعال و پاپ‌آپ بسته شود
+        Active_SelectElement(true, true); // فعال کردن حالت انتخاب و بستن پاپ‌آپ
       }, AUTO_CLOSE_TIMEOUT);
     } else {
       logPopupEvent(
@@ -112,26 +114,30 @@ function setupInteractionListeners() {
 
   elements.popupContainer?.addEventListener("mousedown", () => {
     if (!interactionLocked) {
-      interactionLocked = true;
+      interactionLocked = true; // با کلیک، تعامل قفل می‌شود
       cancelHoverTimer();
       cancelAutoClose("mousedown");
       cancelInitialEntryTimer();
       logPopupEvent(
         "[popupInteractionManager] User clicked – locking & deactivating select"
       );
-      Active_SelectElement(false);
+      Active_SelectElement(false); // غیرفعال کردن حالت انتخاب
     }
   });
 
   // شروع تایمر اولیه برای تشخیص اینکه موس اصلاً وارد popup شده یا نه
   initialEntryTimer = setTimeout(() => {
     if (!isMouseOverPopup && !interactionLocked) {
-      logPopupEvent();
-      // "🚪 Initial mouse entry timeout – closing popup (no interaction)"
-      Active_SelectElement(true, true);
-    } else {
+      // اگر موس وارد پاپ‌آپ نشده و تعامل هم قفل نشده باشد
       logPopupEvent(
-        "[popupInteractionManager] Mouse entered or interacted – popup stays open"
+        "[popupInteractionManager] Initial mouse entry to popup not detected – Deactivating Select Mode, Popup remains open." // لاگ به‌روز شده
+      );
+      // رفتار جدید: حالت انتخاب المنت غیرفعال شود و پاپ‌آپ باز بماند
+      Active_SelectElement(false);
+    } else {
+      // اگر موس وارد شده یا تعامل قفل شده، پاپ‌آپ باز می‌ماند (و حالت انتخاب توسط رویدادهای دیگر مدیریت شده)
+      logPopupEvent(
+        "[popupInteractionManager] Mouse entered popup or interaction locked – popup stays open"
       );
     }
   }, AUTO_CLOSE_TIMEOUT);
@@ -144,6 +150,8 @@ function setupInteractionListeners() {
 export async function init() {
   logPopupEvent("[popupInteractionManager] INIT");
   const success = await ensureSelectElementActive();
-  if (success) setupInteractionListeners();
+  if (success) {
+    setupInteractionListeners();
+  }
   logPopupEvent("[popupInteractionManager] READY");
 }
