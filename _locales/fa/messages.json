@@ -125,6 +125,9 @@
   "theme_dark": {
     "message": "تاریک"
   },
+  "theme_toggle_title": {
+    "message": "روشن/تیره"
+  },
 
   "popup_revert_title_icon": { "message": "بازگرداندن (Esc کلید)" },
   "popup_revert_alt_icon": { "message": "بازگرداندن" },

@@ -121,6 +121,9 @@
   "theme_dark": {
     "message": "Dark"
   },
+  "theme_toggle_title": {
+    "message": "Light/Dark"
+  },
   
   "popup_page_title": { "message": "Translate It!" },
   "popup_translate_page_link": { "message": "Translate This Page" },
