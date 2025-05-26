@@ -1,6 +1,6 @@
 ## Translate It!
 
-#### vx.x.x - ...
+#### x.x.x - unreleased
 
 - Improved Popup Behavior on Initial Inactivity
 - Enhanced display of the last translation (now shown only in Dictionary mode)
