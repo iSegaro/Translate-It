@@ -505,3 +505,75 @@ input:focus + .slider {
 input:checked + .slider:before {
   transform: translateX(20px);
 }
+
+
+/* Styles for the top-right overlay controls */
+.top-right-controls {
+  position: fixed; /* Or absolute if you want it to scroll with the page */
+  top: 15px; /* فاصله از بالا */
+  right: 20px; /* فاصله از راست */
+  z-index: 1050; /* بالاتر از سایر محتوا */
+  display: flex;
+  align-items: center; /* تراز عمودی آیتم‌ها */
+  gap: 18px; /* کمی کاهش فاصله بین آیکون GitHub و گروه تنظیمات تم */
+  padding: 8px 10px; /* پدینگ داخلی */
+  background-color: var(--container-bg-color, #fff); /* رنگ پس‌زمینه مشابه کانتینر اصلی با فال‌بک */
+  border-radius: 8px; /* گوشه‌های گرد */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); /* سایه کمی مشخص‌تر */
+}
+
+/* Styling for the GitHub link/icon within the overlay */
+.top-right-controls #githubLink { /* هدف‌گیری خود لینک برای display */
+  display: flex; /* برای تراز بهتر آیکون */
+  align-items: center;
+}
+.top-right-controls #githubLink img#githubIcon {
+  display: block; 
+  filter: var(--github-icon-filter);
+  height: 22px;
+  width: 22px;
+}
+
+/* Styling for the theme control group (the specific setting-row for theme in overlay) */
+/* This is the original .setting-row element that was moved */
+.top-right-controls .setting-row.theme-control-overlay-group {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* فاصله بین آیکون تم، سوئیچ و لیبل Auto */
+  margin-bottom: 0; /* حذف margin-bottom پیش‌فرض setting-row */
+  padding: 0; /* حذف پدینگ اضافی اگر setting-row اصلی پدینگ دارد */
+}
+
+/* Styling for the theme icon within the overlay group */
+.top-right-controls .theme-control-overlay-group #themeIcon {
+  filter: var(--theme-icon-filter);
+  height: 22px;
+  width: 22px;
+}
+
+/* Styling for the "System Theme" checkbox and its label within the overlay group */
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* فاصله بین چک‌باکس و متن "System Theme" */
+  margin-bottom: 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  /* padding-left: 3px;  optional */
+}
+
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay input[type="checkbox"] {
+  margin: 0; /* حذف margin پیش‌فرض چک‌باکس */
+  vertical-align: middle;
+}
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay span {
+  vertical-align: middle;
+  line-height: 1; /* برای تراز بهتر متن با چک‌باکس */
+}
+
+
+/* اگر هدر اصلی با کنترل‌های overlay تداخل دارد: */
+/* body > .header {
+  padding-top: 70px; 
+} */

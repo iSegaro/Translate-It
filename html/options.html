@@ -9,49 +9,41 @@
     <script src="../options.bundle.js" defer></script>
   </head>
   <body>
-    <div class="header">
-      <h1 id="options_app_name">Translate It!</h1>
-      <span id="options_app_version">version 0.0.0</span>
-      <p data-i18n="options_description">Translate Everywhere, Simple.</p>
-      <a target="_blank" href="https://github.com/iSegaro/Translate-It">
+    <div class="top-right-controls">
+      <a
+        id="githubLink"
+        target="_blank"
+        href="https://github.com/iSegaro/Translate-It"
+        title="Home Page" >
         <img
           src="../icons/github.svg"
-          alt="GitHub"
-          title="Home Page"
-          height="20"
+          alt="GitHub" height="22"
           id="githubIcon"
         />
       </a>
 
-      <div class="setting-row">
+      <div class="setting-row theme-control-overlay-group">
         <img
           src="../icons/theme.png"
-          alt="Light/Dark"
-          title="System Theme"
-          data-i18n-title="theme_auto"
-          height="20"
+          alt="Light/Dark" data-i18n-title="theme_toggle_title" height="22"
           id="themeIcon"
         />
-
         <label
           class="switch"
-          data-i18n-title="theme_toggle_title"
-          title="روشن / تیره"
-        >
+          title="روشن / تیره" data-i18n-title="theme_toggle_title" >
           <input type="checkbox" id="theme-Switch" />
           <span class="slider round"></span>
-          
         </label>
-        <input type="checkbox" id="theme-Auto" />
-        <span>System Theme</span>
-
-        <!-- <select id="theme-select">
-          <option value="auto" data-i18n="theme_auto">Auto</option>
-          <option value="light" data-i18n="theme_light">Light</option>
-          <option value="dark" data-i18n="theme_dark">Dark</option>
-        </select> -->
+        <label for="theme-Auto" class="theme-auto-label-overlay" title="System Theme"> <input type="checkbox" id="theme-Auto" />
+          <span data-i18n="theme_auto">System Theme</span> </label>
       </div>
     </div>
+    <div class="header">
+      <h1 id="options_app_name">Translate It!</h1>
+      <span id="options_app_version">version 0.0.0</span>
+      <p data-i18n="options_description">Translate Everywhere, Simple.</p>
+      </div>
+
     <div class="localization"></div>
     <div class="container">
       <div class="tabs">
@@ -307,14 +299,13 @@
           <div id="geminiApiSettings">
             <h3 data-i18n="gemini_api_settings_title">Gemini API Settings</h3>
 
-            <!-- راهنمای دریافت API Key -->
             <div class="setting-group api-key-info">
               <span class="setting-description" data-i18n="gemini_api_key_info">
                 You can get your Gemini API key from
               </span>
               <a
                 class="api-link"
-                data-i18n="gemini_api_key_link"
+                data-i18n="gemini_api_key_link" 
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -418,21 +409,18 @@
 
       <div id="advance" class="tab-content">
         <section>
-          <!-- Add Dev API Mode Checkbox Here -->
           <div class="setting-group">
             <label data-i18n="advance_dev_api_mode_label" for="useMock"
               >Use Dev API Mode</label
             >
             <input type="checkbox" id="useMock" />
           </div>
-          <!-- Add Debug Mode Checkbox Here -->
           <div class="setting-group">
             <label for="debugMode" data-i18n="advance_debug_mode_label"
               >Debug Mode</label
             >
             <input type="checkbox" id="debugMode" />
           </div>
-          <!-- Add Exclude -->
           <div class="setting-group">
             <label for="excludedSites" data-i18n="excluded_sites_label"
               >Exclude these sites (comma separated)</label
@@ -472,7 +460,7 @@
     </footer>
 
     <datalist id="allLanguages">
-      <option value="English"></option>
+     <option value="English"></option>
       <option value="Farsi"></option>
       <option value="German"></option>
       <option value="French"></option>
