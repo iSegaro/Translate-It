@@ -67,15 +67,17 @@ export async function handleFetchTranslation(
       throw err;
     }
 
-    // ذخیرهٔ آخرین ترجمه
-    await Browser.storage.local.set({
-      lastTranslation: {
-        sourceText: promptText,
-        translatedText: translation,
-        sourceLanguage,
-        targetLanguage,
-      },
-    });
+    // ذخیرهٔ آخرین ترجمه در حالت دیکنشری
+    if (translateMode === TranslationMode.Dictionary_Translation) {
+      await Browser.storage.local.set({
+        lastTranslation: {
+          sourceText: promptText,
+          translatedText: translation,
+          sourceLanguage,
+          targetLanguage,
+        },
+      });
+    }
 
     sendResponse({ success: true, data: { translatedText: translation } });
   } catch (err) {
@@ -131,7 +133,9 @@ export async function handleFetchTranslationBackground(
     }
 
     // ذخیرهٔ آخرین ترجمه (به‌جز SelectElement)
-    if (translationMode !== TranslationMode.SelectElement) {
+    // if (translationMode !== TranslationMode.SelectElement) {
+    // ذخیرهٔ آخرین ترجمه دیکشنری
+    if (translationMode === TranslationMode.Dictionary_Translation) {
       await Browser.storage.local.set({
         lastTranslation: {
           sourceText: promptText,
