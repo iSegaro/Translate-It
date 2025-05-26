@@ -69,7 +69,7 @@ async function handleTranslationResponse(
     const parser = new DOMParser();
     const doc = parser.parseFromString(sanitized.toString(), "text/html");
 
-    elements.translationResult.textContent = ""; // پاک‌سازی قبلی
+    elements.translationResult.textContent = "";
     Array.from(doc.body.childNodes).forEach((node) => {
       elements.translationResult.appendChild(node);
     });
