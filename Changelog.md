@@ -1,9 +1,10 @@
 ## Translate It!
 
-#### x.x.x - unreleased
+#### 0.2.1 - Released 28 May 2025
 
 - Improved Popup Behavior on Initial Inactivity
 - Enhanced display of the last translation (now shown only in Dictionary mode)
+- fix: resolve conflicts between theme styles and website styles (#43)
 
 ---
 
