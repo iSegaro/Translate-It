@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title data-i18n="popup_page_title">Translate It!</title>
+    <link rel="stylesheet" href="../styles/popup.css" />
+    <link rel="stylesheet" href="../styles/theme.css" />
+  </head>
+  <body>
+    <div class="popup-container">
+      <div class="header-toolbar">
+        <div class="toolbar-left-group">
+          <a
+            id="translatePageLink"
+            target="_blank"
+            class="toolbar-link"
+            title="ترجمه این صفحه در تب جدید"
+            data-i18n-title="popup_translate_page_link_title"
+            data-i18n="popup_translate_page_link"
+          >
+            ترجمه این صفحه
+          </a>
+        </div>
+        <div class="toolbar-right-group">
+          <img
+            src="../icons/select.png"
+            id="selectElementIcon"
+            data-i18n="popup_select_element_alt_icon"
+            alt="Select Element"
+            data-i18n-title="popup_select_element_title_icon"
+            title="حالت انتخاب با موس"
+            class="toolbar-icon"
+          />
+          <img
+            src="../icons/clear.png"
+            id="clearStorageBtn"
+            data-i18n-title="popup_clear_storage_title_icon"
+            title="پاک کردن فیلدها"
+            alt="Clear Fields"
+            class="toolbar-icon"
+            data-i18n="popup_clear_storage_alt_icon"
+          />
+          <img
+            src="../icons/revert.png"
+            id="revertActionIcon"
+            data-i18n="popup_revert_alt_icon"
+            alt="Revert"
+            data-i18n-title="popup_revert_title_icon"
+            title="بازگرداندن به حالت قبلی"
+            class="toolbar-icon"
+          />
+          <img
+            src="../icons/settings.png"
+            id="settingsIcon"
+            data-i18n="popup_settings_alt_icon"
+            alt="Settings"
+            data-i18n-title="popup_settings_title_icon"
+            title="تنظیمات"
+            class="toolbar-icon"
+          />
+          <label
+            class="switch"
+            data-i18n-title="popup_exclude_toggle_title"
+            title="فعال/غیرفعال در این صفحه"
+          >
+            <input type="checkbox" id="excludeCurrentPageToggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="language-controls">
+        <div class="language-input-container">
+          <input
+            type="text"
+            id="targetLanguageInput"
+            list="targetLanguagesList"
+            placeholder="زبان مقصد"
+            class="language-input"
+            title="زبان مقصد"
+            data-i18n-title="popup_target_language_title"
+            data-i18n-placeholder="popup_target_language_placeholder"
+          />
+          <span
+            id="clearTargetLanguage"
+            class="clear-input clear-input-target"
+            title="پاک کردن زبان مقصد"
+            data-i18n-title="popup_clear_target_language_title"
+          ></span>
+          <datalist id="targetLanguagesList"></datalist>
+        </div>
+        <button
+          id="swapLanguagesBtn"
+          class="swap-button"
+          title="جابجایی زبان‌ها"
+          data-i18n-title="popup_swap_languages_title"
+        >
+          <img
+            src="../icons/swap.png"
+            alt="Swap"
+            data-i18n="popup_swap_languages_alt_icon"
+          />
+        </button>
+
+        <div class="language-input-container">
+          <input
+            type="text"
+            id="sourceLanguageInput"
+            list="sourceLanguagesList"
+            placeholder="زبان مبدا"
+            data-i18n-placeholder="popup_source_language_placeholder"
+            data-i18n-title="popup_source_language_title"
+            class="language-input"
+            title="زبان مبدا"
+          />
+          <span
+            id="clearSourceLanguage"
+            class="clear-input clear-input-source"
+            title="پاک کردن زبان مبدا"
+            data-i18n-title="popup_clear_source_language_title"
+          ></span>
+          <datalist id="sourceLanguagesList"></datalist>
+        </div>
+        <button
+          type="submit"
+          form="translationForm"
+          id="translateBtn"
+          class="translate-button"
+          title="ترجمه"
+          data-i18n-title="popup_translate_button_title"
+        >
+          <img
+            src="../icons/translate.png"
+            alt="Translate"
+            data-i18n="popup_translate_button_alt_icon"
+          />
+        </button>
+      </div>
+
+      <form id="translationForm">
+        <div class="textarea-container source-container">
+          <div class="inline-toolbar source-toolbar">
+            <div class="toolbar-left-group">
+              <img
+                src="../icons/copy.png"
+                id="copySourceBtn"
+                title="کپی"
+                alt="Copy"
+                class="inline-icon"
+                data-i18n="popup_copy_source_alt_icon"
+                data-i18n-title="popup_copy_source_title_icon"
+              />
+              <img
+                src="../icons/speaker.png"
+                id="voiceSourceIcon"
+                title="خواندن متن مبدا"
+                alt="Voice Source"
+                class="inline-icon"
+                data-i18n="popup_voice_source_alt_icon"
+                data-i18n-title="popup_voice_source_title_icon"
+              />
+            </div>
+          </div>
+          <img
+            src="../icons/paste.png"
+            id="pasteSourceBtn"
+            title="چسباندن"
+            alt="Paste"
+            class="inline-icon paste-icon-separate"
+            data-i18n="popup_paste_source_alt_icon"
+            data-i18n-title="popup_paste_source_title_icon"
+          />
+          <textarea
+            id="sourceText"
+            placeholder="متن را اینجا وارد کنید..."
+            rows="4"
+            tabindex="1"
+            data-i18n-placeholder="popup_source_text_placeholder"
+          ></textarea>
+        </div>
+
+        <div class="textarea-container result-container">
+          <div class="inline-toolbar target-toolbar">
+            <img
+              src="../icons/copy.png"
+              id="copyTargetBtn"
+              title="کپی نتیجه"
+              alt="Copy Result"
+              data-i18n="popup_copy_target_alt_icon"
+              data-i18n-title="popup_copy_target_title_icon"
+              class="inline-icon"
+            />
+            <img
+              src="../icons/speaker.png"
+              id="voiceTargetIcon"
+              title="خواندن متن مقصد"
+              alt="Voice Target"
+              class="inline-icon voice-target-icon"
+              data-i18n="popup_voice_target_alt_icon"
+              data-i18n-title="popup_voice_target_title_icon"
+            />
+          </div>
+          <div id="translationResult" class="result aiwc-popup-markdown"></div>
+        </div>
+      </form>
+    </div>
+    <script type="application/javascript" src="../browser-polyfill.js"></script>
+    <script src="../popup.bundle.js"></script>
+  </body>
+</html>

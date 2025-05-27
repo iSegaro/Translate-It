@@ -1,4 +1,5 @@
 /* File:styles/theme.css */
+
 :root.theme-light {
   --bg-color: #ffffff;
   --text-color: #000000;
@@ -7,9 +8,4 @@
 :root.theme-dark {
   --bg-color: #1e1e1e;
   --text-color: #ffffff;
-}
-
-body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
 }
