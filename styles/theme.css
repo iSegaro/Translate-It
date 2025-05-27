@@ -8,8 +8,3 @@
   --bg-color: #1e1e1e;
   --text-color: #ffffff;
 }
-
-body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-}
