@@ -27,7 +27,7 @@ export const CONFIG = {
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
-  selectionTranslationMode: "immediate",
+  selectionTranslationMode: "onClick", // "immediate",
 
   // --- API Settings ---
   TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter
