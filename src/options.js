@@ -36,7 +36,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       themeSwitch.disabled = true;
       // اختیاری: وضعیت سوئیچ را با تم فعلی سیستم هماهنگ کنید (وقتی غیرفعال است)
       // این به کاربر نشان می‌دهد که اگر Auto را غیرفعال کند، به چه حالتی برمی‌گردد
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      if (
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      ) {
         themeSwitch.checked = true; // اگر سیستم تیره است، سوئیچ را تیک بزن
       } else {
         themeSwitch.checked = false; // اگر سیستم روشن است، تیک سوئیچ را بردار
@@ -44,21 +47,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       themeAuto.checked = false;
       themeSwitch.disabled = false;
-      themeSwitch.checked = (currentThemeValue === "dark");
+      themeSwitch.checked = currentThemeValue === "dark";
     }
-    logME(`Theme controls updated: THEME = ${currentThemeValue}, Auto checked: ${themeAuto.checked}, Switch disabled: ${themeSwitch.disabled}, Switch checked: ${themeSwitch.checked}`);
+    logME(
+      `Theme controls updated: THEME = ${currentThemeValue}, Auto checked: ${themeAuto.checked}, Switch disabled: ${themeSwitch.disabled}, Switch checked: ${themeSwitch.checked}`
+    );
   };
 
   // بارگذاری اولیه و تنظیم وضعیت کنترل‌های تم
   if (themeSwitch && themeAuto) {
-    Browser.storage.local.get("THEME").then((result) => {
-      const savedTheme = result.THEME || CONFIG.THEME || "auto"; // پیش‌فرض به auto
-      logME("Initial theme loaded from storage:", savedTheme);
-      setThemeControlsState(savedTheme);
-    }).catch(err => {
-      logME("Error loading theme from storage on init:", err);
-      setThemeControlsState(CONFIG.THEME || "auto"); // Fallback on error
-    });
+    Browser.storage.local
+      .get("THEME")
+      .then((result) => {
+        const savedTheme = result.THEME || CONFIG.THEME || "auto"; // پیش‌فرض به auto
+        logME("Initial theme loaded from storage:", savedTheme);
+        setThemeControlsState(savedTheme);
+      })
+      .catch((err) => {
+        logME("Error loading theme from storage on init:", err);
+        setThemeControlsState(CONFIG.THEME || "auto"); // Fallback on error
+      });
 
     // رویداد برای سوئیچ دستی تم (Light/Dark)
     themeSwitch.addEventListener("change", async () => {
@@ -70,17 +78,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyTheme(newThemeValue); // فقط تم را اعمال کن، وضعیت کنترلرها نباید تغییر کند
       // themeAuto.checked باید false باشد، که با کلیک روی سوئیچ دستی، توسط کنترلر themeAuto مدیریت می‌شود اگر پیاده‌سازی شود
       // یا مستقیماً اینجا:
-      if (themeAuto.checked) { // اگر به نحوی Auto هنوز تیک داشت
-          themeAuto.checked = false;
+      if (themeAuto.checked) {
+        // اگر به نحوی Auto هنوز تیک داشت
+        themeAuto.checked = false;
       }
     });
 
     // رویداد برای چک‌باکس تم خودکار (System Theme)
     themeAuto.addEventListener("change", async () => {
       let newThemeToApply;
-      if (themeAuto.checked) { // وقتی "Auto" انتخاب می‌شود
+      if (themeAuto.checked) {
+        // وقتی "Auto" انتخاب می‌شود
         newThemeToApply = "auto";
-      } else { // وقتی "Auto" از انتخاب خارج می‌شود
+      } else {
+        // وقتی "Auto" از انتخاب خارج می‌شود
         // به وضعیت فعلی سوئیچ دستی برگرد و آن را فعال کن
         newThemeToApply = themeSwitch.checked ? "dark" : "light";
       }
@@ -92,11 +103,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- Start of added elements for the new feature ---
   // Elements for Selection Translation Mode
-  const selectionModeImmediateRadio = document.getElementById("selection-mode-immediate");
-  const selectionModeOnClickRadio = document.getElementById("selection-mode-onclick");
+  const selectionModeImmediateRadio = document.getElementById(
+    "selection-mode-immediate"
+  );
+  const selectionModeOnClickRadio = document.getElementById(
+    "selection-mode-onclick"
+  );
   const selectionModeGroup = document.getElementById("selectionModeGroup"); // The container div for the radio buttons
   // --- End of added elements ---
-
 
   // Elements for Tab Navigation
   // const languagesTabButton = document.querySelector('[data-tab="languages"]'); // کامنت شده در کد شما
@@ -138,7 +152,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const translationApiSelect = document.getElementById("translationApi");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
   // const apiKeySettingGroup = document.getElementById("apiKey")?.closest(".setting-group"); // کامنت شده در کد شما
-  const apiUrlSettingGroup = document.getElementById("apiUrl")?.closest(".setting-group");
+  const apiUrlSettingGroup = document
+    .getElementById("apiUrl")
+    ?.closest(".setting-group");
   const useMockCheckbox = document.getElementById("useMock");
   const debugModeCheckbox = document.getElementById("debugMode");
   const webAIApiUrlInput = document.getElementById("webAIApiUrl");
@@ -179,28 +195,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (
       !translateOnTextSelectionCheckbox ||
       !requireCtrlForTextSelectionCheckbox ||
-      !textSelectionCtrlGroup
+      !textSelectionCtrlGroup ||
+      !selectionModeImmediateRadio ||
+      !selectionModeOnClickRadio ||
+      !selectionModeGroup
     )
       return;
 
-    const isTextSelectionEnabled = translateOnTextSelectionCheckbox.checked;
-    requireCtrlForTextSelectionCheckbox.disabled = !isTextSelectionEnabled;
-    textSelectionCtrlGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
-    textSelectionCtrlGroup.style.pointerEvents =
+    // وضعیت چک‌باکس والد (ترجمه با انتخاب متن) را بررسی می‌کند
+    // اگر چک‌باکس اصلی "Enable Extension" غیرفعال باشد، این متغیر false خواهد بود چون آن چک‌باکس غیرفعال شده است.
+    const isTextSelectionEnabled =
+      translateOnTextSelectionCheckbox.checked &&
+      !translateOnTextSelectionCheckbox.disabled;
+    const isImmediateModeEnabled = selectionModeImmediateRadio.checked;
+
+    // 1. فعال/غیرفعال کردن کل گروه رادیو‌باکس‌ها
+    selectionModeGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
+    selectionModeGroup.style.pointerEvents =
       isTextSelectionEnabled ? "auto" : "none";
+    selectionModeImmediateRadio.disabled = !isTextSelectionEnabled;
+    selectionModeOnClickRadio.disabled = !isTextSelectionEnabled;
 
-    // --- Start of added dependency logic ---
-    if (selectionModeGroup) {
-      selectionModeGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
-      selectionModeGroup.style.pointerEvents = isTextSelectionEnabled ? "auto" : "none";
-    }
-    if (selectionModeImmediateRadio) selectionModeImmediateRadio.disabled = !isTextSelectionEnabled;
-    if (selectionModeOnClickRadio) selectionModeOnClickRadio.disabled = !isTextSelectionEnabled;
-    // --- End of added dependency logic ---
+    // 2. فعال/غیرفعال کردن گزینه "Require Ctrl key"
+    const isCtrlGroupEnabled = isTextSelectionEnabled && isImmediateModeEnabled;
+    requireCtrlForTextSelectionCheckbox.disabled = !isCtrlGroupEnabled;
+    textSelectionCtrlGroup.style.opacity = isCtrlGroupEnabled ? "1" : "0.6";
+    textSelectionCtrlGroup.style.pointerEvents =
+      isCtrlGroupEnabled ? "auto" : "none";
+  }
 
-    if (!isTextSelectionEnabled) {
-      requireCtrlForTextSelectionCheckbox.checked = false;
-    }
+  // Add event listeners for the radio buttons to update the dependency
+  if (selectionModeImmediateRadio) {
+    selectionModeImmediateRadio.addEventListener(
+      "change",
+      handleTextSelectionDependency
+    );
+  }
+  if (selectionModeOnClickRadio) {
+    selectionModeOnClickRadio.addEventListener(
+      "change",
+      handleTextSelectionDependency
+    );
   }
 
   // Add event listener for the text selection checkbox
@@ -221,30 +256,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     tabButtons.forEach((btn) => btn.classList.remove("active"));
     const newActiveButton = document.querySelector(`[data-tab="${tabId}"]`);
     if (newActiveButton) {
-        newActiveButton.classList.add("active");
+      newActiveButton.classList.add("active");
     }
-
 
     if (activeContent) {
       fadeOutInElement(
         activeContent,
         () => {
           activeContent.classList.remove("active");
-          if (targetContent) { // بررسی وجود targetContent
+          if (targetContent) {
+            // بررسی وجود targetContent
             targetContent.classList.add("active");
             targetContent.style.opacity = "0"; // برای شروع انیمیشن fade in
             targetContent.style.transition = "opacity 300ms ease-in-out"; // اطمینان از وجود transition
 
-            requestAnimationFrame(() => { // برای اطمینان از اعمال تغییرات display قبل از انیمیشن
-              setTimeout(() => { // تاخیر کوچک برای محاسبه صحیح ارتفاع
-                if (container && targetContent.classList.contains("active")) { // بررسی مجدد فعال بودن
+            requestAnimationFrame(() => {
+              // برای اطمینان از اعمال تغییرات display قبل از انیمیشن
+              setTimeout(() => {
+                // تاخیر کوچک برای محاسبه صحیح ارتفاع
+                if (container && targetContent.classList.contains("active")) {
+                  // بررسی مجدد فعال بودن
                   const containerRect = container.getBoundingClientRect();
                   const contentRect = targetContent.getBoundingClientRect();
                   const paddingBottom = 40; // برای دکمه save و status و فاصله پایین
                   // اطمینان از اینکه contentRect.bottom معتبر است
-                  const newHeight = (contentRect.bottom > containerRect.top) ? 
-                                    (contentRect.bottom - containerRect.top + paddingBottom) : 
-                                    (targetContent.scrollHeight + paddingBottom); // fallback اگر rect معتبر نباشد
+                  const newHeight =
+                    contentRect.bottom > containerRect.top ?
+                      contentRect.bottom - containerRect.top + paddingBottom
+                    : targetContent.scrollHeight + paddingBottom; // fallback اگر rect معتبر نباشد
 
                   container.style.transition = "height 300ms ease-in-out";
                   container.style.height = `${newHeight}px`;
@@ -256,7 +295,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         200 // مدت زمان fadeOut
       );
-    } else if(targetContent) { // اگر هیچ تب فعالی از قبل نبود (بار اول)
+    } else if (targetContent) {
+      // اگر هیچ تب فعالی از قبل نبود (بار اول)
       targetContent.classList.add("active");
       targetContent.style.opacity = "1"; // نمایش مستقیم بدون fade اولیه
 
@@ -266,9 +306,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             const containerRect = container.getBoundingClientRect();
             const contentRect = targetContent.getBoundingClientRect();
             const paddingBottom = 40;
-            const newHeight = (contentRect.bottom > containerRect.top) ? 
-                              (contentRect.bottom - containerRect.top + paddingBottom) : 
-                              (targetContent.scrollHeight + paddingBottom);
+            const newHeight =
+              contentRect.bottom > containerRect.top ?
+                contentRect.bottom - containerRect.top + paddingBottom
+              : targetContent.scrollHeight + paddingBottom;
             // در بار اول ممکن است transition برای height لازم نباشد یا متفاوت باشد
             container.style.height = `${newHeight}px`;
           }
@@ -281,24 +322,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!extensionEnabledCheckbox) return;
     const isEnabled = extensionEnabledCheckbox.checked;
 
-    [
+    // لیست کنترل‌های اصلی که مستقیماً به چک‌باکس اصلی وابسته‌اند
+    const dependentControls = [
       translateOnTextFieldsCheckbox,
       enableShortcutForTextFieldsCheckbox,
       translateWithSelectElementCheckbox,
       translateOnTextSelectionCheckbox,
-      requireCtrlForTextSelectionCheckbox, // این هم باید بر اساس والدش غیرفعال شود
       enableDictionraryCheckbox,
-    ].forEach((el) => {
+    ];
+
+    dependentControls.forEach((el) => {
       if (el) {
         el.disabled = !isEnabled;
         const group = el.closest(".setting-group");
-        if (group) group.classList.toggle("disabled", !isEnabled);
+        if (group) {
+          group.classList.toggle("disabled", !isEnabled);
+        }
       }
     });
-    // اگر افزونه کلی غیرفعال است، کنترل‌های وابستگی متن انتخاب شده را نیز به‌روز کنید
-    if (!isEnabled) {
-        handleTextSelectionDependency();
-    }
+
+    // مهم: همیشه بعد از تغییر سوئیچ اصلی، وابستگی‌های زیرمجموعه را دوباره ارزیابی کن.
+    // این تابع، وضعیت رادیو‌باکس‌ها و چک‌باکس "Require Ctrl" را مدیریت خواهد کرد.
+    handleTextSelectionDependency();
   }
 
   // در لود اولیه و هنگام تغییر این تابع را فراخوانی کن
@@ -343,9 +388,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         openai: openAIApiSettings,
         openrouter: openRouterApiSettings,
       };
-      
+
       // نمایش یا عدم نمایش بخش‌ها بر اساس انتخاب API و وضعیت Mock
-      if (translationApiSelect) { // بررسی وجود translationApiSelect
+      if (translationApiSelect) {
+        // بررسی وجود translationApiSelect
         Object.entries(apiSections).forEach(([key, section]) => {
           if (section) {
             section.style.display =
@@ -356,10 +402,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         // نمایش فیلد API URL فقط در صورتی که Gemini انتخاب شده باشد و mock فعال نباشد
         if (apiUrlSettingGroup) {
-            apiUrlSettingGroup.style.display = (!isMockEnabled && translationApiSelect.value === "gemini") ? "block" : "none";
+          apiUrlSettingGroup.style.display =
+            !isMockEnabled && translationApiSelect.value === "gemini" ?
+              "block"
+            : "none";
         }
       }
-
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -373,44 +421,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectedApi = translationApiSelect.value;
     const isMock = useMockCheckbox ? useMockCheckbox.checked : false; // وضعیت mock را هم در نظر بگیر
 
-    if (isMock) { // اگر mock فعال است، همه بخش‌های API خاص مخفی شوند
-        if (webAIApiSettings) webAIApiSettings.style.display = "none";
-        if (geminiApiSettings) geminiApiSettings.style.display = "none";
-        if (openAIApiSettings) openAIApiSettings.style.display = "none";
-        if (openRouterApiSettings) openRouterApiSettings.style.display = "none";
-        if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = "none";
-        return;
+    if (isMock) {
+      // اگر mock فعال است، همه بخش‌های API خاص مخفی شوند
+      if (webAIApiSettings) webAIApiSettings.style.display = "none";
+      if (geminiApiSettings) geminiApiSettings.style.display = "none";
+      if (openAIApiSettings) openAIApiSettings.style.display = "none";
+      if (openRouterApiSettings) openRouterApiSettings.style.display = "none";
+      if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = "none";
+      return;
     }
 
     if (webAIApiSettings) {
-      webAIApiSettings.style.display = selectedApi === "webai" ? "block" : "none";
+      webAIApiSettings.style.display =
+        selectedApi === "webai" ? "block" : "none";
     }
     if (geminiApiSettings) {
-      geminiApiSettings.style.display = selectedApi === "gemini" ? "block" : "none";
+      geminiApiSettings.style.display =
+        selectedApi === "gemini" ? "block" : "none";
     }
     if (openAIApiSettings) {
-      openAIApiSettings.style.display = selectedApi === "openai" ? "block" : "none";
+      openAIApiSettings.style.display =
+        selectedApi === "openai" ? "block" : "none";
     }
     if (openRouterApiSettings) {
-      openRouterApiSettings.style.display = selectedApi === "openrouter" ? "block" : "none";
+      openRouterApiSettings.style.display =
+        selectedApi === "openrouter" ? "block" : "none";
     }
     if (apiUrlSettingGroup) {
-      apiUrlSettingGroup.style.display = selectedApi === "gemini" ? "block" : "none";
+      apiUrlSettingGroup.style.display =
+        selectedApi === "gemini" ? "block" : "none";
     }
   }
 
-  if (translationApiSelect) { // بررسی وجود translationApiSelect
+  if (translationApiSelect) {
+    // بررسی وجود translationApiSelect
     toggleApiSettings(); // تنظیم حالت اولیه
     translationApiSelect.addEventListener("change", toggleApiSettings);
   }
 
-  if (useMockCheckbox) { // بررسی وجود useMockCheckbox
+  if (useMockCheckbox) {
+    // بررسی وجود useMockCheckbox
     useMockCheckbox.addEventListener("change", () => {
-        updateMockState(useMockCheckbox.checked); // updateMockState باید toggleApiSettings را نیز در نظر بگیرد یا فراخوانی کند
-        toggleApiSettings(); // اطمینان از اینکه نمایش بخش‌ها پس از تغییر mock به‌روز می‌شود
+      updateMockState(useMockCheckbox.checked); // updateMockState باید toggleApiSettings را نیز در نظر بگیرد یا فراخوانی کند
+      toggleApiSettings(); // اطمینان از اینکه نمایش بخش‌ها پس از تغییر mock به‌روز می‌شود
     });
   }
-
 
   saveSettingsButton.addEventListener("click", async () => {
     // const currentSettings = await getSettingsAsync(); // این خط دیگر برای APPLICATION_LOCALIZE لازم نیست اگر مستقیم از storage بخوانیم
@@ -426,9 +481,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       finalThemeValue = storedTheme.THEME || CONFIG.THEME || "auto";
     }
     logME("Saving theme as:", finalThemeValue);
-    
+
     // --- Start of added logic to get new setting value ---
-    const selectionTranslationMode = selectionModeOnClickRadio?.checked ? 'onClick' : 'immediate';
+    const selectionTranslationMode =
+      selectionModeOnClickRadio?.checked ? "onClick" : "immediate";
     // --- End of added logic ---
 
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
@@ -445,18 +501,37 @@ document.addEventListener("DOMContentLoaded", async () => {
     const openaiApiModel = openAIModelInput?.value?.trim();
     const openrouterApiKey = openRouterApiKeyInput?.value?.trim();
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
-    const extensionEnabled = extensionEnabledCheckbox?.checked ?? CONFIG.EXTENSION_ENABLED;
-    const enableDictionary = enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY;
-    const translateOnTextFields = translateOnTextFieldsCheckbox?.checked ?? CONFIG.TRANSLATE_ON_TEXT_FIELDS;
-    const enableShortcutForTextFields = enableShortcutForTextFieldsCheckbox?.checked ?? CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS;
-    const translateWithSelectElement = translateWithSelectElementCheckbox?.checked ?? CONFIG.TRANSLATE_WITH_SELECT_ELEMENT;
-    const translateOnTextSelection = translateOnTextSelectionCheckbox?.checked ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION;
-    const requireCtrlForTextSelection = requireCtrlForTextSelectionCheckbox?.checked ?? CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION;
-    const excludedList = excludedSites?.value?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+    const extensionEnabled =
+      extensionEnabledCheckbox?.checked ?? CONFIG.EXTENSION_ENABLED;
+    const enableDictionary =
+      enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY;
+    const translateOnTextFields =
+      translateOnTextFieldsCheckbox?.checked ?? CONFIG.TRANSLATE_ON_TEXT_FIELDS;
+    const enableShortcutForTextFields =
+      enableShortcutForTextFieldsCheckbox?.checked ??
+      CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS;
+    const translateWithSelectElement =
+      translateWithSelectElementCheckbox?.checked ??
+      CONFIG.TRANSLATE_WITH_SELECT_ELEMENT;
+    const translateOnTextSelection =
+      translateOnTextSelectionCheckbox?.checked ??
+      CONFIG.TRANSLATE_ON_TEXT_SELECTION;
+    const requireCtrlForTextSelection =
+      requireCtrlForTextSelectionCheckbox?.checked ??
+      CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION;
+    const excludedList =
+      excludedSites?.value
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [];
 
     try {
-      const currentLocalizationSetting = await Browser.storage.local.get("APPLICATION_LOCALIZE");
-      const appLocalize = currentLocalizationSetting.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE;
+      const currentLocalizationSetting = await Browser.storage.local.get(
+        "APPLICATION_LOCALIZE"
+      );
+      const appLocalize =
+        currentLocalizationSetting.APPLICATION_LOCALIZE ||
+        CONFIG.APPLICATION_LOCALIZE;
 
       const settingsToSave = {
         API_KEY: apiKey || "", // فال‌بک به رشته خالی اگر تعریف نشده باشد
@@ -489,7 +564,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       await Browser.storage.local.set(settingsToSave);
       logME("Settings saved:", settingsToSave);
 
-
       if (settingsToSave.EXTENSION_ENABLED) {
         const tabs = await Browser.tabs.query({ url: "<all_urls>" });
         await Promise.allSettled(
@@ -508,7 +582,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 });
                 // logME("Injection message sent for", tab.url); // لاگ قبلی شما
               } catch (e) {
-                logME("Injection message failed for", tab.url, e.message.includes("Could not establish connection") ? "(Tab not accessible)" : e);
+                logME(
+                  "Injection message failed for",
+                  tab.url,
+                  e.message.includes("Could not establish connection") ?
+                    "(Tab not accessible)"
+                  : e
+                );
               }
             }
           })
@@ -536,7 +616,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function updatePromptHelpText(currentSettings) {
     // اگر currentSettings پاس داده نشده، از storage بخوان
-    const settings = currentSettings || await getSettingsAsync();
+    const settings = currentSettings || (await getSettingsAsync());
     const sourceLang = settings.SOURCE_LANGUAGE || CONFIG.SOURCE_LANGUAGE; // استفاده از فال‌بک CONFIG
     const targetLang = settings.TARGET_LANGUAGE || CONFIG.TARGET_LANGUAGE; // استفاده از فال‌بک CONFIG
 
@@ -551,16 +631,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function loadSettings() {
     try {
       const settings = await getSettingsAsync(); // این شامل THEME از قبل لود شده هم می‌شود.
-                                                // منطق مربوط به UI تم در DOMContentLoaded انجام شده.
+      // منطق مربوط به UI تم در DOMContentLoaded انجام شده.
 
       // نمایش اطلاعات مانیفست
       const manifest = Browser.runtime.getManifest();
-      if (manifest_Name && CONFIG.APP_NAME) { // بررسی وجود CONFIG.APP_NAME
+      if (manifest_Name && CONFIG.APP_NAME) {
+        // بررسی وجود CONFIG.APP_NAME
         manifest_Name.textContent = CONFIG.APP_NAME;
       } else if (manifest_Name) {
         manifest_Name.textContent = manifest.name; // فال‌بک به نام از مانیفست
       }
-
 
       if (manifest_Version) {
         manifest_Version.textContent = `v${manifest.version}`;
@@ -576,10 +656,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateMockState(useMockCheckbox.checked); // <--- این خط اضافه شد
       }
 
-
       // مقداردهی اولیه تنظیمات حالت‌های مختلف ترجمه
       if (extensionEnabledCheckbox) {
-        extensionEnabledCheckbox.checked = settings.EXTENSION_ENABLED ?? CONFIG.EXTENSION_ENABLED;
+        extensionEnabledCheckbox.checked =
+          settings.EXTENSION_ENABLED ?? CONFIG.EXTENSION_ENABLED;
       }
       if (translateOnTextFieldsCheckbox) {
         translateOnTextFieldsCheckbox.checked =
@@ -587,31 +667,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (enableShortcutForTextFieldsCheckbox) {
         enableShortcutForTextFieldsCheckbox.checked =
-          settings.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS;
+          settings.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ??
+          CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS;
       }
       if (translateWithSelectElementCheckbox) {
         translateWithSelectElementCheckbox.checked =
-          settings.TRANSLATE_WITH_SELECT_ELEMENT ?? CONFIG.TRANSLATE_WITH_SELECT_ELEMENT;
+          settings.TRANSLATE_WITH_SELECT_ELEMENT ??
+          CONFIG.TRANSLATE_WITH_SELECT_ELEMENT;
       }
       if (translateOnTextSelectionCheckbox) {
         translateOnTextSelectionCheckbox.checked =
-          settings.TRANSLATE_ON_TEXT_SELECTION ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION;
+          settings.TRANSLATE_ON_TEXT_SELECTION ??
+          CONFIG.TRANSLATE_ON_TEXT_SELECTION;
       }
       if (requireCtrlForTextSelectionCheckbox) {
         requireCtrlForTextSelectionCheckbox.checked =
-          settings.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION;
+          settings.REQUIRE_CTRL_FOR_TEXT_SELECTION ??
+          CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION;
       }
       if (enableDictionraryCheckbox) {
-        enableDictionraryCheckbox.checked = settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
+        enableDictionraryCheckbox.checked =
+          settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
       }
 
       // --- Start of added logic to load new setting ---
       if (selectionModeImmediateRadio && selectionModeOnClickRadio) {
-          if (settings.selectionTranslationMode === 'onClick') {
-            selectionModeOnClickRadio.checked = true;
-          } else {
-            selectionModeImmediateRadio.checked = true; // Default
-          }
+        if (settings.selectionTranslationMode === "onClick") {
+          selectionModeOnClickRadio.checked = true;
+        } else {
+          selectionModeImmediateRadio.checked = true; // Default
+        }
       }
       // --- End of added logic ---
 
@@ -621,10 +706,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       if (sourceLanguageInput) {
-        sourceLanguageInput.value = settings.SOURCE_LANGUAGE || CONFIG.SOURCE_LANGUAGE;
+        sourceLanguageInput.value =
+          settings.SOURCE_LANGUAGE || CONFIG.SOURCE_LANGUAGE;
       }
       if (targetLanguageInput) {
-        targetLanguageInput.value = settings.TARGET_LANGUAGE || CONFIG.TARGET_LANGUAGE;
+        targetLanguageInput.value =
+          settings.TARGET_LANGUAGE || CONFIG.TARGET_LANGUAGE;
       }
       if (promptTemplateInput) {
         promptTemplateInput.value =
@@ -635,7 +722,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (apiUrlInput) apiUrlInput.value = settings.API_URL || CONFIG.API_URL;
 
       if (translationApiSelect) {
-        translationApiSelect.value = settings.TRANSLATION_API || CONFIG.TRANSLATION_API;
+        translationApiSelect.value =
+          settings.TRANSLATION_API || CONFIG.TRANSLATION_API;
         toggleApiSettings(); // <--- این خط اضافه شد تا نمایش بخش‌های API بر اساس مقدار لود شده صحیح باشد
       }
 
@@ -662,39 +750,47 @@ document.addEventListener("DOMContentLoaded", async () => {
         openRouterApiModelInput.value =
           settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
       }
-      
+
       // اطمینان از اینکه app_localize با مقدار صحیح فراخوانی می‌شود
       // این باید در انتهای لود تنظیمات باشد یا اگر APPLICATION_LOCALIZE تغییر نمی‌کند، یکبار کافی است.
-      const currentAppLocalize = settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE;
-      if (typeof app_localize === 'function') { // بررسی اینکه app_localize یک تابع است
-          app_localize(currentAppLocalize);
+      const currentAppLocalize =
+        settings.APPLICATION_LOCALIZE || CONFIG.APPLICATION_LOCALIZE;
+      if (typeof app_localize === "function") {
+        // بررسی اینکه app_localize یک تابع است
+        app_localize(currentAppLocalize);
       }
-
 
       handleTextSelectionDependency();
       updateOverallExtensionDependency();
       await updatePromptHelpText(settings); // پاس دادن settings برای جلوگیری از خواندن مجدد
 
-
       //*** تنظیم اندازه تب برای نمایش انیمیشن */
-      const activeTabInitially = document.querySelector(".tab-content.active") || document.getElementById("languages");
-      if (activeTabInitially && !activeTabInitially.classList.contains("active")) { // اگر هیچ تبی فعال نیست، languages را فعال کن
-          showTab("languages"); // این showTab ارتفاع را هم تنظیم می‌کند
-      } else if (activeTabInitially) { // اگر تبی فعال است، فقط ارتفاع را تنظیم کن
-          window.requestAnimationFrame(() => {
-            setTimeout(() => {
-              const container = document.querySelector(".container");
-              if (container && activeTabInitially.classList.contains("active")) {
-                const containerRect = container.getBoundingClientRect();
-                const contentRect = activeTabInitially.getBoundingClientRect();
-                const paddingBottom = 40;
-                const newHeight = (contentRect.bottom > containerRect.top) ? 
-                                  (contentRect.bottom - containerRect.top + paddingBottom) : 
-                                  (activeTabInitially.scrollHeight + paddingBottom);
-                container.style.height = `${newHeight}px`;
-              }
-            }, 50); // کمی تاخیر بیشتر برای اطمینان از رندر کامل محتوای تب
-          });
+      const activeTabInitially =
+        document.querySelector(".tab-content.active") ||
+        document.getElementById("languages");
+      if (
+        activeTabInitially &&
+        !activeTabInitially.classList.contains("active")
+      ) {
+        // اگر هیچ تبی فعال نیست، languages را فعال کن
+        showTab("languages"); // این showTab ارتفاع را هم تنظیم می‌کند
+      } else if (activeTabInitially) {
+        // اگر تبی فعال است، فقط ارتفاع را تنظیم کن
+        window.requestAnimationFrame(() => {
+          setTimeout(() => {
+            const container = document.querySelector(".container");
+            if (container && activeTabInitially.classList.contains("active")) {
+              const containerRect = container.getBoundingClientRect();
+              const contentRect = activeTabInitially.getBoundingClientRect();
+              const paddingBottom = 40;
+              const newHeight =
+                contentRect.bottom > containerRect.top ?
+                  contentRect.bottom - containerRect.top + paddingBottom
+                : activeTabInitially.scrollHeight + paddingBottom;
+              container.style.height = `${newHeight}px`;
+            }
+          }, 50); // کمی تاخیر بیشتر برای اطمینان از رندر کامل محتوای تب
+        });
       }
     } catch (error) {
       errorHandler.handle(error, {
@@ -703,19 +799,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         details: { component: "options-page", action: "initialize-settings" },
       });
       // در صورت بروز خطا، ممکن است بخواهید یک پیام به کاربر نشان دهید
-      showStatus(await getTranslationString("OPTIONS_STATUS_LOAD_FAILED") || "Failed to load settings.", "error");
+      showStatus(
+        (await getTranslationString("OPTIONS_STATUS_LOAD_FAILED")) ||
+          "Failed to load settings.",
+        "error"
+      );
     }
   }
 
-  function showStatus(message, type = "info") { // مقدار پیش‌فرض برای type
+  function showStatus(message, type = "info") {
+    // مقدار پیش‌فرض برای type
     if (statusElement) {
       statusElement.textContent = message;
       statusElement.className = ""; // پاک کردن کلاس‌های قبلی
       statusElement.classList.add(`status-${type}`); // اضافه کردن کلاس جدید
       if (message) {
-        statusElement.style.display = 'block';
+        statusElement.style.display = "block";
       } else {
-        statusElement.style.display = 'none';
+        statusElement.style.display = "none";
       }
     }
   }
@@ -736,11 +837,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
-      showStatus(await getTranslationString("OPTIONS_STATUS_EXPORT_SUCCESS") || "Settings exported successfully!", "success");
+      showStatus(
+        (await getTranslationString("OPTIONS_STATUS_EXPORT_SUCCESS")) ||
+          "Settings exported successfully!",
+        "success"
+      );
       setTimeout(() => showStatus(""), 2000);
     } catch (error) {
-      errorHandler.handle(error, { type: ErrorTypes.UI, context: "exportSettings" });
-      showStatus(await getTranslationString("OPTIONS_STATUS_EXPORT_FAILED") || "Failed to export settings.", "error");
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "exportSettings",
+      });
+      showStatus(
+        (await getTranslationString("OPTIONS_STATUS_EXPORT_FAILED")) ||
+          "Failed to export settings.",
+        "error"
+      );
       setTimeout(() => showStatus(""), 3000);
     }
   });
@@ -751,16 +863,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!file) return;
       const importedSettingsText = await file.text();
       const importedSettings = JSON.parse(importedSettingsText);
-      
+
       // اعتبارسنجی اولیه تنظیمات وارد شده (اختیاری اما توصیه شده)
       // مثلاً بررسی کنید که آیا کلیدهای اصلی مانند THEME، API_KEY و غیره وجود دارند.
 
       await Browser.storage.local.set(importedSettings);
-      showStatus(await getTranslationString("OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING") || "Settings imported! Reloading...", "success");
+      showStatus(
+        (await getTranslationString(
+          "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING"
+        )) || "Settings imported! Reloading...",
+        "success"
+      );
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
-      errorHandler.handle(error, { type: ErrorTypes.UI, context: "importSettings" });
-      showStatus(await getTranslationString("OPTIONS_STATUS_IMPORT_FAILED") || "Failed to import settings. Invalid file?", "error");
+      errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "importSettings",
+      });
+      showStatus(
+        (await getTranslationString("OPTIONS_STATUS_IMPORT_FAILED")) ||
+          "Failed to import settings. Invalid file?",
+        "error"
+      );
       if (importFile) importFile.value = ""; // Reset file input
       setTimeout(() => showStatus(""), 3000);
     }
@@ -773,5 +897,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!document.querySelector(".tab-content.active")) {
     showTab("languages");
   }
-
 });
