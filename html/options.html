@@ -139,39 +139,6 @@
             </span>
           </div>
 
-          <div class="option-item">
-            <label
-              class="option-label"
-              data-i18n="options_selection_mode_label"
-            ></label>
-            <div class="radio-group">
-              <div class="radio-option">
-                <input
-                  type="radio"
-                  id="selection-mode-immediate"
-                  name="selectionTranslationMode"
-                  value="immediate"
-                />
-                <label
-                  for="selection-mode-immediate"
-                  data-i18n="options_selection_mode_immediate"
-                ></label>
-              </div>
-              <div class="radio-option">
-                <input
-                  type="radio"
-                  id="selection-mode-onclick"
-                  name="selectionTranslationMode"
-                  value="onClick"
-                />
-                <label
-                  for="selection-mode-onclick"
-                  data-i18n="options_selection_mode_onclick"
-                ></label>
-              </div>
-            </div>
-          </div>
-
           <div class="setting-group">
             <label
               for="translateOnTextFields"
@@ -230,6 +197,33 @@
               selecting text on the page.</span
             >
           </div>
+
+          <div class="radio-group" id="selectionModeGroup">
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-immediate"
+                  name="selectionTranslationMode"
+                  value="immediate"
+                />
+                <label
+                  for="selection-mode-immediate"
+                  data-i18n="options_selection_mode_immediate"
+                ></label>
+              </div>
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-onclick"
+                  name="selectionTranslationMode"
+                  value="onClick"
+                />
+                <label
+                  for="selection-mode-onclick"
+                  data-i18n="options_selection_mode_onclick"
+                ></label>
+              </div>
+            </div>
 
           <div
             class="setting-group sub-setting-group"
