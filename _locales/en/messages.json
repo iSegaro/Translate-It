@@ -241,5 +241,18 @@
   },
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "Saved failed :("
+  },
+    "options_selection_mode_label": {
+    "message": "Selection Translate Mode",
+    "description": "Label for the selection translate mode option."
+  },
+  "options_selection_mode_immediate": {
+    "message": "Translate Immediately",
+    "description": "Option to translate immediately upon text selection."
+  },
+  "options_selection_mode_onclick": {
+    "message": "Show icon to translate on click",
+    "description": "Option to show an icon and translate only when it's clicked."
   }
+  
 }

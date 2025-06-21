@@ -235,5 +235,17 @@
   },
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "ذخیره نشد :("
+  },
+  "options_selection_mode_label": {
+    "message": "حالت ترجمه متن انتخابی",
+    "description": "برچسب برای گزینه حالت ترجمه متن انتخابی."
+  },
+  "options_selection_mode_immediate": {
+    "message": "ترجمه فوری",
+    "description": "گزینه‌ای برای ترجمه فوری پس از انتخاب متن."
+  },
+  "options_selection_mode_onclick": {
+    "message": "نمایش آیکون برای ترجمه با کلیک",
+    "description": "گزینه‌ای برای نمایش آیکون و ترجمه تنها در صورت کلیک روی آن."
   }
 }
