@@ -346,9 +346,9 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
 [edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
-[firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Firefox/Translate-It-v0.2.1.zip
-[chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/Translate-It-v0.2.1.zip
-[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Edge/Translate-It-v0.2.1.zip
+[firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Firefox/Translate-It-v0.2.2.zip
+[chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/Translate-It-v0.2.2.zip
+[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Edge/Translate-It-v0.2.2.zip
 [chrome-extensions-url]: chrome://extensions/
 [edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
