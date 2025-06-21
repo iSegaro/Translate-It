@@ -27,6 +27,7 @@ export const CONFIG = {
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
+  selectionTranslationMode: "immediate",
 
   // --- API Settings ---
   TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter
@@ -72,60 +73,134 @@ export const CONFIG = {
     /^(?=.*[\u0600-\u06FF])[\u0600-\u06FF\u0660-\u0669\u06F0-\u06F9\u0041-\u005A\u0061-\u007A\u0030-\u0039\s.,:;؟!()«»@#\n\t\u200C]+$/,
 
   // --- Prompt Templates ---
-  PROMPT_BASE_FIELD: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
+  // PROMPT_BASE_FIELD: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
 
-  - If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-  - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-  - If the input is in any other language, translate it to $_{TARGET}.
-  - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
+  // - If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+  // - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+  // - If the input is in any other language, translate it to $_{TARGET}.
+  // - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.
 
-  Return **only** the translated text without any extra words, explanations, markdown, or modifications.
+  // Return **only** the translated text without any extra words, explanations, markdown, or modifications.
 
-  \`\`\`text input
-  $_{TEXT}
-  \`\`\`
-  `,
-  PROMPT_BASE_SELECT: `Act as an automated JSON translation service. The input is a JSON array where each object contains a "text" property.
+  // \`\`\`text input
+  // $_{TEXT}
+  // \`\`\`
+  // `,
 
-  1. Translate each "text" value according to the given rules: $_{USER_RULES}
+  PROMPT_BASE_FIELD: `You are a professional translation service. Your task is to translate text between $_{SOURCE} and $_{TARGET}, or from other languages to $_{TARGET}, depending on the input language.
+
+Strictly follow these rules:
+
+- Detect the language of the input.
+- If it's in $_{SOURCE}, translate to $_{TARGET}.
+- If it's in $_{TARGET}, translate to $_{SOURCE}.
+- If it's in any other language, translate to $_{TARGET}.
+- If the input is grammatically incorrect but in $_{TARGET}, translate it to $_{SOURCE} with intended meaning preserved.
+
+Additional translation rules:
+- Preserve the original structure, formatting, and line breaks.
+- Translate fluently and naturally, as if written by a native speaker.
+- Prioritize clarity and readability over literal word-for-word translation.
+- Do **not** add any extra explanations, markdown, or content.
+
+Return only the translated text below:
+\`\`\`text input
+$_{TEXT}
+\`\`\`
+`,
+
+  // PROMPT_BASE_SELECT: `Act as an automated JSON translation service. The input is a JSON array where each object contains a "text" property.
+
+  // 1. Translate each "text" value according to the given rules: $_{USER_RULES}
+  // 2. Preserve all input elements. **Do not omit, modify, or skip any entry.**
+  // 3. If translation is not needed for a specific item (e.g., numbers, hashtags, URLs), **return the original value unchanged.**
+  // 4. Maintain the internal structure, formatting, and line breaks exactly.
+  // 5. Output **only** the translated JSON array, with no extra text, explanations, or markdown.
+
+  // \`\`\`json input
+  // $_{TEXT}
+  // \`\`\`
+  PROMPT_BASE_SELECT: `Act as an automated but fluent JSON translation service. The input is a JSON array where each object contains a "text" property.
+
+Your task:
+  1. Translate each "text" value according to the following user rules: $_{USER_RULES}
   2. Preserve all input elements. **Do not omit, modify, or skip any entry.**
   3. If translation is not needed for a specific item (e.g., numbers, hashtags, URLs), **return the original value unchanged.**
   4. Maintain the internal structure, formatting, and line breaks exactly.
-  5. Output **only** the translated JSON array, with no extra text, explanations, or markdown.
+  5. Translations must be fluent, natural, and human-like — not literal or machine-like.
+  6. Prioritize readability and meaning over word-for-word equivalence.
 
-  \`\`\`json input
-  $_{TEXT}
-  \`\`\`
-    `,
-  PROMPT_BASE_DICTIONARY: `You are a $_{TARGET} dictionary service. Your task is to provide in detailed dictionary definitions while strictly preserving the input structure and formatting. Follow these rules:
+Return **only** the translated JSON array as output, with no explanations, markdown, or extra content.
 
-  - Provide the translation of the input word or phrase.
-  - Include synonyms, word type (noun, verb, adjective, etc.), and a brief definition.
-  - If applicable, provide example sentences using the word or phrase in context.
-  - If the input is ambiguous, return the most common meanings.
-  - If no definition is found, return translation only.
+\`\`\`json input
+$_{TEXT}
+\`\`\`
+`,
+  // PROMPT_BASE_DICTIONARY: `You are a $_{TARGET} dictionary service. Your task is to provide in detailed dictionary definitions while strictly preserving the input structure and formatting. Follow these rules:
 
-  Return in $_{TARGET} language, and **ONLY** the dictionary entry without any extra words, explanations, markdown, or modifications.
+  // - Provide the translation of the input word or phrase.
+  // - Include synonyms, word type (noun, verb, adjective, etc.), and a brief definition.
+  // - If applicable, provide example sentences using the word or phrase in context.
+  // - If the input is ambiguous, return the most common meanings.
+  // - If no definition is found, return translation only.
 
-  \`\`\`text input
-  $_{TEXT}
-  \`\`\`
-  `,
-  PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
+  // Return in $_{TARGET} language, and **ONLY** the dictionary entry without any extra words, explanations, markdown, or modifications.
 
-  - If the input is in any language, translate it to $_{TARGET}.
+  // \`\`\`text input
+  // $_{TEXT}
+  // \`\`\`
+  // `,
+  PROMPT_BASE_DICTIONARY: `You are a $_{TARGET} dictionary service. Your task is to provide rich and fluent dictionary-style definitions while strictly preserving the input structure and formatting.
 
+Follow these rules:
+  - Translate the input word or phrase to $_{TARGET}.
+  - Include synonyms, word type (noun, verb, adjective, etc.), and a concise, clear definition.
+  - If possible, include one or two example sentences that show how the word or phrase is used in natural context.
+  - If the word or phrase is ambiguous, provide the most common meanings, ordered by usage frequency.
+  - If no dictionary definition is found, return only the best-matching translation.
 
-  Return **only** the translated text without any extra words, explanations, markdown, or modifications.
+Formatting and tone guidelines:
+  - Write fluently and naturally in $_{TARGET}, as if for a human reader.
+  - Prioritize clarity, readability, and usefulness over word-for-word literalness.
+  - Do **not** add explanations, markdown, or meta-comments.
+  - Output should contain **only** the dictionary entry — nothing more.
 
-  \`\`\`text input
-  $_{TEXT}
-  \`\`\`
-  `,
-  PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
-- If the input is in $_{TARGET}, translate it to $_{SOURCE}.
-- If the input is in any other language, translate it to $_{TARGET}.
-- If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
+\`\`\`text input
+$_{TEXT}
+\`\`\`
+`,
+  // PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate text while strictly preserving its structure, formatting, and line breaks. Follow these rules:
+
+  // - If the input is in any language, translate it to $_{TARGET}.
+
+  // Return **only** the translated text without any extra words, explanations, markdown, or modifications.
+
+  // \`\`\`text input
+  // $_{TEXT}
+  // \`\`\`
+  // `,
+  PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate text into $_{TARGET}, while strictly preserving its structure, formatting, and line breaks.
+
+Rules:
+  - Detect the input language automatically.
+  - Translate the content into $_{TARGET}.
+  - The translation should be fluent, natural, and idiomatic — not literal or robotic.
+  - Prioritize clarity and readability without altering structure or layout.
+
+Return **only** the translated text without any extra words, explanations, markdown, or modifications.
+
+\`\`\`text input
+$_{TEXT}
+\`\`\`
+`,
+  //   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET}.
+  // - If the input is in $_{TARGET}, translate it to $_{SOURCE}.
+  // - If the input is in any other language, translate it to $_{TARGET}.
+  // - If the input has grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE} while preserving the intended meaning.`,
+  PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it to $_{TARGET} using fluent, natural language that preserves the original intent.
+- If the input is in $_{TARGET}, translate it to $_{SOURCE} with the same fluency and clarity.
+- If the input is in any other language, translate it to $_{TARGET}, prioritizing readability and meaning over literal translation.
+- If the input contains grammar mistakes but is in $_{TARGET}, translate it to $_{SOURCE}, correcting the intent and expressing it in a clear, natural way.`,
 
   // --- Debugging Values ---
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
