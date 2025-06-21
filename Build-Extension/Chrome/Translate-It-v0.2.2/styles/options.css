@@ -1,0 +1,646 @@
+/* src/styles/options.css */
+
+:root.theme-light {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --container-bg-color: #fff;
+  --container-text-color: #333;
+  --border-color: #ddd;
+  --tab-button-color: #555;
+  --tab-button-active-color: #3498db;
+  --tab-button-active-border-color: #3498db;
+  --input-bg-color: #fff;
+  --input-text-color: #333;
+  --input-border-color: #ddd;
+  --input-focus-border-color: #3498db;
+  --input-focus-shadow-color: rgba(52, 152, 219, 0.2);
+  --button-bg-color: #3498db;
+  --button-text-color: #fff;
+  --button-hover-bg-color: #2980b9;
+  --link-color: #1a73e8;
+  --link-hover-color: #0c5dc0;
+  --prompt-help-bg-color: #f9f9f9;
+  --prompt-help-border-color: #eee;
+  --prompt-help-text-color: #555;
+  --prompt-help-code-bg-color: #eee;
+  --language-list-gap: 10px;
+  --language-list-item-padding: 5px 10px;
+  --language-list-item-border-color: #ccc;
+  --language-list-item-border-radius: 4px;
+  --language-list-item-bg-color: #fff;
+  --language-list-item-text-color: #333;
+  --language-list-item-hover-bg-color: #e2e6ea;
+  --github-icon-filter: none;
+  --theme-icon-filter: none;
+}
+
+:root.theme-dark {
+  --bg-color: #1e1e1e;
+  --text-color: #ffffff;
+  --container-bg-color: #333;
+  --container-text-color: #eee;
+  --border-color: #555;
+  --tab-button-color: #ccc;
+  --tab-button-active-color: #64b5f6;
+  --tab-button-active-border-color: #64b5f6;
+  --input-bg-color: #444;
+  --input-text-color: #eee;
+  --input-border-color: #555;
+  --input-focus-border-color: #64b5f6;
+  --input-focus-shadow-color: rgba(100, 181, 246, 0.4);
+  --button-bg-color: #64b5f6;
+  --button-text-color: #222;
+  --button-hover-bg-color: #42a5f5;
+  --link-color: #bbdefb;
+  --link-hover-color: #90caf9;
+  --prompt-help-bg-color: #444;
+  --prompt-help-border-color: #555;
+  --prompt-help-text-color: #ccc;
+  --prompt-help-code-bg-color: #555;
+  --language-list-gap: 10px;
+  --language-list-item-padding: 5px 10px;
+  --language-list-item-border-color: #555;
+  --language-list-item-border-radius: 4px;
+  --language-list-item-bg-color: #444;
+  --language-list-item-text-color: #eee;
+  --language-list-item-hover-bg-color: #555;
+  --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+  --theme-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+  width: 100%;
+  max-width: 960px;
+}
+#githubIcon {
+  filter: var(--github-icon-filter);
+}
+#themeIcon {
+  filter: var(--theme-icon-filter);
+}
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: inherit; /* استفاده از رنگ متن بدنه */
+  margin-bottom: 5px;
+}
+#options_app_version {
+  font-size: 0.8rem;
+  color: #777;
+  margin-top: 0;
+}
+.container {
+  background-color: var(--container-bg-color);
+  color: var(--container-text-color);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+  padding: 20px;
+  width: 100%;
+  max-width: 960px; /* Increased max-width */
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+.tab-button {
+  padding: 10px 15px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--tab-button-color);
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.2s ease,
+    border-bottom-color 0.2s ease;
+}
+.tab-button.active {
+  color: var(--tab-button-active-color);
+  border-bottom-color: var(--tab-button-active-border-color);
+}
+.tab-content {
+  opacity: 0;
+  display: none;
+  transition: opacity 300ms ease;
+}
+
+.tab-content.active {
+  display: block;
+  opacity: 1;
+}
+
+section {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+}
+section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+section h2 {
+  font-size: 1.1rem; /* Slightly smaller section titles */
+  font-weight: 500;
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+.setting-group {
+  margin-bottom: 15px;
+}
+.setting-group.api-key-info {
+  margin-bottom: 20px; /* فاصله بیشتر پایین */
+}
+
+.setting-group.api-key-info .api-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--link-color);
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.api-link {
+  display: inline-block;
+  margin-top: 6px;
+  margin-bottom: 16px; /* برای فاصله بیشتر از پایین */
+  color: var(--link-color);
+  font-weight: 500;
+  text-decoration: underline;
+  transition:
+    opacity 0.3s ease,
+    color 0.3s ease;
+}
+
+.api-link:hover {
+  opacity: 0.7;
+  color: var(--link-hover-color);
+}
+
+label {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+  margin-bottom: 5px;
+  display: block;
+}
+input[type="text"],
+select,
+textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--input-border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: var(--input-text-color);
+  background-color: var(--input-bg-color);
+  box-sizing: border-box;
+  margin-bottom: 0;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 5px var(--input-focus-shadow-color);
+}
+input[type="checkbox"] {
+  margin-right: 8px;
+}
+button {
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 15px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  width: 100%;
+  margin-top: 20px;
+}
+button:hover {
+  background-color: var(--button-hover-bg-color);
+}
+#status {
+  font-size: 0.8rem;
+  color: #27ae60;
+  margin-top: 10px;
+  text-align: center;
+}
+#status.error {
+  color: #c0392b;
+}
+#webAIApiSettings,
+#webAIApiSettings,
+#webAIApiSettings,
+#openRouterApiSettings {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+#promptHelpText {
+  font-size: 0.75rem;
+  color: #777;
+  margin-top: 5px;
+}
+#promptHelpText ul {
+  padding-left: 15px;
+  margin-top: 5px;
+  margin-bottom: 0;
+}
+#promptHelpText li {
+  margin-bottom: 2px;
+}
+
+.about-link {
+  text-decoration: none;
+  background-image: linear-gradient(to right, #4caf50 50%, transparent 50%);
+  background-position: 0 1.15em;
+  background-repeat: repeat-x;
+  background-size: 4px 2px;
+  color: inherit; /* استفاده از رنگ متن بدنه */
+  transition:
+    background-size 0.3s,
+    color 0.3s;
+}
+
+.about-link:hover {
+  background-size: 4px 4px;
+  color: #4caf50;
+}
+
+/* Prompt Template Styles */
+.prompt-template-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.prompt-template-group label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.prompt-template-info {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.prompt-template-input {
+  font-family: inherit; /* استفاده از فونت اصلی صفحه */
+  padding: 10px;
+  border: 1px solid var(--input-border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--input-text-color);
+  background-color: var(--input-bg-color);
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  resize: vertical; /* امکان تغییر ارتفاع textarea */
+}
+
+.prompt-template-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border-color);
+  box-shadow: 0 0 5px var(--input-focus-shadow-color);
+}
+
+.prompt-template-help {
+  background-color: var(--prompt-help-bg-color);
+  border: 1px solid var(--prompt-help-border-color);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 0.85rem;
+  color: var(--prompt-help-text-color);
+}
+
+.prompt-template-help p {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.prompt-template-help ul {
+  padding-left: 20px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prompt-template-help li {
+  margin-bottom: 3px;
+}
+
+.prompt-template-help code {
+  font-family: monospace;
+  background-color: var(--prompt-help-code-bg-color);
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+/* Styling for the new translation activation section */
+.translation-activation h2 {
+  margin-top: 20px; /* Add some space above the new section title */
+  margin-bottom: 15px;
+  border-top: 1px solid var(--border-color); /* Optional separator line */
+  padding-top: 20px; /* Space above title after the line */
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+}
+
+.setting-group {
+  margin-bottom: 15px; /* Consistent spacing */
+  display: flex; /* Use flexbox for alignment */
+  align-items: center; /* Align items vertically */
+  flex-wrap: wrap; /* Allow wrapping if needed */
+}
+
+.setting-group label {
+  margin-right: 10px; /* Space between label and checkbox */
+  flex-shrink: 0; /* Prevent label from shrinking */
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+}
+
+/* Styling for setting descriptions */
+.setting-description {
+  font-size: 0.9em;
+  color: #666;
+  margin-left: 5px; /* Space after checkbox */
+  flex-grow: 1; /* Allow description to take remaining space */
+  margin-top: 3px; /* Small space if it wraps */
+  flex-basis: 100%; /* Make description take full width on wrap */
+  order: 3; /* Ensure description comes last visually */
+  margin-left: 30px; /* Align description under the label */
+  color: inherit; /* استفاده از رنگ متن کانتینر */
+}
+
+/* Indentation for the sub-setting group */
+.sub-setting-group {
+  margin-left: 30px; /* Adjust indentation as needed */
+  padding-left: 15px; /* Optional extra padding */
+  border-left: 2px solid var(--border-color); /* Optional visual indicator for hierarchy */
+  transition: opacity 0.3s ease; /* Smooth transition for enable/disable */
+}
+
+/* Ensure checkbox and label alignment is good */
+.setting-group input[type="checkbox"] {
+  order: 2; /* Position checkbox after label */
+  margin-top: 1px; /* Fine-tune vertical alignment */
+  margin-right: 5px; /* Space between checkbox and description */
+}
+
+/* Style disabled sub-setting labels for better visual feedback */
+.setting-group label {
+  order: 1; /* Position label first */
+  /* Opacity is handled by JS on the group now, but you can style label specifically */
+  /* color: #999; /* Example: Lighter text color when disabled */
+}
+
+.setting-group.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Language List Styles */
+.language-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--language-list-gap);
+  padding: 0;
+}
+
+.language-list-item {
+  cursor: pointer;
+  padding: var(--language-list-item-padding);
+  border: 1px solid var(--language-list-item-border-color);
+  border-radius: var(--language-list-item-border-radius);
+  display: flex;
+  align-items: center;
+  background: var(--language-list-item-bg-color);
+  color: var(--language-list-item-text-color);
+  transition: background-color 0.2s ease;
+}
+
+.language-list-item:hover {
+  background-color: var(--language-list-item-hover-bg-color);
+}
+
+.language-flag {
+  margin-right: 5px;
+}
+
+.language-list-item.selected {
+  background-color: var(--language-list-item-hover-bg-color);
+}
+
+
+/* استایل برای سوئیچ Theme */
+/* Toggle Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.2s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4caf50;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #4caf50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+
+/* Styles for the top-right overlay controls */
+.top-right-controls {
+  position: fixed; /* Or absolute if you want it to scroll with the page */
+  top: 15px; /* فاصله از بالا */
+  right: 20px; /* فاصله از راست */
+  z-index: 1050; /* بالاتر از سایر محتوا */
+  display: flex;
+  align-items: center; /* تراز عمودی آیتم‌ها */
+  gap: 18px; /* کمی کاهش فاصله بین آیکون GitHub و گروه تنظیمات تم */
+  padding: 8px 10px; /* پدینگ داخلی */
+  background-color: var(--container-bg-color, #fff); /* رنگ پس‌زمینه مشابه کانتینر اصلی با فال‌بک */
+  border-radius: 8px; /* گوشه‌های گرد */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); /* سایه کمی مشخص‌تر */
+}
+
+/* Styling for the GitHub link/icon within the overlay */
+.top-right-controls #githubLink { /* هدف‌گیری خود لینک برای display */
+  display: flex; /* برای تراز بهتر آیکون */
+  align-items: center;
+}
+.top-right-controls #githubLink img#githubIcon {
+  display: block; 
+  filter: var(--github-icon-filter);
+  height: 22px;
+  width: 22px;
+}
+
+/* Styling for the theme control group (the specific setting-row for theme in overlay) */
+/* This is the original .setting-row element that was moved */
+.top-right-controls .setting-row.theme-control-overlay-group {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* فاصله بین آیکون تم، سوئیچ و لیبل Auto */
+  margin-bottom: 0; /* حذف margin-bottom پیش‌فرض setting-row */
+  padding: 0; /* حذف پدینگ اضافی اگر setting-row اصلی پدینگ دارد */
+}
+
+/* Styling for the theme icon within the overlay group */
+.top-right-controls .theme-control-overlay-group #themeIcon {
+  filter: var(--theme-icon-filter);
+  height: 22px;
+  width: 22px;
+}
+
+/* Styling for the "System Theme" checkbox and its label within the overlay group */
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* فاصله بین چک‌باکس و متن "System Theme" */
+  margin-bottom: 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  /* padding-left: 3px;  optional */
+}
+
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay input[type="checkbox"] {
+  margin: 0; /* حذف margin پیش‌فرض چک‌باکس */
+  vertical-align: middle;
+}
+.top-right-controls .theme-control-overlay-group .theme-auto-label-overlay span {
+  vertical-align: middle;
+  line-height: 1; /* برای تراز بهتر متن با چک‌باکس */
+}
+
+#translate-it-icon {
+    position: absolute;
+    z-index: 2147483647;
+    width: 24px;
+    height: 24px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>');
+    background-color: #2a2a2e;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: transform 0.1s ease;
+}
+
+#translate-it-icon:hover {
+    transform: scale(1.1);
+}
+
+
+/* اگر هدر اصلی با کنترل‌های overlay تداخل دارد: */
+/* body > .header {
+  padding-top: 70px; 
+} */
+
+/* ====== Radio Button Group Styling ====== */
+
+/* این کلاس را به کانتینر اصلی دکمه‌های رادیویی اعمال می‌کنیم
+  تا گزینه‌ها (immediate و onClick) را در یک ردیف افقی بچیند.
+*/
+.radio-group {
+  display: flex;          /* فعال‌سازی Flexbox */
+  align-items: center;    /* تراز عمودی آیتم‌ها در مرکز */
+  gap: 24px;              /* ایجاد فاصله 24 پیکسلی بین دو گزینه */
+}
+
+/*
+  این استایل برای هر گزینه رادیویی (دکمه + لیبل) اعمال می‌شود
+  تا خود دکمه و متن آن به درستی کنار هم قرار گیرند.
+*/
+.radio-option {
+  display: flex;          /* استفاده از Flexbox برای چیدمان داخلی */
+  align-items: center;    /* تراز عمودی دکمه و متن */
+  gap: 6px;               /* فاصله کم بین دکمه رادیویی و لیبل آن */
+}
+
+/* تغییر نشانگر موس روی لیبل‌ها برای بهبود تجربه کاربری.
+  این کار به کاربر نشان می‌دهد که متن نیز قابل کلیک است.
+*/
+.radio-option label {
+  cursor: pointer;
+  margin-bottom: 0; /* حذف margin پایین اضافی در صورت وجود */
+}
+
+/*
+  حذف margin پیش‌فرض دکمه رادیویی برای تراز دقیق‌تر.
+*/
+.radio-option input[type="radio"] {
+  margin: 0;
+}
+
+.setting-group.option-item {
+  flex-direction: column;   /* جهت چیدمان را از افقی (row) به عمودی (column) تغییر می‌دهد */
+  align-items: flex-start;  /* تراز آیتم‌ها را به ابتدای خط (چپ) منتقل می‌کند */
+  gap: 8px;                 /* یک فاصله کوچک بین لیبل و گروه دکمه‌های رادیویی ایجاد می‌کند */
+}
+
+/*
+  این قانون ترتیب قرارگیری گروه دکمه‌ها را مشخص می‌کند تا 
+  حتماً بعد از لیبل اصلی نمایش داده شود.
+*/
+.setting-group.option-item .radio-group {
+  order: 2; /* این مقدار از order پیش‌فرض لیبل (که 1 است) بزرگتر است */
+}

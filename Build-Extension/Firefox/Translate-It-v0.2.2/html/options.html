@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="options_page_title">Settings</title>
+    <link rel="stylesheet" href="../styles/options.css" />
+    <link rel="stylesheet" href="../styles/theme.css" />
+    <script src="../options.bundle.js" defer></script>
+  </head>
+  <body>
+    <div class="top-right-controls">
+      <a
+        id="githubLink"
+        target="_blank"
+        href="https://github.com/iSegaro/Translate-It"
+        title="Home Page"
+      >
+        <img
+          src="../icons/github.svg"
+          alt="GitHub"
+          height="22"
+          id="githubIcon"
+        />
+      </a>
+
+      <div class="setting-row theme-control-overlay-group">
+        <img
+          src="../icons/theme.png"
+          alt="Light/Dark"
+          data-i18n-title="theme_toggle_title"
+          height="22"
+          id="themeIcon"
+        />
+        <label
+          class="switch"
+          title="روشن / تیره"
+          data-i18n-title="theme_toggle_title"
+        >
+          <input type="checkbox" id="theme-Switch" />
+          <span class="slider round"></span>
+        </label>
+        <label
+          for="theme-Auto"
+          class="theme-auto-label-overlay"
+          title="System Theme"
+        >
+          <input type="checkbox" id="theme-Auto" />
+          <span data-i18n="theme_auto">System Theme</span>
+        </label>
+      </div>
+    </div>
+    <div class="header">
+      <h1 id="options_app_name">Translate It!</h1>
+      <span id="options_app_version">version 0.0.0</span>
+      <p data-i18n="options_description">Translate Everywhere, Simple.</p>
+    </div>
+
+    <div class="localization"></div>
+    <div class="container">
+      <div class="tabs">
+        <button
+          class="tab-button active"
+          data-tab="languages"
+          data-i18n="languages_tab_title"
+        >
+          Languages
+        </button>
+        <button
+          class="tab-button"
+          data-tab="prompt"
+          data-i18n="prompt_tab_title"
+        >
+          Prompt
+        </button>
+        <button class="tab-button" data-tab="api" data-i18n="api_tab_title">
+          API
+        </button>
+        <button
+          class="tab-button"
+          data-tab="import-export"
+          data-i18n="import_export_tab_title"
+        >
+          Import/Export
+        </button>
+        <button
+          class="tab-button"
+          data-tab="advance"
+          data-i18n="advance_tab_title"
+        >
+          Advance
+        </button>
+      </div>
+
+      <div id="languages" class="tab-content active">
+        <section>
+          <h2 data-i18n="languages_section_title">Languages</h2>
+          <div class="setting-group">
+            <label for="sourceLanguage" data-i18n="source_language_label"
+              >Source Language</label
+            >
+            <input
+              type="text"
+              id="sourceLanguage"
+              list="allLanguages"
+              data-i18n-placeholder="source_language_placeholder"
+              placeholder="Enter source language"
+            />
+          </div>
+          <div class="setting-group">
+            <label for="targetLanguage" data-i18n="target_language_label"
+              >Target Language</label
+            >
+            <input
+              type="text"
+              id="targetLanguage"
+              list="allLanguages"
+              data-i18n-placeholder="target_language_placeholder"
+              placeholder="Enter target language"
+            />
+          </div>
+        </section>
+
+        <section class="translation-activation">
+          <h2 data-i18n="translation_activation_section_title">
+            Translation Activation Methods
+          </h2>
+
+          <div class="setting-group extension-enabled-group">
+            <label for="extensionEnabled" data-i18n="extension_enabled_label"
+              >Enable Extension</label
+            >
+            <input type="checkbox" id="extensionEnabled" />
+            <span
+              class="setting-description"
+              data-i18n="extension_enabled_description"
+            >
+              Enable or disable the entire extension functionality except Popup.
+            </span>
+          </div>
+
+          <div class="setting-group">
+            <label
+              for="translateOnTextFields"
+              data-i18n="translate_on_text_fields_label"
+              >Enable translation on text fields</label
+            >
+            <input type="checkbox" id="translateOnTextFields" />
+            <span
+              class="setting-description"
+              data-i18n="translate_on_text_fields_description"
+              >Allow triggering translation directly within input/textarea
+              fields (e.g., via context menu or shortcut).</span
+            >
+          </div>
+
+          <div class="setting-group" id="textFieldShortcutGroup">
+            <label
+              for="enableShortcutForTextFields"
+              data-i18n="enable_shortcut_for_text_fields_label"
+              >Enable Ctrl+/ shortcut for text fields</label
+            >
+            <input type="checkbox" id="enableShortcutForTextFields" />
+            <span
+              class="setting-description"
+              data-i18n="enable_shortcut_for_text_fields_description"
+              >Allow using the Ctrl+/ keyboard shortcut to trigger translation
+              when inside a text field.</span
+            >
+          </div>
+          <div class="setting-group">
+            <label
+              for="translateWithSelectElement"
+              data-i18n="translate_with_select_element_label"
+              >Enable translation via select element</label
+            >
+            <input type="checkbox" id="translateWithSelectElement" />
+            <span
+              class="setting-description"
+              data-i18n="translate_with_select_element_description"
+              >Allow triggering translation using a specific selection method
+              (if implemented, e.g., selecting a whole paragraph).</span
+            >
+          </div>
+
+          <div class="setting-group">
+            <label
+              for="translateOnTextSelection"
+              data-i18n="translate_on_text_selection_label"
+              >Enable translation on text selection</label
+            >
+            <input type="checkbox" id="translateOnTextSelection" />
+            <span
+              class="setting-description"
+              data-i18n="translate_on_text_selection_description"
+              >Allow triggering translation automatically or via shortcut after
+              selecting text on the page.</span
+            >
+          </div>
+
+          <div class="radio-group" id="selectionModeGroup">
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-immediate"
+                  name="selectionTranslationMode"
+                  value="immediate"
+                />
+                <label
+                  for="selection-mode-immediate"
+                  data-i18n="options_selection_mode_immediate"
+                ></label>
+              </div>
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-onclick"
+                  name="selectionTranslationMode"
+                  value="onClick"
+                />
+                <label
+                  for="selection-mode-onclick"
+                  data-i18n="options_selection_mode_onclick"
+                ></label>
+              </div>
+            </div>
+
+          <div
+            class="setting-group sub-setting-group"
+            id="textSelectionCtrlGroup"
+          >
+            <label
+              for="requireCtrlForTextSelection"
+              data-i18n="require_ctrl_for_text_selection_label"
+              >Require Ctrl key for text selection translation</label
+            >
+            <input type="checkbox" id="requireCtrlForTextSelection" />
+          </div>
+
+          <div class="setting-group" id="enableDictionaryTranslation">
+            <label
+              for="enableDictionrary"
+              data-i18n="enable_dictionary_translation_label"
+              >Enable Dictionary Translation</label
+            >
+            <input type="checkbox" id="enableDictionrary" />
+            <span
+              class="setting-description"
+              data-i18n="enable_dictionary_translation_description"
+              >When text selection translation is enabled, single words or short
+              phrases will be treated as dictionary lookups, providing detailed
+              definitions instead of standard translations.</span
+            >
+          </div>
+        </section>
+      </div>
+
+      <div id="prompt" class="tab-content">
+        <section>
+          <h2 data-i18n="prompt_section_title">Prompt Template</h2>
+          <div class="setting-group prompt-template-group">
+            <label for="promptTemplate" data-i18n="prompt_template_label">
+              Prompt Template
+              <span
+                class="prompt-template-info"
+                data-i18n="prompt_template_info"
+                >Use keywords to customize your prompt...</span
+              >
+            </label>
+            <textarea
+              id="promptTemplate"
+              class="prompt-template-input"
+              data-i18n-placeholder="prompt_template_placeholder"
+              placeholder="Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
+              rows="5"
+            ></textarea>
+            <div class="prompt-template-help">
+              <p data-i18n="prompt_template_help">
+                You can use the following keywords in your prompt template:
+              </p>
+              <ul>
+                <li id="sourceLangHelp">
+                  <code>$_{SOURCE}</code>: Source language.
+                  <span id="sourceLangName"></span>
+                </li>
+                <li id="targetLangHelp">
+                  <code>$_{TARGET}</code>: Target language.
+                  <span id="targetLangName"></span>
+                </li>
+                <li><code>$_{TEXT}</code>: Text to be translated.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="api" class="tab-content">
+        <section>
+          <h2 data-i18n="api_section_title">Translation API</h2>
+          <div class="setting-group">
+            <label for="translationApi" data-i18n="translation_api_label"
+              >API Choice</label
+            >
+            <select id="translationApi">
+              <option value="gemini">Gemini API</option>
+              <option value="webai">WebAI API</option>
+              <option value="openai">OpenAI API</option>
+              <option value="openrouter">OpenRouter API</option>
+            </select>
+          </div>
+
+          <div id="webAIApiSettings">
+            <h3 data-i18n="webai_api_settings_title">WebAI API Settings</h3>
+            <div class="setting-group">
+              <label for="webAIApiUrl" data-i18n="webai_api_url_label"
+                >WebAI API URL</label
+              >
+              <input
+                type="text"
+                id="webAIApiUrl"
+                data-i18n-placeholder="webai_api_url_placeholder"
+                placeholder="Enter WebAI API URL"
+              />
+            </div>
+            <div class="setting-group">
+              <label for="webAIApiModel" data-i18n="webai_api_model_label"
+                >WebAI API Model</label
+              >
+              <input
+                type="text"
+                id="webAIApiModel"
+                data-i18n-placeholder="webai_api_model_placeholder"
+                placeholder="Enter WebAI API model"
+              />
+            </div>
+          </div>
+
+          <div id="geminiApiSettings">
+            <h3 data-i18n="gemini_api_settings_title">Gemini API Settings</h3>
+
+            <div class="setting-group api-key-info">
+              <span class="setting-description" data-i18n="gemini_api_key_info">
+                You can get your Gemini API key from
+              </span>
+              <a
+                class="api-link"
+                data-i18n="gemini_api_key_link"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get free API Key
+              </a>
+            </div>
+
+            <div class="setting-group">
+              <label for="apiKey">API Key</label>
+              <input
+                type="text"
+                id="apiKey"
+                data-i18n-placeholder="gemini_api_key_placeholder"
+                placeholder="Paste your API key here"
+              />
+            </div>
+
+            <div class="setting-group">
+              <label for="apiUrl">API URL</label>
+              <input
+                type="text"
+                id="apiUrl"
+                data-i18n-placeholder="gemini_api_url_placeholder"
+                placeholder="Enter API URL"
+              />
+            </div>
+          </div>
+
+          <div id="openAIApiSettings" style="display: none">
+            <h3 data-i18n="openai_api_settings_title">OpenAI API Settings</h3>
+            <div class="setting-group">
+              <label for="openaiApiKey">API Key</label>
+              <input
+                type="text"
+                id="openaiApiKey"
+                data-i18n-placeholder="openai_api_key_placeholder"
+                placeholder="Paste your OpenAI API key here"
+              />
+            </div>
+            <div class="setting-group">
+              <label for="openaiApiModel">Model</label>
+              <input
+                type="text"
+                id="openaiApiModel"
+                data-i18n-placeholder="openai_api_model_placeholder"
+                placeholder="Enter OpenAI model"
+              />
+            </div>
+          </div>
+
+          <div id="openRouterApiSettings" style="display: none">
+            <h3 data-i18n="openrouter_api_settings_title">
+              OpenRouter API Settings
+            </h3>
+            <div class="setting-group">
+              <label for="openrouterApiKey">API Key</label>
+              <input
+                type="text"
+                id="openrouterApiKey"
+                data-i18n-placeholder="openrouter_api_key_placeholder"
+                placeholder="Paste your OpenRouter API key here"
+              />
+            </div>
+            <div class="setting-group">
+              <label for="openrouterApiModel">Model</label>
+              <input
+                type="text"
+                id="openrouterApiModel"
+                data-i18n-placeholder="openrouter_api_model_placeholder"
+                placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="import-export" class="tab-content">
+        <section>
+          <h2 data-i18n="import_export_section_title">
+            Import/Export Settings
+          </h2>
+          <div class="setting-group">
+            <button id="exportSettings" data-i18n="export_settings_button">
+              Export Settings
+            </button>
+          </div>
+          <div class="setting-group">
+            <label for="importFile" data-i18n="import_settings_label"
+              >Import Settings</label
+            >
+            <input type="file" id="importFile" accept=".json" />
+          </div>
+          <div class="setting-group">
+            <button id="importSettings" data-i18n="import_settings_button">
+              Import Settings
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div id="advance" class="tab-content">
+        <section>
+          <div class="setting-group">
+            <label data-i18n="advance_dev_api_mode_label" for="useMock"
+              >Use Dev API Mode</label
+            >
+            <input type="checkbox" id="useMock" />
+          </div>
+          <div class="setting-group">
+            <label for="debugMode" data-i18n="advance_debug_mode_label"
+              >Debug Mode</label
+            >
+            <input type="checkbox" id="debugMode" />
+          </div>
+          <div class="setting-group">
+            <label for="excludedSites" data-i18n="excluded_sites_label"
+              >Exclude these sites (comma separated)</label
+            >
+            <textarea
+              id="excludedSites"
+              rows="3"
+              placeholder="example.com, anotherdomain.org"
+            ></textarea>
+          </div>
+        </section>
+      </div>
+
+      <div id="status" class=""></div>
+      <button id="saveSettings" data-i18n="save_settings_button">Save</button>
+    </div>
+    <footer>
+      <p>
+        by
+        <a
+          class="about-link"
+          href="https://x.com/M_Khani65"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Me</a
+        >
+        and
+        <a
+          class="about-link"
+          href="https://x.com/iSegar0"
+          target="_blank"
+          rel="noopener noreferrer"
+          >iSegar0</a
+        >
+        <span>&copy; 2025</span>
+      </p>
+    </footer>
+
+    <datalist id="allLanguages">
+      <option value="English"></option>
+      <option value="Farsi"></option>
+      <option value="German"></option>
+      <option value="French"></option>
+      <option value="Chinese (Simplified)"></option>
+      <option value="Spanish"></option>
+      <option value="Hindi"></option>
+      <option value="Arabic"></option>
+      <option value="Bengali"></option>
+      <option value="Portuguese"></option>
+      <option value="Russian"></option>
+      <option value="Japanese"></option>
+      <option value="Urdu"></option>
+      <option value="Indonesian"></option>
+      <option value="Italian"></option>
+      <option value="Swahili"></option>
+      <option value="Marathi"></option>
+      <option value="Telugu"></option>
+      <option value="Tamil"></option>
+      <option value="Turkish"></option>
+      <option value="Vietnamese"></option>
+      <option value="Korean"></option>
+      <option value="Thai"></option>
+      <option value="Malay"></option>
+      <option value="Polish"></option>
+      <option value="Dutch"></option>
+      <option value="Filipino"></option>
+      <option value="Ukrainian"></option>
+      <option value="Romanian"></option>
+      <option value="Greek"></option>
+      <option value="Czech"></option>
+      <option value="Hungarian"></option>
+      <option value="Swedish"></option>
+      <option value="Norwegian"></option>
+      <option value="Danish"></option>
+      <option value="Finnish"></option>
+      <option value="Hebrew"></option>
+      <option value="Afrikaans"></option>
+      <option value="Albanian"></option>
+      <option value="Bulgarian"></option>
+      <option value="Catalan"></option>
+      <option value="Croatian"></option>
+      <option value="Estonian"></option>
+      <option value="Latvian"></option>
+      <option value="Lithuanian"></option>
+      <option value="Slovak"></option>
+      <option value="Slovenian"></option>
+      <option value="Serbian"></option>
+      <option value="Malayalam"></option>
+      <option value="Kannada"></option>
+      <option value="Odia"></option>
+      <option value="Punjabi"></option>
+      <option value="Sinhala"></option>
+      <option value="Nepali"></option>
+      <option value="Azerbaijani"></option>
+      <option value="Belarusian"></option>
+      <option value="Kazakh"></option>
+      <option value="Uzbek"></option>
+      <option value="Pashto"></option>
+      <option value="Tagalog"></option>
+      <option value="Cebuano"></option>
+    </datalist>
+  </body>
+</html>
