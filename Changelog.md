@@ -1,5 +1,12 @@
 ## Translate It!
 
+#### 0.2.2 - Released 21 June 2025
+
+- New Feature: In addition to automatic translation on text selection, a new method has been added — a small icon now appears near the selected text. The translation is shown only after clicking this icon, allowing for a more deliberate and user-controlled experience.
+- Minor UI improvements and stability enhancements.
+
+---
+
 #### 0.2.1 - Released 28 May 2025
 
 - Improved Popup Behavior on Initial Inactivity
