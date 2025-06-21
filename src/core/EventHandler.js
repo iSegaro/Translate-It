@@ -217,6 +217,11 @@ export default class EventHandler {
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
       }
     } else {
+      const { selectionTranslationMode } = await Browser.storage.local.get({ selectionTranslationMode: 'immediate' });
+      if (selectionTranslationMode === 'onClick'){
+        return
+      }
+
       // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
       if (this.selectionTimeoutId) {
         clearTimeout(this.selectionTimeoutId);
@@ -228,6 +233,7 @@ export default class EventHandler {
       }
       // همچنین اگر پاپ‌آپ ترجمه متن انتخاب شده باز است آن را ببندید.
       if (this.SelectionWindows?.isVisible) {
+        logME("[EventHandler] Dismis SelectionWindows handleMouseUp");
         this.SelectionWindows.dismiss();
       }
     }
