@@ -90,6 +90,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // --- Start of added elements for the new feature ---
+  // Elements for Selection Translation Mode
+  const selectionModeImmediateRadio = document.getElementById("selection-mode-immediate");
+  const selectionModeOnClickRadio = document.getElementById("selection-mode-onclick");
+  const selectionModeGroup = document.getElementById("selectionModeGroup"); // The container div for the radio buttons
+  // --- End of added elements ---
+
 
   // Elements for Tab Navigation
   // const languagesTabButton = document.querySelector('[data-tab="languages"]'); // کامنت شده در کد شما
@@ -181,6 +188,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     textSelectionCtrlGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
     textSelectionCtrlGroup.style.pointerEvents =
       isTextSelectionEnabled ? "auto" : "none";
+
+    // --- Start of added dependency logic ---
+    if (selectionModeGroup) {
+      selectionModeGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
+      selectionModeGroup.style.pointerEvents = isTextSelectionEnabled ? "auto" : "none";
+    }
+    if (selectionModeImmediateRadio) selectionModeImmediateRadio.disabled = !isTextSelectionEnabled;
+    if (selectionModeOnClickRadio) selectionModeOnClickRadio.disabled = !isTextSelectionEnabled;
+    // --- End of added dependency logic ---
 
     if (!isTextSelectionEnabled) {
       requireCtrlForTextSelectionCheckbox.checked = false;
@@ -410,6 +426,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       finalThemeValue = storedTheme.THEME || CONFIG.THEME || "auto";
     }
     logME("Saving theme as:", finalThemeValue);
+    
+    // --- Start of added logic to get new setting value ---
+    const selectionTranslationMode = selectionModeOnClickRadio?.checked ? 'onClick' : 'immediate';
+    // --- End of added logic ---
 
     const webAIApiUrl = webAIApiUrlInput?.value?.trim();
     const webAIApiModel = webAIApiModelInput?.value?.trim();
@@ -463,6 +483,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         TRANSLATE_ON_TEXT_SELECTION: translateOnTextSelection,
         REQUIRE_CTRL_FOR_TEXT_SELECTION: requireCtrlForTextSelection,
         EXCLUDED_SITES: excludedList,
+        selectionTranslationMode: selectionTranslationMode, // --- Added new setting to save object ---
       };
 
       await Browser.storage.local.set(settingsToSave);
@@ -583,6 +604,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (enableDictionraryCheckbox) {
         enableDictionraryCheckbox.checked = settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
       }
+
+      // --- Start of added logic to load new setting ---
+      if (selectionModeImmediateRadio && selectionModeOnClickRadio) {
+          if (settings.selectionTranslationMode === 'onClick') {
+            selectionModeOnClickRadio.checked = true;
+          } else {
+            selectionModeImmediateRadio.checked = true; // Default
+          }
+      }
+      // --- End of added logic ---
 
       /** مقدار دهی اولیه exclude */
       if (excludedSites) {

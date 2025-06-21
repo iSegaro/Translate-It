@@ -14,10 +14,12 @@
         id="githubLink"
         target="_blank"
         href="https://github.com/iSegaro/Translate-It"
-        title="Home Page" >
+        title="Home Page"
+      >
         <img
           src="../icons/github.svg"
-          alt="GitHub" height="22"
+          alt="GitHub"
+          height="22"
           id="githubIcon"
         />
       </a>
@@ -25,24 +27,34 @@
       <div class="setting-row theme-control-overlay-group">
         <img
           src="../icons/theme.png"
-          alt="Light/Dark" data-i18n-title="theme_toggle_title" height="22"
+          alt="Light/Dark"
+          data-i18n-title="theme_toggle_title"
+          height="22"
           id="themeIcon"
         />
         <label
           class="switch"
-          title="روشن / تیره" data-i18n-title="theme_toggle_title" >
+          title="روشن / تیره"
+          data-i18n-title="theme_toggle_title"
+        >
           <input type="checkbox" id="theme-Switch" />
           <span class="slider round"></span>
         </label>
-        <label for="theme-Auto" class="theme-auto-label-overlay" title="System Theme"> <input type="checkbox" id="theme-Auto" />
-          <span data-i18n="theme_auto">System Theme</span> </label>
+        <label
+          for="theme-Auto"
+          class="theme-auto-label-overlay"
+          title="System Theme"
+        >
+          <input type="checkbox" id="theme-Auto" />
+          <span data-i18n="theme_auto">System Theme</span>
+        </label>
       </div>
     </div>
     <div class="header">
       <h1 id="options_app_name">Translate It!</h1>
       <span id="options_app_version">version 0.0.0</span>
       <p data-i18n="options_description">Translate Everywhere, Simple.</p>
-      </div>
+    </div>
 
     <div class="localization"></div>
     <div class="container">
@@ -125,6 +137,39 @@
             >
               Enable or disable the entire extension functionality except Popup.
             </span>
+          </div>
+
+          <div class="option-item">
+            <label
+              class="option-label"
+              data-i18n="options_selection_mode_label"
+            ></label>
+            <div class="radio-group">
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-immediate"
+                  name="selectionTranslationMode"
+                  value="immediate"
+                />
+                <label
+                  for="selection-mode-immediate"
+                  data-i18n="options_selection_mode_immediate"
+                ></label>
+              </div>
+              <div class="radio-option">
+                <input
+                  type="radio"
+                  id="selection-mode-onclick"
+                  name="selectionTranslationMode"
+                  value="onClick"
+                />
+                <label
+                  for="selection-mode-onclick"
+                  data-i18n="options_selection_mode_onclick"
+                ></label>
+              </div>
+            </div>
           </div>
 
           <div class="setting-group">
@@ -305,7 +350,7 @@
               </span>
               <a
                 class="api-link"
-                data-i18n="gemini_api_key_link" 
+                data-i18n="gemini_api_key_link"
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -460,7 +505,7 @@
     </footer>
 
     <datalist id="allLanguages">
-     <option value="English"></option>
+      <option value="English"></option>
       <option value="Farsi"></option>
       <option value="German"></option>
       <option value="French"></option>
