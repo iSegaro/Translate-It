@@ -208,18 +208,31 @@ export default class EventHandler {
     if (selectedText) {
       // اگر متن انتخاب شده وجود دارد و تایمر قبلی فعال نیست
       if (!this.selectionTimeoutId) {
+
+        // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
+        const { selectionTranslationMode } = await Browser.storage.local.get({
+          selectionTranslationMode: "immediate",
+        });
+
+        // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
+        //    - برای حالت آیکون (onClick)، تأخیر کمتر (10ms)
+        //    - برای حالت پنجره فوری (immediate)، تأخیر پیش‌فرض (250ms)
+        const delay = selectionTranslationMode === "onClick" ? 10 : 250;
+
         this.selectionTimeoutId = setTimeout(() => {
           this.selectionTimeoutId = null; // پاک کردن شناسه تایمر بعد از اجرا
           this.processSelectedText(selectedText, event);
-        }, 250);
+        }, delay);
 
         // اضافه کردن listener برای لغو ترجمه در صورت کلیک
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
       }
     } else {
-      const { selectionTranslationMode } = await Browser.storage.local.get({ selectionTranslationMode: 'immediate' });
-      if (selectionTranslationMode === 'onClick'){
-        return
+      const { selectionTranslationMode } = await Browser.storage.local.get({
+        selectionTranslationMode: "immediate",
+      });
+      if (selectionTranslationMode === "onClick") {
+        return;
       }
 
       // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
