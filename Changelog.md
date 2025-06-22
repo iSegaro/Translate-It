@@ -1,6 +1,6 @@
 ### Translate It!
 
-#### 0.3.0 - Draft
+#### 0.3.0 - Released 23 June 2025
 
 ##### Added
 
