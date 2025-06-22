@@ -126,7 +126,7 @@ export default class EventHandler {
         await this.handleMouseUp(event);
       }
     } catch (rawError) {
-      const error = await this.translationHandler.processError(rawError);
+      const error = await ErrorHandler.processError(rawError);
       await this.translationHandler.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "event-handling",
