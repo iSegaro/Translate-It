@@ -31,8 +31,11 @@ This is a lightweight and efficient personal tool for translating text on websit
 
 - **Text Selection Translation:** Simply select any text, and the translation box will appear right where you selected.
 
+Alternatively, a small translation icon can appear below the selected text—clicking it will show the translation.
+
   <p align="center">
     <img src="./docs/Selection.png" alt="Popup showing translation of selected text" height="280" />
+    <img src="./docs/Selection_Icon.png" alt="Small translation icon showing" height="120" />
   </p>
 
 - **Element Selection Translation:** Activate “Select Element” mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
