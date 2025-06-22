@@ -4,18 +4,64 @@ import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 
 /**
- * Determines the error type for a given error object or message.
- * Priority:
- *   1. Explicit error.type property
- *   2. statusCode property (HTTP 4xx/5xx)
- *   3. HTTP status codes in raw message via regex
- *   4. Known string patterns
- *   5. Unknown
- * @param {Error|string} rawOrError
- * @returns {string} One of ErrorTypes
+ * Determines the error type for a given error object or message by prioritizing:
+ * 1. An explicit `type` property on the error object.
+ * 2. A specific `statusCode` (e.g., 401, 402, 429).
+ * 3. Fallback to string matching for cases without a clear status code.
+ * @param {Error|string} rawOrError - The error object or message string.
+ * @returns {string} One of the keys from ErrorTypes.
  */
 export function matchErrorToType(rawOrError = "") {
-  // 1. If a string exactly matches an ErrorTypes key, return it
+  // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
+    return rawOrError.type;
+  }
+
+  // اولویت ۲: تشخیص دقیق خطا بر اساس کد وضعیت HTTP
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.statusCode) {
+    const code = rawOrError.statusCode;
+    if (typeof code === "number" && code >= 400 && code < 600) {
+      switch (code) {
+        // خطای مربوط به کلید API
+        case 401:
+          return ErrorTypes.API_KEY_INVALID;
+
+        // خطای مربوط به اتمام اعتبار
+        case 402:
+          return ErrorTypes.INSUFFICIENT_BALANCE;
+
+        // خطای دسترسی (مجوز، منطقه جغرافیایی، فیلتر محتوا)
+        case 403:
+          return ErrorTypes.FORBIDDEN_ERROR;
+
+        // منبع یا مدل پیدا نشد
+        case 404:
+          return ErrorTypes.MODEL_MISSING;
+
+        // درخواست نامعتبر (پارامترها یا ساختار اشتباه)
+        case 400:
+        case 422:
+          return ErrorTypes.INVALID_REQUEST;
+
+        // محدودیت تعداد درخواست
+        case 429:
+          return ErrorTypes.RATE_LIMIT_REACHED;
+
+        // خطاهای عمومی سمت سرور
+        case 500: // خطای داخلی سرور
+        case 502: // Bad Gateway (مدل در دسترس نیست)
+        case 503: // Service Unavailable / Overloaded
+        case 524: // Origin Server Timeout
+          return ErrorTypes.SERVER_ERROR;
+
+        // سایر خطاهای HTTP
+        default:
+          return ErrorTypes.HTTP_ERROR;
+      }
+    }
+  }
+
+  // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا (برای مواردی که statusCode ندارند)
   if (typeof rawOrError === "string") {
     const rawKey = rawOrError.trim();
     if (Object.values(ErrorTypes).includes(rawKey)) {
@@ -23,26 +69,11 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
-  // 2. If object with type property, use it
-  if (rawOrError && typeof rawOrError === "object") {
-    if (rawOrError.type) {
-      return rawOrError.type;
-    }
-    // 3. If statusCode numeric between 400-599, HTTP error
-    const code = rawOrError.statusCode;
-    if (typeof code === "number" && code >= 400 && code < 600) {
-      return ErrorTypes.HTTP_ERROR;
-    }
-  }
-
   const msg = String(rawOrError).toLowerCase().trim();
 
-  // 4. Quick HTTP codes in message
-  if (/\b(403|404|500|502|503|504)\b/.test(msg)) {
-    return ErrorTypes.HTTP_ERROR;
-  }
+  //--- این بخش به عنوان فال‌بک برای مواردی که کد وضعیت در دسترس نیست، حفظ می‌شود --- //
 
-  // 5. Common string-based matching
+  // Common string-based matching
   if (msg.includes("text is empty")) return ErrorTypes.TEXT_EMPTY;
   if (msg.includes("prompt is invalid")) return ErrorTypes.PROMPT_INVALID;
   if (msg.includes("text is too long") || msg.includes("too long"))
@@ -60,7 +91,8 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
     msg.includes("API key expired") ||
-    msg.includes("renew the api key")
+    msg.includes("renew the api key") ||
+    msg.includes("authentication fails")
   )
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
@@ -75,6 +107,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("model not found") ||
     msg.includes("model is missing") ||
     msg.includes("model not available") ||
+    msg.includes("is not found for api version") || 
     (msg.includes("the model `") &&
       msg.includes("does not exist or you do not have access to it"))
   )
