@@ -2,6 +2,7 @@
 
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import { isUrlExcluded } from "../utils/exclusion.js";
 
 async function injectContentScript(tabId, url) {
   try {
@@ -21,6 +22,22 @@ async function injectContentScript(tabId, url) {
     logME("[Background-Injection] Failed to inject content script:", error);
   }
 }
+
+Browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete" || !tab.url) return;
+
+  const { EXTENSION_ENABLED, EXCLUDED_SITES = [] } =
+    await Browser.storage.local.get(["EXTENSION_ENABLED", "EXCLUDED_SITES"]);
+
+  if (!EXTENSION_ENABLED) return;
+
+  if (isUrlExcluded(tab.url, EXCLUDED_SITES)) {
+    logME("[Injection] Skipped due to excluded site:", tab.url);
+    return;
+  }
+
+  injectContentScript(tabId, tab.url);
+});
 
 Browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;

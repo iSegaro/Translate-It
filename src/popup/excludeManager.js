@@ -4,6 +4,7 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
+import { DEFAULT_EXCLUDED_SITES } from "../utils/exclusion.js";
 
 // Helper to extract origin from a URL
 function getOrigin(url) {
@@ -42,19 +43,28 @@ export async function init() {
     protocol = null;
   }
   const isHttp = protocol === "http:" || protocol === "https:";
-  toggle.disabled = !isHttp;
-  if (!isHttp) {
-    toggle.checked = false;
-    toggle.title =
-      (await getTranslationString("popup_exclude_toggle_title")) ||
-      "(فعال/غیرفعال در این صفحه)";
+
+
+  // بررسی جدید: آیا سایت در لیست پیش‌فرض و دائمی exclude قرار دارد؟
+  const isPermanentlyExcluded = DEFAULT_EXCLUDED_SITES.some((site) =>
+    origin.includes(site)
+);
+
+// toggle.disabled = !isHttp;
+
+  if (!isHttp || isPermanentlyExcluded) {
+    toggle.disabled = true;
+    toggle.checked = false; // همیشه غیرفعال (چون مستثنی است)
+    toggle.title = isPermanentlyExcluded
+      ? "This site is excluded by default"
+      : await getTranslationString("popup_exclude_toggle_title");
+    return;
   }
 
-  // Read existing excluded sites
-  let { EXCLUDED_SITES = [] } =
-    await Browser.storage.local.get("EXCLUDED_SITES");
-  // Set initial toggle state: enabled by default unless in exclude list
-  toggle.checked = isHttp && !EXCLUDED_SITES.includes(origin);
+  // منطق برای سایت‌های مستثنی شده توسط کاربر
+  let { EXCLUDED_SITES = [] } = await Browser.storage.local.get("EXCLUDED_SITES");
+  toggle.checked = !EXCLUDED_SITES.includes(origin);
+
 
   // Listen for changes
   toggle.addEventListener("change", async () => {

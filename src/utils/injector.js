@@ -1,6 +1,7 @@
 // src/utils/injector.js
 import Browser from "webextension-polyfill";
 import { logME } from "./helpers.js";
+import { isUrlExcluded } from "./exclusion.js";
 
 /**
  * Injects content script into the given tab if not already injected and not excluded.
@@ -14,12 +15,8 @@ export async function tryInjectIfNeeded({ tabId, url }) {
     const parsedUrl = new URL(url);
     if (!["http:", "https:"].includes(parsedUrl.protocol)) return false;
 
-    const settings = await Browser.storage.local.get(["EXCLUDED_SITES"]);
-    const excludedSites = settings.EXCLUDED_SITES ?? [];
-
-    const isExcluded = excludedSites.some((site) => url.includes(site));
-    if (isExcluded) {
-      logME(`[Injector] Skipped injection for excluded site: ${url}`);
+    if (!(await shouldInject(url))) {
+      logME(`[Injector] Skipped injection for excluded or disabled site: ${url}`);
       return false;
     }
 
@@ -56,8 +53,7 @@ export async function shouldInject(url) {
     ]);
     if (!settings.EXTENSION_ENABLED) return false;
 
-    const excluded = settings.EXCLUDED_SITES ?? [];
-    return !excluded.some((site) => url.includes(site));
+    return !isUrlExcluded(url, settings.EXCLUDED_SITES);
   } catch (err) {
     logME("[InjectionGuard] Failed to evaluate injection permission:", err);
     return false;
