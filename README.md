@@ -83,6 +83,7 @@ You can choose from several AI-powered translation providers:
 - [WebAI to API][webai-to-api-url] (✔ Free)
 - [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
+- Custom OpenAI Compatible (refrence to Advanced Settings)
 
 <br>
 
@@ -161,6 +162,7 @@ To use the extension, you’ll need an API key from one of the providers below:
 | DeepSeek      | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
 | OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
 | WebAI to API  | _(No key needed)_                             | [Free][webai-to-api-url] |
+| Custom OpenAI | -                                             | - |
 
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
@@ -197,6 +199,11 @@ In the API Settings page of the extension, each provider has customizable option
 
   This is a free local backend for translation. You can configure your own model in the settings. For setup, see [WebAI to API GitHub repo][webai-to-api-url-docs].
 
+- **Custom (OpenAI Compatible)**
+
+    For maximum flexibility, this option lets you connect to any API service that uses the OpenAI chat completions format. Simply enter the custom `API URL`, `API Key`, and `Model Name` in the settings. This is ideal for using self-hosted models, local LLMs (e.g., through Ollama), or other compatible third-party providers. For the required format, see the [OpenAI API reference][openai-url-docs].
+
+
 > These options let you balance between cost, quality, and speed.  
 > The extension uses default models with minimum setup required — but upgrading the model will improve translation results.
 
@@ -204,6 +211,7 @@ In the API Settings page of the extension, each provider has customizable option
 
 - For `OpenAI` and `OpenRouter`: `gpt-3.5-turbo`
 - For `Google Gemini` and `WebAI to API`: `gemini-2.0-flash`
+- For `DeepSeek`: `deepseek-chat`
 
 </details>
 

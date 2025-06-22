@@ -85,6 +85,7 @@
 - [WebAI to API][webai-to-api-url] (✔ رایگان)
 - [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
+- Custom OpenAI Compatible (به تنظیماتِ پیش‌رفته رجوع کنید.)
 
 </div>
 
@@ -159,10 +160,11 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 | ارائه‌دهنده   | دریافت کلید API                                  | هزینه                      |
 | ------------- | ------------------------------------------------ | -------------------------- |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]           | رایگان                     |
-| OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]         | پولی                       |
-| DeepSeek      | [کلیدهای API DeepSeek][deepseek-api-key-url]         | پولی                       |
-| OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url] | رایگان                     |
-| WebAI to API  | _(نیاز به کلید ندارد)_                           | [رایگان][webai-to-api-url] |
+| OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]           | پولی                       |
+| DeepSeek      | [کلیدهای API DeepSeek][deepseek-api-key-url]       | پولی                       |
+| OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url]   | رایگان                     |
+| WebAI to API  | _(نیاز به کلید ندارد)_                                | [رایگان][webai-to-api-url] |
+| Custom OpenAI | -                                                | -                      |
 
 **توجه:** **`WebAI to API`** یک سرور python است که بدون نیاز به API میتونید API Local داشته باشید.
 
@@ -199,6 +201,12 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
   این نرم‌افزار، یک API محلی (local) و رایگان است که نیازی به کلید ندارد. می‌توانید مدل‌های دلخواه خود را در تنظیمات آن تعریف کنید. برای آشنایی با نحوه پیکربندی و مدل‌های قابل استفاده، به [مستندات WebAI to API][webai-to-api-url-docs] مراجعه نمایید.
 
+- **سفارشی (سازگار با OpenAI)**
+
+    این گزینه برای ایجاد حداکثر انعطاف‌پذیری طراحی شده و به شما امکان می‌دهد تا به هر سرویس API که با ساختار `chat completions` در OpenAI سازگار است، متصل شوید. کافیست مقادیر سفارشی `API URL`، `API Key` و `Model Name` را در تنظیمات وارد کنید. این قابلیت برای استفاده از مدل‌های شخصی (self-hosted)، مدل‌های زبان بزرگ محلی (مانند استفاده از Ollama) یا سایر ارائه‌دهندگان شخص ثالث که با این ساختار سازگار هستند، ایده‌آل است. برای اطلاع از ساختار مورد نیاز، به [مستندات API در OpenAI][openai-url-docs] مراجعه کنید.
+
+
+
 <br>
 
 > تنظیم مدل‌ها این امکان را می‌دهد تا بین هزینه، کیفیت، و سرعت ترجمه، تعادل مناسب را انتخاب کنید.
@@ -211,6 +219,8 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 _نکته:_ برای `OpenAI` و `OpenRouter` بصورت پیش‌فرض از `gpt-3.5-turbo` استفاده می‌شود.
 
 _نکته:_ برای `Google Gemini` و `WebAI to API` بصورت پیش‌فرض از `gemini-2.0-flash` استفاده می شود.
+
+_نکته:_ برای `DeepSeek` مدل پیش‌فرض `deepseek-chat` است.
 
 <br>
 
