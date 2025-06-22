@@ -369,8 +369,8 @@ npm run lint
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
-[firefox-zip-url]: https://github.com/iSegaro/Translate-It/releases/
-[chrome-zip-url]: https://github.com/iSegaro/Translate-It/releases/
+[firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Firefox/
+[chrome-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Chrome/
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
