@@ -15,6 +15,8 @@ import {
   getOpenAIModelAsync,
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
+  getDeepSeekApiKeyAsync,
+  getDeepSeekApiModelAsync,
   TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid } from "../utils/helpers.js";
@@ -317,6 +319,46 @@ class ApiService {
     });
   }
 
+  async handleDeepSeekTranslation(text, sourceLang, targetLang, translateMode) {
+    const [apiKey, model] = await Promise.all([
+      getDeepSeekApiKeyAsync(),
+      getDeepSeekApiModelAsync(),
+    ]);
+
+    if (!apiKey) {
+      const err = new Error(ErrorTypes.API_KEY_MISSING);
+      err.type = ErrorTypes.API;
+      err.context = "api-deepseek-apikey";
+      throw err;
+    }
+
+    const prompt = await buildPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model || "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+      }),
+    };
+
+    return this._executeApiCall({
+      url: CONFIG.DEEPSEEK_API_URL,
+      fetchOptions,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: "api-deepseek-translation",
+    });
+  }
+
   storeSessionContext(ctx) {
     this.sessionContext = { ...ctx, timestamp: Date.now() };
   }
@@ -384,6 +426,13 @@ class ApiService {
         );
       case "openrouter":
         return this.handleOpenRouterTranslation(
+          text,
+          sourceLang,
+          targetLang,
+          translateMode
+        );
+      case "deepseek":
+        return this.handleDeepSeekTranslation(
           text,
           sourceLang,
           targetLang,

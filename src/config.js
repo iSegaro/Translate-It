@@ -30,7 +30,7 @@ export const CONFIG = {
   selectionTranslationMode: "onClick", // "immediate",
 
   // --- API Settings ---
-  TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter
+  TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter, deepseek
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
   API_KEY: "", // Gemini specific
@@ -42,6 +42,9 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
+  DEEPSEEK_API_KEY: "",
+  DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
+  DEEPSEEK_API_MODEL: "deepseek-chat",
 
   // --- Translation Activation Settings (New) ---
   TRANSLATE_ON_TEXT_FIELDS: true, // فعال کردن ترجمه در فیلدهای متنی (کلی)
@@ -387,6 +390,15 @@ export const getWebAIApiUrlAsync = async () => {
 
 export const getWebAIApiModelAsync = async () => {
   return getSettingValueAsync("WEBAI_API_MODEL", CONFIG.WEBAI_API_MODEL);
+};
+
+// DeepSeek Specific
+export const getDeepSeekApiKeyAsync = async () => {
+  return getSettingValueAsync("DEEPSEEK_API_KEY", CONFIG.DEEPSEEK_API_KEY);
+};
+
+export const getDeepSeekApiModelAsync = async () => {
+  return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
 };
 
 // OpenAI Specific

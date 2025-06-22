@@ -306,6 +306,7 @@
               <option value="webai">WebAI API</option>
               <option value="openai">OpenAI API</option>
               <option value="openrouter">OpenRouter API</option>
+              <option value="deepseek">DeepSeek API</option>
             </select>
           </div>
 
@@ -416,6 +417,27 @@
                 id="openrouterApiModel"
                 data-i18n-placeholder="openrouter_api_model_placeholder"
                 placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
+              />
+            </div>
+          </div>
+
+           <div id="deepseekApiSettings" style="display: none"> <h3 data-i18n="deepseek_api_settings_title">DeepSeek API Settings</h3>
+            <div class="setting-group">
+              <label for="deepseekApiKey">API Key</label>
+              <input
+                type="text"
+                id="deepseekApiKey"
+                data-i18n-placeholder="deepseek_api_key_placeholder"
+                placeholder="Paste your DeepSeek API key here"
+              />
+            </div>
+            <div class="setting-group">
+              <label for="deepseekApiModel">Model</label>
+              <input
+                type="text"
+                id="deepseekApiModel"
+                data-i18n-placeholder="deepseek_api_model_placeholder"
+                placeholder="Enter DeepSeek model (e.g., deepseek-chat)"
               />
             </div>
           </div>
