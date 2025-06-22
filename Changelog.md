@@ -2,16 +2,17 @@
 
 #### 0.3.0 - Draft
 
-### Added
+##### Added
 
 -   **Added support for the DeepSeek API** as a new translation provider.
 -   **Added a "Custom" provider**, allowing users to connect to any OpenAI-compatible API endpoint (e.g., for local or self-hosted models).
+-   **Added an update notification** to inform users when a new version has been installed (Chromium-based only).
 
-### Changed
+##### Changed
 
 -   **Overhauled the error handling system** to be more robust and provide clearer, generalized messages for all supported API providers.
 
-### Fixed
+##### Fixed
 
 -   The extension is now correctly disabled on non-web pages (e.g., `file://` or internal browser pages) to prevent errors.
 -   The in-field translation icon now appears more accurately on editable text fields and ignores non-text elements like checkboxes.
