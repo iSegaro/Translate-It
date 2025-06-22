@@ -17,6 +17,9 @@ import {
   getOpenRouterApiModelAsync,
   getDeepSeekApiKeyAsync,
   getDeepSeekApiModelAsync,
+  getCustomApiUrlAsync,
+  getCustomApiKeyAsync,
+  getCustomApiModelAsync,
   TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid } from "../utils/helpers.js";
@@ -273,6 +276,52 @@ class ApiService {
     });
   }
 
+  async handleCustomTranslation(text, sourceLang, targetLang, translateMode) {
+    const [apiUrl, apiKey, model] = await Promise.all([
+      getCustomApiUrlAsync(),
+      getCustomApiKeyAsync(),
+      getCustomApiModelAsync(),
+    ]);
+
+    if (!apiUrl) {
+      const err = new Error(ErrorTypes.API_URL_MISSING);
+      err.type = ErrorTypes.API;
+      err.context = "api-custom-url";
+      throw err;
+    }
+    if (!apiKey) {
+      const err = new Error(ErrorTypes.API_KEY_MISSING);
+      err.type = ErrorTypes.API;
+      err.context = "api-custom-apikey";
+      throw err;
+    }
+
+    const prompt = await buildPrompt(
+      text,
+      sourceLang,
+      targetLang,
+      translateMode
+    );
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model, // مدل باید توسط کاربر مشخص شود
+        messages: [{ role: "user", content: prompt }],
+      }),
+    };
+
+    return this._executeApiCall({
+      url: apiUrl,
+      fetchOptions,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: "api-custom-translation",
+    });
+  }
+
   async handleOpenRouterTranslation(
     text,
     sourceLang,
@@ -433,6 +482,13 @@ class ApiService {
         );
       case "deepseek":
         return this.handleDeepSeekTranslation(
+          text,
+          sourceLang,
+          targetLang,
+          translateMode
+        );
+      case "custom":
+        return this.handleCustomTranslation(
           text,
           sourceLang,
           targetLang,

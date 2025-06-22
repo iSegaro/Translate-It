@@ -179,6 +179,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const deepseekApiKeyInput = document.getElementById("deepseekApiKey");
   const deepseekApiModelInput = document.getElementById("deepseekApiModel");
 
+  // Custom API
+  const customApiSettings = document.getElementById("customApiSettings");
+  const customApiUrlInput = document.getElementById("customApiUrl");
+  const customApiKeyInput = document.getElementById("customApiKey");
+  const customApiModelInput = document.getElementById("customApiModel");
+
   // Elements for Import/Export
   const exportSettingsButton = document.getElementById("exportSettings");
   const importFile = document.getElementById("importFile");
@@ -456,6 +462,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       deepseekApiSettings.style.display =
         selectedApi === "deepseek" ? "block" : "none";
     }
+    if (customApiSettings) {
+      customApiSettings.style.display =
+        selectedApi === "custom" ? "block" : "none";
+    }
     if (apiUrlSettingGroup) {
       apiUrlSettingGroup.style.display =
         selectedApi === "gemini" ? "block" : "none";
@@ -512,6 +522,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const openrouterApiModel = openRouterApiModelInput?.value?.trim();
     const deepseekApiKey = deepseekApiKeyInput?.value?.trim();
     const deepseekApiModel = deepseekApiModelInput?.value?.trim();
+    const customApiUrl = customApiUrlInput?.value?.trim();
+    const customApiKey = customApiKeyInput?.value?.trim();
+    const customApiModel = customApiModelInput?.value?.trim();
     const extensionEnabled =
       extensionEnabledCheckbox?.checked ?? CONFIG.EXTENSION_ENABLED;
     const enableDictionary =
@@ -564,6 +577,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         OPENROUTER_API_MODEL: openrouterApiModel || CONFIG.OPENROUTER_API_MODEL,
         DEEPSEEK_API_KEY: deepseekApiKey || CONFIG.DEEPSEEK_API_KEY,
         DEEPSEEK_API_MODEL: deepseekApiModel || CONFIG.DEEPSEEK_API_MODEL,
+        CUSTOM_API_URL: customApiUrl || CONFIG.CUSTOM_API_URL,
+        CUSTOM_API_KEY: customApiKey || CONFIG.CUSTOM_API_KEY,
+        CUSTOM_API_MODEL: customApiModel || CONFIG.CUSTOM_API_MODEL,
         TRANSLATE_ON_TEXT_FIELDS: translateOnTextFields,
         ENABLE_DICTIONARY: enableDictionary,
         ENABLE_SHORTCUT_FOR_TEXT_FIELDS: enableShortcutForTextFields,
@@ -770,6 +786,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (deepseekApiModelInput) {
         deepseekApiModelInput.value =
           settings.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
+      }
+
+      if (customApiUrlInput) {
+        customApiUrlInput.value =
+          settings.CUSTOM_API_URL || CONFIG.CUSTOM_API_URL;
+      }
+      if (customApiKeyInput) {
+        customApiKeyInput.value =
+          settings.CUSTOM_API_KEY || CONFIG.CUSTOM_API_KEY;
+      }
+      if (customApiModelInput) {
+        customApiModelInput.value =
+          settings.CUSTOM_API_MODEL || CONFIG.CUSTOM_API_MODEL;
       }
 
       // اطمینان از اینکه app_localize با مقدار صحیح فراخوانی می‌شود

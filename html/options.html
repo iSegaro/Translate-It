@@ -199,31 +199,31 @@
           </div>
 
           <div class="radio-group" id="selectionModeGroup">
-              <div class="radio-option">
-                <input
-                  type="radio"
-                  id="selection-mode-immediate"
-                  name="selectionTranslationMode"
-                  value="immediate"
-                />
-                <label
-                  for="selection-mode-immediate"
-                  data-i18n="options_selection_mode_immediate"
-                ></label>
-              </div>
-              <div class="radio-option">
-                <input
-                  type="radio"
-                  id="selection-mode-onclick"
-                  name="selectionTranslationMode"
-                  value="onClick"
-                />
-                <label
-                  for="selection-mode-onclick"
-                  data-i18n="options_selection_mode_onclick"
-                ></label>
-              </div>
+            <div class="radio-option">
+              <input
+                type="radio"
+                id="selection-mode-immediate"
+                name="selectionTranslationMode"
+                value="immediate"
+              />
+              <label
+                for="selection-mode-immediate"
+                data-i18n="options_selection_mode_immediate"
+              ></label>
             </div>
+            <div class="radio-option">
+              <input
+                type="radio"
+                id="selection-mode-onclick"
+                name="selectionTranslationMode"
+                value="onClick"
+              />
+              <label
+                for="selection-mode-onclick"
+                data-i18n="options_selection_mode_onclick"
+              ></label>
+            </div>
+          </div>
 
           <div
             class="setting-group sub-setting-group"
@@ -307,6 +307,7 @@
               <option value="openai">OpenAI API</option>
               <option value="openrouter">OpenRouter API</option>
               <option value="deepseek">DeepSeek API</option>
+              <option value="custom">Custom (OpenAI Compatible)</option>
             </select>
           </div>
 
@@ -421,7 +422,10 @@
             </div>
           </div>
 
-           <div id="deepseekApiSettings" style="display: none"> <h3 data-i18n="deepseek_api_settings_title">DeepSeek API Settings</h3>
+          <div id="deepseekApiSettings" style="display: none">
+            <h3 data-i18n="deepseek_api_settings_title">
+              DeepSeek API Settings
+            </h3>
             <div class="setting-group">
               <label for="deepseekApiKey">API Key</label>
               <input
@@ -438,6 +442,56 @@
                 id="deepseekApiModel"
                 data-i18n-placeholder="deepseek_api_model_placeholder"
                 placeholder="Enter DeepSeek model (e.g., deepseek-chat)"
+              />
+            </div>
+          </div>
+
+          <div id="customApiSettings" style="display: none">
+            <h3 data-i18n="custom_api_settings_title">Custom API Settings</h3>
+            <span
+              class="setting-description"
+              data-i18n="custom_api_settings_description"
+            >
+              Use any API service that is compatible with the OpenAI chat
+              completions format.
+            </span>
+            <div class="setting-group">
+              <label
+                for="customApiUrl"
+                data-i18n="custom_api_settings_api_url_label"
+                >API URL</label
+              >
+              <input
+                type="text"
+                id="customApiUrl"
+                data-i18n-placeholder="custom_api_url_placeholder"
+                placeholder="Enter the base URL of your custom API"
+              />
+            </div>
+            <div class="setting-group">
+              <label
+                for="customApiKey"
+                data-i18n="custom_api_settings_api_key_label"
+                >API Key</label
+              >
+              <input
+                type="text"
+                id="customApiKey"
+                data-i18n-placeholder="custom_api_key_placeholder"
+                placeholder="Paste your custom API key here"
+              />
+            </div>
+            <div class="setting-group">
+              <label
+                for="customApiModel"
+                data-i18n="custom_api_settings_model_label"
+                >Model</label
+              >
+              <input
+                type="text"
+                id="customApiModel"
+                data-i18n-placeholder="custom_api_model_placeholder"
+                placeholder="Enter the model name"
               />
             </div>
           </div>

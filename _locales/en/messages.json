@@ -126,6 +126,15 @@
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model (e.g., deepseek-chat)"
   },
+  "api_provider_custom": { "message": "Custom (OpenAI Compatible)" },
+  "custom_api_settings_title": { "message": "Custom API Settings" },
+  "custom_api_settings_description": { "message": "Use any service that is compatible with the OpenAI chat completions format." },
+  "custom_api_settings_api_url_label": { "message": "API URL" },
+  "custom_api_url_placeholder": { "message": "Enter the base URL of your custom API" },
+  "custom_api_settings_api_key_label": { "message": "API Key" },
+  "custom_api_key_placeholder": { "message": "Paste your custom API key here" },
+  "custom_api_settings_model_label": { "message": "Model" },
+  "custom_api_model_placeholder": { "message": "Enter the model name" },
 
   "import_export_section_title": { "message": "Import/Export Settings" },
   "export_settings_button": { "message": "Export Settings" },

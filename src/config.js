@@ -30,7 +30,8 @@ export const CONFIG = {
   selectionTranslationMode: "onClick", // "immediate",
 
   // --- API Settings ---
-  TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter, deepseek
+  TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter, deepseek, custom
+
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
   API_KEY: "", // Gemini specific
@@ -45,6 +46,9 @@ export const CONFIG = {
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
   DEEPSEEK_API_MODEL: "deepseek-chat",
+  CUSTOM_API_URL: "",
+  CUSTOM_API_KEY: "",
+  CUSTOM_API_MODEL: "",
 
   // --- Translation Activation Settings (New) ---
   TRANSLATE_ON_TEXT_FIELDS: true, // فعال کردن ترجمه در فیلدهای متنی (کلی)
@@ -400,6 +404,20 @@ export const getDeepSeekApiKeyAsync = async () => {
 export const getDeepSeekApiModelAsync = async () => {
   return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
 };
+
+// Custom Provider Specific
+export const getCustomApiUrlAsync = async () => {
+  return getSettingValueAsync("CUSTOM_API_URL", CONFIG.CUSTOM_API_URL);
+};
+
+export const getCustomApiKeyAsync = async () => {
+  return getSettingValueAsync("CUSTOM_API_KEY", CONFIG.CUSTOM_API_KEY);
+};
+
+export const getCustomApiModelAsync = async () => {
+  return getSettingValueAsync("CUSTOM_API_MODEL", CONFIG.CUSTOM_API_MODEL);
+};
+
 
 // OpenAI Specific
 export const getOpenAIApiKeyAsync = async () => {
