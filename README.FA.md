@@ -79,9 +79,10 @@
 این افزونه از چندین سرویس ترجمه هوش مصنوعی پشتیبانی می‌کند تا بهترین گزینه را مطابق نیازهای خود انتخاب کنید:
 
 - [Gemini][gemini-url] (✔ رایگان)
-- [OpenAI][openai-url]
 - [OpenRouter][openrouter-url] (✔ رایگان)
 - [WebAI to API][webai-to-api-url] (✔ رایگان)
+- [OpenAI][openai-url]
+- [DeepSeek][deepseek-url]
 
 </div>
 
@@ -157,6 +158,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 | ------------- | ------------------------------------------------ | -------------------------- |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]           | رایگان                     |
 | OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]         | پولی                       |
+| DeepSeek      | [کلیدهای API DeepSeek][deepseek-api-key-url]         | پولی                       |
 | OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url] | رایگان                     |
 | WebAI to API  | _(نیاز به کلید ندارد)_                           | [رایگان][webai-to-api-url] |
 
@@ -186,6 +188,10 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 - **OpenRouter**
 
   مانند OpenAI، در بخش OpenRouter نیز می‌توانید با مراجعه به [مستندات OpenRouter][openrouter-url-docs]، مدل مورد نظر خود را انتخاب کرده و نام آن را در تنظیمات وارد کنید. OpenRouter از چندین مدل مختلف پشتیبانی می‌کند و امکان انعطاف‌پذیری بیشتری به شما می‌دهد.
+  
+- **DeepSeek**
+
+  در DeepSeek نیز می‌توانید با مراجعه به [مستندات DeepSeek][deepseek-url-docs]، مدل را در تنظیمات وارد کنید.
 
 - **WebAI to API**
 
@@ -346,6 +352,7 @@ npm run lint
 
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
+[deepseek-url]: https://chat.deepseek.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
@@ -356,6 +363,7 @@ npm run lint
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
+[deepseek-api-key-url]: https://platform.deepseek.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
 [mohammad-x-url]: https://x.com/m_khani65/
 [github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues/
@@ -364,6 +372,7 @@ npm run lint
 [flaticon-url]: https://www.flaticon.com/free-icons/translate/
 [gemini-url-docs]: https://ai.google.dev/api/all-methods/
 [openai-url-docs]: https://platform.openai.com/docs/models/
+[deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/
 [webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
 [pnpm-url]: https://pnpm.io/

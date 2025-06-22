@@ -76,9 +76,10 @@ When selecting a word, you’ll not only get a translation but also helpful info
 You can choose from several AI-powered translation providers:
 
 - [Gemini][gemini-url] (✔ Free)
-- [OpenAI][openai-url]
 - [OpenRouter][openrouter-url] (✔ Free)
 - [WebAI to API][webai-to-api-url] (✔ Free)
+- [OpenAI][openai-url]
+- [DeepSeek][deepseek-url]
 
 <br>
 
@@ -154,6 +155,7 @@ To use the extension, you’ll need an API key from one of the providers below:
 | ------------- | --------------------------------------------- | ------------------------ |
 | Google Gemini | [Google AI Studio][gemini-api-key-url]        | Free                     |
 | OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
+| DeepSeek      | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
 | OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
 | WebAI to API  | _(No key needed)_                             | [Free][webai-to-api-url] |
 
@@ -183,6 +185,10 @@ In the API Settings page of the extension, each provider has customizable option
 - **OpenRouter**
 
   Similar to OpenAI, OpenRouter supports a variety of models. You can pick one from the list at [OpenRouter documentation][openrouter-url-docs] and use it by name.
+
+- **DeepSeek**
+
+  You can also add the model in the settings on DeepSeek by referring to the [DeepSeek documentation][deepseek-url-docs].
 
 - **WebAI to API**
 
@@ -323,6 +329,7 @@ This project is licensed under the **MIT License** — feel free to modify and s
 
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
+[deepseek-url]: https://chat.deepseek.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
@@ -333,6 +340,7 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
+[deepseek-api-key-url]: https://platform.deepseek.com/api-keys/
 [openrouter-api-key-url]: https://openrouter.ai/settings/keys/
 [mohammad-x-url]: https://x.com/m_khani65/
 [github-issues-url]: https://github.com/iSegaro/AIWritingCompanion/issues/
@@ -341,6 +349,7 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [flaticon-url]: https://www.flaticon.com/free-icons/translate/
 [gemini-url-docs]: https://ai.google.dev/api/all-methods/
 [openai-url-docs]: https://platform.openai.com/docs/models/
+[deepseek-url-docs]: https://api-docs.deepseek.com/api/list-models/
 [openrouter-url-docs]: https://openrouter.ai/models/
 [webai-to-api-url-docs]: https://github.com/Amm1rr/WebAI-to-API/
 [pnpm-url]: https://pnpm.io/
