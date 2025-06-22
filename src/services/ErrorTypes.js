@@ -29,4 +29,5 @@ export class ErrorTypes {
   static MODEL_OVERLOADED = "MODEL_OVERLOADED";
   static QUOTA_EXCEEDED = "QUOTA_EXCEEDED";
   static GEMINI_QUOTA_REGION = "GEMINI_QUOTA_REGION";
-}
+  static RATE_LIMIT_REACHED = "RATE_LIMIT_REACHED"; // برای خطای 429
+};

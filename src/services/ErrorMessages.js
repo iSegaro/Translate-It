@@ -21,6 +21,16 @@ export const errorMessages = {
   [ErrorTypes.QUOTA_EXCEEDED]: "You exceeded your current quota",
   [ErrorTypes.GEMINI_QUOTA_REGION]:
     "You reached the Gemini quota. (Region issue)",
+  [ErrorTypes.INVALID_REQUEST]: "Invalid request format or parameters.", // برای 400, 422
+  [ErrorTypes.INSUFFICIENT_BALANCE]:
+    "Insufficient balance or credits for the selected API.", // برای 402
+  [ErrorTypes.FORBIDDEN_ERROR]:
+    "Access denied. Check permissions or potential content moderation.", // برای 403
+  [ErrorTypes.RATE_LIMIT_REACHED]:
+    "Rate limit reached. Please pace your requests or try again later.", // برای 429
+  [ErrorTypes.SERVER_ERROR]:
+    "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
+
 
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
