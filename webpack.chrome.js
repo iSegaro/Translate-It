@@ -9,6 +9,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 const { merge } = require("webpack-merge");
 const common = require("./webpack.common.js");
 const archiver = require("archiver");
+const packageJson = require("./package.json");
 
 const isBuildMode = process.env.BUILD_MODE === "build";
 
@@ -40,7 +41,7 @@ if (typeof manifest.name === "string") {
 }
 
 const extensionName = manifest.name.replace(/ /g, "-");
-const extensionVersion = manifest.version;
+const extensionVersion = packageJson.version;
 
 const outputFolderPath = path.resolve(
   __dirname,
@@ -98,6 +99,7 @@ const chromeDistConfig = {
           to: "manifest.json",
           transform(content) {
             let manifest = JSON.parse(content);
+            manifest.version = packageJson.version;
             if (typeof manifest.name === "string") {
               manifest.name = manifest.name.replace(
                 /__MSG_(\w+)__/g,

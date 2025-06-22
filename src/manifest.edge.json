@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_nameEdge__",
-  "version": "0.2.2",
+  "version": "[auto-from-package.json:version]",
   "description": "__MSG_description__",
   "default_locale": "en",
   "permissions": [
