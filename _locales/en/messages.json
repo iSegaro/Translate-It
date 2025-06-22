@@ -15,6 +15,9 @@
   "import_export_tab_title": { "message": "Import/Export" },
   "advance_tab_title": { "message": "Advance" },
 
+  "notification_update_title": { "message": "Extension Updated" },
+  "notification_update_message": { "message": "{appName} has been successfully updated to version {version}." },
+
   "languages_section_title": { "message": "Languages" },
   "source_language_label": { "message": "Source Language" },
   "target_language_label": { "message": "Target Language" },

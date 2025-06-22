@@ -6,6 +6,9 @@
   "nameFirefox": { "message": "Translate It" },
   "description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
 
+  "notification_update_title": { "message": "افزونه به‌روز شد" },
+  "notification_update_message": { "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد." },
+
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
 

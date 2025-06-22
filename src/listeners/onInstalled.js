@@ -6,15 +6,20 @@ import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { dismissAllSelectionWindows } from "../utils/cleanupSelectionWindows.js";
 import { teardownEventListeners } from "../core/EventRouter.js";
+// وارد کردن تابع برای خواندن رشته‌های ترجمه شده
+import { getTranslationString } from "../utils/i18n.js";
 
 const errorHandler = new ErrorHandler();
 
-Browser.runtime.onInstalled.addListener((details) => {
+// listener اصلی را async می‌کنیم تا بتوانیم از await در آن استفاده کنیم
+Browser.runtime.onInstalled.addListener(async (details) => {
   logME(
     `[AI Writing Companion] 🌟 Successfully ${
-      details.reason === "install" ? "Installed!"
-      : details.reason === "update" ? "Updated!"
-      : ""
+      details.reason === "install"
+        ? "Installed!"
+        : details.reason === "update"
+          ? "Updated!"
+          : ""
     }`
   );
 
@@ -30,7 +35,6 @@ Browser.runtime.onInstalled.addListener((details) => {
       };
 
       await Browser.storage.local.set(defaultSettings);
-      // logME("[Background] Settings initialized");
 
       const tabs = await Browser.tabs.query({ url: "<all_urls>" });
 
@@ -44,7 +48,7 @@ Browser.runtime.onInstalled.addListener((details) => {
             url: tab.url,
           });
         } catch {
-          // logME("[onInstalled] sendMessage failed:", tab.url, err.message);
+          //
         }
       }
     } catch (error) {
@@ -59,5 +63,37 @@ Browser.runtime.onInstalled.addListener((details) => {
     initOrUpdate().then(() => {
       dismissAllSelectionWindows();
     });
+  }
+
+  // نمایش اعلان برای بروزرسانی
+  //--- این روش فقط در Chromium-based مرورگرها کار می‌کند ---//
+  if (details.reason === "update") {
+    try {
+      // دریافت اطلاعات از مانیفست
+      const manifest = Browser.runtime.getManifest();
+      const version = manifest.version;
+      const appName = (await getTranslationString("name")) || "Translate It!";
+
+      // دریافت عنوان و پیام اعلان از فایل ترجمه
+      const title =
+        (await getTranslationString("notification_update_title")) ||
+        "Extension Updated";
+      let message =
+        (await getTranslationString("notification_update_message")) ||
+        "{appName} has been updated to version {version}.";
+
+      // جایگزینی متغیرهای داخل پیام
+      message = message.replace("{appName}", appName).replace("{version}", version);
+
+      // ایجاد و نمایش اعلان
+      await Browser.notifications.create("update-notification", {
+        type: "basic",
+        iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"),
+        title: title,
+        message: message,
+      });
+    } catch (e) {
+      logME("Failed to create update notification:", e);
+    }
   }
 });
