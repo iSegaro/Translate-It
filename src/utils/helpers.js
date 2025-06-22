@@ -42,24 +42,49 @@ export const logME = (...args) => {
 };
 
 export const isEditable = (element) => {
-  // اگر element دارای isContentEditable باشد یا از نوع contenteditable باشد
-  if (element?.isContentEditable) return true;
-
-  // اگر تگ آن TEXTAREA است، فیلد متنی است
-  if (element?.tagName === "TEXTAREA") return true;
-
-  // اگر تگ INPUT است، بررسی کنید که نوع آن یکی از انواع متنی مجاز باشد
-  if (element?.tagName === "INPUT") {
-    // گرفتن مقدار type به صورت کوچک (در صورت عدم وجود، فرض بر "text" می‌شود)
-    const inputType = element.getAttribute("type")?.toLowerCase() || "text";
-    // فقط نوع‌های زیر به عنوان فیلد متنی در نظر گرفته می‌شوند
-    return ["text", "search"].includes(inputType);
+  // اگر عنصری وجود ندارد، false برگردان
+  if (!element) {
+    return false;
   }
 
-  // اگر المان در داخل یک المان دارای contenteditable قرار دارد
-  if (element?.closest && element.closest('[contenteditable="true"]'))
+  // ۱. بررسی مستقیم ویژگی isContentEditable که سریع‌ترین راه است.
+  if (element.isContentEditable) {
     return true;
+  }
 
+  // ۲. بررسی برای <textarea>
+  if (element.tagName === "TEXTAREA") {
+    return true;
+  }
+
+  // ۳. بررسی دقیق برای <input>
+  if (element.tagName === "INPUT") {
+    // لیستی از انواع input که قابلیت ورود متن دارند.
+    // استفاده از Set برای جستجوی سریع و بهینه.
+    const textEntryTypes = new Set([
+      "text",
+      "search",
+      "url",
+      "tel",
+      "email",
+      "password",
+      "number",
+      "date",
+      "month",
+      "week",
+      "time",
+      "datetime-local",
+    ]);
+    return textEntryTypes.has(element.type.toLowerCase());
+  }
+
+  // ۴. در نهایت، بررسی اینکه آیا عنصر داخل یک والد contenteditable قرار دارد یا خیر.
+  // این بررسی بعد از موارد دیگر انجام می‌شود چون کمی هزینه‌برتر است.
+  if (element.closest && element.closest('[contenteditable="true"]')) {
+    return true;
+  }
+
+  // در غیر این صورت، عنصر قابل ویرایش نیست.
   return false;
 };
 
