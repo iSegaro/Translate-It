@@ -1,6 +1,6 @@
 {
   "name": "translate-it",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Smart Translation Assistant",
   "scripts": {
     "build:chrome": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Building Chrome extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
