@@ -140,23 +140,6 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 
 </details>
 
-<br>
-
-<details id="install-for-edge">
-<summary>
-  <h3>Install for Microsoft Edge</h3>
-</summary>
-
-- [Download the latest Edge version here][edge-zip-url].
-- Extract the downloaded ZIP file.
-- Open [`edge://extensions/`][edge-extensions-url] and enable **Developer mode**.
-- Drag the extracted folder into the page to install the extension.
-- Done!
-
-_Note:_ After installation, click the **extension icon**, go to **Settings**, and enter your **API Key**.
-
-</details>
-
 </details>
 
 <br>
@@ -268,7 +251,6 @@ npm run build
 
 npm run build:chrome
 npm run build:firefox
-npm run build:edge
 
 ```
 
@@ -345,12 +327,9 @@ This project is licensed under the **MIT License** — feel free to modify and s
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
-[edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Firefox/Translate-It-v0.2.2.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/Translate-It-v0.2.2.zip
-[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Edge/Translate-It-v0.2.2.zip
 [chrome-extensions-url]: chrome://extensions/
-[edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/

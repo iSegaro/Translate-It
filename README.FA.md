@@ -142,24 +142,9 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه** در مرورگر، به **تنظیمات** بروید و کلید **API خود** را وارد کنید.
 
 </details>
-<br>
-
-<details id="install-for-edge">
-<summary>
-  <h3>نصب دستی برای Edge</h3>
-</summary>
-
-- [از اینجا آخرین نسخه مخصوص ایج را دانلود کنید][edge-zip-url]
-- فایل ZIP دانلود شده را از حالت فشرده خارج کنید.
-- آدرس [`edge://extensions`][edge-extensions-url] را در Edge باز کنید و **Developer mode** را فعال کنید.
-- فولدر استخراج شده را به صفحه `edge://extensions` بکشید و رها کنید تا افزونه نصب شود.
-- تمام
-
-_توجه_: بعد از نصب، با کلیک روی **آیکون افزونه** در مرورگر، به **تنظیمات** بروید و کلید **API خود** را وارد کنید.
 
 </details>
 
-</details>
 <br>
 
 ---
@@ -283,7 +268,6 @@ npm run build
 
 npm run build:chrome
 npm run build:firefox
-npm run build:edge
 
 ```
 
@@ -366,12 +350,9 @@ npm run lint
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
-[edge-store]: https://microsoftedge.microsoft.com/addons/detail/ai-writing-companion
 [firefox-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Firefox/Translate-It-v0.2.2.zip
 [chrome-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Chrome/Translate-It-v0.2.2.zip
-[edge-zip-url]: https://github.com/iSegaro/AIWritingCompanion/raw/refs/heads/main/Build-Extension/Edge/Translate-It-v0.2.2.zip
 [chrome-extensions-url]: chrome://extensions/
-[edge-extensions-url]: edge://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
 [openai-api-key-url]: https://platform.openai.com/api-keys/
