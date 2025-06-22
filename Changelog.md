@@ -1,16 +1,21 @@
 ### Translate It!
 
-#### 0.2.6 - Draft
+#### 0.3.0 - Draft
 
--   **feat:** Added support for DeepSeek as a new API provider.
--   **fix:** The extension is now correctly disabled on non-web pages (e.g., `file://` or `about:blank`).
--   **fix:** The in-field translation icon now only appears on editable text fields, ignoring non-text elements like checkboxes and radio buttons.
--   **fix:** Added a default exclusion list to prevent conflicts on sensitive sites, including:
-    -   `accounts.google.com`
-    -   `chrome.google.com/webstore`
-    -   `addons.mozilla.org`
-    -   `meet.google.com`
-    -   `acrobat.adobe.com`
+### Added
+
+-   **Added support for the DeepSeek API** as a new translation provider.
+-   **Added a "Custom" provider**, allowing users to connect to any OpenAI-compatible API endpoint (e.g., for local or self-hosted models).
+
+### Changed
+
+-   **Overhauled the error handling system** to be more robust and provide clearer, generalized messages for all supported API providers.
+
+### Fixed
+
+-   The extension is now correctly disabled on non-web pages (e.g., `file://` or internal browser pages) to prevent errors.
+-   The in-field translation icon now appears more accurately on editable text fields and ignores non-text elements like checkboxes.
+-   A default list of excluded sites (e.g., `accounts.google.com`, web stores) has been added to prevent conflicts.
 
 ---
 
