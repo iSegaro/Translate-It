@@ -7,6 +7,10 @@ export const DEFAULT_EXCLUDED_SITES = [
   "addons.mozilla.org",
   "meet.google.com",
   "acrobat.adobe.com",
+  "developer.chrome.com",
+  "docs.google.com",
+  "docs.microsoft.com",
+  "developers.google.com",
 ];
 
 /**
