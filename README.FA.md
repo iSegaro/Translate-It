@@ -163,7 +163,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 | OpenAI        | [کلیدهای API OpenAI][openai-api-key-url]           | پولی                       |
 | DeepSeek      | [کلیدهای API DeepSeek][deepseek-api-key-url]       | پولی                       |
 | OpenRouter    | [کلیدهای API OpenRouter][openrouter-api-key-url]   | رایگان                     |
-| WebAI to API  | _(نیاز به کلید ندارد)_                                | [رایگان][webai-to-api-url] |
+| WebAI to API  | _[سرور محلی][webai-to-api-url]_                   | رایگان                     |
 | Custom OpenAI | -                                                | -                      |
 
 **توجه:** **`WebAI to API`** یک سرور python است که بدون نیاز به API میتونید API Local داشته باشید.

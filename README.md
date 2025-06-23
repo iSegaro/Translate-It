@@ -161,8 +161,8 @@ To use the extension, you’ll need an API key from one of the providers below:
 | OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
 | DeepSeek      | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
 | OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
-| WebAI to API  | _(No key needed)_                             | [Free][webai-to-api-url] |
-| Custom OpenAI | -                                             | - |
+| WebAI to API  | _[Local Server][webai-to-api-url]_            | Free                     |
+| Custom OpenAI | -                                             | -                        |
 
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
