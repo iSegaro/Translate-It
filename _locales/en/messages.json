@@ -96,7 +96,23 @@
   "gemini_api_key_info": {
     "message": "You can get your Gemini API key from Google AI Studio."
   },
-  "gemini_api_key_link": { "message": "Get free API Key" },
+  "openai_api_key_info": {
+    "message": "You can get your OpenAI API key from OpenAI Platform."
+  },
+  "deepseek_api_key_info": {
+    "message": "You can get your DeepSeek API key from DeepSeek Platform."
+  },
+  "openrouter_api_key_info": {
+    "message": "You can get your OpenRouter API key from OpenRouter Platform."
+  },
+  "webai_api_key_info": {
+    "message": "You can get and run your locally hosted WebAI API server."
+  },
+  "gemini_api_key_link": { "message": "Get Your Free API Key" },
+  "openai_api_key_link": { "message": "Get Your API Key" },
+  "deepseek_api_key_link": { "message": "Get Your API Key" },
+  "openrouter_api_key_link": { "message": "Get Your API Key" },
+  "webai_api_key_link": { "message": "Run Your API Server Locally" },
   "gemini_api_settings_api_key_label": { "message": "API Key" },
   "gemini_api_key_placeholder": { "message": "Paste your API key here" },
   "gemini_api_settings_api_url_label": { "message": "API URL" },
