@@ -3,7 +3,7 @@
 import { logME } from "./utils/helpers.js";
 
 // Import listeners to activate them
-import "./listeners/Injection.js";
+// import "./listeners/Injection.js";
 import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./offscreen.js";
 import "./listeners/onStartup.js";
@@ -11,7 +11,7 @@ import "./listeners/onAlarm_chrome.js";
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 // Potentially import other listeners like onCommand, onActionClicked etc. if needed
 
-logME("[AI Writing Companion] ✅ Main script loaded, listeners attached.");
+logME("[Translate-It] ✅ Main script loaded, listeners attached.");
 
 // Global error handling setup or other initializations can stay here if needed
 // For instance, if ErrorHandler needs to be a singleton accessible everywhere:

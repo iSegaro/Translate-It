@@ -1,5 +1,8 @@
 // src/listeners/Injection.js
 
+/* REMOVEME */
+/* دیگر به ین اسکریپت نیازی نیست و میتوان حذف کرد */
+
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";

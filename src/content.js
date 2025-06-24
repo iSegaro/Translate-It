@@ -1,39 +1,37 @@
 // src/content.js
 
+import Browser from "webextension-polyfill";
 import { initContentScript } from "./contentMain.js";
-// import { logME } from "./utils/helpers.js";
+import { isUrlExcluded } from "./utils/exclusion.js";
+import { logME } from "./utils/helpers.js";
 
-(function () {
-  // جلوگیری از اجرای افزونه داخل iframeهایی که مجاز نیستند
-  const allowInIframes = [];
-  const isTopWindow = window.top === window.self;
-  const isAllowedIframe = allowInIframes.some((host) =>
-    location.hostname.includes(host)
-  );
+(async () => {
+  try {
+    // ابتدا تنظیمات را از حافظه افزونه دریافت کن
+    const settings = await Browser.storage.local.get([
+      "EXTENSION_ENABLED",
+      "EXCLUDED_SITES",
+    ]);
 
-  if (!isTopWindow && !isAllowedIframe) {
-    // logME("[AIWriting] Skipping injection inside iframe:", location.hostname);
-    return;
+    const isEnabled = settings.EXTENSION_ENABLED !== false; // اگر تعریف نشده باشد، فعال در نظر گرفته شود
+    const excludedSites = settings.EXCLUDED_SITES || [];
+
+    // شرط ۱: اگر افزونه به طور کلی غیرفعال است، اسکریپت را متوقف کن
+    if (!isEnabled) {
+      logME("Extension is disabled. Content script will not run on this page.");
+      return;
+    }
+
+    // شرط ۲: اگر این سایت در لیست استثناها قرار دارد، اسکریپت را متوقف کن
+    if (isUrlExcluded(window.location.href, excludedSites)) {
+      logME("This site is excluded. Content script will not run on this page.");
+      return;
+    }
+
+    // اگر تمام شرایط برقرار بود، منطق اصلی اسکریپت محتوا را اجرا کن
+    initContentScript();
+    
+  } catch (error) {
+    console.error("Translate-It: Error initializing content script:", error);
   }
-
-  // ✅ اگر از قبل فعال شده بود، دوباره اجرا نکن
-  if (window.__AI_WRITING_EXTENSION_ACTIVE__) {
-    // logME("[AIWriting] Skipping double init.");
-    return;
-  }
-
-  // ✅ اینجا importهای ESM انجام می‌شن بدون مشکل
-  // import("./contentMain.js")
-  //   .then(({ initContentScript }) => {
-  //     if (typeof initContentScript === "function") {
-  //       initContentScript();
-  //     } else {
-  //       logME("[AIWriting] initContentScript is not a function");
-  //     }
-  //   })
-  //   .catch((err) => {
-  //     logME("[AIWriting] Failed to import contentMain.js", err);
-  //   });
-
-  initContentScript();
 })();

@@ -45,7 +45,14 @@
     "page": "html/options.html",
     "open_in_tab": true
   },
-  "content_scripts": [],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["browser-polyfill.js", "content.bundle.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "web_accessible_resources": [
     {
       "resources": [
