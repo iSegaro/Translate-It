@@ -1,5 +1,23 @@
 ### Translate It!
 
+#### 0.3.3 - Released 26 June 2025
+
+##### Added
+-   Add API key information and links for WebAI, OpenAI, OpenRouter, and DeepSeek on Options page.
+-   Add additional default excluded sites to the exclusion list:
+
+        developer.chrome.com
+        docs.microsoft.com
+        docs.google.com
+        meet.google.com
+        developers.google.com
+        ai.google.dev
+
+##### Fixed
+-   Improve content script injection logic and add validation checks
+
+---
+
 #### 0.3.0 - Released 23 June 2025
 
 ##### Added
