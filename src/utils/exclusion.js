@@ -11,6 +11,7 @@ export const DEFAULT_EXCLUDED_SITES = [
   "docs.google.com",
   "docs.microsoft.com",
   "developers.google.com",
+  "ai.google.dev"
 ];
 
 /**
