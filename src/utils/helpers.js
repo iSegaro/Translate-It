@@ -196,10 +196,6 @@ const injectCSS = (filePath) => {
 export const injectStyle = () => {
   try {
     const hostname = window?.location.hostname;
-    injectCSS("styles/content.css");
-    injectCSS("styles/disable_links.css");
-    injectCSS("styles/SelectionWindows.css");
-    injectCSS("styles/theme.css");
 
     if (hostname.includes("whatsapp.com")) {
       injectCSS("styles/whatsapp.css");
