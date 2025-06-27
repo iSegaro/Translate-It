@@ -136,11 +136,7 @@ const firefoxDistConfig = {
         { from: "html/offscreen.html", to: "offscreen.html" },
         { from: "src/offscreen.js", to: "offscreen.js" },
         { from: "node_modules/webextension-polyfill/dist/browser-polyfill.js" },
-        { from: "_locales", to: "_locales" },
-        {
-          from: "src/pageBridge.js",
-          to: "pageBridge.js",
-        },
+        { from: "_locales", to: "_locales" }
       ],
     }),
     ...(isBuildMode ? [new ZipAfterBuildPlugin()] : []),
