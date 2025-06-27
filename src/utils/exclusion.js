@@ -2,16 +2,16 @@
 
 // لیست سایت‌هایی که به صورت پیش‌فرض و همیشگی غیرفعال هستند
 export const DEFAULT_EXCLUDED_SITES = [
-  "accounts.google.com",
-  "chrome.google.com/webstore",
-  "addons.mozilla.org",
-  "meet.google.com",
-  "acrobat.adobe.com",
-  "developer.chrome.com",
-  "docs.google.com",
-  "docs.microsoft.com",
-  "developers.google.com",
-  "ai.google.dev"
+  // "accounts.google.com",
+  // "chrome.google.com/webstore",
+  // "addons.mozilla.org",
+  // "meet.google.com",
+  // "acrobat.adobe.com",
+  // "developer.chrome.com",
+  // "docs.google.com",
+  // "docs.microsoft.com",
+  // "developers.google.com",
+  // "ai.google.dev"
 ];
 
 /**
