@@ -6,8 +6,6 @@ import { logME } from "./utils/helpers.js";
 // import "./listeners/Injection.js";
 import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./offscreen.js";
-import "./listeners/onStartup.js";
-import "./listeners/onAlarm_chrome.js";
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 // Potentially import other listeners like onCommand, onActionClicked etc. if needed
 
