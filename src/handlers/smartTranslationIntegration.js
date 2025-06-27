@@ -12,7 +12,6 @@
 
 import {
   smartTranslate,
-  injectPageBridge,
 } from "../backgrounds/bridgeIntegration.js";
 import { TranslationMode } from "../config.js";
 import { detectPlatform } from "../utils/platformDetector.js";
@@ -35,7 +34,6 @@ export async function translateFieldViaSmartHandler({
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
   try {
-    injectPageBridge();
     const response = await smartTranslate(text, mode);
 
     if (response?.success === false) {

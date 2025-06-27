@@ -6,8 +6,6 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
 import { translateText } from "../core/api.js";
 
-import { tryInjectIfNeeded } from "../utils/injector.js";
-
 // --- Import Handlers ---
 import { handleExtensionLifecycle } from "../handlers/extensionLifecycleHandler.js";
 import { handleGetSelectedText } from "../handlers/getSelectedTextHandler.js";
@@ -156,35 +154,6 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           injectionState
         );
         return true;
-
-      case "TRY_INJECT_IF_NEEDED":
-        // must return Promise to keep channel open
-        return new Promise((resolve) => {
-          let responded = false;
-          tryInjectIfNeeded({
-            tabId: message.tabId,
-            url: message.url,
-          })
-            .then((result) => {
-              sendResponse({ success: result });
-              responded = true;
-              resolve();
-            })
-            .catch((e) => {
-              logME("[onMessage] Injection check failed:", e);
-              sendResponse({ success: false });
-              responded = true;
-              resolve();
-            });
-
-          // کلاً یه timeout fail-safe برای Chrome بذاریم
-          setTimeout(() => {
-            if (!responded) {
-              sendResponse({ success: false, timeout: true });
-            }
-            resolve();
-          }, 100); // اگه با این مقدار تاخیر جزیی sendResponse نشد، به زور بفرست
-        });
 
       case "applyTranslationToActiveElement":
         // ارسال مستقیم به تب جاری که درخواست داده

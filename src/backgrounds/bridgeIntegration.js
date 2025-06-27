@@ -2,37 +2,6 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers";
 
-// ✅ Inject the page bridge script into the page (only once)
-export function injectPageBridge() {
-  // Get current tab info
-  let tabs;
-  try {
-    tabs = Browser.tabs.query({ active: true, currentWindow: true });
-  } catch {
-    // logME("[injectPageBridge]: Error querying tabs:", err);
-    return;
-  }
-  const currentTab = tabs[0];
-
-  // Only enable toggle for HTTP/HTTPS
-  let protocol;
-  try {
-    protocol = new URL(currentTab.url).protocol;
-  } catch {
-    protocol = null;
-  }
-  const isHttp = protocol === "http:" || protocol === "https:";
-
-  if (isHttp) {return;}
-
-  if (document.getElementById("__AI_WRITING_BRIDGE")) return;
-
-  const script = document.createElement("script");
-  script.src = Browser.runtime.getURL("./pageBridge.js");
-  script.id = "__AI_WRITING_BRIDGE";
-  (document.head || document.documentElement).appendChild(script);
-}
-
 // ✅ Smart translation with bridge fallback
 export async function smartTranslate(text, translateMode = "Popup_Translate") {
   try {

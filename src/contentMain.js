@@ -2,7 +2,6 @@
 
 import Browser from "webextension-polyfill";
 import { CONFIG, state } from "./config.js";
-import { injectPageBridge } from "./backgrounds/bridgeIntegration.js";
 import {
   isExtensionContextValid,
   taggleLinks,
@@ -38,7 +37,6 @@ export function initContentScript() {
       this.popupJustClosedForSelection = false;
       this.popupJustClosedForSelectionTimeout = null;
 
-      injectPageBridge();
       injectStyle();
       this.translationHandler = getTranslationHandlerInstance();
       this.initPolyfills();

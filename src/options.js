@@ -7,7 +7,6 @@ import { ErrorTypes } from "./services/ErrorTypes.js";
 import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
-import { shouldInject } from "./utils/injector.js";
 import { applyTheme } from "./utils/theme.js";
 import "./utils/localization.js";
 
@@ -592,37 +591,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       await Browser.storage.local.set(settingsToSave);
       logME("Settings saved:", settingsToSave);
-
-      if (settingsToSave.EXTENSION_ENABLED) {
-        const tabs = await Browser.tabs.query({ url: "<all_urls>" });
-        await Promise.allSettled(
-          tabs.map(async (tab) => {
-            if (!tab.id || !tab.url) return;
-            // حالا shouldInject لیست exclude را از settingsToSave می‌گیرد
-            if (await shouldInject(tab.url, settingsToSave.EXCLUDED_SITES)) {
-              try {
-                // بررسی می‌کنیم آیا اسکریپت محتوا قبلاً inject شده یا نه
-                // این بخش ممکن است نیاز به منطق دقیق‌تری برای جلوگیری از inject مجدد داشته باشد
-                // یا اینکه TRY_INJECT_IF_NEEDED این را مدیریت می‌کند.
-                await Browser.runtime.sendMessage({
-                  action: "TRY_INJECT_IF_NEEDED", // این اکشن باید در background script تعریف شده باشد
-                  tabId: tab.id,
-                  url: tab.url,
-                });
-                // logME("Injection message sent for", tab.url); // لاگ قبلی شما
-              } catch (e) {
-                logME(
-                  "Injection message failed for",
-                  tab.url,
-                  e.message.includes("Could not establish connection") ?
-                    "(Tab not accessible)"
-                  : e
-                );
-              }
-            }
-          })
-        );
-      }
 
       await updatePromptHelpText(settingsToSave); // پاس دادن تنظیمات ذخیره شده برای جلوگیری از خواندن مجدد
       showStatus(
