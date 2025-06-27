@@ -12,6 +12,7 @@ export const DEFAULT_EXCLUDED_SITES = [
   // "docs.microsoft.com",
   // "developers.google.com",
   // "ai.google.dev"
+  "t24.theorie24.de"
 ];
 
 /**
