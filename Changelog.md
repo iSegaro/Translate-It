@@ -1,6 +1,26 @@
-### Translate It!
+### Changelog
 
-#### 0.3.3 - Released 26 June 2025
+#### v0.3.5 – Released on 27 June 2025
+
+##### Fixed
+-   Resolved an error that occurred during page loading.
+
+##### Changed
+-   Removed the default list of websites where the extension was previously disabled.
+        accounts.google.com
+        chrome.google.com/webstore
+        addons.mozilla.org
+        meet.google.com
+        acrobat.adobe.com
+        developer.chrome.com
+        docs.google.com
+        docs.microsoft.com
+        developers.google.com
+        ai.google.de
+
+---
+
+#### v0.3.3 - Released 26 June 2025
 
 ##### Added
 -   Add API key information and links for WebAI, OpenAI, OpenRouter, and DeepSeek on Options page.
@@ -18,7 +38,7 @@
 
 ---
 
-#### 0.3.0 - Released 23 June 2025
+#### v0.3.0 - Released 23 June 2025
 
 ##### Added
 
@@ -38,14 +58,14 @@
 
 ---
 
-#### 0.2.2 - Released 21 June 2025
+#### v0.2.2 - Released 21 June 2025
 
 -   New Feature: In addition to automatic translation on text selection, a new method has been added — a small icon now appears near the selected text. The translation is shown only after clicking this icon, allowing for a more deliberate and user-controlled experience.
 -   Minor UI improvements and stability enhancements.
 
 ---
 
-#### 0.2.1 - Released 28 May 2025
+#### v0.2.1 - Released 28 May 2025
 
 -   Improved Popup Behavior on Initial Inactivity
 -   Enhanced display of the last translation (now shown only in Dictionary mode)
