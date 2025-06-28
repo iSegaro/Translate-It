@@ -1,4 +1,14 @@
-### Changelog
+### Changelog – Translate It!
+
+#### v0.3.6 – Released on 28 June 2025
+
+##### Fixed
+-   Resolved issues on certain pages where the extension failed to function properly — particularly on platforms acting as software containers (e.g., frameworks like PhoneGap and similar).
+
+##### Changed
+-   Improved the visual design of in-page messages for better readability and aesthetics.
+
+---
 
 #### v0.3.5 – Released on 27 June 2025
 
