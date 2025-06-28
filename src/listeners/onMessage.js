@@ -155,7 +155,7 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         );
         return true;
 
-      case "applyTranslationToActiveElement":
+      case "applyTranslationToActiveElement":{
         // ارسال مستقیم به تب جاری که درخواست داده
         if (sender.tab?.id) {
           safeSendMessage(sender.tab.id, message)
@@ -168,6 +168,25 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         sendResponse({ success: false, error: "No valid tab." });
         return false;
+      }
+
+      case "show_os_notification": {
+        const { title, message: msg } = message.payload;
+        if (Browser.notifications && msg) {
+          Browser.notifications
+            .create({
+              type: "basic",
+              iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"), // Use a specific size
+              title: title || "Translate It!",
+              message: msg,
+            })
+            .catch((err) => {
+              logME("[onMessage] OS notification creation failed:", err);
+            });
+        }
+        // No response needed, this is a fire-and-forget action.
+        return false;
+      }
 
       default:
         logME("[onMessage]Unhandled action:", action);

@@ -3,7 +3,6 @@
 import Browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
 const safe = {
@@ -20,64 +19,88 @@ export default class NotificationManager {
   constructor(errorHandler) {
     this.errorHandler = errorHandler || { handle: () => {} };
     this.map = {
-      error: {
-        title: "Translate It! - Error",
-        icon: safe.ICON_ERROR,
-        cls: "AIWC-error",
-        dur: 5000,
-      },
-      warning: {
-        title: "Translate It! - Warning",
-        icon: safe.ICON_WARNING,
-        cls: "AIWC-warning",
-        dur: 4000,
-      },
-      success: {
-        title: "Translate It! - Success",
-        icon: safe.ICON_SUCCESS,
-        cls: "AIWC-success",
-        dur: 3000,
-      },
-      info: {
-        title: "Translate It! - Info",
-        icon: safe.ICON_INFO,
-        cls: "AIWC-info",
-        dur: 3000,
-      },
-      status: {
-        title: "Translate It! - Status",
-        icon: safe.ICON_STATUS,
-        cls: "AIWC-status",
-        dur: 2000,
-      },
-      revert: {
-        title: "Translate It! - Revert",
-        icon: safe.ICON_REVERT,
-        cls: "AIWC-revert",
-        dur: 800,
-      },
+      error: { title: "Translate It! - Error", icon: safe.ICON_ERROR, cls: "AIWC-error", dur: 5000 },
+      warning: { title: "Translate It! - Warning", icon: safe.ICON_WARNING, cls: "AIWC-warning", dur: 4000 },
+      success: { title: "Translate It! - Success", icon: safe.ICON_SUCCESS, cls: "AIWC-success", dur: 3000 },
+      info: { title: "Translate It! - Info", icon: safe.ICON_INFO, cls: "AIWC-info", dur: 3000 },
+      status: { title: "Translate It! - Status", icon: safe.ICON_STATUS, cls: "AIWC-status", dur: 2000 },
+      revert: { title: "Translate It! - Revert", icon: safe.ICON_REVERT, cls: "AIWC-revert", dur: 800 },
     };
 
     this.container = null;
+    this.canShowInPage = false;
+    
+    // [REFACTOR] The premature initialization call is removed from the constructor.
+    // The container will be created on-demand by the `show` method.
+    // this._initializeContainer(); 
+    
+    this._setupLocaleListener();
+  }
 
-    // Create container when DOM ready
-    if (typeof document !== "undefined") {
-      if (document.readyState === "loading") {
-        document.addEventListener(
-          "DOMContentLoaded",
-          () => this._makeContainer(),
-          { once: true }
-        );
-      } else {
-        this._makeContainer();
-      }
+  /**
+   * Ensures the notification container exists in the DOM.
+   * This method implements a lazy-initialization pattern. It creates and appends
+   * the container only when it's first needed, preventing conflicts during page load.
+   */
+  _ensureContainerExists() {
+    // If the container is already created and attached, do nothing.
+    if (this.container && document.body.contains(this.container)) {
+      this.canShowInPage = true;
+      return;
     }
 
-    // Listen for locale changes to update alignment dynamically
+    // Check for DOM readiness. Essential guard for asynchronous execution.
+    if (typeof document === "undefined" || !document.body || typeof document.createElement !== 'function') {
+      logME("[NotificationManager] DOM not ready or capable for in-page notifications.");
+      this.canShowInPage = false;
+      return;
+    }
+
+    try {
+      const id = "AIWritingCompanion-notifications";
+      let el = document.getElementById(id);
+      if (el) {
+        this.container = el;
+        this.canShowInPage = true;
+        this._applyAlignment(); // Ensure alignment is correct if re-attaching
+        logME("[NotificationManager] Re-attached to existing container.");
+        return;
+      }
+
+      el = document.createElement("div");
+      el.id = id;
+      Object.assign(el.style, {
+        position: "fixed", top: "20px", right: "20px", left: "auto",
+        zIndex: "2147483646", display: "flex", flexDirection: "column",
+        gap: "10px", pointerEvents: "none", direction: "ltr", textAlign: "left"
+      });
+      
+      // [REFACTOR] The critical DOM manipulation now happens here, just-in-time.
+      document.body.appendChild(el);
+      
+      this.container = el;
+      this.canShowInPage = true; // Set capability flag upon success
+      this._applyAlignment(); // Apply alignment styles immediately after creation
+      logME("[NotificationManager] Container created and appended successfully.");
+
+    } catch (error) {
+      logME("[NotificationManager] Environment not compatible for in-page notifications due to error:", error.message);
+      this.canShowInPage = false;
+      if (this.container) {
+        try { this.container.remove(); } catch (e) { /* ignore */ }
+        this.container = null;
+      }
+    }
+  }
+
+  _setupLocaleListener() {
     if (Browser.storage && Browser.storage.onChanged) {
       Browser.storage.onChanged.addListener((changes, area) => {
         if (area === "local" && changes.APPLICATION_LOCALIZE) {
-          this._applyAlignment();
+          // Only apply alignment if the container has already been created
+          if (this.container) {
+            this._applyAlignment();
+          }
         }
       });
     }
@@ -85,102 +108,93 @@ export default class NotificationManager {
 
   async _applyAlignment() {
     if (!this.container) return;
+    
     try {
       const rtlMsg = await getTranslationString("IsRTL");
       const isRTL = parseBoolean(rtlMsg);
-      if (isRTL) {
-        this.container.style.right = "20px";
-        this.container.style.left = "";
-      } else {
-        this.container.style.left = "";
-        this.container.style.right = "20px";
-      }
+      
+      this.container.style.right = "20px" // isRTL ? "auto" : "20px";
+      this.container.style.left = "auto"; //isRTL ? "20px" : "auto";
       this.container.style.direction = isRTL ? "rtl" : "ltr";
       this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
-    } catch {
-      // logME("[NotificationManager] _applyAlignment failed:", error);
-    }
-  }
-
-  _makeContainer() {
-    let el = null;
-    try {
-      const id = "AIWritingCompanion-notifications";
-      el = document.getElementById(id);
-      if (el) {
-        this.container = el;
-        this._applyAlignment();
-        return el;
-      }
-
-      if (!document.body) {
-        logME("[NotificationManager] document.body not available.");
-        return null;
-      }
-
-      el = document.createElement("div");
-      if (!el) {
-        logME("[NotificationManager] createElement failed.");
-        return null;
-      }
-      el.id = id;
-      Object.assign(el.style, {
-        position: "fixed",
-        top: "20px",
-        zIndex: "2147483646",
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-      });
-      document.body.appendChild(el);
-      this.container = el;
-      this._applyAlignment();
-      return el;
     } catch (error) {
-      logME("[NotificationManager] _makeContainer error:", error);
-      if (el && el.remove) el.remove();
-      return null;
+      // Fallback to default LTR styles
+      this.container.style.right = "20px";
+      this.container.style.left = "auto";
+      this.container.style.direction = "ltr";
+      this.container.style.textAlign = "left";
+      logME("[NotificationManager] Alignment application failed, using defaults:", error);
     }
   }
-
+  
+  /**
+   * [The `show` method now ensures the container exists before attempting to display a notification.
+   */
   show(msg, type = "info", auto = true, dur = null, onClick) {
+    // Step 1: Ensure the container is ready for in-page notifications.
+    this._ensureContainerExists();
+
     const cfg = this.map[type] || this.map.info;
     const finalDur = dur ?? cfg.dur;
 
-    if (this.container && document.body.contains(this.container)) {
+    // Step 2: Attempt to show the notification in-page if possible.
+    if (this.canShowInPage) {
       try {
         return this._toastInPage(msg, cfg, auto, finalDur, onClick);
       } catch (err) {
-        this.errorHandler.handle?.(err, {
-          type: ErrorTypes.UI,
-          context: "NotificationManager-show",
-        });
-        return null;
+        logME("[NotificationManager] In-page notification failed, will fallback.", err);
       }
     }
-    this._sendToActiveTab(msg, type, auto, finalDur, onClick);
-    return null;
+
+    // Step 3: Fallback to a background script notification if in-page is not available or failed.
+    logME(`[NotificationManager] In-page not available. Sending notification request to background for: "${msg}"`);
+    if (isExtensionContextValid()) {
+      Browser.runtime.sendMessage({
+        action: "show_os_notification",
+        payload: { message: msg, title: cfg.title, type: type },
+      }).catch(error => {
+        logME("[NotificationManager] Could not send message to background script.", error);
+      });
+    }
+    
+    return null; // No DOM node to return when using the fallback.
   }
 
   dismiss(node) {
-    if (!node || typeof node.remove !== "function") return;
-    node.style.opacity = "0";
-    setTimeout(() => node.remove(), 500);
+    if (!node || typeof node.remove !== "function" || !node.parentNode) return;
+    
+    try {
+      node.style.opacity = "0";
+      setTimeout(() => {
+        try {
+          if (node.parentNode) { node.remove(); }
+        // eslint-disable-next-line no-unused-vars
+        } catch (error) { /* Already removed, which is fine. */ }
+      }, 500);
+    } catch (error) {
+      logME("[NotificationManager] Error dismissing notification:", error);
+    }
   }
 
   _toastInPage(message, cfg, auto, dur, onClick) {
+    // This internal method remains largely the same, but it's now called more safely.
+    if (!this.container) return null; // Extra safety guard
+
     const n = document.createElement("div");
     n.className = `AIWC-notification ${cfg.cls}`;
     n.style.cssText = `
-      background:#fff;color:#333;padding:10px 15px;
-      border-radius:6px;font-size:14px;border:1px solid #ddd;
-      box-shadow:0 2px 8px rgba(0,0,0,0.1);display:flex;
-      align-items:center;cursor:pointer;opacity:1;
-      transition:opacity .5s`;
+      background: #fff; color: #333; padding: 10px 15px; border-radius: 6px;
+      font-size: 14px; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex; align-items: center; cursor: ${onClick ? 'pointer' : 'default'};
+      opacity: 0; transform: translateY(10px); transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: auto; max-width: 300px; word-wrap: break-word;
+    `;
 
     // ✅ DOM-safe API instead replace:
     const iconSpan = document.createElement("span");
     iconSpan.textContent = cfg.icon;
+    iconSpan.style.marginRight = this.container.style.direction === 'rtl' ? '0' : '8px';
+    iconSpan.style.marginLeft = this.container.style.direction === 'rtl' ? '8px' : '0';
 
     const msgSpan = document.createElement("span");
     msgSpan.textContent = message;
@@ -188,67 +202,42 @@ export default class NotificationManager {
     n.appendChild(iconSpan);
     n.appendChild(msgSpan);
 
-    n.addEventListener("click", () => {
-      try {
-        onClick?.();
-      } catch (e) {
-        logME(e);
-      }
-      this.dismiss(n);
-    });
+    if (onClick) {
+      n.addEventListener("click", () => {
+        try { onClick(); } catch (e) { logME("[NotificationManager] onClick error:", e); }
+        this.dismiss(n);
+      }, { once: true });
+    }
 
     this.container.appendChild(n);
-    if (auto && cfg.cls !== "AIWC-status")
+    
+    setTimeout(() => {
+      n.style.opacity = '1';
+      n.style.transform = 'translateY(0)';
+    }, 10);
+    
+    if (auto && cfg.cls !== "AIWC-status") {
       setTimeout(() => this.dismiss(n), dur);
+    }
 
     return n;
   }
 
-  _sendToActiveTab(message, type, auto, duration, onClick) {
-    return Browser.tabs
-      .query({ active: true, currentWindow: true })
-      .then((tabs) =>
-        tabs?.[0]?.id && isExtensionContextValid() ?
-          Browser.tabs.sendMessage(tabs[0].id, {
-            action: "show_notification",
-            payload: { message, type, autoDismiss: auto, duration },
-          })
-        : null
-      )
-      .then((res) => {
-        if (onClick && res !== undefined) {
-          const listener = (msg) => {
-            if (msg?.action === "notification_clicked") {
-              onClick();
-              Browser.runtime.onMessage.removeListener(listener);
-            }
-          };
-          Browser.runtime.onMessage.addListener(listener);
-        }
-      })
-      .catch(() => this._osNotification(message, type, onClick));
+  reset() {
+    this.canShowInPage = false;
+    if (this.container) {
+      // eslint-disable-next-line no-unused-vars
+      try { this.container.remove(); } catch (error) { /* ignore */ }
+      this.container = null;
+    }
   }
 
-  _osNotification(message, type, onClick) {
-    const cfg = this.map[type] || this.map.info;
-    Browser.notifications
-      .create({
-        type: "basic",
-        iconUrl: Browser.runtime.getURL("icons/extension_icon.png"),
-        title: cfg.title,
-        message,
-      })
-      .then((id) => {
-        if (!onClick) return;
-        const click = (cid) => {
-          if (cid === id) {
-            onClick();
-            Browser.notifications.clear(id);
-            Browser.notifications.onClicked.removeListener(click);
-          }
-        };
-        Browser.notifications.onClicked.addListener(click);
-      })
-      .catch(() => {});
+  isReady() {
+    // The meaning of 'ready' is now simpler: can it potentially show a notification?
+    const containerExists = !!(this.container && document.body.contains(this.container));
+    return {
+      canShowInPage: this.canShowInPage || containerExists,
+      containerAvailable: containerExists,
+    };
   }
 }
