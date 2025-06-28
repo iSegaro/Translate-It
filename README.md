@@ -217,7 +217,10 @@ In the API Settings page of the extension, each provider has customizable option
 
 ---
 
-## ☕ Buy Me a Coffee
+<details>
+<summary>
+  <h2>☕ Buy Me a Coffee</h2>
+</summary>
 
 If this project helped you and you’d like to support it, you can buy me a coffee ☕
 
@@ -229,6 +232,9 @@ If this project helped you and you’d like to support it, you can buy me a coff
 | **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                                                                            |
 | **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                                                                            |
 | **PayPal**          | [![کمک مالی PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)                                                      |
+
+
+</details>
 
 <br>
 Thank you for your support!
@@ -246,40 +252,42 @@ Thank you for your support!
 
 ---
 
-## 🥤 Development
+<details>
+<summary>
+  <h2>🥤 Development Notes</h2>
+</summary>
 
 ### Prerequisites
 
-Make sure [**Node.js**][node-js-url] is installed (it includes `npm`). Then run:
-
-_Note: I am using [`pnpm`][pnpm-url] in this project instead `npm`._
+Make sure [**Node.js**][node-js-url] and [**pnpm**][pnpm-url] are installed. Then, clone the repository and install the dependencies:
 
 ```bash
+git clone https://github.com/iSegar0/Translate-It.git
 cd Translate-It
-npm install
+pnpm install
 ```
 
-### Build
+### Building for Development
 
-To generate the extension files, run:
+To generate the unpacked extension files for development, run:
 
 ```bash
-npm run build
+# Build for both browsers
+pnpm run build
 
-npm run build:chrome
-npm run build:firefox
-
+# Build for a specific browser
+pnpm run build:chrome
+pnpm run build:firefox
 ```
 
-This will create `zip` files in the `Build-Extension/` directory for each browser, intended for manual installation.
+This will create the necessary files in the `Build-Extension/Chrome/` and `Build-Extension/Firefox/` directories, which you can load as temporary extensions in your browser.
 
-To actively develop and apply changes in real time, use one of follwing commands:
+To actively develop and apply changes in real time, use one of the following commands:
 
 ```bash
-npm run watch
-
-npm run watch:chrome
-npm run watch:firefox
+# Watch for changes for both browsers
+pnpm run watch:chrome
+pnpm run watch:firefox
 ```
 
 ### Lint Check
@@ -287,14 +295,42 @@ npm run watch:firefox
 To ensure code quality and catch potential issues early, you can run ESLint:
 
 ```bash
-npm run lint
+pnpm run lint
 ```
 
-This command will scan all src/\*_/_.js files and report any syntax errors, unsafe patterns or unused variables.
+This command will scan all `src/**/*.js` files and report any syntax errors or unsafe patterns.
+
+### Packaging for Distribution
+
+When you are ready to create distributable packages, use the following commands.
+
+**To package the source code:**
+
+This command creates a `.zip` archive of the project's source files, named `Source-vX.X.X.zip`.
+
+```bash
+pnpm run source
+```
+
+**To create a full release:**
+
+This command bundles everything. It creates the source code archive and builds the final, installable `.zip` packages for both browsers.
+
+```bash
+pnpm run publish
+```
+
+After running, the `Build-Extension/` directory will contain:
+
+  * `Source-vX.X.X.zip`
+  * `Translate-It-vX.X.X-for-Chrome.zip`
+  * `Translate-It-vX.X.X-for-Firefox.zip`
+
+</details>
 
 <br>
 
----
+-----
 
 ## 🤝 Contributing
 
@@ -302,11 +338,17 @@ This command will scan all src/\*_/_.js files and report any syntax errors, unsa
 - 🐞 **Report issues** via [GitHub Issues][github-issues-url].
 - 📝 **Submit a Pull Request (PR)** to help improve the extension.
 
+<br>
+
 ---
 
-### 🖼️ Icons Credit
+<details>
+<summary>
+  <h2>🖼️ Icons Credit</h2>
 
 Icons used in this project are provided by [Flaticon](https://www.flaticon.com) and created by:
+</summary>
+
 
 - <img src="icons/page.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon)
 - <img src="icons/select.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
@@ -319,6 +361,8 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
 - <img src="icons/settings.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
 - <img src="icons/copy.png" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
 - <img src="icons/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (Revert)
+
+</details>
 
 <br>
 
@@ -337,6 +381,8 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
 ## 📜 License
 
 This project is licensed under the **MIT License** — feel free to modify and share!
+
+year 2025
 
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
