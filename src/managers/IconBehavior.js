@@ -88,8 +88,42 @@ export default function setupIconBehavior(
     }
     const id = requestAnimationFrame(() => {
       const rect = target.getBoundingClientRect();
-      icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      icon.style.left = `${rect.left + window.scrollX}px`;
+      const iconHeight = icon.offsetHeight || 24;
+
+      // --- شروع منطق شرطی جدید ---
+
+      // آستانه فاصله از بالای صفحه (به پیکسل)
+      // اگر بالای فیلد از این مقدار به بالای صفحه نزدیک‌تر باشد، آیکون به زیر منتقل می‌شود.
+      // این مقدار باید حداقل به اندازه ارتفاع آیکون + حاشیه باشد تا منطقی باشد.
+      const topThreshold = 40;
+
+      // بررسی شرط: آیا فیلد متنی به بالای صفحه خیلی نزدیک است؟
+      if (rect.top < topThreshold) {
+        
+        // حالت ۱: فیلد نزدیک به بالای صفحه است -> آیکون را زیر فیلد قرار بده
+        
+        // محاسبه موقعیت عمودی (top):
+        // rect.bottom: موقعیت لبه‌ی پایینی فیلد.
+        // + 5: یک حاشیه ۵ پیکسلی از پایین.
+        icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
+
+      } else {
+        
+        // حالت ۲: فیلد به اندازه کافی از بالای صفحه فاصله دارد -> آیکون را بالای فیلد قرار بده (رفتار پیش‌فرض)
+
+        // محاسبه موقعیت عمودی (top):
+        // rect.top: موقعیت لبه‌ی بالایی فیلد.
+        // - iconHeight: ارتفاع خود آیکون را کم می‌کنیم تا به بالا منتقل شود.
+        // - 5: یک حاشیه ۵ پیکسلی از بالا.
+        icon.style.top = `${rect.top + window.scrollY - iconHeight - 5}px`;
+      }
+
+      // محاسبه موقعیت افقی (left) در هر دو حالت یکسان است:
+      // آیکون در سمت راست فیلد قرار می‌گیرد.
+      icon.style.left = `${rect.right + window.scrollX + 5}px`;
+
+      // --- پایان منطق شرطی ---
+
       icon.style.display = "block";
       icon.classList.add("fade-in");
     });
