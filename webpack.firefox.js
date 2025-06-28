@@ -11,12 +11,13 @@ const common = require("./webpack.common.js");
 const archiver = require("archiver");
 const packageJson = require("./package.json");
 
+const isBuildMode = process.env.BUILD_MODE === "build";
+const isPublishMode = process.env.PUBLISH_MODE === "true";
+
 // خواندن manifest مربوط به فایرفاکس
 const manifestFilePath = "./src/manifest.firefox.json";
 const manifestRaw = fs.readFileSync(manifestFilePath, "utf8");
 const manifest = JSON.parse(manifestRaw);
-
-const isBuildMode = process.env.BUILD_MODE === "build";
 
 const defaultLocale = "en";
 const messagesPath = path.resolve(
@@ -49,11 +50,26 @@ const outputFolderPath = path.resolve(
   "Firefox",
   `${extensionName}-v${extensionVersion}`
 );
-const zipFilePath = path.resolve(
-  __dirname,
-  "Build-Extension",
-  `${extensionName}-v${extensionVersion}-for-Firefox.zip` // تغییر در این خط
-);
+
+// --- منطق شرطی برای تعیین مسیر فایل ZIP ---
+let zipFilePath;
+if (isPublishMode) {
+  // اگر در حالت publish بود، خروجی را در پوشه Publish قرار بده
+  zipFilePath = path.resolve(
+    __dirname,
+    "Build-Extension",
+    "Publish",
+    `${extensionName}-v${extensionVersion}-for-Firefox.zip`
+  );
+} else {
+  // در حالت build عادی، خروجی را در همان پوشه Firefox قرار بده
+  zipFilePath = path.resolve(
+    outputFolderPath,
+    `../${extensionName}-v${extensionVersion}.zip`
+  );
+}
+// --- پایان منطق شرطی ---
+
 
 rimraf.sync(outputFolderPath);
 if (fs.existsSync(zipFilePath)) fs.unlinkSync(zipFilePath);

@@ -17,8 +17,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootPath = path.resolve(__dirname, "..");
 
-// تعریف مسیر خروجی
-const outputDir = path.resolve(rootPath, "Build-Extension");
+// تعریف مسیر خروجی به پوشه Publish
+const outputDir = path.resolve(rootPath, "Build-Extension", "Publish");
 const outputFilePath = path.resolve(
   outputDir,
   `Source-v${extensionVersion}.zip`

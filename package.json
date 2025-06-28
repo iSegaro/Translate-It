@@ -11,7 +11,7 @@
     "lint": "eslint src/**/*.js",
     "format": "prettier --write src/**/*.js",
     "source": "node ./build-scripts/create-source-zip.mjs",
-    "publish": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Publishing All Artifacts'))\" && pnpm run source && pnpm run build"
+    "publish": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Publishing All Artifacts'))\" && cross-env PUBLISH_MODE=true pnpm run source && cross-env PUBLISH_MODE=true pnpm run build"
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
@@ -41,4 +41,3 @@
     "regenerator-runtime": "^0.14.1"
   }
 }
-  
