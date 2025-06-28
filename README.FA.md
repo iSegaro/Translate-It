@@ -357,7 +357,7 @@ pnpm run publish
 
 </div>
 
-پس از اجرا، پوشه `Build-Extension/` حاوی فایل‌های زیر خواهد بود:
+پس از اجرا، پوشه `Build-Extension/Publish/` حاوی فایل‌های زیر خواهد بود:
 
   * `Source-vX.X.X.zip`
   * `Translate-It-vX.X.X-for-Chrome.zip`
@@ -426,8 +426,8 @@ pnpm run publish
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
-[firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Firefox/
-[chrome-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Chrome/
+[firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Publish/
+[chrome-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Publish/
 [chrome-extensions-url]: chrome://extensions/
 [firefox-extensions-url]: about:debugging#/runtime/this-firefox/
 [gemini-api-key-url]: https://aistudio.google.com/apikey/
