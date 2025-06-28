@@ -81,6 +81,8 @@ export async function handleFetchTranslationBackground(
 
 export default class TranslationHandler {
   constructor() {
+    // IMPORTANT: FIRST initialize the notifier, then the errorHandler
+    // This ensures that the errorHandler can use the notifier for displaying errors.
     // ابتدا notifier سپس errorHandler
     this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
