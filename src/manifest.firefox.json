@@ -10,8 +10,7 @@
     "clipboardWrite",
     "clipboardRead",
     "tabs",
-    "notifications",
-    "alarms"
+    "notifications"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
