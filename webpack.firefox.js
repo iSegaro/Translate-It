@@ -52,8 +52,7 @@ const outputFolderPath = path.resolve(
 const zipFilePath = path.resolve(
   __dirname,
   "Build-Extension",
-  "Firefox",
-  `${extensionName}-v${extensionVersion}.zip`
+  `${extensionName}-v${extensionVersion}-for-Firefox.zip` // تغییر در این خط
 );
 
 rimraf.sync(outputFolderPath);
@@ -136,7 +135,7 @@ const firefoxDistConfig = {
         { from: "html/offscreen.html", to: "offscreen.html" },
         { from: "src/offscreen.js", to: "offscreen.js" },
         { from: "node_modules/webextension-polyfill/dist/browser-polyfill.js" },
-        { from: "_locales", to: "_locales" }
+        { from: "_locales", to: "_locales" },
       ],
     }),
     ...(isBuildMode ? [new ZipAfterBuildPlugin()] : []),

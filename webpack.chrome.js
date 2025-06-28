@@ -52,8 +52,7 @@ const outputFolderPath = path.resolve(
 const zipFilePath = path.resolve(
   __dirname,
   "Build-Extension",
-  "Chrome",
-  `${extensionName}-v${extensionVersion}.zip`
+  `${extensionName}-v${extensionVersion}-for-Chrome.zip` // تغییر در این خط
 );
 
 rimraf.sync(outputFolderPath);

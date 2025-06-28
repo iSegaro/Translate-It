@@ -5,11 +5,13 @@
   "scripts": {
     "build:chrome": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Building Chrome extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.chrome.js --mode production",
     "build:firefox": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Building Firefox extension'))\" && cross-env BUILD_MODE=build webpack --config webpack.firefox.js --mode production",
-    "build": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Running Build for All Browsers'))\" && npm run build:chrome && npm run build:firefox",
+    "build": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Running Build for All Browsers'))\" && pnpm run build:chrome && pnpm run build:firefox",
     "watch:chrome": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Watching Chrome...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.chrome.js --watch --mode development",
     "watch:firefox": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Watching Firefox...'))\" && cross-env BUILD_MODE=watch webpack --config webpack.firefox.js --watch --mode development",
     "lint": "eslint src/**/*.js",
-    "format": "prettier --write src/**/*.js"
+    "format": "prettier --write src/**/*.js",
+    "source": "node ./build-scripts/create-source-zip.mjs",
+    "publish": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Publishing All Artifacts'))\" && pnpm run source && pnpm run build"
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
@@ -39,3 +41,4 @@
     "regenerator-runtime": "^0.14.1"
   }
 }
+  
