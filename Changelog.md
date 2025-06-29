@@ -1,5 +1,23 @@
 ### Changelog – Translate It!
 
+#### v0.4.0 – Released on 29 June 2025
+
+##### Added
+
+  - Added 'Translate with Select Element' mode to the right-click context menu for quick access.
+  - Added a keyboard shortcut to activate 'Select Element' mode:
+
+      - Default Chrome  (Win/Linux): `Ctrl+Shift+Z` | Mac: `Command+Shift+Z`
+      - Default Firefox (Win/Linux): `Ctrl+Space`   | Mac: `Command+Space`
+
+##### Changed
+
+  - Improved the positioning and behavior of the in-field translation icon to be more intelligent and less intrusive.
+  - Enhanced translation prompts to yield more natural and human-like translations.
+  - Update Theme (light)
+  
+---
+
 #### v0.3.6 – Released on 28 June 2025
 
 ##### Fixed
