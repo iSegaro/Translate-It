@@ -14,7 +14,7 @@
 
   - Improved the positioning and behavior of the in-field translation icon to be more intelligent and less intrusive.
   - Enhanced translation prompts to yield more natural and human-like translations.
-  - Update Theme (light)
+  - Updated Light Theme
   
 ---
 
