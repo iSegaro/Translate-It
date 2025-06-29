@@ -6,14 +6,28 @@
   "nameFirefox": { "message": "Translate It" },
   "description": { "message": "Translate Everywhere. Simply." },
 
+  "theme_section_title": { "message": "Theme" },
+  "localization_section_title": { "message": "Extension Language" },
+  
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
-
+  
   "languages_tab_title": { "message": "Languages" },
+  "activation_tab_title": { "message": "Activation" },
   "prompt_tab_title": { "message": "Prompt" },
   "api_tab_title": { "message": "API" },
   "import_export_tab_title": { "message": "Import/Export" },
   "advance_tab_title": { "message": "Advance" },
+
+  "prompt_reset_button": { "message": "Reset" },
+
+  "activation_group_general_title": { "message": "General Switch" },
+  "activation_group_text_fields_title": { "message": "Text Field Translation" },
+  "activation_group_page_selection_title": { "message": "On-Page Selection" },
+  "activation_group_dictionary_title": { "message": "Dictionary Mode" },
+
+  "import_export_export_title": { "message": "Export Settings" },
+  "import_export_import_title": { "message": "Import Settings" },
 
   "notification_update_title": { "message": "Extension Updated" },
   "notification_update_message": { "message": "{appName} has been successfully updated to version {version}." },
@@ -32,16 +46,16 @@
     "message": "Enable or disable the entire extension functionality except Popup."
   },
   "translate_on_text_fields_label": {
-    "message": "Enable translation on text fields"
+    "message": "Showing translation Icon on text fields"
   },
   "translate_on_text_fields_description": {
-    "message": "Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut)."
+    "message": "Quick access to translation via icon directly within input/textarea fields."
   },
   "enable_shortcut_for_text_fields_label": {
     "message": "Enable Ctrl+/ shortcut for text fields"
   },
   "enable_shortcut_for_text_fields_description": {
-    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field."
+    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field. (alternative: Ctrl+Alt+/)"
   },
   "translate_with_select_element_label": {
     "message": "Enable translation via select element"
@@ -167,7 +181,7 @@
   "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
   "advance_debug_mode_label": { "message": "Debug Mode" },
 
-  "theme_auto": { "message": "System" },
+  "theme_auto": { "message": "Auto" },
   "theme_light": { "message": "Light" },
   "theme_dark": { "message": "Dark" },
   "theme_toggle_title": { "message": "Toggle Theme" },

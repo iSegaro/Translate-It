@@ -6,6 +6,10 @@
   "nameFirefox": { "message": "Translate It" },
   "description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
 
+  "theme_section_title": { "message": "پوسته" },
+  "localization_section_title": { "message": "زبان افزونه" },
+  
+
   "notification_update_title": { "message": "افزونه به‌روز شد" },
   "notification_update_message": { "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد." },
 
@@ -13,10 +17,21 @@
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
 
   "languages_tab_title": { "message": "زبان‌ها" },
+  "activation_tab_title": { "message": "روش‌های ترجمه" },
   "prompt_tab_title": { "message": "تنظیمات پرامپت" },
   "api_tab_title": { "message": "تنظیمات API" },
   "import_export_tab_title": { "message": "پشتیبان‌گیری" },
   "advance_tab_title": { "message": "پیش‌رفته" },
+
+    "prompt_reset_button": { "message": "Reset" },
+
+  "activation_group_general_title": { "message": "سوییچ کلی" },
+  "activation_group_text_fields_title": { "message": "ترجمه فیلدهای متنی" },
+  "activation_group_page_selection_title": { "message": "انتخاب در صفحه" },
+  "activation_group_dictionary_title": { "message": "حالت دیکشنری" },
+
+  "import_export_export_title": { "message": "پشتیبان‌گیری تنظیمات" },
+  "import_export_import_title": { "message": "بازیابی تنظیمات" },
 
   "languages_section_title": { "message": "زبان‌ها" },
   "source_language_label": { "message": "زبان مبدا" },
@@ -27,8 +42,8 @@
   "translation_activation_section_title": { "message": "روش‌های فعال‌سازی ترجمه" },
   "extension_enabled_label": { "message": "فعال بودن افزونه" },
   "extension_enabled_description": { "message": "فعال‌سازی یا غیرفعال‌سازی تمام عملکردهای افزونه به جز پاپ‌آپ." },
-  "translate_on_text_fields_label": { "message": "فعال‌سازی ترجمه در فیلدهای متنی" },
-  "translate_on_text_fields_description": { "message": "اجازه می‌دهد تا ترجمه مستقیماً در فیلدهای ورودی (مانند منوی زمینه یا کلید میانبر) فعال شود." },
+  "translate_on_text_fields_label": { "message": "نمایش آیکون در فیلدهای متنی" },
+  "translate_on_text_fields_description": { "message": "نمایش آیکونِ ترجمه در هر جایی که تایپ می‌کنید." },
   "enable_shortcut_for_text_fields_label": { "message": "فعال‌سازی کلید میانبر Ctrl+/ برای فیلدهای متنی" },
   "enable_shortcut_for_text_fields_description": { "message": "امکان استفاده از کلید میانبر Ctrl+/ برای فعال‌سازی ترجمه در داخل فیلد متنی را فراهم می‌کند." },
   "translate_with_select_element_label": { "message": "فعال‌سازی ترجمه از طریق انتخاب المان" },
@@ -107,7 +122,7 @@
   "advance_dev_api_mode_label": { "message": "استفاده از حالت توسعه API" },
   "advance_debug_mode_label": { "message": "حالت اشکال‌زدایی (Debug Mode)" },
 
-  "theme_auto": { "message": "سیستم" },
+  "theme_auto": { "message": "خودکار" },
   "theme_light": { "message": "روشن" },
   "theme_dark": { "message": "تاریک" },
   "theme_toggle_title": { "message": "تغییر پوسته" },

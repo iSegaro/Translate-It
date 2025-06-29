@@ -9,643 +9,705 @@
     <script src="../options.bundle.js" defer></script>
   </head>
   <body>
-    <div class="top-right-controls">
-      <a
-        id="githubLink"
-        target="_blank"
-        href="https://github.com/iSegaro/Translate-It"
-        title="Home Page"
-      >
-        <img
-          src="../icons/github.svg"
-          alt="GitHub"
-          height="22"
-          id="githubIcon"
-        />
-      </a>
+    <div class="options-layout">
+      <aside class="options-sidebar">
+        <div class="sidebar-header">
+          <h1 id="options_app_name">Translate It!</h1>
+          <span id="options_app_version">version 0.0.0</span>
+          <p data-i18n="options_description">Translate Everywhere, Simple.</p>
+        </div>
 
-      <div class="setting-row theme-control-overlay-group">
-        <img
-          src="../icons/theme.png"
-          alt="Light/Dark"
-          data-i18n-title="theme_toggle_title"
-          height="22"
-          id="themeIcon"
-        />
-        <label
-          class="switch"
-          title="روشن / تیره"
-          data-i18n-title="theme_toggle_title"
-        >
-          <input type="checkbox" id="theme-Switch" />
-          <span class="slider round"></span>
-        </label>
-        <label
-          for="theme-Auto"
-          class="theme-auto-label-overlay"
-          title="System Theme"
-        >
-          <input type="checkbox" id="theme-Auto" />
-          <span data-i18n="theme_auto">System Theme</span>
-        </label>
-      </div>
-    </div>
-    <div class="header">
-      <h1 id="options_app_name">Translate It!</h1>
-      <span id="options_app_version">version 0.0.0</span>
-      <p data-i18n="options_description">Translate Everywhere, Simple.</p>
-    </div>
-
-    <div class="localization"></div>
-    <div class="container">
-      <div class="tabs">
-        <button
-          class="tab-button active"
-          data-tab="languages"
-          data-i18n="languages_tab_title"
-        >
-          Languages
-        </button>
-        <button
-          class="tab-button"
-          data-tab="prompt"
-          data-i18n="prompt_tab_title"
-        >
-          Prompt
-        </button>
-        <button class="tab-button" data-tab="api" data-i18n="api_tab_title">
-          API
-        </button>
-        <button
-          class="tab-button"
-          data-tab="import-export"
-          data-i18n="import_export_tab_title"
-        >
-          Import/Export
-        </button>
-        <button
-          class="tab-button"
-          data-tab="advance"
-          data-i18n="advance_tab_title"
-        >
-          Advance
-        </button>
-      </div>
-
-      <div id="languages" class="tab-content active">
-        <section>
-          <h2 data-i18n="languages_section_title">Languages</h2>
-          <div class="setting-group">
-            <label for="sourceLanguage" data-i18n="source_language_label"
-              >Source Language</label
-            >
-            <input
-              type="text"
-              id="sourceLanguage"
-              list="allLanguages"
-              data-i18n-placeholder="source_language_placeholder"
-              placeholder="Enter source language"
-            />
-          </div>
-          <div class="setting-group">
-            <label for="targetLanguage" data-i18n="target_language_label"
-              >Target Language</label
-            >
-            <input
-              type="text"
-              id="targetLanguage"
-              list="allLanguages"
-              data-i18n-placeholder="target_language_placeholder"
-              placeholder="Enter target language"
-            />
-          </div>
-        </section>
-
-        <section class="translation-activation">
-          <h2 data-i18n="translation_activation_section_title">
-            Translation Activation Methods
-          </h2>
-
-          <div class="setting-group extension-enabled-group">
-            <label for="extensionEnabled" data-i18n="extension_enabled_label"
-              >Enable Extension</label
-            >
-            <input type="checkbox" id="extensionEnabled" />
-            <span
-              class="setting-description"
-              data-i18n="extension_enabled_description"
-            >
-              Enable or disable the entire extension functionality except Popup.
-            </span>
-          </div>
-
-          <div class="setting-group">
-            <label
-              for="translateOnTextFields"
-              data-i18n="translate_on_text_fields_label"
-              >Enable translation on text fields</label
-            >
-            <input type="checkbox" id="translateOnTextFields" />
-            <span
-              class="setting-description"
-              data-i18n="translate_on_text_fields_description"
-              >Allow triggering translation directly within input/textarea
-              fields (e.g., via context menu or shortcut).</span
-            >
-          </div>
-
-          <div class="setting-group" id="textFieldShortcutGroup">
-            <label
-              for="enableShortcutForTextFields"
-              data-i18n="enable_shortcut_for_text_fields_label"
-              >Enable Ctrl+/ shortcut for text fields</label
-            >
-            <input type="checkbox" id="enableShortcutForTextFields" />
-            <span
-              class="setting-description"
-              data-i18n="enable_shortcut_for_text_fields_description"
-              >Allow using the Ctrl+/ keyboard shortcut to trigger translation
-              when inside a text field.</span
-            >
-          </div>
-          <div class="setting-group">
-            <label
-              for="translateWithSelectElement"
-              data-i18n="translate_with_select_element_label"
-              >Enable translation via select element</label
-            >
-            <input type="checkbox" id="translateWithSelectElement" />
-            <span
-              class="setting-description"
-              data-i18n="translate_with_select_element_description"
-              >Allow triggering translation using a specific selection method
-              (if implemented, e.g., selecting a whole paragraph).</span
-            >
-          </div>
-
-          <div class="setting-group">
-            <label
-              for="translateOnTextSelection"
-              data-i18n="translate_on_text_selection_label"
-              >Enable translation on text selection</label
-            >
-            <input type="checkbox" id="translateOnTextSelection" />
-            <span
-              class="setting-description"
-              data-i18n="translate_on_text_selection_description"
-              >Allow triggering translation automatically or via shortcut after
-              selecting text on the page.</span
-            >
-          </div>
-
-          <div class="radio-group" id="selectionModeGroup">
-            <div class="radio-option">
-              <input
-                type="radio"
-                id="selection-mode-immediate"
-                name="selectionTranslationMode"
-                value="immediate"
-              />
+        <div class="sidebar-section theme-controls">
+          <h2 data-i18n="theme_section_title">Theme</h2>
+          <div class="theme-control-group">
+            <div class="theme-switch-row">
+              <svg
+                class="theme-icon-svg"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zm-9-7c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1s-1 .45-1 1v2c0 .55.45 1 1 1zm0 12c.55 0 1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1v2c0 .55.45 1 1 1zM5.64 5.64c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.64 2.81c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l1.41 1.42zm12.73 12.73c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.41-1.41c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l1.41 1.41zM2.81 18.36c.39.39 1.02.39 1.41 0l1.41-1.41c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0l-1.41 1.41c-.39.39-.39 1.02 0 1.41z"
+                ></path>
+              </svg>
               <label
-                for="selection-mode-immediate"
-                data-i18n="options_selection_mode_immediate"
+                class="switch"
+                title="Toggle Light/Dark Theme"
+                data-i18n-title="theme_toggle_title"
+                ><input type="checkbox" id="theme-Switch" /><span
+                  class="slider round"
+                ></span
               ></label>
+              <svg
+                class="theme-icon-svg"
+                xmlns="http://www.w3.org/2000/svg"
+                enable-background="new 0 0 24 24"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M12,3c-0.2,0-0.4,0-0.6,0.1C10.7,3.5,10,4.6,10,5.9c0,1.5,1.2,2.7,2.7,2.7c0.7,0,1.4-0.3,1.9-0.8c0.8-0.8,1-2,0.5-3 C14.6,4,13.3,3,12,3z M12.5,13.4c-3.1,1.2-5.5,4.1-5.5,7.6c0,0.5,0.4,1,1,1h10c0.5,0,1-0.4,1-1C19,17.5,16.6,14.6,12.5,13.4z"
+                ></path>
+              </svg>
             </div>
-            <div class="radio-option">
-              <input
-                type="radio"
-                id="selection-mode-onclick"
-                name="selectionTranslationMode"
-                value="onClick"
-              />
-              <label
-                for="selection-mode-onclick"
-                data-i18n="options_selection_mode_onclick"
-              ></label>
-            </div>
+            <label for="theme-Auto" class="theme-auto-label"
+              ><input type="checkbox" id="theme-Auto" /><span
+                data-i18n="theme_auto"
+                >System Theme</span
+              ></label
+            >
           </div>
+        </div>
 
-          <div
-            class="setting-group sub-setting-group"
-            id="textSelectionCtrlGroup"
+        <div class="sidebar-section localization-controls">
+          <h2 data-i18n="localization_section_title">Language</h2>
+          <div class="localization"></div>
+        </div>
+
+        <div class="sidebar-footer">
+          <a
+            id="githubLink"
+            target="_blank"
+            href="https://github.com/iSegaro/Translate-It"
+            title="Home Page"
           >
-            <label
-              for="requireCtrlForTextSelection"
-              data-i18n="require_ctrl_for_text_selection_label"
-              >Require Ctrl key for text selection translation</label
+            <img
+              src="../icons/github.svg"
+              alt="GitHub"
+              height="22"
+              id="githubIcon"
+            />
+          </a>
+          <p>
+            by
+            <a
+              class="about-link"
+              href="https://x.com/M_Khani65"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Me</a
             >
-            <input type="checkbox" id="requireCtrlForTextSelection" />
-          </div>
-
-          <div class="setting-group" id="enableDictionaryTranslation">
-            <label
-              for="enableDictionrary"
-              data-i18n="enable_dictionary_translation_label"
-              >Enable Dictionary Translation</label
+            and
+            <a
+              class="about-link"
+              href="https://x.com/iSegar0"
+              target="_blank"
+              rel="noopener noreferrer"
+              >iSegar0</a
             >
-            <input type="checkbox" id="enableDictionrary" />
-            <span
-              class="setting-description"
-              data-i18n="enable_dictionary_translation_description"
-              >When text selection translation is enabled, single words or short
-              phrases will be treated as dictionary lookups, providing detailed
-              definitions instead of standard translations.</span
-            >
-          </div>
-        </section>
-      </div>
+            <span>&copy; 2025</span>
+          </p>
+        </div>
+      </aside>
 
-      <div id="prompt" class="tab-content">
-        <section>
-          <h2 data-i18n="prompt_section_title">Prompt Template</h2>
-          <div class="setting-group prompt-template-group">
-            <label for="promptTemplate" data-i18n="prompt_template_label">
-              Prompt Template
-              <span
-                class="prompt-template-info"
-                data-i18n="prompt_template_info"
-                >Use keywords to customize your prompt...</span
-              >
-            </label>
-            <textarea
-              id="promptTemplate"
-              class="prompt-template-input"
-              data-i18n-placeholder="prompt_template_placeholder"
-              placeholder="Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
-              rows="5"
-            ></textarea>
-            <div class="prompt-template-help">
-              <p data-i18n="prompt_template_help">
-                You can use the following keywords in your prompt template:
-              </p>
-              <ul>
-                <li id="sourceLangHelp">
-                  <code>$_{SOURCE}</code>: Source language.
-                  <span id="sourceLangName"></span>
-                </li>
-                <li id="targetLangHelp">
-                  <code>$_{TARGET}</code>: Target language.
-                  <span id="targetLangName"></span>
-                </li>
-                <li><code>$_{TEXT}</code>: Text to be translated.</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div id="api" class="tab-content">
-        <section>
-          <h2 data-i18n="api_section_title">Translation API</h2>
-          <div class="setting-group">
-            <label for="translationApi" data-i18n="translation_api_label"
-              >API Choice</label
-            >
-            <select id="translationApi">
-              <option value="gemini">Gemini API</option>
-              <option value="webai">WebAI API</option>
-              <option value="openai">OpenAI API</option>
-              <option value="openrouter">OpenRouter API</option>
-              <option value="deepseek">DeepSeek API</option>
-              <option value="custom">Custom (OpenAI Compatible)</option>
-            </select>
-          </div>
-
-          <div id="webAIApiSettings">
-            <h3 data-i18n="webai_api_settings_title">WebAI API Settings</h3>
-            <div class="setting-group api-key-info">
-              <span
-                class="setting-description"
-                data-i18n="webai_api_key_info"
-              >
-                Run your API Server.
-              </span>
-              <a
-                class="api-link"
-                data-i18n="webai_api_key_link"
-                href="https://github.com/Amm1rr/WebAI-to-API"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Get and Run your locally hosted WebAI API server.
-              </a>
-            </div>
-
-            <div class="setting-group">
-              <label for="webAIApiUrl" data-i18n="webai_api_url_label"
-                >WebAI API URL</label
-              >
-              <input
-                type="text"
-                id="webAIApiUrl"
-                data-i18n-placeholder="webai_api_url_placeholder"
-                placeholder="Enter WebAI API URL"
-              />
-            </div>
-            <div class="setting-group">
-              <label for="webAIApiModel" data-i18n="webai_api_model_label"
-                >WebAI API Model</label
-              >
-              <input
-                type="text"
-                id="webAIApiModel"
-                data-i18n-placeholder="webai_api_model_placeholder"
-                placeholder="Enter WebAI API model"
-              />
-            </div>
-          </div>
-
-          <div id="geminiApiSettings">
-            <h3 data-i18n="gemini_api_settings_title">Gemini API Settings</h3>
-
-            <div class="setting-group api-key-info">
-              <span class="setting-description" data-i18n="gemini_api_key_info">
-                You can get your Gemini API key from
-              </span>
-              <a
-                class="api-link"
-                data-i18n="gemini_api_key_link"
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Get Your Free API Key
-              </a>
-            </div>
-
-            <div class="setting-group">
-              <label for="apiKey">API Key</label>
-              <input
-                type="text"
-                id="apiKey"
-                data-i18n-placeholder="gemini_api_key_placeholder"
-                placeholder="Paste your API key here"
-              />
-            </div>
-
-            <div class="setting-group">
-              <label for="apiUrl">API URL</label>
-              <input
-                type="text"
-                id="apiUrl"
-                data-i18n-placeholder="gemini_api_url_placeholder"
-                placeholder="Enter API URL"
-              />
-            </div>
-          </div>
-
-          <div id="openAIApiSettings" style="display: none">
-            <h3 data-i18n="openai_api_settings_title">OpenAI API Settings</h3>
-
-            <div class="setting-group api-key-info">
-              <span class="setting-description" data-i18n="openai_api_key_info">
-                Get your OpenAI API key from
-              </span>
-              <a
-                class="api-link"
-                data-i18n="openai_api_key_link"
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Get OpenAI API Key
-              </a>
-            </div>
-
-            <div class="setting-group">
-              <label for="openaiApiKey">API Key</label>
-              <input
-                type="text"
-                id="openaiApiKey"
-                data-i18n-placeholder="openai_api_key_placeholder"
-                placeholder="Paste your OpenAI API key here"
-              />
-            </div>
-            <div class="setting-group">
-              <label for="openaiApiModel">Model</label>
-              <input
-                type="text"
-                id="openaiApiModel"
-                data-i18n-placeholder="openai_api_model_placeholder"
-                placeholder="Enter OpenAI model"
-              />
-            </div>
-          </div>
-
-          <div id="openRouterApiSettings" style="display: none">
-            <h3 data-i18n="openrouter_api_settings_title">
-              OpenRouter API Settings
-            </h3>
-
-            <div class="setting-group api-key-info">
-              <span
-                class="setting-description"
-                data-i18n="openrouter_api_key_info"
-              >
-                Get your OpenRouter API key from
-              </span>
-              <a
-                class="api-link"
-                data-i18n="openrouter_api_key_link"
-                href="https://openrouter.ai/settings/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Get OpenRouter API Key
-              </a>
-            </div>
-
-            <div class="setting-group">
-              <label for="openrouterApiKey">API Key</label>
-              <input
-                type="text"
-                id="openrouterApiKey"
-                data-i18n-placeholder="openrouter_api_key_placeholder"
-                placeholder="Paste your OpenRouter API key here"
-              />
-            </div>
-            <div class="setting-group">
-              <label for="openrouterApiModel">Model</label>
-              <input
-                type="text"
-                id="openrouterApiModel"
-                data-i18n-placeholder="openrouter_api_model_placeholder"
-                placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
-              />
-            </div>
-          </div>
-
-          <div id="deepseekApiSettings" style="display: none">
-            <h3 data-i18n="deepseek_api_settings_title">
-              DeepSeek API Settings
-            </h3>
-
-            <div class="setting-group api-key-info">
-              <span
-                class="setting-description"
-                data-i18n="deepseek_api_key_info"
-              >
-                Get your DeepSeek API key from
-              </span>
-              <a
-                class="api-link"
-                data-i18n="deepseek_api_key_link"
-                href="https://platform.deepseek.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Get DeepSeek API Key
-              </a>
-            </div>
-
-            <div class="setting-group">
-              <label for="deepseekApiKey">API Key</label>
-              <input
-                type="text"
-                id="deepseekApiKey"
-                data-i18n-placeholder="deepseek_api_key_placeholder"
-                placeholder="Paste your DeepSeek API key here"
-              />
-            </div>
-            <div class="setting-group">
-              <label for="deepseekApiModel">Model</label>
-              <input
-                type="text"
-                id="deepseekApiModel"
-                data-i18n-placeholder="deepseek_api_model_placeholder"
-                placeholder="Enter DeepSeek model (e.g., deepseek-chat)"
-              />
-            </div>
-          </div>
-
-          <div id="customApiSettings" style="display: none">
-            <h3 data-i18n="custom_api_settings_title">Custom API Settings</h3>
-            <span
-              class="setting-description"
-              data-i18n="custom_api_settings_description"
-            >
-              Use any API service that is compatible with the OpenAI chat
-              completions format.
-            </span>
-            <div class="setting-group">
-              <label
-                for="customApiUrl"
-                data-i18n="custom_api_settings_api_url_label"
-                >API URL</label
-              >
-              <input
-                type="text"
-                id="customApiUrl"
-                data-i18n-placeholder="custom_api_url_placeholder"
-                placeholder="Enter the base URL of your custom API"
-              />
-            </div>
-            <div class="setting-group">
-              <label
-                for="customApiKey"
-                data-i18n="custom_api_settings_api_key_label"
-                >API Key</label
-              >
-              <input
-                type="text"
-                id="customApiKey"
-                data-i18n-placeholder="custom_api_key_placeholder"
-                placeholder="Paste your custom API key here"
-              />
-            </div>
-            <div class="setting-group">
-              <label
-                for="customApiModel"
-                data-i18n="custom_api_settings_model_label"
-                >Model</label
-              >
-              <input
-                type="text"
-                id="customApiModel"
-                data-i18n-placeholder="custom_api_model_placeholder"
-                placeholder="Enter the model name"
-              />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div id="import-export" class="tab-content">
-        <section>
-          <h2 data-i18n="import_export_section_title">
-            Import/Export Settings
-          </h2>
-          <div class="setting-group">
-            <button id="exportSettings" data-i18n="export_settings_button">
-              Export Settings
+      <main class="options-main">
+        <nav class="vertical-tabs">
+          <a
+            href="#languages"
+            class="tab-button"
+            data-tab="languages"
+            data-i18n="languages_tab_title"
+            >Languages</a
+          >
+          <a
+            href="#activation"
+            class="tab-button"
+            data-tab="activation"
+            data-i18n="activation_tab_title"
+            >Activation</a
+          >
+          <a
+            href="#prompt"
+            class="tab-button"
+            data-tab="prompt"
+            data-i18n="prompt_tab_title"
+            >Prompt</a
+          >
+          <a
+            href="#api"
+            class="tab-button"
+            data-tab="api"
+            data-i18n="api_tab_title"
+            >API</a
+          >
+          <a
+            href="#import-export"
+            class="tab-button"
+            data-tab="import-export"
+            data-i18n="import_export_tab_title"
+            >Import/Export</a
+          >
+          <a
+            href="#advance"
+            class="tab-button"
+            data-tab="advance"
+            data-i18n="advance_tab_title"
+            >Advance</a
+          >
+          <div class="tabs-action-area">
+            <div id="status" class=""></div>
+            <button id="saveSettings" data-i18n="save_settings_button">
+              Save
             </button>
           </div>
-          <div class="setting-group">
-            <label for="importFile" data-i18n="import_settings_label"
-              >Import Settings</label
-            >
-            <input type="file" id="importFile" accept=".json" />
-          </div>
-          <div class="setting-group">
-            <button id="importSettings" data-i18n="import_settings_button">
-              Import Settings
-            </button>
-          </div>
-        </section>
-      </div>
+        </nav>
 
-      <div id="advance" class="tab-content">
-        <section>
-          <div class="setting-group">
-            <label data-i18n="advance_dev_api_mode_label" for="useMock"
-              >Use Dev API Mode</label
-            >
-            <input type="checkbox" id="useMock" />
+        <div class="tab-content-container">
+          <div id="languages" class="tab-content">
+            <section>
+              <h2 data-i18n="languages_section_title">Languages</h2>
+              <div class="setting-group">
+                <label for="sourceLanguage" data-i18n="source_language_label"
+                  >Source Language</label
+                ><input
+                  type="text"
+                  id="sourceLanguage"
+                  list="allLanguages"
+                  data-i18n-placeholder="source_language_placeholder"
+                  placeholder="Enter source language"
+                />
+              </div>
+              <div class="setting-group">
+                <label for="targetLanguage" data-i18n="target_language_label"
+                  >Target Language</label
+                ><input
+                  type="text"
+                  id="targetLanguage"
+                  list="allLanguages"
+                  data-i18n-placeholder="target_language_placeholder"
+                  placeholder="Enter target language"
+                />
+              </div>
+            </section>
           </div>
-          <div class="setting-group">
-            <label for="debugMode" data-i18n="advance_debug_mode_label"
-              >Debug Mode</label
-            >
-            <input type="checkbox" id="debugMode" />
-          </div>
-          <div class="setting-group">
-            <label for="excludedSites" data-i18n="excluded_sites_label"
-              >Exclude these sites (comma separated)</label
-            >
-            <textarea
-              id="excludedSites"
-              rows="3"
-              placeholder="example.com, anotherdomain.org"
-            ></textarea>
-          </div>
-        </section>
-      </div>
 
-      <div id="status" class=""></div>
-      <button id="saveSettings" data-i18n="save_settings_button">Save</button>
+          <div id="activation" class="tab-content">
+            <section class="translation-activation">
+              <h2 data-i18n="translation_activation_section_title">
+                Translation Activation Methods
+              </h2>
+
+              <div class="setting-group extension-enabled-group">
+                <label
+                  for="extensionEnabled"
+                  data-i18n="extension_enabled_label"
+                  >Enable Extension</label
+                >
+                <input type="checkbox" id="extensionEnabled" />
+                <span
+                  class="setting-description"
+                  data-i18n="extension_enabled_description"
+                  >Enable or disable the entire extension functionality except
+                  Popup.</span
+                >
+              </div>
+
+              <fieldset>
+                <legend data-i18n="activation_group_text_fields_title">
+                  Text Field Translation
+                </legend>
+                <div class="setting-group">
+                  <label
+                    for="translateOnTextFields"
+                    data-i18n="translate_on_text_fields_label"
+                    >Enable translation on text fields</label
+                  >
+                  <input type="checkbox" id="translateOnTextFields" />
+                  <span
+                    class="setting-description"
+                    data-i18n="translate_on_text_fields_description"
+                    >Allow triggering translation directly within input/textarea
+                    fields (e.g., via context menu or shortcut).</span
+                  >
+                </div>
+                <div class="setting-group" id="textFieldShortcutGroup">
+                  <label
+                    for="enableShortcutForTextFields"
+                    data-i18n="enable_shortcut_for_text_fields_label"
+                    >Enable Ctrl+/ shortcut for text fields</label
+                  >
+                  <input type="checkbox" id="enableShortcutForTextFields" />
+                  <span
+                    class="setting-description"
+                    data-i18n="enable_shortcut_for_text_fields_description"
+                    >Allow using the Ctrl+/ keyboard shortcut to trigger
+                    translation when inside a text field.</span
+                  >
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend data-i18n="activation_group_page_selection_title">
+                  On-Page Selection
+                </legend>
+
+                <div class="setting-group">
+                  <label
+                    for="translateWithSelectElement"
+                    data-i18n="translate_with_select_element_label"
+                    >Enable translation via select element</label
+                  >
+                  <input type="checkbox" id="translateWithSelectElement" />
+                  <span
+                    class="setting-description"
+                    data-i18n="translate_with_select_element_description"
+                    >Allow triggering translation using a specific selection
+                    method (if implemented, e.g., selecting a whole
+                    paragraph).</span
+                  >
+                </div>
+
+                <div class="setting-group">
+                  <label
+                    for="translateOnTextSelection"
+                    data-i18n="translate_on_text_selection_label"
+                    >Enable translation on text selection</label
+                  >
+                  <input type="checkbox" id="translateOnTextSelection" />
+                  <span
+                    class="setting-description"
+                    data-i18n="translate_on_text_selection_description"
+                    >Allow triggering translation automatically or via shortcut
+                    after selecting text on the page.</span
+                  >
+                </div>
+
+                <div class="sub-options-group">
+                  <div class="radio-group" id="selectionModeGroup">
+                    <div class="radio-option">
+                      <input
+                        type="radio"
+                        id="selection-mode-immediate"
+                        name="selectionTranslationMode"
+                        value="immediate"
+                      /><label
+                        for="selection-mode-immediate"
+                        data-i18n="options_selection_mode_immediate"
+                      ></label>
+                    </div>
+                    <div class="radio-option">
+                      <input
+                        type="radio"
+                        id="selection-mode-onclick"
+                        name="selectionTranslationMode"
+                        value="onClick"
+                      /><label
+                        for="selection-mode-onclick"
+                        data-i18n="options_selection_mode_onclick"
+                      ></label>
+                    </div>
+                  </div>
+                  <div
+                    class="setting-group sub-setting-group"
+                    id="textSelectionCtrlGroup"
+                  >
+                    <label
+                      for="requireCtrlForTextSelection"
+                      data-i18n="require_ctrl_for_text_selection_label"
+                      >Require Ctrl key for text selection translation</label
+                    >
+                    <input type="checkbox" id="requireCtrlForTextSelection" />
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend data-i18n="activation_group_dictionary_title">
+                  Dictionary Mode
+                </legend>
+                <div class="setting-group" id="enableDictionaryTranslation">
+                  <label
+                    for="enableDictionrary"
+                    data-i18n="enable_dictionary_translation_label"
+                    >Enable Dictionary Translation</label
+                  >
+                  <input type="checkbox" id="enableDictionrary" />
+                  <span
+                    class="setting-description"
+                    data-i18n="enable_dictionary_translation_description"
+                    >When text selection translation is enabled, single words or
+                    short phrases will be treated as dictionary lookups,
+                    providing detailed definitions instead of standard
+                    translations.</span
+                  >
+                </div>
+              </fieldset>
+            </section>
+          </div>
+
+          <div id="prompt" class="tab-content">
+            <section>
+              <h2 data-i18n="prompt_section_title">Prompt Template</h2>
+              <div class="setting-group prompt-template-group">
+                <label for="promptTemplate" class="prompt-label-with-button">
+                  <span data-i18n="prompt_template_label">Prompt Template</span>
+                  <button
+                    id="resetPromptButton"
+                    class="button-inline"
+                    data-i18n="prompt_reset_button"
+                  >
+                    Reset
+                  </button>
+                </label>
+                <textarea
+                  id="promptTemplate"
+                  class="prompt-template-input"
+                  data-i18n-placeholder="prompt_template_placeholder"
+                  placeholder="Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
+                  rows="5"
+                ></textarea>
+
+                <div class="prompt-template-help">
+                  <p data-i18n="prompt_template_help">
+                    You can use the following keywords in your prompt template:
+                  </p>
+                  <ul>
+                    <li id="sourceLangHelp">
+                      <code>$_{SOURCE}</code>: Source language.
+                      <span id="sourceLangName"></span>
+                    </li>
+                    <li id="targetLangHelp">
+                      <code>$_{TARGET}</code>: Target language.
+                      <span id="targetLangName"></span>
+                    </li>
+                    <li><code>$_{TEXT}</code>: Text to be translated.</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="api" class="tab-content">
+            <section>
+              <h2 data-i18n="api_section_title">Translation API</h2>
+              <div class="setting-group">
+                <label for="translationApi" data-i18n="translation_api_label"
+                  >API Choice</label
+                ><select id="translationApi">
+                  <option value="gemini">Gemini API</option>
+                  <option value="webai">WebAI API</option>
+                  <option value="openai">OpenAI API</option>
+                  <option value="openrouter">OpenRouter API</option>
+                  <option value="deepseek">DeepSeek API</option>
+                  <option value="custom">Custom (OpenAI Compatible)</option>
+                </select>
+              </div>
+              <div id="webAIApiSettings">
+                <h3 data-i18n="webai_api_settings_title">WebAI API Settings</h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="webai_api_key_info"
+                    >Run your API Server.</span
+                  ><a
+                    class="api-link"
+                    data-i18n="webai_api_key_link"
+                    href="https://github.com/Amm1rr/WebAI-to-API"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Get and Run your locally hosted WebAI API server.</a
+                  >
+                </div>
+                <div class="setting-group">
+                  <label for="webAIApiUrl" data-i18n="webai_api_url_label"
+                    >WebAI API URL</label
+                  ><input
+                    type="text"
+                    id="webAIApiUrl"
+                    data-i18n-placeholder="webai_api_url_placeholder"
+                    placeholder="Enter WebAI API URL"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label for="webAIApiModel" data-i18n="webai_api_model_label"
+                    >WebAI API Model</label
+                  ><input
+                    type="text"
+                    id="webAIApiModel"
+                    data-i18n-placeholder="webai_api_model_placeholder"
+                    placeholder="Enter WebAI API model"
+                  />
+                </div>
+              </div>
+              <div id="geminiApiSettings">
+                <h3 data-i18n="gemini_api_settings_title">
+                  Gemini API Settings
+                </h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="gemini_api_key_info"
+                    >You can get your Gemini API key from</span
+                  ><a
+                    class="api-link"
+                    data-i18n="gemini_api_key_link"
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Get Your Free API Key</a
+                  >
+                </div>
+                <div class="setting-group">
+                  <label for="apiKey">API Key</label
+                  ><input
+                    type="text"
+                    id="apiKey"
+                    data-i18n-placeholder="gemini_api_key_placeholder"
+                    placeholder="Paste your API key here"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label for="apiUrl">API URL</label
+                  ><input
+                    type="text"
+                    id="apiUrl"
+                    data-i18n-placeholder="gemini_api_url_placeholder"
+                    placeholder="Enter API URL"
+                  />
+                </div>
+              </div>
+              <div id="openAIApiSettings" style="display: none">
+                <h3 data-i18n="openai_api_settings_title">
+                  OpenAI API Settings
+                </h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="openai_api_key_info"
+                    >Get your OpenAI API key from</span
+                  ><a
+                    class="api-link"
+                    data-i18n="openai_api_key_link"
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Get OpenAI API Key</a
+                  >
+                </div>
+                <div class="setting-group">
+                  <label for="openaiApiKey">API Key</label
+                  ><input
+                    type="text"
+                    id="openaiApiKey"
+                    data-i18n-placeholder="openai_api_key_placeholder"
+                    placeholder="Paste your OpenAI API key here"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label for="openaiApiModel">Model</label
+                  ><input
+                    type="text"
+                    id="openaiApiModel"
+                    data-i18n-placeholder="openai_api_model_placeholder"
+                    placeholder="Enter OpenAI model"
+                  />
+                </div>
+              </div>
+              <div id="openRouterApiSettings" style="display: none">
+                <h3 data-i18n="openrouter_api_settings_title">
+                  OpenRouter API Settings
+                </h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="openrouter_api_key_info"
+                    >Get your OpenRouter API key from</span
+                  ><a
+                    class="api-link"
+                    data-i18n="openrouter_api_key_link"
+                    href="https://openrouter.ai/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Get OpenRouter API Key</a
+                  >
+                </div>
+                <div class="setting-group">
+                  <label for="openrouterApiKey">API Key</label
+                  ><input
+                    type="text"
+                    id="openrouterApiKey"
+                    data-i18n-placeholder="openrouter_api_key_placeholder"
+                    placeholder="Paste your OpenRouter API key here"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label for="openrouterApiModel">Model</label
+                  ><input
+                    type="text"
+                    id="openrouterApiModel"
+                    data-i18n-placeholder="openrouter_api_model_placeholder"
+                    placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
+                  />
+                </div>
+              </div>
+              <div id="deepseekApiSettings" style="display: none">
+                <h3 data-i18n="deepseek_api_settings_title">
+                  DeepSeek API Settings
+                </h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="deepseek_api_key_info"
+                    >Get your DeepSeek API key from</span
+                  ><a
+                    class="api-link"
+                    data-i18n="deepseek_api_key_link"
+                    href="https://platform.deepseek.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Get DeepSeek API Key</a
+                  >
+                </div>
+                <div class="setting-group">
+                  <label for="deepseekApiKey">API Key</label
+                  ><input
+                    type="text"
+                    id="deepseekApiKey"
+                    data-i18n-placeholder="deepseek_api_key_placeholder"
+                    placeholder="Paste your DeepSeek API key here"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label for="deepseekApiModel">Model</label
+                  ><input
+                    type="text"
+                    id="deepseekApiModel"
+                    data-i18n-placeholder="deepseek_api_model_placeholder"
+                    placeholder="Enter DeepSeek model (e.g., deepseek-chat)"
+                  />
+                </div>
+              </div>
+              <div id="customApiSettings" style="display: none">
+                <h3 data-i18n="custom_api_settings_title">
+                  Custom API Settings
+                </h3>
+                <span
+                  class="setting-description"
+                  data-i18n="custom_api_settings_description"
+                  >Use any API service that is compatible with the OpenAI chat
+                  completions format.</span
+                >
+                <div class="setting-group">
+                  <label
+                    for="customApiUrl"
+                    data-i18n="custom_api_settings_api_url_label"
+                    >API URL</label
+                  ><input
+                    type="text"
+                    id="customApiUrl"
+                    data-i18n-placeholder="custom_api_url_placeholder"
+                    placeholder="Enter the base URL of your custom API"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label
+                    for="customApiKey"
+                    data-i18n="custom_api_settings_api_key_label"
+                    >API Key</label
+                  ><input
+                    type="text"
+                    id="customApiKey"
+                    data-i18n-placeholder="custom_api_key_placeholder"
+                    placeholder="Paste your custom API key here"
+                  />
+                </div>
+                <div class="setting-group">
+                  <label
+                    for="customApiModel"
+                    data-i18n="custom_api_settings_model_label"
+                    >Model</label
+                  ><input
+                    type="text"
+                    id="customApiModel"
+                    data-i18n-placeholder="custom_api_model_placeholder"
+                    placeholder="Enter the model name"
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="import-export" class="tab-content">
+            <section>
+              <h2 data-i18n="import_export_section_title">
+                Import/Export Settings
+              </h2>
+
+              <fieldset>
+                <legend data-i18n="import_export_export_title">
+                  Export Settings
+                </legend>
+                <div class="setting-group">
+                  <p
+                    class="setting-description"
+                    style="flex-basis: auto; padding-left: 0"
+                  >
+                    Export your current settings to a JSON file for backup or
+                    sharing.
+                  </p>
+                  <button
+                    id="exportSettings"
+                    data-i18n="export_settings_button"
+                  >
+                    Export Settings
+                  </button>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend data-i18n="import_export_import_title">
+                  Import Settings
+                </legend>
+                <div class="setting-group">
+                  <label for="importFile" data-i18n="import_settings_label"
+                    >Import from file</label
+                  >
+                  <input type="file" id="importFile" accept=".json" />
+                </div>
+                <div class="setting-group">
+                  <p
+                    class="setting-description"
+                    style="flex-basis: auto; padding-left: 0"
+                  >
+                    Importing will overwrite your current settings. The page
+                    will reload after a successful import.
+                  </p>
+                  <button
+                    id="importSettings"
+                    data-i18n="import_settings_button"
+                  >
+                    Import Settings
+                  </button>
+                </div>
+              </fieldset>
+            </section>
+          </div>
+
+          <div id="advance" class="tab-content">
+            <section>
+              <div class="setting-group">
+                <label data-i18n="advance_dev_api_mode_label" for="useMock"
+                  >Use Dev API Mode</label
+                ><input type="checkbox" id="useMock" />
+              </div>
+              <div class="setting-group">
+                <label for="debugMode" data-i18n="advance_debug_mode_label"
+                  >Debug Mode</label
+                ><input type="checkbox" id="debugMode" />
+              </div>
+              <div class="setting-group">
+                <label for="excludedSites" data-i18n="excluded_sites_label"
+                  >Exclude these sites (comma separated)</label
+                ><textarea
+                  id="excludedSites"
+                  rows="3"
+                  placeholder="example.com, anotherdomain.org"
+                ></textarea>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
     </div>
-    <footer>
-      <p>
-        by
-        <a
-          class="about-link"
-          href="https://x.com/M_Khani65"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Me</a
-        >
-        and
-        <a
-          class="about-link"
-          href="https://x.com/iSegar0"
-          target="_blank"
-          rel="noopener noreferrer"
-          >iSegar0</a
-        >
-        <span>&copy; 2025</span>
-      </p>
-    </footer>
-
     <datalist id="allLanguages">
       <option value="English"></option>
       <option value="Farsi"></option>
