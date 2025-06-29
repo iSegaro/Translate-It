@@ -12,7 +12,8 @@
     "tabs",
     "clipboardWrite",
     "clipboardRead",
-    "notifications"
+    "notifications",
+    "contextMenus"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
