@@ -35,27 +35,27 @@
 همچنین می‌توانید تنظیم کنید که به‌جای نمایش مستقیم ترجمه، یک آیکون کوچک زیر متن انتخاب‌شده نمایش داده شود که با کلیک روی آن، ترجمه نشان داده می‌شود.
 
 <p align="center">
-  <img src="./docs/Selection.png" alt="نمایش ترجمه پس از انتخاب متن" height="280" />
-  <img src="./docs/Selection_Icon.png" alt="نمایش آیکون کوچک ترجمه زیر متن انتخاب‌شده" height="120" />
+  <img src="./docs/Images/Selection.png" alt="نمایش ترجمه پس از انتخاب متن" height="280" />
+  <img src="./docs/Images/Selection_Icon.png" alt="نمایش آیکون کوچک ترجمه زیر متن انتخاب‌شده" height="120" />
 </p>
 
 - **ترجمه با انتخاب قسمتی از صفحه:** با فعال‌سازی حالت "انتخاب اِلِمان" از طریق آیکون افزونه در نوار ابزار، می‌توانید هر بخش از صفحه (مانند پاراگراف یا دکمه) را بدون تغییر در چینش، به‌طور کامل ترجمه کنید.
 
 <p align="center">
-  <img src="./docs/Select_Element_Before.png" alt="قبل از انتخاب المان" height="120" />
-  <img src="./docs/Select_Element_After.png"  alt="بعد از انتخاب المان" height="120" />
+  <img src="./docs/Images/Select_Element_Before.png" alt="قبل از انتخاب المان" height="120" />
+  <img src="./docs/Images/Select_Element_After.png"  alt="بعد از انتخاب المان" height="120" />
 </p>
 
 - **ترجمه در حین نوشتن:** وقتی در فیلدهای متنی یا فرم‌ها مشغول تایپ هستید، می‌توانید یا با فشار کلید میانبر `Ctrl + /` یا با کلیک روی آیکون مترجم کوچک کنار فیلد، متن خود را قبل از ارسال به سرعت ترجمه کنید.
 
 <p align="center">
-  <img src="./docs/Popup.png" alt="پنجره Popup" height="280" />
+  <img src="./docs/Images/Popup.png" alt="پنجره Popup" height="280" />
 </p>
 
 - **ترجمه پیشرفته از طریق Popup:** با کلیک روی آیکون افزونه در نوار ابزار، یک پنجره popup فعال می‌شود که علاوه بر ترجمه، امکانات بیشتری مانند بررسی تلفظ و ارائه اطلاعات دیکشنری را در اختیار قرار می‌دهد.
 
 <p align="center">
-  <img src="./docs/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
+  <img src="./docs/Images/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
 </p>
 
 این افزونه به صورت اختصاصی برای استفاده شخصی توسعه یافته و ترجمه‌ای هوشمند و سریع را همیشه در دسترس قرار می‌دهد.

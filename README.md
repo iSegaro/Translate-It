@@ -34,28 +34,28 @@ This is a lightweight and efficient personal tool for translating text on websit
 Alternatively, a small translation icon can appear below the selected text—clicking it will show the translation.
 
   <p align="center">
-    <img src="./docs/Selection.png" alt="Popup showing translation of selected text" height="280" />
-    <img src="./docs/Selection_Icon.png" alt="Small translation icon showing" height="120" />
+    <img src="./docs/Images/Selection.png" alt="Popup showing translation of selected text" height="280" />
+    <img src="./docs/Images/Selection_Icon.png" alt="Small translation icon showing" height="120" />
   </p>
 
 - **Element Selection Translation:** Activate “Select Element” mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
 
 <p align="center">
-  <img src="./docs/Select_Element_Item.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
-  <img src="./docs/Select_Element_Before.png" alt="Webpage before element-selection mode is activated" height="120" />
-  <img src="./docs/Select_Element_After.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
+  <img src="./docs/Images/Select_Element_Item.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
+  <img src="./docs/Images/Select_Element_Before.png" alt="Webpage before element-selection mode is activated" height="120" />
+  <img src="./docs/Images/Select_Element_After.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
 </p>
 
 - **In-Field Translation:** When typing inside a form or text field, press the `Ctrl + /` shortcut or click the inline translator icon to instantly translate the content before sending.
 
 <p align="center">
-  <img src="./docs/Icon.png" alt="Small translation icon next to text input field" height="240" />
+  <img src="./docs/Images/Icon.png" alt="Small translation icon next to text input field" height="240" />
 </p>
 
 - **Advanced Popup Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support.
 
 <p align="center">
-  <img src="./docs/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
+  <img src="./docs/Images/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
 </p>
 
 This extension is developed solely for personal use and keeps smart and fast translation always within reach.
