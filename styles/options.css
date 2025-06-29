@@ -3,7 +3,7 @@
 :root.theme-light {
   --bg-color: #ffffff;
   --text-color: #000000;
-  --container-bg-color: #fff;
+  --container-bg-color: #f3f3f3;
   --container-text-color: #333;
   --border-color: #ddd;
   --tab-button-color: #555;
