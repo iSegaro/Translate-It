@@ -66,9 +66,6 @@
       "matches": ["<all_urls>"]
     }
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
-  },
   "commands": {
     "toggle-select-element": {
       "suggested_key": {
