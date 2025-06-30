@@ -73,10 +73,6 @@
   "help_api_keys_content": {
     "message": "You can find links to each API provider's website in the 'API' tab. You will need to create an account on their respective platforms to generate a key."
   },
-  "help_privacy_title": { "message": "Privacy Policy" },
-  "help_privacy_content": {
-    "message": "This extension processes your text for translation by sending it to the API provider you select. No data is stored on our servers. All settings are stored locally on your device."
-  },
 
   "translation_activation_section_title": {
     "message": "Translation Activation Methods"
