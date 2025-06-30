@@ -16,31 +16,52 @@ Browser.runtime.onInstalled.addListener(async (details) => {
     const optionsUrl = Browser.runtime.getURL("html/options.html#api");
     Browser.tabs.create({ url: optionsUrl });
   }
-  
+
   // --- Scenario 2: Extension Update ---
   else if (details.reason === "update") {
     try {
       const manifest = Browser.runtime.getManifest();
       const version = manifest.version;
       const appName = (await getTranslationString("name")) || "Translate It!";
-      const title = (await getTranslationString("notification_update_title")) || "Extension Updated";
-      let message = (await getTranslationString("notification_update_message")) || `{appName} has been updated to version {version}. Click to see what's new.`;
-      
-      message = message.replace("{appName}", appName).replace("{version}", version);
+      const title =
+        (await getTranslationString("notification_update_title")) ||
+        "Extension Updated";
+      let message =
+        (await getTranslationString("notification_update_message")) ||
+        `{appName} has been updated to version {version}. Click to see what's new.`;
 
-      // Create and display the notification with a specific ID.
-      // The click event will be handled by a separate listener.
-      await Browser.notifications.create("update-notification", {
+      message = message
+        .replace("{appName}", appName)
+        .replace("{version}", version);
+
+      // --- START: BROWSER-AWARE NOTIFICATION OPTIONS ---
+
+      // 1. Create a base options object with properties common to all browsers.
+      const notificationOptions = {
         type: "basic",
         iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"),
         title: title,
         message: message,
-        // Optional: Make it more obvious it's clickable on some systems
-        requireInteraction: true 
-      });
-      logME("Update notification created.");
-      
+      };
+
+      // 2. Get browser information.
+      const browserInfo = await Browser.runtime.getBrowserInfo();
+
+      // 3. Conditionally add the Chrome-specific property.
+      if (browserInfo.name.toLowerCase().includes("chrome")) {
+        notificationOptions.requireInteraction = true;
+      }
+
+      // --- END: BROWSER-AWARE NOTIFICATION OPTIONS ---
+
+      // 4. Create the notification using the compatible options object.
+      await Browser.notifications.create(
+        "update-notification",
+        notificationOptions
+      );
+      logME("Update notification created with browser-specific options.");
     } catch (e) {
+      // This will now only catch unexpected errors, not the compatibility error.
       logME("[onInstalled] Failed to create update notification:", e);
     }
   }
