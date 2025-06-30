@@ -137,7 +137,9 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("quota exceeded") ||
     msg.includes("gemini quota") ||
     msg.includes("resource has been exhausted") ||
-    msg.includes("check quota")
+    msg.includes("check quota") ||
+    msg.includes("requires more credits") ||
+    msg.includes("fewer max_tokens")
   )
     return ErrorTypes.QUOTA_EXCEEDED;
 
