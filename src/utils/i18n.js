@@ -5,6 +5,7 @@ import { applyElementDirection } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
+import { marked } from "marked";
 // import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {
@@ -128,17 +129,12 @@ export async function app_localize(lang_code) {
  * این تابع به ترتیب المان‌هایی با data-i18n، data-i18n-title و data-i18n-placeholder را پردازش می‌کند.
  */
 function localizeContainer(container, translations) {
-  // لوکالایز کردن المان‌هایی که دارای data-i18n هستند
+  // --- Part 1: Handle standard text content (data-i18n) ---
   const textItems = container.querySelectorAll("[data-i18n]");
   textItems.forEach((item) => {
     const key = item.getAttribute("data-i18n");
-    let translation = "";
-    if (translations && translations[key] && translations[key].message) {
-      translation = translations[key].message;
-    } else {
-      translation = Browser.i18n.getMessage(key);
-    }
-
+    const translation = translations?.[key]?.message || Browser.i18n.getMessage(key);
+    
     if (item.matches("input, textarea")) {
       item.value = translation;
     } else if (item.matches("img")) {
@@ -147,41 +143,41 @@ function localizeContainer(container, translations) {
       item.textContent = translation;
     }
   });
-
-  // لوکالایز کردن المان‌هایی که دارای data-i18n-title هستند
+  
+  // --- Part 2: Handle titles (data-i18n-title) ---
   const titleItems = container.querySelectorAll("[data-i18n-title]");
   titleItems.forEach((item) => {
     const titleKey = item.getAttribute("data-i18n-title");
-    let titleTranslation = "";
-    if (
-      translations &&
-      translations[titleKey] &&
-      translations[titleKey].message
-    ) {
-      titleTranslation = translations[titleKey].message;
-    } else {
-      titleTranslation = Browser.i18n.getMessage(titleKey);
-    }
+    const titleTranslation = translations?.[titleKey]?.message || Browser.i18n.getMessage(titleKey);
     item.setAttribute("title", titleTranslation);
   });
-
-  // لوکالایز کردن placeholderها (برای المان‌هایی که data-i18n-placeholder دارند)
-  const placeholderItems = container.querySelectorAll(
-    "[data-i18n-placeholder]"
-  );
+  
+  // --- Part 3: Handle placeholders (data-i18n-placeholder) ---
+  const placeholderItems = container.querySelectorAll("[data-i18n-placeholder]");
   placeholderItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-placeholder");
-    let translation = "";
-    if (translations && translations[key] && translations[key].message) {
-      translation = translations[key].message;
-    } else {
-      translation = Browser.i18n.getMessage(key);
-    }
+    const translation = translations?.[key]?.message || Browser.i18n.getMessage(key);
     if (translation) {
       item.placeholder = translation;
     }
   });
+
+  // --- Part 4: Handle Markdown content ---
+  const markdownItems = container.querySelectorAll("[data-i18n-markdown]");
+  markdownItems.forEach((item) => {
+    const key = item.getAttribute("data-i18n-markdown");
+    const markdownString = translations?.[key]?.message || Browser.i18n.getMessage(key);
+
+    if (markdownString) {
+      // Sanitize is recommended for security if the content is user-generated.
+      // For internal content from messages.json, it's generally safe.
+      const htmlContent = marked.parse(markdownString, { breaks: true });
+      // eslint-disable-next-line no-unsanitized/property
+      item.innerHTML = htmlContent;
+    }
+  });
 }
+
 
 // متد ترجمه برای پنجره Popup
 export async function app_localize_popup(lang_code) {
