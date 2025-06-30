@@ -7,6 +7,7 @@ import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 import "./listeners/onContextMenu.js"; // Listener for context menu actions
 import "./listeners/onCommand.js"; // Listener for command shortcuts
+import "./listeners/onNotificationClicked.js"; // Listener for Install/Update Notification 
 // Potentially import other listeners like onCommand, onActionClicked etc. if needed
 
 logME("[Translate-It] ✅ Main script loaded, listeners attached.");
