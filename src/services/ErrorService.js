@@ -1,3 +1,5 @@
+// File: src/services/ErrorService.js
+
 import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { openOptionsPage } from "../utils/helpers.js";
@@ -61,7 +63,9 @@ export class ErrorHandler {
         console.error(`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
-      const action = OPEN_SETTINGS.has(type) ? openOptionsPage : undefined;
+
+      const action = OPEN_SETTINGS.has(type) ? () => openOptionsPage("api") : undefined;
+
       this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
       return err;
     } finally {
