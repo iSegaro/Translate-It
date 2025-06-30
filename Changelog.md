@@ -1,5 +1,33 @@
 ### Changelog – Translate It!
 
+#### v0.6.0 – Released on 1 July 2025
+
+##### Added
+
+-   Added support for **Google Translate** as a translation provider.
+-   Disabled the translation icon on the following websites to prevent interference with important content areas:
+
+    - `microsoftonline.com`
+    - `docs.microsoft.com`
+    - `cloud.microsoft`
+    - `acrobat.adobe.com`
+    - `docs.google.com`
+    - `onedrive.live.com`
+    - `canva.com/design`
+    - `dochub.com`
+    - `edit-document.pdffiller.com`
+    - `zoho.com`
+
+##### Changed
+
+-   Disabled in-field translation icon in non-webpage contexts (e.g., internal browser pages or other extensions).
+
+##### Fixed
+
+- Fixed an issue where the translation icon appeared incorrectly when selecting text on first install.
+
+---
+
 #### v0.5.0 – Released on 30 June 2025
 
 ##### Added
