@@ -319,6 +319,9 @@ export default class EventHandler {
     if (!this.IconManager || !this.featureManager.isOn("EXTENSION_ENABLED"))
       return null;
     if (!this.IconManager) return null;
+    if (!["http:", "https:"].includes(window.location.protocol)) {
+      return null;
+    }
 
     /* ابتدا هر آیکون قبلی را پاک کن */
     this.IconManager.cleanup();
