@@ -32,7 +32,7 @@ export default class IconManager {
     element.style.textAlign = isRtl ? "right" : "left";
   }
 
-    createTranslateIcon(target) {
+  createTranslateIcon(target) {
     try {
       if (!target?.isConnected) {
         return null;
@@ -44,16 +44,16 @@ export default class IconManager {
       icon.textContent = CONFIG.ICON_TRANSLATION;
       icon.title = CONFIG.TRANSLATION_ICON_TITLE;
       icon.style.display = "none";
-      
+
       // یک z-index بالا تضمین می‌کند که آیکون روی دیگر عناصر صفحه، از جمله خود فیلد متنی، قرار می‌گیرد.
-      icon.style.zIndex = "2147483640"; 
+      icon.style.zIndex = "2147483640";
 
       document.body.appendChild(icon);
 
       requestAnimationFrame(() => {
         if (!target.isConnected) return;
         const rect = target.getBoundingClientRect();
-        
+
         // [نکته]: این بخش از کد دیگر موقعیت را تنظیم نمی‌کند،
         // زیرا این مسئولیت به تابع updatePosition در IconBehavior.js منتقل شده است.
         // با این حال، نگه داشتن آن ضرری ندارد، چون بلافاصله توسط updatePosition بازنویسی می‌شود.
