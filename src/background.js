@@ -2,10 +2,8 @@
 
 import { logME } from "./utils/helpers.js";
 
-// Import listeners to activate them
-// import "./listeners/Injection.js";
-import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./offscreen.js";
+import "./listeners/onMessage.js"; // Listener for runtime messages
 import "./listeners/onInstalled.js"; // Listener for extension installation/update
 import "./listeners/onContextMenu.js"; // Listener for context menu actions
 import "./listeners/onCommand.js"; // Listener for command shortcuts
