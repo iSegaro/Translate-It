@@ -15,6 +15,39 @@ export const DEFAULT_EXCLUDED_SITES = [
   // "t24.theorie24.de"
 ];
 
+export const DEFAULT_EXCLUDED_TEXT_FIELDS_ICON = [
+  "microsoftonline.com",
+  "docs.microsoft.com",
+  "cloud.microsoft",
+  "acrobat.adobe.com",
+  "docs.google.com",
+  "onedrive.live.com",
+  "canva.com/design",
+  "dochub.com",
+  "edit-document.pdffiller.com",
+  "zoho.com",
+];
+
+/**
+ * بررسی می‌کند که آیا یک URL در لیست پیش‌فرض مستثنی
+ * برای قابلیت نمایش آیکون ترجمه در فیلد متنی است یا خیر
+ * @param {string} url - آدرس صفحه‌ای که باید بررسی شود
+ * @returns {boolean} - اگر URL باید مستثنی شود، true برمی‌گرداند
+ */
+export function isUrlExcluded_TEXT_FIELDS_ICON(url) {
+  if (!url) return true; // URL نامعتبر را همیشه مستثنی کن
+
+  // ۱. بررسی در لیست پیش‌فرض
+  const isDefaultExcluded = DEFAULT_EXCLUDED_TEXT_FIELDS_ICON.some((site) =>
+    url.includes(site)
+  );
+  if (isDefaultExcluded) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * بررسی می‌کند که آیا یک URL در لیست پیش‌فرض یا لیست کاربر مستثنی شده است یا خیر
  * @param {string} url - آدرس صفحه‌ای که باید بررسی شود

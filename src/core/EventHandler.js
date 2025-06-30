@@ -24,6 +24,7 @@ import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
 import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
+import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler
@@ -208,7 +209,6 @@ export default class EventHandler {
     if (selectedText) {
       // اگر متن انتخاب شده وجود دارد و تایمر قبلی فعال نیست
       if (!this.selectionTimeoutId) {
-
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         const { selectionTranslationMode } = await Browser.storage.local.get({
           selectionTranslationMode: "immediate",
@@ -320,6 +320,9 @@ export default class EventHandler {
       return null;
     if (!this.IconManager) return null;
     if (!["http:", "https:"].includes(window.location.protocol)) {
+      return null;
+    }
+    if (isUrlExcluded_TEXT_FIELDS_ICON(window.location.href)) {
       return null;
     }
 
