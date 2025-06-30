@@ -23,18 +23,19 @@ export const CONFIG = {
   USE_MOCK: false,
   DEBUG_MODE: false,
   EXTENSION_ENABLED: true,
-  APPLICATION_LOCALIZE: "Farsi",
+  APPLICATION_LOCALIZE: "English",
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
   selectionTranslationMode: "onClick", // "immediate",
 
   // --- API Settings ---
-  TRANSLATION_API: "gemini", // gemini, webai, openai, openrouter, deepseek, custom
+  TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google
 
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
   API_KEY: "", // Gemini specific
+  GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
   WEBAI_API_URL: "http://localhost:6969/translate",
   WEBAI_API_MODEL: "gemini-2.0-flash",
   OPENAI_API_KEY: "",
@@ -291,6 +292,11 @@ export const getApiKeyAsync = async () => {
 
 export const getApiUrlAsync = async () => {
   return getSettingValueAsync("API_URL", CONFIG.API_URL);
+};
+
+// Google Translate Specific
+export const getGoogleTranslateUrlAsync = async () => {
+  return getSettingValueAsync("GOOGLE_TRANSLATE_URL", CONFIG.GOOGLE_TRANSLATE_URL);
 };
 
 export const getApplication_LocalizeAsync = async () => {

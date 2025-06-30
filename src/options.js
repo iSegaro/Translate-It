@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabContentContainer = document.querySelector(".tab-content-container");
   const errorHandler = new ErrorHandler();
+  
+  // --- Prompt Tab Button ---
+  const promptTabButton = document.querySelector('a[data-tab="prompt"]');
 
   // Theme controls
   const themeSwitch = document.getElementById("theme-Switch");
@@ -112,6 +115,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const enableDictionraryCheckbox =
     document.getElementById("enableDictionrary");
   const translationApiSelect = document.getElementById("translationApi");
+  const googleApiSettingsInfo = document.getElementById("googleApiSettingsInfo");
   const webAIApiSettings = document.getElementById("webAIApiSettings");
   const apiUrlSettingGroup = document
     .getElementById("apiUrl")
@@ -334,45 +338,64 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   tabButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
+      // Prevent action if the tab is disabled
+      if (event.currentTarget.classList.contains('disabled')) {
+        event.preventDefault();
+        return;
+      }
       event.preventDefault();
       const tabId = event.currentTarget.getAttribute("data-tab");
       showTab(tabId);
     });
   });
 
-  // --- API Settings Visibility Logic ---
+  // --- API Settings Visibility Logic (Refactored & Enhanced) ---
   function toggleApiSettings() {
-    if (!translationApiSelect) return;
-    const selectedApi = translationApiSelect.value;
-    const isMock = useMockCheckbox ? useMockCheckbox.checked : false;
+      if (!translationApiSelect) return;
+      const selectedApi = translationApiSelect.value;
+      const isMock = useMockCheckbox ? useMockCheckbox.checked : false;
 
-    const apiSections = {
-      webai: webAIApiSettings,
-      gemini: geminiApiSettings,
-      openai: openAIApiSettings,
-      openrouter: openRouterApiSettings,
-      deepseek: deepseekApiSettings,
-      custom: customApiSettings,
-    };
+      const allApiSections = {
+          google: googleApiSettingsInfo,
+          webai: webAIApiSettings,
+          gemini: geminiApiSettings,
+          openai: openAIApiSettings,
+          openrouter: openRouterApiSettings,
+          deepseek: deepseekApiSettings,
+          custom: customApiSettings,
+      };
 
-    if (isMock) {
-      Object.values(apiSections).forEach((section) => {
-        if (section) section.style.display = "none";
+      // Hide all sections first
+      Object.values(allApiSections).forEach(section => {
+          if (section) section.style.display = 'none';
       });
-      if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = "none";
-      return;
-    }
+      if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = 'none';
 
-    Object.entries(apiSections).forEach(([key, section]) => {
-      if (section) {
-        section.style.display = selectedApi === key ? "block" : "none";
+      // If mock is enabled, do nothing else
+      if (isMock) {
+          return;
       }
-    });
 
-    if (apiUrlSettingGroup) {
-      apiUrlSettingGroup.style.display =
-        selectedApi === "gemini" ? "block" : "none";
-    }
+      // Show the selected API's section
+      if (allApiSections[selectedApi]) {
+          allApiSections[selectedApi].style.display = 'block';
+      }
+
+      // Special case for Gemini API URL
+      if (selectedApi === 'gemini' && apiUrlSettingGroup) {
+          apiUrlSettingGroup.style.display = 'block';
+      }
+      
+      // --- Logic to disable/enable prompt tab ---
+      if (promptTabButton) {
+        const isGoogleTranslate = selectedApi === 'google';
+        promptTabButton.classList.toggle('disabled', isGoogleTranslate);
+        
+        // If the prompt tab is now disabled and was active, switch to the API tab
+        if (isGoogleTranslate && promptTabButton.classList.contains('active')) {
+            showTab('api');
+        }
+      }
   }
 
   if (translationApiSelect) {

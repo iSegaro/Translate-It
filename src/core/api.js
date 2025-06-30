@@ -8,6 +8,7 @@ import {
   getSourceLanguageAsync,
   getTargetLanguageAsync,
   getTranslationApiAsync,
+  getGoogleTranslateUrlAsync,
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
   getOpenAIApiKeyAsync,
@@ -30,6 +31,21 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";
+
+// A simple map for converting full language names to Google Translate's codes.
+const langNameToCodeMap = {
+  farsi: "fa",
+  persian: "fa",
+  english: "en",
+  german: "de",
+  french: "fr",
+  spanish: "es",
+  arabic: "ar",
+  russian: "ru",
+  japanese: "ja",
+  korean: "ko",
+  // Add other common languages as needed
+};
 
 class ApiService {
   constructor() {
@@ -136,6 +152,98 @@ class ApiService {
       }
       // Rethrow existing HTTP/API errors or others
       throw err;
+    }
+  }
+
+  async handleGoogleTranslate(text, sourceLang, targetLang) {
+    if (sourceLang === targetLang) return null;
+  
+    // --- JSON Mode Detection ---
+    let isJsonMode = false;
+    let originalJsonStruct;
+    let textsToTranslate = [text];
+    const context = "api-google-translate";
+  
+    try {
+      const parsed = JSON.parse(text);
+      if (this._isSpecificTextJsonFormat(parsed)) {
+        isJsonMode = true;
+        originalJsonStruct = parsed;
+        textsToTranslate = originalJsonStruct.map((item) => item.text);
+      }
+    } catch (e) {
+      // Not a valid JSON, proceed in plain text mode.
+    }
+  
+    // --- URL Construction ---
+    const apiUrl = await getGoogleTranslateUrlAsync();
+    const getLangCode = (lang) => {
+        if (!lang || typeof lang !== 'string') return 'auto';
+        const lowerCaseLang = lang.toLowerCase();
+        return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
+    }
+    const sl = sourceLang === AUTO_DETECT_VALUE ? "auto" : getLangCode(sourceLang);
+    const tl = getLangCode(targetLang);
+  
+    if (sl === tl) return text;
+  
+    const url = new URL(apiUrl);
+    const params = {
+      client: "gtx",
+      sl: sl,
+      tl: tl,
+      dt: "t",
+      q: textsToTranslate.join(TEXT_DELIMITER),
+    };
+    url.search = new URLSearchParams(params).toString();
+  
+    // --- API Call ---
+    try {
+      const response = await fetch(url.toString(), { method: "GET" });
+  
+      if (!response.ok) {
+        const err = new Error(`HTTP ${response.status}`);
+        err.type = ErrorTypes.HTTP_ERROR;
+        err.statusCode = response.status;
+        err.context = context;
+        throw err;
+      }
+  
+      const data = await response.json();
+  
+      // --- Response Parsing ---
+      if (!data?.[0]) {
+        const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
+        err.type = ErrorTypes.API;
+        err.context = `${context}-parsing`;
+        throw err;
+      }
+  
+      const translatedTextBlob = data[0].map((segment) => segment[0]).join("");
+  
+      if (isJsonMode) {
+        const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
+        if (translatedParts.length !== originalJsonStruct.length) {
+          // Fallback if splitting fails to match original structure
+          console.warn("Google Translate: JSON reconstruction failed due to segment mismatch.");
+          return translatedTextBlob;
+        }
+        const translatedJson = originalJsonStruct.map((item, index) => ({
+          ...item,
+          text: translatedParts[index].trim(),
+        }));
+        return JSON.stringify(translatedJson, null, 2);
+      } else {
+        return translatedTextBlob;
+      }
+    } catch (err) {
+      if (err instanceof TypeError) {
+        const networkErr = new Error(err.message);
+        networkErr.type = ErrorTypes.NETWORK_ERROR;
+        networkErr.context = `${context}-network`;
+        throw networkErr;
+      }
+      throw err; // Rethrow other errors (HTTP, API)
     }
   }
 
@@ -452,6 +560,12 @@ class ApiService {
 
     const api = await getTranslationApiAsync();
     switch (api) {
+      case "google":
+        return this.handleGoogleTranslate(
+          text,
+          sourceLang,
+          targetLang
+        );
       case "gemini":
         return this.handleGeminiTranslation(
           text,

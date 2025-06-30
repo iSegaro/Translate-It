@@ -415,6 +415,7 @@
                 <label for="translationApi" data-i18n="translation_api_label"
                   >API Choice</label
                 ><select id="translationApi">
+                  <option value="google">Google Translate</option>
                   <option value="gemini">Gemini API</option>
                   <option value="webai">WebAI API</option>
                   <option value="openai">OpenAI API</option>
@@ -422,6 +423,14 @@
                   <option value="deepseek">DeepSeek API</option>
                   <option value="custom">Custom (OpenAI Compatible)</option>
                 </select>
+              </div>
+              <div id="googleApiSettingsInfo" style="display: none;">
+                <h3 data-i18n="google_translate_settings_title">Google Translate</h3>
+                 <div class="setting-group api-key-info">
+                    <span class="setting-description" data-i18n="google_translate_description">
+                      Uses the free, public Google Translate endpoint. No API key is required.
+                    </span>
+                </div>
               </div>
               <div id="webAIApiSettings">
                 <h3 data-i18n="webai_api_settings_title">WebAI API Settings</h3>

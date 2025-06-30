@@ -53,6 +53,7 @@ export default [
         FileReader: "readonly",
         location: "readonly",
         alert: "readonly",
+        URLSearchParams: "readonly",
       },
     },
     plugins: {

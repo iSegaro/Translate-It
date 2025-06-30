@@ -97,6 +97,10 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
     return ErrorTypes.API_KEY_MISSING;
+  
+  // Google Translate
+  if (msg.includes("400 Error") || msg.includes("HTTP 400"))
+    return ErrorTypes.INVALID_REQUEST;
 
   // API URL or model errors
   if (

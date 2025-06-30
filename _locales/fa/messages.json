@@ -14,6 +14,9 @@
   "context_menu_help": { "message": "کمک مفید" },
   "context_menu_translate_with_selection": { "message": "ترجمه انتخابی" },
 
+  "google_translate_settings_title": { "message": "مترجم Google" },
+  "google_translate_description": { "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست." },
+
   "notification_update_title": { "message": "افزونه به‌روز شد" },
   "notification_update_message": {
     "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد."

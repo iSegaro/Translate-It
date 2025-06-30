@@ -14,6 +14,9 @@
   "context_menu_help": { "message": "Useful Help" },
   "context_menu_translate_with_selection": { "message": "Translate Element" },
 
+  "google_translate_settings_title": { "message": "Google Translate" },
+  "google_translate_description": { "message": "Uses the free, public Google Translate endpoint. No API key is required." },
+
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
   "options_changelog_loading": { "message": "Loading changelog..." },
