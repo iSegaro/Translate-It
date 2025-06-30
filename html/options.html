@@ -25,27 +25,44 @@
                 class="theme-icon-svg"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                <path
-                  d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zm-9-7c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1s-1 .45-1 1v2c0 .55.45 1 1 1zm0 12c.55 0 1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1v2c0 .55.45 1 1 1zM5.64 5.64c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.64 2.81c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l1.41 1.42zm12.73 12.73c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.41-1.41c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l1.41 1.41zM2.81 18.36c.39.39 1.02.39 1.41 0l1.41-1.41c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0l-1.41 1.41c-.39.39-.39 1.02 0 1.41z"
-                ></path>
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
               </svg>
+
               <label
                 class="switch"
                 title="Toggle Light/Dark Theme"
                 data-i18n-title="theme_toggle_title"
-                ><input type="checkbox" id="theme-Switch" /><span
-                  class="slider round"
-                ></span
-              ></label>
+              >
+                <input type="checkbox" id="theme-Switch" />
+                <span class="slider round"></span>
+              </label>
+
               <svg
                 class="theme-icon-svg"
                 xmlns="http://www.w3.org/2000/svg"
-                enable-background="new 0 0 24 24"
                 viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
                 <path
-                  d="M12,3c-0.2,0-0.4,0-0.6,0.1C10.7,3.5,10,4.6,10,5.9c0,1.5,1.2,2.7,2.7,2.7c0.7,0,1.4-0.3,1.9-0.8c0.8-0.8,1-2,0.5-3 C14.6,4,13.3,3,12,3z M12.5,13.4c-3.1,1.2-5.5,4.1-5.5,7.6c0,0.5,0.4,1,1,1h10c0.5,0,1-0.4,1-1C19,17.5,16.6,14.6,12.5,13.4z"
+                  d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
                 ></path>
               </svg>
             </div>
@@ -155,7 +172,7 @@
             class="tab-button"
             data-tab="about"
             data-i18n="about_tab_title"
-            >About</a
+            >What's New</a
           >
 
           <div class="tabs-action-area">
@@ -742,6 +759,27 @@
                       <li data-i18n-markdown="help_shortcut_content_li3"></li>
                       <li data-i18n-markdown="help_shortcut_content_li4"></li>
                     </ol>
+
+                    <hr
+                      style="
+                        border: none;
+                        border-top: 1px solid var(--border-color);
+                        margin: 20px 0;
+                      "
+                    />
+
+                    <p data-i18n-markdown="help_shortcut_content_p2"></p>
+                    <ol>
+                      <li
+                        data-i18n-markdown="help_shortcut_content_chrome_li1"
+                      ></li>
+                      <li
+                        data-i18n-markdown="help_shortcut_content_chrome_li2"
+                      ></li>
+                      <li
+                        data-i18n-markdown="help_shortcut_content_chrome_li3"
+                      ></li>
+                    </ol>
                   </div>
                 </div>
                 <div class="accordion-item" id="help-api-keys">
@@ -760,7 +798,7 @@
           <!-- About Tab for Changelog -->
           <div id="about" class="tab-content">
             <section>
-              <h2 data-i18n="about_section_title">About & Changelog</h2>
+              <h2 data-i18n="about_section_title">What's New</h2>
               <div id="changelog-container">
                 <p data-i18n="options_changelog_loading">loading...</p>
               </div>

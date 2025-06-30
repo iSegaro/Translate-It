@@ -11,7 +11,7 @@
 
   "context_menu_options": { "message": "Options" },
   "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
-  "context_menu_help": { "message": "Help && Support" },
+  "context_menu_help": { "message": "Useful Help" },
   "context_menu_translate_with_selection": { "message": "Translate Element" },
 
   "options_page_title": { "message": "Settings" },
@@ -50,10 +50,10 @@
   "target_language_placeholder": { "message": "Enter target language" },
 
   "help_tab_title": { "message": "Help" },
-  "about_tab_title": { "message": "About" },
+  "about_tab_title": { "message": "What's New" },
   "help_section_title": { "message": "Help & Documentation" },
-  "about_section_title": { "message": "About & Changelog" },
-  "help_shortcut_title": { "message": "How to Change Shortcuts in Firefox" },
+  "about_section_title": { "message": "Changelog" },
+  "help_shortcut_title": { "message": "How to change keyboard shortcuts ?" },
   "help_shortcut_content_p1": {
     "message": "In Firefox, shortcuts are managed through the Add-ons page:"
   },
@@ -61,17 +61,30 @@
     "message": "Navigate to **about:addons** in your address bar."
   },
   "help_shortcut_content_li2": {
-    "message": "Click the gear icon (⚙️) in the top-right corner."
+    "message": "Click the **gear icon (⚙️)** in the top-right corner."
   },
   "help_shortcut_content_li3": {
-    "message": "Select 'Manage Extension Shortcuts' from the menu."
+    "message": "Select **Manage Extension Shortcuts** from the menu."
   },
   "help_shortcut_content_li4": {
-    "message": "Find 'Translate It' and set your desired shortcut."
+    "message": "Find **Translate It** and set your desired shortcut."
   },
   "help_api_keys_title": { "message": "Where do I get API keys?" },
   "help_api_keys_content": {
-    "message": "You can find links to each API provider's website in the 'API' tab. You will need to create an account on their respective platforms to generate a key."
+    "message": "You can find links to each API provider's website in the **API** tab. You will need to create an account on their respective platforms to generate a key."
+  },
+
+  "help_shortcut_content_p2": {
+    "message": "In **Chrome**, the process is different:"
+  },
+  "help_shortcut_content_chrome_li1": {
+    "message": "Right-click on the extension icon."
+  },
+  "help_shortcut_content_chrome_li2": {
+    "message": "Select **Keyboard shortcuts** from the menu."
+  },
+  "help_shortcut_content_chrome_li3": {
+    "message": "Click the pencil icon (✏️) next to **Translate It** and type your new shortcut."
   },
 
   "translation_activation_section_title": {
@@ -221,7 +234,7 @@
   "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
   "advance_debug_mode_label": { "message": "Debug Mode" },
 
-  "theme_auto": { "message": "Auto" },
+  "theme_auto": { "message": "Auto (System)" },
   "theme_light": { "message": "Light" },
   "theme_dark": { "message": "Dark" },
   "theme_toggle_title": { "message": "Toggle Theme" },
