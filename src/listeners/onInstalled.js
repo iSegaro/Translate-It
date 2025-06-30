@@ -36,7 +36,7 @@ Browser.runtime.onInstalled.addListener(async (details) => {
 
       // --- START: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
-      // 1. Create a base options object with properties common to all browsers.
+      // Create a base options object with properties common to all browsers.
       const notificationOptions = {
         type: "basic",
         iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"),
@@ -44,17 +44,12 @@ Browser.runtime.onInstalled.addListener(async (details) => {
         message: message,
       };
 
-      // 2. Get browser information.
-      const browserInfo = await Browser.runtime.getBrowserInfo();
-
-      // 3. Conditionally add the Chrome-specific property.
-      if (browserInfo.name.toLowerCase().includes("chrome")) {
-        notificationOptions.requireInteraction = true;
-      }
-
+      // --- Clear any existing notification with the same ID before creating a new one ---
+      await Browser.notifications.clear("update-notification");
+      
       // --- END: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
-      // 4. Create the notification using the compatible options object.
+      // Create the notification using the compatible options object.
       await Browser.notifications.create(
         "update-notification",
         notificationOptions
