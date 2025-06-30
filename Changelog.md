@@ -1,20 +1,36 @@
 ### Changelog – Translate It!
 
+#### v0.5.0 – Released on 30 June 2025
+
+##### Added
+
+-   Added quick access options to the extension’s context (right-click) menu via the action toolbar.
+-   Added a Help section to the Settings page.
+-   Added a Changelog section to the Settings page.
+
+##### Changed
+
+-   Completely redesigned the Settings page for better clarity and usability.
+-   Changed the default model for OpenRouter to `gpt-4o`.
+
+##### Fixed
+
+-   Added handling for newly occurring error scenarios with appropriate messaging.
+
+---
+
 #### v0.4.0 – Released on 29 June 2025
 
 ##### Added
 
-  - Added 'Translate with Select Element' mode to the right-click context menu for quick access.
-  - Added a keyboard shortcut to activate 'Select Element' mode:
-
-      - Default Chrome  (Win/Linux): `Ctrl+Shift+Z` | Mac: `Command+Shift+Z`
-      - Default Firefox (Win/Linux): `Ctrl+Space`   | Mac: `Command+Space`
+- Added 'Translate with Select Element' mode to the right-click context menu for quick access.
+- Added a keyboard shortcut to activate 'Select Element' mode.
 
 ##### Changed
 
-  - Improved the positioning and behavior of the in-field translation icon to be more intelligent and less intrusive.
-  - Enhanced translation prompts to yield more natural and human-like translations.
-  - Updated Light Theme
+-   Improved the positioning and behavior of the in-field translation icon to be more intelligent and less intrusive.
+-   Enhanced translation prompts to yield more natural and human-like translations.
+-   Updated Light Theme
   
 ---
 
