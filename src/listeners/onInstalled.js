@@ -12,8 +12,8 @@ Browser.runtime.onInstalled.addListener(async (details) => {
 
   // --- Scenario 1: Fresh Installation ---
   if (details.reason === "install") {
-    logME("First installation detected. Opening options page to #api.");
-    const optionsUrl = Browser.runtime.getURL("html/options.html#api");
+    logME("First installation detected. Opening options page to #languages.");
+    const optionsUrl = Browser.runtime.getURL("html/options.html#languages");
     Browser.tabs.create({ url: optionsUrl });
   }
 
