@@ -18,6 +18,9 @@
   "options_description": { "message": "Translate Everywhere. Simply." },
   "options_changelog_loading": { "message": "Loading changelog..." },
 
+  "export_settings_description":{"message":"Export your current settings to a JSON file for backup or sharing."},
+  "import_settings_description":{"message":"Importing will overwrite your current settings. The page will reload after a successful import."},
+
   "languages_tab_title": { "message": "Languages" },
   "activation_tab_title": { "message": "Activation" },
   "prompt_tab_title": { "message": "Prompt" },
