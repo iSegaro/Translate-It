@@ -99,7 +99,12 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.API_KEY_MISSING;
 
   // API URL or model errors
-  if (msg.includes("api url") && msg.includes("missing"))
+  if (
+    (msg.includes("api url") && msg.includes("missing")) ||
+    msg.includes("no endpoints found") ||
+    msg.includes("no endpoint") ||
+    msg.includes("no endpoints")
+  )
     return ErrorTypes.API_URL_MISSING;
   if (
     msg.includes("not a valid model id") ||
@@ -107,7 +112,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("model not found") ||
     msg.includes("model is missing") ||
     msg.includes("model not available") ||
-    msg.includes("is not found for api version") || 
+    msg.includes("is not found for api version") ||
     (msg.includes("the model `") &&
       msg.includes("does not exist or you do not have access to it"))
   )
