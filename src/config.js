@@ -42,7 +42,7 @@ export const CONFIG = {
   OPENAI_API_MODEL: "gpt-3.5-turbo",
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
-  OPENROUTER_API_MODEL: "openai/gpt-3.5-turbo",
+  OPENROUTER_API_MODEL: "openai/gpt-4o",
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
   DEEPSEEK_API_MODEL: "deepseek-chat",
