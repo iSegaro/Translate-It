@@ -169,7 +169,9 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("context invalid") ||
     msg.includes("extension context") ||
     msg.includes("context invalidated") ||
-    msg.includes("extension context invalidated")
+    msg.includes("extension context invalidated") ||
+    msg.includes("not establish") ||
+    msg.includes("not establish connection")
   )
     return ErrorTypes.CONTEXT;
 
