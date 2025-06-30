@@ -3,7 +3,11 @@
 import Browser from "webextension-polyfill";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { logME } from "../utils/helpers.js";
+import {
+  focusOrCreateTab,
+  logME,
+  openOptionsPage_from_Background,
+} from "../utils/helpers.js";
 import { translateText } from "../core/api.js";
 
 // --- Import Handlers ---
@@ -17,6 +21,7 @@ import {
 } from "../handlers/backgroundHandlers.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
 import { playTTS, stopTTS } from "../backgrounds/tts-player.js";
+import { setupContextMenus } from "./onContextMenu.js";
 
 // --- State Management ---
 const selectElementStates = {};
@@ -92,6 +97,18 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }, 100);
         return false;
 
+      case "REFRESH_CONTEXT_MENUS":
+        setupContextMenus()
+          .then(() => {
+            logME("[onMessage] Context menus refreshed successfully.");
+            sendResponse({ success: true });
+          })
+          .catch((err) => {
+            logME("[onMessage] Failed to refresh context menus:", err);
+            sendResponse({ success: false, error: err.message });
+          });
+        return false; // Indicates an asynchronous response.
+
       case "getSelectedText":
         // handler itself will call sendResponse
         handleGetSelectedText(message, sender, sendResponse, safeSendMessage);
@@ -155,7 +172,7 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         );
         return true;
 
-      case "applyTranslationToActiveElement":{
+      case "applyTranslationToActiveElement": {
         // ارسال مستقیم به تب جاری که درخواست داده
         if (sender.tab?.id) {
           safeSendMessage(sender.tab.id, message)
@@ -186,6 +203,18 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         // No response needed, this is a fire-and-forget action.
         return false;
+      }
+      case "open_options_page": {
+        openOptionsPage_from_Background(message);
+        return false;
+      }
+      case "open_url": {
+        const anchor = message.data?.anchor;
+        const optionsUrl = Browser.runtime.getURL(
+          `html/options.html${anchor ? `#${anchor}` : ""}`
+        );
+        focusOrCreateTab(optionsUrl);
+        return true;
       }
 
       default:

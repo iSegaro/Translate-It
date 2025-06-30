@@ -8,10 +8,16 @@
 
   "theme_section_title": { "message": "Theme" },
   "localization_section_title": { "message": "Extension Language" },
-  
+
+  "context_menu_options": { "message": "Options" },
+  "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
+  "context_menu_help": { "message": "Help && Support" },
+  "context_menu_translate_with_selection": { "message": "Translate Element" },
+
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
-  
+  "changelog_loading": { "message": "Loading changelog..." },
+
   "languages_tab_title": { "message": "Languages" },
   "activation_tab_title": { "message": "Activation" },
   "prompt_tab_title": { "message": "Prompt" },
@@ -30,13 +36,44 @@
   "import_export_import_title": { "message": "Import Settings" },
 
   "notification_update_title": { "message": "Extension Updated" },
-  "notification_update_message": { "message": "{appName} has been successfully updated to version {version}." },
+  "notification_update_message": {
+    "message": "{appName} has been successfully updated to version {version}."
+  },
 
   "languages_section_title": { "message": "Languages" },
   "source_language_label": { "message": "Source Language" },
   "target_language_label": { "message": "Target Language" },
   "source_language_placeholder": { "message": "Enter source language" },
   "target_language_placeholder": { "message": "Enter target language" },
+
+  "help_tab_title": { "message": "Help" },
+  "about_tab_title": { "message": "About" },
+  "help_section_title": { "message": "Help & Documentation" },
+  "about_section_title": { "message": "About & Changelog" },
+  "help_shortcut_title": { "message": "How to Change Shortcuts in Firefox" },
+  "help_shortcut_content_p1": {
+    "message": "In Firefox, shortcuts are managed through the Add-ons page:"
+  },
+  "help_shortcut_content_li1": {
+    "message": "Navigate to **about:addons** in your address bar."
+  },
+  "help_shortcut_content_li2": {
+    "message": "Click the gear icon (⚙️) in the top-right corner."
+  },
+  "help_shortcut_content_li3": {
+    "message": "Select 'Manage Extension Shortcuts' from the menu."
+  },
+  "help_shortcut_content_li4": {
+    "message": "Find 'Translate It!' and set your desired shortcut."
+  },
+  "help_api_keys_title": { "message": "Where do I get API keys?" },
+  "help_api_keys_content": {
+    "message": "You can find links to each API provider's website in the 'API' tab. You will need to create an account on their respective platforms to generate a key."
+  },
+  "help_privacy_title": { "message": "Privacy Policy" },
+  "help_privacy_content": {
+    "message": "This extension processes your text for translation by sending it to the API provider you select. No data is stored on our servers. All settings are stored locally on your device."
+  },
 
   "translation_activation_section_title": {
     "message": "Translation Activation Methods"
@@ -161,9 +198,13 @@
   },
   "api_provider_custom": { "message": "Custom (OpenAI Compatible)" },
   "custom_api_settings_title": { "message": "Custom API Settings" },
-  "custom_api_settings_description": { "message": "Use any service that is compatible with the OpenAI chat completions format." },
+  "custom_api_settings_description": {
+    "message": "Use any service that is compatible with the OpenAI chat completions format."
+  },
   "custom_api_settings_api_url_label": { "message": "API URL" },
-  "custom_api_url_placeholder": { "message": "Enter the base URL of your custom API" },
+  "custom_api_url_placeholder": {
+    "message": "Enter the base URL of your custom API"
+  },
   "custom_api_settings_api_key_label": { "message": "API Key" },
   "custom_api_key_placeholder": { "message": "Paste your custom API key here" },
   "custom_api_settings_model_label": { "message": "Model" },

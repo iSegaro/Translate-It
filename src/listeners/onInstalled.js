@@ -2,18 +2,14 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
-// import { getTranslationString } from "../utils/i18n.js";
+import { setupContextMenus } from "./onContextMenu.js"; // CHANGED: Import the setup function
 
 Browser.runtime.onInstalled.addListener(async (details) => {
-  logME(
-    `[Translate-It] 🌟 Successfully ${
-      details.reason === "install" ? "Installed!"
-      : details.reason === "update" ? "Updated!"
-      : ""
-    }`
-  );
+  logME(`[Translate-It] 🌟 Successfully: ${details.reason}`);
 
-  // بررسی دلیل رویداد؛ اگر "update" بود، یک نوتیفیکیشن به کاربر نشان بده
+  // Setup all context menus on installation or update
+  await setupContextMenus();
+  
   if (details.reason === "update") {
     try {
       const manifest = Browser.runtime.getManifest();
@@ -27,7 +23,6 @@ Browser.runtime.onInstalled.addListener(async (details) => {
       let message =
         (await getTranslationString("notification_update_message")) ||
         "{appName} has been updated to version {version}.";
-
       // جایگزینی متغیرهای داخل پیام
       message = message
         .replace("{appName}", appName)
