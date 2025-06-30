@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       // eslint-disable-next-line no-unsanitized/property
       container.innerHTML = `<p>Could not load changelog. Error: ${error.message}</p>`;
-      console.error("Failed to fetch changelog:", error);
+      logME("Failed to fetch changelog:", error);
     }
   }
 
@@ -597,18 +597,39 @@ document.addEventListener("DOMContentLoaded", async () => {
         app_localize(currentAppLocalize);
       }
 
-      const hash = window.location.hash;
-      if (hash.startsWith("#help=")) {
-        handleHelpAnchor(hash);
-      } else if (hash === "#about") {
-        fetchAndDisplayChangelog();
+      // --- START: GENERALIZED HASH HANDLING LOGIC ---
       
-      } else {
-        // Handle initial tab display based on URL hash
-        const initialTabId = hash.substring(1) || "languages";
-        showTab(initialTabId);
+      const hash = window.location.hash;
+      let targetTabId = "languages"; // Default tab
+
+      if (hash) {
+        // Extract the base tab ID from any hash format (e.g., #about, #help=shortcut)
+        targetTabId = hash.substring(1).split("=")[0];
       }
 
+      // Validate if a tab with this ID actually exists
+      const tabElement = document.getElementById(targetTabId);
+      if (!tabElement) {
+        targetTabId = "languages"; // Fallback to default if hash is invalid
+      }
+
+      // 1. ALWAYS show the target tab. This is the main generic action.
+      showTab(targetTabId);
+
+      // 2. Perform any ADDITIONAL, tab-specific actions AFTER showing it.
+      switch (targetTabId) {
+        case "about":
+          fetchAndDisplayChangelog();
+          break;
+        case "help":
+          // The handleHelpAnchor function is designed for deep-linking
+          if (hash.startsWith("#help=")) {
+            handleHelpAnchor(hash);
+          }
+          break;
+        // Add other cases here if new tabs need special logic on load
+      }
+      // --- END: GENERALIZED HASH HANDLING LOGIC ---
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
