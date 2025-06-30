@@ -41,7 +41,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     logME("[Popup Main]: All modules initialized successfully.");
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
-    logME("Popup initialization failed:", error);
     const safeHtml = DOMPurify.sanitize(
       `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`,
       { RETURN_TRUSTED_TYPE: true }
