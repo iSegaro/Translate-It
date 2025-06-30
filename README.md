@@ -1,6 +1,6 @@
 # Translate It!
 
-> Smart Translation Assistant
+> Smart Translation Assistant - Web Extension
 
 <p align="center">
   <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
@@ -115,7 +115,7 @@ Manual Installation
 
 <details id="install-for-chrome">
 <summary>
-  <h3>Install for Chrome</h3>
+  <h3>Install Translate It Web Extension for Chrome</h3>
 </summary>
 
 - [Download the latest Chrome version here][chrome-zip-url].
@@ -132,7 +132,7 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 
 <details id="install-for-firefox">
 <summary>
-  <h3>Install for Firefox</h3>
+  <h3>Install Translate It Web Extension for Firefox</h3>
 </summary>
 
 - [Download the latest Firefox version here][firefox-zip-url].
@@ -167,6 +167,70 @@ To use the extension, you’ll need an API key from one of the providers below:
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
 **Important:** If you're in Iran, you may need a VPN to access and register for free API keys.
+
+<br>
+
+---
+
+<details>
+<summary>
+  <h2>🪶 How to Use</h2>
+</summary>
+
+1. **Add the Extension to Your Browser**
+
+   After installation, pin the extension to your browser toolbar for quick and easy access.
+
+2. **Activate "Element Selection Mode"**
+
+   To translate any specific part of a web page, you first need to activate *Element Selection Mode*. You can do this using one of the following methods:
+
+   - Click on the extension icon and select the relevant option.
+   - Right-click anywhere on the page and choose the option from the context menu.
+   - Or [use the keyboard shortcut](#keyboard-shortcuts) for faster access.
+
+3. **Translate Text by Clicking an Element**
+
+   Once the mode is active, hover over any part of the page to highlight it. Click the highlighted area to instantly translate its content.
+
+4. **Revert Translations**
+
+   To undo translations and restore the original text, use either of the following methods:
+
+   - Press the `ESC` key.
+   - Click the `Revert` button from within the extension popup.
+
+5. **Translation Cache**
+
+   When you translate and then revert a piece of text, its translation is cached. On subsequent translations, the cached result will be shown instantly.
+   A small "From Cache" label will appear temporarily in the top-right corner of the page.
+
+6. **Clear the Translation Cache**
+
+   To force a fresh translation from the server, click the "From Cache" label. This will clear the cached entry for that element.
+
+---
+
+### Keyboard Shortcuts
+
+To quickly activate *Element Selection Mode*, you can use configurable keyboard shortcuts.
+We recommend setting them manually to avoid conflicts with browser or system shortcuts.
+
+#### Customize Shortcuts:
+
+You can modify the default shortcuts as needed:
+
+- **In Chrome**:  
+  Go to [`chrome://extensions/shortcuts`](chrome://extensions/shortcuts)
+
+- **In Firefox**:
+
+  1. Right-click on the extension icon in the toolbar and choose `Manage Extension`.
+  2. In the opened page, click the gear icon.
+  3. Select `Manage Extension Shortcuts`.
+
+</details>
+
 
 <br>
 
@@ -214,6 +278,8 @@ In the API Settings page of the extension, each provider has customizable option
 - For `DeepSeek`: `deepseek-chat`
 
 </details>
+
+<br>
 
 ---
 
