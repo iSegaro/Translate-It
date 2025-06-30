@@ -21,6 +21,7 @@
 
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
+  "options_changelog_loading": { "message": "در حال بارگذاری تغییرات..." },
 
   "changelog_loading": { "message": "در حال بارگذاری تغییرات..." },
 

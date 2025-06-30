@@ -16,7 +16,7 @@
 
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
-  "changelog_loading": { "message": "Loading changelog..." },
+  "options_changelog_loading": { "message": "Loading changelog..." },
 
   "languages_tab_title": { "message": "Languages" },
   "activation_tab_title": { "message": "Activation" },

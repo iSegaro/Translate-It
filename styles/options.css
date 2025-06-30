@@ -670,3 +670,95 @@ legend {
 .highlight-on-reset {
   animation: strong-highlight 1s ease-out;
 }
+
+
+/* Accordion Styles */
+.accordion {
+  width: 100%;
+}
+.accordion-item {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.accordion-header {
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  text-align: left;
+}
+.accordion-header:hover {
+  background-color: var(--tab-button-hover-bg);
+}
+.accordion-icon {
+  font-size: 1.5rem;
+  font-weight: 300;
+  transition: transform 0.3s ease;
+}
+.accordion-item.active .accordion-icon {
+  transform: rotate(45deg);
+}
+.accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, padding 0.3s ease;
+  padding: 0 16px;
+}
+.accordion-content p, .accordion-content ol {
+  margin-top: 0;
+}
+.accordion-item.active .accordion-content {
+  padding: 16px;
+  max-height: 500px; /* Adjust as needed */
+}
+
+/* Changelog Styles */
+#changelog-container {
+  direction: ltr;
+  text-align: left;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+#changelog-container h1, #changelog-container h2, #changelog-container h3 {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+#changelog-container ul {
+  padding-left: 20px;
+}
+#changelog-container code {
+  background-color: var(--tab-button-active-bg);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* Accordion Styles */
+.accordion { width: 100%; }
+.accordion-item { border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.accordion-header { width: 100%; background-color: transparent; border: none; padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 1rem; font-weight: 600; color: var(--text-color); text-align: left; }
+.accordion-header:hover { background-color: var(--tab-button-hover-bg); }
+.accordion-icon { font-size: 1.5rem; font-weight: 300; transition: transform 0.3s ease; }
+.accordion-item.active .accordion-icon { transform: rotate(45deg); }
+.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, padding 0.3s ease; padding: 0 16px; }
+.accordion-content p, .accordion-content ol { margin-top: 0; line-height: 1.6; }
+.accordion-item.active .accordion-content { padding: 16px; max-height: 500px; }
+
+/* Changelog Styles */
+#changelog-container { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 24px; max-height: 60vh; overflow-y: auto; }
+#changelog-container h1, #changelog-container h2, #changelog-container h3 { border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+#changelog-container ul { padding-left: 20px; }
+#changelog-container code { background-color: var(--tab-button-active-bg); padding: 2px 4px; border-radius: 4px; }
+#changelog-container a { color: var(--link-color); }

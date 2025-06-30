@@ -8,6 +8,7 @@ import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { applyTheme } from "./utils/theme.js";
+import { marked } from "marked";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -64,7 +65,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (themeSwitch.disabled) return; // اگر سوئیچ غیرفعال است (Auto فعال است)، کاری نکن
       const newThemeValue = themeSwitch.checked ? "dark" : "light";
       await Browser.storage.local.set({ THEME: newThemeValue });
-      applyTheme(newThemeValue);// فقط تم را اعمال کن، وضعیت کنترلرها نباید تغییر کند
+      applyTheme(newThemeValue); // فقط تم را اعمال کن، وضعیت کنترلرها نباید تغییر کند
       // themeAuto.checked باید false باشد، که با کلیک روی سوئیچ دستی، توسط کنترلر themeAuto مدیریت می‌شود اگر پیاده‌سازی شود
       // یا مستقیماً اینجا:
       // اگر به نحوی Auto هنوز تیک داشت
@@ -80,7 +81,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       setThemeControlsState(newThemeToApply);
     });
   }
-
 
   const selectionModeImmediateRadio = document.getElementById(
     "selection-mode-immediate"
@@ -168,6 +168,66 @@ document.addEventListener("DOMContentLoaded", async () => {
         promptTemplateInput.classList.remove("highlight-on-reset");
       }, 800); // Duration should match the animation time
     });
+  }
+
+  // --- Accordion Logic ---
+  const accordionItems = document.querySelectorAll(".accordion-item");
+  accordionItems.forEach((item) => {
+    const header = item.querySelector(".accordion-header");
+    header.addEventListener("click", () => {
+      // Close other items
+      accordionItems.forEach((otherItem) => {
+        if (otherItem !== item && otherItem.classList.contains("active")) {
+          otherItem.classList.remove("active");
+        }
+      });
+      // Toggle current item
+      item.classList.toggle("active");
+    });
+  });
+
+  // --- Deep-linking within Help Tab ---
+  function handleHelpAnchor(hash) {
+    if (hash && hash.startsWith("#help=")) {
+      const subAnchor = hash.split("=")[1];
+      if (subAnchor) {
+        const targetItem = document.getElementById(`help-${subAnchor}`);
+        if (targetItem) {
+          // Ensure the help tab is shown first
+          showTab("help");
+          // Open the specific accordion item
+          setTimeout(() => targetItem.classList.add("active"), 100);
+        }
+      }
+    }
+  }
+
+  // --- Changelog Fetching Logic ---
+  async function fetchAndDisplayChangelog() {
+    const changelogUrl =
+      "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md"; // Example URL
+    const container = document.getElementById("changelog-container");
+    try {
+      const response = await fetch(changelogUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const markdownText = await response.text();
+      // eslint-disable-next-line no-unsanitized/property
+      container.innerHTML = marked.parse(markdownText);
+    } catch (error) {
+      // eslint-disable-next-line no-unsanitized/property
+      container.innerHTML = `<p>Could not load changelog. Error: ${error.message}</p>`;
+      console.error("Failed to fetch changelog:", error);
+    }
+  }
+
+  // Add listener to fetch changelog when about tab is clicked
+  const aboutTabButton = document.querySelector('a[data-tab="about"]');
+  if (aboutTabButton) {
+    aboutTabButton.addEventListener("click", fetchAndDisplayChangelog, {
+      once: true,
+    }); // Fetch only once
   }
 
   // --- Dependency Logic ---
@@ -537,9 +597,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         app_localize(currentAppLocalize);
       }
 
-      // Handle initial tab display based on URL hash
-      const initialTabId = window.location.hash.substring(1) || "languages";
-      showTab(initialTabId);
+      const hash = window.location.hash;
+      if (hash.startsWith("#help=")) {
+        handleHelpAnchor(hash);
+      } else if (hash === "#about") {
+        fetchAndDisplayChangelog();
+      
+      } else {
+        // Handle initial tab display based on URL hash
+        const initialTabId = hash.substring(1) || "languages";
+        showTab(initialTabId);
+      }
+
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,

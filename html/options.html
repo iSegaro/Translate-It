@@ -59,7 +59,7 @@
         </div>
 
         <div class="sidebar-section localization-controls">
-          <h2 data-i18n="localization_section_title">Language</h2>
+          <h2 data-i18n="localization_section_title">language</h2>
           <div class="localization"></div>
         </div>
 
@@ -143,6 +143,21 @@
             data-i18n="advance_tab_title"
             >Advance</a
           >
+          <a
+            href="#help"
+            class="tab-button"
+            data-tab="help"
+            data-i18n="help_tab_title"
+            >Help</a
+          >
+          <a
+            href="#about"
+            class="tab-button"
+            data-tab="about"
+            data-i18n="about_tab_title"
+            >About</a
+          >
+
           <div class="tabs-action-area">
             <div id="status" class=""></div>
             <button id="saveSettings" data-i18n="save_settings_button">
@@ -702,6 +717,58 @@
                   rows="3"
                   placeholder="example.com, anotherdomain.org"
                 ></textarea>
+              </div>
+            </section>
+          </div>
+
+          <!-- Help Tab with Collapsible Sections -->
+          <div id="help" class="tab-content">
+            <section>
+              <h2 data-i18n="help_section_title">Help & Documentation</h2>
+              <div class="accordion">
+                <div class="accordion-item" id="help-shortcut">
+                  <button class="accordion-header">
+                    <span data-i18n="help_shortcut_title"></span>
+                    <span class="accordion-icon">+</span>
+                  </button>
+                  <div class="accordion-content">
+                    <p data-i18n-markdown="help_shortcut_content_p1"></p>
+                    <ol>
+                      <li data-i18n-markdown="help_shortcut_content_li1"></li>
+                      <li data-i18n-markdown="help_shortcut_content_li2"></li>
+                      <li data-i18n-markdown="help_shortcut_content_li3"></li>
+                      <li data-i18n-markdown="help_shortcut_content_li4"></li>
+                    </ol>
+                  </div>
+                </div>
+                <div class="accordion-item" id="help-api-keys">
+                  <button class="accordion-header">
+                    <span data-i18n="help_api_keys_title"></span>
+                    <span class="accordion-icon">+</span>
+                  </button>
+                  <div class="accordion-content">
+                    <p data-i18n-markdown="help_api_keys_content"></p>
+                  </div>
+                </div>
+                <div class="accordion-item" id="help-privacy">
+                  <button class="accordion-header">
+                    <span data-i18n="help_privacy_title"></span>
+                    <span class="accordion-icon">+</span>
+                  </button>
+                  <div class="accordion-content">
+                    <p data-i18n-markdown="help_privacy_content"></p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- About Tab for Changelog -->
+          <div id="about" class="tab-content">
+            <section>
+              <h2 data-i18n="about_section_title">About & Changelog</h2>
+              <div id="changelog-container">
+                <p data-i18n="options_changelog_loading">loading...</p>
               </div>
             </section>
           </div>
