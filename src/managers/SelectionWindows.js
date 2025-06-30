@@ -73,7 +73,9 @@ export default class SelectionWindows {
     this.dismiss(false);
     if (!selectedText) return;
 
-    const { selectionTranslationMode } = await Browser.storage.local.get({ selectionTranslationMode: 'immediate' });
+    const { selectionTranslationMode } = await Browser.storage.local.get({
+      selectionTranslationMode: CONFIG.selectionTranslationMode, 
+    });
 
     if (selectionTranslationMode === 'onClick') {
       this.isIconMode = true;

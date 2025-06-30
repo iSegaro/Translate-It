@@ -4,6 +4,7 @@ import {
   getRequireCtrlForTextSelectionAsync,
   state,
   TranslationMode,
+  CONFIG,
 } from "../config.js";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
@@ -28,7 +29,7 @@ import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler
-   *  @param {FeatureManager} featureManager */
+   * @param {FeatureManager} featureManager */
   constructor(translationHandler, featureManager) {
     this.translationHandler = translationHandler;
     this.featureManager = featureManager;
@@ -120,7 +121,7 @@ export default class EventHandler {
        **/
       if (this.isMouseUp(event)) {
         /** requireCtrlForTextSelection
-         *  در اینجا شرط مربوط به نیاز بودن به نگه‌داشتن کلید کنترل بررسی می‌شود
+         * در اینجا شرط مربوط به نیاز بودن به نگه‌داشتن کلید کنترل بررسی می‌شود
          */
         const requireCtrl = await getRequireCtrlForTextSelectionAsync();
         if (requireCtrl && !this.isMouseUpCtrl(event)) return;
@@ -206,12 +207,11 @@ export default class EventHandler {
       return;
     }
 
-    if (selectedText) {
-      // اگر متن انتخاب شده وجود دارد و تایمر قبلی فعال نیست
+     if (selectedText) {
       if (!this.selectionTimeoutId) {
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         const { selectionTranslationMode } = await Browser.storage.local.get({
-          selectionTranslationMode: "immediate",
+          selectionTranslationMode: CONFIG.selectionTranslationMode,
         });
 
         // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
@@ -229,12 +229,13 @@ export default class EventHandler {
       }
     } else {
       const { selectionTranslationMode } = await Browser.storage.local.get({
-        selectionTranslationMode: "immediate",
+        selectionTranslationMode: CONFIG.selectionTranslationMode,
       });
+
       if (selectionTranslationMode === "onClick") {
         return;
       }
-
+      
       // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
       if (this.selectionTimeoutId) {
         clearTimeout(this.selectionTimeoutId);
@@ -244,6 +245,7 @@ export default class EventHandler {
           this.cancelSelectionTranslation
         );
       }
+
       // همچنین اگر پاپ‌آپ ترجمه متن انتخاب شده باز است آن را ببندید.
       if (this.SelectionWindows?.isVisible) {
         logME("[EventHandler] Dismis SelectionWindows handleMouseUp");
@@ -295,7 +297,7 @@ export default class EventHandler {
       /**
        * اگر متن همان متن قبلی است و پاپ‌آپ قابل مشاهده است، کاری نکن.
        * اجازه بده listener مربوط به mousedown تصمیم بگیرد که ببندد یا نه.
-       *  */
+       * */
       // logME(
       //   "[EventHandler] MouseUp on the same selected text while window is visible. Ignoring show()."
       // );
