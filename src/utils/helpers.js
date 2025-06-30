@@ -119,13 +119,68 @@ export const isExtensionContextValid = () => {
   }
 };
 
-export const openOptionsPage = () => {
-  if (Browser.runtime.openOptionsPage) {
-    Browser.runtime.openOptionsPage();
-  } else {
-    window.open(Browser.runtime.getURL("html/options.html"));
-  }
+export const openOptionsPage = (anchor = null) => {
+  Browser.runtime
+    .sendMessage({
+      action: "open_options_page",
+      data: { anchor: anchor },
+    })
+    .catch((err) => {
+      console.error("Error sending open_options_page message:", err);
+    });
 };
+
+export const openOptionsPage_from_Background = (message) => {
+  const anchor = message.data?.anchor;
+  const optionsPath = "html/options.html";
+  const baseUrl = Browser.runtime.getURL(optionsPath);
+  const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
+
+  // This logic runs safely in the background context
+  Browser.tabs.query({}).then((tabs) => {
+    const existingTab = tabs.find(
+      (tab) => tab.url && tab.url.startsWith(baseUrl)
+    );
+    if (existingTab) {
+      Browser.tabs
+        .update(existingTab.id, { active: true, url: finalUrl })
+        .then((updatedTab) => {
+          if (updatedTab)
+            Browser.windows.update(updatedTab.windowId, { focused: true });
+        });
+    } else {
+      Browser.tabs.create({ url: finalUrl });
+    }
+  });
+};
+
+/**
+ * A robust function to open an extension page.
+ * It checks if a tab with the same base URL is already open to avoid duplicates.
+ * If found, it updates and focuses the existing tab. Otherwise, it creates a new one.
+ * @param {string} url - The full URL of the extension page to open (e.g., including #anchor).
+ */
+export function focusOrCreateTab(url) {
+  const baseUrl = url.split('#')[0]; 
+  Browser.tabs.query({})
+    .then(tabs => {
+      const existingTab = tabs.find(tab => tab.url && tab.url.startsWith(baseUrl));
+      if (existingTab) {
+        Browser.tabs.update(existingTab.id, { active: true, url: url })
+          .then(updatedTab => {
+            if (updatedTab) {
+              Browser.windows.update(updatedTab.windowId, { focused: true });
+            }
+          });
+      } else {
+        Browser.tabs.create({ url: url });
+      }
+    })
+    .catch(err => {
+      console.error("Error in focusOrCreateTab:", err);
+      Browser.tabs.create({ url: url });
+    });
+}
 
 export const showStatus = (() => {
   let currentNotification = null;
