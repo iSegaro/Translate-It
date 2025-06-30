@@ -444,6 +444,10 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
  </picture>
 </a>
 
+<br>
+
+---
+
 ## 📜 License
 
 This project is licensed under the **MIT License** — feel free to modify and share!
