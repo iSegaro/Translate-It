@@ -78,19 +78,20 @@ When selecting a word, you’ll not only get a translation but also helpful info
 ✅ **Supports Multiple Translation Providers:**  
 You can choose from several AI-powered translation providers:
 
+- [Google Translate][google-translate-url] (✔ Free)
 - [Gemini][gemini-url] (✔ Free)
-- [OpenRouter][openrouter-url] (✔ Free)
 - [WebAI to API][webai-to-api-url] (✔ Free)
+- [OpenRouter][openrouter-url]
 - [OpenAI][openai-url]
 - [DeepSeek][deepseek-url]
-- Custom OpenAI Compatible (refrence to Advanced Settings)
+- Custom OpenAI Compatible (refrence to [Advanced Settings](#advanced-settings))
 
 <br>
 
 ## 📋 Requirements
 
 - A modern Chromium-based browser or Firefox (Chrome, Edge, Brave, etc.)
-- A valid API key (unless using [WebAI to API][webai-to-api-url])
+- A valid API key (unless using [Google Translate][google-translate-url] or [WebAI to API][webai-to-api-url])
 
 <br>
 
@@ -236,7 +237,7 @@ You can modify the default shortcuts as needed:
 
 ---
 
-<details>
+<details id="advanced-settings">
 <summary>
   <h2>⚙️ Advanced Settings</h2>
 </summary>
@@ -454,6 +455,7 @@ This project is licensed under the **MIT License** — feel free to modify and s
 
 year 2025
 
+[google-translate-url]: https://translate.google.com/
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
 [deepseek-url]: https://chat.deepseek.com/

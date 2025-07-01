@@ -80,12 +80,13 @@
 ✅ **پشتیبانی از ارائه‌دهندگان ترجمه متنوع:**
 این افزونه از چندین سرویس ترجمه هوش مصنوعی پشتیبانی می‌کند تا بهترین گزینه را مطابق نیازهای خود انتخاب کنید:
 
+- [Google Translate][google-translate-url] (✔ رایگان)
 - [Gemini][gemini-url] (✔ رایگان)
-- [OpenRouter][openrouter-url] (✔ رایگان)
 - [WebAI to API][webai-to-api-url] (✔ رایگان)
 - [OpenAI][openai-url]
+- [OpenRouter][openrouter-url]
 - [DeepSeek][deepseek-url]
-- Custom OpenAI Compatible (به تنظیماتِ پیش‌رفته رجوع کنید.)
+- Custom OpenAI Compatible (به [تنظیمات پیش‌رفته](#advanced-settings) رجوع کنید)
 
 </div>
 
@@ -94,7 +95,7 @@
 ## 📋 نیازمندی‌ها
 
 - مرورگر مدرن مبتنی بر Chromium یا Firefox (Chrome، Edge، Brave و غیره)
-- یک کلید API معتبر (در صورت عدم استفاده از [WebAI to API][webai-to-api-url])
+- یک کلید API معتبر (در صورت عدم استفاده از [Google Translate][google-translate-url] یا [WebAI to API][webai-to-api-url])
 
 <br>
 
@@ -235,7 +236,7 @@ _توجه_: بعد از نصب، با کلیک روی **آیکون افزونه*
 
 ---
 
-<details>
+<details id="advanced-settings">
   <summary>
     <h3>⚙️ تنظیمات پیشرفته</h3>
   </summary>
@@ -484,6 +485,7 @@ pnpm run publish
 
 سال  ۱۴۰۴ - ۲۰۲۵
 
+[google-translate-url]: https://translate.google.com/
 [gemini-url]: https://gemini.com/
 [openai-url]: https://chat.openai.com/
 [deepseek-url]: https://chat.deepseek.com/
