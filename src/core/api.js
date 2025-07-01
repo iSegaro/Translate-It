@@ -186,7 +186,7 @@ class ApiService {
       sourceLang === AUTO_DETECT_VALUE ? "auto" : getLangCode(sourceLang);
     const tl = getLangCode(targetLang);
 
-    if (sl === tl) return text;
+    if (sl === tl && !isJsonMode) return text;
 
     const url = new URL(apiUrl);
     const params = {
@@ -198,55 +198,38 @@ class ApiService {
     };
     url.search = new URLSearchParams(params).toString();
 
-    // --- API Call ---
-    try {
-      const response = await fetch(url.toString(), { method: "GET" });
-
-      if (!response.ok) {
-        const err = new Error(`HTTP ${response.status}`);
-        err.type = ErrorTypes.HTTP_ERROR;
-        err.statusCode = response.status;
-        err.context = context;
-        throw err;
-      }
-
-      const data = await response.json();
-
-      // --- Response Parsing ---
-      if (!data?.[0]) {
-        const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
-        err.type = ErrorTypes.API;
-        err.context = `${context}-parsing`;
-        throw err;
-      }
-
-      const translatedTextBlob = data[0].map((segment) => segment[0]).join("");
-
-      if (isJsonMode) {
-        const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
-        if (translatedParts.length !== originalJsonStruct.length) {
-          // Fallback if splitting fails to match original structure
-          logME(
-            "[api] Google Translate: JSON reconstruction failed due to segment mismatch."
-          );
-          return translatedTextBlob;
+    // --- API Call using the centralized handler ---
+    const translatedTextBlob = await this._executeApiCall({
+      url: url.toString(),
+      fetchOptions: { method: "GET" },
+      extractResponse: (data) => {
+        // Check for valid Google Translate response structure
+        if (!data?.[0]) {
+          // Returning undefined will trigger an API_RESPONSE_INVALID error in _executeApiCall
+          return undefined;
         }
-        const translatedJson = originalJsonStruct.map((item, index) => ({
-          ...item,
-          text: translatedParts[index].trim(),
-        }));
-        return JSON.stringify(translatedJson, null, 2);
-      } else {
-        return translatedTextBlob;
+        // Join all translated segments
+        return data[0].map((segment) => segment[0] || "").join("");
+      },
+      context: context,
+    });
+
+    // --- Response Processing ---
+    if (isJsonMode) {
+      const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
+      if (translatedParts.length !== originalJsonStruct.length) {
+        console.warn(
+          "Google Translate: JSON reconstruction failed due to segment mismatch."
+        );
+        return translatedTextBlob; // Fallback to returning the raw translated blob
       }
-    } catch (err) {
-      if (err instanceof TypeError) {
-        const networkErr = new Error(err.message);
-        networkErr.type = ErrorTypes.NETWORK_ERROR;
-        networkErr.context = `${context}-network`;
-        throw networkErr;
-      }
-      throw err; // Rethrow other errors (HTTP, API)
+      const translatedJson = originalJsonStruct.map((item, index) => ({
+        ...item,
+        text: translatedParts[index]?.trim() || "",
+      }));
+      return JSON.stringify(translatedJson, null, 2);
+    } else {
+      return translatedTextBlob;
     }
   }
 
@@ -560,8 +543,9 @@ class ApiService {
     // سناریوی خاص: اگر از Google Translate برای ترجمه فیلدهای متنی استفاده می‌شود،
     // هدف ترجمه را به "زبان مبدأ" کاربر تغییر بده.
     if (
-      (api === "google" && translateMode === TranslationMode.Field) ||
-      !translateMode
+      api === "google" &&
+      (translateMode === TranslationMode.Field ||
+        typeof translateMode === "undefined")
     ) {
       const newTargetLanguage = sourceLanguage; // هدف جدید = زبان مبدأ کاربر
       const newSourceLanguage = AUTO_DETECT_VALUE; // زبان متن ورودی را خودکار تشخیص بده
