@@ -15,8 +15,9 @@ function initLocalizationUI() {
   // Prepare language list
   const languages =
     Array.isArray(languagesData) ? languagesData : Object.values(languagesData);
-  // فقط زبان‌هایی که flag دارند را انتخاب می‌کنیم
-  const filtered = languages.filter((lang) => lang.flag);
+
+  // 1. فیلتر کردن بر اساس وجود 'flagCode'
+  const filtered = languages.filter((lang) => lang.flagCode);
   const ul = document.createElement("ul");
   ul.classList.add("language-list");
 
@@ -24,10 +25,15 @@ function initLocalizationUI() {
     const li = document.createElement("li");
     li.dataset.locale = lang.locale;
     li.classList.add("language-list-item");
-    const span = document.createElement("span");
-    span.classList.add("language-flag");
-    span.textContent = lang.flag;
-    li.appendChild(span);
+
+    // 2. ایجاد تگ <img> برای نمایش پرچم
+    const img = document.createElement("img");
+    img.className = "language-flag-image"; // استفاده از کلاسی که در CSS تعریف کردیم
+    img.src = Browser.runtime.getURL(`icons/flags/${lang.flagCode}.svg`);
+    img.alt = `${lang.name} flag`; // برای دسترسی‌پذیری بهتر
+
+    li.appendChild(img); // ابتدا تصویر پرچم اضافه می‌شود
+
     li.appendChild(document.createTextNode(lang.name));
 
     li.addEventListener("click", async () => {

@@ -1,5 +1,11 @@
 // src/utils/languages.js
 
+/*
+پرچم‌ها را میتوانید از وبسایت زیر دریافت کنید:
+  https://nucleoapp.com/svg-flag-icons
+
+*/
+
 export const languageList = [
   {
     name: "English",
@@ -7,7 +13,7 @@ export const languageList = [
     promptName: "English",
     code: "en",
     locale: "en",
-    flag: "🇬🇧",
+    flagCode: "gb",
   },
   {
     name: "Farsi",
@@ -15,7 +21,7 @@ export const languageList = [
     promptName: "Farsi",
     code: "fa",
     locale: "fa",
-    flag: "🇮🇷",
+    flagCode: "ir",
   },
   { name: "German", voiceCode: "de-DE", promptName: "German", code: "de" },
   { name: "French", voiceCode: "fr-FR", promptName: "French", code: "fr" },

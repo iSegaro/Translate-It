@@ -435,18 +435,16 @@ input:checked + .slider:before {
   color: var(--tab-button-active-color);
   font-weight: 500;
 }
-.language-flag {
-  /*
-   * این فونت‌ها را به ترتیب اولویت قرار می‌دهد:
-   * 1. Segoe UI Emoji: فونت تخصصی ایموجی در ویندوز.
-   * 2. Noto Color Emoji: فونت ایموجی گوگل (رایج در لینوکس).
-   * 3. Apple Color Emoji: فونت ایموجی اپل.
-   * این کار تضمین می‌کند که در هر سیستم‌عامل، بهترین فونت موجود برای نمایش پرچم انتخاب شود.
-  */
-  font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
+
+
+.language-flag-image {
+  width: 18px;  /* عرض تصویر پرچم */
+  height: 14px; /* ارتفاع تصویر پرچم */
   margin-right: 8px; /* برای ایجاد فاصله بین پرچم و نام زبان */
   margin-left: 8px; /* برای ایجاد فاصله بین پرچم و نام زبان */
-  font-size: 1.2em;  /* کمی بزرگ‌تر کردن پرچم برای وضوح بیشتر */
+  border: 1px solid var(--border-color); /* یک بوردر ظریف برای زیبایی */
+  object-fit: cover;
+  vertical-align: middle; /* تراز عمودی بهتر با متن */
 }
 
 /* --- ACTION AREA IN TABS COLUMN --- */

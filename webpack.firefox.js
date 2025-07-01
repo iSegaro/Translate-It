@@ -70,7 +70,6 @@ if (isPublishMode) {
 }
 // --- پایان منطق شرطی ---
 
-
 rimraf.sync(outputFolderPath);
 if (fs.existsSync(zipFilePath)) fs.unlinkSync(zipFilePath);
 
@@ -146,6 +145,13 @@ const firefoxDistConfig = {
           to: ({ absoluteFilename }) => {
             const iconName = path.basename(absoluteFilename);
             return `icons/${iconName}`;
+          },
+        },
+        {
+          from: "icons/flags/*.svg",
+          to: ({ absoluteFilename }) => {
+            const iconName = path.basename(absoluteFilename);
+            return `icons/flags/${iconName}`;
           },
         },
         { from: "html/offscreen.html", to: "offscreen.html" },
