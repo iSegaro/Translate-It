@@ -154,16 +154,17 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 
 ## 🔑 API Keys
 
-To use the extension, you’ll need an API key from one of the providers below:
+To use AI-based translation, you’ll need an API key from one of the providers listed below:
 
-| Provider      | How to Get API Key                            | Cost                     |
-| ------------- | --------------------------------------------- | ------------------------ |
-| Google Gemini | [Google AI Studio][gemini-api-key-url]        | Free                     |
-| OpenAI        | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
-| DeepSeek      | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
-| OpenRouter    | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
-| WebAI to API  | _[Local Server][webai-to-api-url]_            | Free                     |
-| Custom OpenAI | -                                             | -                        |
+| Provider         | How to Get API Key                            | Cost                     |
+| ---------------- | --------------------------------------------- | ------------------------ |
+| Google Translate | _Dont Need_                                   | Free                     |
+| Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free                     |
+| WebAI to API     | _[Local Server][webai-to-api-url]_            | Free                     |
+| OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
+| OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
+| DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
+| Custom OpenAI    | -                                             | -                        |
 
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
