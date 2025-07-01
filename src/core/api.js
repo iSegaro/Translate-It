@@ -23,7 +23,7 @@ import {
   getCustomApiModelAsync,
   TranslationMode,
 } from "../config.js";
-import { delay, isExtensionContextValid } from "../utils/helpers.js";
+import { delay, isExtensionContextValid, logME } from "../utils/helpers.js";
 import { buildPrompt } from "../utils/promptBuilder.js";
 import { isPersianText } from "../utils/textDetection.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
@@ -157,13 +157,13 @@ class ApiService {
 
   async handleGoogleTranslate(text, sourceLang, targetLang) {
     if (sourceLang === targetLang) return null;
-  
+
     // --- JSON Mode Detection ---
     let isJsonMode = false;
     let originalJsonStruct;
     let textsToTranslate = [text];
     const context = "api-google-translate";
-  
+
     try {
       const parsed = JSON.parse(text);
       if (this._isSpecificTextJsonFormat(parsed)) {
@@ -174,19 +174,20 @@ class ApiService {
     } catch (e) {
       // Not a valid JSON, proceed in plain text mode.
     }
-  
+
     // --- URL Construction ---
     const apiUrl = await getGoogleTranslateUrlAsync();
     const getLangCode = (lang) => {
-        if (!lang || typeof lang !== 'string') return 'auto';
-        const lowerCaseLang = lang.toLowerCase();
-        return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
-    }
-    const sl = sourceLang === AUTO_DETECT_VALUE ? "auto" : getLangCode(sourceLang);
+      if (!lang || typeof lang !== "string") return "auto";
+      const lowerCaseLang = lang.toLowerCase();
+      return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
+    };
+    const sl =
+      sourceLang === AUTO_DETECT_VALUE ? "auto" : getLangCode(sourceLang);
     const tl = getLangCode(targetLang);
-  
+
     if (sl === tl) return text;
-  
+
     const url = new URL(apiUrl);
     const params = {
       client: "gtx",
@@ -196,11 +197,11 @@ class ApiService {
       q: textsToTranslate.join(TEXT_DELIMITER),
     };
     url.search = new URLSearchParams(params).toString();
-  
+
     // --- API Call ---
     try {
       const response = await fetch(url.toString(), { method: "GET" });
-  
+
       if (!response.ok) {
         const err = new Error(`HTTP ${response.status}`);
         err.type = ErrorTypes.HTTP_ERROR;
@@ -208,9 +209,9 @@ class ApiService {
         err.context = context;
         throw err;
       }
-  
+
       const data = await response.json();
-  
+
       // --- Response Parsing ---
       if (!data?.[0]) {
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
@@ -218,14 +219,16 @@ class ApiService {
         err.context = `${context}-parsing`;
         throw err;
       }
-  
+
       const translatedTextBlob = data[0].map((segment) => segment[0]).join("");
-  
+
       if (isJsonMode) {
         const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
         if (translatedParts.length !== originalJsonStruct.length) {
           // Fallback if splitting fails to match original structure
-          console.warn("Google Translate: JSON reconstruction failed due to segment mismatch.");
+          logME(
+            "[api] Google Translate: JSON reconstruction failed due to segment mismatch."
+          );
           return translatedTextBlob;
         }
         const translatedJson = originalJsonStruct.map((item, index) => ({
@@ -546,66 +549,82 @@ class ApiService {
       throw err;
     }
 
-    let [sourceLang, targetLang] = await Promise.all([
+    let [sourceLanguage, targetLanguage] = await Promise.all([
       srcLang || getSourceLanguageAsync(),
       tgtLang || getTargetLanguageAsync(),
     ]);
 
+    const api = await getTranslationApiAsync();
+
+    // ▼▼▼ Start Google Translate ▼▼▼
+    // سناریوی خاص: اگر از Google Translate برای ترجمه فیلدهای متنی استفاده می‌شود،
+    // هدف ترجمه را به "زبان مبدأ" کاربر تغییر بده.
     if (
-      sourceLang === targetLang &&
+      (api === "google" && translateMode === TranslationMode.Field) ||
+      !translateMode
+    ) {
+      const newTargetLanguage = sourceLanguage; // هدف جدید = زبان مبدأ کاربر
+      const newSourceLanguage = AUTO_DETECT_VALUE; // زبان متن ورودی را خودکار تشخیص بده
+
+      return this.handleGoogleTranslate(
+        text,
+        newSourceLanguage,
+        newTargetLanguage
+      );
+    }
+    // ▲▲▲ End Google Translate ▲▲▲
+
+    // منطق استاندارد برای سایر حالت‌ها
+    if (
+      sourceLanguage === targetLanguage &&
       translateMode !== TranslationMode.Popup_Translate
     ) {
       return null;
     }
 
-    const api = await getTranslationApiAsync();
     switch (api) {
       case "google":
-        return this.handleGoogleTranslate(
-          text,
-          sourceLang,
-          targetLang
-        );
+        return this.handleGoogleTranslate(text, sourceLanguage, targetLanguage);
       case "gemini":
         return this.handleGeminiTranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       case "webai":
         return this.handleWebAITranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       case "openai":
         return this.handleOpenAITranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       case "openrouter":
         return this.handleOpenRouterTranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       case "deepseek":
         return this.handleDeepSeekTranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       case "custom":
         return this.handleCustomTranslation(
           text,
-          sourceLang,
-          targetLang,
+          sourceLanguage,
+          targetLanguage,
           translateMode
         );
       default: {
