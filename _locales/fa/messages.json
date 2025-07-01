@@ -13,6 +13,14 @@
   "context_menu_shortcuts": { "message": "تنظیمات میانبرها" },
   "context_menu_help": { "message": "کمک مفید" },
   "context_menu_translate_with_selection": { "message": "ترجمه انتخابی" },
+  "context_menu_api_provider":{"message": "سرور API"},
+  "api_provider_google": {"message": "مترجم گوگل" },
+  "api_provider_gemini":{"message": "Gemini"},
+  "api_provider_webai":{"message": "WebAI"},
+  "api_provider_openai":{"message": "OpenAI"},
+  "api_provider_openrouter":{"message": "OpenRouter"},
+  "api_provider_deepseek":{"message": "DeepSeek"},
+  "api_provider_custom":{"message": "(OpenAI) سفارشی"},
 
   "google_translate_settings_title": { "message": "مترجم Google" },
   "google_translate_description": { "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست." },
@@ -57,7 +65,7 @@
   "help_section_title": { "message": "راهنما و مستندات" },
   "about_section_title": { "message": "آخرین تغییرات" },
   "help_shortcut_title": {
-    "message": "چگونه میانبرها کیبرد را تغییر دهیم؟"
+    "message": "چگونه میانبرهای کیبورد را تغییر دهیم؟"
   },
   "help_shortcut_content_p1": {
     "message": "در **Firefox**، میانبرها از طریق صفحه افزونه‌ها مدیریت می‌شوند:"
@@ -155,7 +163,6 @@
 
   "api_section_title": { "message": "رابط ترجمه (API)" },
   "translation_api_label": { "message": "ارائه‌دهنده سرویس API" },
-  "api_provider_deepseek": { "message": "رابط برنامه نویسی DeepSeek" },
   "gemini_api_settings_title": { "message": "تنظیمات API Gemini" },
   "gemini_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از Google AI Studio دریافت کنید."
@@ -213,7 +220,6 @@
   "deepseek_api_model_placeholder": {
     "message": "مدل DeepSeek را وارد کنید (مثلا: deepseek-chat)"
   },
-  "api_provider_custom": { "message": "سفارشی (سازگار با OpenAI)" },
   "custom_api_settings_title": { "message": "تنظیمات API سفارشی" },
   "custom_api_settings_description": {
     "message": "برای اتصال به هر سرویس دیگری که با فرمت OpenAI سازگار است، استفاده کنید."

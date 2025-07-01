@@ -13,6 +13,16 @@
   "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
   "context_menu_help": { "message": "Useful Help" },
   "context_menu_translate_with_selection": { "message": "Translate Element" },
+  "context_menu_api_provider":{"message": "API Provider"},
+  "api_provider_google": {"message": "Google Translate" },
+  "api_provider_gemini":{"message": "Gemini"},
+  "api_provider_webai":{"message": "WebAI"},
+  "api_provider_openai":{"message": "OpenAI"},
+  "api_provider_openrouter":{"message": "OpenRouter"},
+  "api_provider_deepseek":{"message": "DeepSeek"},
+  "api_provider_custom":{"message": "Custom (OpenAI)"},
+
+
 
   "google_translate_settings_title": { "message": "Google Translate" },
   "google_translate_description": { "message": "Uses the free, public Google Translate endpoint. No API key is required." },
@@ -157,7 +167,6 @@
 
   "api_section_title": { "message": "Translation API" },
   "translation_api_label": { "message": "API Provider Choice" },
-  "api_provider_deepseek": { "message": "DeepSeek API" },
   "gemini_api_settings_title": { "message": "Gemini API Settings" },
   "gemini_api_key_info": {
     "message": "You can get your Gemini API key from Google AI Studio."
@@ -211,7 +220,6 @@
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model (e.g., deepseek-chat)"
   },
-  "api_provider_custom": { "message": "Custom (OpenAI Compatible)" },
   "custom_api_settings_title": { "message": "Custom API Settings" },
   "custom_api_settings_description": {
     "message": "Use any service that is compatible with the OpenAI chat completions format."

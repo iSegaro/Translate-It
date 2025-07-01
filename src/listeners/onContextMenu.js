@@ -2,23 +2,41 @@
 
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { getTranslationString } from "../utils/i18n.js"; // ADDED: Import for i18n
+import { getTranslationString } from "../utils/i18n.js";
+import { getTranslationApiAsync } from "../config.js";
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
+const API_PROVIDER_PARENT_ID = "api-provider-parent";
+const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 const COMMAND_NAME = "toggle-select-element";
+
+// --- Data structure for API Providers ---
+const API_PROVIDERS = [
+  { id: 'google', i18nKey: 'api_provider_google', defaultTitle: 'Google Translate' },
+  { id: 'gemini', i18nKey: 'api_provider_gemini', defaultTitle: 'Gemini' },
+  { id: 'webai', i18nKey: 'api_provider_webai', defaultTitle: 'WebAI' },
+  { id: 'openai', i18nKey: 'api_provider_openai', defaultTitle: 'OpenAI' },
+  { id: 'openrouter', i18nKey: 'api_provider_openrouter', defaultTitle: 'OpenRouter' },
+  { id: 'deepseek', i18nKey: 'api_provider_deepseek', defaultTitle: 'DeepSeek' },
+  { id: 'custom', i18nKey: 'api_provider_custom', defaultTitle: 'Custom (OpenAI)' }
+];
+
 
 /**
  * Creates or updates all context menus for the extension.
- * This function is now centralized and can be called from onInstalled or on-demand.
+ * This function is centralized and can be called from onInstalled or on-demand.
  */
 export async function setupContextMenus() {
   // Clear all previous context menus to prevent duplicate errors
   await Browser.contextMenus.removeAll();
   logME("[ContextMenuSetup] All previous context menus removed.");
+
+  // Get the currently active API to set the 'checked' state
+  const currentApi = await getTranslationApiAsync();
 
   // --- 1. Create Page Context Menu ---
   try {
@@ -40,12 +58,35 @@ export async function setupContextMenus() {
 
   // --- 2. Create Action (Browser Action) Context Menus ---
   try {
+    // --- Options Menu ---
     Browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_OPTIONS_ID,
       title: (await getTranslationString("context_menu_options")) || "Options",
       contexts: ["action"],
     });
 
+    // --- API Provider Parent Menu ---
+    Browser.contextMenus.create({
+        id: API_PROVIDER_PARENT_ID,
+        title: (await getTranslationString("context_menu_api_provider")) || "API Provider",
+        contexts: ["action"],
+    });
+
+    // --- API Provider Sub-Menus (Radio Buttons) ---
+    for (const provider of API_PROVIDERS) {
+        Browser.contextMenus.create({
+            id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
+            parentId: API_PROVIDER_PARENT_ID,
+            title: (await getTranslationString(provider.i18nKey)) || provider.defaultTitle,
+            type: 'radio',
+            checked: provider.id === currentApi,
+            contexts: ["action"],
+        });
+    }
+    logME(`[ContextMenuSetup] API Provider sub-menus created. Current API: ${currentApi}`);
+
+
+    // --- Other Action Menus ---
     Browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
       title: (await getTranslationString("context_menu_shortcuts")) || "Manage Shortcuts",
@@ -69,6 +110,19 @@ export async function setupContextMenus() {
 Browser.contextMenus.onClicked.addListener(async (info, tab) => {
   logME(`[ContextMenu] Clicked menu item: ${info.menuItemId}`);
 
+  // --- Handler for API Provider selection ---
+  if (info.menuItemId.startsWith(API_PROVIDER_ITEM_ID_PREFIX)) {
+    const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
+    try {
+        await Browser.storage.local.set({ TRANSLATION_API: newApiId });
+        logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
+    } catch(e) {
+        logME(`[ContextMenu] Error setting new API provider:`, e);
+    }
+    return; // Stop further processing
+  }
+
+  // --- Handler for other menu items ---
   switch (info.menuItemId) {
     case PAGE_CONTEXT_MENU_ID:
       if (tab && tab.id) {
@@ -99,4 +153,17 @@ Browser.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-logME("[ContextMenu] Click listener is active.");
+
+/**
+ * Listener to keep the context menu synchronized with storage changes.
+ * This runs if the user changes the API from the options page.
+ */
+Browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && changes.TRANSLATION_API) {
+        logME("[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization.");
+        setupContextMenus();
+    }
+});
+
+
+logME("[ContextMenu] Listeners are active.");
