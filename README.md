@@ -213,7 +213,7 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 
 ---
 
-### Keyboard Shortcuts
+### <div id="keyboard-shortcuts">Keyboard Shortcuts</div>
 
 To quickly activate *Element Selection Mode*, you can use configurable keyboard shortcuts.
 We recommend setting them manually to avoid conflicts with browser or system shortcuts.
