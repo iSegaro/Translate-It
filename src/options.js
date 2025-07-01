@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabContentContainer = document.querySelector(".tab-content-container");
   const errorHandler = new ErrorHandler();
-  
+
   // --- Prompt Tab Button ---
   const promptTabButton = document.querySelector('a[data-tab="prompt"]');
 
@@ -116,7 +116,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const enableDictionraryCheckbox =
     document.getElementById("enableDictionrary");
   const translationApiSelect = document.getElementById("translationApi");
-  const googleApiSettingsInfo = document.getElementById("googleApiSettingsInfo");
+  const googleApiSettingsInfo = document.getElementById(
+    "googleApiSettingsInfo"
+  );
   const webAIApiSettings = document.getElementById("webAIApiSettings");
   const apiUrlSettingGroup = document
     .getElementById("apiUrl")
@@ -221,21 +223,32 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Sanitize the markdown output before setting innerHTML
       const rawHtml = marked.parse(markdownText); // Convert Markdown to HTML
       // Sanitize the HTML to prevent XSS attacks
-      const sanitized = DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: true }); 
+      const sanitized = DOMPurify.sanitize(rawHtml, {
+        RETURN_TRUSTED_TYPE: true,
+      });
       // Use DOMParser to safely append sanitized HTML instead of direct innerHTML assignment
       const parser = new DOMParser();
       const doc = parser.parseFromString(sanitized.toString(), "text/html"); // Convert TrustedHTML to string for DOMParser
 
       // Clear existing content and append new nodes
       container.textContent = ""; // Clear existing content
-      Array.from(doc.body.childNodes).forEach((node) => container.appendChild(node));
-    } catch (error) { 
+      Array.from(doc.body.childNodes).forEach((node) =>
+        container.appendChild(node)
+      );
+    } catch (error) {
       // Sanitize the error message before displaying it
-      const sanitizedErrorMessage = DOMPurify.sanitize(error.message, { RETURN_TRUSTED_TYPE: true });
+      const sanitizedErrorMessage = DOMPurify.sanitize(error.message, {
+        RETURN_TRUSTED_TYPE: true,
+      });
       const parser = new DOMParser();
-      const doc = parser.parseFromString(`<p>Could not load changelog. Error: ${sanitizedErrorMessage}</p>`, "text/html");
+      const doc = parser.parseFromString(
+        `<p>Could not load changelog. Error: ${sanitizedErrorMessage}</p>`,
+        "text/html"
+      );
       container.textContent = "";
-      Array.from(doc.body.childNodes).forEach((node) => container.appendChild(node));
+      Array.from(doc.body.childNodes).forEach((node) =>
+        container.appendChild(node)
+      );
 
       logME("[Options] Failed to fetch changelog:", error);
     }
@@ -289,13 +302,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateOverallExtensionDependency() {
     if (!extensionEnabledCheckbox) return;
+
     const isEnabled = extensionEnabledCheckbox.checked;
+    const selectedApi = translationApiSelect.value; // <-- دریافت API انتخاب شده
+    const isGoogleTranslate = selectedApi === "google";
+
     const dependentControls = [
       translateOnTextFieldsCheckbox,
       enableShortcutForTextFieldsCheckbox,
       translateWithSelectElementCheckbox,
       translateOnTextSelectionCheckbox,
-      enableDictionraryCheckbox,
+      // enableDictionraryCheckbox, //  <-- مدیریت دیکشنری را به بخش جداگانه Toggle منتقل می‌کنیم
     ];
     dependentControls.forEach((el) => {
       if (el) {
@@ -303,6 +320,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         el.closest(".setting-group")?.classList.toggle("disabled", !isEnabled);
       }
     });
+
+    // --- منطق جدید و اختصاصی برای دیکشنری ---
+    if (enableDictionraryCheckbox) {
+      // گزینه‌ی دیکشنری باید غیرفعال شود اگر:
+      // ۱. کل افزونه غیرفعال باشد.
+      // ۲. یا API انتخاب شده Google Translate باشد.
+      const shouldBeDisabled = !isEnabled || isGoogleTranslate;
+
+      enableDictionraryCheckbox.disabled = shouldBeDisabled;
+      enableDictionraryCheckbox
+        .closest(".setting-group")
+        ?.classList.toggle("disabled", shouldBeDisabled);
+
+      // اگر به دلیل انتخاب گوگل غیرفعال می‌شود، تیک آن را نیز بردار
+      // if (isGoogleTranslate) {
+      //   enableDictionraryCheckbox.checked = false;
+      // }
+    }
+
     handleTextSelectionDependency();
   }
 
@@ -354,7 +390,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   tabButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       // Prevent action if the tab is disabled
-      if (event.currentTarget.classList.contains('disabled')) {
+      if (event.currentTarget.classList.contains("disabled")) {
         event.preventDefault();
         return;
       }
@@ -366,51 +402,57 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- API Settings Visibility Logic (Refactored & Enhanced) ---
   function toggleApiSettings() {
-      if (!translationApiSelect) return;
-      const selectedApi = translationApiSelect.value;
-      const isMock = useMockCheckbox ? useMockCheckbox.checked : false;
+    if (!translationApiSelect) return;
+    const selectedApi = translationApiSelect.value;
+    const isMock = useMockCheckbox ? useMockCheckbox.checked : false;
 
-      const allApiSections = {
-          google: googleApiSettingsInfo,
-          webai: webAIApiSettings,
-          gemini: geminiApiSettings,
-          openai: openAIApiSettings,
-          openrouter: openRouterApiSettings,
-          deepseek: deepseekApiSettings,
-          custom: customApiSettings,
-      };
+    const allApiSections = {
+      google: googleApiSettingsInfo,
+      webai: webAIApiSettings,
+      gemini: geminiApiSettings,
+      openai: openAIApiSettings,
+      openrouter: openRouterApiSettings,
+      deepseek: deepseekApiSettings,
+      custom: customApiSettings,
+    };
 
-      // Hide all sections first
-      Object.values(allApiSections).forEach(section => {
-          if (section) section.style.display = 'none';
-      });
-      if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = 'none';
+    // Hide all sections first
+    
+    // ... (کدهای موجود در این تابع برای نمایش و پنهان‌سازی بخش‌های API) ...
+    // ... (منطق مربوط به غیرفعال کردن تب Prompt) ...
 
-      // If mock is enabled, do nothing else
-      if (isMock) {
-          return;
-      }
+    Object.values(allApiSections).forEach((section) => {
+      if (section) section.style.display = "none";
+    });
+    if (apiUrlSettingGroup) apiUrlSettingGroup.style.display = "none";
 
+    if (!isMock) {
       // Show the selected API's section
       if (allApiSections[selectedApi]) {
-          allApiSections[selectedApi].style.display = 'block';
+        allApiSections[selectedApi].style.display = "block";
       }
-
       // Special case for Gemini API URL
-      if (selectedApi === 'gemini' && apiUrlSettingGroup) {
-          apiUrlSettingGroup.style.display = 'block';
+      if (selectedApi === "gemini" && apiUrlSettingGroup) {
+        apiUrlSettingGroup.style.display = "block";
       }
-      
-      // --- Logic to disable/enable prompt tab ---
-      if (promptTabButton) {
-        const isGoogleTranslate = selectedApi === 'google';
-        promptTabButton.classList.toggle('disabled', isGoogleTranslate);
-        
-        // If the prompt tab is now disabled and was active, switch to the API tab
-        if (isGoogleTranslate && promptTabButton.classList.contains('active')) {
-            showTab('api');
-        }
+    }
+
+    // --- Logic to disable/enable prompt tab ---
+    if (promptTabButton) {
+      const isGoogleTranslateForPrompt = selectedApi === "google";
+      promptTabButton.classList.toggle("disabled", isGoogleTranslateForPrompt);
+
+      // If the prompt tab is now disabled and was active, switch to the API tab
+      if (
+        isGoogleTranslateForPrompt &&
+        promptTabButton.classList.contains("active")
+      ) {
+        showTab("api");
       }
+    }
+
+    // پس از هر تغییر API، وضعیت وابستگی‌ها را مجدداً ارزیابی کن
+    updateOverallExtensionDependency();
   }
 
   if (translationApiSelect) {
@@ -636,7 +678,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       // --- START: GENERALIZED HASH HANDLING LOGIC ---
-      
+
       const hash = window.location.hash;
       let targetTabId = "languages"; // Default tab
 
