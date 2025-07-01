@@ -26,15 +26,23 @@
   --bg-result-color: #0e0e0e;
   --header-bg-color: lab(45.6% -1.56 -3.7); /* رنگ پس زمینه هدر */
   --header-border-color: hsl(60, 7%, 42%); /* بوردر بوردر هدر */
-  --toolbar-link-color: lch(83.98% 24.38 250.24); /* رنگ لینک در تولبار، ترجمه این صفحه */
+  --toolbar-link-color: lch(
+    83.98% 24.38 250.24
+  ); /* رنگ لینک در تولبار، ترجمه این صفحه */
   --toolbar-link-hover-bg-color: #404040; /* رنگ پس زمینه هاور لینک، ترجمه این صفحه */
   --icon-opacity: 0.6;
   --icon-hover-opacity: 0.9;
-  --language-controls-bg-color: lab(45.6% -1.56 -3.7); /* رنگ پس زمینه هدر انتخاب زبان ها */
+  --language-controls-bg-color: lab(
+    45.6% -1.56 -3.7
+  ); /* رنگ پس زمینه هدر انتخاب زبان ها */
   --language-controls-border-color: hsl(73, 35%, 24%);
   --language-select-bg-color: #333; /* رنگ پس زمینه کمبوباکس زبان ها */
   --language-select-text-color: #fff; /* رنگ متن کمبوباکس زبان ها */
-  --language-select-border-color: hsl(73, 35%, 24%); /* رنگ بوردر کمبوباکس زبان ها */
+  --language-select-border-color: hsl(
+    73,
+    35%,
+    24%
+  ); /* رنگ بوردر کمبوباکس زبان ها */
   --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%); /* فیلتر آیکون برای تم تیره */
 }
 
@@ -42,10 +50,11 @@
 body {
   margin: 0;
   font-family:
-    "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* فونت استاندارد و خوانا */
+    "Vazirmatn", "Google Sans", "-apple-system", "Segoe UI", Tahoma, Geneva,
+    Verdana, sans-serif; /* فونت استاندارد و خوانا */
   background-color: var(--bg-color); /* پس زمینه کمی متفاوت برای بدنه */
   color: var(--text-color); /* رنگ متن اصلی */
-  font-size: 13px; /* اندازه فونت پایه */
+  font-size: 14px; /* اندازه فونت پایه */
 }
 
 .popup-container {
@@ -102,7 +111,9 @@ body {
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity); /* استفاده از متغیر شفافیت */
-  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  transition:
+    opacity 0.2s ease-in-out,
+    filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   filter: var(--icon-filter); /* اعمال فیلتر آیکون */
 }
 
@@ -163,7 +174,9 @@ body {
   font-size: 13px; /* همسان سازی اندازه فونت */
   border: 1px solid var(--language-select-border-color); /* استفاده از متغیر بوردر زبان */
   border-radius: 4px;
-  background-color: var(--language-select-bg-color); /* استفاده از متغیر پس زمینه زبان */
+  background-color: var(
+    --language-select-bg-color
+  ); /* استفاده از متغیر پس زمینه زبان */
   color: var(--language-select-text-color); /* استفاده از متغیر رنگ متن زبان */
   box-sizing: border-box; /* مهم برای محاسبه درست width */
 }
@@ -203,12 +216,16 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  transition:
+    background-color 0.2s ease,
+    filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   flex-shrink: 0; /* جلوگیری از کوچک شدن دکمه ها */
 }
 
 .swap-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color); /* استفاده از متغیر برای هاور */
+  background-color: var(
+    --toolbar-link-hover-bg-color
+  ); /* استفاده از متغیر برای هاور */
 }
 
 .swap-button img {
@@ -233,12 +250,16 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  transition:
+    background-color 0.2s ease,
+    filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   flex-shrink: 0;
 }
 
 .translate-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color); /* رنگ هاور دکمه ترجمه */
+  background-color: var(
+    --toolbar-link-hover-bg-color
+  ); /* رنگ هاور دکمه ترجمه */
 }
 
 .translate-button img {
@@ -307,11 +328,11 @@ textarea:focus,
   right: auto; /* اطمینان از عدم تداخل با left (برای RTL placeholder: right: 10px; left: auto;) */
   pointer-events: none;
 }
-html[dir="rtl"] .result:empty::before { /* تنظیمات خاص برای RTL placeholder */
-    right: 10px;
-    left: auto;
+html[dir="rtl"] .result:empty::before {
+  /* تنظیمات خاص برای RTL placeholder */
+  right: 10px;
+  left: auto;
 }
-
 
 /* استایل عمومی تولبار داخلی */
 .inline-toolbar {
@@ -359,7 +380,9 @@ html[dir="rtl"] .result:empty::before { /* تنظیمات خاص برای RTL pl
   height: 16px;
   cursor: pointer;
   opacity: var(--icon-opacity, 0.6); /* اضافه کردن فال‌بک برای اطمینان */
-  transition: opacity 0.2s ease, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   filter: var(--icon-filter); /* اعمال فیلتر آیکون */
 }
 
@@ -381,10 +404,8 @@ html[dir="rtl"] .result:empty::before { /* تنظیمات خاص برای RTL pl
   /* موقعیت paste-icon-separate با توجه به dir صفحه تنظیم می‌شود */
 }
 html[dir="rtl"] .paste-icon-separate {
-    right: 8px;
+  right: 8px;
 }
-
-
 
 /* استایل برای مخفی کردن دکمه Paste (توسط JS) */
 #pasteSourceBtn.hidden-by-clipboard {
@@ -404,17 +425,18 @@ html[dir="rtl"] .paste-icon-separate {
   background-repeat: no-repeat;
   cursor: pointer;
   opacity: var(--icon-opacity, 0.6); /* استفاده از متغیر و فال‌بک */
-  transition: opacity 0.3s, filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
+  transition:
+    opacity 0.3s,
+    filter 0.2s ease-in-out; /* اضافه شدن ترنزیشن برای فیلتر */
   display: none; /* به طور پیش فرض مخفی */
   filter: var(--icon-filter); /* اعمال فیلتر آیکون */
 }
 html[dir="ltr"] .clear-input {
-    right: 8px;
+  right: 8px;
 }
 html[dir="rtl"] .clear-input {
-    left: 8px;
+  left: 8px;
 }
-
 
 .clear-input:hover {
   opacity: var(--icon-hover-opacity, 1); /* استفاده از متغیر و فال‌بک */
@@ -458,9 +480,9 @@ body.selecting-element {
   position: absolute;
   content: "";
   height: 16px; /* کمی کوچکتر */
-  width: 16px;  /* کمی کوچکتر */
-  left: 2px;    /* تنظیم موقعیت */
-  bottom: 2px;  /* تنظیم موقعیت */
+  width: 16px; /* کمی کوچکتر */
+  left: 2px; /* تنظیم موقعیت */
+  bottom: 2px; /* تنظیم موقعیت */
   background-color: white;
   transition: 0.2s; /* کاهش زمان انیمیشن */
   border-radius: 50%;
@@ -477,7 +499,6 @@ input:focus + .slider {
 input:checked + .slider:before {
   transform: translateX(20px); /* تنظیم مقدار حرکت برای عرض جدید */
 }
-
 
 /* ==========================================================================
          Markdown Styles
@@ -564,11 +585,11 @@ input:checked + .slider:before {
   animation: spin 0.7s linear infinite;
   margin: auto;
 }
-:root.theme-dark .spinner { /* تنظیم رنگ اسپینر برای تم تیره */
-    border: 3px solid var(--header-border-color, #555);
-    border-top: 3px solid var(--toolbar-link-color, #58a6ff); /* استفاده از رنگ لینک تم تیره */
+:root.theme-dark .spinner {
+  /* تنظیم رنگ اسپینر برای تم تیره */
+  border: 3px solid var(--header-border-color, #555);
+  border-top: 3px solid var(--toolbar-link-color, #58a6ff); /* استفاده از رنگ لینک تم تیره */
 }
-
 
 @keyframes spin {
   to {
