@@ -9,6 +9,7 @@ import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { applyTheme } from "./utils/theme.js";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -217,12 +218,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const markdownText = await response.text();
-      // eslint-disable-next-line no-unsanitized/property
-      container.innerHTML = marked.parse(markdownText);
-    } catch (error) {
-      // eslint-disable-next-line no-unsanitized/property
-      container.innerHTML = `<p>Could not load changelog. Error: ${error.message}</p>`;
-      logME("Failed to fetch changelog:", error);
+      // Sanitize the markdown output before setting innerHTML
+      const rawHtml = marked.parse(markdownText); // Convert Markdown to HTML
+      // Sanitize the HTML to prevent XSS attacks
+      const sanitized = DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: true }); 
+      // Use DOMParser to safely append sanitized HTML instead of direct innerHTML assignment
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitized.toString(), "text/html"); // Convert TrustedHTML to string for DOMParser
+
+      // Clear existing content and append new nodes
+      container.textContent = ""; // Clear existing content
+      Array.from(doc.body.childNodes).forEach((node) => container.appendChild(node));
+    } catch (error) { 
+      // Sanitize the error message before displaying it
+      const sanitizedErrorMessage = DOMPurify.sanitize(error.message, { RETURN_TRUSTED_TYPE: true });
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<p>Could not load changelog. Error: ${sanitizedErrorMessage}</p>`, "text/html");
+      container.textContent = "";
+      Array.from(doc.body.childNodes).forEach((node) => container.appendChild(node));
+
+      logME("[Options] Failed to fetch changelog:", error);
     }
   }
 

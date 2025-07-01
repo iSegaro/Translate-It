@@ -168,8 +168,7 @@ export default class NotificationManager {
       setTimeout(() => {
         try {
           if (node.parentNode) { node.remove(); }
-        // eslint-disable-next-line no-unused-vars
-        } catch (error) { /* Already removed, which is fine. */ }
+        } catch { /* Already removed, which is fine. */ }
       }, 500);
     } catch (error) {
       logME("[NotificationManager] Error dismissing notification:", error);
@@ -226,8 +225,7 @@ export default class NotificationManager {
   reset() {
     this.canShowInPage = false;
     if (this.container) {
-      // eslint-disable-next-line no-unused-vars
-      try { this.container.remove(); } catch (error) { /* ignore */ }
+      try { this.container.remove(); } catch  { /* ignore */ }
       this.container = null;
     }
   }

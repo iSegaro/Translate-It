@@ -52,7 +52,6 @@ export function initContentScript() {
               this.document || this.ownerDocument
             ).querySelectorAll(selector);
             let i = matches.length;
-            // eslint-disable-next-line no-empty
             while (--i >= 0 && matches.item(i) !== this) {
               // ignore error
             }

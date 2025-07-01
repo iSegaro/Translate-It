@@ -6,6 +6,7 @@ import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 // import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {
@@ -171,9 +172,12 @@ function localizeContainer(container, translations) {
     if (markdownString) {
       // Sanitize is recommended for security if the content is user-generated.
       // For internal content from messages.json, it's generally safe.
-      const htmlContent = marked.parse(markdownString, { breaks: true });
-      // eslint-disable-next-line no-unsanitized/property
-      item.innerHTML = htmlContent;
+      const rawHtml = marked.parse(markdownString, { breaks: true });
+      const sanitized = DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: true });
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitized.toString(), "text/html");
+      item.textContent = ""; // Clear existing content
+      Array.from(doc.body.childNodes).forEach((node) => item.appendChild(node));
     }
   });
 }
