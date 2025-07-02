@@ -28,6 +28,7 @@ import { buildPrompt } from "../utils/promptBuilder.js";
 import { isPersianText } from "../utils/textDetection.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { getLanguageCode } from "../utils/tts.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";
@@ -218,7 +219,7 @@ class ApiService {
     if (isJsonMode) {
       const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
       if (translatedParts.length !== originalJsonStruct.length) {
-        console.warn(
+        logME(
           "Google Translate: JSON reconstruction failed due to segment mismatch."
         );
         return translatedTextBlob; // Fallback to returning the raw translated blob
@@ -539,26 +540,55 @@ class ApiService {
 
     const api = await getTranslationApiAsync();
 
-    // ▼▼▼ Start Google Translate ▼▼▼
-    // سناریوی خاص: اگر از Google Translate برای ترجمه فیلدهای متنی استفاده می‌شود،
-    // هدف ترجمه را به "زبان مبدأ" کاربر تغییر بده.
-    if (
-      api === "google" &&
-      (translateMode === TranslationMode.Field ||
-        typeof translateMode === "undefined")
-    ) {
-      const newTargetLanguage = sourceLanguage; // هدف جدید = زبان مبدأ کاربر
-      const newSourceLanguage = AUTO_DETECT_VALUE; // زبان متن ورودی را خودکار تشخیص بده
+    // ▼▼▼ شروع منطق اختصاصی برای Google Translate ▼▼▼
+    if (api === "google") {
+      // سناریوی ۱: ترجمه در فیلدهای متنی (مثلاً با Ctrl+/)
+      // در این حالت، همیشه متن به زبان مبدأ (Source) کاربر ترجمه می‌شود.
+      if (translateMode === TranslationMode.Field) {
+        const newTargetLanguage = sourceLanguage;
+        const newSourceLanguage = AUTO_DETECT_VALUE; // زبان ورودی همیشه خودکار تشخیص داده شود
 
-      return this.handleGoogleTranslate(
-        text,
-        newSourceLanguage,
-        newTargetLanguage
-      );
+        // با پارامترهای جدید، تابع را فراخوانی کرده و از ادامه اجرای تابع اصلی خارج شو
+        return this.handleGoogleTranslate(
+          text,
+          newSourceLanguage,
+          newTargetLanguage,
+          translateMode
+        );
+      }
+
+      // سناریوی ۲: سایر حالت‌های ترجمه (مانند انتخاب متن یا پاپ‌آپ)
+      // در این حالت، بررسی می‌کنیم که آیا متن انتخاب شده به زبان مقصد هست یا خیر.
+      try {
+        const detectionResult = await Browser.i18n.detectLanguage(text);
+
+        // فقط در صورتی که تشخیص زبان قابل اعتماد باشد، ادامه بده
+        if (
+          detectionResult?.isReliable &&
+          detectionResult.languages.length > 0
+        ) {
+          const detectedLangCode =
+            detectionResult.languages[0].language.split("-")[0];
+          const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
+
+          // اگر زبان متن با زبان مقصد یکی بود، عملیات جابجایی (Swap) را انجام بده
+          if (detectedLangCode === targetLangCode) {
+            logME(
+              `[API Logic] Text is already in the target language (${detectedLangCode}). Swapping for reverse translation.`
+            );
+            // جابجایی مقادیر مبدأ و مقصد با استفاده از destructuring assignment
+            [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
+          }
+        }
+      } catch (e) {
+        logME(
+          "[API Logic] Language detection failed. Proceeding with default target.",
+          e
+        );
+      }
     }
-    // ▲▲▲ End Google Translate ▲▲▲
+    // ▲▲▲ پایان منطق اختصاصی برای Google Translate ▲▲▲
 
-    // منطق استاندارد برای سایر حالت‌ها
     if (
       sourceLanguage === targetLanguage &&
       translateMode !== TranslationMode.Popup_Translate
