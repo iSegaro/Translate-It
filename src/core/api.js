@@ -53,7 +53,7 @@ const langNameToCodeMap = {
   english: "en",
   estonian: "et",
   farsi: "fa",
-  persian: "fa", 
+  persian: "fa",
   filipino: "fil", // Note: ISO 639-2 code
   finnish: "fi",
   french: "fr",
@@ -594,10 +594,10 @@ class ApiService {
 
     // ▼▼▼ شروع منطق اختصاصی برای Google Translate ▼▼▼
     if (api === "google") {
-      // سناریوی ۱: ترجمه در فیلدهای متنی (مثلاً با Ctrl+/)
-      // در این حالت، همیشه متن به زبان مبدأ (Source) کاربر ترجمه می‌شود.
+      // سناریو ۱: ترجمه در فیلدهای متنی (مانند Ctrl+/)
+      // عملکرد: این حالت همیشه یک ترجمه معکوس به زبان مبدأ کاربر انجام می‌دهد.
       if (translateMode === TranslationMode.Field) {
-        const newTargetLanguage = sourceLanguage;
+        const newTargetLanguage = sourceLanguage; // هدف جدید = زبان مبدأ کاربر
         const newSourceLanguage = AUTO_DETECT_VALUE; // زبان ورودی همیشه خودکار تشخیص داده شود
 
         // با پارامترهای جدید، تابع را فراخوانی کرده و از ادامه اجرای تابع اصلی خارج شو
@@ -609,27 +609,41 @@ class ApiService {
         );
       }
 
-      // سناریوی ۲: سایر حالت‌های ترجمه (مانند انتخاب متن یا پاپ‌آپ)
-      // در این حالت، بررسی می‌کنیم که آیا متن انتخاب شده به زبان مقصد هست یا خیر.
+      // سناریو ۲: سایر حالت‌های ترجمه (SelectElement, Selection, Popup)
+      // عملکرد: این بخش تصمیم می‌گیرد که آیا زبان‌ها را جابجا کند یا زبان مبدأ را برای دقت بیشتر تثبیت کند.
       try {
         const detectionResult = await Browser.i18n.detectLanguage(text);
 
-        // فقط در صورتی که تشخیص زبان قابل اعتماد باشد، ادامه بده
+        // فقط در صورتی که تشخیص زبان قابل اعتماد باشد، منطق را اجرا کن
         if (
           detectionResult?.isReliable &&
           detectionResult.languages.length > 0
         ) {
-          const detectedLangCode =
-            detectionResult.languages[0].language.split("-")[0];
+          const mainDetection = detectionResult.languages[0];
+          const detectedLangCode = mainDetection.language.split("-")[0];
           const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
 
-          // اگر زبان متن با زبان مقصد یکی بود، عملیات جابجایی (Swap) را انجام بده
+          logME(sourceLanguage, targetLanguage, detectedLangCode, targetLangCode);
+
+          // اولویت اول: آیا متن از قبل به زبان مقصد است؟
+          // اگر بله، زبان‌ها را برای ترجمه معکوس جابجا (swap) کن.
           if (detectedLangCode === targetLangCode) {
             logME(
-              `[API Logic] Text is already in the target language (${detectedLangCode}). Swapping for reverse translation.`
+              `[API Logic] Swapping languages: Detected language (${detectedLangCode}) matches target.`
             );
-            // جابجایی مقادیر مبدأ و مقصد با استفاده از destructuring assignment
             [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
+          }
+          // اولویت دوم: اگر شرط بالا برقرار نبود، آیا این یک انتخاب SelectElement با اطمینان بالا است؟
+          // اگر بله، زبان مبدأ را برای ترجمه دقیق‌تر، برابر با زبان تشخیص داده شده قرار بده.
+          else if (
+            translateMode === TranslationMode.SelectElement &&
+            mainDetection.percentage > 85
+          ) {
+            logME(
+              `[API Logic] Overriding source language. Reason: High confidence (${mainDetection.percentage}%) in Select Element mode. Detected language (${detectedLangCode})`
+            );
+            // توجه: در اینجا swap انجام نمی‌شود. فقط زبان مبدأ برای دقت بیشتر تثبیت می‌شود.
+            sourceLanguage = mainDetection.language;
           }
         }
       } catch (e) {
