@@ -55,11 +55,13 @@
     {
       "resources": [
         "browser-polyfill.js",
-        "offscreen.js",
         "content.bundle.js",
+        "icons/flags/*.svg",
         "offscreen.html",
+        "offscreen.js",
         "styles/*.css",
         "icons/*.png",
+        "icons/*.svg",
         "html/*",
         "_locales/*"
       ],

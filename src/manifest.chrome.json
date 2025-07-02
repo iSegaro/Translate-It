@@ -57,11 +57,13 @@
     {
       "resources": [
         "browser-polyfill.js",
-        "offscreen.js",
         "content.bundle.js",
+        "icons/flags/*.svg",
         "offscreen.html",
+        "offscreen.js",
         "styles/*.css",
         "icons/*.png",
+        "icons/*.svg",
         "html/*",
         "_locales/*"
       ],
@@ -72,7 +74,7 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
-    "commands": {
+  "commands": {
     "toggle-select-element": {
       "suggested_key": {
         "default": "Ctrl+Shift+Z",
