@@ -647,6 +647,7 @@ class ApiService {
           }
         }
         // لایه دوم: اگر تشخیص زبان قابل اعتماد نبود، از Regex به عنوان راهکار جایگزین استفاده کن
+        // TODO: این روش هنوز ۱۰۰ دردصد تست نشده و احتمال داره که باعث تداخل شود
         else {
           logME(
             "[API Logic] Language detection was not reliable. Using Regex fallback."

@@ -12,7 +12,7 @@ Browser.runtime.onInstalled.addListener(async (details) => {
 
   // --- Scenario 1: Fresh Installation ---
   if (details.reason === "install") {
-    logME("First installation detected. Opening options page to #languages.");
+    logME("[onInstalled] First installation detected.");
     const optionsUrl = Browser.runtime.getURL("html/options.html#languages");
     Browser.tabs.create({ url: optionsUrl });
   }
@@ -54,7 +54,7 @@ Browser.runtime.onInstalled.addListener(async (details) => {
         "update-notification",
         notificationOptions
       );
-      logME("Update notification created with browser-specific options.");
+      logME("[onInstalled] Update notification created with browser-specific options.");
     } catch (e) {
       // This will now only catch unexpected errors, not the compatibility error.
       logME("[onInstalled] Failed to create update notification:", e);
