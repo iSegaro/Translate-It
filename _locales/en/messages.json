@@ -32,6 +32,7 @@
   "options_changelog_loading": { "message": "Loading changelog..." },
 
   "options_error_same_languages": { "message": "Source and target languages cannot be the same." },
+  "options_error_empty_language": { "message": "Language fields cannot be empty." },
 
   "export_settings_description":{"message":"Export your current settings to a JSON file for backup or sharing."},
   "import_settings_description":{"message":"Importing will overwrite your current settings. The page will reload after a successful import."},
@@ -39,7 +40,7 @@
   "languages_tab_title": { "message": "Languages" },
   "activation_tab_title": { "message": "Activation" },
   "prompt_tab_title": { "message": "Prompt" },
-  "api_tab_title": { "message": "API" },
+  "api_tab_title": { "message": "API Settings" },
   "import_export_tab_title": { "message": "Import/Export" },
   "advance_tab_title": { "message": "Advance" },
 
@@ -169,7 +170,7 @@
 
   "api_section_title": { "message": "Translation API" },
   "translation_api_label": { "message": "API Provider Choice" },
-  "gemini_api_settings_title": { "message": "Gemini API Settings" },
+  "gemini_api_settings_title": { "message": "Gemini Settings" },
   "gemini_api_key_info": {
     "message": "You can get your Gemini API key from Google AI Studio."
   },
@@ -194,17 +195,17 @@
   "gemini_api_key_placeholder": { "message": "Paste your API key here" },
   "gemini_api_settings_api_url_label": { "message": "API URL" },
   "gemini_api_url_placeholder": { "message": "Enter API URL" },
-  "webai_api_settings_title": { "message": "WebAI API Settings" },
+  "webai_api_settings_title": { "message": "WebAI Settings" },
   "webai_api_url_label": { "message": "WebAI API URL" },
   "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
   "webai_api_model_label": { "message": "WebAI API Model" },
   "webai_api_model_placeholder": { "message": "Enter WebAI API model" },
-  "openai_api_settings_title": { "message": "OpenAI API Settings" },
+  "openai_api_settings_title": { "message": "OpenAI Settings" },
   "openai_api_settings_api_key_label": { "message": "API Key" },
   "openai_api_key_placeholder": { "message": "Paste your OpenAI API key here" },
   "openai_api_settings_model_label": { "message": "Model" },
   "openai_api_model_placeholder": { "message": "Enter OpenAI model" },
-  "openrouter_api_settings_title": { "message": "OpenRouter API Settings" },
+  "openrouter_api_settings_title": { "message": "OpenRouter Settings" },
   "openrouter_api_settings_api_key_label": { "message": "API Key" },
   "openrouter_api_key_placeholder": {
     "message": "Paste your OpenRouter API key here"
@@ -213,7 +214,7 @@
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
   },
-  "deepseek_api_settings_title": { "message": "DeepSeek API Settings" },
+  "deepseek_api_settings_title": { "message": "DeepSeek Settings" },
   "deepseek_api_settings_api_key_label": { "message": "API Key" },
   "deepseek_api_key_placeholder": {
     "message": "Paste your DeepSeek API key here"

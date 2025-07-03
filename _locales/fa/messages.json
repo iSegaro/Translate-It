@@ -35,6 +35,7 @@
   "options_changelog_loading": { "message": "در حال بارگذاری تغییرات..." },
 
   "options_error_same_languages": { "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند." },
+  "options_error_empty_language": { "message": "زبان را انتخاب نکرده‌اید." },
 
   "export_settings_description":{"message":"تنظیمات فعلی خود را به یک فایل JSON برای پشتیبان‌گیری یا اشتراک‌گذاری صادر کنید."},
   "import_settings_description":{"message":"وارد کردن تنظیمات فعلی شما را بازنویسی خواهد کرد. پس از وارد کردن موفقیت‌آمیز، صفحه دوباره بارگذاری خواهد شد."},
@@ -165,7 +166,7 @@
 
   "api_section_title": { "message": "رابط ترجمه (API)" },
   "translation_api_label": { "message": "ارائه‌دهنده سرویس API" },
-  "gemini_api_settings_title": { "message": "تنظیمات API Gemini" },
+  "gemini_api_settings_title": { "message": "تنظیمات Gemini" },
   "gemini_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از Google AI Studio دریافت کنید."
   },
@@ -174,18 +175,18 @@
   "gemini_api_key_placeholder": {
     "message": "کلید API خود را اینجا وارد کنید"
   },
-  "gemini_api_settings_api_url_label": { "message": "آدرس URL API" },
-  "gemini_api_url_placeholder": { "message": "آدرس URL API را وارد کنید" },
-  "webai_api_settings_title": { "message": "تنظیمات API WebAI" },
+  "gemini_api_settings_api_url_label": { "message": "آدرس API" },
+  "gemini_api_url_placeholder": { "message": "آدرس API را وارد کنید" },
+  "webai_api_settings_title": { "message": "تنظیمات WebAI" },
   "webai_api_key_info": {
     "message": "شما می‌توانید یک API Server شخصی در کامپیوتر خود اجرا کنید."
   },
   "webai_api_key_link": { "message": "راه‌اندازی API Server شخصی." },
-  "webai_api_url_label": { "message": "آدرس URL API WebAI" },
-  "webai_api_url_placeholder": { "message": "آدرس URL API WebAI را وارد کنید" },
-  "webai_api_model_label": { "message": "مدل API WebAI" },
-  "webai_api_model_placeholder": { "message": "مدل API WebAI را وارد کنید" },
-  "openai_api_settings_title": { "message": "تنظیمات API OpenAI" },
+  "webai_api_url_label": { "message": "آدرس" },
+  "webai_api_url_placeholder": { "message": "آدرس API را وارد کنید" },
+  "webai_api_model_label": { "message": "مدل" },
+  "webai_api_model_placeholder": { "message": "مدل WebAI را وارد کنید" },
+  "openai_api_settings_title": { "message": "تنظیمات OpenAI" },
   "openai_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت OpenAI دریافت کنید."
   },
@@ -196,20 +197,20 @@
   },
   "openai_api_settings_model_label": { "message": "مدل" },
   "openai_api_model_placeholder": { "message": "مدل OpenAI را وارد کنید" },
-  "openrouter_api_settings_title": { "message": "تنظیمات API OpenRouter" },
+  "openrouter_api_settings_title": { "message": "تنظیمات OpenRouter" },
   "openrouter_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت OpenRouter دریافت کنید."
   },
   "openrouter_api_key_link": { "message": "دریافت کلید API" },
   "openrouter_api_settings_api_key_label": { "message": "کلید API" },
   "openrouter_api_key_placeholder": {
-    "message": "کلید API OpenRouter خود را اینجا وارد کنید"
+    "message": "کلید API خود را اینجا وارد کنید"
   },
   "openrouter_api_settings_model_label": { "message": "مدل" },
   "openrouter_api_model_placeholder": {
     "message": "مدل OpenRouter (مثلاً: openai/gpt-4o) را وارد کنید"
   },
-  "deepseek_api_settings_title": { "message": "تنظیمات API DeepSeek" },
+  "deepseek_api_settings_title": { "message": "تنظیمات DeepSeek" },
   "deepseek_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت DeepSeek دریافت کنید."
   },
@@ -226,13 +227,13 @@
   "custom_api_settings_description": {
     "message": "برای اتصال به هر سرویس دیگری که با فرمت OpenAI سازگار است، استفاده کنید."
   },
-  "custom_api_settings_api_url_label": { "message": "آدرس URL" },
+  "custom_api_settings_api_url_label": { "message": "آدرس" },
   "custom_api_url_placeholder": {
-    "message": "آدرس پایه API سفارشی خود را وارد کنید"
+    "message": "آدرس پایه API خود را وارد کنید"
   },
   "custom_api_settings_api_key_label": { "message": "کلید API" },
   "custom_api_key_placeholder": {
-    "message": "کلید API سفارشی خود را اینجا وارد کنید"
+    "message": "کلید API خود را اینجا وارد کنید"
   },
   "custom_api_settings_model_label": { "message": "مدل" },
   "custom_api_model_placeholder": { "message": "نام مدل را وارد کنید" },
@@ -358,7 +359,7 @@
     "message": "سرور مدل مورد نظر در حال حاضر شلوغ است. لطفاً کمی بعد تلاش کنید."
   },
   "ERRORS_QUOTA_EXCEEDED": {
-    "message": "سهمیه استفاده شما از این API به پایان رسیده است."
+    "message": "اعتبار مورد استفاده شما از این API به پایان رسیده است."
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "سهمیه Gemini به پایان رسیده است (احتمالاً به دلیل محدودیت منطقه‌ای)."

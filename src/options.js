@@ -469,31 +469,48 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // ▼▼▼ شروع اعتبارسنجی زبان مبدا و مقصد ▼▼▼
     // 1. بررسی کن آیا زبان مبدأ و مقصد یکسان هستند (بدون توجه به حروف بزرگ و کوچک)
-    if (
-      sourceLangValue &&
-      targetLangValue &&
-      sourceLangValue.toLowerCase() === targetLangValue.toLowerCase()
-    ) {
-      showTab("languages");
+    let validationError = false;
+    let errorMessage = "";
+    const errorInputs = [];
 
-      // 2. نمایش پیام خطا در بخش وضعیت
-      showStatus(
+    // شرط ۱: بررسی خالی بودن فیلدهای زبان
+    if (!sourceLangValue || !targetLangValue) {
+      validationError = true;
+      errorMessage =
+        (await getTranslationString("options_error_empty_language")) ||
+        "Language fields cannot be empty.";
+
+      // فیلد خالی را برای نمایش خطا مشخص کن
+      if (!sourceLangValue) errorInputs.push(sourceLanguageInput);
+      if (!targetLangValue) errorInputs.push(targetLanguageInput);
+    }
+    // شرط ۲: بررسی یکی بودن زبان مبدأ و مقصد
+    else if (sourceLangValue.toLowerCase() === targetLangValue.toLowerCase()) {
+      validationError = true;
+      errorMessage =
         (await getTranslationString("options_error_same_languages")) ||
-          "Source and target languages cannot be the same",
-        "error"
-      );
+        "Source and target languages cannot be the same.";
 
-      // 3. افزودن یک کلاس خطا برای بازخورد بصری به اینپوت‌ها
-      sourceLanguageInput.classList.add("input-error");
-      targetLanguageInput.classList.add("input-error");
+      // هر دو فیلد را برای نمایش خطا مشخص کن
+      errorInputs.push(sourceLanguageInput, targetLanguageInput);
+    }
 
-      // 4. حذف کلاس خطا پس از ۲ ثانیه
+    // اگر هر یک از خطاهای اعتبارسنجی رخ داده بود
+    if (validationError) {
+      // به تب مربوط به زبان‌ها برو
+      showTab("languages");
+      // پیام خطا را نمایش بده
+      showStatus(errorMessage, "error");
+
+      // به فیلدهای دارای خطا کلاس ارور را اضافه کن
+      errorInputs.forEach((input) => input.classList.add("input-error"));
+
+      // پس از ۲ ثانیه کلاس خطا را حذف کن
       setTimeout(() => {
-        sourceLanguageInput.classList.remove("input-error");
-        targetLanguageInput.classList.remove("input-error");
+        errorInputs.forEach((input) => input.classList.remove("input-error"));
       }, 2000);
 
-      // 5. از ادامه‌ی اجرای تابع و ذخیره تنظیمات جلوگیری کن
+      // از ادامه اجرای تابع و ذخیره تنظیمات جلوگیری کن
       return;
     }
     // ▲▲▲ پایان منطق اعتبارسنجی زبان مبدا و مقصد ▲▲▲
