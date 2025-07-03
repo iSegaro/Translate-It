@@ -143,7 +143,8 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("resource has been exhausted") ||
     msg.includes("check quota") ||
     msg.includes("requires more credits") ||
-    msg.includes("fewer max_tokens")
+    msg.includes("fewer max_tokens") ||
+    msg.includes("insufficient balance")
   )
     return ErrorTypes.QUOTA_EXCEEDED;
 
