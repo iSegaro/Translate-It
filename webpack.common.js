@@ -11,7 +11,7 @@ module.exports = {
       "regenerator-runtime/runtime",
       "./src/content.js",
     ],
-    background: "./src/background.js",
+    background: "./src/backgrounds/background.js",
     options: "./src/options.js",
     popup: "./src/popup/main.js",
   },
