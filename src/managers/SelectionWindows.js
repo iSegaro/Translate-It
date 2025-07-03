@@ -432,7 +432,7 @@ export default class SelectionWindows {
     firstLine.classList.add("first-line");
     const ttsIconOriginal = this.createTTSIcon(
       originalText,
-      "Original text TTS"
+      CONFIG.SOURCE_LANGUAGE || "listen"
     );
     firstLine.appendChild(ttsIconOriginal);
     if (trans_Mode === TranslationMode.Dictionary_Translation) {
