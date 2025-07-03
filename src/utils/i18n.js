@@ -123,6 +123,9 @@ export async function app_localize(lang_code) {
   if (headContainer) {
     localizeContainer(headContainer, translations);
   }
+
+  // خالی کردن متن status در صفحه تنظیمات
+  document.getElementById("status").textContent = "";
 }
 
 /**
