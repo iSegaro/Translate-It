@@ -417,7 +417,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     // Hide all sections first
-    
+
     // ... (کدهای موجود در این تابع برای نمایش و پنهان‌سازی بخش‌های API) ...
     // ... (منطق مربوط به غیرفعال کردن تب Prompt) ...
 
@@ -464,6 +464,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- Save & Load Settings ---
   saveSettingsButton.addEventListener("click", async () => {
+    const sourceLangValue = sourceLanguageInput.value.trim();
+    const targetLangValue = targetLanguageInput.value.trim();
+
+    // ▼▼▼ شروع اعتبارسنجی زبان مبدا و مقصد ▼▼▼
+    // 1. بررسی کن آیا زبان مبدأ و مقصد یکسان هستند (بدون توجه به حروف بزرگ و کوچک)
+    if (
+      sourceLangValue &&
+      targetLangValue &&
+      sourceLangValue.toLowerCase() === targetLangValue.toLowerCase()
+    ) {
+      showTab("languages");
+
+      // 2. نمایش پیام خطا در بخش وضعیت
+      showStatus(
+        (await getTranslationString("options_error_same_languages")) ||
+          "Source and target languages cannot be the same",
+        "error"
+      );
+
+      // 3. افزودن یک کلاس خطا برای بازخورد بصری به اینپوت‌ها
+      sourceLanguageInput.classList.add("input-error");
+      targetLanguageInput.classList.add("input-error");
+
+      // 4. حذف کلاس خطا پس از ۲ ثانیه
+      setTimeout(() => {
+        sourceLanguageInput.classList.remove("input-error");
+        targetLanguageInput.classList.remove("input-error");
+      }, 2000);
+
+      // 5. از ادامه‌ی اجرای تابع و ذخیره تنظیمات جلوگیری کن
+      return;
+    }
+    // ▲▲▲ پایان منطق اعتبارسنجی زبان مبدا و مقصد ▲▲▲
+
     let finalThemeValue;
     if (themeAuto?.checked) {
       finalThemeValue = "auto";

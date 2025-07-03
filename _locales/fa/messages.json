@@ -34,6 +34,8 @@
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
   "options_changelog_loading": { "message": "در حال بارگذاری تغییرات..." },
 
+  "options_error_same_languages": { "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند." },
+
   "export_settings_description":{"message":"تنظیمات فعلی خود را به یک فایل JSON برای پشتیبان‌گیری یا اشتراک‌گذاری صادر کنید."},
   "import_settings_description":{"message":"وارد کردن تنظیمات فعلی شما را بازنویسی خواهد کرد. پس از وارد کردن موفقیت‌آمیز، صفحه دوباره بارگذاری خواهد شد."},
 
