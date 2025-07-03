@@ -46,13 +46,20 @@ export default class SelectionWindows {
 
   _handleThemeChange(changes) {
     if (changes.THEME && this.displayElement && this.isVisible) {
-      logME("[SelectionWindows] Theme changed, updating popup theme.", changes.THEME.newValue);
+      logME(
+        "[SelectionWindows] Theme changed, updating popup theme.",
+        changes.THEME.newValue
+      );
       this._applyThemeToHost();
     }
   }
 
   _addThemeChangeListener() {
-    if (!this.themeChangeListener && Browser.storage && Browser.storage.onChanged) {
+    if (
+      !this.themeChangeListener &&
+      Browser.storage &&
+      Browser.storage.onChanged
+    ) {
       // Store the bound function so it can be correctly removed
       this.boundHandleThemeChange = this._handleThemeChange.bind(this);
       Browser.storage.onChanged.addListener(this.boundHandleThemeChange);
@@ -61,7 +68,11 @@ export default class SelectionWindows {
   }
 
   _removeThemeChangeListener() {
-    if (this.boundHandleThemeChange && Browser.storage && Browser.storage.onChanged) {
+    if (
+      this.boundHandleThemeChange &&
+      Browser.storage &&
+      Browser.storage.onChanged
+    ) {
       Browser.storage.onChanged.removeListener(this.boundHandleThemeChange);
       this.boundHandleThemeChange = null; // Clear the stored listener
       // logME("[SelectionWindows] Theme change listener removed.");
@@ -74,10 +85,10 @@ export default class SelectionWindows {
     if (!selectedText) return;
 
     const { selectionTranslationMode } = await Browser.storage.local.get({
-      selectionTranslationMode: CONFIG.selectionTranslationMode, 
+      selectionTranslationMode: CONFIG.selectionTranslationMode,
     });
 
-    if (selectionTranslationMode === 'onClick') {
+    if (selectionTranslationMode === "onClick") {
       this.isIconMode = true;
       this._createTranslateIcon(selectedText, position);
     } else {
@@ -98,18 +109,45 @@ export default class SelectionWindows {
 
     const iconUrl = Browser.runtime.getURL("icons/extension_icon_32.png");
 
+    // --- شروع تغییرات برای افزودن انیمیشن ---
+
+    // 1. تعریف استایل‌های اولیه (حالت شروع انیمیشن)
     Object.assign(this.icon.style, {
-      position: "absolute", zIndex: "2147483647",
+      position: "absolute",
+      zIndex: "2147483647",
       left: `${window.scrollX + rect.left + rect.width / 2 - 12}px`,
       top: `${window.scrollY + rect.bottom + 5}px`,
-      width: '24px', height: '24px', backgroundColor: '#f0f0f0',
-      backgroundImage: `url('${iconUrl}')`, backgroundSize: '16px 16px',
-      backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
-      borderRadius: '50%', border: '1px solid #ccc', cursor: 'pointer',
-      boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'transform 0.1s ease'
+      width: "24px",
+      height: "24px",
+      backgroundColor: "#f0f0f0",
+      backgroundImage: `url('${iconUrl}')`,
+      backgroundSize: "16px 16px",
+      backgroundRepeat: "no-repeat",
+      backgroundPosition: "center",
+      borderRadius: "50%",
+      border: "1px solid #ccc",
+      cursor: "pointer",
+      boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+
+      // --- ویژگی‌های انیمیشن ---
+      opacity: "0", // شروع از حالت نامرئی
+      transform: "scale(0.5)", // شروع از اندازه کوچک‌تر
+      transformOrigin: "bottom center", // نقطه شروع بزرگ‌نمایی از پایین و وسط آیکون
+      transition:
+        "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
     });
 
+    // 2. افزودن آیکون به صفحه
     document.body.appendChild(this.icon);
+
+    // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
+    setTimeout(() => {
+      // اطمینان از اینکه آیکون هنوز در صفحه وجود دارد
+      if (this.icon) {
+        this.icon.style.opacity = "1";
+        this.icon.style.transform = "scale(1)";
+      }
+    }, 10); // یک تأخیر کوتاه برای اجرای صحیح انیمیشن کافی است
 
     this.iconClickContext = { text: selectedText, position };
     this.icon.addEventListener("click", this.onIconClick);
@@ -152,7 +190,11 @@ export default class SelectionWindows {
   }
 
   async _createTranslateWindow(selectedText, position) {
-    if (!isExtensionContextValid() || !selectedText || (this.isVisible && selectedText === this.originalText)) {
+    if (
+      !isExtensionContextValid() ||
+      !selectedText ||
+      (this.isVisible && selectedText === this.originalText)
+    ) {
       return;
     }
 
@@ -160,7 +202,10 @@ export default class SelectionWindows {
     this.isTranslationCancelled = false;
     this.isIconMode = false; // Now in window mode
 
-    const translationMode = determineTranslationMode(selectedText, TranslationMode.Selection);
+    const translationMode = determineTranslationMode(
+      selectedText,
+      TranslationMode.Selection
+    );
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-popup-host");
 
@@ -216,15 +261,34 @@ export default class SelectionWindows {
       }
     });
 
-    Browser.runtime.sendMessage({ action: "fetchTranslationBackground", payload: { promptText: selectedText, translationMode } })
+    Browser.runtime
+      .sendMessage({
+        action: "fetchTranslationBackground",
+        payload: { promptText: selectedText, translationMode },
+      })
       .then((response) => {
-        if (this.isTranslationCancelled || this.originalText !== selectedText || !this.innerContainer) return;
+        if (
+          this.isTranslationCancelled ||
+          this.originalText !== selectedText ||
+          !this.innerContainer
+        )
+          return;
         if (response?.success) {
           const txt = (response.data.translatedText || "").trim();
           if (!txt) throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
-          this.transitionToTranslatedText(txt, loading, selectedText, translationMode);
-        } else { throw new Error(response?.error?.message || response?.error || ErrorTypes.SERVICE); }
-      }).catch(async (err) => {
+          this.transitionToTranslatedText(
+            txt,
+            loading,
+            selectedText,
+            translationMode
+          );
+        } else {
+          throw new Error(
+            response?.error?.message || response?.error || ErrorTypes.SERVICE
+          );
+        }
+      })
+      .catch(async (err) => {
         if (this.isTranslationCancelled || !this.innerContainer) return;
         await this.handleTranslationError(err, loading);
       });
@@ -234,11 +298,15 @@ export default class SelectionWindows {
     // The timeout here ensures that the click event that initiated the window creation
     // has fully propagated and won't be caught by this new listener.
     setTimeout(() => {
-        // Ensure we only add the listener if the window is still supposed to be visible
-        // and we are NOT in the process of transitioning (pendingTranslationWindow is false).
-        if (this.isVisible && this.displayElement && !this.pendingTranslationWindow) {
-            this._addOutsideClickListener();
-        }
+      // Ensure we only add the listener if the window is still supposed to be visible
+      // and we are NOT in the process of transitioning (pendingTranslationWindow is false).
+      if (
+        this.isVisible &&
+        this.displayElement &&
+        !this.pendingTranslationWindow
+      ) {
+        this._addOutsideClickListener();
+      }
     }, 150); // Slightly increased delay for robustness, can be tuned.
   }
 
@@ -261,10 +329,18 @@ export default class SelectionWindows {
       // Check if the click is outside the displayElement AND not on any potential new icon
       // (though in window mode, an icon shouldn't exist simultaneously)
       const clickedIcon = document.getElementById("translate-it-icon");
-      if (!this.displayElement.contains(e.target) && (!clickedIcon || !clickedIcon.contains(e.target))) {
+      if (
+        !this.displayElement.contains(e.target) &&
+        (!clickedIcon || !clickedIcon.contains(e.target))
+      ) {
         // Add small delay for better UX, and re-check visibility
         setTimeout(() => {
-          if (this.isVisible && !this.pendingTranslationWindow && this.displayElement && !this.displayElement.contains(document.activeElement)) {
+          if (
+            this.isVisible &&
+            !this.pendingTranslationWindow &&
+            this.displayElement &&
+            !this.displayElement.contains(document.activeElement)
+          ) {
             this.cancelCurrentTranslation();
           }
         }, 50);
@@ -286,7 +362,9 @@ export default class SelectionWindows {
 
     // Store removal function
     this.removeMouseDownListener = () => {
-      document.removeEventListener("click", this._onOutsideClick, { capture: true });
+      document.removeEventListener("click", this._onOutsideClick, {
+        capture: true,
+      });
     };
   }
 
@@ -313,8 +391,13 @@ export default class SelectionWindows {
 
   applyInitialStyles(position) {
     Object.assign(this.displayElement.style, {
-      position: "absolute", zIndex: "2147483637", left: `${position.x}px`, top: `${position.y}px`,
-      transform: "scale(0.1)", transformOrigin: "top left", opacity: "0",
+      position: "absolute",
+      zIndex: "2147483637",
+      left: `${position.x}px`,
+      top: `${position.y}px`,
+      transform: "scale(0.1)",
+      transformOrigin: "top left",
+      opacity: "0",
       transition: `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`,
     });
   }
@@ -331,15 +414,26 @@ export default class SelectionWindows {
     return container;
   }
 
-  transitionToTranslatedText(translatedText, loadingContainer, originalText, trans_Mode) {
+  transitionToTranslatedText(
+    translatedText,
+    loadingContainer,
+    originalText,
+    trans_Mode
+  ) {
     if (!this.innerContainer || !this.displayElement) return;
-    if (loadingContainer && loadingContainer.parentNode === this.innerContainer) {
+    if (
+      loadingContainer &&
+      loadingContainer.parentNode === this.innerContainer
+    ) {
       loadingContainer.remove();
     }
     this.innerContainer.innerHTML = "";
     const firstLine = document.createElement("div");
     firstLine.classList.add("first-line");
-    const ttsIconOriginal = this.createTTSIcon(originalText, "Original text TTS");
+    const ttsIconOriginal = this.createTTSIcon(
+      originalText,
+      "Original text TTS"
+    );
     firstLine.appendChild(ttsIconOriginal);
     if (trans_Mode === TranslationMode.Dictionary_Translation) {
       const orig = document.createElement("span");
@@ -353,13 +447,13 @@ export default class SelectionWindows {
     const textSpan = document.createElement("span");
     textSpan.classList.add("text-content");
     try {
-        const rawHtml = marked.parse(translatedText);
-        const sanitizedHtmlString = DOMPurify.sanitize(rawHtml);
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(sanitizedHtmlString, "text/html");
-        Array.from(doc.body.childNodes).forEach((node) => {
-          textSpan.appendChild(node.cloneNode(true));
-        });
+      const rawHtml = marked.parse(translatedText);
+      const sanitizedHtmlString = DOMPurify.sanitize(rawHtml);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sanitizedHtmlString, "text/html");
+      Array.from(doc.body.childNodes).forEach((node) => {
+        textSpan.appendChild(node.cloneNode(true));
+      });
     } catch (e) {
       logME("Error parsing markdown or sanitizing HTML:", e);
       textSpan.textContent = translatedText;
@@ -384,31 +478,42 @@ export default class SelectionWindows {
     icon.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isExtensionContextValid()) {
-        Browser.runtime.sendMessage({ action: "speak", text: textToSpeak, lang: AUTO_DETECT_VALUE });
+        Browser.runtime.sendMessage({
+          action: "speak",
+          text: textToSpeak,
+          lang: AUTO_DETECT_VALUE,
+        });
       }
     });
     return icon;
   }
 
   async handleTranslationError(error, loadingContainer) {
-    if (loadingContainer && loadingContainer.parentNode === this.innerContainer) {
+    if (
+      loadingContainer &&
+      loadingContainer.parentNode === this.innerContainer
+    ) {
       loadingContainer.remove();
     }
     if (this.innerContainer) {
-        const errorMsgElement = document.createElement("div");
-        errorMsgElement.textContent = CONFIG.ICON_ERROR + "Translation failed. Please try again.";
-        errorMsgElement.style.color = "var(--sw-text-color)";
-        errorMsgElement.style.padding = "5px";
-        this.innerContainer.appendChild(errorMsgElement);
-        setTimeout(() => this.dismiss(true), 3000);
+      const errorMsgElement = document.createElement("div");
+      errorMsgElement.textContent =
+        CONFIG.ICON_ERROR + "Translation failed. Please try again.";
+      errorMsgElement.style.color = "var(--sw-text-color)";
+      errorMsgElement.style.padding = "5px";
+      this.innerContainer.appendChild(errorMsgElement);
+      setTimeout(() => this.dismiss(true), 3000);
     } else {
       this.dismiss(false);
     }
-    const errObj = error instanceof Error ? error : new Error(String(error.message || error));
+    const errObj =
+      error instanceof Error ? error : (
+        new Error(String(error.message || error))
+      );
     await this.translationHandler.errorHandler.handle(errObj, {
       type: errObj.type || ErrorTypes.API,
       context: "selection-window-translate",
-      isSilent: true
+      isSilent: true,
     });
   }
 
@@ -443,25 +548,46 @@ export default class SelectionWindows {
           this.removeElement(el);
         }
       }, this.fadeOutDuration + 50); // A bit more than fadeOutDuration
-      el.addEventListener("transitionend", () => {
-        clearTimeout(fallbackTimeout);
-        this.removeElement(el);
-      }, { once: true });
+      el.addEventListener(
+        "transitionend",
+        () => {
+          clearTimeout(fallbackTimeout);
+          this.removeElement(el);
+        },
+        { once: true }
+      );
     } else {
       this.removeElement(this.displayElement);
     }
   }
 
-  _cleanupIcon(removeListener = true) {
+    _cleanupIcon(removeListener = true) {
+    // فقط در صورتی که آیکونی برای حذف وجود داشته باشد، ادامه بده
     if (this.icon) {
-      this.icon.removeEventListener("click", this.onIconClick);
-      if (this.icon.parentNode) {
-        this.icon.remove();
-      }
+      const iconElement = this.icon; // یک رفرنس به عنصر آیکون نگه می‌داریم
+
+      // رویداد کلیک را فوراً حذف می‌کنیم تا کاربر نتواند روی آیکونی که در حال ناپدید شدن است کلیک کند
+      iconElement.removeEventListener("click", this.onIconClick);
+
+      // --- افزودن انیمیشن ناپدید شدن ---
+
+      // 1. با تغییر استایل، انیمیشن بازگشت (ناپدید شدن) را فعال می‌کنیم
+      iconElement.style.opacity = '0';
+      iconElement.style.transform = 'scale(0.5)';
+
+      // 2. یک تایمر تنظیم می‌کنیم تا عنصر را پس از پایان انیمیشن از DOM حذف کند
+      // زمان تایمر باید با زمان transition در استایل هماهنگ باشد (مثلاً 150 میلی‌ثانیه)
+      setTimeout(() => {
+        if (iconElement.parentNode) {
+          iconElement.remove();
+        }
+      }, 150); // کمی بیشتر از زمان انیمیشن (120ms) برای اطمینان
+
+      // بلافاصله this.icon را null می‌کنیم تا بقیه قسمت‌های برنامه آن را یک عنصر در حال حذف بدانند
       this.icon = null;
     }
+
     this.iconClickContext = null;
-    // this.isIconMode = false; // This should be set by the calling context (e.g. dismiss, onIconClick)
 
     // If 'removeListener' is true, and we were in icon mode, attempt to remove the listener.
     // This logic is maintained for when dismiss() calls _cleanupIcon.
@@ -477,9 +603,9 @@ export default class SelectionWindows {
       el.remove();
     }
     if (el === this.displayElement) {
-        this.displayElement = null;
-        this.innerContainer = null;
-        this.originalText = null;
+      this.displayElement = null;
+      this.innerContainer = null;
+      this.originalText = null;
     }
   }
 
@@ -503,8 +629,11 @@ export function dismissAllSelectionWindows() {
       }
     });
     const icons = document.querySelectorAll("#translate-it-icon");
-    icons.forEach(icon => icon.remove());
+    icons.forEach((icon) => icon.remove());
   } catch (err) {
-    logME("[SelectionWindows] Unknown error in dismissAllSelectionWindows:", err);
+    logME(
+      "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
+      err
+    );
   }
 }
