@@ -1,4 +1,4 @@
-// src/backgrounds/tts-player.js
+// src/managers/tts-player.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import {
@@ -203,7 +203,7 @@ export function stopTTS() {
   activeTTS = null;
 }
 
-// تابع کمکی برای متوقف‌کردن پخش در offscreen (در صورت نیاز)
+// تابع کمکی برای متوقف‌کردن پخش در offscreen
 async function stopAudioViaOffscreen() {
   try {
     if (!chrome.offscreen?.hasDocument) return;
