@@ -73,9 +73,7 @@ export function initContentScript() {
 
     init() {
       if (!isExtensionContextValid()) {
-        console.warn(
-          "[Translate-It] ❌ Extension context is not valid"
-        );
+        logME("[Translate-It] ❌ Extension context is not valid");
         this.translationHandler.notifier.show(
           "خطای بارگذاری افزونه - لطفا صفحه را رفرش کنید",
           "error",
@@ -97,29 +95,40 @@ export function initContentScript() {
       window.addEventListener("pagehide", () => {
         logME("[ContentCS] Pagehide event triggered.");
         this.translationHandler.IconManager?.cleanup?.();
-        if (state.selectElementActive) { // فقط اگر فعال بود، غیرفعال کن
-            this.updateSelectElementState(false);
+        if (state.selectElementActive) {
+          // فقط اگر فعال بود، غیرفعال کن
+          this.updateSelectElementState(false);
         }
         this._removePageMouseMoveListenerForPopup();
         // پاک کردن فلگ و تایمر در صورت خروج از صفحه
-        if (this.popupJustClosedForSelectionTimeout) clearTimeout(this.popupJustClosedForSelectionTimeout);
+        if (this.popupJustClosedForSelectionTimeout)
+          clearTimeout(this.popupJustClosedForSelectionTimeout);
         this.popupJustClosedForSelection = false;
       });
 
       window.addEventListener("blur", () => {
-        logME("[ContentCS] Main window blurred. Current selectElementActive state:", state.selectElementActive, "popupJustClosedForSelection:", this.popupJustClosedForSelection);
-        
+        logME(
+          "[ContentCS] Main window blurred. Current selectElementActive state:",
+          state.selectElementActive,
+          "popupJustClosedForSelection:",
+          this.popupJustClosedForSelection
+        );
+
         // اگر پاپ‌آپ به تازگی برای انتخاب بسته شده، این blur را نادیده بگیر
         if (this.popupJustClosedForSelection) {
-            logME("[ContentCS] Main window blur: Ignoring due to recent popup closure for selection.");
-            // فلگ پس از تاخیرش خود به خود false می‌شود، یا اینجا هم می‌توان false کرد اگر تاخیر کوتاه است
-            // this.popupJustClosedForSelection = false; // اگر می‌خواهید بلافاصله پس از اولین blur ریست شود
-            return; 
+          logME(
+            "[ContentCS] Main window blur: Ignoring due to recent popup closure for selection."
+          );
+          // فلگ پس از تاخیرش خود به خود false می‌شود، یا اینجا هم می‌توان false کرد اگر تاخیر کوتاه است
+          // this.popupJustClosedForSelection = false; // اگر می‌خواهید بلافاصله پس از اولین blur ریست شود
+          return;
         }
 
         // اگر حالت انتخاب فعال است و دلیل خاصی برای نادیده گرفتن blur نیست، آن را غیرفعال کن
         if (state.selectElementActive) {
-          logME("[ContentCS] Main window blur: Standard deactivation of select element state.");
+          logME(
+            "[ContentCS] Main window blur: Standard deactivation of select element state."
+          );
           this.updateSelectElementState(false);
         }
         this._removePageMouseMoveListenerForPopup(); // شنونده موس را هم متوقف کن
@@ -139,12 +148,17 @@ export function initContentScript() {
       }
 
       // این بخش ممکن است نیاز به بررسی داشته باشد که آیا featureManager قبل از translationHandler مقداردهی شده
-      if (this.translationHandler.featureManager && !this.translationHandler.featureManager.isOn("EXTENSION_ENABLED")) {
+      if (
+        this.translationHandler.featureManager &&
+        !this.translationHandler.featureManager.isOn("EXTENSION_ENABLED")
+      ) {
         newState = false;
       } else if (!this.translationHandler.featureManager) {
         // اگر featureManager هنوز آماده نیست، ممکن است بخواهید یک رفتار پیش‌فرض داشته باشید
         // یا صبر کنید. برای سادگی فعلا اینگونه رها شده.
-        logME("[Content] featureManager not available in updateSelectElementState");
+        logME(
+          "[Content] featureManager not available in updateSelectElementState"
+        );
       }
 
       try {
@@ -188,44 +202,75 @@ export function initContentScript() {
 
     _hasMouseMovedSignificantlyOnPage(currentPos) {
       if (!this.initialMousePositionOnPageForContent) return false;
-      const deltaX = Math.abs(currentPos.x - this.initialMousePositionOnPageForContent.x);
-      const deltaY = Math.abs(currentPos.y - this.initialMousePositionOnPageForContent.y);
-      return deltaX > MOUSE_MOVE_THRESHOLD_ON_PAGE || deltaY > MOUSE_MOVE_THRESHOLD_ON_PAGE;
+      const deltaX = Math.abs(
+        currentPos.x - this.initialMousePositionOnPageForContent.x
+      );
+      const deltaY = Math.abs(
+        currentPos.y - this.initialMousePositionOnPageForContent.y
+      );
+      return (
+        deltaX > MOUSE_MOVE_THRESHOLD_ON_PAGE ||
+        deltaY > MOUSE_MOVE_THRESHOLD_ON_PAGE
+      );
     }
 
     _handlePageMouseMoveForPopup(event) {
       if (!this.initialMousePositionOnPageForContent) {
-        this.initialMousePositionOnPageForContent = this._getMousePagePosition(event);
-        logME("[ContentCS] Initial mouse position captured on page for popup check (class):", this.initialMousePositionOnPageForContent);
+        this.initialMousePositionOnPageForContent =
+          this._getMousePagePosition(event);
+        logME(
+          "[ContentCS] Initial mouse position captured on page for popup check (class):",
+          this.initialMousePositionOnPageForContent
+        );
         return;
       }
       const currentMousePosition = this._getMousePagePosition(event);
       if (this._hasMouseMovedSignificantlyOnPage(currentMousePosition)) {
-        logME("[ContentCS] Significant mouse movement detected on page (class method).");
-        Browser.runtime.sendMessage({ action: MSG_MOUSE_MOVED_ON_PAGE })
-          .then(() => logME("[ContentCS] Sent MSG_MOUSE_MOVED_ON_PAGE to popup/runtime."))
-          .catch(err => logME("[ContentCS] Error sending MSG_MOUSE_MOVED_ON_PAGE:", err));
+        logME(
+          "[ContentCS] Significant mouse movement detected on page (class method)."
+        );
+        Browser.runtime
+          .sendMessage({ action: MSG_MOUSE_MOVED_ON_PAGE })
+          .then(() =>
+            logME("[ContentCS] Sent MSG_MOUSE_MOVED_ON_PAGE to popup/runtime.")
+          )
+          .catch((err) =>
+            logME("[ContentCS] Error sending MSG_MOUSE_MOVED_ON_PAGE:", err)
+          );
         this._removePageMouseMoveListenerForPopup(); // پس از ارسال پیام، شنونده را حذف کن
       }
     }
-    
+
     _addPageMouseMoveListenerForPopup() {
-      if (this.boundHandlePageMouseMoveForPopup) { // اگر شنونده‌ای از قبل وجود دارد، حذفش کن
+      if (this.boundHandlePageMouseMoveForPopup) {
+        // اگر شنونده‌ای از قبل وجود دارد، حذفش کن
         this._removePageMouseMoveListenerForPopup();
       }
       this.initialMousePositionOnPageForContent = null; // موقعیت اولیه را ریست کن
       // bind(this) برای حفظ context صحیح this در داخل _handlePageMouseMoveForPopup
-      this.boundHandlePageMouseMoveForPopup = this._handlePageMouseMoveForPopup.bind(this); 
-      document.addEventListener('mousemove', this.boundHandlePageMouseMoveForPopup, { passive: true });
-      logME("[ContentCS] Added mousemove listener to page document (class method for popup).");
+      this.boundHandlePageMouseMoveForPopup =
+        this._handlePageMouseMoveForPopup.bind(this);
+      document.addEventListener(
+        "mousemove",
+        this.boundHandlePageMouseMoveForPopup,
+        { passive: true }
+      );
+      logME(
+        "[ContentCS] Added mousemove listener to page document (class method for popup)."
+      );
     }
 
     _removePageMouseMoveListenerForPopup() {
       if (this.boundHandlePageMouseMoveForPopup) {
-        document.removeEventListener('mousemove', this.boundHandlePageMouseMoveForPopup);
+        document.removeEventListener(
+          "mousemove",
+          this.boundHandlePageMouseMoveForPopup
+        );
         this.boundHandlePageMouseMoveForPopup = null;
         this.initialMousePositionOnPageForContent = null;
-        logME("[ContentCS] Removed mousemove listener from page document (class method for popup).");
+        logME(
+          "[ContentCS] Removed mousemove listener from page document (class method for popup)."
+        );
       }
     }
     // --- پایان متدهای تشخیص حرکت موس ---
@@ -243,14 +288,18 @@ export function initContentScript() {
         switch (action) {
           // --- Case های جدید برای ارتباط با پاپ‌آپ ---
           case MSG_POPUP_OPENED_CHECK_MOUSE:
-            logME(`[ContentCS] Received ${MSG_POPUP_OPENED_CHECK_MOUSE}. Starting to listen for mouse movement.`);
+            logME(
+              `[ContentCS] Received ${MSG_POPUP_OPENED_CHECK_MOUSE}. Starting to listen for mouse movement.`
+            );
             this._addPageMouseMoveListenerForPopup();
             // پاسخی برای این پیام لازم نیست، مگر اینکه پاپ‌آپ منتظر تایید باشد
             // if (sendResponse) sendResponse({status: "listening_started"});
             return false; // چون sendResponse بلافاصله فراخوانی نمی‌شود
 
           case MSG_STOP_MOUSE_MOVE_CHECK:
-            logME(`[ContentCS] Received ${MSG_STOP_MOUSE_MOVE_CHECK}. Reason: ${message.reason}. Stopping mouse movement listener.`);
+            logME(
+              `[ContentCS] Received ${MSG_STOP_MOUSE_MOVE_CHECK}. Reason: ${message.reason}. Stopping mouse movement listener.`
+            );
             this._removePageMouseMoveListenerForPopup();
             // if (sendResponse) sendResponse({status: "listening_stopped"});
             return false;
@@ -258,15 +307,24 @@ export function initContentScript() {
 
           // --- Case های اصلی شما ---
           case "TOGGLE_SELECT_ELEMENT_MODE": // این پیام از پاپ‌آپ برای تغییر حالت می‌آید
-            logME("[ContentCS] Received TOGGLE_SELECT_ELEMENT_MODE with data:", message.data);
-            if (message.data === true) { // اگر پاپ‌آپ دستور فعال‌سازی داده
-                this.popupJustClosedForSelection = true;
-                logME("[ContentCS] Flag 'popupJustClosedForSelection' set TRUE via TOGGLE_SELECT_ELEMENT_MODE.");
-                if (this.popupJustClosedForSelectionTimeout) clearTimeout(this.popupJustClosedForSelectionTimeout);
-                this.popupJustClosedForSelectionTimeout = setTimeout(() => {
-                    this.popupJustClosedForSelection = false;
-                    logME("[ContentCS] Flag 'popupJustClosedForSelection' auto-reset to FALSE after timeout.");
-                }, 500); // 500 میلی‌ثانیه برای پوشش دادن رویداد blur
+            logME(
+              "[ContentCS] Received TOGGLE_SELECT_ELEMENT_MODE with data:",
+              message.data
+            );
+            if (message.data === true) {
+              // اگر پاپ‌آپ دستور فعال‌سازی داده
+              this.popupJustClosedForSelection = true;
+              logME(
+                "[ContentCS] Flag 'popupJustClosedForSelection' set TRUE via TOGGLE_SELECT_ELEMENT_MODE."
+              );
+              if (this.popupJustClosedForSelectionTimeout)
+                clearTimeout(this.popupJustClosedForSelectionTimeout);
+              this.popupJustClosedForSelectionTimeout = setTimeout(() => {
+                this.popupJustClosedForSelection = false;
+                logME(
+                  "[ContentCS] Flag 'popupJustClosedForSelection' auto-reset to FALSE after timeout."
+                );
+              }, 500); // 500 میلی‌ثانیه برای پوشش دادن رویداد blur
             }
             this.updateSelectElementState(message.data); // وضعیت را به‌روز کن
             return false;
@@ -276,7 +334,7 @@ export function initContentScript() {
               window.getSelection()?.toString()?.trim() ?? "";
             // برای sendResponse آسنکرون، باید promise برگردانده شود یا true و sendResponse بعداً فراخوانی شود
             Promise.resolve({ selectedText }).then(sendResponse);
-            return true; 
+            return true;
           }
 
           case "CONTEXT_INVALID":
@@ -285,7 +343,10 @@ export function initContentScript() {
               action: "CONTENT_SCRIPT_WILL_RELOAD",
             });
             const reloadNotif = this.translationHandler.notifier.show(
-              "لطفا صفحه را رفرش کنید", "info", true, 2000
+              "لطفا صفحه را رفرش کنید",
+              "info",
+              true,
+              2000
             );
             setTimeout(() => {
               this.translationHandler.notifier.dismiss(reloadNotif);
@@ -296,7 +357,7 @@ export function initContentScript() {
           case "applyTranslationToActiveElement": {
             const active = document.activeElement;
             const translated = message.payload?.translatedText;
-            let didApply = false; // استفاده از خروجی استراتژی برای تعیین موفقیت
+            let didApply = false;
 
             if (active && typeof translated === "string") {
               try {
@@ -304,6 +365,7 @@ export function initContentScript() {
                   this.translationHandler.detectPlatform?.(active) ??
                   detectPlatform(active);
 
+                // تلاش برای جایگزینی با استراتژی پلتفرم
                 if (
                   this.translationHandler.strategies[platform]?.updateElement &&
                   typeof this.translationHandler.strategies[platform]
@@ -313,21 +375,37 @@ export function initContentScript() {
                     platform
                   ].updateElement(active, translated);
                 } else {
+                  // تلاش با روش‌های عمومی
                   if (active.isContentEditable) {
                     active.innerText = translated;
-                    didApply = true;
                   } else if ("value" in active) {
                     active.value = translated;
-                    didApply = true;
                   }
-                  logME("[Content] Applied via fallback method");
+
+                  // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
+                  active.dispatchEvent(
+                    new Event("input", { bubbles: true, cancelable: true })
+                  );
+                  active.dispatchEvent(
+                    new Event("change", { bubbles: true, cancelable: true })
+                  );
+
+                  // <<<<< بخش کلیدی جدید >>>>>
+                  // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
+                  await new Promise((resolve) => setTimeout(resolve, 50));
+
+                  // مقدار نهایی را دوباره می‌خوانیم تا از موفقیت مطمئن شویم
+                  const finalValue =
+                    (active.isContentEditable ?
+                      active.innerText
+                    : active.value) || "";
+                  didApply = finalValue.trim() === translated.trim();
+                  logME(
+                    `[Content] Apply attempt finished. Success: ${didApply}. Final value: '${finalValue}'`
+                  );
                 }
 
-                // اطلاع‌رسانی به فرم برای بروزرسانی
-                active.dispatchEvent(new Event("input", { bubbles: true }));
-                active.dispatchEvent(new Event("change", { bubbles: true }));
-
-                Promise.resolve({ success: !!didApply }).then(sendResponse); // ارسال نتیجه واقعی
+                Promise.resolve({ success: didApply }).then(sendResponse);
               } catch (err) {
                 logME("[Content] Strategy failed", err);
                 Promise.resolve({
@@ -343,11 +421,11 @@ export function initContentScript() {
             }
             return true; // برای sendResponse آسنکرون
           }
-          
+
           case "revertAllAndEscape":
             logME("Received revertAllAndEscape in content script");
             revertTranslations({
-              state, 
+              state,
               errorHandler: this.translationHandler.errorHandler,
               notifier: this.translationHandler.notifier,
               IconManager: this.translationHandler.IconManager,
@@ -358,7 +436,7 @@ export function initContentScript() {
           default:
             logME("[ContentCS] Unknown message in handleMessage:", message);
             // اگر sendResponse مورد انتظار بوده و هیچ case ای آن را مدیریت نکرده، false برگردانید
-            return false; 
+            return false;
         }
       } catch (error) {
         logME("[ContentCS] Error in handleMessage:", error);
