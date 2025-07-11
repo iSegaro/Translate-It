@@ -27,6 +27,10 @@ export const CONFIG = {
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
   selectionTranslationMode: "onClick", // "immediate",
+  COPY_REPLACE: "copy", // "replace",
+  REPLACE_SPECIAL_SITES: true,
+  CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
+
 
   // --- API Settings ---
   TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google
@@ -447,5 +451,19 @@ export const getRequireCtrlForTextSelectionAsync = async () => {
   return getSettingValueAsync(
     "REQUIRE_CTRL_FOR_TEXT_SELECTION",
     CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION
+  );
+};
+
+export const getCOPY_REPLACEAsync = async () => {
+  return getSettingValueAsync(
+    "COPY_REPLACE",
+    CONFIG.COPY_REPLACE
+  );
+};
+
+export const getREPLACE_SPECIAL_SITESAsync = async () => {
+  return getSettingValueAsync(
+    "REPLACE_SPECIAL_SITES",
+    CONFIG.REPLACE_SPECIAL_SITES
   );
 };

@@ -101,6 +101,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const enableShortcutForTextFieldsCheckbox = document.getElementById(
     "enableShortcutForTextFields"
   );
+
+  const copy_on_clipboadRadiobox = document.getElementById(
+    "textField-mode-Copy"
+  );
+  const replace_on_textfieldRadiobox = document.getElementById(
+    "textField-mode-replace"
+  );
+  const replace_on_special_sitesCheckbox = document.getElementById(
+    "replace_on_special_sites"
+  );
+
   const translateWithSelectElementCheckbox = document.getElementById(
     "translateWithSelectElement"
   );
@@ -211,11 +222,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- Changelog Fetching Logic ---
   async function fetchAndDisplayChangelog() {
-    const changelogUrl =
-      "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md"; // Example URL
     const container = document.getElementById("changelog-container");
     try {
-      const response = await fetch(changelogUrl);
+      const response = await fetch(CONFIG.CHANGELOG_URL);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -303,41 +312,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateOverallExtensionDependency() {
     if (!extensionEnabledCheckbox) return;
 
-    const isEnabled = extensionEnabledCheckbox.checked;
-    const selectedApi = translationApiSelect.value; // <-- دریافت API انتخاب شده
-    const isGoogleTranslate = selectedApi === "google";
+    const isMasterEnabled = extensionEnabledCheckbox.checked;
+    const isGoogleApi = translationApiSelect.value === "google";
 
-    const dependentControls = [
+    const topLevelControls = [
       translateOnTextFieldsCheckbox,
       enableShortcutForTextFieldsCheckbox,
       translateWithSelectElementCheckbox,
       translateOnTextSelectionCheckbox,
-      // enableDictionraryCheckbox, //  <-- مدیریت دیکشنری را به بخش جداگانه Toggle منتقل می‌کنیم
     ];
-    dependentControls.forEach((el) => {
+
+    topLevelControls.forEach((el) => {
       if (el) {
-        el.disabled = !isEnabled;
-        el.closest(".setting-group")?.classList.toggle("disabled", !isEnabled);
+        el.disabled = !isMasterEnabled;
+        el.closest(".setting-group")?.classList.toggle(
+          "disabled",
+          !isMasterEnabled
+        );
       }
     });
 
-    // --- منطق جدید و اختصاصی برای دیکشنری ---
     if (enableDictionraryCheckbox) {
       // گزینه‌ی دیکشنری باید غیرفعال شود اگر:
       // ۱. کل افزونه غیرفعال باشد.
       // ۲. یا API انتخاب شده Google Translate باشد.
-      const shouldBeDisabled = !isEnabled || isGoogleTranslate;
-
-      enableDictionraryCheckbox.disabled = shouldBeDisabled;
+      const shouldDictionaryBeDisabled = !isMasterEnabled || isGoogleApi;
+      enableDictionraryCheckbox.disabled = shouldDictionaryBeDisabled;
       enableDictionraryCheckbox
         .closest(".setting-group")
-        ?.classList.toggle("disabled", shouldBeDisabled);
-
-      // اگر به دلیل انتخاب گوگل غیرفعال می‌شود، تیک آن را نیز بردار
-      // if (isGoogleTranslate) {
-      //   enableDictionraryCheckbox.checked = false;
-      // }
+        ?.classList.toggle("disabled", shouldDictionaryBeDisabled);
+      if (isGoogleApi) {
+        enableDictionraryCheckbox.checked = false;
+      }
     }
+
+    // این شرط مشخص می‌کند که آیا زیرمجموعه‌ها باید بر اساس کنترل‌کننده‌هایشان غیرفعال شوند یا خیر
+    const shouldSubOptionsBeDisabled =
+      !enableShortcutForTextFieldsCheckbox.checked &&
+      !translateOnTextFieldsCheckbox.checked;
+
+    const textFieldSubOptions = [
+      copy_on_clipboadRadiobox,
+      replace_on_textfieldRadiobox,
+      replace_on_special_sitesCheckbox,
+    ];
+
+    textFieldSubOptions.forEach((el) => {
+      if (el) {
+        // یک کنترل باید غیرفعال باشد اگر کل افزونه غیرفعال باشد، یا هر دو کنترل‌کننده آن غیرفعال باشند
+        const isFinallyDisabled =
+          !isMasterEnabled || shouldSubOptionsBeDisabled;
+        el.disabled = isFinallyDisabled;
+        el.closest(".radio-option, .setting-group")?.classList.toggle(
+          "disabled",
+          isFinallyDisabled
+        );
+      }
+    });
 
     handleTextSelectionDependency();
   }
@@ -348,6 +379,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       updateOverallExtensionDependency
     );
   }
+
+  enableShortcutForTextFieldsCheckbox?.addEventListener(
+    "change",
+    updateOverallExtensionDependency
+  );
+  translateOnTextFieldsCheckbox?.addEventListener(
+    "change",
+    updateOverallExtensionDependency
+  );
 
   // --- Tab Navigation Logic ---
   function showTab(tabId) {
@@ -577,6 +617,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           .filter(Boolean) ?? [],
       selectionTranslationMode:
         selectionModeOnClickRadio?.checked ? "onClick" : "immediate",
+      COPY_REPLACE: replace_on_textfieldRadiobox?.checked ? "replace" : "copy",
+      REPLACE_SPECIAL_SITES: replace_on_special_sitesCheckbox?.checked ?? CONFIG.REPLACE_SPECIAL_SITES,
     };
 
     try {
@@ -638,6 +680,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         enableShortcutForTextFieldsCheckbox.checked =
           settings.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ??
           CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS;
+
+      // Populate new text field mode options
+      if (copy_on_clipboadRadiobox && replace_on_textfieldRadiobox) {
+        if (settings.COPY_REPLACE === "replace") {
+          replace_on_textfieldRadiobox.checked = true;
+        } else {
+          copy_on_clipboadRadiobox.checked = true; // حالت پیش‌فرض 'copy' است
+        }
+      }
+
+      if (replace_on_special_sitesCheckbox) {
+        // با استفاده از ?? مقدار پیش‌فرض از CONFIG خوانده می‌شود اگر مقداری در حافظه نباشد
+        replace_on_special_sitesCheckbox.checked =
+          settings.REPLACE_SPECIAL_SITES ?? CONFIG.REPLACE_SPECIAL_SITES;
+      }
+
       if (translateWithSelectElementCheckbox)
         translateWithSelectElementCheckbox.checked =
           settings.TRANSLATE_WITH_SELECT_ELEMENT ??

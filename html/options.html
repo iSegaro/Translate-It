@@ -265,6 +265,45 @@
                     translation when inside a text field.</span
                   >
                 </div>
+                <div class="sub-options-group">
+                  <div class="radio-group" id="textFieldModeGroup">
+                    <div class="radio-option">
+                      <input
+                        type="radio"
+                        id="textField-mode-Copy"
+                        name="textFieldMode"
+                        value="Copy"
+                      /><label
+                        for="textField-mode-Copy"
+                        data-i18n="options_textField_mode_copy"
+                        >Copy to Clipboard</label
+                      >
+                    </div>
+                    <div class="radio-option">
+                      <input
+                        type="radio"
+                        id="textField-mode-replace"
+                        name="textFieldMode"
+                        value="Replace"
+                      /><label
+                        for="textField-mode-Replace"
+                        data-i18n="options_textField_mode_replace"
+                        >Replace on Textfield</label
+                      >
+                    </div>
+                  </div>
+                  <div
+                      class="setting-group sub-setting-group"
+                      id="copyOnTextfieldGroup"
+                    >
+                      <label
+                        for="replace_on_special_sites"
+                        data-i18n="enable_replace_on_special_sites"
+                        >Enable replace on special sites (Whatsapp, Telegram, etc.)</label
+                      >
+                      <input type="checkbox" id="replace_on_special_sites" />
+                    </div>
+                </div>
               </fieldset>
 
               <fieldset>
@@ -424,12 +463,18 @@
                   <option value="custom">Custom (OpenAI Compatible)</option>
                 </select>
               </div>
-              <div id="googleApiSettingsInfo" style="display: none;">
-                <h3 data-i18n="google_translate_settings_title">Google Translate</h3>
-                 <div class="setting-group api-key-info">
-                    <span class="setting-description" data-i18n="google_translate_description">
-                      Uses the free, public Google Translate endpoint. No API key is required.
-                    </span>
+              <div id="googleApiSettingsInfo" style="display: none">
+                <h3 data-i18n="google_translate_settings_title">
+                  Google Translate
+                </h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="google_translate_description"
+                  >
+                    Uses the free, public Google Translate endpoint. No API key
+                    is required.
+                  </span>
                 </div>
               </div>
               <div id="webAIApiSettings">
