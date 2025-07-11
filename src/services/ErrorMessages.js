@@ -50,7 +50,7 @@ export const errorMessages = {
  */
 export async function getErrorMessage(type) {
   // construct translation key (e.g. 'ERRORS_API_KEY_MISSING')
-  const translationKey = type.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
+  const translationKey = type?.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
   // attempt to get localized string
   let msg = await getTranslationString(translationKey);
   // fallback to default message or unknown

@@ -90,7 +90,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("incorrect api key provided") ||
     msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
-    msg.includes("API key expired") ||
+    msg.includes("api key expired") ||
     msg.includes("renew the api key") ||
     msg.includes("authentication fails")
   )
@@ -99,7 +99,9 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.API_KEY_MISSING;
   
   // Google Translate
-  if (msg.includes("400 Error") || msg.includes("HTTP 400"))
+  if (msg.includes("http 400 error") ||
+      msg.includes("http 400") ||
+      msg.includes("400 error"))
     return ErrorTypes.INVALID_REQUEST;
 
   // API URL or model errors
