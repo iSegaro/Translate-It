@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       !translateOnTextSelectionCheckbox.disabled;
     const isImmediateModeEnabled = selectionModeImmediateRadio.checked;
 
-    selectionModeGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.6";
+    selectionModeGroup.style.opacity = isTextSelectionEnabled ? "1" : "0.2";
     selectionModeGroup.style.pointerEvents =
       isTextSelectionEnabled ? "auto" : "none";
     selectionModeImmediateRadio.disabled = !isTextSelectionEnabled;
@@ -296,9 +296,47 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const isCtrlGroupEnabled = isTextSelectionEnabled && isImmediateModeEnabled;
     requireCtrlForTextSelectionCheckbox.disabled = !isCtrlGroupEnabled;
-    textSelectionCtrlGroup.style.opacity = isCtrlGroupEnabled ? "1" : "0.6";
+    textSelectionCtrlGroup.style.opacity = isCtrlGroupEnabled ? "1" : "0.2";
     textSelectionCtrlGroup.style.pointerEvents =
       isCtrlGroupEnabled ? "auto" : "none";
+  }
+
+  // --- Dependency Logic for Replace Mode ---
+  function handleReplaceModeDependency() {
+    if (
+      !extensionEnabledCheckbox || // اطمینان از وجود کلید اصلی
+      !replace_on_textfieldRadiobox ||
+      !replace_on_special_sitesCheckbox ||
+      !enableShortcutForTextFieldsCheckbox ||
+      !translateOnTextFieldsCheckbox
+    ) {
+      return; // اگر عناصر لازم وجود ندارند، خارج شو
+    }
+
+    // شرط ۰: آیا کل افزونه غیرفعال است؟
+    const isMasterDisabled = !extensionEnabledCheckbox.checked;
+
+    // شرط ۱: آیا کنترل‌های والد غیرفعال هستند؟
+    const areParentsDisabled =
+      !enableShortcutForTextFieldsCheckbox.checked &&
+      !translateOnTextFieldsCheckbox.checked;
+
+    // شرط ۲: آیا حالت "جایگزینی" فعال است؟
+    const isReplaceModeActive = replace_on_textfieldRadiobox.checked;
+
+    // چک‌باکس باید غیرفعال باشد اگر «کل افزونه غیرفعال باشد» یا «والدها غیرفعال باشند» یا «حالت جایگزینی فعال باشد»
+    const shouldBeDisabled =
+      isMasterDisabled || areParentsDisabled || isReplaceModeActive;
+
+    replace_on_special_sitesCheckbox.disabled = shouldBeDisabled;
+    replace_on_special_sitesCheckbox
+      .closest(".setting-group")
+      ?.classList.toggle("disabled", shouldBeDisabled);
+
+    // منطق تیک‌دار شدن: فقط وقتی حالت جایگزینی فعال است، تیک را اجباری کن
+    if (isReplaceModeActive) {
+      replace_on_special_sitesCheckbox.checked = true;
+    }
   }
 
   [
@@ -354,7 +392,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const textFieldSubOptions = [
       copy_on_clipboadRadiobox,
       replace_on_textfieldRadiobox,
-      replace_on_special_sitesCheckbox,
     ];
 
     textFieldSubOptions.forEach((el) => {
@@ -369,6 +406,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
       }
     });
+
+    handleReplaceModeDependency();
 
     handleTextSelectionDependency();
   }
@@ -385,6 +424,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateOverallExtensionDependency
   );
   translateOnTextFieldsCheckbox?.addEventListener(
+    "change",
+    updateOverallExtensionDependency
+  );
+
+  copy_on_clipboadRadiobox?.addEventListener(
+    "change",
+    updateOverallExtensionDependency
+  );
+  replace_on_textfieldRadiobox?.addEventListener(
     "change",
     updateOverallExtensionDependency
   );
@@ -618,7 +666,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectionTranslationMode:
         selectionModeOnClickRadio?.checked ? "onClick" : "immediate",
       COPY_REPLACE: replace_on_textfieldRadiobox?.checked ? "replace" : "copy",
-      REPLACE_SPECIAL_SITES: replace_on_special_sitesCheckbox?.checked ?? CONFIG.REPLACE_SPECIAL_SITES,
+      REPLACE_SPECIAL_SITES:
+        replace_on_special_sitesCheckbox?.checked ??
+        CONFIG.REPLACE_SPECIAL_SITES,
     };
 
     try {
