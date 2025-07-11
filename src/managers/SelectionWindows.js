@@ -206,6 +206,9 @@ export default class SelectionWindows {
       selectedText,
       TranslationMode.Selection
     );
+
+    logME("[SelectionWindows] Creating translation window ", translationMode);
+
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-popup-host");
 

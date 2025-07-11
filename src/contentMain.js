@@ -390,7 +390,6 @@ export function initContentScript() {
                     new Event("change", { bubbles: true, cancelable: true })
                   );
 
-                  // <<<<< بخش کلیدی جدید >>>>>
                   // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
                   await new Promise((resolve) => setTimeout(resolve, 50));
 
