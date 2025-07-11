@@ -134,6 +134,15 @@
   "translate_on_text_selection_description": {
     "message": "Allow triggering translation automatically or via an icon after selecting text on the page."
   },
+  "options_textField_mode_copy": {
+    "message": "Copy to Clipboard"
+  },
+  "options_textField_mode_replace": {
+    "message": "Replace on Textfield"
+  },
+  "enable_replace_on_special_sites": {
+    "message": "Enable replace on special sites (WhatsApp, Telegram, Instagram, etc)"
+  },
   "options_selection_mode_label": {
     "message": "Selection Translate Mode"
   },

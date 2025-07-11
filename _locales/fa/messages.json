@@ -134,6 +134,15 @@
   "translate_on_text_selection_description": {
     "message": "امکان فعال شدن ترجمه به‌صورت خودکار یا با آیکون پس از انتخاب متن در صفحه را فراهم می‌کند."
   },
+  "options_textField_mode_copy": {
+    "message": "کپی در حافظه"
+  },
+  "options_textField_mode_replace": {
+    "message": "جایگذاری در فیلد متنی"
+  },
+    "enable_replace_on_special_sites": {
+    "message": "جایگذاری فقط در سایت‌های خاص (WhatsApp, Telegram, Instagram و غیره)"
+  },
   "options_selection_mode_label": { "message": "حالت ترجمه متن انتخابی" },
   "options_selection_mode_immediate": { "message": "ترجمه فوری" },
   "options_selection_mode_onclick": {
