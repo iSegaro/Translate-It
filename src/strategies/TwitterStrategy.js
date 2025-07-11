@@ -12,240 +12,174 @@ export default class TwitterStrategy extends PlatformStrategy {
   }
 
   isTwitterElement(target) {
-    if (!target || !(target instanceof Element)) {
-      return false;
-    }
-
+    if (!target || !(target instanceof Element)) return false;
     try {
-      const result = !!target.closest(
-        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
-      );
-
-      return result;
+      return !!target.closest('[data-testid="tweetTextarea_0"]');
     } catch {
       return false;
     }
   }
 
   isDMElement(target) {
-    if (!target || !(target instanceof Element)) {
-      return false;
-    }
-
+    if (!target || !(target instanceof Element)) return false;
     try {
-      const result = !!target.closest(
-        '[data-testid="dmComposerTextInput"], [role="textbox"][aria-label="Text message"]'
-      );
-
-      return result;
+      return !!target.closest('[data-testid="dmComposerTextInput"]');
     } catch {
       return false;
     }
   }
 
-  /**
-
-* پاک کردن فیلد متنی از طریق ClipboardEvent
-
-* @param {HTMLElement} tweetField - فیلد هدف
-
-*/
-
   clearTweetField(tweetField) {
-    if (!tweetField) {
-      return;
-    }
-
+    if (!tweetField) return;
     try {
-      // First ensure we have focus on the element
-
       tweetField.focus();
-
-      // Check if the element already has text selected (Select All state)
-
       const selection = window.getSelection();
-
-      const isTextSelected = selection.toString().length > 0;
-
-      if (!isTextSelected) {
-        // Only create a new selection if nothing is currently selected
-
+      if (selection.toString().length === 0) {
         const range = document.createRange();
-
         range.selectNodeContents(tweetField);
-
         selection.removeAllRanges();
-
         selection.addRange(range);
       }
-
-      // Create an empty paste event to clear the selected content
-
       const dt = new DataTransfer();
-
       dt.setData("text/plain", "");
-
       const pasteEvent = new ClipboardEvent("paste", {
         bubbles: true,
-
         cancelable: true,
-
         clipboardData: dt,
       });
-
       tweetField.dispatchEvent(pasteEvent);
     } catch (error) {
-      // Handle the error but don't throw it to prevent breaking the process
-
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
-
         context: "twitter-strategy-clearTweetField",
       });
     }
   }
 
-  /**
-
-* درج متن تمیزشده در فیلد، با استفاده از DataTransfer برای ناسازگارنشدن با Draft.js
-
-*/
-
-  async pasteText_OLD(tweetField, text) {
-    if (!tweetField) {
-      return;
-    }
-
-    try {
-      if (text && typeof text === "string") {
-        // بررسی نوع و وجود مقدار
-
-        // تقسیم متن به خطوط
-        let lines = text.split("\n");
-
-        // حذف خطوط خالی انتهایی
-        while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-          lines.pop();
-        }
-
-        // اتصال خطوط به همراه کاراکتر خط جدید
-        const trimmedText = lines.join("\n");
-
-        const dt = new DataTransfer();
-
-        dt.setData("text/plain", trimmedText);
-
-        dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
-
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-
-          cancelable: true,
-
-          clipboardData: dt,
-        });
-
-        tweetField.dispatchEvent(pasteEvent);
-      }
-    } catch (error) {
-      const handlerError = this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-
-        context: "twitter-strategy-pasteText",
-      });
-
-      throw handlerError;
-    }
-  }
-
   async pasteText(tweetField, text) {
-    if (!tweetField) return;
-
+    if (!tweetField || typeof text !== "string") return;
     try {
-      if (text && typeof text === "string") {
-        const lines = text.split("\n").filter((l) => l.trim() !== "");
-        const trimmedText = lines.join("\n");
+      const trimmedText = text.trim();
+      tweetField.focus();
+      await delay(30);
 
-        // فوکوس روی فیلد
-        tweetField.focus();
-        await delay(20);
-
-        // اعمال انتخاب (selection) انتهای فیلد برای paste
-        const range = document.createRange();
-        range.selectNodeContents(tweetField);
-        range.collapse(false);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        // ساخت DataTransfer
-        const dt = new DataTransfer();
-        dt.setData("text/plain", trimmedText);
-        dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
-
-        // ساخت و dispatch ClipboardEvent برای paste
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: dt,
-        });
-
-        const success = tweetField.dispatchEvent(pasteEvent);
-
-        // اگر paste موفق نبود، fallback
-        if (!success || tweetField.innerText.trim() === "") {
-          tweetField.innerText = trimmedText;
-
-          tweetField.dispatchEvent(new Event("beforeinput", { bubbles: true }));
-          tweetField.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        // اطمینان از اینکه focus و cursor در انتها قرار داره
-        this.setCursorToEnd(tweetField);
-      }
-    } catch (error) {
-      const handlerError = this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "twitter-strategy-pasteText",
+      // از paste event برای سازگاری با React استفاده می‌کنیم
+      const dt = new DataTransfer();
+      dt.setData("text/plain", trimmedText);
+      dt.setData("text/html", trimmedText.replace(/\n/g, "<br>"));
+      const pasteEvent = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
       });
 
-      throw handlerError;
-    }
-  }
+      tweetField.dispatchEvent(pasteEvent);
 
-  /**
-
-* قراردادن کرسر در انتهای فیلد متنی
-
-* @param {HTMLElement} tweetField - فیلد هدف
-
-*/
-
-  setCursorToEnd(tweetField) {
-    if (!tweetField) {
-      return;
-    }
-
-    try {
-      const selection = window.getSelection();
-
-      const range = document.createRange();
-
-      range.selectNodeContents(tweetField);
-
-      range.collapse(false);
-
-      selection.removeAllRanges();
-
-      selection.addRange(range);
+      // برای اطمینان از قرار گرفتن کرسر در انتها
+      await delay(50);
+      this.setCursorToEnd(tweetField);
     } catch (error) {
-      // Handle the error but don't throw it to prevent breaking the process
-
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
+        context: "twitter-strategy-pasteText",
+      });
+      throw error; // خطا را پرتاب می‌کنیم تا updateElement متوجه شکست شود
+    }
+  }
 
+  setCursorToEnd(tweetField) {
+    if (!tweetField) return;
+    try {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(tweetField);
+      range.collapse(false); // انتقال به انتها
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (error) {
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
         context: "twitter-strategy-setCursorToEnd",
       });
+    }
+  }
+
+  async updateElement(element, translatedText) {
+    try {
+      // 1. پردازش فیلد جستجو
+      const searchInput = document.querySelector(
+        '[data-testid="SearchBox_Search_Input"]'
+      );
+      if (searchInput && element.contains(searchInput)) {
+        this.applyVisualFeedback(searchInput);
+        searchInput.value = translatedText;
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        this.applyTextDirection(searchInput, translatedText);
+        return true;
+      }
+
+      // 2. پردازش فیلد Direct Message (DM)
+      if (this.isDMElement(element)) {
+        const dmField = element.closest('[data-testid="dmComposerTextInput"]');
+        if (dmField) {
+          dmField.focus();
+          this.applyVisualFeedback(dmField);
+          this.clearTweetField(dmField);
+          await delay(50);
+          await this.pasteText(dmField, translatedText);
+          this.applyTextDirection(dmField, translatedText);
+          return true;
+        }
+      }
+
+      // 3. <<<<< بخش کلیدی اصلاح شده: پردازش فیلد اصلی توییت >>>>>
+      if (this.isTwitterElement(element)) {
+        const tweetField = element.closest('[data-testid="tweetTextarea_0"]');
+        if (tweetField) {
+          tweetField.focus();
+          this.applyVisualFeedback(tweetField);
+
+          // ابتدا فیلد را پاک می‌کنیم
+          this.clearTweetField(tweetField);
+          await delay(50); // تاخیر کوتاه برای پردازش رویداد clear
+
+          // متن جدید را paste می‌کنیم
+          await this.pasteText(tweetField, translatedText);
+          this.applyTextDirection(tweetField, translatedText);
+
+          logME("[TwitterStrategy] Tweet field updated successfully.");
+          return true; // گزارش موفقیت
+        }
+      }
+
+      logME("[TwitterStrategy] No specific element matched. Update failed.");
+      return false; // اگر هیچ یک از شرایط بالا برقرار نبود
+    } catch (error) {
+      logME("[TwitterStrategy] Critical error in updateElement:", error);
+      this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "twitter-strategy-updateElement",
+      });
+      return false; // در صورت بروز خطا، شکست را گزارش می‌دهیم
+    }
+  }
+
+  extractText(target) {
+    try {
+      const searchInput = target.closest(
+        '[data-testid="SearchBox_Search_Input"]'
+      );
+      if (searchInput) return searchInput.value.trim();
+
+      const dmField = target.closest('[data-testid="dmComposerTextInput"]');
+      if (dmField) return dmField.textContent.trim();
+
+      const tweetField = target.closest('[data-testid="tweetTextarea_0"]');
+      if (tweetField) return tweetField.textContent.trim();
+
+      return target.value || target.textContent || "";
+    } catch {
+      return "";
     }
   }
 
@@ -255,278 +189,6 @@ export default class TwitterStrategy extends PlatformStrategy {
     }
 
     const result = el.tagName === "INPUT" || el.tagName === "TEXTAREA";
-
-    return result;
-  }
-
-  async updateElement(element, translatedText) {
-    try {
-      // 1. پردازش فیلد جستجو
-      const searchInput = document.querySelector(
-        '[data-testid="SearchBox_Search_Input"]'
-      );
-
-      if (searchInput) {
-        // Check if element contains searchInput - add safety check
-
-        let containsSearchInput = false;
-
-        try {
-          if (element && typeof element.contains === "function") {
-            containsSearchInput = element.contains(searchInput);
-          }
-        } catch {
-          //
-        }
-
-        if (
-          this.validateField(searchInput) &&
-          (element === searchInput ||
-            containsSearchInput ||
-            document.activeElement === searchInput)
-        ) {
-          // For input elements, it's safer to clear them directly using .value
-
-          this.applyVisualFeedback(searchInput);
-
-          searchInput.value = translatedText;
-
-          searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-          this.applyTextDirection(searchInput, translatedText);
-
-          return true;
-        }
-      }
-
-      // 2. پردازش فیلد Direct Message
-
-      let isDMElementActive = false;
-
-      if (element) {
-        isDMElementActive = this.isDMElement(element);
-      }
-
-      let isDMElementDocumentActive = false;
-
-      isDMElementDocumentActive = this.isDMElement(document.activeElement);
-
-      if (isDMElementActive || isDMElementDocumentActive) {
-        let dmField = null;
-
-        dmField = this.findField(
-          element || document.activeElement,
-
-          '[data-testid="dmComposerTextInput"]'
-        );
-
-        if (dmField) {
-          // First we clear any selection that might exist
-
-          try {
-            window.getSelection().removeAllRanges();
-          } catch (err) {
-            logME(
-              "[DEBUG] updateElement - Error removing selection ranges:",
-              err
-            );
-          }
-
-          dmField.focus();
-
-          this.applyVisualFeedback(dmField);
-
-          this.clearTweetField(dmField);
-
-          await delay(50);
-
-          this.pasteText(dmField, translatedText);
-
-          this.applyTextDirection(dmField, translatedText);
-
-          await delay(100);
-
-          this.setCursorToEnd(dmField);
-
-          return true;
-        }
-      }
-
-      return false;
-      // 3. پردازش فیلدهای توییت
-
-      // let tweetField = null;
-
-      // let isTwitterElementActive = false;
-
-      // isTwitterElementActive = this.isTwitterElement(document.activeElement);
-
-      // let isElementTwitter = false;
-
-      // if (element) {
-      //   isElementTwitter = this.isTwitterElement(element);
-      // }
-
-      // if (isTwitterElementActive) {
-      //   tweetField = document.activeElement;
-      // } else if (isElementTwitter) {
-      //   tweetField = element;
-      // } else {
-      //   tweetField = this.findField(
-      //     element || document.body,
-
-      //     '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]'
-      //   );
-      // }
-
-      // if (tweetField) {
-      //   if (this.validateField(tweetField)) {
-      //     // First we clear any selection that might exist
-      //     try {
-      //       window.getSelection().removeAllRanges();
-      //     } catch (err) {
-      //       //
-      //     }
-      //     tweetField.focus();
-      //     this.applyVisualFeedback(tweetField);
-      //     this.clearTweetField(tweetField);
-      //     await delay(50);
-      //     this.pasteText(tweetField, translatedText);
-      //     this.applyTextDirection(tweetField, translatedText);
-      //     await delay(100);
-      //     this.setCursorToEnd(tweetField);
-      //   }
-      // }
-    } catch (error) {
-      logME("[DEBUG] Critical error in updateElement:", error);
-
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-
-        context: "twitter-strategy-updateElement",
-      });
-      return false;
-    }
-  }
-
-  extractText(target) {
-    // 1. بررسی فیلد جستجو
-
-    const searchInput = document.querySelector(
-      '[data-testid="SearchBox_Search_Input"]'
-    );
-
-    if (searchInput) {
-      // Safe target contains check
-
-      let targetContainsSearchInput = false;
-
-      if (target && typeof target.contains === "function") {
-        targetContainsSearchInput = target.contains(searchInput);
-      }
-
-      if (
-        this.validateField(searchInput) &&
-        (target === searchInput ||
-          document.activeElement === searchInput ||
-          targetContainsSearchInput)
-      ) {
-        const result = searchInput.value.trim();
-
-        return result;
-      }
-    }
-
-    // 2. بررسی فیلد Direct Message
-
-    let isDMElementTarget = false;
-
-    if (target) {
-      isDMElementTarget = this.isDMElement(target);
-    }
-
-    let isDMElementDocActive = false;
-
-    isDMElementDocActive = this.isDMElement(document.activeElement);
-
-    if (isDMElementTarget || isDMElementDocActive) {
-      let dmField = null;
-
-      dmField = this.findField(
-        target || document.activeElement,
-
-        '[data-testid="dmComposerTextInput"]'
-      );
-
-      if (dmField) {
-        let result = "";
-
-        if (dmField.tagName === "DIV") {
-          const contentDiv = dmField.querySelector('[data-contents="true"]');
-          if (contentDiv) {
-            const lines = Array.from(
-              contentDiv.querySelectorAll(":scope > div")
-            );
-            result = lines
-              .map((line) => line.textContent)
-              .join("\n")
-              .trim();
-          } else {
-            result = dmField.textContent.trim(); // اگر data-contents پیدا نشد، به روش قبلی برگردید
-          }
-        } else {
-          result = (dmField.value || "").trim();
-        }
-
-        return result;
-      }
-    }
-
-    // 3. بررسی فیلدهای توییت
-
-    let tweetField = null;
-
-    let isTwitterElementActive = false;
-
-    isTwitterElementActive = this.isTwitterElement(document.activeElement);
-
-    let isTargetTwitter = false;
-
-    if (target) {
-      isTargetTwitter = this.isTwitterElement(target);
-    }
-
-    if (isTwitterElementActive) {
-      tweetField = document.activeElement;
-    } else if (isTargetTwitter) {
-      tweetField = target;
-    } else {
-      const SELECTORS =
-        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea"]';
-
-      tweetField = this.findField(target || document.body, SELECTORS);
-    }
-
-    if (!tweetField) {
-      return "";
-    }
-
-    let result = "";
-
-    if (tweetField.tagName === "DIV") {
-      const contentDiv = tweetField.querySelector('[data-contents="true"]');
-      if (contentDiv) {
-        const lines = Array.from(contentDiv.querySelectorAll(":scope > div"));
-        result = lines
-          .map((line) => line.textContent)
-          .join("\n")
-          .trim();
-      } else {
-        result = tweetField.textContent.trim(); // اگر contentDiv پیدا نشد از fallback استفاده کن
-      }
-    } else {
-      result = (tweetField.value || "").trim();
-    }
 
     return result;
   }
