@@ -1,5 +1,26 @@
 ### Changelog – Translate It!
 
+#### v0.7.0 – Released on 12 July 2025
+
+##### Added
+
+- New feature: enhanced translation support in text fields, including copy and paste actions.
+- Improved behavior for `Google Translate`: when source and target languages are the same, the system now auto-swaps them for a smoother user experience.
+- Minor UI enhancements for better usability.
+
+##### Fixed
+
+- Fixed issues with localization strings.
+- Fixed error in handling DeepSeek translation credits.
+- Resolved various minor bugs.
+
+##### Changed
+
+- Added validation to prevent selecting the same source and target languages, with clearer user feedback.
+
+---
+
+
 #### v0.6.5 – Released on 2 July 2025
 
 ##### Added
