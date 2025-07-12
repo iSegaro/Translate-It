@@ -27,6 +27,12 @@
 
 <br>
 
+<p align="center">
+  <img src="./docs/Images/Options.png" alt="Options page of the extension" height="420" />
+</p>
+
+<br>
+
 This is a lightweight and efficient personal tool for translating text on websites and even the text you write yourself. With multiple methods for translation and word lookup, it offers a fast and seamless experience:
 
 - **Text Selection Translation:** Simply select any text, and the translation box will appear right where you selected.
