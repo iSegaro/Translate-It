@@ -306,6 +306,9 @@
   "popup_string_translate_error_response": {
     "message": "خطا در دریافت پاسخ ترجمه."
   },
+  "popup_open_side_panel_title": {
+    "message": "پنل کناری"
+  },
 
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "درحال ترجمه..." },

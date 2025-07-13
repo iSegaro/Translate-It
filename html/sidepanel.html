@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title data-i18n="sidepanel_page_title">Translate It! - Side Panel</title>
+    <link rel="stylesheet" href="../styles/sidepanel.css" />
+    <link rel="stylesheet" href="../styles/theme.css" />
+  </head>
+  <body>
+    <div class="sidepanel-container">
+      <div class="main-content">
+        <form id="translationForm">
+          <div class="language-controls">
+            <div class="language-input-container">
+              <input
+                type="text"
+                id="targetLanguageInput"
+                list="targetLanguagesList"
+                placeholder="زبان مقصد"
+                class="language-input"
+                data-i18n-placeholder="popup_target_language_placeholder"
+              />
+              <datalist id="targetLanguagesList"></datalist>
+            </div>
+            <button
+              type="button"
+              id="swapLanguagesBtn"
+              class="swap-button"
+              title="جابجایی زبان‌ها"
+              data-i18n-title="popup_swap_languages_title"
+            >
+              <img src="../icons/swap.png" alt="Swap" />
+            </button>
+            <div class="language-input-container">
+              <input
+                type="text"
+                id="sourceLanguageInput"
+                list="sourceLanguagesList"
+                placeholder="زبان مبدأ (خودکار)"
+                class="language-input"
+                data-i18n-placeholder="popup_source_language_placeholder_auto"
+              />
+              <datalist id="sourceLanguagesList"></datalist>
+            </div>
+          </div>
+
+          <div class="textarea-container source-container">
+            <textarea
+              id="sourceText"
+              placeholder="متنی برای ترجمه وارد کنید یا از صفحه انتخاب نمایید..."
+              rows="6"
+              data-i18n-placeholder="sidepanel_source_text_placeholder"
+            ></textarea>
+          </div>
+
+          <div class="action-bar">
+            <button type="submit" id="translateBtn" class="translate-button-main">
+              <span data-i18n="translate_button_text">ترجمه</span>
+              <img src="../icons/translate.png" alt="Translate" />
+            </button>
+          </div>
+          
+          <div class="textarea-container result-container">
+            <div id="translationResult" class="result" placeholder="نتیجه ترجمه..." data-i18n-placeholder="popup_result_placeholder"></div>
+          </div>
+        </form>
+      </div>
+
+      <div class="side-toolbar">
+        <div class="toolbar-group">
+          <button
+            id="selectElementBtn"
+            class="toolbar-button"
+            title="انتخاب المان برای ترجمه"
+            data-i18n-title="sidepanel_select_element_tooltip"
+          >
+            <img
+              src="../icons/select.png"
+              alt="Select Element"
+              class="toolbar-icon"
+            />
+          </button>
+          <button
+            id="revertActionBtn"
+            class="toolbar-button"
+            title="بازگرداندن ترجمه‌ها در صفحه"
+            data-i18n-title="sidepanel_revert_tooltip"
+          >
+            <img
+              src="../icons/revert.png"
+              alt="Revert"
+              class="toolbar-icon"
+            />
+          </button>
+          <button
+            id="clearFieldsBtn"
+            class="toolbar-button"
+            title="پاک کردن فیلدها و تاریخچه"
+            data-i18n-title="popup_clear_storage_title_icon"
+          >
+            <img
+              src="../icons/clear.png"
+              alt="Clear Fields"
+              class="toolbar-icon"
+            />
+          </button>
+        </div>
+        <div class="toolbar-group-bottom">
+           <button
+            id="settingsBtn"
+            class="toolbar-button"
+            title="تنظیمات"
+            data-i18n-title="popup_settings_title_icon"
+          >
+            <img
+              src="../icons/settings.png"
+              alt="Settings"
+              class="toolbar-icon"
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+    <script src="../browser-polyfill.js"></script>
+    <script src="../sidepanel.bundle.js"></script>
+  </body>
+</html>

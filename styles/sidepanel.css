@@ -1,0 +1,212 @@
+/* src/styles/sidepanel.css */
+
+/* Theme variables should be read from a shared file (like theme.css)
+   but are included here for completeness. */
+:root.theme-light {
+  --bg-color: #f8f9fa;
+  --text-color: #212529;
+  --bg-secondary: #ffffff;
+  --border-color: #dee2e6;
+  --toolbar-bg: #e9ecef;
+  --toolbar-button-hover-bg: #dcdfe2;
+  --primary-color: #007bff;
+  --primary-color-hover: #0056b3;
+  --icon-filter: none;
+}
+
+:root.theme-dark {
+  --bg-color: #1e1e1e;
+  --text-color: #e9ecef;
+  --bg-secondary: #2a2a2e;
+  --border-color: #495057;
+  --toolbar-bg: #343a40;
+  --toolbar-button-hover-bg: #495057;
+  --primary-color: #58a6ff;
+  --primary-color-hover: #2e8eff;
+  --icon-filter: invert(92%) hue-rotate(180deg) brightness(1.1);
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  font-family: "Vazirmatn", "Segoe UI", sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+  height: 100%;
+}
+
+.sidepanel-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* --- Vertical Toolbar --- */
+.side-toolbar {
+  width: 55px;
+  background-color: var(--toolbar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 0;
+  flex-shrink: 0;
+  order: 2; /* Toolbar on the right */
+}
+
+.toolbar-group, .toolbar-group-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.toolbar-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.toolbar-button:hover {
+  background-color: var(--toolbar-button-hover-bg);
+}
+
+.toolbar-icon {
+  width: 22px;
+  height: 22px;
+  filter: var(--icon-filter);
+}
+
+/* --- Main Content --- */
+.main-content {
+  flex-grow: 1;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  order: 1; /* Main content on the left */
+}
+
+#translationForm {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Language Controls */
+.language-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.language-input-container {
+  flex-grow: 1;
+}
+
+.language-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-secondary);
+  color: var(--text-color);
+  box-sizing: border-box;
+}
+
+.swap-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swap-button:hover {
+  background-color: var(--toolbar-button-hover-bg);
+}
+.swap-button img {
+  width: 16px;
+  height: 16px;
+  filter: var(--icon-filter);
+}
+
+/* Textarea Container */
+.textarea-container {
+  margin-bottom: 15px;
+  flex-grow: 1;
+  display: flex;
+}
+
+textarea,
+.result {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--bg-secondary);
+  color: var(--text-color);
+  font-family: inherit;
+  font-size: 14px;
+  resize: none;
+  line-height: 1.6;
+  direction: ltr;
+  text-align: left;
+}
+
+.result {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+}
+
+.result:empty::before {
+  content: attr(placeholder);
+  color: #6c757d;
+  pointer-events: none;
+}
+
+/* Action Bar (Translate Button) */
+.action-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.translate-button-main {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.translate-button-main:hover {
+  background-color: var(--primary-color-hover);
+}
+
+.translate-button-main img {
+  width: 18px;
+  height: 18px;
+  /* filter: invert(100%); */
+}
