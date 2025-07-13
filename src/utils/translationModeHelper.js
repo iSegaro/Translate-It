@@ -25,7 +25,7 @@ const STOP_WORDS = new Set([
   "from",
 ]);
 
-const MAX_DICT_CHARS = 30;
+const MAX_DICT_CHARS = 15;
 
 /**
  * بررسی می‌کند که آیا باید از حالت Dictionary_Translation استفاده شود یا خیر.
