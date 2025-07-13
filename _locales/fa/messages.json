@@ -267,7 +267,7 @@
   "theme_toggle_title": { "message": "تغییر پوسته" },
 
   "popup_page_title": { "message": "Translate It!" },
-  "popup_translate_page_link": { "message": "ترجمه این صفحه" },
+  "popup_translate_page_link": { "message": "ترجمه صفحه" },
   "popup_translate_page_link_title": { "message": "ترجمه صفحه در تب جدید" },
   "popup_select_element_alt_icon": { "message": "انتخاب عنصر" },
   "popup_select_element_title_icon": { "message": "حالت انتخاب با ماوس" },

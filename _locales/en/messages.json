@@ -263,7 +263,7 @@
   "theme_toggle_title": { "message": "Toggle Theme" },
 
   "popup_page_title": { "message": "Translate It!" },
-  "popup_translate_page_link": { "message": "Translate This Page" },
+  "popup_translate_page_link": { "message": "Translate Page" },
   "popup_translate_page_link_title": { "message": "Open translate in new tab" },
   "popup_select_element_alt_icon": { "message": "Select Element" },
   "popup_select_element_title_icon": { "message": "Select Element Mode" },
