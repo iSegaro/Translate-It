@@ -14,6 +14,7 @@ module.exports = {
     background: "./src/backgrounds/background.js",
     options: "./src/options.js",
     popup: "./src/popup/main.js",
+    sidepanel: "./src/sidepanel/sidepanel.js",
   },
   resolve: {
     extensions: [".js"],

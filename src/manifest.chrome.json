@@ -5,6 +5,7 @@
   "description": "__MSG_description__",
   "default_locale": "en",
   "permissions": [
+    "sidePanel",
     "scripting",
     "storage",
     "tts",
@@ -18,6 +19,9 @@
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.bundle.js"
+  },
+    "side_panel": {
+    "default_path": "html/sidepanel.html"
   },
   "action": {
     "default_title": "__MSG_name__",

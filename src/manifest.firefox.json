@@ -17,6 +17,10 @@
   "background": {
     "scripts": ["background.bundle.js"]
   },
+  "sidebar_action": {
+    "default_panel": "html/sidepanel.html",
+    "default_title": "__MSG_name__"
+  },
   "action": {
     "default_title": "__MSG_name__",
     "default_popup": "html/popup.html",
