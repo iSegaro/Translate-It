@@ -170,7 +170,7 @@ function setupEventListeners() {
         elements.clearTargetLanguage
       );
 
-      const sourceContent = elements.sourceText.value;
+      // const sourceContent = elements.sourceText.value;
       const targetContent = elements.translationResult.textContent;
 
       if (
@@ -178,16 +178,16 @@ function setupEventListeners() {
         targetContent !==
           (await getTranslationString("popup_string_during_translate"))
       ) {
-        elements.sourceText.value = targetContent;
-        elements.translationResult.textContent = sourceContent;
+      //   elements.sourceText.value = targetContent;
+      //   elements.translationResult.textContent = sourceContent;
 
-        correctTextDirection(elements.sourceText, targetContent);
-        correctTextDirection(elements.translationResult, sourceContent);
+      //   correctTextDirection(elements.sourceText, targetContent);
+      //   correctTextDirection(elements.translationResult, sourceContent);
 
-        uiManager.toggleInlineToolbarVisibility(elements.sourceText);
-        uiManager.toggleInlineToolbarVisibility(elements.translationResult);
+        // uiManager.toggleInlineToolbarVisibility(elements.sourceText);
+        // uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
-        document.dispatchEvent(new CustomEvent("translationSwapped"));
+        // document.dispatchEvent(new CustomEvent("translationSwapped"));
       }
     } else {
       logME("[LangManager]: Cannot swap - invalid language selection.", {
