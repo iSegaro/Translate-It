@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <title data-i18n="sidepanel_page_title">Translate It! - Side Panel</title>
+    <!-- The title will be set by the script -->
+    <title>Translate It!</title>
     <link rel="stylesheet" href="../styles/sidepanel.css" />
     <link rel="stylesheet" href="../styles/theme.css" />
   </head>
@@ -16,9 +17,8 @@
                 type="text"
                 id="targetLanguageInput"
                 list="targetLanguagesList"
-                placeholder="زبان مقصد"
                 class="language-input"
-                data-i18n-placeholder="popup_target_language_placeholder"
+                data-i18n-placeholder="SLIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER"
               />
               <datalist id="targetLanguagesList"></datalist>
             </div>
@@ -26,8 +26,7 @@
               type="button"
               id="swapLanguagesBtn"
               class="swap-button"
-              title="جابجایی زبان‌ها"
-              data-i18n-title="popup_swap_languages_title"
+              data-i18n-title="SLIDEPANEL_SWAP_LANGUAGES_TITLE"
             >
               <img src="../icons/swap.png" alt="Swap" />
             </button>
@@ -36,9 +35,8 @@
                 type="text"
                 id="sourceLanguageInput"
                 list="sourceLanguagesList"
-                placeholder="زبان مبدأ (خودکار)"
                 class="language-input"
-                data-i18n-placeholder="popup_source_language_placeholder_auto"
+                data-i18n-placeholder="SLIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO"
               />
               <datalist id="sourceLanguagesList"></datalist>
             </div>
@@ -47,21 +45,28 @@
           <div class="textarea-container source-container">
             <textarea
               id="sourceText"
-              placeholder="متنی برای ترجمه وارد کنید یا از صفحه انتخاب نمایید..."
               rows="6"
-              data-i18n-placeholder="sidepanel_source_text_placeholder"
+              data-i18n-placeholder="SIDEPANEL_SOURCE_TEXT_PLACEHOLDER"
             ></textarea>
           </div>
 
           <div class="action-bar">
-            <button type="submit" id="translateBtn" class="translate-button-main">
-              <span data-i18n="translate_button_text">ترجمه</span>
+            <button
+              type="submit"
+              id="translateBtn"
+              class="translate-button-main"
+            >
+              <span data-i18n="SIDEPANEL_TRANSLATE_BUTTON_TEXT">Translate</span>
               <img src="../icons/translate.png" alt="Translate" />
             </button>
           </div>
-          
+
           <div class="textarea-container result-container">
-            <div id="translationResult" class="result" placeholder="نتیجه ترجمه..." data-i18n-placeholder="popup_result_placeholder"></div>
+            <div
+              id="translationResult"
+              class="result"
+              data-i18n-placeholder="SIDEPANEL_RESULT_PLACEHOLDER"
+            ></div>
           </div>
         </form>
       </div>
@@ -71,8 +76,7 @@
           <button
             id="selectElementBtn"
             class="toolbar-button"
-            title="انتخاب المان برای ترجمه"
-            data-i18n-title="sidepanel_select_element_tooltip"
+            data-i18n-title="SIDEPANEL_SELECT_ELEMENT_TOOLTIP"
           >
             <img
               src="../icons/select.png"
@@ -83,20 +87,14 @@
           <button
             id="revertActionBtn"
             class="toolbar-button"
-            title="بازگرداندن ترجمه‌ها در صفحه"
-            data-i18n-title="sidepanel_revert_tooltip"
+            data-i18n-title="SIDEPANEL_REVERT_TOOLTIP"
           >
-            <img
-              src="../icons/revert.png"
-              alt="Revert"
-              class="toolbar-icon"
-            />
+            <img src="../icons/revert.png" alt="Revert" class="toolbar-icon" />
           </button>
           <button
             id="clearFieldsBtn"
             class="toolbar-button"
-            title="پاک کردن فیلدها و تاریخچه"
-            data-i18n-title="popup_clear_storage_title_icon"
+            data-i18n-title="SLIDEPANEL_CLEAR_STORAGE_TITLE_ICON"
           >
             <img
               src="../icons/clear.png"
@@ -106,11 +104,10 @@
           </button>
         </div>
         <div class="toolbar-group-bottom">
-           <button
+          <button
             id="settingsBtn"
             class="toolbar-button"
-            title="تنظیمات"
-            data-i18n-title="popup_settings_title_icon"
+            data-i18n-title="SLIDEPANEL_SETTINGS_TITLE_ICON"
           >
             <img
               src="../icons/settings.png"

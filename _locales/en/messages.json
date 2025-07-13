@@ -307,7 +307,18 @@
   "popup_open_side_panel_title": {
     "message": "Sidepanel"
   },
-  
+
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Enter..." },
+  "SIDEPANEL_RESULT_PLACEHOLDER": { "message": "Result..." },
+  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "Translate" },
+  "SLIDEPANEL_SETTINGS_TITLE_ICON": { "message": "Options" },
+  "SLIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "Clear fields" },
+  "SIDEPANEL_REVERT_TOOLTIP": { "message": "Revert (Esc Key)" },
+  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": { "message": "Select Element" },
+  "SLIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": { "message": "Input (Auto)" },
+  "SLIDEPANEL_SWAP_LANGUAGES_TITLE": { "message": "Swap languages" },
+  "SLIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": { "message": "Target Language" },
+
 
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "translating..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "translating..." },

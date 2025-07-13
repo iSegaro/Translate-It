@@ -310,6 +310,17 @@
     "message": "پنل کناری"
   },
 
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "متنی برای ترجمه وارد کنید ..." },
+  "SIDEPANEL_RESULT_PLACEHOLDER": { "message": "نتیجه ترجمه..." },
+  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "ترجمه" },
+  "SLIDEPANEL_SETTINGS_TITLE_ICON": { "message": "تنظیمات" },
+  "SLIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "خالی کردن" },
+  "SIDEPANEL_REVERT_TOOLTIP": { "message": "بازگردانی (Esc کلید)" },
+  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": { "message": "انتخاب المان با موس" },
+  "SLIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": { "message": "ورودی (خودکار)" },
+  "SLIDEPANEL_SWAP_LANGUAGES_TITLE": { "message": "جابجایی زبان‌ها" },
+  "SLIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": { "message": "زبان مقصد" },
+
   "STATUS_TRANSLATING_CTRLSLASH": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "درحال ترجمه..." },
   "STATUS_TRANSLATING_ICON": { "message": "درحال ترجمه..." },
