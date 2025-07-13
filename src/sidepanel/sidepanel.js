@@ -31,17 +31,14 @@ const elements = {
   targetLanguageInput: null,
   sourceLanguagesList: null,
   targetLanguagesList: null,
-
   swapLanguagesBtn: null,
   sourceText: null,
   translationResult: null,
-
   translateBtn: null,
   selectElementBtn: null,
   revertActionBtn: null,
   clearFieldsBtn: null,
   settingsBtn: null,
-
   translationForm: null,
 };
 
@@ -399,9 +396,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupEventListeners();
     await loadLastTranslation();
 
-    app_localize_popup(CONFIG.APPLICATION_LOCALIZE);
+    // Apply initial theme and localization
     const settings = await getSettingsAsync();
     applyTheme(settings.THEME);
+    app_localize_popup(settings.APPLICATION_LOCALIZE);
 
     logME("[SidePanel] Initialization complete");
   } catch (error) {
@@ -416,5 +414,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     Array.from(doc.body.childNodes).forEach((node) =>
       document.body.appendChild(node)
     );
+  }
+});
+
+// --- Listen for settings changes from other parts of the extension ---
+Browser.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") {
+    return;
+  }
+
+  // Check for theme changes
+  if (changes.THEME) {
+    const newTheme = changes.THEME.newValue;
+    logME(`[SidePanel] Theme changed to: ${newTheme}. Applying...`);
+    applyTheme(newTheme);
+  }
+
+  // Check for localization changes
+  if (changes.APPLICATION_LOCALIZE) {
+    const newLocale = changes.APPLICATION_LOCALIZE.newValue;
+    logME(`[SidePanel] Localization changed to: ${newLocale}. Applying...`);
+    app_localize_popup(newLocale);
   }
 });
