@@ -22,6 +22,7 @@ import {
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
 import { playTTS, stopTTS } from "../managers/tts-player.js";
 import { setupContextMenus } from "./onContextMenu.js";
+import { openSidePanel } from "../sidepanel/action-helpers.js";
 
 // --- State Management ---
 const selectElementStates = {};
@@ -185,6 +186,13 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         sendResponse({ success: false, error: "No valid tab." });
         return false;
+      }
+
+      case "OPEN_SIDE_PANEL": {
+        // چون ممکن است از پاپ‌آپ فراخوانی شود، tabId را از sender می‌گیریم
+        const tabId = sender.tab?.id;
+        openSidePanel(tabId);
+        return false; // نیازی به پاسخ نیست
       }
 
       case "show_os_notification": {

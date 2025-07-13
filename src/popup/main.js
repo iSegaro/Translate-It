@@ -17,6 +17,37 @@ import * as excludeManager from "./excludeManager.js";
 import Browser from "webextension-polyfill";
 import { applyTheme } from "../utils/theme.js";
 
+function SetupSidePanelBtn(){
+  const openSidePanelBtn = document.getElementById("openSidePanelIcon");
+    if (openSidePanelBtn) {
+      // Make the event listener async to use await
+      openSidePanelBtn.addEventListener("click", async () => {
+        try {
+
+          // For Chrome, find the current tab and open its side panel
+          if (Browser.sidePanel) {
+            const [activeTab] = await Browser.tabs.query({
+              active: true,
+              currentWindow: true,
+            });
+            if (activeTab) {
+              await Browser.sidePanel.open({ tabId: activeTab.id });
+            }
+          }
+          // For Firefox, just open the sidebar
+          else if (Browser.sidebarAction) {
+            await Browser.sidebarAction.open();
+          }
+
+          // Close the popup after the action is initiated
+          window.close();
+        } catch (error) {
+          logME("Error opening side panel from popup:", error);
+        }
+      });
+    }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   logME("[Popup Main]: DOMContentLoaded event fired.");
 
@@ -30,6 +61,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initializationManager.init();
     await popupInteractionManager.init();
     await excludeManager.init();
+
+    SetupSidePanelBtn();
 
     try {
       const popupPort = Browser.runtime.connect({ name: "popup" });
