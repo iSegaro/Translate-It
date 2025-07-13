@@ -1,7 +1,7 @@
 // src/sidepanel/sidepanel.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { CONFIG, getSettingsAsync } from "../config.js";
+import { getSettingsAsync, getSourceLanguageAsync } from "../config.js";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
@@ -25,6 +25,13 @@ import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 import { getErrorMessageByKey } from "../services/ErrorMessages.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 
+import {
+  toggleInlineToolbarVisibility,
+  showVisualFeedback,
+} from "./uiManager.js";
+import { initClipboard } from "./clipboardManager.js";
+import { initTts } from "./ttsManager.js";
+
 // DOM Elements
 const elements = {
   sourceLanguageInput: null,
@@ -40,6 +47,11 @@ const elements = {
   clearFieldsBtn: null,
   settingsBtn: null,
   translationForm: null,
+  copySourceBtn: null,
+  pasteSourceBtn: null,
+  voiceSourceIcon: null,
+  copyTargetBtn: null,
+  voiceTargetIcon: null,
 };
 
 /**
@@ -54,6 +66,19 @@ async function deactivateSelectElementMode() {
   } catch (error) {
     logME("[SidePanel] Failed to send deactivation message:", error);
   }
+}
+
+/**
+ * بخش نتیجه را پاک کرده و یک انیمیشن اسپینر در آن نمایش می‌دهد.
+ */
+function showSpinner() {
+  if (!elements.translationResult) return;
+  elements.translationResult.classList.remove('fade-in'); // حذف انیمیشن قبلی
+  elements.translationResult.innerHTML = `
+    <div class="spinner-center">
+        <div class="spinner"></div>
+    </div>
+  `;
 }
 
 /**
@@ -73,6 +98,11 @@ function initializeElements() {
   elements.clearFieldsBtn = document.getElementById("clearFieldsBtn");
   elements.settingsBtn = document.getElementById("settingsBtn");
   elements.translationForm = document.getElementById("translationForm");
+  elements.copySourceBtn = document.getElementById("copySourceBtn");
+  elements.pasteSourceBtn = document.getElementById("pasteSourceBtn");
+  elements.voiceSourceIcon = document.getElementById("voiceSourceIcon");
+  elements.copyTargetBtn = document.getElementById("copyTargetBtn");
+  elements.voiceTargetIcon = document.getElementById("voiceTargetIcon");
 }
 
 /**
@@ -129,6 +159,9 @@ async function handleTranslationResponse(
   sourceLangIdentifier,
   targetLangIdentifier
 ) {
+
+  elements.translationResult.innerHTML = '';
+
   if (Browser.runtime.lastError) {
     elements.translationResult.textContent = Browser.runtime.lastError.message;
     return;
@@ -143,10 +176,11 @@ async function handleTranslationResponse(
     const parser = new DOMParser();
     const doc = parser.parseFromString(sanitized.toString(), "text/html");
 
-    elements.translationResult.textContent = "";
+    // elements.translationResult.textContent = "";
     Array.from(doc.body.childNodes).forEach((node) =>
       elements.translationResult.appendChild(node)
     );
+    elements.translationResult.classList.add('fade-in');
     correctTextDirection(elements.translationResult, translated);
 
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
@@ -200,7 +234,8 @@ async function triggerTranslation() {
   if (!sourceLangCheck || sourceLangCheck === AUTO_DETECT_VALUE)
     sourceLangCheck = null;
 
-  elements.translationResult.textContent = "Translating...";
+  elements.translationResult.textContent = "";
+  showSpinner();
   correctTextDirection(elements.sourceText, textToTranslate);
   applyElementDirection(
     elements.translationResult,
@@ -209,7 +244,7 @@ async function triggerTranslation() {
 
   const translateMode = determineTranslationMode(
     textToTranslate,
-    TranslationMode.Popup_Translate
+    TranslationMode.Sidepanel_Translate
   );
 
   try {
@@ -229,6 +264,7 @@ async function triggerTranslation() {
       targetLangIdentifier
     );
   } catch (error) {
+    elements.translationResult.innerHTML = '';
     const fallback =
       (await getTranslationString("popup_string_translate_error_trigger")) ||
       "(⚠️ An error occurred.)";
@@ -251,6 +287,25 @@ function setupEventListeners() {
     deactivateSelectElementMode();
   });
 
+  const sourceContainer = elements.sourceText.parentElement;
+  const resultContainer = elements.translationResult.parentElement;
+
+  elements.sourceText.addEventListener("input", () => {
+    toggleInlineToolbarVisibility(sourceContainer);
+  });
+
+  const observer = new MutationObserver(() => {
+    toggleInlineToolbarVisibility(resultContainer);
+  });
+  observer.observe(elements.translationResult, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+
+  initClipboard(elements);
+  initTts(elements);
+
   elements.translationForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     triggerTranslation();
@@ -267,19 +322,77 @@ function setupEventListeners() {
   });
 
   elements.swapLanguagesBtn?.addEventListener("click", async () => {
-    const currentSource = elements.sourceLanguageInput.value;
-    const currentTarget = elements.targetLanguageInput.value;
-    if (currentSource === AUTO_DETECT_VALUE) return;
-    elements.sourceLanguageInput.value = currentTarget;
-    elements.targetLanguageInput.value = currentSource;
-    const targetLangCode = getLanguageCode(currentSource);
-    if (targetLangCode) {
-      await Browser.storage.local.set({ targetLanguage: targetLangCode });
+    let sourceVal = elements.sourceLanguageInput.value;
+    let targetVal = elements.targetLanguageInput.value;
+
+    let sourceCode = getLanguageCode(sourceVal);
+    let targetCode = getLanguageCode(targetVal);
+
+    let resolvedSourceCode = sourceCode;
+    let resolvedTargetCode = targetCode;
+
+    // اگر زبان مبدأ "Auto-Detect" باشد، سعی می‌کنیم آن را از تنظیمات ذخیره‌شده‌ی کاربر بخوانیم
+    if (sourceCode === AUTO_DETECT_VALUE) {
+      try {
+        // getSourceLanguageAsync از فایل config.js باید import شده باشد
+        resolvedSourceCode = await getSourceLanguageAsync();
+      } catch (err) {
+        logME("[SidePanel]: Failed to load source language from settings", err);
+        resolvedSourceCode = null; // در صورت خطا، آن را ناموفق علامت‌گذاری می‌کنیم
+      }
     }
-    if (elements.translationResult.textContent && elements.sourceText.value) {
-      const tempText = elements.sourceText.value;
-      elements.sourceText.value = elements.translationResult.textContent;
-      elements.translationResult.textContent = tempText;
+
+    // این بخش برای اطمینان از استحکام کد است، هرچند "Auto-Detect" نباید در لیست زبان‌های مقصد باشد
+    if (targetCode === AUTO_DETECT_VALUE) {
+      try {
+        // getTargetLanguageAsync از فایل config.js باید import شده باشد
+        resolvedTargetCode = await getTargetLanguageAsync();
+      } catch (err) {
+        logME("[SidePanel]: Failed to load target language from settings", err);
+        resolvedTargetCode = null;
+      }
+    }
+    
+    // تنها در صورتی که هر دو زبان مبدأ و مقصد مشخص و معتبر باشند، عملیات را ادامه می‌دهیم
+    if (
+      resolvedSourceCode &&
+      resolvedTargetCode &&
+      resolvedSourceCode !== AUTO_DETECT_VALUE
+    ) {
+      // نام نمایشی زبان‌ها را برای مقادیر جدید دریافت می‌کنیم
+      const newSourceDisplay = getLanguageDisplayValue(resolvedTargetCode); // زبان مبدأ جدید، همان زبان مقصد قبلی است
+      const newTargetDisplay = getLanguageDisplayValue(resolvedSourceCode); // زبان مقصد جدید، همان زبان مبدأ قبلی است
+
+      // مقادیر input ها را با نام‌های نمایشی جدید تنظیم می‌کنیم
+      elements.sourceLanguageInput.value = newSourceDisplay || targetVal;
+      elements.targetLanguageInput.value = newTargetDisplay || sourceVal;
+
+      // // --- شروع بخش جابجایی محتوا و بروزرسانی UI ---
+      // const sourceContent = elements.sourceText.value;
+      // const targetContent = elements.translationResult.textContent;
+
+      // if (targetContent && targetContent.trim() !== "") {
+      //   // 1. جابجایی محتوای متنی
+      //   elements.sourceText.value = targetContent;
+      //   elements.translationResult.textContent = sourceContent;
+
+      //   // 2. اصلاح جهت نوشتار (ltr/rtl)
+      //   correctTextDirection(elements.sourceText, targetContent);
+      //   correctTextDirection(elements.translationResult, sourceContent);
+
+      //   // 3. بروزرسانی نمایش نوار ابزار داخلی
+      //   toggleInlineToolbarVisibility(elements.sourceText.parentElement);
+      //   toggleInlineToolbarVisibility(elements.translationResult.parentElement);
+      // }
+    } else {
+      // اگر زبان‌ها به درستی مشخص نشده باشند، یک بازخورد خطا به کاربر نمایش می‌دهیم
+      logME("[SidePanel] Cannot swap - invalid language selection.", {
+        resolvedSourceCode,
+        resolvedTargetCode,
+      });
+      if (elements.swapLanguagesBtn) {
+        showVisualFeedback(elements.swapLanguagesBtn, "error", 800);
+      }
     }
   });
 
@@ -326,6 +439,9 @@ function setupEventListeners() {
           elements.targetLanguageInput.value = getLanguageDisplayValue("en");
         }
         elements.sourceText.focus();
+        // بروزرسانی نوار ابزارها پس از پاک کردن
+        toggleInlineToolbarVisibility(sourceContainer);
+        toggleInlineToolbarVisibility(resultContainer);
       })
       .catch((error) => logME("[SidePanel] Error clearing fields:", error));
   });
@@ -337,6 +453,7 @@ function setupEventListeners() {
   Browser.runtime.onMessage.addListener((message) => {
     if (message.action === "selectedTextForSidePanel") {
       elements.sourceText.value = message.text;
+      toggleInlineToolbarVisibility(sourceContainer); // بروزرسانی پس از دریافت متن
       triggerTranslation();
     }
   });
@@ -378,6 +495,10 @@ async function loadLastTranslation() {
         if (targetLangDisplay)
           elements.targetLanguageInput.value = targetLangDisplay;
       }
+
+      // After loading, update toolbars visibility
+      toggleInlineToolbarVisibility(elements.sourceText.parentElement);
+      toggleInlineToolbarVisibility(elements.translationResult.parentElement);
     }
   } catch (error) {
     logME("[SidePanel] Error loading last translation:", error);
@@ -394,7 +515,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initializeElements();
     await initializeLanguages();
     setupEventListeners();
-    await loadLastTranslation();
+    // await loadLastTranslation();
 
     // Apply initial theme and localization
     const settings = await getSettingsAsync();

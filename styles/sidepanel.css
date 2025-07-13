@@ -1,7 +1,6 @@
 /* src/styles/sidepanel.css */
 
-/* Theme variables should be read from a shared file (like theme.css)
-   but are included here for completeness. */
+/* Theme variables should be read from a shared file (like theme.css) */
 :root.theme-light {
   --bg-color: #f8f9fa;
   --text-color: #212529;
@@ -35,6 +34,7 @@ html {
   color: var(--text-color);
   font-size: 14px;
   height: 100%;
+  overflow: hidden; /* جلوگیری از اسکرول خوردن کل صفحه */
 }
 
 .sidepanel-container {
@@ -52,16 +52,15 @@ html {
   justify-content: space-between;
   padding: 10px 0;
   flex-shrink: 0;
-  order: 2; /* Toolbar on the right */
+  order: 0; /* Keep on left side */
 }
-
-.toolbar-group, .toolbar-group-bottom {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
+.toolbar-group,
+.toolbar-group-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
-
 .toolbar-button {
   background: none;
   border: none;
@@ -75,11 +74,9 @@ html {
   justify-content: center;
   transition: background-color 0.2s ease;
 }
-
 .toolbar-button:hover {
   background-color: var(--toolbar-button-hover-bg);
 }
-
 .toolbar-icon {
   width: 22px;
   height: 22px;
@@ -92,14 +89,15 @@ html {
   padding: 15px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  order: 1; /* Main content on the left */
+  overflow-y: hidden; /* محتوای اصلی اسکرول نمی‌خورد */
+  order: 1;
 }
 
 #translationForm {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 /* Language Controls */
@@ -108,12 +106,11 @@ html {
   gap: 8px;
   align-items: center;
   margin-bottom: 15px;
+  flex-shrink: 0; /* جلوگیری از کوچک شدن */
 }
-
 .language-input-container {
   flex-grow: 1;
 }
-
 .language-input {
   width: 100%;
   padding: 8px 10px;
@@ -124,7 +121,6 @@ html {
   color: var(--text-color);
   box-sizing: border-box;
 }
-
 .swap-button {
   background: none;
   border: none;
@@ -144,39 +140,36 @@ html {
   filter: var(--icon-filter);
 }
 
-/* Textarea Container */
+/* --- Textarea Container --- */
 .textarea-container {
-  margin-bottom: 15px;
-  flex-grow: 1;
+  position: relative;
   display: flex;
 }
 
-textarea,
-.result {
+.textarea-container.source-container {
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+/* [تغییر]: استفاده از padding هوشمند و box-sizing */
+textarea#sourceText {
   width: 100%;
-  padding: 10px;
+  height: 140px;
+  resize: none;
+  box-sizing: border-box; /* برای محاسبه صحیح اندازه */
+  padding-top: 32px;
+  padding-bottom: 10px;
+  padding-inline-start: 10px; /* فاصله از ابتدای متن */
+  padding-inline-end: 10px; /* فاصله از انتهای متن */
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--bg-secondary);
   color: var(--text-color);
   font-family: inherit;
   font-size: 14px;
-  resize: none;
   line-height: 1.6;
   direction: ltr;
   text-align: left;
-}
-
-.result {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-y: auto;
-}
-
-.result:empty::before {
-  content: attr(placeholder);
-  color: #6c757d;
-  pointer-events: none;
 }
 
 /* Action Bar (Translate Button) */
@@ -184,8 +177,8 @@ textarea,
   display: flex;
   justify-content: center;
   margin-bottom: 15px;
+  flex-shrink: 0; /* جلوگیری از تغییر مکان دکمه */
 }
-
 .translate-button-main {
   background-color: var(--primary-color);
   color: white;
@@ -200,13 +193,147 @@ textarea,
   gap: 8px;
   transition: background-color 0.2s ease;
 }
-
 .translate-button-main:hover {
   background-color: var(--primary-color-hover);
 }
-
 .translate-button-main img {
   width: 18px;
   height: 18px;
-  /* filter: invert(100%); */
+}
+
+.textarea-container.result-container {
+  flex-grow: 1;
+  min-height: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+/* [تغییر]: استفاده از padding هوشمند و box-sizing */
+.result {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box; /* برای محاسبه صحیح اندازه */
+  padding-top: 32px;
+  padding-bottom: 10px;
+  padding-inline-start: 10px; /* فاصله از ابتدای متن */
+  padding-inline-end: 10px; /* فاصله از انتهای متن */
+  color: var(--text-color);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  direction: ltr;
+  text-align: left;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+  position: relative;
+}
+
+.result:empty::before {
+  content: attr(data-i18n-placeholder);
+  color: #6c757d;
+  pointer-events: none;
+  position: absolute;
+  top: 32px;
+  /* با توجه به direction، یکی از این دو اعمال می‌شود */
+  left: 10px;
+  right: 10px;
+}
+html[dir="rtl"] .result:empty::before {
+  text-align: right;
+}
+
+/* --- Inline Toolbar Styles --- */
+.inline-toolbar {
+  position: absolute;
+  top: 5px;
+  left: 18px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+.textarea-container.has-content .inline-toolbar {
+  display: flex;
+}
+.inline-icon {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
+  filter: var(--icon-filter);
+}
+.inline-icon:hover {
+  opacity: 1;
+}
+.paste-icon-separate {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  display: none;
+  z-index: 10;
+}
+html[dir="rtl"] .paste-icon-separate {
+  left: 18px;
+  right: auto;
+}
+.feedback-success {
+  filter: var(--icon-filter) drop-shadow(0 0 4px #28a745);
+}
+.feedback-error {
+  filter: var(--icon-filter) drop-shadow(0 0 4px #dc3545);
+}
+
+/* ==========================================================================
+   استایل‌های اسپینر و انیمیشن
+   ========================================================================== */
+.spinner-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+:root.theme-dark .spinner {
+  border-top: 3px solid var(--primary-color);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.result.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -1,8 +1,7 @@
 <!doctype html>
-<html dir="rtl">
+<html>
   <head>
     <meta charset="UTF-8" />
-    <!-- The title will be set by the script -->
     <title>Translate It!</title>
     <link rel="stylesheet" href="../styles/sidepanel.css" />
     <link rel="stylesheet" href="../styles/theme.css" />
@@ -11,38 +10,61 @@
     <div class="sidepanel-container">
       <div class="main-content">
         <form id="translationForm">
+          <!-- Language Controls -->
           <div class="language-controls">
-            <div class="language-input-container">
-              <input
-                type="text"
-                id="targetLanguageInput"
-                list="targetLanguagesList"
-                class="language-input"
-                data-i18n-placeholder="SLIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER"
-              />
-              <datalist id="targetLanguagesList"></datalist>
-            </div>
-            <button
-              type="button"
-              id="swapLanguagesBtn"
-              class="swap-button"
-              data-i18n-title="SLIDEPANEL_SWAP_LANGUAGES_TITLE"
-            >
-              <img src="../icons/swap.png" alt="Swap" />
-            </button>
             <div class="language-input-container">
               <input
                 type="text"
                 id="sourceLanguageInput"
                 list="sourceLanguagesList"
                 class="language-input"
-                data-i18n-placeholder="SLIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO"
+                data-i18n-placeholder="SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO"
               />
               <datalist id="sourceLanguagesList"></datalist>
             </div>
+            <button
+              type="button"
+              id="swapLanguagesBtn"
+              class="swap-button"
+              data-i18n-title="SIDEPANEL_SWAP_LANGUAGES_TITLE"
+            >
+              <img src="../icons/swap.png" alt="Swap" />
+            </button>
+            <div class="language-input-container">
+              <input
+                type="text"
+                id="targetLanguageInput"
+                list="targetLanguagesList"
+                class="language-input"
+                data-i18n-title="SIDEPANEL_TARGET_LANGUAGE_TITLE"
+                data-i18n-placeholder="SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER"
+              />
+              <datalist id="targetLanguagesList"></datalist>
+            </div>
           </div>
 
+          <!-- Source Text Area with Toolbar -->
           <div class="textarea-container source-container">
+            <div class="inline-toolbar source-toolbar">
+              <img
+                src="../icons/copy.png"
+                id="copySourceBtn"
+                class="inline-icon"
+                data-i18n-title="SIDEPANEL_COPY_SOURCE_TITLE_ICON"
+              />
+              <img
+                src="../icons/speaker.png"
+                id="voiceSourceIcon"
+                class="inline-icon"
+                data-i18n-title="SIDEPANEL_VOICE_SOURCE_TITLE_ICON"
+              />
+            </div>
+            <img
+              src="../icons/paste.png"
+              id="pasteSourceBtn"
+              class="inline-icon paste-icon-separate"
+              data-i18n-title="SIDEPANEL_PASTE_SOURCE_TITLE_ICON"
+            />
             <textarea
               id="sourceText"
               rows="6"
@@ -50,6 +72,7 @@
             ></textarea>
           </div>
 
+          <!-- Action Bar -->
           <div class="action-bar">
             <button
               type="submit"
@@ -61,16 +84,31 @@
             </button>
           </div>
 
+          <!-- Result Area with Toolbar -->
           <div class="textarea-container result-container">
+            <div class="inline-toolbar target-toolbar">
+              <img
+                src="../icons/copy.png"
+                id="copyTargetBtn"
+                class="inline-icon"
+                data-i18n-title="SIDEPANEL_COPY_TARGET_TITLE_ICON"
+              />
+              <img
+                src="../icons/speaker.png"
+                id="voiceTargetIcon"
+                class="inline-icon"
+                data-i18n-title="SIDEPANEL_VOICE_TARGET_TITLE_ICON"
+              />
+            </div>
             <div
               id="translationResult"
               class="result"
-              data-i18n-placeholder="SIDEPANEL_RESULT_PLACEHOLDER"
             ></div>
           </div>
         </form>
       </div>
 
+      <!-- Side Toolbar -->
       <div class="side-toolbar">
         <div class="toolbar-group">
           <button
@@ -94,7 +132,7 @@
           <button
             id="clearFieldsBtn"
             class="toolbar-button"
-            data-i18n-title="SLIDEPANEL_CLEAR_STORAGE_TITLE_ICON"
+            data-i18n-title="SIDEPANEL_CLEAR_STORAGE_TITLE_ICON"
           >
             <img
               src="../icons/clear.png"
@@ -107,7 +145,7 @@
           <button
             id="settingsBtn"
             class="toolbar-button"
-            data-i18n-title="SLIDEPANEL_SETTINGS_TITLE_ICON"
+            data-i18n-title="SIDEPANEL_SETTINGS_TITLE_ICON"
           >
             <img
               src="../icons/settings.png"
