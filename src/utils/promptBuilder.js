@@ -66,7 +66,7 @@ export async function buildPrompt(
   if (isJsonMode) {
     promptBase = await getPromptBASESelectAsync();
   } else {
-    if (translateMode === TranslationMode.Popup_Translate) {
+    if (translateMode === TranslationMode.Popup_Translate || translateMode === TranslationMode.Sidepanel_Translate) {
       promptBase = await getPromptPopupTranslateAsync();
     } else if ((await getEnableDictionaryAsync()) === true) {
       if (translateMode === TranslationMode.Dictionary_Translation) {

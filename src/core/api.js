@@ -679,7 +679,8 @@ class ApiService {
 
     if (
       sourceLanguage === targetLanguage &&
-      translateMode !== TranslationMode.Popup_Translate
+      translateMode !== TranslationMode.Popup_Translate &&
+      translateMode !== TranslationMode.Sidepanel_Translate
     ) {
       return null;
     }

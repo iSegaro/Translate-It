@@ -193,6 +193,7 @@ export const TranslationMode = {
   Selection: "selection",
   Dictionary_Translation: "dictionary",
   Popup_Translate: "popup_translate",
+  Sidepanel_Translate: "sidepanel_translate",
 };
 
 export const state = {
