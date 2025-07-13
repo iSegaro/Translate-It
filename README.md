@@ -435,6 +435,7 @@ Icons used in this project are provided by [Flaticon](https://www.flaticon.com) 
 - <img src="icons/settings.png" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (Settings)
 - <img src="icons/copy.png" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (Copy)
 - <img src="icons/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (Revert)
+- <img src="icons/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (Side Panel)
 
 </details>
 

@@ -465,6 +465,7 @@ pnpm run publish
 - <img src="icons/settings.png" alt="تنظیمات" width="24px"> — [Freepik](https://www.flaticon.com/authors/freepik) (تنظیمات)
 - <img src="icons/copy.png" alt="کپی" width="24px"> — [Catalin Fertu](https://www.flaticon.com/free-icons/copy) (کپی)
 - <img src="icons/revert.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/revert) (بازگشت)
+- <img src="icons/side-panel.png" width="24px"> — [KP Arts](https://www.flaticon.com/free-icons/app) (پنل کناری)
 
 </details>
 

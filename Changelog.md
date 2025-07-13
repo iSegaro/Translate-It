@@ -1,5 +1,15 @@
 ### Changelog – Translate It!
 
+#### v0.8.0 – Released on July 14, 2025
+
+##### Added
+- Introduced Side Panel support for display in the browser's sidebar
+
+##### Changed
+- Improved various UI and UX elements for a better user experience
+
+---
+
 #### v0.7.0 – Released on 12 July 2025
 
 ##### Added
