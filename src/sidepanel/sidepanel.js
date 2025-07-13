@@ -36,8 +36,6 @@ import { initTts } from "./ttsManager.js";
 const elements = {
   sourceLanguageInput: null,
   targetLanguageInput: null,
-  sourceLanguagesList: null,
-  targetLanguagesList: null,
   swapLanguagesBtn: null,
   sourceText: null,
   translationResult: null,
@@ -87,8 +85,6 @@ function showSpinner() {
 function initializeElements() {
   elements.sourceLanguageInput = document.getElementById("sourceLanguageInput");
   elements.targetLanguageInput = document.getElementById("targetLanguageInput");
-  elements.sourceLanguagesList = document.getElementById("sourceLanguagesList");
-  elements.targetLanguagesList = document.getElementById("targetLanguagesList");
   elements.swapLanguagesBtn = document.getElementById("swapLanguagesBtn");
   elements.sourceText = document.getElementById("sourceText");
   elements.translationResult = document.getElementById("translationResult");
@@ -110,23 +106,36 @@ function initializeElements() {
  */
 async function initializeLanguages() {
   try {
-    if (elements.sourceLanguagesList && elements.targetLanguagesList) {
-      elements.sourceLanguagesList.innerHTML = "";
-      elements.targetLanguagesList.innerHTML = "";
+    const sourceSelect = elements.sourceLanguageInput;
+    const targetSelect = elements.targetLanguageInput;
 
+    if (sourceSelect && targetSelect) {
+      // پاک کردن گزینه‌های قبلی
+      sourceSelect.innerHTML = "";
+      targetSelect.innerHTML = "";
+
+      // افزودن گزینه "Auto-Detect" به لیست زبان مبدأ
       const autoOption = document.createElement("option");
       autoOption.value = AUTO_DETECT_VALUE;
-      elements.sourceLanguagesList.appendChild(autoOption);
+      autoOption.textContent = "Auto-Detect"; // متن نمایشی
+      sourceSelect.appendChild(autoOption);
 
+      // پر کردن لیست زبان‌ها
       languageList.forEach((lang) => {
+        const displayName = lang.promptName || lang.name;
+        
+        // افزودن به لیست مبدأ
         const sourceOption = document.createElement("option");
-        sourceOption.value = lang.promptName || lang.name;
-        elements.sourceLanguagesList.appendChild(sourceOption);
+        sourceOption.value = displayName;
+        sourceOption.textContent = displayName;
+        sourceSelect.appendChild(sourceOption);
 
+        // افزودن به لیست مقصد (به جز Auto-Detect)
         if (lang.code !== AUTO_DETECT_VALUE) {
           const targetOption = document.createElement("option");
-          targetOption.value = lang.promptName || lang.name;
-          elements.targetLanguagesList.appendChild(targetOption);
+          targetOption.value = displayName;
+          targetOption.textContent = displayName;
+          targetSelect.appendChild(targetOption);
         }
       });
     }

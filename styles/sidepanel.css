@@ -106,13 +106,14 @@ html {
   gap: 8px;
   align-items: center;
   margin-bottom: 15px;
-  flex-shrink: 0; /* جلوگیری از کوچک شدن */
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
-.language-input-container {
+
+/* استایل برای select language */
+.language-select {
   flex-grow: 1;
-}
-.language-input {
-  width: 100%;
+  flex-basis: 120px;
   padding: 8px 10px;
   font-size: 13px;
   border: 1px solid var(--border-color);
@@ -120,7 +121,24 @@ html {
   background-color: var(--bg-secondary);
   color: var(--text-color);
   box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 30px; /* ایجاد فضا برای آیکون */
+  filter: var(--icon-filter);
 }
+
+html[dir="rtl"] .language-select {
+    background-position: left 10px center;
+    padding-right: 10px;
+    padding-left: 30px;
+}
+
+
 .swap-button {
   background: none;
   border: none;
@@ -130,6 +148,7 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .swap-button:hover {
   background-color: var(--toolbar-button-hover-bg);
@@ -139,6 +158,7 @@ html {
   height: 16px;
   filter: var(--icon-filter);
 }
+
 
 /* --- Textarea Container --- */
 .textarea-container {

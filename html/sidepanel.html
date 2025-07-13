@@ -10,18 +10,12 @@
     <div class="sidepanel-container">
       <div class="main-content">
         <form id="translationForm">
-          <!-- Language Controls -->
           <div class="language-controls">
-            <div class="language-input-container">
-              <input
-                type="text"
-                id="sourceLanguageInput"
-                list="sourceLanguagesList"
-                class="language-input"
-                data-i18n-placeholder="SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO"
-              />
-              <datalist id="sourceLanguagesList"></datalist>
-            </div>
+            <select
+              id="sourceLanguageInput"
+              class="language-select"
+              data-i18n-title="SIDEPANEL_SOURCE_LANGUAGE_TITLE"
+            ></select>
             <button
               type="button"
               id="swapLanguagesBtn"
@@ -30,17 +24,12 @@
             >
               <img src="../icons/swap.png" alt="Swap" />
             </button>
-            <div class="language-input-container">
-              <input
-                type="text"
-                id="targetLanguageInput"
-                list="targetLanguagesList"
-                class="language-input"
-                data-i18n-title="SIDEPANEL_TARGET_LANGUAGE_TITLE"
-                data-i18n-placeholder="SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER"
-              />
-              <datalist id="targetLanguagesList"></datalist>
-            </div>
+
+            <select
+              id="targetLanguageInput"
+              class="language-select"
+              data-i18n-title="SIDEPANEL_TARGET_LANGUAGE_TITLE"
+            ></select>
           </div>
 
           <!-- Source Text Area with Toolbar -->
@@ -100,10 +89,7 @@
                 data-i18n-title="SIDEPANEL_VOICE_TARGET_TITLE_ICON"
               />
             </div>
-            <div
-              id="translationResult"
-              class="result"
-            ></div>
+            <div id="translationResult" class="result"></div>
           </div>
         </form>
       </div>
