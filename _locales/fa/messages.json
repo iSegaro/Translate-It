@@ -62,6 +62,8 @@
   "target_language_label": { "message": "زبان مقصد" },
   "source_language_placeholder": { "message": "زبان مبدا را وارد کنید" },
   "target_language_placeholder": { "message": "زبان مقصد را وارد کنید" },
+  "enable_two_way_label": { "message": "فعال‌سازی ترجمه دوطرفه" },
+  "enable_two_way_description": { "message": "به‌طور خودکار بین دو زبان انتخاب شده ترجمه می‌کند." },
 
   "help_tab_title": { "message": "راهنما" },
   "about_tab_title": { "message": "تغییرات جدید" },

@@ -64,6 +64,8 @@
   "target_language_label": { "message": "Target Language" },
   "source_language_placeholder": { "message": "Enter source language" },
   "target_language_placeholder": { "message": "Enter target language" },
+  "enable_two_way_label": { "message": "Enable 2-Way Translation" },
+  "enable_two_way_description": { "message": "Automatically translate between the selected languages." },
 
   "help_tab_title": { "message": "Help" },
   "about_tab_title": { "message": "What's New" },

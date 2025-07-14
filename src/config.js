@@ -62,6 +62,7 @@ export const CONFIG = {
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
+  ENABLE_TWO_WAY: true, // به طور خودکار بین دو زبان انتخاب شده ترجمه می‌کند
 
   // --- UI & Styling ---
   HIGHTLIH_NEW_ELEMETN_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
@@ -328,6 +329,10 @@ export const getTargetLanguageAsync = async () => {
 
 export const getEnableDictionaryAsync = async () => {
   return getSettingValueAsync("ENABLE_DICTIONARY", CONFIG.ENABLE_DICTIONARY);
+};
+
+export const getEnableTwoWayAsync = async () => {
+  return getSettingValueAsync("ENABLE_TWO_WAY", CONFIG.ENABLE_TWO_WAY);
 };
 
 export const getPromptAsync = async () => {

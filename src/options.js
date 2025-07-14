@@ -168,6 +168,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const resetPromptButton = document.getElementById("resetPromptButton");
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
+  const enableTwoWayCheckbox = document.getElementById("enableTwoWay");
   const excludedSites = document.getElementById("excludedSites");
 
   // --- Event Listener for the new Reset Button ---
@@ -646,6 +647,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         CONFIG.TRANSLATE_ON_TEXT_FIELDS,
       ENABLE_DICTIONARY:
         enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY,
+      ENABLE_TWO_WAY: enableTwoWayCheckbox?.checked ?? CONFIG.ENABLE_TWO_WAY,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS:
         enableShortcutForTextFieldsCheckbox?.checked ??
         CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
@@ -761,6 +763,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (enableDictionraryCheckbox)
         enableDictionraryCheckbox.checked =
           settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
+      if (enableTwoWayCheckbox)
+        enableTwoWayCheckbox.checked =
+          settings.ENABLE_TWO_WAY ?? CONFIG.ENABLE_TWO_WAY;
 
       // Populate text inputs and textareas
       if (sourceLanguageInput)

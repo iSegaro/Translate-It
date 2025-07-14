@@ -21,6 +21,7 @@ import {
   getCustomApiUrlAsync,
   getCustomApiKeyAsync,
   getCustomApiModelAsync,
+  getEnableTwoWayAsync,
   TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid, logME } from "../utils/helpers.js";
@@ -585,10 +586,27 @@ class ApiService {
       throw err;
     }
 
-    let [sourceLanguage, targetLanguage] = await Promise.all([
+    let [sourceLanguage, targetLanguage, twoWayEnabled] = await Promise.all([
       srcLang || getSourceLanguageAsync(),
       tgtLang || getTargetLanguageAsync(),
+      getEnableTwoWayAsync(),
     ]);
+
+    if (twoWayEnabled) {
+      try {
+        const detection = await Browser.i18n.detectLanguage(text);
+        const detected = detection?.languages?.[0]?.language?.split("-")[0];
+        const srcCode = getLanguageCode(sourceLanguage).split("-")[0];
+        const tgtCode = getLanguageCode(targetLanguage).split("-")[0];
+        if (detected) {
+          if (detected === tgtCode) {
+            [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
+          }
+        }
+      } catch (e) {
+        logME("[TwoWay] Language detection failed", e);
+      }
+    }
 
     const api = await getTranslationApiAsync();
 
