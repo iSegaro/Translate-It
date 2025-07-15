@@ -7,3 +7,4 @@ Build-Extension/Firefox/*
 # !Build-Extension/Firefox/*.zip
 Build-Extension/*.zip
 Build-Extension/Publish/Source-*.zip
+package-lock.json
