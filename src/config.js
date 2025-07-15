@@ -24,7 +24,7 @@ export const CONFIG = {
   DEBUG_MODE: false,
   APPLICATION_LOCALIZE: "English",
   SOURCE_LANGUAGE: "English",
-  TARGET_LANGUAGE: "Farsi",
+  TARGET_LANGUAGE: "Hebrew",
   THEME: "auto",
   selectionTranslationMode: "onClick", // "immediate",
   COPY_REPLACE: "copy", // "replace",
@@ -180,11 +180,11 @@ $_{TEXT}
 
   // --- Debugging Values ---
   DEBUG_TRANSLATED_ENGLISH: "This is a mock translation to English.",
-  DEBUG_TRANSLATED_PERSIAN: "این یک ترجمه آزمایشی به فارسی است.",
+  DEBUG_TRANSLATED_HEBREW: "זהו תרגום בדיקה לעברית.",
   DEBUG_TRANSLATED_ENGLISH_With_NewLine:
     "This is a mock \ntranslation to English with \nnew lines.",
-  DEBUG_TRANSLATED_PERSIAN_With_NewLine:
-    "این یک ترجمه آزمایشی \nبرای ترجمه به فارسی \nبا خطوط جدید است.",
+  DEBUG_TRANSLATED_HEBREW_With_NewLine:
+    "זהו תרגום בדיקה \nלעברית עם \nשורות חדשות.",
 };
 
 // --- Enums & State ---
