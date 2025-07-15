@@ -1,0 +1,388 @@
+{
+  "IsRTL": { "message": "true" },
+
+  "name": { "message": "Translate It" },
+  "nameChrome": { "message": "Translate It" },
+  "nameFirefox": { "message": "Translate It" },
+  "description": { "message": "Translate Everywhere. Simply." },
+
+  "theme_section_title": { "message": "Theme" },
+  "localization_section_title": { "message": "Extension Language" },
+
+  "context_menu_options": { "message": "Options" },
+  "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
+  "context_menu_help": { "message": "Useful Help" },
+  "context_menu_translate_with_selection": { "message": "Translate Element" },
+  "context_menu_api_provider":{"message": "API Provider"},
+  "api_provider_google": {"message": "Google Translate" },
+  "api_provider_gemini":{"message": "Gemini"},
+  "api_provider_webai":{"message": "WebAI"},
+  "api_provider_openai":{"message": "OpenAI"},
+  "api_provider_openrouter":{"message": "OpenRouter"},
+  "api_provider_deepseek":{"message": "DeepSeek"},
+  "api_provider_custom":{"message": "Custom (OpenAI)"},
+
+
+
+  "google_translate_settings_title": { "message": "Google Translate" },
+  "google_translate_description": { "message": "Uses the free, public Google Translate endpoint. No API key is required." },
+
+  "options_page_title": { "message": "Settings" },
+  "options_description": { "message": "Translate Everywhere. Simply." },
+  "options_changelog_loading": { "message": "Loading changelog..." },
+
+  "options_error_same_languages": { "message": "Source and target languages cannot be the same." },
+  "options_error_empty_language": { "message": "Language fields cannot be empty." },
+
+  "export_settings_description":{"message":"Export your current settings to a JSON file for backup or sharing."},
+  "import_settings_description":{"message":"Importing will overwrite your current settings. The page will reload after a successful import."},
+
+  "languages_tab_title": { "message": "Languages" },
+  "activation_tab_title": { "message": "Activation" },
+  "prompt_tab_title": { "message": "Prompt" },
+  "api_tab_title": { "message": "API Settings" },
+  "import_export_tab_title": { "message": "Import/Export" },
+  "advance_tab_title": { "message": "Advance" },
+
+  "prompt_reset_button": { "message": "Reset" },
+
+  "activation_group_general_title": { "message": "General Switch" },
+  "activation_group_text_fields_title": { "message": "Text Field Translation" },
+  "activation_group_page_selection_title": { "message": "On-Page Selection" },
+  "activation_group_dictionary_title": { "message": "Dictionary Mode" },
+
+  "import_export_export_title": { "message": "Export Settings" },
+  "import_export_import_title": { "message": "Import Settings" },
+
+  "notification_update_title": { "message": "Extension Updated" },
+  "notification_update_message": {
+    "message": "{appName} has been successfully updated to version {version}."
+  },
+
+  "languages_section_title": { "message": "Languages" },
+  "source_language_label": { "message": "Source Language" },
+  "target_language_label": { "message": "Target Language" },
+  "source_language_placeholder": { "message": "Enter source language" },
+  "target_language_placeholder": { "message": "Enter target language" },
+  "enable_two_way_label": { "message": "Enable 2-Way Translation" },
+  "enable_two_way_description": { "message": "Automatically translate between the selected languages." },
+
+  "help_tab_title": { "message": "Help" },
+  "about_tab_title": { "message": "What's New" },
+  "help_section_title": { "message": "Help & Documentation" },
+  "about_section_title": { "message": "Changelog" },
+  "help_shortcut_title": { "message": "How to change keyboard shortcuts ?" },
+  "help_shortcut_content_p1": {
+    "message": "In Firefox, shortcuts are managed through the Add-ons page:"
+  },
+  "help_shortcut_content_li1": {
+    "message": "Navigate to **about:addons** in your address bar."
+  },
+  "help_shortcut_content_li2": {
+    "message": "Click the **gear icon (⚙️)** in the top-right corner."
+  },
+  "help_shortcut_content_li3": {
+    "message": "Select **Manage Extension Shortcuts** from the menu."
+  },
+  "help_shortcut_content_li4": {
+    "message": "Find **Translate It** and set your desired shortcut."
+  },
+  "help_api_keys_title": { "message": "Where do I get API keys?" },
+  "help_api_keys_content": {
+    "message": "You can find links to each API provider's website in the **API** tab. You will need to create an account on their respective platforms to generate a key."
+  },
+
+  "help_shortcut_content_p2": {
+    "message": "In **Chrome**, the process is different:"
+  },
+  "help_shortcut_content_chrome_li1": {
+    "message": "Right-click on the extension icon."
+  },
+  "help_shortcut_content_chrome_li2": {
+    "message": "Select **Keyboard shortcuts** from the menu."
+  },
+  "help_shortcut_content_chrome_li3": {
+    "message": "Click the pencil icon (✏️) next to **Translate It** and type your new shortcut."
+  },
+
+  "translation_activation_section_title": {
+    "message": "Translation Activation Methods"
+  },
+  "extension_enabled_label": { "message": "Enable Extension" },
+  "extension_enabled_description": {
+    "message": "Enable or disable the entire extension functionality except Popup."
+  },
+  "translate_on_text_fields_label": {
+    "message": "Showing translation Icon on text fields"
+  },
+  "translate_on_text_fields_description": {
+    "message": "Quick access to translation via icon directly within input/textarea fields."
+  },
+  "enable_shortcut_for_text_fields_label": {
+    "message": "Enable Ctrl+/ shortcut for text fields"
+  },
+  "enable_shortcut_for_text_fields_description": {
+    "message": "Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field. (alternative: Ctrl+Alt+/)"
+  },
+  "translate_with_select_element_label": {
+    "message": "Enable translation via select element"
+  },
+  "translate_with_select_element_description": {
+    "message": "Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph)."
+  },
+  "translate_on_text_selection_label": {
+    "message": "Enable translation on text selection"
+  },
+  "translate_on_text_selection_description": {
+    "message": "Allow triggering translation automatically or via an icon after selecting text on the page."
+  },
+  "options_textField_mode_copy": {
+    "message": "Copy to Clipboard"
+  },
+  "options_textField_mode_replace": {
+    "message": "Replace on Textfield"
+  },
+  "enable_replace_on_special_sites": {
+    "message": "Enable replace on special sites (WhatsApp, Telegram, Instagram, etc)"
+  },
+  "options_selection_mode_label": {
+    "message": "Selection Translate Mode"
+  },
+  "options_selection_mode_immediate": {
+    "message": "Translate Immediately"
+  },
+  "options_selection_mode_onclick": {
+    "message": "Show icon to translate on click"
+  },
+  "require_ctrl_for_text_selection_label": {
+    "message": "Require Ctrl key for text selection translation"
+  },
+  "require_ctrl_for_text_selection_description": {
+    "message": "When text selection translation is enabled, require holding Ctrl key during selection to trigger translation."
+  },
+  "enable_dictionary_translation_label": {
+    "message": "Enable Dictionary Translation"
+  },
+  "enable_dictionary_translation_description": {
+    "message": "When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations."
+  },
+
+  "prompt_section_title": { "message": "Prompt Template" },
+  "prompt_template_label": { "message": "Prompt Template" },
+  "prompt_template_info": {
+    "message": "Use keywords to customize your prompt..."
+  },
+  "prompt_template_placeholder": {
+    "message": "Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
+  },
+  "prompt_template_help": {
+    "message": "You can use the following keywords in your prompt template:"
+  },
+
+  "api_section_title": { "message": "Translation API" },
+  "translation_api_label": { "message": "API Provider Choice" },
+  "gemini_api_settings_title": { "message": "Gemini Settings" },
+  "gemini_api_key_info": {
+    "message": "You can get your Gemini API key from Google AI Studio."
+  },
+  "openai_api_key_info": {
+    "message": "You can get your OpenAI API key from OpenAI Platform."
+  },
+  "deepseek_api_key_info": {
+    "message": "You can get your DeepSeek API key from DeepSeek Platform."
+  },
+  "openrouter_api_key_info": {
+    "message": "You can get your OpenRouter API key from OpenRouter Platform."
+  },
+  "webai_api_key_info": {
+    "message": "You can get and run your locally hosted WebAI API server."
+  },
+  "gemini_api_key_link": { "message": "Get Your Free API Key" },
+  "openai_api_key_link": { "message": "Get Your API Key" },
+  "deepseek_api_key_link": { "message": "Get Your API Key" },
+  "openrouter_api_key_link": { "message": "Get Your API Key" },
+  "webai_api_key_link": { "message": "Run Your API Server Locally" },
+  "gemini_api_settings_api_key_label": { "message": "API Key" },
+  "gemini_api_key_placeholder": { "message": "Paste your API key here" },
+  "gemini_api_settings_api_url_label": { "message": "API URL" },
+  "gemini_api_url_placeholder": { "message": "Enter API URL" },
+  "webai_api_settings_title": { "message": "WebAI Settings" },
+  "webai_api_url_label": { "message": "WebAI API URL" },
+  "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
+  "webai_api_model_label": { "message": "WebAI API Model" },
+  "webai_api_model_placeholder": { "message": "Enter WebAI API model" },
+  "openai_api_settings_title": { "message": "OpenAI Settings" },
+  "openai_api_settings_api_key_label": { "message": "API Key" },
+  "openai_api_key_placeholder": { "message": "Paste your OpenAI API key here" },
+  "openai_api_settings_model_label": { "message": "Model" },
+  "openai_api_model_placeholder": { "message": "Enter OpenAI model" },
+  "openrouter_api_settings_title": { "message": "OpenRouter Settings" },
+  "openrouter_api_settings_api_key_label": { "message": "API Key" },
+  "openrouter_api_key_placeholder": {
+    "message": "Paste your OpenRouter API key here"
+  },
+  "openrouter_api_settings_model_label": { "message": "Model" },
+  "openrouter_api_model_placeholder": {
+    "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
+  },
+  "deepseek_api_settings_title": { "message": "DeepSeek Settings" },
+  "deepseek_api_settings_api_key_label": { "message": "API Key" },
+  "deepseek_api_key_placeholder": {
+    "message": "Paste your DeepSeek API key here"
+  },
+  "deepseek_api_settings_model_label": { "message": "Model" },
+  "deepseek_api_model_placeholder": {
+    "message": "Enter DeepSeek model (e.g., deepseek-chat)"
+  },
+  "custom_api_settings_title": { "message": "Custom API Settings" },
+  "custom_api_settings_description": {
+    "message": "Use any service that is compatible with the OpenAI chat completions format."
+  },
+  "custom_api_settings_api_url_label": { "message": "API URL" },
+  "custom_api_url_placeholder": {
+    "message": "Enter the base URL of your custom API"
+  },
+  "custom_api_settings_api_key_label": { "message": "API Key" },
+  "custom_api_key_placeholder": { "message": "Paste your custom API key here" },
+  "custom_api_settings_model_label": { "message": "Model" },
+  "custom_api_model_placeholder": { "message": "Enter the model name" },
+
+  "import_export_section_title": { "message": "Import/Export Settings" },
+  "export_settings_button": { "message": "Export Settings" },
+  "import_settings_label": { "message": "Import Settings" },
+  "import_settings_button": { "message": "Import Settings" },
+  "save_settings_button": { "message": "Save Settings" },
+  "excluded_sites_label": {
+    "message": "Exclude these sites (comma separated)"
+  },
+
+  "advance_dev_api_mode_label": { "message": "Use Dev API Mode" },
+  "advance_debug_mode_label": { "message": "Debug Mode" },
+
+  "theme_auto": { "message": "Auto (System)" },
+  "theme_light": { "message": "Light" },
+  "theme_dark": { "message": "Dark" },
+  "theme_toggle_title": { "message": "Toggle Theme" },
+
+  "popup_page_title": { "message": "Translate It!" },
+  "popup_translate_page_link": { "message": "Translate This Page" },
+  "popup_translate_page_link_title": { "message": "Open translate in new tab" },
+  "popup_select_element_alt_icon": { "message": "Select Element" },
+  "popup_select_element_title_icon": { "message": "Select Element Mode" },
+  "popup_revert_alt_icon": { "message": "Revert" },
+  "popup_revert_title_icon": { "message": "Revert (Esc Key)" },
+  "popup_clear_storage_alt_icon": { "message": "Clear" },
+  "popup_clear_storage_title_icon": { "message": "Clear fields" },
+  "popup_settings_alt_icon": { "message": "Settings" },
+  "popup_settings_title_icon": { "message": "Settings" },
+  "popup_target_language_title": { "message": "Target language" },
+  "popup_target_language_placeholder": { "message": "Target language" },
+  "popup_clear_target_language_title": { "message": "Clear target language" },
+  "popup_swap_languages_title": { "message": "Swap languages" },
+  "popup_swap_languages_alt_icon": { "message": "Swap" },
+  "popup_source_language_placeholder": { "message": "Source language" },
+  "popup_source_language_title": { "message": "Source language" },
+  "popup_clear_source_language_title": { "message": "Clear source language" },
+  "popup_translate_button_title": { "message": "Translate" },
+  "popup_translate_button_alt_icon": { "message": "Translate" },
+  "popup_exclude_toggle_title": { "message": "Enable/Disable on this site" },
+  "popup_copy_source_alt_icon": { "message": "Copy" },
+  "popup_copy_source_title_icon": { "message": "Copy source text" },
+  "popup_voice_source_alt_icon": { "message": "Speak source" },
+  "popup_voice_source_title_icon": { "message": "Speak" },
+  "popup_paste_source_alt_icon": { "message": "Paste" },
+  "popup_paste_source_title_icon": { "message": "Paste from clipboard" },
+  "popup_source_text_placeholder": { "message": "Enter text here..." },
+  "popup_copy_target_alt_icon": { "message": "Copy target" },
+  "popup_copy_target_title_icon": { "message": "Copy target text" },
+  "popup_voice_target_alt_icon": { "message": "Speak target" },
+  "popup_voice_target_title_icon": { "message": "Speak" },
+  "popup_string_during_translate": { "message": "translating..." },
+  "popup_string_error_sending": { "message": "Error sending request." },
+  "popup_string_error_response_empty": { "message": "(translation is empty)" },
+  "popup_string_translate_error_trigger": {
+    "message": "Error on translation trigger."
+  },
+  "popup_string_translate_error_response": {
+    "message": "Error on translation response."
+  },
+
+  "STATUS_TRANSLATING_CTRLSLASH": { "message": "translating..." },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": { "message": "translating..." },
+  "STATUS_TRANSLATING_ICON": { "message": "translating..." },
+  "STATUS_Revert_Number": { "message": "Reverted" },
+  "STATUS_REVERT_NOT_FOUND": { "message": "No text found to revert." },
+  "STATUS_FROM_MEMORY": { "message": "From Memory" },
+  "STATUS_REMOVE_MEMORY": { "message": "Memory Cleared" },
+  "STATUS_SMART_TRANSLATE_COPIED": {
+    "message": "Translation copied to clipboard (Ctrl+V)."
+  },
+
+  "OPTIONS_STATUS_SAVED_SUCCESS": {
+    "message": "Saved successfully :)"
+  },
+  "OPTIONS_STATUS_SAVED_FAILED": {
+    "message": "Save failed :("
+  },
+  "OPTIONS_STATUS_EXPORT_SUCCESS": {
+    "message": "Settings exported successfully!"
+  },
+  "OPTIONS_STATUS_EXPORT_FAILED": {
+    "message": "Failed to export settings."
+  },
+  "OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING": {
+    "message": "Settings imported! Reloading..."
+  },
+  "OPTIONS_STATUS_IMPORT_FAILED": {
+    "message": "Failed to import settings. Invalid file?"
+  },
+  "OPTIONS_STATUS_LOAD_FAILED": {
+    "message": "Failed to load settings."
+  },
+
+  "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },
+  "ERRORS_INVALID_CONTEXT": {
+    "message": "Extension context invalid. Please refresh the page to continue."
+  },
+  "ERRORS_CONTEXT_LOST": { "message": "Extension context lost." },
+  "ERRORS_TAB_AVAILABILITY": { "message": "Tab is not available." },
+  "ERRORS_EMPTY_PROMPT": { "message": "Invalid or missing prompt text." },
+  "ERRORS_NETWORK_ERROR": {
+    "message": "Network Error. Please check your internet connection."
+  },
+  "ERRORS_HTTP_ERROR": {
+    "message": "HTTP Error communicating with the server."
+  },
+  "ERRORS_API_KEY_MISSING": { "message": "API Key is missing." },
+  "ERRORS_API_KEY_INVALID": {
+    "message": "API Key is invalid or unauthorized."
+  },
+  "ERRORS_API_URL_MISSING": { "message": "API URL is missing." },
+  "ERRORS_MODEL_MISSING": {
+    "message": "The selected AI Model is missing or invalid."
+  },
+  "ERRORS_INVALID_REQUEST": {
+    "message": "Invalid request format or parameters."
+  },
+  "ERRORS_INSUFFICIENT_BALANCE": {
+    "message": "Insufficient balance or credits for the selected API."
+  },
+  "ERRORS_FORBIDDEN_ERROR": {
+    "message": "Access denied. Check permissions or potential content moderation."
+  },
+  "ERRORS_RATE_LIMIT_REACHED": {
+    "message": "Rate limit reached. Please pace your requests or try again later."
+  },
+  "ERRORS_SERVER_ERROR": {
+    "message": "The service provider's server encountered an error. Please try again later."
+  },
+  "ERRORS_MODEL_OVERLOADED": {
+    "message": "The AI Model is currently overloaded. Please try again in a moment."
+  },
+  "ERRORS_QUOTA_EXCEEDED": {
+    "message": "You have exceeded your quota for this API."
+  },
+  "ERRORS_GEMINI_QUOTA_REGION": {
+    "message": "Gemini quota exceeded, which may be due to a region-specific limit."
+  }
+}

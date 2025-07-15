@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="he" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <title data-i18n="popup_page_title">Translate It!</title>
@@ -14,11 +14,11 @@
             id="translatePageLink"
             target="_blank"
             class="toolbar-link"
-            title="ترجمه این صفحه در تب جدید"
+            title="Translate this page in a new tab"
             data-i18n-title="popup_translate_page_link_title"
             data-i18n="popup_translate_page_link"
           >
-            ترجمه این صفحه
+            Translate Page
           </a>
         </div>
         <div class="toolbar-right-group">
@@ -28,14 +28,14 @@
             data-i18n="popup_select_element_alt_icon"
             alt="Select Element"
             data-i18n-title="popup_select_element_title_icon"
-            title="حالت انتخاب با موس"
+            title="Select Element Mode"
             class="toolbar-icon"
           />
           <img
             src="../icons/clear.png"
             id="clearStorageBtn"
             data-i18n-title="popup_clear_storage_title_icon"
-            title="پاک کردن فیلدها"
+            title="Clear fields"
             alt="Clear Fields"
             class="toolbar-icon"
             data-i18n="popup_clear_storage_alt_icon"
@@ -46,7 +46,7 @@
             data-i18n="popup_revert_alt_icon"
             alt="Revert"
             data-i18n-title="popup_revert_title_icon"
-            title="بازگرداندن به حالت قبلی"
+            title="Revert"
             class="toolbar-icon"
           />
           <img
@@ -55,13 +55,13 @@
             data-i18n="popup_settings_alt_icon"
             alt="Settings"
             data-i18n-title="popup_settings_title_icon"
-            title="تنظیمات"
+            title="Settings"
             class="toolbar-icon"
           />
           <label
             class="switch"
             data-i18n-title="popup_exclude_toggle_title"
-            title="فعال/غیرفعال در این صفحه"
+            title="Enable/Disable on this site"
           >
             <input type="checkbox" id="excludeCurrentPageToggle" />
             <span class="slider round"></span>
@@ -75,16 +75,16 @@
             type="text"
             id="targetLanguageInput"
             list="targetLanguagesList"
-            placeholder="زبان مقصد"
+            placeholder="Target language"
             class="language-input"
-            title="زبان مقصد"
+            title="Target language"
             data-i18n-title="popup_target_language_title"
             data-i18n-placeholder="popup_target_language_placeholder"
           />
           <span
             id="clearTargetLanguage"
             class="clear-input clear-input-target"
-            title="پاک کردن زبان مقصد"
+            title="Clear target language"
             data-i18n-title="popup_clear_target_language_title"
           ></span>
           <datalist id="targetLanguagesList"></datalist>
@@ -92,7 +92,7 @@
         <button
           id="swapLanguagesBtn"
           class="swap-button"
-          title="جابجایی زبان‌ها"
+          title="Swap languages"
           data-i18n-title="popup_swap_languages_title"
         >
           <img
@@ -107,16 +107,16 @@
             type="text"
             id="sourceLanguageInput"
             list="sourceLanguagesList"
-            placeholder="زبان مبدا"
+            placeholder="Source language"
             data-i18n-placeholder="popup_source_language_placeholder"
             data-i18n-title="popup_source_language_title"
             class="language-input"
-            title="زبان مبدا"
+            title="Source language"
           />
           <span
             id="clearSourceLanguage"
             class="clear-input clear-input-source"
-            title="پاک کردن زبان مبدا"
+            title="Clear source language"
             data-i18n-title="popup_clear_source_language_title"
           ></span>
           <datalist id="sourceLanguagesList"></datalist>
@@ -126,7 +126,7 @@
           form="translationForm"
           id="translateBtn"
           class="translate-button"
-          title="ترجمه"
+          title="Translate"
           data-i18n-title="popup_translate_button_title"
         >
           <img
@@ -144,7 +144,7 @@
               <img
                 src="../icons/copy.png"
                 id="copySourceBtn"
-                title="کپی"
+                title="Copy"
                 alt="Copy"
                 class="inline-icon"
                 data-i18n="popup_copy_source_alt_icon"
@@ -153,7 +153,7 @@
               <img
                 src="../icons/speaker.png"
                 id="voiceSourceIcon"
-                title="خواندن متن مبدا"
+                title="Speak source text"
                 alt="Voice Source"
                 class="inline-icon"
                 data-i18n="popup_voice_source_alt_icon"
@@ -164,7 +164,7 @@
           <img
             src="../icons/paste.png"
             id="pasteSourceBtn"
-            title="چسباندن"
+            title="Paste"
             alt="Paste"
             class="inline-icon paste-icon-separate"
             data-i18n="popup_paste_source_alt_icon"
@@ -172,7 +172,7 @@
           />
           <textarea
             id="sourceText"
-            placeholder="متن را اینجا وارد کنید..."
+            placeholder="Enter text here..."
             rows="4"
             tabindex="1"
             data-i18n-placeholder="popup_source_text_placeholder"
@@ -184,7 +184,7 @@
             <img
               src="../icons/copy.png"
               id="copyTargetBtn"
-              title="کپی نتیجه"
+              title="Copy result"
               alt="Copy Result"
               data-i18n="popup_copy_target_alt_icon"
               data-i18n-title="popup_copy_target_title_icon"
@@ -193,7 +193,7 @@
             <img
               src="../icons/speaker.png"
               id="voiceTargetIcon"
-              title="خواندن متن مقصد"
+              title="Speak target text"
               alt="Voice Target"
               class="inline-icon voice-target-icon"
               data-i18n="popup_voice_target_alt_icon"

@@ -1,9 +1,8 @@
 // src/utils/languages.js
 
 /*
-پرچم‌ها را میتوانید از وبسایت زیر دریافت کنید:
+Flag icons can be obtained from:
   https://nucleoapp.com/svg-flag-icons
-
 */
 
 export const languageList = [
@@ -14,14 +13,6 @@ export const languageList = [
     code: "en",
     locale: "en",
     flagCode: "gb",
-  },
-  {
-    name: "Farsi",
-    voiceCode: "fa-IR",
-    promptName: "Farsi",
-    code: "fa",
-    locale: "fa",
-    flagCode: "ir",
   },
   { name: "German", voiceCode: "de-DE", promptName: "German", code: "de" },
   { name: "French", voiceCode: "fr-FR", promptName: "French", code: "fr" },
@@ -261,8 +252,8 @@ export const languageList = [
     promptName: "Tagalog",
     code: "tl",
   },
-  // Cebuano فاقد کد استاندارد IETF است، ممکن است در برخی از موتورهای TTS پشتیبانی نشود.
-  // در صورت نیاز می‌توانید از یک کد مرتبط دیگر یا یک کد عمومی مانند 'en-US' استفاده کنید.
+  // Cebuano lacks a standard IETF code and may not be supported by some TTS engines.
+  // Use a related code or a generic one like 'en-US' if needed.
   {
     name: "Cebuano",
     voiceCode: "en-US",

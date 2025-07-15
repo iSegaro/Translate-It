@@ -54,8 +54,6 @@ const langNameToCodeMap = {
   dutch: "nl",
   english: "en",
   estonian: "et",
-  farsi: "fa",
-  persian: "fa",
   filipino: "fil", // Note: ISO 639-2 code
   finnish: "fi",
   french: "fr",
@@ -458,7 +456,7 @@ class ApiService {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model, // مدل باید توسط کاربر مشخص شود
+        model: model, // model must be provided by the user
         messages: [{ role: "user", content: prompt }],
       }),
     };
@@ -609,15 +607,15 @@ class ApiService {
 
     const api = await getTranslationApiAsync();
 
-    // ▼▼▼ شروع منطق اختصاصی برای Google Translate ▼▼▼
+    // ▼▼▼ Start of Google Translate specific logic ▼▼▼
     if (api === "google") {
-      // سناریو ۱: ترجمه در فیلدهای متنی (مانند Ctrl+/)
-      // عملکرد: این حالت همیشه یک ترجمه معکوس به زبان مبدأ کاربر انجام می‌دهد.
+      // Scenario 1: field translations (e.g., Ctrl+/)
+      // Always perform a reverse translation back to the user's source language.
       if (translateMode === TranslationMode.Field) {
         const newTargetLanguage = sourceLanguage;
         const newSourceLanguage = AUTO_DETECT_VALUE;
 
-        // با پارامترهای جدید، تابع را فراخوانی کرده و از ادامه اجرای تابع اصلی خارج شو
+        // Call with new parameters and exit to avoid continuing main flow
         return this.handleGoogleTranslate(
           text,
           newSourceLanguage,
@@ -626,12 +624,12 @@ class ApiService {
         );
       }
 
-      // سناریو ۲: سایر حالت‌های ترجمه (SelectElement, Selection, Popup)
-      // عملکرد: این بخش تصمیم می‌گیرد که آیا زبان‌ها را جابجا کند یا زبان مبدأ را برای دقت بیشتر تثبیت کند.
+      // Scenario 2: other translation modes (SelectElement, Selection, Popup)
+      // Decides whether to swap languages or lock the source language for accuracy.
       try {
         const detectionResult = await Browser.i18n.detectLanguage(text);
 
-        // لایه اول: بررسی نتیجه تشخیص زبان قابل اعتماد
+        // First layer: check if language detection is reliable
         if (
           detectionResult?.isReliable &&
           detectionResult.languages.length > 0
@@ -643,8 +641,8 @@ class ApiService {
           let performSwap = false;
           let reason = "";
 
-          // اولویت اول: آیا متن از قبل به زبان مقصد است؟
-          // اگر بله، زبان‌ها را برای ترجمه معکوس جابجا (swap) کن.
+          // Priority 1: is the text already in the target language?
+          // If so, swap languages for reverse translation.
           if (detectedLangCode === targetLangCode) {
             performSwap = true;
             reason = `Detected language (${detectedLangCode}) matches target.`;
@@ -663,15 +661,15 @@ class ApiService {
             [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
           }
         }
-        // لایه دوم: اگر تشخیص زبان قابل اعتماد نبود، از Regex به عنوان راهکار جایگزین استفاده کن
-        // TODO: این روش هنوز ۱۰۰ دردصد تست نشده و احتمال داره که باعث تداخل شود
+        // Second layer: if detection isn't reliable, use a Regex-based fallback
+        // TODO: this method is not fully tested and might cause issues
         else {
           logME(
             "[API Logic] Language detection was not reliable. Using Regex fallback."
           );
           const targetLangCode = normalizeLangCode(getLanguageCode(targetLanguage));
 
-          // اگر متن حاوی حروف فارسی/عربی است و زبان مقصد هم یکی از این زبان‌هاست
+          // If the text contains Persian/Arabic characters and the target language is also one of these
 
           if (
             isPersianText(text) &&
@@ -680,10 +678,10 @@ class ApiService {
             logME(
               "[API Logic] Regex fallback: Detected RTL text matches RTL target. Swapping languages."
             );
-            // زبان‌ها را جابجا کن تا به زبان مبدأ کاربر (مثلاً انگلیسی) ترجمه شود
+            // Swap languages so the text is translated back to the user's source language
             [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
           }
-          // شرط‌های مشابهی برای زبان‌های دیگر نیز در اینجا اضافه کنید
+          // Add similar conditions for other languages if needed
         }
       } catch (e) {
         logME(
@@ -692,7 +690,7 @@ class ApiService {
         );
       }
     }
-    // ▲▲▲ پایان منطق اختصاصی برای Google Translate ▲▲▲
+    // ▲▲▲ End of Google Translate specific logic ▲▲▲
 
     if (
       sourceLanguage === targetLanguage &&
