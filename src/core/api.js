@@ -21,12 +21,14 @@ import {
   getCustomApiUrlAsync,
   getCustomApiKeyAsync,
   getCustomApiModelAsync,
+  getEnableTwoWayAsync,
   TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid, logME } from "../utils/helpers.js";
 import { buildPrompt } from "../utils/promptBuilder.js";
 import { isPersianText } from "../utils/textDetection.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { normalizeLangCode } from "../utils/langUtils.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { getLanguageCode } from "../utils/tts.js";
 
@@ -585,10 +587,25 @@ class ApiService {
       throw err;
     }
 
-    let [sourceLanguage, targetLanguage] = await Promise.all([
+    let [sourceLanguage, targetLanguage, twoWayEnabled] = await Promise.all([
       srcLang || getSourceLanguageAsync(),
       tgtLang || getTargetLanguageAsync(),
+      getEnableTwoWayAsync(),
     ]);
+
+    if (twoWayEnabled) {
+      try {
+        const detection = await Browser.i18n.detectLanguage(text);
+        const detected = normalizeLangCode(detection?.languages?.[0]?.language);
+        const srcCode = normalizeLangCode(getLanguageCode(sourceLanguage));
+        const tgtCode = normalizeLangCode(getLanguageCode(targetLanguage));
+        if (detected && detected === tgtCode) {
+          [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
+        }
+      } catch (e) {
+        logME("[TwoWay] Language detection failed", e);
+      }
+    }
 
     const api = await getTranslationApiAsync();
 
@@ -620,8 +637,8 @@ class ApiService {
           detectionResult.languages.length > 0
         ) {
           const mainDetection = detectionResult.languages[0];
-          const detectedLangCode = mainDetection.language.split("-")[0];
-          const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
+          const detectedLangCode = normalizeLangCode(mainDetection.language);
+          const targetLangCode = normalizeLangCode(getLanguageCode(targetLanguage));
 
           let performSwap = false;
           let reason = "";
@@ -652,7 +669,7 @@ class ApiService {
           logME(
             "[API Logic] Language detection was not reliable. Using Regex fallback."
           );
-          const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
+          const targetLangCode = normalizeLangCode(getLanguageCode(targetLanguage));
 
           // اگر متن حاوی حروف فارسی/عربی است و زبان مقصد هم یکی از این زبان‌هاست
 

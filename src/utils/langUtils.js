@@ -25,6 +25,27 @@ export function resolveLangCode(inputLang) {
   return "en"; // اگر پیدا نشد fallback
 }
 
+/**
+ * Normalize language codes to handle legacy variants.
+ * Converts codes like 'iw' to 'he'. Only returns the base 2-letter code.
+ * @param {string} code
+ * @returns {string|null}
+ */
+export function normalizeLangCode(code) {
+  if (!code) return code;
+  const base = code.toLowerCase().split("-")[0];
+  switch (base) {
+    case "iw":
+      return "he"; // Hebrew legacy code
+    case "in":
+      return "id"; // Indonesian legacy code
+    case "ji":
+      return "yi"; // Yiddish legacy code
+    default:
+      return base;
+  }
+}
+
 export async function getEffectiveLanguage(
   text,
   selectedLang,
