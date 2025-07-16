@@ -34,12 +34,16 @@ html {
   color: var(--text-color);
   font-size: 14px;
   height: 100%;
-  overflow: hidden; /* جلوگیری از اسکرول خوردن کل صفحه */
+  overflow: hidden;
+  width: 100%; /* اضافه شد */
 }
 
 .sidepanel-container {
   display: flex;
   height: 100vh;
+  width: 100%; /* اضافه شد */
+  position: relative;
+  overflow: hidden; /* اضافه شد */
 }
 
 /* --- Vertical Toolbar --- */
@@ -52,8 +56,10 @@ html {
   justify-content: space-between;
   padding: 10px 0;
   flex-shrink: 0;
-  order: 0; /* Keep on left side */
+  z-index: 20; /* بالاتر از history panel */
+  position: relative;
 }
+
 .toolbar-group,
 .toolbar-group-bottom {
   display: flex;
@@ -83,14 +89,24 @@ html {
   filter: var(--icon-filter);
 }
 
-/* --- Main Content --- */
-.main-content {
+/* Content area که شامل main و history می‌شود */
+.content-area {
   flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%; /* اضافه شد */
+  min-width: 0; /* اضافه شد - مهم برای جلوگیری از overflow */
+}
+
+/* Main content */
+.main-content {
+  width: 100%;
+  height: 100%;
   padding: 15px;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden; /* محتوای اصلی اسکرول نمی‌خورد */
-  order: 1;
+  overflow-y: hidden;
+  box-sizing: border-box; /* اضافه شد - خیلی مهم */
 }
 
 #translationForm {
@@ -98,6 +114,7 @@ html {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  width: 100%; /* اضافه شد */
 }
 
 /* Language Controls */
@@ -108,12 +125,15 @@ html {
   margin-bottom: 15px;
   flex-shrink: 0;
   flex-wrap: wrap;
+  width: 100%; /* اضافه شد */
+  box-sizing: border-box; /* اضافه شد */
 }
 
 /* استایل برای select language */
 .language-select {
   flex-grow: 1;
   flex-basis: 120px;
+  min-width: 0; /* اضافه شد - مهم برای flex items */
   padding: 8px 10px;
   font-size: 13px;
   border: 1px solid var(--border-color);
@@ -128,16 +148,15 @@ html {
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 16px;
-  padding-right: 30px; /* ایجاد فضا برای آیکون */
+  padding-right: 30px;
   filter: var(--icon-filter);
 }
 
 html[dir="rtl"] .language-select {
-    background-position: left 10px center;
-    padding-right: 10px;
-    padding-left: 30px;
+  background-position: left 10px center;
+  padding-right: 10px;
+  padding-left: 30px;
 }
-
 
 .swap-button {
   background: none;
@@ -159,11 +178,12 @@ html[dir="rtl"] .language-select {
   filter: var(--icon-filter);
 }
 
-
 /* --- Textarea Container --- */
 .textarea-container {
   position: relative;
   display: flex;
+  width: 100%; /* اضافه شد */
+  box-sizing: border-box; /* اضافه شد */
 }
 
 .textarea-container.source-container {
@@ -171,16 +191,16 @@ html[dir="rtl"] .language-select {
   flex-shrink: 0;
 }
 
-/* [تغییر]: استفاده از padding هوشمند و box-sizing */
+/* textarea styles */
 textarea#sourceText {
   width: 100%;
   height: 140px;
   resize: none;
-  box-sizing: border-box; /* برای محاسبه صحیح اندازه */
+  box-sizing: border-box;
   padding-top: 32px;
   padding-bottom: 10px;
-  padding-inline-start: 10px; /* فاصله از ابتدای متن */
-  padding-inline-end: 10px; /* فاصله از انتهای متن */
+  padding-inline-start: 10px;
+  padding-inline-end: 10px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--bg-secondary);
@@ -190,7 +210,9 @@ textarea#sourceText {
   line-height: 1.6;
   direction: ltr;
   text-align: left;
+  min-width: 0; /* اضافه شد */
 }
+
 
 /* Action Bar (Translate Button) */
 .action-bar {
@@ -221,6 +243,7 @@ textarea#sourceText {
   height: 18px;
 }
 
+/* Result container */
 .textarea-container.result-container {
   flex-grow: 1;
   min-height: 0;
@@ -229,17 +252,20 @@ textarea#sourceText {
   background-color: var(--bg-secondary);
   display: flex;
   flex-direction: column;
+  width: 100%; /* اضافه شد */
+  box-sizing: border-box; /* اضافه شد */
+  overflow: hidden; /* اضافه شد */
 }
 
 /* [تغییر]: استفاده از padding هوشمند و box-sizing */
 .result {
   width: 100%;
   height: 100%;
-  box-sizing: border-box; /* برای محاسبه صحیح اندازه */
+  box-sizing: border-box;
   padding-top: 32px;
   padding-bottom: 10px;
-  padding-inline-start: 10px; /* فاصله از ابتدای متن */
-  padding-inline-end: 10px; /* فاصله از انتهای متن */
+  padding-inline-start: 10px;
+  padding-inline-end: 10px;
   color: var(--text-color);
   font-family: inherit;
   font-size: 14px;
@@ -249,7 +275,9 @@ textarea#sourceText {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-y: auto;
+  overflow-x: hidden; /* اضافه شد */
   position: relative;
+  min-width: 0; /* اضافه شد */
 }
 
 .result:empty::before {
@@ -356,4 +384,363 @@ html[dir="rtl"] .paste-icon-separate {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Toolbar Separator */
+.toolbar-separator {
+  width: 30px;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 10px auto;
+}
+
+/* API Provider Dropdown */
+.dropdown-menu {
+  position: absolute;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 30; /* بالاترین z-index */
+  display: none;
+  min-width: 200px;
+  left: 60px;
+  padding: 4px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  color: var(--text-color);
+}
+
+.dropdown-item:hover {
+  background-color: var(--toolbar-button-hover-bg);
+}
+
+.dropdown-item.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.dropdown-item img {
+  width: 20px;
+  height: 20px;
+}
+
+/* History Panel */
+.history-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-color);
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  box-shadow: none;
+  width: 100%; /* اضافه شد */
+  box-sizing: border-box; /* اضافه شد */
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.history-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-color);
+  padding: 5px;
+  line-height: 1;
+}
+
+.history-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden; /* اضافه شد */
+  padding: 10px;
+  box-sizing: border-box; /* اضافه شد */
+}
+
+.history-item {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+  position: relative; /* برای positioning دکمه حذف */
+}
+
+/* برای اطمینان از عدم overflow در محتوای history items */
+.history-item-source,
+.history-item-target {
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.history-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.history-item-source {
+  font-size: 13px;
+  color: var(--text-color);
+  opacity: 0.8;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-item-target {
+  font-size: 14px;
+  color: var(--text-color);
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-item-time {
+  font-size: 11px;
+  color: var(--text-color);
+  opacity: 0.6;
+  margin-top: 6px;
+  text-align: right;
+}
+
+/* Markdown styles in history items */
+.history-item-target {
+  font-size: 14px;
+  color: var(--text-color);
+  font-weight: 400; /* از 500 به 400 تغییر دادیم */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+/* استایل‌های Markdown در history items */
+.history-item-target p {
+  margin: 0 0 8px 0;
+}
+
+.history-item-target p:last-child {
+  margin-bottom: 0;
+}
+
+.history-item-target strong {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.history-item-target em {
+  font-style: italic;
+}
+
+.history-item-target ul,
+.history-item-target ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.history-item-target li {
+  margin: 2px 0;
+}
+
+.history-item-target code {
+  background-color: var(--toolbar-button-hover-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.history-item-target pre {
+  background-color: var(--toolbar-button-hover-bg);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 4px 0;
+}
+
+.history-item-target blockquote {
+  border-left: 3px solid var(--primary-color);
+  padding-left: 12px;
+  margin: 8px 0;
+  opacity: 0.9;
+}
+
+.history-item-target h1,
+.history-item-target h2,
+.history-item-target h3,
+.history-item-target h4,
+.history-item-target h5,
+.history-item-target h6 {
+  margin: 8px 0 4px 0;
+  font-weight: 600;
+}
+
+.history-item-target a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.history-item-target a:hover {
+  text-decoration: underline;
+}
+
+/* History Panel with Footer */
+.history-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-color);
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  box-shadow: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* History Footer */
+.history-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  background-color: var(--bg-color);
+  flex-shrink: 0;
+}
+
+.clear-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+.clear-all-btn:hover {
+  opacity: 1;
+  background-color: rgba(220, 53, 69, 0.1);
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.clear-all-icon {
+  width: 16px;
+  height: 16px;
+  filter: var(--icon-filter);
+}
+
+.clear-all-btn:hover .clear-all-icon {
+  filter: none;
+}
+
+/* دکمه حذف برای هر آیتم */
+.delete-item-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+html[dir="rtl"] .delete-item-btn {
+  right: auto;
+  left: 8px;
+}
+
+.history-item:hover .delete-item-btn {
+  opacity: 0.6;
+}
+
+.delete-item-btn:hover {
+  opacity: 1 !important;
+  background-color: rgba(220, 53, 69, 0.1);
+  border-color: #dc3545;
+}
+
+.delete-item-icon {
+  width: 14px;
+  height: 14px;
+  filter: var(--icon-filter);
+}
+
+.delete-item-btn:hover .delete-item-icon {
+  filter: none;
+}
+
+/* تنظیم padding برای جلوگیری از overlap با دکمه حذف */
+.history-item-source,
+.history-item-target,
+.history-item-time {
+  padding-right: 30px;
+}
+
+html[dir="rtl"] .history-item-source,
+html[dir="rtl"] .history-item-target,
+html[dir="rtl"] .history-item-time {
+  padding-right: 0;
+  padding-left: 30px;
+}
+
+/* Empty state برای history */
+.empty-history {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-color);
+  opacity: 0.6;
 }

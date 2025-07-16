@@ -13,29 +13,37 @@
   "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
   "context_menu_help": { "message": "Useful Help" },
   "context_menu_translate_with_selection": { "message": "Translate Element" },
-  "context_menu_api_provider":{"message": "API Provider"},
-  "api_provider_google": {"message": "Google Translate" },
-  "api_provider_gemini":{"message": "Gemini"},
-  "api_provider_webai":{"message": "WebAI"},
-  "api_provider_openai":{"message": "OpenAI"},
-  "api_provider_openrouter":{"message": "OpenRouter"},
-  "api_provider_deepseek":{"message": "DeepSeek"},
-  "api_provider_custom":{"message": "Custom (OpenAI)"},
-
-
+  "context_menu_api_provider": { "message": "API Provider" },
+  "api_provider_google": { "message": "Google Translate" },
+  "api_provider_gemini": { "message": "Gemini" },
+  "api_provider_webai": { "message": "WebAI" },
+  "api_provider_openai": { "message": "OpenAI" },
+  "api_provider_openrouter": { "message": "OpenRouter" },
+  "api_provider_deepseek": { "message": "DeepSeek" },
+  "api_provider_custom": { "message": "Custom (OpenAI)" },
 
   "google_translate_settings_title": { "message": "Google Translate" },
-  "google_translate_description": { "message": "Uses the free, public Google Translate endpoint. No API key is required." },
+  "google_translate_description": {
+    "message": "Uses the free, public Google Translate endpoint. No API key is required."
+  },
 
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
   "options_changelog_loading": { "message": "Loading changelog..." },
 
-  "options_error_same_languages": { "message": "Source and target languages cannot be the same." },
-  "options_error_empty_language": { "message": "Language fields cannot be empty." },
+  "options_error_same_languages": {
+    "message": "Source and target languages cannot be the same."
+  },
+  "options_error_empty_language": {
+    "message": "Language fields cannot be empty."
+  },
 
-  "export_settings_description":{"message":"Export your current settings to a JSON file for backup or sharing."},
-  "import_settings_description":{"message":"Importing will overwrite your current settings. The page will reload after a successful import."},
+  "export_settings_description": {
+    "message": "Export your current settings to a JSON file for backup or sharing."
+  },
+  "import_settings_description": {
+    "message": "Importing will overwrite your current settings. The page will reload after a successful import."
+  },
 
   "languages_tab_title": { "message": "Languages" },
   "activation_tab_title": { "message": "Activation" },
@@ -333,6 +341,26 @@
   "STATUS_SMART_TRANSLATE_COPIED": {
     "message": "Translation copied to clipboard (Ctrl+V)."
   },
+
+  "SIDEPANEL_API_PROVIDER_TOOLTIP": {
+    "message": "Change API Provider"
+  },
+  "SIDEPANEL_HISTORY_TOOLTIP": {
+    "message": "Translation History"
+  },
+  "SIDEPANEL_HISTORY_TITLE": {
+    "message": "Translation History"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY": {
+    "message": "Clear All History"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
+    "message": "Delete all translation history"
+  },
+  "CONFIRM_CLEAR_ALL_HISTORY": {
+    "message": "Are you sure you want to clear all translation history?"
+  },
+
 
   "OPTIONS_STATUS_SAVED_SUCCESS": {
     "message": "Saved successfully :)"

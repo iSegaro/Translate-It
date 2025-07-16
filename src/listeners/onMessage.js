@@ -147,6 +147,28 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         );
         return true;
 
+      case "translationAdded":
+        // مستقیماً داده را ذخیره می‌کنیم
+        Browser.storage.local
+          .get("translationHistory")
+          .then(({ translationHistory = [] }) => {
+            translationHistory.push({
+              ...message.data,
+              timestamp: Date.now(),
+            });
+
+            // حداکثر 100 آیتم نگه می‌داریم
+            if (translationHistory.length > 100) {
+              translationHistory.splice(0, translationHistory.length - 100);
+            }
+
+            Browser.storage.local.set({ translationHistory });
+          })
+          .catch((err) => {
+            logME("[Background] Error saving translation history:", err);
+          });
+        return false;
+
       case "fetchTranslationBackground":
         handleFetchTranslationBackground(
           message,

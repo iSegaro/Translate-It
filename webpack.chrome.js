@@ -135,6 +135,13 @@ const chromeDistConfig = {
           },
         },
         {
+          from: "icons/api-providers/*.svg",
+          to: ({ absoluteFilename }) => {
+            const iconName = path.basename(absoluteFilename);
+            return `icons/api-providers/${iconName}`;
+          },
+        },
+        {
           from: "icons/*.svg",
           to: ({ absoluteFilename }) => {
             const iconName = path.basename(absoluteFilename);

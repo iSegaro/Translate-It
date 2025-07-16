@@ -4,6 +4,8 @@ import { logME } from "../utils/helpers.js";
 import { getSettingsAsync, getSourceLanguageAsync } from "../config.js";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { ApiProviderManager } from "./apiProviderManager.js";
+import { HistoryManager } from "./historyManager.js";
 
 // Import utilities
 import { app_localize_popup } from "../utils/i18n.js";
@@ -50,6 +52,15 @@ const elements = {
   voiceSourceIcon: null,
   copyTargetBtn: null,
   voiceTargetIcon: null,
+  apiProviderBtn: null,
+  apiProviderIcon: null,
+  apiProviderDropdown: null,
+  historyBtn: null,
+  historyPanel: null,
+  historyList: null,
+  closeHistoryBtn: null,
+  clearAllHistoryBtn: null,
+
 };
 
 /**
@@ -71,7 +82,7 @@ async function deactivateSelectElementMode() {
  */
 function showSpinner() {
   if (!elements.translationResult) return;
-  elements.translationResult.classList.remove('fade-in'); // حذف انیمیشن قبلی
+  elements.translationResult.classList.remove("fade-in"); // حذف انیمیشن قبلی
   elements.translationResult.innerHTML = `
     <div class="spinner-center">
         <div class="spinner"></div>
@@ -99,6 +110,15 @@ function initializeElements() {
   elements.voiceSourceIcon = document.getElementById("voiceSourceIcon");
   elements.copyTargetBtn = document.getElementById("copyTargetBtn");
   elements.voiceTargetIcon = document.getElementById("voiceTargetIcon");
+
+  elements.apiProviderBtn = document.getElementById("apiProviderBtn");
+  elements.apiProviderIcon = document.getElementById("apiProviderIcon");
+  elements.apiProviderDropdown = document.getElementById("apiProviderDropdown");
+  elements.historyBtn = document.getElementById("historyBtn");
+  elements.historyPanel = document.getElementById("historyPanel");
+  elements.historyList = document.getElementById("historyList");
+  elements.closeHistoryBtn = document.getElementById("closeHistoryBtn");
+  elements.clearAllHistoryBtn = document.getElementById("clearAllHistoryBtn");
 }
 
 /**
@@ -123,7 +143,7 @@ async function initializeLanguages() {
       // پر کردن لیست زبان‌ها
       languageList.forEach((lang) => {
         const displayName = lang.promptName || lang.name;
-        
+
         // افزودن به لیست مبدأ
         const sourceOption = document.createElement("option");
         sourceOption.value = displayName;
@@ -168,8 +188,7 @@ async function handleTranslationResponse(
   sourceLangIdentifier,
   targetLangIdentifier
 ) {
-
-  elements.translationResult.innerHTML = '';
+  elements.translationResult.innerHTML = "";
 
   if (Browser.runtime.lastError) {
     elements.translationResult.textContent = Browser.runtime.lastError.message;
@@ -185,26 +204,36 @@ async function handleTranslationResponse(
     const parser = new DOMParser();
     const doc = parser.parseFromString(sanitized.toString(), "text/html");
 
-    // elements.translationResult.textContent = "";
     Array.from(doc.body.childNodes).forEach((node) =>
       elements.translationResult.appendChild(node)
     );
-    elements.translationResult.classList.add('fade-in');
+    elements.translationResult.classList.add("fade-in");
     correctTextDirection(elements.translationResult, translated);
 
     const sourceLangCode = getLanguageCode(sourceLangIdentifier);
     const targetLangCode = getLanguageCode(targetLangIdentifier);
 
-    Browser.storage.local
-      .set({
-        lastTranslation: {
-          sourceText: textToTranslate,
-          translatedText: translated,
-          sourceLanguage: sourceLangCode || AUTO_DETECT_VALUE,
-          targetLanguage: targetLangCode,
-        },
-      })
-      .catch((error) => logME("[SidePanel] Error saving translation:", error));
+    // ذخیره آخرین ترجمه
+    // Browser.storage.local
+    //   .set({
+    //     lastTranslation: {
+    //       sourceText: textToTranslate,
+    //       translatedText: translated,
+    //       sourceLanguage: sourceLangCode || AUTO_DETECT_VALUE,
+    //       targetLanguage: targetLangCode,
+    //     },
+    //   })
+    //   .catch((error) => logME("[SidePanel] Error saving translation:", error));
+
+    // اضافه کردن به تاریخچه historyManager
+    if (window.historyManager) {
+      window.historyManager.addToHistory({
+        sourceText: textToTranslate,
+        translatedText: translated,
+        sourceLanguage: sourceLangCode || AUTO_DETECT_VALUE,
+        targetLanguage: targetLangCode,
+      });
+    }
 
     if (
       response.data.detectedSourceLang &&
@@ -273,7 +302,7 @@ async function triggerTranslation() {
       targetLangIdentifier
     );
   } catch (error) {
-    elements.translationResult.innerHTML = '';
+    elements.translationResult.innerHTML = "";
     const fallback =
       (await getTranslationString("popup_string_translate_error_trigger")) ||
       "(⚠️ An error occurred.)";
@@ -361,7 +390,7 @@ function setupEventListeners() {
         resolvedTargetCode = null;
       }
     }
-    
+
     // تنها در صورتی که هر دو زبان مبدأ و مقصد مشخص و معتبر باشند، عملیات را ادامه می‌دهیم
     if (
       resolvedSourceCode &&
@@ -530,6 +559,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     const settings = await getSettingsAsync();
     applyTheme(settings.THEME);
     app_localize_popup(settings.APPLICATION_LOCALIZE);
+
+    const apiProviderManager = new ApiProviderManager({
+      button: elements.apiProviderBtn,
+      icon: elements.apiProviderIcon,
+      dropdown: elements.apiProviderDropdown,
+    });
+
+    const historyManager = new HistoryManager({
+      historyBtn: elements.historyBtn,
+      historyPanel: elements.historyPanel,
+      historyList: elements.historyList,
+      closeBtn: elements.closeHistoryBtn,
+      clearAllBtn: elements.clearAllHistoryBtn, // اضافه شد
+      onSelect: (item) => {
+        elements.sourceText.value = item.sourceText;
+        elements.translationResult.innerHTML = "";
+
+        try {
+          const rawHtml = marked.parse(item.translatedText);
+          const sanitized = DOMPurify.sanitize(rawHtml, {
+            RETURN_TRUSTED_TYPE: true,
+          });
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(sanitized.toString(), "text/html");
+
+          Array.from(doc.body.childNodes).forEach((node) =>
+            elements.translationResult.appendChild(node)
+          );
+        } catch (e) {
+          elements.translationResult.textContent = item.translatedText;
+        }
+
+        correctTextDirection(elements.sourceText, item.sourceText);
+        correctTextDirection(elements.translationResult, item.translatedText);
+
+        toggleInlineToolbarVisibility(elements.sourceText.parentElement);
+        toggleInlineToolbarVisibility(elements.translationResult.parentElement);
+      },
+    });
+
+    // ذخیره reference برای دسترسی در سایر توابع
+    window.historyManager = historyManager;
 
     logME("[SidePanel] Initialization complete");
   } catch (error) {
