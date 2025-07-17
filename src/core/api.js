@@ -224,7 +224,7 @@ class ApiService {
         originalJsonStruct = parsed;
         textsToTranslate = originalJsonStruct.map((item) => item.text);
       }
-    } catch (e) {
+    } catch  {
       // Not a valid JSON, proceed in plain text mode.
     }
 

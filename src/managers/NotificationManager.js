@@ -87,7 +87,7 @@ export default class NotificationManager {
       logME("[NotificationManager] Environment not compatible for in-page notifications due to error:", error.message);
       this.canShowInPage = false;
       if (this.container) {
-        try { this.container.remove(); } catch (e) { /* ignore */ }
+        try { this.container.remove(); } catch { /* ignore */ }
         this.container = null;
       }
     }

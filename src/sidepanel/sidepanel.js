@@ -496,7 +496,6 @@ function setupEventListeners() {
     }
   });
 }
-
 /**
  * Loads the last translation from storage.
  */
@@ -553,14 +552,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     initializeElements();
     await initializeLanguages();
     setupEventListeners();
-    // await loadLastTranslation();
+    await loadLastTranslation();
 
     // Apply initial theme and localization
     const settings = await getSettingsAsync();
     applyTheme(settings.THEME);
     app_localize_popup(settings.APPLICATION_LOCALIZE);
 
-    const apiProviderManager = new ApiProviderManager({
+    new ApiProviderManager({
       button: elements.apiProviderBtn,
       icon: elements.apiProviderIcon,
       dropdown: elements.apiProviderDropdown,
@@ -587,7 +586,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           Array.from(doc.body.childNodes).forEach((node) =>
             elements.translationResult.appendChild(node)
           );
-        } catch (e) {
+        } catch {
           elements.translationResult.textContent = item.translatedText;
         }
 
