@@ -29,15 +29,13 @@ export class HistoryManager {
     this.closeBtn.addEventListener("click", () => this.closePanel());
 
     if (this.clearAllBtn) {
-      console.log("[HistoryManager] Clear all button found, adding listener");
       this.clearAllBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log("[HistoryManager] Clear all button clicked");
         this.clearAllHistory();
       });
     } else {
-      console.warn("[HistoryManager] Clear all button not found!");
+      logME("[HistoryManager] Clear all button not found!");
     }
 
     // Listen for storage changes
@@ -83,7 +81,10 @@ export class HistoryManager {
   }
 
   renderHistory(history) {
-    this.historyList.innerHTML = "";
+    // Safe way to clear content
+    while (this.historyList.firstChild) {
+      this.historyList.removeChild(this.historyList.firstChild);
+    }
 
     if (!history || history.length === 0) {
       const emptyDiv = document.createElement("div");
@@ -104,34 +105,53 @@ export class HistoryManager {
       });
   }
 
-  createHistoryItem(item, index) {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.dataset.index = index;
-
-    // دکمه حذف
+  /**
+   * Create delete button with icon safely
+   */
+  createDeleteButton(index) {
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-item-btn";
     deleteBtn.title = "X";
-    deleteBtn.innerHTML = `<img src="${Browser.runtime.getURL("icons/trash-small.svg")}" alt="Delete" class="delete-item-icon" />`;
+
+    // Create img element safely
+    const deleteIcon = document.createElement("img");
+    deleteIcon.src = Browser.runtime.getURL("icons/trash-small.svg");
+    deleteIcon.alt = "Delete";
+    deleteIcon.className = "delete-item-icon";
+
+    deleteBtn.appendChild(deleteIcon);
 
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation(); // جلوگیری از trigger شدن click روی آیتم
       this.deleteHistoryItem(index);
     });
 
-    // Source text
-    const sourceDiv = document.createElement("div");
-    sourceDiv.className = "history-item-source";
-    sourceDiv.textContent = item.sourceText || "";
-    correctTextDirection(sourceDiv, item.sourceText || "");
+    return deleteBtn;
+  }
 
-    // Target text با پشتیبانی از Markdown
-    const targetDiv = document.createElement("div");
-    targetDiv.className = "history-item-target";
+  /**
+   * Safely render markdown content using DOM manipulation
+   */
+  createMarkdownContent(text) {
+    const container = document.createElement("div");
+
+    if (!text) {
+      return container;
+    }
 
     try {
-      const rawHtml = marked.parse(item.translatedText || "");
+      // Configure marked for security
+      const renderer = new marked.Renderer();
+      marked.setOptions({
+        renderer: renderer,
+        gfm: true,
+        breaks: true,
+        sanitize: false, // We'll use DOMPurify for sanitization
+      });
+
+      const rawHtml = marked.parse(text);
+
+      // Comprehensive sanitization
       const sanitized = DOMPurify.sanitize(rawHtml, {
         ALLOWED_TAGS: [
           "p",
@@ -153,11 +173,49 @@ export class HistoryManager {
           "br",
         ],
         ALLOWED_ATTR: ["href", "target"],
+        ALLOW_DATA_ATTR: false,
+        FORBID_TAGS: ["script", "object", "embed", "link", "style", "meta"],
+        FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
+        RETURN_DOM: true, // Return DOM instead of string
       });
-      targetDiv.innerHTML = sanitized;
-    } catch (e) {
-      targetDiv.textContent = item.translatedText || "";
+
+      // Safely append sanitized DOM nodes
+      if (sanitized && sanitized.childNodes) {
+        Array.from(sanitized.childNodes).forEach((node) => {
+          container.appendChild(node.cloneNode(true));
+        });
+      }
+    } catch (error) {
+      logME("[HistoryManager] Error parsing markdown:", error);
+      // Fallback to plain text
+      container.textContent = text;
     }
+
+    return container;
+  }
+
+  createHistoryItem(item, index) {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.dataset.index = index;
+
+    // دکمه حذف - امن
+    const deleteBtn = this.createDeleteButton(index);
+
+    // Source text
+    const sourceDiv = document.createElement("div");
+    sourceDiv.className = "history-item-source";
+    sourceDiv.textContent = item.sourceText || "";
+    correctTextDirection(sourceDiv, item.sourceText || "");
+
+    // Target text با پشتیبانی امن از Markdown
+    const targetDiv = document.createElement("div");
+    targetDiv.className = "history-item-target";
+
+    const markdownContent = this.createMarkdownContent(
+      item.translatedText || ""
+    );
+    targetDiv.appendChild(markdownContent);
 
     correctTextDirection(targetDiv, item.translatedText || "");
 
@@ -211,13 +269,11 @@ export class HistoryManager {
 
   async clearAllHistory() {
     try {
-      // استفاده از i18n برای پیام confirm
       const confirmMessage =
         (await getTranslationString("CONFIRM_CLEAR_ALL_HISTORY")) ||
         "Are you sure you want to clear all translation history?";
 
       const userConfirmed = window.confirm(confirmMessage);
-      console.log("[HistoryManager] User confirmed:", userConfirmed);
 
       if (userConfirmed) {
         await Browser.storage.local.set({ translationHistory: [] });
@@ -228,7 +284,6 @@ export class HistoryManager {
         // this.showMessage("History cleared successfully");
       }
     } catch (error) {
-      console.error("[HistoryManager] Error clearing history:", error);
       logME("[HistoryManager] Error clearing history:", error);
     }
   }

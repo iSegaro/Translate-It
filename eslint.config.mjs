@@ -54,6 +54,7 @@ export default [
         location: "readonly",
         alert: "readonly",
         URLSearchParams: "readonly",
+        MutationObserver: "readonly",
       },
     },
     plugins: {
@@ -62,8 +63,14 @@ export default [
     rules: {
       // استفاده امن از innerHTML
       "no-unsanitized/method": "error",
-      "no-unsanitized/property": "error",
-
+      "no-unsanitized/property": [
+        "error",
+        {
+          escape: {
+            methods: ["DOMPurify.sanitize"],
+          },
+        },
+      ],
       // سایر قوانین
       "no-console": "off",
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
