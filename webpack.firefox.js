@@ -6,8 +6,6 @@ const path = require("path");
 const fs = require("fs");
 const rimraf = require("rimraf");
 const CopyPlugin = require("copy-webpack-plugin");
-const { merge } = require("webpack-merge");
-const common = require("./webpack.common.js");
 const archiver = require("archiver");
 const packageJson = require("./package.json");
 
@@ -101,10 +99,62 @@ class ZipAfterBuildPlugin {
 
 const firefoxDistConfig = {
   mode: "production",
+  entry: {
+    content: [
+      "core-js/stable",
+      "regenerator-runtime/runtime",
+      "./src/content.js",
+    ],
+    background: "./src/backgrounds/background.js",
+    options: "./src/options.js",
+    popup: "./src/popup/main.js",
+    sidepanel: "./src/sidepanel/sidepanel.js",
+  },
   output: {
     path: outputFolderPath,
     filename: "[name].bundle.js",
   },
+  resolve: {
+    extensions: [".js"],
+  },
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            presets: ["@babel/preset-env"],
+            plugins: [["@babel/plugin-proposal-decorators", { legacy: true }]],
+          },
+        },
+      },
+    ],
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new (require("terser-webpack-plugin"))({
+        terserOptions: {
+          compress: {
+            evaluate: false,
+            drop_console: process.env.NODE_ENV === "production",
+            unsafe: false,
+          },
+          mangle: {
+            keep_classnames: true,
+            keep_fnames: true,
+          },
+          format: {
+            comments: false,
+          },
+        },
+        extractComments: false,
+      }),
+    ],
+  },
+  devtool: "cheap-module-source-map",
   plugins: [
     new CopyPlugin({
       patterns: [
@@ -131,7 +181,9 @@ const firefoxDistConfig = {
             return Buffer.from(JSON.stringify(manifest, null, 2));
           },
         },
-        { from: "html/*.html", to: "html/[name][ext]" },
+        { from: "html/options.html", to: "html/options.html" },
+        { from: "html/popup.html", to: "html/popup.html" },
+        { from: "html/sidepanel.html", to: "html/sidepanel.html" },
         { from: "styles/*.css", to: "styles/[name][ext]" },
         {
           from: "icons/*.png",
@@ -161,8 +213,6 @@ const firefoxDistConfig = {
             return `icons/flags/${iconName}`;
           },
         },
-        { from: "html/offscreen.html", to: "offscreen.html" },
-        { from: "src/offscreen.js", to: "offscreen.js" },
         { from: "node_modules/webextension-polyfill/dist/browser-polyfill.js" },
         { from: "_locales", to: "_locales" },
       ],
@@ -171,4 +221,4 @@ const firefoxDistConfig = {
   ],
 };
 
-module.exports = merge(common, firefoxDistConfig);
+module.exports = firefoxDistConfig;

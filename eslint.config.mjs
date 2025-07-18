@@ -4,8 +4,18 @@ import js from "@eslint/js";
 import babelParser from "@babel/eslint-parser";
 import noUnsanitized from "eslint-plugin-no-unsanitized";
 
-/** @type {import("eslint").Linter.Config[]} */
-export default [
+const browser = process.env.BROWSER || "chrome";
+
+const browserGlobals = {
+  chrome: {
+    chrome: "readonly",
+  },
+  firefox: {
+    browser: "readonly",
+  },
+};
+
+const config = [
   js.configs.recommended,
   {
     files: ["src/**/*.js"],
@@ -23,6 +33,8 @@ export default [
         },
       },
       globals: {
+        chrome: "readonly",
+        browser: "readonly",
         window: "readonly",
         document: "readonly",
         Node: "readonly",
@@ -30,7 +42,6 @@ export default [
         Audio: "readonly",
         SpeechSynthesisUtterance: "readonly",
         speechSynthesis: "readonly",
-        chrome: "readonly",
         URL: "readonly",
         fetch: "readonly",
         setTimeout: "readonly",
@@ -77,3 +88,11 @@ export default [
     },
   },
 ];
+
+if (browser === 'firefox') {
+  config.push({
+    ignores: ["src/offscreen.js"],
+  });
+}
+
+export default config;
