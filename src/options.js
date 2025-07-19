@@ -8,8 +8,7 @@ import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { applyTheme } from "./utils/theme.js";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { SimpleMarkdown } from "./utils/simpleMarkdown.js";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -229,35 +228,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const markdownText = await response.text();
-      // Sanitize the markdown output before setting innerHTML
-      const rawHtml = marked.parse(markdownText); // Convert Markdown to HTML
-      // Sanitize the HTML to prevent XSS attacks
-      const sanitized = DOMPurify.sanitize(rawHtml, {
-        RETURN_TRUSTED_TYPE: true,
-      });
-      // Use DOMParser to safely append sanitized HTML instead of direct innerHTML assignment
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitized.toString(), "text/html"); // Convert TrustedHTML to string for DOMParser
+      
+      // Use our custom markdown parser
+      const renderedContent = SimpleMarkdown.render(markdownText);
 
-      // Clear existing content and append new nodes
+      // Clear existing content and append new element
       container.textContent = ""; // Clear existing content
-      Array.from(doc.body.childNodes).forEach((node) =>
-        container.appendChild(node)
-      );
+      container.appendChild(renderedContent);
     } catch (error) {
-      // Sanitize the error message before displaying it
-      const sanitizedErrorMessage = DOMPurify.sanitize(error.message, {
-        RETURN_TRUSTED_TYPE: true,
-      });
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(
-        `<p>Could not load changelog. Error: ${sanitizedErrorMessage}</p>`,
-        "text/html"
-      );
+      // Create error message safely using DOM methods
+      const errorPara = document.createElement("p");
+      errorPara.textContent = `Could not load changelog. Error: ${error.message}`;
+      errorPara.style.color = "red";
+      
       container.textContent = "";
-      Array.from(doc.body.childNodes).forEach((node) =>
-        container.appendChild(node)
-      );
+      container.appendChild(errorPara);
 
       logME("[Options] Failed to fetch changelog:", error);
     }

@@ -855,3 +855,114 @@ legend {
   75% { transform: translateX(-5px); }
   100% { transform: translateX(0); }
 }
+
+/* Simple Markdown Styles */
+.simple-markdown {
+  line-height: 1.6;
+  color: var(--text-color);
+}
+
+.simple-markdown h1,
+.simple-markdown h2,
+.simple-markdown h3,
+.simple-markdown h4,
+.simple-markdown h5,
+.simple-markdown h6 {
+  color: var(--text-color);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.simple-markdown h1 {
+  font-size: 1.8em;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5em;
+}
+
+.simple-markdown h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.3em;
+}
+
+.simple-markdown h3 {
+  font-size: 1.3em;
+}
+
+.simple-markdown h4 {
+  font-size: 1.1em;
+}
+
+.simple-markdown h5 {
+  font-size: 1.05em;
+}
+
+.simple-markdown h6 {
+  font-size: 1em;
+  font-weight: 500;
+}
+
+.simple-markdown p {
+  margin: 0.8em 0;
+}
+
+.simple-markdown ul,
+.simple-markdown ol {
+  margin: 0.8em 0;
+  padding-left: 2em;
+}
+
+.simple-markdown li {
+  margin: 0.3em 0;
+}
+
+.simple-markdown code {
+  background-color: var(--tab-button-active-bg);
+  color: var(--text-color);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.simple-markdown pre {
+  background-color: var(--tab-button-active-bg);
+  color: var(--text-color);
+  padding: 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.simple-markdown pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.simple-markdown blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  border-left: 4px solid var(--tab-button-active-color);
+  background-color: var(--tab-button-hover-bg);
+  font-style: italic;
+}
+
+.simple-markdown a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.simple-markdown a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+.simple-markdown strong {
+  font-weight: bold;
+}
+
+.simple-markdown em {
+  font-style: italic;
+}

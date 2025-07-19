@@ -75,7 +75,7 @@ export default class TelegramStrategy extends PlatformStrategy {
         }
         await delay(50);
         // پاکسازی مستقیم محتوا
-        field.innerHTML = "";
+        field.textContent = "";
         const dt = new DataTransfer();
         dt.setData("text/plain", "");
         const pasteEvent = new ClipboardEvent("paste", {

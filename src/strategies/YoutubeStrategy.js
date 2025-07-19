@@ -121,7 +121,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
         element.value = "";
       } else {
-        element.innerHTML = "";
+        element.textContent = "";
       }
 
       this.applyVisualFeedback(element);

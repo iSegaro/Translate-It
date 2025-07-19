@@ -90,7 +90,7 @@ export default class DefaultStrategy extends PlatformStrategy {
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
         element.value = "";
       } else {
-        element.innerHTML = "";
+        element.textContent = "";
       }
     } catch (error) {
       this.errorHandler.handle(error, {

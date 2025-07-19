@@ -2,8 +2,7 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getSettingsAsync, getSourceLanguageAsync } from "../config.js";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
+import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { ApiProviderManager } from "./apiProviderManager.js";
 import { HistoryManager } from "./historyManager.js";
 
@@ -83,11 +82,13 @@ async function deactivateSelectElementMode() {
 function showSpinner() {
   if (!elements.translationResult) return;
   elements.translationResult.classList.remove("fade-in"); // حذف انیمیشن قبلی
-  elements.translationResult.innerHTML = `
-    <div class="spinner-center">
-        <div class="spinner"></div>
-    </div>
-  `;
+  elements.translationResult.textContent = "";
+  const spinnerContainer = document.createElement("div");
+  spinnerContainer.className = "spinner-center";
+  const spinner = document.createElement("div");
+  spinner.className = "spinner";
+  spinnerContainer.appendChild(spinner);
+  elements.translationResult.appendChild(spinnerContainer);
 }
 
 /**
@@ -131,8 +132,8 @@ async function initializeLanguages() {
 
     if (sourceSelect && targetSelect) {
       // پاک کردن گزینه‌های قبلی
-      sourceSelect.innerHTML = "";
-      targetSelect.innerHTML = "";
+      sourceSelect.textContent = "";
+      targetSelect.textContent = "";
 
       // افزودن گزینه "Auto-Detect" به لیست زبان مبدأ
       const autoOption = document.createElement("option");
@@ -188,7 +189,7 @@ async function handleTranslationResponse(
   sourceLangIdentifier,
   targetLangIdentifier
 ) {
-  elements.translationResult.innerHTML = "";
+  elements.translationResult.textContent = "";
 
   if (Browser.runtime.lastError) {
     elements.translationResult.textContent = Browser.runtime.lastError.message;
@@ -197,16 +198,10 @@ async function handleTranslationResponse(
 
   if (response?.success && response.data?.translatedText) {
     const translated = response.data.translatedText;
-    const rawHtml = marked.parse(translated);
-    const sanitized = DOMPurify.sanitize(rawHtml, {
-      RETURN_TRUSTED_TYPE: true,
-    });
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(sanitized.toString(), "text/html");
-
-    Array.from(doc.body.childNodes).forEach((node) =>
-      elements.translationResult.appendChild(node)
-    );
+    const markdownElement = SimpleMarkdown.render(translated);
+    if (markdownElement) {
+      elements.translationResult.appendChild(markdownElement);
+    }
     elements.translationResult.classList.add("fade-in");
     correctTextDirection(elements.translationResult, translated);
 
@@ -302,7 +297,7 @@ async function triggerTranslation() {
       targetLangIdentifier
     );
   } catch (error) {
-    elements.translationResult.innerHTML = "";
+    elements.translationResult.textContent = "";
     const fallback =
       (await getTranslationString("popup_string_translate_error_trigger")) ||
       "(⚠️ An error occurred.)";
@@ -510,16 +505,11 @@ async function loadLastTranslation() {
         correctTextDirection(elements.sourceText, sourceText);
       }
       if (translatedText) {
-        const rawHtml = marked.parse(translatedText);
-        const sanitized = DOMPurify.sanitize(rawHtml, {
-          RETURN_TRUSTED_TYPE: true,
-        });
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(sanitized.toString(), "text/html");
+        const markdownElement = SimpleMarkdown.render(translatedText);
         elements.translationResult.textContent = "";
-        Array.from(doc.body.childNodes).forEach((node) =>
-          elements.translationResult.appendChild(node)
-        );
+        if (markdownElement) {
+          elements.translationResult.appendChild(markdownElement);
+        }
         correctTextDirection(elements.translationResult, translatedText);
       }
       if (sourceLanguage) {
@@ -573,19 +563,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearAllBtn: elements.clearAllHistoryBtn, // اضافه شد
       onSelect: (item) => {
         elements.sourceText.value = item.sourceText;
-        elements.translationResult.innerHTML = "";
+        elements.translationResult.textContent = "";
 
         try {
-          const rawHtml = marked.parse(item.translatedText);
-          const sanitized = DOMPurify.sanitize(rawHtml, {
-            RETURN_TRUSTED_TYPE: true,
-          });
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(sanitized.toString(), "text/html");
-
-          Array.from(doc.body.childNodes).forEach((node) =>
-            elements.translationResult.appendChild(node)
-          );
+          const markdownElement = SimpleMarkdown.render(item.translatedText);
+          if (markdownElement) {
+            elements.translationResult.appendChild(markdownElement);
+          } else {
+            elements.translationResult.textContent = item.translatedText;
+          }
         } catch {
           elements.translationResult.textContent = item.translatedText;
         }
@@ -604,16 +590,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     logME("[SidePanel] Initialization complete");
   } catch (error) {
     logME("[SidePanel] Error during initialization:", error);
-    const safeHtml = DOMPurify.sanitize(
-      `<div style="padding: 10px; color: red;">Failed to initialize side panel. Please try reloading.</div>`,
-      { RETURN_TRUSTED_TYPE: true }
-    );
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(safeHtml.toString(), "text/html");
+    const errorDiv = document.createElement('div');
+    errorDiv.style.padding = '10px';
+    errorDiv.style.color = 'red';
+    errorDiv.textContent = 'Failed to initialize side panel. Please try reloading.';
     document.body.textContent = "";
-    Array.from(doc.body.childNodes).forEach((node) =>
-      document.body.appendChild(node)
-    );
+    document.body.appendChild(errorDiv);
   }
 });
 

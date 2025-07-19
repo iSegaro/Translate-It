@@ -8,8 +8,7 @@ import { getLanguageDisplayValue } from "./languageManager.js"; // Use lookup
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 
 async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
   try {
@@ -25,18 +24,11 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
         result.lastTranslation.sourceText
       );
 
-      const rawHtml = marked.parse(result.lastTranslation.translatedText || "");
-      const sanitized = DOMPurify.sanitize(rawHtml, {
-        RETURN_TRUSTED_TYPE: true,
-      });
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitized.toString(), "text/html");
-
+      const markdownElement = SimpleMarkdown.render(result.lastTranslation.translatedText || "");
       elements.translationResult.textContent = "";
-      Array.from(doc.body.childNodes).forEach((node) => {
-        elements.translationResult.appendChild(node);
-      });
+      if (markdownElement) {
+        elements.translationResult.appendChild(markdownElement);
+      }
 
       correctTextDirection(
         elements.translationResult,

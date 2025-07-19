@@ -2,8 +2,7 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { getTranslationString } from "../utils/i18n.js";
 
 const MAX_HISTORY_ITEMS = 100;
@@ -140,50 +139,12 @@ export class HistoryManager {
     }
 
     try {
-      // Configure marked for security
-      const renderer = new marked.Renderer();
-      marked.setOptions({
-        renderer: renderer,
-        gfm: true,
-        breaks: true,
-        sanitize: false, // We'll use DOMPurify for sanitization
-      });
-
-      const rawHtml = marked.parse(text);
-
-      // Comprehensive sanitization
-      const sanitized = DOMPurify.sanitize(rawHtml, {
-        ALLOWED_TAGS: [
-          "p",
-          "strong",
-          "em",
-          "ul",
-          "ol",
-          "li",
-          "code",
-          "pre",
-          "blockquote",
-          "h1",
-          "h2",
-          "h3",
-          "h4",
-          "h5",
-          "h6",
-          "a",
-          "br",
-        ],
-        ALLOWED_ATTR: ["href", "target"],
-        ALLOW_DATA_ATTR: false,
-        FORBID_TAGS: ["script", "object", "embed", "link", "style", "meta"],
-        FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
-        RETURN_DOM: true, // Return DOM instead of string
-      });
-
-      // Safely append sanitized DOM nodes
-      if (sanitized && sanitized.childNodes) {
-        Array.from(sanitized.childNodes).forEach((node) => {
-          container.appendChild(node.cloneNode(true));
-        });
+      // Use SimpleMarkdown for secure rendering
+      const markdownElement = SimpleMarkdown.render(text);
+      if (markdownElement) {
+        container.appendChild(markdownElement);
+      } else {
+        container.textContent = text;
       }
     } catch (error) {
       logME("[HistoryManager] Error parsing markdown:", error);

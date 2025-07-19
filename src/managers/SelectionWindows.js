@@ -7,8 +7,7 @@ import { CONFIG, TranslationMode, getThemeAsync } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -430,7 +429,7 @@ export default class SelectionWindows {
     ) {
       loadingContainer.remove();
     }
-    this.innerContainer.innerHTML = "";
+    this.innerContainer.textContent = "";
     const firstLine = document.createElement("div");
     firstLine.classList.add("first-line");
     const ttsIconOriginal = this.createTTSIcon(
@@ -450,15 +449,14 @@ export default class SelectionWindows {
     const textSpan = document.createElement("span");
     textSpan.classList.add("text-content");
     try {
-      const rawHtml = marked.parse(translatedText);
-      const sanitizedHtmlString = DOMPurify.sanitize(rawHtml);
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitizedHtmlString, "text/html");
-      Array.from(doc.body.childNodes).forEach((node) => {
-        textSpan.appendChild(node.cloneNode(true));
-      });
+      const markdownElement = SimpleMarkdown.render(translatedText);
+      if (markdownElement) {
+        textSpan.appendChild(markdownElement);
+      } else {
+        textSpan.textContent = translatedText;
+      }
     } catch (e) {
-      logME("Error parsing markdown or sanitizing HTML:", e);
+      logME("Error parsing markdown:", e);
       textSpan.textContent = translatedText;
     }
     secondLine.appendChild(textSpan);

@@ -43,9 +43,7 @@
     "archiver": "^7.0.1",
     "chalk": "^5.4.1",
     "core-js": "^3.41.0",
-    "dompurify": "^3.2.5",
     "glob": "^11.0.1",
-    "marked": "^15.0.7",
     "regenerator-runtime": "^0.14.1"
   }
 }

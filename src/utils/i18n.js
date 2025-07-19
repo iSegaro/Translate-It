@@ -5,8 +5,7 @@ import { applyElementDirection } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { SimpleMarkdown } from "./simpleMarkdown.js";
 // import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {
@@ -176,14 +175,10 @@ function localizeContainer(container, translations) {
     const markdownString = translations?.[key]?.message || Browser.i18n.getMessage(key);
 
     if (markdownString) {
-      // Sanitize is recommended for security if the content is user-generated.
-      // For internal content from messages.json, it's generally safe.
-      const rawHtml = marked.parse(markdownString, { breaks: true });
-      const sanitized = DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: true });
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitized.toString(), "text/html");
+      // Use our custom markdown parser
+      const renderedContent = SimpleMarkdown.render(markdownString);
       item.textContent = ""; // Clear existing content
-      Array.from(doc.body.childNodes).forEach((node) => item.appendChild(node));
+      item.appendChild(renderedContent);
     }
   });
 }

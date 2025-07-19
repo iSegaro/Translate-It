@@ -13,12 +13,11 @@ import {
   correctTextDirection,
   applyElementDirection,
 } from "../utils/textDetection.js";
-import { marked } from "marked";
+import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { TranslationMode } from "../config.js";
 import { getTranslationString, parseBoolean } from "../utils/i18n.js";
 import { getErrorMessageByKey } from "../services/ErrorMessages.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
-import DOMPurify from "dompurify";
 
 /**
  * Always return the original error message (untranslated).
@@ -60,19 +59,12 @@ async function handleTranslationResponse(
     elements.translationResult.classList.remove("fade-in");
     void elements.translationResult.offsetWidth;
 
-    // ساخت و درج امن با DOM API بجای innerHTML
-    const rawHtml = marked.parse(translated);
-    const sanitized = DOMPurify.sanitize(rawHtml, {
-      RETURN_TRUSTED_TYPE: true,
-    });
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(sanitized.toString(), "text/html");
-
+    // ساخت و درج امن با SimpleMarkdown
+    const markdownElement = SimpleMarkdown.render(translated);
     elements.translationResult.textContent = "";
-    Array.from(doc.body.childNodes).forEach((node) => {
-      elements.translationResult.appendChild(node);
-    });
+    if (markdownElement) {
+      elements.translationResult.appendChild(markdownElement);
+    }
     elements.translationResult.classList.add("fade-in");
 
     correctTextDirection(elements.translationResult, translated);
@@ -131,7 +123,7 @@ async function handleTranslationResponse(
     }
 
     // Clear and display error
-    elements.translationResult.innerHTML = "";
+    elements.translationResult.textContent = "";
     elements.translationResult.textContent = msg;
     correctTextDirection(elements.translationResult, msg);
 
@@ -190,25 +182,17 @@ async function triggerTranslation() {
   }
 
   // Show spinner
-  const spinnerHTML = `
-<div class="spinner-overlay">
-  <div class="spinner-center">
-    <div class="spinner"></div>
-  </div>
-</div>
-`;
-
-  const sanitized = DOMPurify.sanitize(spinnerHTML, {
-    RETURN_TRUSTED_TYPE: true,
-  });
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(sanitized.toString(), "text/html");
+  const spinnerOverlay = document.createElement("div");
+  spinnerOverlay.className = "spinner-overlay";
+  const spinnerCenter = document.createElement("div");
+  spinnerCenter.className = "spinner-center";
+  const spinner = document.createElement("div");
+  spinner.className = "spinner";
+  spinnerCenter.appendChild(spinner);
+  spinnerOverlay.appendChild(spinnerCenter);
 
   elements.translationResult.textContent = "";
-  Array.from(doc.body.childNodes).forEach((node) => {
-    elements.translationResult.appendChild(node);
-  });
+  elements.translationResult.appendChild(spinnerOverlay);
 
   uiManager.toggleInlineToolbarVisibility(elements.translationResult);
 
@@ -244,7 +228,7 @@ async function triggerTranslation() {
       "(⚠️ خطایی در ترجمه پاپ‌آپ رخ داد.)";
     const errMsg = extractErrorMessage(error) || fallback;
 
-    elements.translationResult.innerHTML = "";
+    elements.translationResult.textContent = "";
     elements.translationResult.textContent = errMsg;
     correctTextDirection(elements.translationResult, errMsg);
 
