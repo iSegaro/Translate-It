@@ -46,7 +46,22 @@ export default class DefaultStrategy extends PlatformStrategy {
 
         if (element.isContentEditable) {
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          const trustedHTML = filterXSS(htmlText);
+          const trustedHTML = filterXSS(htmlText, {
+            whiteList: {
+              br: []
+            },
+            stripIgnoreTag: true,
+            stripIgnoreTagBody: ['script', 'style'],
+            onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
+              // Block javascript: and data: URLs
+              if (name === 'href' || name === 'src') {
+                if (value.match(/^(javascript|data|vbscript):/i)) {
+                  return '';
+                }
+              }
+              return false;
+            }
+          });
 
           const parser = new DOMParser();
           const doc = parser.parseFromString(

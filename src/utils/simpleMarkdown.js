@@ -1,18 +1,27 @@
 // src/utils/simpleMarkdown.js
 // Simple, secure markdown parser for basic formatting
 
+import { filterXSS } from "xss";
+
 export class SimpleMarkdown {
   static render(markdown) {
     if (!markdown || typeof markdown !== 'string') {
       return '';
     }
 
+    // Sanitize input to prevent XSS attacks
+    const sanitizedMarkdown = filterXSS(markdown, {
+      whiteList: {}, // No HTML tags allowed in input
+      stripIgnoreTag: true,
+      stripIgnoreTagBody: ['script']
+    });
+
     // Create a container div
     const container = document.createElement('div');
     container.className = 'simple-markdown';
     
     // Split into lines for processing
-    const lines = markdown.split('\n');
+    const lines = sanitizedMarkdown.split('\n');
     let currentSection = null;
     let listItems = [];
     
@@ -196,9 +205,22 @@ export class SimpleMarkdown {
       const element = document.createElement(match.tag);
       element.textContent = match.content;
       if (match.href) {
-        element.href = match.href;
-        element.target = '_blank';
-        element.rel = 'noopener noreferrer';
+        // Sanitize URL to prevent javascript: and data: schemes
+        const sanitizedHref = filterXSS(match.href, {
+          whiteList: {},
+          stripIgnoreTag: true,
+          stripIgnoreTagBody: ['script']
+        });
+        
+        // Only allow http/https URLs
+        if (sanitizedHref.match(/^https?:\/\//)) {
+          element.href = sanitizedHref;
+          element.target = '_blank';
+          element.rel = 'noopener noreferrer';
+        } else {
+          // If URL is not safe, just show as text
+          element.removeAttribute('href');
+        }
       }
       span.appendChild(element);
       

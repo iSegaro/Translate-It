@@ -449,14 +449,18 @@ export default class SelectionWindows {
     const textSpan = document.createElement("span");
     textSpan.classList.add("text-content");
     try {
+      // Ensure translatedText is safely rendered through SimpleMarkdown
+      // which already includes XSS protection via filterXSS
       const markdownElement = SimpleMarkdown.render(translatedText);
       if (markdownElement) {
         textSpan.appendChild(markdownElement);
       } else {
+        // Fallback to safe text content if markdown rendering fails
         textSpan.textContent = translatedText;
       }
     } catch (e) {
       logME("Error parsing markdown:", e);
+      // Always use textContent for safe text rendering
       textSpan.textContent = translatedText;
     }
     secondLine.appendChild(textSpan);
@@ -498,6 +502,7 @@ export default class SelectionWindows {
     }
     if (this.innerContainer) {
       const errorMsgElement = document.createElement("div");
+      // Use textContent to safely display error message
       errorMsgElement.textContent =
         CONFIG.ICON_ERROR + "Translation failed. Please try again.";
       errorMsgElement.style.color = "var(--sw-text-color)";
