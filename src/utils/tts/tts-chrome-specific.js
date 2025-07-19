@@ -1,5 +1,4 @@
 // src/utils/tts-chrome-specific.js
-import Browser from "webextension-polyfill";
 import { logME } from "../helpers.js";
 import { languageList } from "../languages.js";
 
@@ -157,15 +156,15 @@ export async function playAudioViaOffscreen(url) {
 
   // ارسال پیام برای پخش صدا
   return new Promise((resolve, reject) => {
-    Browser.runtime.sendMessage(
+    chrome.runtime.sendMessage(
       {
         action: "playOffscreenAudio",
         url: url,
       },
       (response) => {
-        if (Browser.runtime.lastError) {
-          logME("[TTS:Offscreen] Runtime error:", Browser.runtime.lastError);
-          reject(new Error(Browser.runtime.lastError.message));
+        if (chrome.runtime.lastError) {
+          logME("[TTS:Offscreen] Runtime error:", chrome.runtime.lastError);
+          reject(new Error(chrome.runtime.lastError.message));
         } else if (!response || !response.success) {
           logME("[TTS:Offscreen] Response error:", response);
           reject(new Error(response?.error || "Unknown offscreen error"));

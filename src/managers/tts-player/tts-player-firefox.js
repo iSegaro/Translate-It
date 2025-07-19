@@ -56,9 +56,20 @@ export async function playTTS(message) {
         activeTTS = null;
       });
   } catch (err) {
-    logME("[TTS Firefox] Google TTS failed, using Web Speech API fallback.", err);
+    logME("[TTS Firefox] Google TTS failed, checking if Web Speech API should be used.", err);
     
-    // Fallback to Web Speech API
+    // Check if this is a language support error - if so, don't use fallback
+    const errorMessage = err?.message || err?.toString() || "";
+    const isLanguageError = errorMessage.includes("NS_BINDING_ABORTED") || 
+                           errorMessage.includes("not suitable") ||
+                           err?.target?.error?.code === 4; // MEDIA_ELEMENT_ERROR: MEDIA_ERR_SRC_NOT_SUPPORTED
+    
+    if (isLanguageError) {
+      logME(`[TTS Firefox] Language '${lang}' not supported by Google TTS. Skipping Web Speech API fallback to avoid language warning.`);
+      throw new Error(`Language '${lang}' not supported for TTS`);
+    }
+    
+    // Fallback to Web Speech API for other errors
     const speechLang = getSpeechApiLangCode(lang) || lang;
     logME("[TTS Firefox] Using Web Speech API with language:", speechLang);
     

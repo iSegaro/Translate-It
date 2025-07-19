@@ -1,7 +1,6 @@
 // src/managers/tts-player-chrome.js
 // Chrome-specific TTS player with offscreen support
 
-import Browser from "webextension-polyfill";
 import { logME } from "../../utils/helpers.js";
 import {
   AUTO_DETECT_VALUE,
@@ -123,11 +122,19 @@ async function stopAudioViaOffscreen() {
     const docExists = await chrome.offscreen.hasDocument();
     if (!docExists) return;
 
-    await Browser.runtime.sendMessage({
-      action: "stopOffscreenAudio",
+    await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: "stopOffscreenAudio",
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
 
-    await Browser.offscreen.closeDocument();
+    await chrome.offscreen.closeDocument();
     logME("[TTS Chrome] Offscreen stopped and closed.");
   } catch (err) {
     logME("[TTS Chrome] Error stopping offscreen audio:", err);

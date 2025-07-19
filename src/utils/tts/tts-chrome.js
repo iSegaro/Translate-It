@@ -1,7 +1,6 @@
 // src/utils/tts-chrome.js
 // Chrome-specific TTS utilities
 
-import Browser from "webextension-polyfill";
 import { logME } from "../helpers.js";
 import { languageList } from "../languages.js";
 
@@ -94,12 +93,20 @@ export async function playAudioViaOffscreen(url) {
   }
 
   try {
-    const response = await Browser.runtime.sendMessage({
-      action: "playOffscreenAudio",
-      url,
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: "playOffscreenAudio",
+        url,
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
 
-    await Browser.offscreen.closeDocument();
+    await chrome.offscreen.closeDocument();
 
     if (!response || !response.success) {
       throw new Error(response?.error || "Playback failed via offscreen.");
@@ -108,7 +115,7 @@ export async function playAudioViaOffscreen(url) {
     return { success: true };
   } catch (err) {
     try {
-      await Browser.offscreen.closeDocument();
+      await chrome.offscreen.closeDocument();
     } catch  {
       // ignore
     }
