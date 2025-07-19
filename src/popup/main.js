@@ -2,7 +2,7 @@
 
 import { logME } from "../utils/helpers.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
-import DOMPurify from "dompurify";
+import { filterXSS } from "xss";
 
 // Import Managers/Handlers
 import * as languageManager from "./languageManager.js";
@@ -74,13 +74,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     logME("[Popup Main]: All modules initialized successfully.");
   } catch (error) {
     logME("[Popup Main]: Error during initialization:", error);
-    const safeHtml = DOMPurify.sanitize(
-      `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`,
-      { RETURN_TRUSTED_TYPE: true }
+    const safeHtml = filterXSS(
+      `<div style="padding: 10px; color: red;">[AIWC] Failed to initialize extension popup. Please try reloading.</div>`
     );
 
     const parser = new DOMParser();
-    const doc = parser.parseFromString(safeHtml.toString(), "text/html");
+    const doc = parser.parseFromString(safeHtml, "text/html");
 
     document.body.textContent = "";
     Array.from(doc.body.childNodes).forEach((node) =>

@@ -2,7 +2,7 @@
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
-import DOMPurify from "dompurify";
+import { filterXSS } from "xss";
 
 export default class InstagramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -30,12 +30,10 @@ export default class InstagramStrategy extends PlatformStrategy {
         this.triggerStateUpdate(element);
         this.applyVisualFeedback(element);
       } else if (element.isContentEditable) {
-        const trustedHTML = DOMPurify.sanitize(translatedText, {
-          RETURN_TRUSTED_TYPE: true,
-        });
+        const trustedHTML = filterXSS(translatedText);
 
         const parser = new DOMParser();
-        const doc = parser.parseFromString(trustedHTML.toString(), "text/html");
+        const doc = parser.parseFromString(trustedHTML, "text/html");
 
         element.textContent = "";
         Array.from(doc.body.childNodes).forEach((node) => {

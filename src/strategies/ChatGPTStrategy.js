@@ -3,7 +3,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { setCursorToEnd } from "../utils/simulate_events.js";
 import { CONFIG } from "../config";
-import DOMPurify from "dompurify";
+import { filterXSS } from "xss";
 
 export default class ChatGPTStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -78,12 +78,10 @@ export default class ChatGPTStrategy extends PlatformStrategy {
       }
 
       const htmlWithBreaks = translated.replace(/\n/g, "<br>");
-      const sanitized = DOMPurify.sanitize(htmlWithBreaks, {
-        RETURN_TRUSTED_TYPE: true,
-      });
+      const sanitized = filterXSS(htmlWithBreaks);
 
       const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitized.toString(), "text/html");
+      const doc = parser.parseFromString(sanitized, "text/html");
 
       element.textContent = "";
       Array.from(doc.body.childNodes).forEach((node) => {

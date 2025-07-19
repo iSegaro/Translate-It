@@ -2,7 +2,7 @@
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { logME } from "../utils/helpers.js";
-import DOMPurify from "dompurify";
+import { filterXSS } from "xss";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -76,13 +76,11 @@ export default class YoutubeStrategy extends PlatformStrategy {
         if (element.isContentEditable) {
           // برای عناصر contentEditable از <br> استفاده کنید
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          const trustedHTML = DOMPurify.sanitize(htmlText, {
-            RETURN_TRUSTED_TYPE: true,
-          });
+          const trustedHTML = filterXSS(htmlText);
 
           const parser = new DOMParser();
           const doc = parser.parseFromString(
-            trustedHTML.toString(),
+            trustedHTML,
             "text/html"
           );
 

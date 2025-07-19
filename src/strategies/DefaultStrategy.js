@@ -3,7 +3,7 @@
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers.js";
-import DOMPurify from "dompurify";
+import { filterXSS } from "xss";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -46,13 +46,11 @@ export default class DefaultStrategy extends PlatformStrategy {
 
         if (element.isContentEditable) {
           const htmlText = translatedText.replace(/\n/g, "<br>");
-          const trustedHTML = DOMPurify.sanitize(htmlText, {
-            RETURN_TRUSTED_TYPE: true,
-          });
+          const trustedHTML = filterXSS(htmlText);
 
           const parser = new DOMParser();
           const doc = parser.parseFromString(
-            trustedHTML.toString(),
+            trustedHTML,
             "text/html"
           );
 
