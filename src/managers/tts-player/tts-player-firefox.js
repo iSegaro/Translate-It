@@ -1,15 +1,15 @@
 // src/managers/tts-player-firefox.js  
 // Firefox-specific TTS player with direct Google TTS
 
-import { logME } from "../utils/helpers.js";
+import { logME } from "../../utils/helpers.js";
 import {
   AUTO_DETECT_VALUE,
   playAudioGoogleTTS,
-  playAudioWebSpeech,
+  playAudioWebSpeechAPI as playAudioWebSpeech,
   getSpeechApiLangCode,
-} from "../utils/tts-firefox.js";
-import { detectTextLanguage } from "../utils/textDetection.js";
-import { resolveLangCode } from "../utils/langUtils.js";
+} from "tts-utils";
+import { detectTextLanguage } from "../../utils/textDetection.js";
+import { resolveLangCode } from "../../utils/langUtils.js";
 
 let activeTTS = null;
 

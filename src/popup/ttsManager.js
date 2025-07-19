@@ -1,7 +1,7 @@
 // src/popup/ttsManager.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
-import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 
 function setupEventListeners() {
   const sourceLanguageInput = document.querySelector("#sourceLanguageInput");

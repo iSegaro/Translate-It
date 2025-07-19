@@ -3,7 +3,7 @@ import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
 import { languageList } from "../utils/languages.js";
 import { getTargetLanguageAsync, getSourceLanguageAsync } from "../config.js";
-import { AUTO_DETECT_VALUE, getLanguageCode } from "../utils/tts.js"; // getLanguageCode might be needed
+import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils"; // getLanguageCode might be needed
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 

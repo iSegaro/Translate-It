@@ -7,7 +7,7 @@ import {
   getLanguagePromptName,
   getLanguageDisplayValue,
 } from "./languageManager.js"; // Use lookup from lang manager
-import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js"; // For saving storage
+import { getLanguageCode, AUTO_DETECT_VALUE } from "tts-utils"; // For saving storage
 import { logME } from "../utils/helpers.js";
 import {
   correctTextDirection,

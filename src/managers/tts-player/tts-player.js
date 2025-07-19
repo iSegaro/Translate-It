@@ -3,7 +3,7 @@
 
 import * as chromePlayer from "./tts-player-chrome.js";
 import * as firefoxPlayer from "./tts-player-firefox.js";
-import { isFirefox } from "../utils/browserCompat.js";
+import { isFirefox } from "../../utils/browserCompat.js";
 
 let ttsPlayer = null;
 let browserType = null;

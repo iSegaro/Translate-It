@@ -2,14 +2,14 @@
 // Chrome-specific TTS player with offscreen support
 
 import Browser from "webextension-polyfill";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../../utils/helpers.js";
 import {
   AUTO_DETECT_VALUE,
   playAudioViaOffscreen,
   playAudioChromeTTS,
-} from "../utils/tts-chrome.js";
-import { detectTextLanguage } from "../utils/textDetection.js";
-import { resolveLangCode } from "../utils/langUtils.js";
+} from "tts-utils";
+import { detectTextLanguage } from "../../utils/textDetection.js";
+import { resolveLangCode } from "../../utils/langUtils.js";
 
 let activeTTS = null;
 

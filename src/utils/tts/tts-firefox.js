@@ -1,7 +1,7 @@
 // src/utils/tts-firefox.js
 // Firefox-specific TTS utilities
 
-import { languageList } from "./languages.js";
+import { languageList } from "../languages.js";
 
 export const AUTO_DETECT_VALUE = "Auto Detect";
 

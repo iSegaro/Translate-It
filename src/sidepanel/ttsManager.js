@@ -1,6 +1,6 @@
 // src/sidepanel/ttsManager.js
 import Browser from "webextension-polyfill";
-import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 
 async function speakText(text, lang) {
   if (!text) return;

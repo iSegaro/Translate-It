@@ -5,7 +5,7 @@ import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { CONFIG, TranslationMode, getThemeAsync } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
-import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 

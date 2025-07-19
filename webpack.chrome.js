@@ -105,7 +105,7 @@ const chromeDistConfig = {
       "regenerator-runtime/runtime",
       "./src/content.js",
     ],
-    background: "./src/backgrounds/background.js",
+    background: "./src/backgrounds/background-chrome.js",
     options: "./src/options.js",
     popup: "./src/popup/main.js",
     sidepanel: "./src/sidepanel/sidepanel.js",
@@ -117,6 +117,10 @@ const chromeDistConfig = {
   },
   resolve: {
     extensions: [".js"],
+    alias: {
+      "tts-utils": path.resolve(__dirname, "src/utils/tts/tts-chrome-specific.js"),
+      "tts-player": path.resolve(__dirname, "src/managers/tts-player/tts-player-chrome.js"),
+    },
   },
   module: {
     rules: [

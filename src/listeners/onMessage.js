@@ -20,7 +20,7 @@ import {
   handleRevertBackground,
 } from "../handlers/backgroundHandlers.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
-import { playTTS, stopTTS } from "../managers/tts-player.js";
+import { playTTS, stopTTS } from "tts-player";
 import { setupContextMenus } from "./onContextMenu.js";
 import { openSidePanel } from "../sidepanel/action-helpers.js";
 

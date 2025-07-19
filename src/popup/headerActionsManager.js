@@ -2,7 +2,7 @@
 import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import { Active_SelectElement } from "../utils/select_element.js";
-import { AUTO_DETECT_VALUE, getLanguageCode } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 import { getTargetLanguageAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js";
 import * as uiManager from "./uiManager.js";

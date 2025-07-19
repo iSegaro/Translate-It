@@ -5,7 +5,7 @@ import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
 import { getTargetLanguageAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js"; // Use lookup
-import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";

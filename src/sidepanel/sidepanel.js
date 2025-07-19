@@ -16,7 +16,7 @@ import {
 } from "../popup/languageManager.js";
 import { languageList } from "../utils/languages.js";
 import { getTargetLanguageAsync } from "../config.js";
-import { getLanguageCode, AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { getLanguageCode, AUTO_DETECT_VALUE } from "tts-utils";
 import {
   correctTextDirection,
   applyElementDirection,

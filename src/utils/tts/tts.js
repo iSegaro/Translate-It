@@ -1,7 +1,7 @@
 // src/utils/tts.js
 import Browser from "webextension-polyfill";
-import { logME } from "../utils/helpers.js";
-import { languageList } from "./languages.js";
+import { logME } from "../helpers.js";
+import { languageList } from "../languages.js";
 
 // --- Voice Functions ---
 export const AUTO_DETECT_VALUE = "Auto Detect"; // مقدار ثابت برای تشخیص خودکار

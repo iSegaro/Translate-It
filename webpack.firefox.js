@@ -105,7 +105,7 @@ const firefoxDistConfig = {
       "regenerator-runtime/runtime",
       "./src/content.js",
     ],
-    background: "./src/backgrounds/background.js",
+    background: "./src/backgrounds/background-firefox.js",
     options: "./src/options.js",
     popup: "./src/popup/main.js",
     sidepanel: "./src/sidepanel/sidepanel.js",
@@ -116,6 +116,10 @@ const firefoxDistConfig = {
   },
   resolve: {
     extensions: [".js"],
+    alias: {
+      "tts-utils": path.resolve(__dirname, "src/utils/tts/tts-firefox-specific.js"),
+      "tts-player": path.resolve(__dirname, "src/managers/tts-player/tts-player-firefox.js"),
+    },
   },
   module: {
     rules: [

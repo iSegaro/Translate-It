@@ -26,9 +26,8 @@ import {
 import { delay, isExtensionContextValid, logME } from "../utils/helpers.js";
 import { buildPrompt } from "../utils/promptBuilder.js";
 import { isPersianText } from "../utils/textDetection.js";
-import { AUTO_DETECT_VALUE } from "../utils/tts.js";
+import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { getLanguageCode } from "../utils/tts.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";

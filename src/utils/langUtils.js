@@ -2,7 +2,7 @@
 
 import { logME } from "./helpers.js";
 import { detectTextLanguage } from "./textDetection.js";
-import { AUTO_DETECT_VALUE } from "./tts.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 import { getLanguageInfoFromName } from "./textDetection.js";
 
 /**
