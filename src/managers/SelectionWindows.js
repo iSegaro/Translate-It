@@ -27,12 +27,88 @@ export default class SelectionWindows {
     this.iconClickContext = null;
     this.isIconMode = false; // Track current mode
     this.pendingTranslationWindow = false; // Flag to prevent immediate dismissal
+    
+    // Drag functionality
+    this.isDragging = false;
+    this.dragOffset = { x: 0, y: 0 };
+    this.dragHandle = null;
+    
+    // Cross-iframe dismiss functionality - removed complex system
 
     this.show = this.show.bind(this);
     this.cancelCurrentTranslation = this.cancelCurrentTranslation.bind(this);
     this._handleThemeChange = this._handleThemeChange.bind(this);
     this.onIconClick = this.onIconClick.bind(this);
     this._onOutsideClick = this._onOutsideClick.bind(this);
+    this._onMouseDown = this._onMouseDown.bind(this);
+    this._onMouseMove = this._onMouseMove.bind(this);
+    this._onMouseUp = this._onMouseUp.bind(this);
+  }
+
+  _getTopDocument() {
+    // Try to get the topmost document accessible
+    let currentWindow = window;
+    let topDocument = document;
+    
+    try {
+      // Traverse up the window hierarchy
+      while (currentWindow.parent !== currentWindow) {
+        try {
+          // Test if we can access the parent document
+          const parentDoc = currentWindow.parent.document;
+          if (parentDoc) {
+            topDocument = parentDoc;
+            currentWindow = currentWindow.parent;
+          } else {
+            break;
+          }
+        } catch {
+          // Cross-origin restriction, can't go higher
+          break;
+        }
+      }
+    } catch (e) {
+      // If anything fails, use current document
+      console.warn('[SelectionWindows] Could not access top document, using current:', e);
+    }
+    
+    return topDocument;
+  }
+
+  _calculateCoordsForTopWindow(position) {
+    // If we're in an iframe, we need to adjust coordinates
+    if (window !== window.top) {
+      try {
+        let totalOffsetX = position.x;
+        let totalOffsetY = position.y;
+        let currentWindow = window;
+        
+        // Add iframe offsets up the chain
+        while (currentWindow.parent !== currentWindow) {
+          try {
+            const frameElement = currentWindow.frameElement;
+            if (frameElement) {
+              const frameRect = frameElement.getBoundingClientRect();
+              const parentWindow = currentWindow.parent;
+              totalOffsetX += frameRect.left + parentWindow.scrollX;
+              totalOffsetY += frameRect.top + parentWindow.scrollY;
+              currentWindow = parentWindow;
+            } else {
+              break;
+            }
+          } catch {
+            // Cross-origin restriction
+            break;
+          }
+        }
+        
+        return { x: totalOffsetX, y: totalOffsetY };
+      } catch (e) {
+        console.warn('[SelectionWindows] Could not calculate top window coords:', e);
+      }
+    }
+    
+    return position;
   }
 
   async _applyThemeToHost() {
@@ -108,14 +184,24 @@ export default class SelectionWindows {
 
     const iconUrl = Browser.runtime.getURL("icons/extension_icon_32.png");
 
+    // Calculate position for iframe escape
+    const iconPosition = this._calculateCoordsForTopWindow({
+      x: window.scrollX + rect.left + rect.width / 2 - 12,
+      y: window.scrollY + rect.bottom + 5
+    });
+
+    // Get top window for positioning
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+
     // --- شروع تغییرات برای افزودن انیمیشن ---
 
     // 1. تعریف استایل‌های اولیه (حالت شروع انیمیشن)
     Object.assign(this.icon.style, {
-      position: "absolute",
+      position: "fixed", // Use fixed for iframe escape
       zIndex: "2147483647",
-      left: `${window.scrollX + rect.left + rect.width / 2 - 12}px`,
-      top: `${window.scrollY + rect.bottom + 5}px`,
+      left: `${iconPosition.x - topWindow.scrollX}px`,
+      top: `${iconPosition.y - topWindow.scrollY}px`,
       width: "24px",
       height: "24px",
       backgroundColor: "#f0f0f0",
@@ -136,8 +222,9 @@ export default class SelectionWindows {
         "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
     });
 
-    // 2. افزودن آیکون به صفحه
-    document.body.appendChild(this.icon);
+    // 2. افزودن آیکون به صفحه (top document برای iframe escape)
+    const iconTopDocument = this._getTopDocument();
+    iconTopDocument.body.appendChild(this.icon);
 
     // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
     setTimeout(() => {
@@ -237,7 +324,12 @@ export default class SelectionWindows {
         .loading-container { display: flex; justify-content: center; align-items: center; color: var(--sw-text-color); }
         @keyframes blink { 0% { opacity: var(--sw-loading-dot-opacity-start); } 50% { opacity: var(--sw-loading-dot-opacity-mid); } 100% { opacity: var(--sw-loading-dot-opacity-start); } }
         .loading-dot { font-size: 1.2em; margin: 0 2px; animation: blink 0.7s infinite; }
-        .first-line { margin-bottom: 6px; display: flex; align-items: center; }
+        .first-line { margin-bottom: 6px; display: flex; align-items: center; cursor: move; 
+          user-select: none; padding: 6px 8px; margin: -8px -12px 6px -12px; 
+          background-color: var(--sw-border-color); border-radius: 4px 4px 0 0; 
+          border-bottom: 1px solid var(--sw-border-color); opacity: 0.9;
+        }
+        .first-line:hover { opacity: 1; }
         .original-text { font-weight: bold; margin-left: 6px; color: var(--sw-original-text-color); }
         .second-line { margin-top: 4px; }
         .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; vertical-align: middle; }
@@ -253,8 +345,14 @@ export default class SelectionWindows {
     shadowRoot.appendChild(this.innerContainer);
     const loading = this.createLoadingDots();
     this.innerContainer.appendChild(loading);
-    document.body.appendChild(this.displayElement);
+    
+    // Get the top-level document to escape iframe constraints
+    const topDocument = this._getTopDocument();
+    topDocument.body.appendChild(this.displayElement);
     this.isVisible = true;
+
+    // Add drag functionality
+    this._setupDragHandlers();
 
     requestAnimationFrame(() => {
       if (this.displayElement) {
@@ -328,24 +426,22 @@ export default class SelectionWindows {
 
     // Handle translation window mode
     if (this.displayElement && this.isVisible) {
-      // Check if the click is outside the displayElement AND not on any potential new icon
-      // (though in window mode, an icon shouldn't exist simultaneously)
-      const clickedIcon = document.getElementById("translate-it-icon");
-      if (
-        !this.displayElement.contains(e.target) &&
-        (!clickedIcon || !clickedIcon.contains(e.target))
-      ) {
-        // Add small delay for better UX, and re-check visibility
-        setTimeout(() => {
-          if (
-            this.isVisible &&
-            !this.pendingTranslationWindow &&
-            this.displayElement &&
-            !this.displayElement.contains(document.activeElement)
-          ) {
-            this.cancelCurrentTranslation();
-          }
-        }, 50);
+      // Get top document for proper element checking
+      const topDocument = this._getTopDocument();
+      
+      // Check if click target is outside our popup
+      // Since popup is in top document, we can directly check contains
+      const isClickInsidePopup = this.displayElement.contains(e.target);
+      
+      // Check for potential icon clicks (shouldn't exist in window mode but safety check)
+      const clickedIcon = topDocument.getElementById("translate-it-icon");
+      const isClickOnIcon = clickedIcon && clickedIcon.contains(e.target);
+      
+      // If click is outside popup and not on icon, dismiss
+      if (!isClickInsidePopup && !isClickOnIcon) {
+        // Immediate dismissal for outside clicks - no need for complex checks
+        // since we're now properly handling cross-iframe scenarios
+        this.cancelCurrentTranslation();
       }
     }
   }
@@ -356,19 +452,20 @@ export default class SelectionWindows {
     // Remove existing listener first
     this._removeOutsideClickListener();
 
-    // Add new listener
-    // Using 'mousedown' can sometimes be more reliable for catching clicks
-    // that might be stopped by other handlers before 'click' fires.
-    // However, 'click' is generally fine. We'll stick to 'click' as it was.
-    document.addEventListener("click", this._onOutsideClick, { capture: true });
+    // Get top document - this is where popup exists and where we should listen
+    const topDocument = this._getTopDocument();
+
+    // Only add listener to top document since popup is always there
+    topDocument.addEventListener("click", this._onOutsideClick, { capture: true });
 
     // Store removal function
     this.removeMouseDownListener = () => {
-      document.removeEventListener("click", this._onOutsideClick, {
+      topDocument.removeEventListener("click", this._onOutsideClick, {
         capture: true,
       });
     };
   }
+
 
   _removeOutsideClickListener() {
     if (this.removeMouseDownListener) {
@@ -392,16 +489,242 @@ export default class SelectionWindows {
   }
 
   applyInitialStyles(position) {
+    // Calculate coordinates relative to top window if in iframe
+    const topWindowPosition = this._calculateCoordsForTopWindow(position);
+    
+    // Calculate smart position that stays within viewport
+    const smartPosition = this.calculateSmartPosition(topWindowPosition);
+    
+    // Get top document for proper viewport calculations
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    
     Object.assign(this.displayElement.style, {
-      position: "absolute",
-      zIndex: "2147483637",
-      left: `${position.x}px`,
-      top: `${position.y}px`,
+      position: "fixed", // Use fixed instead of absolute to escape iframe constraints
+      zIndex: "2147483647", // Maximum z-index to ensure it's always on top
+      left: `${smartPosition.x - topWindow.scrollX}px`, // Adjust for scroll since we're using fixed
+      top: `${smartPosition.y - topWindow.scrollY}px`, // Adjust for scroll since we're using fixed
       transform: "scale(0.1)",
-      transformOrigin: "top left",
+      transformOrigin: smartPosition.origin,
       opacity: "0",
       transition: `transform 0.1s ease-out, opacity ${this.fadeInDuration}ms ease-in-out`,
     });
+  }
+
+  calculateSmartPosition(position) {
+    // Get top window for proper viewport calculations
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    
+    // Get viewport dimensions from top window
+    const viewport = {
+      width: topWindow.innerWidth,
+      height: topWindow.innerHeight,
+      scrollX: topWindow.scrollX,
+      scrollY: topWindow.scrollY
+    };
+
+    // Estimated popup dimensions (will be refined after DOM insertion)
+    const popupWidth = 320; // Slightly larger than max-width: 300px + padding
+    const popupHeight = 120; // Estimated height for typical translations
+
+    // Calculate available space in each direction
+    const spaceRight = viewport.width - (position.x - viewport.scrollX);
+    const spaceLeft = position.x - viewport.scrollX;
+    const spaceBelow = viewport.height - (position.y - viewport.scrollY);
+    const spaceAbove = position.y - viewport.scrollY;
+
+    let finalX = position.x;
+    let finalY = position.y;
+    let transformOrigin = "top left";
+
+    // Horizontal positioning logic
+    if (spaceRight >= popupWidth) {
+      // Enough space on the right
+      finalX = position.x;
+    } else if (spaceLeft >= popupWidth) {
+      // Not enough space on right, try left
+      finalX = position.x - popupWidth;
+      transformOrigin = transformOrigin.replace("left", "right");
+    } else {
+      // Not enough space on either side, position to fit within viewport
+      const maxRight = viewport.scrollX + viewport.width - popupWidth - 10; // 10px margin
+      const minLeft = viewport.scrollX + 10; // 10px margin
+      finalX = Math.max(minLeft, Math.min(position.x, maxRight));
+      transformOrigin = "top center";
+    }
+
+    // Vertical positioning logic
+    if (spaceBelow >= popupHeight) {
+      // Enough space below
+      finalY = position.y;
+    } else if (spaceAbove >= popupHeight) {
+      // Not enough space below, try above
+      finalY = position.y - popupHeight - 10; // 10px gap from selection
+      transformOrigin = transformOrigin.replace("top", "bottom");
+    } else {
+      // Not enough space above or below, position to fit within viewport
+      const maxBottom = viewport.scrollY + viewport.height - popupHeight - 10; // 10px margin
+      const minTop = viewport.scrollY + 10; // 10px margin
+      finalY = Math.max(minTop, Math.min(position.y, maxBottom));
+      
+      // Adjust transform origin based on final position relative to selection
+      if (finalY < position.y) {
+        transformOrigin = transformOrigin.replace("top", "bottom");
+      }
+    }
+
+    // Handle fixed/sticky elements by checking for overlaps
+    finalY = this.adjustForFixedElements(finalX, finalY, popupWidth, popupHeight);
+
+    return {
+      x: finalX,
+      y: finalY,
+      origin: transformOrigin
+    };
+  }
+
+  adjustForFixedElements(x, y, width, height) {
+    // Get top document and window for proper element detection
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    
+    // Get all fixed and sticky positioned elements from top document
+    const fixedElements = Array.from(topDocument.querySelectorAll('*')).filter(el => {
+      const style = topWindow.getComputedStyle(el);
+      return style.position === 'fixed' || style.position === 'sticky';
+    });
+
+    const popupRect = {
+      left: x - topWindow.scrollX,
+      top: y - topWindow.scrollY,
+      right: (x - topWindow.scrollX) + width,
+      bottom: (y - topWindow.scrollY) + height
+    };
+
+    for (const element of fixedElements) {
+      const rect = element.getBoundingClientRect();
+      
+      // Skip if element is not visible or has no dimensions
+      if (rect.width === 0 || rect.height === 0 || 
+          rect.left >= window.innerWidth || rect.top >= window.innerHeight ||
+          rect.right <= 0 || rect.bottom <= 0) {
+        continue;
+      }
+
+      // Check for overlap
+      const isOverlapping = !(
+        popupRect.right <= rect.left ||
+        popupRect.left >= rect.right ||
+        popupRect.bottom <= rect.top ||
+        popupRect.top >= rect.bottom
+      );
+
+      if (isOverlapping) {
+        // Try to reposition below the fixed element
+        const newY = window.scrollY + rect.bottom + 10;
+        const spaceBelow = window.innerHeight - (rect.bottom + 10);
+        
+        if (spaceBelow >= height) {
+          return newY;
+        } else {
+          // Try above the fixed element
+          const newYAbove = window.scrollY + rect.top - height - 10;
+          if (rect.top >= height + 10) {
+            return newYAbove;
+          }
+        }
+      }
+    }
+
+    return y;
+  }
+
+
+  _setupDragHandlers() {
+    // We'll set up drag handlers when first-line is created in transitionToTranslatedText
+    // This method is called early before content is ready
+  }
+
+  _onMouseDown(e) {
+    if (!this.displayElement) return;
+    
+    this.isDragging = true;
+    const rect = this.displayElement.getBoundingClientRect();
+    this.dragOffset.x = e.clientX - rect.left;
+    this.dragOffset.y = e.clientY - rect.top;
+    
+    // Get top document for proper event handling
+    const topDocument = this._getTopDocument();
+    
+    // Add global listeners
+    topDocument.addEventListener('mousemove', this._onMouseMove);
+    topDocument.addEventListener('mouseup', this._onMouseUp);
+    
+    // Prevent text selection during drag
+    e.preventDefault();
+    
+    // Add visual feedback
+    if (this.dragHandle) {
+      this.dragHandle.style.opacity = '1';
+    }
+  }
+
+  _onMouseMove(e) {
+    if (!this.isDragging || !this.displayElement) return;
+    
+    e.preventDefault();
+    
+    const newX = e.clientX - this.dragOffset.x;
+    const newY = e.clientY - this.dragOffset.y;
+    
+    // Get top window for proper viewport calculations
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    
+    // Keep popup within viewport bounds
+    const viewport = {
+      width: topWindow.innerWidth,
+      height: topWindow.innerHeight
+    };
+    
+    const rect = this.displayElement.getBoundingClientRect();
+    const constrainedX = Math.max(0, Math.min(newX, viewport.width - rect.width));
+    const constrainedY = Math.max(0, Math.min(newY, viewport.height - rect.height));
+    
+    // Apply position directly since we're using position: fixed
+    this.displayElement.style.left = `${constrainedX}px`;
+    this.displayElement.style.top = `${constrainedY}px`;
+  }
+
+  _onMouseUp(_e) {
+    if (!this.isDragging) return;
+    
+    this.isDragging = false;
+    
+    // Get top document for proper event handling
+    const topDocument = this._getTopDocument();
+    
+    // Remove global listeners
+    topDocument.removeEventListener('mousemove', this._onMouseMove);
+    topDocument.removeEventListener('mouseup', this._onMouseUp);
+    
+    // Reset visual feedback
+    if (this.dragHandle) {
+      this.dragHandle.style.opacity = '0.8';
+    }
+  }
+
+  _removeDragHandlers() {
+    if (this.dragHandle) {
+      this.dragHandle.removeEventListener('mousedown', this._onMouseDown);
+    }
+    
+    // Get top document for proper event handling
+    const topDocument = this._getTopDocument();
+    topDocument.removeEventListener('mousemove', this._onMouseMove);
+    topDocument.removeEventListener('mouseup', this._onMouseUp);
+    this.isDragging = false;
   }
 
   createLoadingDots() {
@@ -432,6 +755,10 @@ export default class SelectionWindows {
     this.innerContainer.textContent = "";
     const firstLine = document.createElement("div");
     firstLine.classList.add("first-line");
+    
+    // Set first-line as drag handle
+    this.dragHandle = firstLine;
+    
     const ttsIconOriginal = this.createTTSIcon(
       originalText,
       CONFIG.SOURCE_LANGUAGE || "listen"
@@ -443,7 +770,29 @@ export default class SelectionWindows {
       orig.textContent = originalText;
       firstLine.appendChild(orig);
     }
+    
+    // Add close button
+    const closeButton = document.createElement("span");
+    closeButton.innerHTML = "✕";
+    closeButton.style.marginLeft = "auto";
+    closeButton.style.opacity = "0.7";
+    closeButton.style.fontSize = "14px";
+    closeButton.style.cursor = "pointer";
+    closeButton.style.padding = "0 4px";
+    closeButton.title = "Close";
+    closeButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.cancelCurrentTranslation();
+    });
+    firstLine.appendChild(closeButton);
+    
     this.innerContainer.appendChild(firstLine);
+    
+    // Setup drag handlers now that first-line exists
+    if (this.dragHandle) {
+      this.dragHandle.addEventListener('mousedown', this._onMouseDown);
+    }
+    
     const secondLine = document.createElement("div");
     secondLine.classList.add("second-line");
     const textSpan = document.createElement("span");
@@ -466,12 +815,66 @@ export default class SelectionWindows {
     secondLine.appendChild(textSpan);
     this.applyTextDirection(secondLine, translatedText);
     this.innerContainer.appendChild(secondLine);
+    
+    // Reposition popup after content is added to ensure it fits properly
     requestAnimationFrame(() => {
       if (this.displayElement) {
+        this.adjustPositionAfterContentChange();
         this.displayElement.style.transition = `opacity 0.15s ease-in-out`;
         this.displayElement.style.opacity = "0.95";
       }
     });
+  }
+
+  adjustPositionAfterContentChange() {
+    if (!this.displayElement || !this.isVisible) return;
+
+    // Get actual popup dimensions after content is rendered
+    const rect = this.displayElement.getBoundingClientRect();
+    const currentX = parseInt(this.displayElement.style.left);
+    const currentY = parseInt(this.displayElement.style.top);
+
+    // Get top window for proper viewport calculations
+    const topDocument = this._getTopDocument();
+    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+
+    // Check if popup is now outside viewport with actual dimensions
+    const viewport = {
+      width: topWindow.innerWidth,
+      height: topWindow.innerHeight
+    };
+    
+    let needsRepositioning = false;
+    let newX = currentX;
+    let newY = currentY;
+
+    // Check horizontal bounds (fixed positioning, so no need to consider scroll)
+    if (currentX + rect.width > viewport.width - 10) {
+      // Popup extends beyond right edge
+      newX = viewport.width - rect.width - 10;
+      needsRepositioning = true;
+    } else if (currentX < 10) {
+      // Popup extends beyond left edge
+      newX = 10;
+      needsRepositioning = true;
+    }
+
+    // Check vertical bounds
+    if (currentY + rect.height > viewport.height - 10) {
+      // Popup extends beyond bottom edge
+      newY = viewport.height - rect.height - 10;
+      needsRepositioning = true;
+    } else if (currentY < 10) {
+      // Popup extends beyond top edge
+      newY = 10;
+      needsRepositioning = true;
+    }
+
+    // Apply new position if needed
+    if (needsRepositioning) {
+      this.displayElement.style.left = `${newX}px`;
+      this.displayElement.style.top = `${newY}px`;
+    }
   }
 
   createTTSIcon(textToSpeak, title = "Speak") {
@@ -539,6 +942,7 @@ export default class SelectionWindows {
 
     this._removeThemeChangeListener();
     this._removeOutsideClickListener(); // Specifically for the window
+    this._removeDragHandlers(); // Clean up drag handlers
 
     this.isVisible = false;
     this.pendingTranslationWindow = false; // Reset this flag
@@ -611,6 +1015,7 @@ export default class SelectionWindows {
     if (el === this.displayElement) {
       this.displayElement = null;
       this.innerContainer = null;
+      this.dragHandle = null;
       this.originalText = null;
     }
   }
@@ -626,16 +1031,48 @@ export default class SelectionWindows {
 export function dismissAllSelectionWindows() {
   logME("[SelectionWindows] Dismissing all selection windows");
   try {
-    const hosts = document.querySelectorAll(".aiwc-selection-popup-host");
-    hosts.forEach((host) => {
-      try {
-        host.remove();
-      } catch (innerErr) {
-        logME("[SelectionWindows] Failed to remove a host:", innerErr);
+    // Function to clean up from a specific document
+    const cleanupDocument = (doc) => {
+      const hosts = doc.querySelectorAll(".aiwc-selection-popup-host");
+      hosts.forEach((host) => {
+        try {
+          host.remove();
+        } catch (innerErr) {
+          logME("[SelectionWindows] Failed to remove a host:", innerErr);
+        }
+      });
+      const icons = doc.querySelectorAll("#translate-it-icon");
+      icons.forEach((icon) => icon.remove());
+    };
+
+    // Clean current document
+    cleanupDocument(document);
+
+    // Also clean top document if different (for iframe cases)
+    try {
+      let currentWindow = window;
+      let topDocument = document;
+      
+      while (currentWindow.parent !== currentWindow) {
+        try {
+          const parentDoc = currentWindow.parent.document;
+          if (parentDoc) {
+            topDocument = parentDoc;
+            currentWindow = currentWindow.parent;
+          } else {
+            break;
+          }
+        } catch {
+          break;
+        }
       }
-    });
-    const icons = document.querySelectorAll("#translate-it-icon");
-    icons.forEach((icon) => icon.remove());
+
+      if (topDocument !== document) {
+        cleanupDocument(topDocument);
+      }
+    } catch (err) {
+      logME("[SelectionWindows] Could not clean top document:", err);
+    }
   } catch (err) {
     logME(
       "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
