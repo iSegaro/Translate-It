@@ -98,13 +98,9 @@ class ZipAfterBuildPlugin {
 }
 
 const firefoxDistConfig = {
-  mode: "production",
+  mode: "production", // Production mode with safe optimizations
   entry: {
-    content: [
-      "core-js/stable",
-      "regenerator-runtime/runtime",
-      "./src/content.js",
-    ],
+    content: "./src/content.js", // Remove polyfills that cause warnings
     background: "./src/backgrounds/background-firefox.js",
     options: "./src/options.js",
     popup: "./src/popup/main.js",
@@ -129,7 +125,13 @@ const firefoxDistConfig = {
         use: {
           loader: "babel-loader",
           options: {
-            presets: ["@babel/preset-env"],
+            presets: [["@babel/preset-env", {
+              targets: {
+                firefox: "109"
+              },
+              useBuiltIns: false, // Disable polyfills
+              modules: false
+            }]],
             plugins: [["@babel/plugin-proposal-decorators", { legacy: true }]],
           },
         },
@@ -141,24 +143,56 @@ const firefoxDistConfig = {
     minimizer: [
       new (require("terser-webpack-plugin"))({
         terserOptions: {
-          compress: {
+          compress: {      // Enable safe compression only
+            arrows: false,
+            collapse_vars: false,
+            comparisons: false,
+            computed_props: false,
+            hoist_funs: false,
+            hoist_props: false,
+            hoist_vars: false,
+            inline: false,
+            loops: false,
+            negate_iife: false,
+            properties: false,
+            reduce_funcs: false,
+            reduce_vars: false,
+            switches: false,
+            toplevel: false,
+            typeofs: false,
+            booleans: false,
+            if_return: false,
+            sequences: false,
+            unused: false,
+            conditionals: false,
+            dead_code: false,
             evaluate: false,
-            drop_console: process.env.NODE_ENV === "production",
+            // Explicitly disable dangerous optimizations
             unsafe: false,
+            unsafe_arrows: false,
+            unsafe_comps: false,
+            unsafe_Function: false,
+            unsafe_math: false,
+            unsafe_symbols: false,
+            unsafe_methods: false,
+            unsafe_proto: false,
+            unsafe_regexp: false,
+            unsafe_undefined: false,
           },
-          mangle: {
+          mangle: {        // Enable basic variable name mangling
             keep_classnames: true,
             keep_fnames: true,
           },
           format: {
             comments: false,
+            beautify: false,
           },
         },
         extractComments: false,
       }),
     ],
   },
-  devtool: "cheap-module-source-map",
+  devtool: false, // Disable source maps
   plugins: [
     new CopyPlugin({
       patterns: [
