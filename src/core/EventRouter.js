@@ -31,6 +31,8 @@ export default class EventRouter {
     this.handleKeyDown = wrap(this.handleKeyDownMethod);
     this.handleMouseOver = wrap(this.handleMouseOverMethod);
     this.handleMouseUp = wrap(this.handleMouseUpMethod);
+    this.handleCtrlKeyDown = wrap(this.handleCtrlKeyDownMethod);
+    this.handleCtrlKeyUp = wrap(this.handleCtrlKeyUpMethod);
 
     /* ---------- ۲) FeatureManager ---------- */
 
@@ -63,6 +65,8 @@ export default class EventRouter {
       ],
       TEXT_SELECTION: [
         { target: document, type: "mouseup", listener: this.handleMouseUp },
+        { target: document, type: "keydown", listener: this.handleCtrlKeyDown },
+        { target: document, type: "keyup", listener: this.handleCtrlKeyUp },
       ],
     };
 
@@ -159,6 +163,14 @@ export default class EventRouter {
 
   async handleMouseUpMethod(e) {
     this.translationHandler.handleEvent(e);
+  }
+
+  async handleCtrlKeyDownMethod(e) {
+    this.translationHandler.eventHandler.handleKeyDown(e);
+  }
+
+  async handleCtrlKeyUpMethod(e) {
+    this.translationHandler.eventHandler.handleKeyUp(e);
   }
 
   async dispose() {

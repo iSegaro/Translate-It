@@ -279,11 +279,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     selectionModeImmediateRadio.disabled = !isTextSelectionEnabled;
     selectionModeOnClickRadio.disabled = !isTextSelectionEnabled;
 
+    // گزینه Ctrl فقط برای حالت immediate فعال است و برای حالت onClick (آیکون) باید غیرفعال باشد
     const isCtrlGroupEnabled = isTextSelectionEnabled && isImmediateModeEnabled;
     requireCtrlForTextSelectionCheckbox.disabled = !isCtrlGroupEnabled;
     textSelectionCtrlGroup.style.opacity = isCtrlGroupEnabled ? "1" : "0.2";
     textSelectionCtrlGroup.style.pointerEvents =
       isCtrlGroupEnabled ? "auto" : "none";
+    
+    // اگر حالت onClick انتخاب شده، چک‌باکس Ctrl را خاموش کن
+    if (!isImmediateModeEnabled && selectionModeOnClickRadio.checked) {
+      requireCtrlForTextSelectionCheckbox.checked = false;
+    }
   }
 
   // --- Dependency Logic for Replace Mode ---

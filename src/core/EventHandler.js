@@ -54,6 +54,11 @@ export default class EventHandler {
     this.selectionTimeoutId = null; // شناسه تایمر برای تاخیر در ترجمه انتخاب متن
     this.cancelSelectionTranslation =
       this.cancelSelectionTranslation.bind(this);
+    
+    // Track Ctrl key state for better selection handling
+    this.ctrlKeyPressed = false;
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
   }
   setFeatureManager(fm) {
     this.featureManager = fm;
@@ -121,10 +126,18 @@ export default class EventHandler {
        **/
       if (this.isMouseUp(event)) {
         /** requireCtrlForTextSelection
-         * در اینجا شرط مربوط به نیاز بودن به نگه‌داشتن کلید کنترل بررسی می‌شود
+         * بررسی نیاز به Ctrl فقط در حالت immediate، نه onClick
          */
-        const requireCtrl = await getRequireCtrlForTextSelectionAsync();
-        if (requireCtrl && !this.isMouseUpCtrl(event)) return;
+        const { selectionTranslationMode } = await Browser.storage.local.get({
+          selectionTranslationMode: CONFIG.selectionTranslationMode,
+        });
+        
+        // فقط در حالت immediate باید Ctrl را چک کنیم
+        if (selectionTranslationMode === "immediate") {
+          const requireCtrl = await getRequireCtrlForTextSelectionAsync();
+          if (requireCtrl && !this.isMouseUpCtrl(event)) return;
+        }
+        
         await this.handleMouseUp(event);
       }
     } catch (rawError) {
@@ -143,6 +156,21 @@ export default class EventHandler {
 
   isMouseUp(event) {
     return event.type === "mouseup";
+  }
+
+  handleKeyDown(event) {
+    if (event.key === "Control" || event.key === "Meta" || event.ctrlKey || event.metaKey) {
+      this.ctrlKeyPressed = true;
+    }
+  }
+
+  handleKeyUp(event) {
+    if (event.key === "Control" || event.key === "Meta") {
+      // تأخیر کوتاه برای اطمینان از اینکه mouseup event پردازش شده
+      setTimeout(() => {
+        this.ctrlKeyPressed = false;
+      }, 50);
+    }
   }
 
   isCtrlSlashEvent(event) {
@@ -599,6 +627,9 @@ export default class EventHandler {
 
     this.translationHandler.select_Element_ModeActive = false;
     state.selectElementActive = false;
+
+    // Reset Ctrl key state
+    this.ctrlKeyPressed = false;
 
     if (state.translateMode === TranslationMode.SelectElement) {
       revertTranslations({
