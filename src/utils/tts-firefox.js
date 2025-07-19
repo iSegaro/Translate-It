@@ -15,7 +15,7 @@ export function playAudioGoogleTTS(text, lang) {
   )}&tl=${lang}`;
 
   const audio = new Audio(ttsUrl);
-  audio.crossOrigin = "anonymous";
+  // Remove crossOrigin to avoid CORS issues in Firefox
 
   const playbackPromise = new Promise((resolve, reject) => {
     audio.addEventListener("ended", () => {

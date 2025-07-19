@@ -5,6 +5,8 @@ import { logME } from "../utils/helpers.js";
 import {
   AUTO_DETECT_VALUE,
   playAudioGoogleTTS,
+  playAudioWebSpeech,
+  getSpeechApiLangCode,
 } from "../utils/tts-firefox.js";
 import { detectTextLanguage } from "../utils/textDetection.js";
 import { resolveLangCode } from "../utils/langUtils.js";
@@ -38,20 +40,39 @@ export async function playTTS(message) {
   const lang = resolveLangCode(rawLang);
   logME("[TTS Firefox] Final language to play:", lang);
 
-  // Use Google TTS directly
-  logME("[TTS Firefox] Using Google TTS method.");
-  const { audio, playbackPromise } = playAudioGoogleTTS(text, lang);
+  // Try Google TTS first, fallback to Web Speech API if it fails
+  try {
+    logME("[TTS Firefox] Using Google TTS method.");
+    const { audio, playbackPromise } = playAudioGoogleTTS(text, lang);
 
-  activeTTS = { method: "google", audio };
+    activeTTS = { method: "google", audio };
 
-  await playbackPromise
-    .catch((err) => {
-      logME("[TTS Firefox] GoogleTTS error:", err);
-      throw err;
-    })
-    .finally(() => {
-      activeTTS = null;
-    });
+    await playbackPromise
+      .catch((err) => {
+        logME("[TTS Firefox] GoogleTTS error, falling back to Web Speech API:", err);
+        throw err;
+      })
+      .finally(() => {
+        activeTTS = null;
+      });
+  } catch (err) {
+    logME("[TTS Firefox] Google TTS failed, using Web Speech API fallback.", err);
+    
+    // Fallback to Web Speech API
+    const speechLang = getSpeechApiLangCode(lang) || lang;
+    logME("[TTS Firefox] Using Web Speech API with language:", speechLang);
+    
+    activeTTS = { method: "webspeech" };
+    
+    await playAudioWebSpeech(text, speechLang)
+      .catch((speechErr) => {
+        logME("[TTS Firefox] Web Speech API error:", speechErr);
+        throw speechErr;
+      })
+      .finally(() => {
+        activeTTS = null;
+      });
+  }
 
   return { success: true };
 }
@@ -65,6 +86,8 @@ export function stopTTS() {
     if (activeTTS.method === "google" && activeTTS.audio) {
       activeTTS.audio.pause();
       activeTTS.audio.src = "";
+    } else if (activeTTS.method === "webspeech") {
+      speechSynthesis.cancel();
     }
   } catch (err) {
     logME("[TTS Firefox] Error stopping TTS:", err);
