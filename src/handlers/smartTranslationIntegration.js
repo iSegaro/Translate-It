@@ -22,6 +22,28 @@ import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 
+/**
+ * بررسی اینکه آیا متنی در المان فعال انتخاب شده است یا نه
+ */
+function hasActiveElementTextSelection() {
+  try {
+    const activeElement = document.activeElement;
+    if (!activeElement) return false;
+
+    if (activeElement.isContentEditable) {
+      const selection = window.getSelection();
+      return selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+    } else if (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA") {
+      return activeElement.selectionStart !== activeElement.selectionEnd;
+    }
+
+    return false;
+  } catch (error) {
+    logME("[SmartTranslationHandler] Error checking text selection:", error);
+    return false;
+  }
+}
+
 export async function translateFieldViaSmartHandler({
   text,
   translationHandler,
@@ -71,24 +93,35 @@ export async function translateFieldViaSmartHandler({
 
     // تعیین حالت عملیات: جایگزینی یا کپی
     let isReplaceMode = false;
+    
+    // بررسی اولویت: اگر متن انتخاب شده باشد، همیشه جایگزین می‌کنیم
+    const hasTextSelection = hasActiveElementTextSelection();
+    
     if (mode === TranslationMode.Field) {
-      const is_copy = await getCOPY_REPLACEAsync();
-      if (platform === Platform.Default) {
-        if (is_copy === "replace") {
-          isReplaceMode = true;
-          logME("[SmartTranslationHandler] replace on default");
-        } else {
-          logME("[SmartTranslationHandler] copy on default");
-        }
+      if (hasTextSelection) {
+        // اگر متن انتخاب شده باشد، بدون توجه به تنظیمات، جایگزین می‌کنیم
+        isReplaceMode = true;
+        logME("[SmartTranslationHandler] replace mode due to text selection");
       } else {
-        if (is_copy === "replace") {
-          isReplaceMode = true;
-          logME("[SmartTranslationHandler] replace on platform");
-        } else {
-          const is_special_replace = await getREPLACE_SPECIAL_SITESAsync();
-          logME(`REPLACE_SPECIAL_SITES ${is_special_replace}`);
-          if (is_special_replace === true) {
+        // اگر متن انتخاب نشده باشد، طبق تنظیمات عمل می‌کنیم
+        const is_copy = await getCOPY_REPLACEAsync();
+        if (platform === Platform.Default) {
+          if (is_copy === "replace") {
             isReplaceMode = true;
+            logME("[SmartTranslationHandler] replace on default (no selection)");
+          } else {
+            logME("[SmartTranslationHandler] copy on default (no selection)");
+          }
+        } else {
+          if (is_copy === "replace") {
+            isReplaceMode = true;
+            logME("[SmartTranslationHandler] replace on platform (no selection)");
+          } else {
+            const is_special_replace = await getREPLACE_SPECIAL_SITESAsync();
+            logME(`REPLACE_SPECIAL_SITES ${is_special_replace}`);
+            if (is_special_replace === true) {
+              isReplaceMode = true;
+            }
           }
         }
       }

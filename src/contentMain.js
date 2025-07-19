@@ -43,6 +43,56 @@ export function initContentScript() {
       this.init();
     }
 
+    // بررسی وجود متن انتخاب شده در فیلد متنی
+    _hasTextSelection(element) {
+      if (!element) return false;
+      
+      if (element.isContentEditable) {
+        const selection = window.getSelection();
+        return selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+      } else if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+        return element.selectionStart !== element.selectionEnd;
+      }
+      
+      return false;
+    }
+
+    // جایگزینی متن انتخاب شده با ترجمه
+    _replaceSelectedText(element, translatedText) {
+      try {
+        if (element.isContentEditable) {
+          const selection = window.getSelection();
+          if (selection && !selection.isCollapsed) {
+            selection.deleteContents();
+            const textNode = document.createTextNode(translatedText);
+            selection.getRangeAt(0).insertNode(textNode);
+            
+            // انتخاب را پاک کنید
+            selection.removeAllRanges();
+            return true;
+          }
+        } else if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+          const start = element.selectionStart;
+          const end = element.selectionEnd;
+          
+          if (start !== end) {
+            const value = element.value;
+            const newValue = value.substring(0, start) + translatedText + value.substring(end);
+            element.value = newValue;
+            
+            // مکان کرسر را بعد از متن ترجمه شده قرار دهید
+            const newCursorPosition = start + translatedText.length;
+            element.setSelectionRange(newCursorPosition, newCursorPosition);
+            return true;
+          }
+        }
+      } catch (error) {
+        logME("[Content] Error in _replaceSelectedText:", error);
+      }
+      
+      return false;
+    }
+
     initPolyfills() {
       if (!Element.prototype.matches) {
         Element.prototype.matches =
@@ -375,32 +425,37 @@ export function initContentScript() {
                     platform
                   ].updateElement(active, translated);
                 } else {
-                  // تلاش با روش‌های عمومی
-                  if (active.isContentEditable) {
-                    active.innerText = translated;
-                  } else if ("value" in active) {
-                    active.value = translated;
+                  // بررسی وجود متن انتخاب شده در فیلد متنی
+                  const hasSelection = this._hasTextSelection(active);
+                  
+                  if (hasSelection) {
+                    // ترجمه فقط متن انتخاب شده
+                    didApply = this._replaceSelectedText(active, translated);
+                  } else {
+                    // ترجمه کل فیلد متنی
+                    if (active.isContentEditable) {
+                      active.innerText = translated;
+                    } else if ("value" in active) {
+                      active.value = translated;
+                    }
+                    didApply = true;
                   }
 
-                  // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
-                  active.dispatchEvent(
-                    new Event("input", { bubbles: true, cancelable: true })
-                  );
-                  active.dispatchEvent(
-                    new Event("change", { bubbles: true, cancelable: true })
-                  );
+                  if (didApply) {
+                    // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
+                    active.dispatchEvent(
+                      new Event("input", { bubbles: true, cancelable: true })
+                    );
+                    active.dispatchEvent(
+                      new Event("change", { bubbles: true, cancelable: true })
+                    );
 
-                  // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
-                  await new Promise((resolve) => setTimeout(resolve, 50));
+                    // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                  }
 
-                  // مقدار نهایی را دوباره می‌خوانیم تا از موفقیت مطمئن شویم
-                  const finalValue =
-                    (active.isContentEditable ?
-                      active.innerText
-                    : active.value) || "";
-                  didApply = finalValue.trim() === translated.trim();
                   logME(
-                    `[Content] Apply attempt finished. Success: ${didApply}. Final value: '${finalValue}'`
+                    `[Content] Apply attempt finished. Success: ${didApply}. Has selection: ${hasSelection}`
                   );
                 }
 
