@@ -1,30 +1,29 @@
 // src/managers/NotificationManager.js
 
 import Browser from "webextension-polyfill";
-import { CONFIG } from "../config.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
-const safe = {
-  ICON_TRANSLATION: CONFIG?.ICON_TRANSLATION ?? "🌐",
-  ICON_SUCCESS: CONFIG?.ICON_SUCCESS ?? "✅",
-  ICON_WARNING: CONFIG?.ICON_WARNING ?? "⚠️",
-  ICON_STATUS: CONFIG?.ICON_STATUS ?? "⏳",
-  ICON_ERROR: CONFIG?.ICON_ERROR ?? "❌",
-  ICON_INFO: CONFIG?.ICON_INFO ?? "🔵",
-  ICON_REVERT: CONFIG?.ICON_REVERT ?? "↩️",
+const SAFE_ICONS = {
+  ICON_TRANSLATION: "🌐",
+  ICON_SUCCESS: "✅",
+  ICON_WARNING: "⚠️",
+  ICON_STATUS: "⏳",
+  ICON_ERROR: "❌",
+  ICON_INFO: "🔵",
+  ICON_REVERT: "↩️",
 };
 
 export default class NotificationManager {
   constructor(errorHandler) {
     this.errorHandler = errorHandler || { handle: () => {} };
     this.map = {
-      error: { title: "Translate It! - Error", icon: safe.ICON_ERROR, cls: "AIWC-error", dur: 5000 },
-      warning: { title: "Translate It! - Warning", icon: safe.ICON_WARNING, cls: "AIWC-warning", dur: 4000 },
-      success: { title: "Translate It! - Success", icon: safe.ICON_SUCCESS, cls: "AIWC-success", dur: 3000 },
-      info: { title: "Translate It! - Info", icon: safe.ICON_INFO, cls: "AIWC-info", dur: 3000 },
-      status: { title: "Translate It! - Status", icon: safe.ICON_STATUS, cls: "AIWC-status", dur: 2000 },
-      revert: { title: "Translate It! - Revert", icon: safe.ICON_REVERT, cls: "AIWC-revert", dur: 800 },
+      error: { title: "Translate It! - Error", icon: SAFE_ICONS.ICON_ERROR, cls: "AIWC-error", dur: 5000 },
+      warning: { title: "Translate It! - Warning", icon: SAFE_ICONS.ICON_WARNING, cls: "AIWC-warning", dur: 4000 },
+      success: { title: "Translate It! - Success", icon: SAFE_ICONS.ICON_SUCCESS, cls: "AIWC-success", dur: 3000 },
+      info: { title: "Translate It! - Info", icon: SAFE_ICONS.ICON_INFO, cls: "AIWC-info", dur: 3000 },
+      status: { title: "Translate It! - Status", icon: SAFE_ICONS.ICON_STATUS, cls: "AIWC-status", dur: 2000 },
+      revert: { title: "Translate It! - Revert", icon: SAFE_ICONS.ICON_REVERT, cls: "AIWC-revert", dur: 800 },
     };
 
     this.container = null;
