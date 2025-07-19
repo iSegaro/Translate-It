@@ -129,7 +129,8 @@ const firefoxDistConfig = {
               targets: {
                 firefox: "109"
               },
-              useBuiltIns: false, // Disable polyfills
+              useBuiltIns: "usage", // Enable polyfills on usage
+              corejs: 3,
               modules: false
             }]],
             plugins: [["@babel/plugin-proposal-decorators", { legacy: true }]],
@@ -140,57 +141,57 @@ const firefoxDistConfig = {
   },
   optimization: {
     minimize: true,
-    minimizer: [
-      new (require("terser-webpack-plugin"))({
-        terserOptions: {
-          compress: {      // Enable safe compression only
-            arrows: false,
-            collapse_vars: false,
-            comparisons: false,
-            computed_props: false,
-            hoist_funs: false,
-            hoist_props: false,
-            hoist_vars: false,
-            inline: false,
-            loops: false,
-            negate_iife: false,
-            properties: false,
-            reduce_funcs: false,
-            reduce_vars: false,
-            switches: false,
-            toplevel: false,
-            typeofs: false,
-            booleans: false,
-            if_return: false,
-            sequences: false,
-            unused: false,
-            conditionals: false,
-            dead_code: false,
-            evaluate: false,
-            // Explicitly disable dangerous optimizations
-            unsafe: false,
-            unsafe_arrows: false,
-            unsafe_comps: false,
-            unsafe_Function: false,
-            unsafe_math: false,
-            unsafe_symbols: false,
-            unsafe_methods: false,
-            unsafe_proto: false,
-            unsafe_regexp: false,
-            unsafe_undefined: false,
-          },
-          mangle: {        // Enable basic variable name mangling
-            keep_classnames: true,
-            keep_fnames: true,
-          },
-          format: {
-            comments: false,
-            beautify: false,
-          },
-        },
-        extractComments: false,
-      }),
-    ],
+    // minimizer: [
+    //   new (require("terser-webpack-plugin"))({
+    //     terserOptions: {
+    //       compress: {      // Enable safe compression only
+    //         arrows: false,
+    //         collapse_vars: false,
+    //         comparisons: false,
+    //         computed_props: false,
+    //         hoist_funs: false,
+    //         hoist_props: false,
+    //         hoist_vars: false,
+    //         inline: false,
+    //         loops: false,
+    //         negate_iife: false,
+    //         properties: false,
+    //         reduce_funcs: false,
+    //         reduce_vars: false,
+    //         switches: false,
+    //         toplevel: false,
+    //         typeofs: false,
+    //         booleans: false,
+    //         if_return: false,
+    //         sequences: false,
+    //         unused: false,
+    //         conditionals: false,
+    //         dead_code: false,
+    //         evaluate: false,
+    //         // Explicitly disable dangerous optimizations
+    //         unsafe: false,
+    //         unsafe_arrows: false,
+    //         unsafe_comps: false,
+    //         unsafe_Function: false,
+    //         unsafe_math: false,
+    //         unsafe_symbols: false,
+    //         unsafe_methods: false,
+    //         unsafe_proto: false,
+    //         unsafe_regexp: false,
+    //         unsafe_undefined: false,
+    //       },
+    //       mangle: {        // Enable basic variable name mangling
+    //         keep_classnames: true,
+    //         keep_fnames: true,
+    //       },
+    //       format: {
+    //         comments: false,
+    //         beautify: false,
+    //       },
+    //     },
+    //     extractComments: false,
+    //   }),
+    // ],
   },
   devtool: false, // Disable source maps
   plugins: [
