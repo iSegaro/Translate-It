@@ -29,6 +29,8 @@ async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
       if (markdownElement) {
         elements.translationResult.appendChild(markdownElement);
       }
+      // Store original markdown for copy functionality
+      elements.translationResult.dataset.originalMarkdown = result.lastTranslation.translatedText || "";
 
       correctTextDirection(
         elements.translationResult,

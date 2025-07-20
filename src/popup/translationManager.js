@@ -65,6 +65,8 @@ async function handleTranslationResponse(
     if (markdownElement) {
       elements.translationResult.appendChild(markdownElement);
     }
+    // Store original markdown for copy functionality
+    elements.translationResult.dataset.originalMarkdown = translated;
     elements.translationResult.classList.add("fade-in");
 
     correctTextDirection(elements.translationResult, translated);

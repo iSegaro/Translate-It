@@ -101,7 +101,10 @@ function setupEventListeners() {
   });
 
   elements.copyTargetBtn?.addEventListener("click", async () => {
-    const text = elements.translationResult.textContent;
+    // Get the original markdown text if available, otherwise fall back to textContent
+    const originalMarkdown = elements.translationResult.dataset.originalMarkdown;
+    const text = originalMarkdown || elements.translationResult.textContent;
+    
     if (
       !text ||
       text === (await getTranslationString("popup_string_during_translate"))

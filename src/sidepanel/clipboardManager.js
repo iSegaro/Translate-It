@@ -46,7 +46,10 @@ export function initClipboard(options) {
   });
 
   copyTargetBtn?.addEventListener('click', () => {
-    copyText(translationResult.textContent, copyTargetBtn);
+    // Get the original markdown text if available, otherwise fall back to textContent
+    const originalMarkdown = translationResult.dataset.originalMarkdown;
+    const text = originalMarkdown || translationResult.textContent;
+    copyText(text, copyTargetBtn);
   });
 
   // Show/hide paste button based on clipboard content

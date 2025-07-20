@@ -202,6 +202,8 @@ async function handleTranslationResponse(
     if (markdownElement) {
       elements.translationResult.appendChild(markdownElement);
     }
+    // Store original markdown for copy functionality
+    elements.translationResult.dataset.originalMarkdown = translated;
     elements.translationResult.classList.add("fade-in");
     correctTextDirection(elements.translationResult, translated);
 
@@ -510,6 +512,8 @@ async function loadLastTranslation() {
         if (markdownElement) {
           elements.translationResult.appendChild(markdownElement);
         }
+        // Store original markdown for copy functionality
+        elements.translationResult.dataset.originalMarkdown = translatedText;
         correctTextDirection(elements.translationResult, translatedText);
       }
       if (sourceLanguage) {
@@ -572,8 +576,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           } else {
             elements.translationResult.textContent = item.translatedText;
           }
+          // Store original markdown for copy functionality
+          elements.translationResult.dataset.originalMarkdown = item.translatedText;
         } catch {
           elements.translationResult.textContent = item.translatedText;
+          elements.translationResult.dataset.originalMarkdown = item.translatedText;
         }
 
         correctTextDirection(elements.sourceText, item.sourceText);
