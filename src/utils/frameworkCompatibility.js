@@ -674,76 +674,145 @@ export async function smartTextReplacement(element, newValue, start = null, end 
 }
 
 /**
- * جایگزینی ساده (fallback)
+ * جایگزینی ساده (fallback) با حفظ undo capability
  */
 function handleSimpleReplacement(element, newValue, start, end) {
   try {
     if (element.isContentEditable) {
-      const selection = window.getSelection();
-      let hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+      return handleContentEditableWithUndo(element, newValue, start, end);
+    } else {
+      return handleInputWithUndo(element, newValue, start, end);
+    }
+  } catch (error) {
+    logME('[FrameworkCompatibility] Error in simple replacement:', error);
+    return false;
+  }
+}
+
+/**
+ * جایگزینی contentEditable با حفظ undo
+ */
+function handleContentEditableWithUndo(element, newValue, start, end) {
+  try {
+    // استفاده از execCommand برای حفظ undo (deprecated ولی هنوز کار می‌کند)
+    const selection = window.getSelection();
+    let hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+    
+    logME('[handleContentEditableWithUndo] Processing:', {
+      hasSelection,
+      selectionText: selection?.toString(),
+      newValue: newValue.substring(0, 50)
+    });
+    
+    // Focus element
+    element.focus();
+    
+    if (hasSelection && selection.rangeCount > 0) {
+      // جایگزینی انتخاب با execCommand
+      try {
+        if (document.execCommand) {
+          // پاک کردن انتخاب
+          document.execCommand('delete', false);
+          // اضافه کردن متن جدید
+          document.execCommand('insertText', false, newValue);
+          logME('[handleContentEditableWithUndo] Used execCommand for selection');
+          return true;
+        }
+      } catch (execError) {
+        logME('[handleContentEditableWithUndo] execCommand failed:', execError);
+      }
       
-      logME('[handleSimpleReplacement] ContentEditable replacement:', {
-        hasSelection,
-        selectionText: selection?.toString(),
-        rangeCount: selection?.rangeCount,
-        startParam: start,
-        endParam: end
-      });
-      
-      // اگر انتخاب فعال وجود دارد، آن را جایگزین کن
-      if (hasSelection && selection.rangeCount > 0) {
-        try {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
-          const textNode = document.createTextNode(newValue);
-          range.insertNode(textNode);
-          
-          // cursor را بعد از متن جدید قرار بده
-          range.setStartAfter(textNode);
-          range.setEndAfter(textNode);
+      // fallback: استفاده از range API
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode(newValue);
+      range.insertNode(textNode);
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      // جایگزینی کل محتوا
+      try {
+        if (document.execCommand) {
+          // انتخاب کل محتوا
+          const range = document.createRange();
+          range.selectNodeContents(element);
           selection.removeAllRanges();
           selection.addRange(range);
-          
-          logME('[handleSimpleReplacement] Successfully replaced selected text in contentEditable');
-        } catch (error) {
-          logME('[handleSimpleReplacement] Selection manipulation failed:', error);
-          // fallback: جایگزینی کل محتوا
-          element.textContent = newValue;
+          // جایگزینی با execCommand
+          document.execCommand('insertText', false, newValue);
+          logME('[handleContentEditableWithUndo] Used execCommand for full replacement');
+          return true;
         }
-      } else {
-        // اگر انتخاب وجود ندارد، کل محتوا را جایگزین کن
-        logME('[handleSimpleReplacement] No selection found, replacing all content');
-        element.textContent = newValue;
+      } catch (execError) {
+        logME('[handleContentEditableWithUndo] execCommand failed:', execError);
       }
-    } else {
-      const originalStart = element.selectionStart || 0;
-      const originalEnd = element.selectionEnd || 0;
       
-      if (start !== null && end !== null) {
-        const currentValue = element.value || '';
-        const newFullValue = currentValue.substring(0, start) + newValue + currentValue.substring(end);
-        element.value = newFullValue;
-        const newCursorPosition = start + newValue.length;
-        element.setSelectionRange(newCursorPosition, newCursorPosition);
-      } else if (originalStart !== originalEnd) {
-        const currentValue = element.value || '';
-        const newFullValue = currentValue.substring(0, originalStart) + newValue + currentValue.substring(originalEnd);
-        element.value = newFullValue;
-        const newCursorPosition = originalStart + newValue.length;
-        element.setSelectionRange(newCursorPosition, newCursorPosition);
-      } else {
-        element.value = newValue;
-        element.setSelectionRange(newValue.length, newValue.length);
-      }
+      // fallback
+      element.textContent = newValue;
     }
     
-    // رویدادهای ساده
+    // رویدادهای ضروری
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
     
     return true;
   } catch (error) {
-    logME('[FrameworkCompatibility] Error in simple replacement:', error);
+    logME('[handleContentEditableWithUndo] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * جایگزینی input/textarea با حفظ undo
+ */
+function handleInputWithUndo(element, newValue, start, end) {
+  try {
+    const originalStart = element.selectionStart || 0;
+    const originalEnd = element.selectionEnd || 0;
+    
+    // Focus element
+    element.focus();
+    
+    if (start !== null && end !== null) {
+      // جایگزینی محدوده مشخص
+      element.setSelectionRange(start, end);
+    } else if (originalStart !== originalEnd) {
+      // استفاده از انتخاب موجود
+      element.setSelectionRange(originalStart, originalEnd);
+    } else {
+      // انتخاب کل محتوا
+      element.setSelectionRange(0, element.value.length);
+    }
+    
+    // استفاده از execCommand برای input elements
+    try {
+      if (document.execCommand && document.execCommand('insertText', false, newValue)) {
+        logME('[handleInputWithUndo] Used execCommand for input');
+        return true;
+      }
+    } catch (execError) {
+      logME('[handleInputWithUndo] execCommand failed:', execError);
+    }
+    
+    // fallback: manual replacement
+    const currentValue = element.value || '';
+    const startPos = start !== null ? start : originalStart;
+    const endPos = end !== null ? end : (originalStart !== originalEnd ? originalEnd : currentValue.length);
+    
+    const newFullValue = currentValue.substring(0, startPos) + newValue + currentValue.substring(endPos);
+    element.value = newFullValue;
+    const newCursorPosition = startPos + newValue.length;
+    element.setSelectionRange(newCursorPosition, newCursorPosition);
+    
+    // رویدادهای ضروری
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    return true;
+  } catch (error) {
+    logME('[handleInputWithUndo] Error:', error);
     return false;
   }
 }
