@@ -17,28 +17,85 @@ export default class DefaultStrategy extends PlatformStrategy {
    */
   extractText(target) {
     try {
-      if (!target || !(target instanceof Element)) return "";
+      if (!target || !(target instanceof Element)) {
+        logME('[DefaultStrategy] extractText: Invalid target', target);
+        return "";
+      }
+
+      logME('[DefaultStrategy] extractText target info:', {
+        tagName: target.tagName,
+        isContentEditable: target.isContentEditable,
+        className: target.className,
+        id: target.id,
+        hasValue: 'value' in target,
+        textContent: target.textContent?.substring(0, 50)
+      });
 
       // حالت contenteditable - بررسی انتخاب متن
       if (target.isContentEditable) {
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
-          return selection.toString().trim();
+          const selectedText = selection.toString().trim();
+          logME('[DefaultStrategy] extractText: Selected text from contentEditable:', selectedText.substring(0, 50));
+          return selectedText;
         }
-        return target.innerText?.trim?.() || "";
+        const fullText = target.innerText?.trim?.() || "";
+        logME('[DefaultStrategy] extractText: Full text from contentEditable:', fullText.substring(0, 50));
+        return fullText;
       }
 
       // حالت input/textarea - بررسی انتخاب متن
       if (["TEXTAREA", "INPUT"].includes(target.tagName)) {
         if (target.selectionStart !== target.selectionEnd) {
-          return target.value.substring(target.selectionStart, target.selectionEnd).trim();
+          const selectedText = target.value.substring(target.selectionStart, target.selectionEnd).trim();
+          logME('[DefaultStrategy] extractText: Selected text from input/textarea:', selectedText.substring(0, 50));
+          return selectedText;
         }
-        return target.value?.trim?.() || "";
+        const fullValue = target.value?.trim?.() || "";
+        logME('[DefaultStrategy] extractText: Full value from input/textarea:', fullValue.substring(0, 50));
+        return fullValue;
       }
 
-      // حالت fallback برای سایر المان‌ها
-      return target.textContent?.trim?.() || "";
+      // حالت fallback برای سایر المان‌ها - خاص Reddit
+      let fallbackText = target.textContent?.trim?.() || "";
+      
+      // اگر textContent خالی است، سعی کن از innerText استفاده کنی
+      if (!fallbackText && target.innerText) {
+        fallbackText = target.innerText.trim();
+        logME('[DefaultStrategy] extractText: Using innerText as fallback:', fallbackText.substring(0, 50));
+      }
+      
+      // اگر هنوز خالی است، بررسی کن آیا دارای فرزندان متنی است
+      if (!fallbackText) {
+        const textNodes = Array.from(target.childNodes)
+          .filter(node => node.nodeType === Node.TEXT_NODE)
+          .map(node => node.textContent?.trim())
+          .filter(Boolean);
+        
+        if (textNodes.length > 0) {
+          fallbackText = textNodes.join(' ');
+          logME('[DefaultStrategy] extractText: Using child text nodes:', fallbackText.substring(0, 50));
+        }
+      }
+      
+      // اگر هنوز خالی است، بررسی کن المان‌های فرزند قابل ویرایش
+      if (!fallbackText && target.querySelector) {
+        const editableChild = target.querySelector('[contenteditable="true"], input, textarea');
+        if (editableChild) {
+          if (editableChild.value) {
+            fallbackText = editableChild.value.trim();
+            logME('[DefaultStrategy] extractText: Using editable child value:', fallbackText.substring(0, 50));
+          } else if (editableChild.textContent) {
+            fallbackText = editableChild.textContent.trim();
+            logME('[DefaultStrategy] extractText: Using editable child textContent:', fallbackText.substring(0, 50));
+          }
+        }
+      }
+      
+      logME('[DefaultStrategy] extractText: Final fallback result:', fallbackText.substring(0, 50));
+      return fallbackText;
     } catch (error) {
+      logME('[DefaultStrategy] extractText error:', error);
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "default-strategy-extractText",
