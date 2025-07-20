@@ -324,7 +324,7 @@ export default class SelectionWindows {
         .loading-container { display: flex; justify-content: center; align-items: center; color: var(--sw-text-color); }
         @keyframes blink { 0% { opacity: var(--sw-loading-dot-opacity-start); } 50% { opacity: var(--sw-loading-dot-opacity-mid); } 100% { opacity: var(--sw-loading-dot-opacity-start); } }
         .loading-dot { font-size: 1.2em; margin: 0 2px; animation: blink 0.7s infinite; }
-        .first-line { margin-bottom: 6px; display: flex; align-items: center; cursor: move; 
+        .first-line { margin-bottom: 6px; display: flex; align-items: center; 
           user-select: none; padding: 6px 8px; margin: -8px -12px 6px -12px; 
           background-color: var(--sw-border-color); border-radius: 4px 4px 0 0; 
           border-bottom: 1px solid var(--sw-border-color); opacity: 0.9;
@@ -756,25 +756,35 @@ export default class SelectionWindows {
     const firstLine = document.createElement("div");
     firstLine.classList.add("first-line");
     
-    // Set first-line as drag handle
-    this.dragHandle = firstLine;
+    // Create a dedicated drag handle area in the middle
+    const dragHandle = document.createElement("div");
+    dragHandle.style.flex = "1"; // Take up available space between icons and close button
+    dragHandle.style.cursor = "move";
+    dragHandle.style.minHeight = "16px"; // Ensure there's a clickable area
+    this.dragHandle = dragHandle;
     
     const ttsIconOriginal = this.createTTSIcon(
       originalText,
       CONFIG.SOURCE_LANGUAGE || "listen"
     );
     firstLine.appendChild(ttsIconOriginal);
+    
+    // Add copy button for translated text
+    const copyIcon = this.createCopyIcon(translatedText);
+    firstLine.appendChild(copyIcon);
+    
+    // Add the drag handle (middle area)
     if (trans_Mode === TranslationMode.Dictionary_Translation) {
       const orig = document.createElement("span");
       orig.classList.add("original-text");
       orig.textContent = originalText;
-      firstLine.appendChild(orig);
+      dragHandle.appendChild(orig);
     }
+    firstLine.appendChild(dragHandle);
     
     // Add close button
     const closeButton = document.createElement("span");
     closeButton.innerHTML = "✕";
-    closeButton.style.marginLeft = "auto";
     closeButton.style.opacity = "0.7";
     closeButton.style.fontSize = "14px";
     closeButton.style.cursor = "pointer";
@@ -891,6 +901,30 @@ export default class SelectionWindows {
           text: textToSpeak,
           lang: AUTO_DETECT_VALUE,
         });
+      }
+    });
+    return icon;
+  }
+
+  createCopyIcon(textToCopy, title = "Copy") {
+    const icon = document.createElement("img");
+    icon.src = Browser.runtime.getURL("icons/copy.png");
+    icon.alt = title;
+    icon.title = title;
+    icon.classList.add("tts-icon"); // Reuse same styling as TTS icon
+    icon.style.marginLeft = "4px"; // Small gap from TTS icon
+    icon.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        // Visual feedback - briefly change opacity
+        const originalOpacity = icon.style.opacity;
+        icon.style.opacity = "0.5";
+        setTimeout(() => {
+          icon.style.opacity = originalOpacity;
+        }, 150);
+      } catch (err) {
+        logME("[SelectionWindows] Failed to copy text:", err);
       }
     });
     return icon;
