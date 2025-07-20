@@ -265,34 +265,32 @@ class ApiService {
     if (sourceLang === targetLang) return null;
 
     // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
-    // اگر در Field mode هستیم، language swapping انجام می‌دهیم
-    if (translateMode === TranslationMode.Field) {
-      // در Field mode، targetLang را به sourceLanguage تبدیل می‌کنیم (reverse translation)
-      targetLang = sourceLang;
-      sourceLang = AUTO_DETECT_VALUE;
-    } else {
-      // برای سایر حالت‌ها، منطق language detection و swapping
-      try {
-        const detectionResult = await Browser.i18n.detectLanguage(text);
-        if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
-          const mainDetection = detectionResult.languages[0];
-          const detectedLangCode = mainDetection.language.split("-")[0];
-          const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+    // برای همه حالت‌ها، ابتدا language detection و swapping انجام می‌دهیم
+    try {
+      const detectionResult = await Browser.i18n.detectLanguage(text);
+      if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
+        const mainDetection = detectionResult.languages[0];
+        const detectedLangCode = mainDetection.language.split("-")[0];
+        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
 
-          if (detectedLangCode === targetLangCode) {
-            // زبان‌ها را جابجا کن
-            [sourceLang, targetLang] = [targetLang, sourceLang];
-          }
-        } else {
-          // Regex fallback
-          const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-          if (isPersianText(text) && (targetLangCode === "fa" || targetLangCode === "ar")) {
-            [sourceLang, targetLang] = [targetLang, sourceLang];
-          }
+        if (detectedLangCode === targetLangCode) {
+          // زبان‌ها را جابجا کن
+          [sourceLang, targetLang] = [targetLang, sourceLang];
         }
-      } catch (e) {
-        logME('[handleGoogleTranslate] Language detection failed:', e);
+      } else {
+        // Regex fallback
+        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+        if (isPersianText(text) && (targetLangCode === "fa" || targetLangCode === "ar")) {
+          [sourceLang, targetLang] = [targetLang, sourceLang];
+        }
       }
+    } catch (e) {
+      logME('[handleGoogleTranslate] Language detection failed:', e);
+    }
+
+    // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
+    if (translateMode === TranslationMode.Field) {
+      sourceLang = AUTO_DETECT_VALUE;
     }
     // ▲▲▲ پایان منطق اختصاصی Google Translate ▲▲▲
 
