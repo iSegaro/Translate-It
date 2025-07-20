@@ -143,6 +143,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sourceLanguageInput = document.getElementById("sourceLanguage");
   const targetLanguageInput = document.getElementById("targetLanguage");
   const geminiApiSettings = document.getElementById("geminiApiSettings");
+  const geminiModelSelect = document.getElementById("geminiModel");
+  const geminiCustomUrlGroup = document.getElementById("geminiCustomUrlGroup");
   const openAIApiSettings = document.getElementById("openAIApiSettings");
   const openAIApiKeyInput = document.getElementById("openaiApiKey");
   const openAIModelInput = document.getElementById("openaiApiModel");
@@ -504,10 +506,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (allApiSections[selectedApi]) {
         allApiSections[selectedApi].style.display = "block";
       }
-      // Special case for Gemini API URL
-      if (selectedApi === "gemini" && apiUrlSettingGroup) {
-        apiUrlSettingGroup.style.display = "block";
-      }
+      // Special case for Gemini: don't show API URL by default, handle via model selection
+      // The API URL will be shown only when "custom" model is selected
     }
 
     // --- Logic to disable/enable prompt tab ---
@@ -533,6 +533,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   if (useMockCheckbox) {
     useMockCheckbox.addEventListener("change", toggleApiSettings);
+  }
+
+  // --- Gemini Model Selection Logic ---
+  function handleGeminiModelChange() {
+    if (!geminiModelSelect || !geminiCustomUrlGroup) return;
+    const selectedModel = geminiModelSelect.value;
+    const isCustom = selectedModel === "custom";
+    
+    // Show/hide custom URL group based on selection
+    geminiCustomUrlGroup.style.display = isCustom ? "block" : "none";
+    
+    // Update API URL for predefined models
+    if (!isCustom && apiUrlInput) {
+      const models = CONFIG.GEMINI_MODELS || [];
+      const selectedModelConfig = models.find(model => model.value === selectedModel);
+      if (selectedModelConfig && selectedModelConfig.url) {
+        apiUrlInput.value = selectedModelConfig.url;
+      }
+    }
+  }
+
+  if (geminiModelSelect) {
+    geminiModelSelect.addEventListener("change", handleGeminiModelChange);
   }
 
   // --- Save & Load Settings ---
@@ -626,6 +649,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       CUSTOM_API_KEY: customApiKeyInput?.value?.trim() || CONFIG.CUSTOM_API_KEY,
       CUSTOM_API_MODEL:
         customApiModelInput?.value?.trim() || CONFIG.CUSTOM_API_MODEL,
+      GEMINI_MODEL: geminiModelSelect?.value || CONFIG.GEMINI_MODEL,
       TRANSLATE_ON_TEXT_FIELDS:
         translateOnTextFieldsCheckbox?.checked ??
         CONFIG.TRANSLATE_ON_TEXT_FIELDS,
@@ -798,6 +822,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (translationApiSelect)
         translationApiSelect.value =
           settings.TRANSLATION_API || CONFIG.TRANSLATION_API;
+      
+      // Load Gemini model selection
+      if (geminiModelSelect)
+        geminiModelSelect.value = settings.GEMINI_MODEL || CONFIG.GEMINI_MODEL;
 
       // Populate radio buttons
       if (selectionModeImmediateRadio && selectionModeOnClickRadio) {
@@ -810,6 +838,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // --- Trigger UI updates that depend on the loaded settings ---
       toggleApiSettings();
+      handleGeminiModelChange(); // Initialize Gemini model UI state
       handleTextSelectionDependency();
       updateOverallExtensionDependency();
       await updatePromptHelpText(settings);

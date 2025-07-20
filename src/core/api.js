@@ -5,6 +5,7 @@ import {
   getApiKeyAsync,
   getUseMockAsync,
   getApiUrlAsync,
+  getGeminiModelAsync,
   getSourceLanguageAsync,
   getTargetLanguageAsync,
   getTranslationApiAsync,
@@ -407,10 +408,20 @@ class ApiService {
   async handleGeminiTranslation(text, sourceLang, targetLang, translateMode) {
     if (sourceLang === targetLang) return null;
 
-    const [apiKey, apiUrl] = await Promise.all([
+    const [apiKey, geminiModel] = await Promise.all([
       getApiKeyAsync(),
-      getApiUrlAsync(),
+      getGeminiModelAsync(),
     ]);
+
+    // Build API URL based on selected model
+    let apiUrl;
+    if (geminiModel === "custom") {
+      apiUrl = await getApiUrlAsync(); // Use custom URL from user input
+    } else {
+      // Use predefined URL for selected model
+      const modelConfig = CONFIG.GEMINI_MODELS?.find(m => m.value === geminiModel);
+      apiUrl = modelConfig?.url || CONFIG.API_URL; // Fallback to default
+    }
 
     if (!apiKey) {
       const err = new Error(ErrorTypes.API_KEY_MISSING);

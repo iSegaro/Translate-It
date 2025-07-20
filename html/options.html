@@ -542,6 +542,20 @@
                   />
                 </div>
                 <div class="setting-group">
+                  <label for="geminiModel" data-i18n="GEMINI_MODEL_LABEL">Model</label>
+                  <select id="geminiModel">
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-flash-lite-preview">Gemini 2.5 Flash-Lite Preview</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
+                    <option value="custom">Custom URL</option>
+                  </select>
+                </div>
+                <div class="setting-group" id="geminiCustomUrlGroup" style="display: none;">
                   <label for="apiUrl">API URL</label
                   ><input
                     type="text"

@@ -361,7 +361,6 @@
     "message": "Are you sure you want to clear all translation history?"
   },
 
-
   "OPTIONS_STATUS_SAVED_SUCCESS": {
     "message": "Saved successfully :)"
   },
@@ -382,6 +381,9 @@
   },
   "OPTIONS_STATUS_LOAD_FAILED": {
     "message": "Failed to load settings."
+  },
+  "GEMINI_MODEL_LABEL": {
+    "message": "Model"
   },
 
   "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },

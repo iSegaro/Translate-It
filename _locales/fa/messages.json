@@ -360,7 +360,7 @@
   "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
     "message": "پاک کردن تمام تاریخچه"
   },
-    "CONFIRM_CLEAR_ALL_HISTORY": {
+  "CONFIRM_CLEAR_ALL_HISTORY": {
     "message": "تاریخچه پاک شود؟"
   },
 
@@ -377,6 +377,9 @@
     "message": "خطا در بازیابی تنظیمات. فایل نامعتبر است؟"
   },
   "OPTIONS_STATUS_LOAD_FAILED": { "message": "خطا در بارگذاری تنظیمات." },
+  "GEMINI_MODEL_LABEL": {
+    "message": "مدل"
+  },
 
   "ERRORS_UNKNOWN": { "message": "خطای ناشناخته رخ داد." },
   "ERRORS_INVALID_CONTEXT": {
