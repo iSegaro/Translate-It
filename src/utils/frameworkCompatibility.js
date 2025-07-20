@@ -62,9 +62,11 @@ function checkKnownEditors(element) {
     return 'CKEditor';
   }
 
-  // بررسی TinyMCE
+  // بررسی TinyMCE (نسخه‌های مختلف)
   if (element.classList?.contains('mce-content-body') ||
-      element.closest?.('.mce-edit-area, .tox-edit-area')) {
+      element.classList?.contains('tox-edit-area__iframe') ||
+      element.classList?.contains('tox-editor-container') ||
+      element.closest?.('.mce-edit-area, .tox-edit-area, .tox-editor, .tox-tinymce, .mce-tinymce')) {
     return 'TinyMCE';
   }
 
@@ -147,12 +149,19 @@ function checkDangerousStructure(element) {
       return true;
     }
 
-    // بررسی کلاس‌های ویرایشگر CKEditor جدید
-    const ckClasses = Array.from(element.classList || []);
-    const hasCkClasses = ckClasses.some(cls => cls.startsWith('ck-') || cls.startsWith('ck '));
+    // بررسی کلاس‌های ویرایشگرهای پیچیده
+    const editorClasses = Array.from(element.classList || []);
+    const hasEditorClasses = editorClasses.some(cls => 
+      cls.startsWith('ck-') || cls.startsWith('ck ') ||  // CKEditor
+      cls.startsWith('mce-') || cls.startsWith('tox-') || // TinyMCE
+      cls.startsWith('ql-') ||  // Quill
+      cls.includes('editor')    // Generic editor classes
+    );
     
-    if (hasCkClasses) {
-      logME('[checkDangerousStructure] Has CKEditor classes:', ckClasses.filter(cls => cls.startsWith('ck')));
+    if (hasEditorClasses) {
+      logME('[checkDangerousStructure] Has editor classes:', editorClasses.filter(cls => 
+        cls.startsWith('ck') || cls.startsWith('mce-') || cls.startsWith('tox-') || cls.startsWith('ql-') || cls.includes('editor')
+      ));
       return true;
     }
 
