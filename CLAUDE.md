@@ -215,6 +215,7 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
 - Script injection provides fallback when offscreen communication fails
 - Browser detection determines appropriate TTS strategy
 - Robust error handling with multiple fallback mechanisms
+- **No Character Limits**: TTS system handles texts of any length without restrictions
 
 ### Security Considerations
 
@@ -352,3 +353,23 @@ The Firefox build is optimized to pass validation without warnings:
 - **Sidepanel Interface**: Enhanced markdown rendering system with better typography and spacing
 - **Cross-Platform Consistency**: Unified font choices and sizing between popup and sidepanel
 - **Provider Dropdown**: Fixed hover effects and improved visual consistency
+
+**Text Insertion and Framework Compatibility Enhancements (January 2025):**
+- **Enhanced Text Replacement System**: Implemented `universalTextInsertion()` in `src/utils/frameworkCompatibility.js` with multi-strategy approach
+- **Undo Capability Preservation**: All text insertion methods now prioritize `execCommand` to maintain browser undo/redo functionality
+- **Multi-Layer Fallback System**: execCommand → paste event simulation → direct value assignment with comprehensive error handling
+- **Framework-Specific Optimizations**: Enhanced compatibility for React, Vue, Angular with natural typing simulation
+- **Smart Selection Handling**: Improved text selection detection and replacement for both input fields and contentEditable elements
+- **Copy/Replace Logic Refinement**: Clarified separation between decision logic in `smartTranslationIntegration.js` and implementation in strategies
+- **Complex Editor Detection**: Enhanced `isComplexEditor()` function for better identification of rich text editors
+
+**Google Translate API Improvements (January 2025):**
+- **Language Swapping Fix**: Corrected language detection and swapping logic for Field mode translations
+- **Universal Language Detection**: Language detection now applies to all translation modes, not just non-Field modes
+- **Improved Swap Logic**: Fixed issue where English text wasn't being translated to target language in text fields
+- **Auto-Detection Enhancement**: Better integration of auto-detect functionality with language swapping
+
+**TTS System Enhancements (January 2025):**
+- **Character Limit Removal**: Removed 200-character restriction from Google TTS in `src/handlers/ttsHandler.js`
+- **Unified TTS Control**: Added click-to-stop TTS functionality in sidepanel for better user control
+- **Enhanced Audio Management**: Improved TTS stopping mechanism across all interfaces (popup, sidepanel, selection windows)
