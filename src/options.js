@@ -362,17 +362,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     if (enableDictionraryCheckbox) {
-      // گزینه‌ی دیکشنری باید غیرفعال شود اگر:
-      // ۱. کل افزونه غیرفعال باشد.
-      // ۲. یا API انتخاب شده Google Translate باشد.
-      const shouldDictionaryBeDisabled = !isMasterEnabled || isGoogleApi;
+      // گزینه‌ی دیکشنری فقط باید غیرفعال شود اگر کل افزونه غیرفعال باشد
+      const shouldDictionaryBeDisabled = !isMasterEnabled;
       enableDictionraryCheckbox.disabled = shouldDictionaryBeDisabled;
       enableDictionraryCheckbox
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldDictionaryBeDisabled);
-      if (isGoogleApi) {
-        enableDictionraryCheckbox.checked = false;
-      }
     }
 
     // این شرط مشخص می‌کند که آیا زیرمجموعه‌ها باید بر اساس کنترل‌کننده‌هایشان غیرفعال شوند یا خیر

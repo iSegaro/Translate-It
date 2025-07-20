@@ -21,6 +21,7 @@ import {
   getCustomApiUrlAsync,
   getCustomApiKeyAsync,
   getCustomApiModelAsync,
+  getEnableDictionaryAsync,
   TranslationMode,
 } from "../config.js";
 import { delay, isExtensionContextValid, logME } from "../utils/helpers.js";
@@ -255,17 +256,28 @@ class ApiService {
     if (sl === tl && !isJsonMode) return text;
 
     const url = new URL(apiUrl);
-    const params = {
-      client: "gtx",
-      sl: sl,
-      tl: tl,
-      dt: "t",
-      q: textsToTranslate.join(TEXT_DELIMITER),
-    };
-    url.search = new URLSearchParams(params).toString();
+    
+    // بررسی تنظیمات دیکشنری
+    const isDictionaryEnabled = await getEnableDictionaryAsync();
+    
+    // ساخت query string دستی برای پشتیبانی از چندین dt
+    const queryParams = [
+      `client=gtx`,
+      `sl=${sl}`,
+      `tl=${tl}`,
+      `dt=t`, // Translation text
+    ];
+    
+    // فقط در صورت فعال بودن دیکشنری، پارامتر bd اضافه شود
+    if (isDictionaryEnabled) {
+      queryParams.push(`dt=bd`); // Dictionary data
+    }
+    
+    queryParams.push(`q=${encodeURIComponent(textsToTranslate.join(TEXT_DELIMITER))}`);
+    url.search = queryParams.join('&');
 
     // --- API Call using the centralized handler ---
-    const translatedTextBlob = await this._executeApiCall({
+    const result = await this._executeApiCall({
       url: url.toString(),
       fetchOptions: { method: "GET" },
       extractResponse: (data) => {
@@ -274,20 +286,38 @@ class ApiService {
           // Returning undefined will trigger an API_RESPONSE_INVALID error in _executeApiCall
           return undefined;
         }
-        // Join all translated segments
-        return data[0].map((segment) => segment[0] || "").join("");
+        
+        // Extract main translation
+        const translatedText = data[0].map((segment) => segment[0] || "").join("");
+        
+        // Extract dictionary data if available and enabled
+        let candidateText = "";
+        if (isDictionaryEnabled && data[1]) { // data[1] contains dictionary information
+          candidateText = data[1]
+            .map((dict) => {
+              const pos = dict[0] || ""; // Part of speech
+              const terms = dict[1] || []; // Alternative translations
+              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+            })
+            .join("");
+        }
+        
+        return {
+          resultText: translatedText,
+          candidateText: candidateText.trim()
+        };
       },
       context: context,
     });
 
     // --- Response Processing ---
     if (isJsonMode) {
-      const translatedParts = translatedTextBlob.split(TEXT_DELIMITER);
+      const translatedParts = result.resultText.split(TEXT_DELIMITER);
       if (translatedParts.length !== originalJsonStruct.length) {
         logME(
           "Google Translate: JSON reconstruction failed due to segment mismatch."
         );
-        return translatedTextBlob; // Fallback to returning the raw translated blob
+        return result.resultText; // Fallback to returning the raw translated text
       }
       const translatedJson = originalJsonStruct.map((item, index) => ({
         ...item,
@@ -295,7 +325,11 @@ class ApiService {
       }));
       return JSON.stringify(translatedJson, null, 2);
     } else {
-      return translatedTextBlob;
+      // Return both translation and dictionary data
+      if (result.candidateText) {
+        return `${result.resultText}\n\n${result.candidateText}`;
+      }
+      return result.resultText;
     }
   }
 
