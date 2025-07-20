@@ -19,15 +19,8 @@ export async function handlePlayGoogleTTS(
   logME("[Handler:TTS] Handling playGoogleTTS request", message);
   try {
     const text = message?.text;
-    const maxLengthGoogle = 200;
 
     if (!text) throw new Error("No text provided for TTS.");
-    if (text.length > maxLengthGoogle) {
-      logME("[Handler:TTS] Text too long for Google TTS, skipping.");
-      throw new Error(
-        `Text exceeds maximum length of ${maxLengthGoogle} characters.`
-      );
-    }
 
     let voiceLangCode = "en";
     try {
