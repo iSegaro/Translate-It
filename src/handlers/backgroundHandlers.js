@@ -42,8 +42,11 @@ export async function handleFetchTranslation(
 ) {
   logME("[Handler:Translation] Handling fetchTranslation request");
   try {
-    const { promptText, targetLanguage, sourceLanguage, translateMode } =
+    const { promptText, targetLanguage, sourceLanguage, translateMode, translationMode } =
       message.payload;
+    
+    // Handle both translateMode and translationMode for compatibility
+    const finalTranslateMode = translateMode || translationMode;
 
     logME("[Handler:Translation] Received promptText:", promptText);
     logME("[Handler:Translation] Received payload:", message.payload);
@@ -59,7 +62,7 @@ export async function handleFetchTranslation(
     // تماس با سرویس ترجمه
     const translation = await translateText(
       promptText,
-      translateMode,
+      finalTranslateMode,
       sourceLanguage,
       targetLanguage
     );
