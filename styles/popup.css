@@ -335,8 +335,7 @@ body {
   pointer-events: none;
 }
 
-.provider-dropdown-area:hover,
-.provider-dropdown-area:hover .dropdown-arrow {
+.provider-dropdown-area:hover {
   background-color: var(--toolbar-link-hover-bg-color);
 }
 
