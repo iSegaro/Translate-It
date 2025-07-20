@@ -58,7 +58,7 @@ body {
 }
 
 .popup-container {
-  width: 380px; /* عرض popup */
+  width: 400px; /* عرض popup */
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
@@ -189,9 +189,10 @@ body {
 /* #targetLanguageInput, #sourceLanguageInput, #translationResult در بخش textarea استایل‌دهی شده‌اند */
 
 .language-select {
-  flex-grow: 1; /* اجازه می دهد کمبوباکس ها فضا را پر کنند */
-  padding: 5px 8px;
-  font-size: 12px;
+  flex: 1; /* اجازه می دهد کمبوباکس ها فضا را پر کنند */
+  min-width: 100px; /* حداقل عرض برای جلوگیری از کوچک شدن بیش از حد */
+  padding: 6px 8px;
+  font-size: 13px;
   border: 1px solid var(--language-select-border-color);
   border-radius: 4px;
   background-color: var(--language-select-bg-color);

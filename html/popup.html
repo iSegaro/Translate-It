@@ -77,25 +77,12 @@
       </div>
 
       <div class="language-controls">
-        <div class="language-input-container">
-          <input
-            type="text"
-            id="targetLanguageInput"
-            list="targetLanguagesList"
-            placeholder="زبان مقصد"
-            class="language-input"
-            title="زبان مقصد"
-            data-i18n-title="popup_target_language_title"
-            data-i18n-placeholder="popup_target_language_placeholder"
-          />
-          <span
-            id="clearTargetLanguage"
-            class="clear-input clear-input-target"
-            title="پاک کردن زبان مقصد"
-            data-i18n-title="popup_clear_target_language_title"
-          ></span>
-          <datalist id="targetLanguagesList"></datalist>
-        </div>
+        <select
+          id="targetLanguageInput"
+          class="language-select"
+          title="زبان مقصد"
+          data-i18n-title="popup_target_language_title"
+        ></select>
         <button
           id="swapLanguagesBtn"
           class="swap-button"
@@ -109,25 +96,12 @@
           />
         </button>
 
-        <div class="language-input-container">
-          <input
-            type="text"
-            id="sourceLanguageInput"
-            list="sourceLanguagesList"
-            placeholder="زبان مبدا"
-            data-i18n-placeholder="popup_source_language_placeholder"
-            data-i18n-title="popup_source_language_title"
-            class="language-input"
-            title="زبان مبدا"
-          />
-          <span
-            id="clearSourceLanguage"
-            class="clear-input clear-input-source"
-            title="پاک کردن زبان مبدا"
-            data-i18n-title="popup_clear_source_language_title"
-          ></span>
-          <datalist id="sourceLanguagesList"></datalist>
-        </div>
+        <select
+          id="sourceLanguageInput"
+          class="language-select"
+          title="زبان مبدا"
+          data-i18n-title="popup_source_language_title"
+        ></select>
         <button
           type="submit"
           form="translationForm"

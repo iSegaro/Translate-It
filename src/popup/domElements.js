@@ -16,10 +16,6 @@ export default {
   // Language Controls
   sourceLanguageInput: $("sourceLanguageInput"),
   targetLanguageInput: $("targetLanguageInput"),
-  sourceLanguagesList: $("sourceLanguagesList"),
-  targetLanguagesList: $("targetLanguagesList"),
-  clearSourceLanguage: $("clearSourceLanguage"),
-  clearTargetLanguage: $("clearTargetLanguage"),
   swapLanguagesBtn: $("swapLanguagesBtn"),
   translateBtn: $("translateBtn"),
 

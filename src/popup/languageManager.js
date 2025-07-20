@@ -32,18 +32,25 @@ export function getLanguageDisplayValue(langIdentifier) {
 }
 
 function populateLists() {
+  // Populate source language select (includes auto-detect)
   languageList.forEach((lang) => {
     const optionSource = document.createElement("option");
     optionSource.value = lang.promptName || lang.name;
-    elements.sourceLanguagesList?.appendChild(optionSource);
+    optionSource.textContent = lang.promptName || lang.name;
+    elements.sourceLanguageInput?.appendChild(optionSource);
+  });
 
+  // Populate target language select (excludes auto-detect)
+  languageList.forEach((lang) => {
     if (lang.code !== AUTO_DETECT_VALUE) {
       const optionTarget = document.createElement("option");
       optionTarget.value = lang.promptName || lang.name;
-      elements.targetLanguagesList?.appendChild(optionTarget);
+      optionTarget.textContent = lang.promptName || lang.name;
+      elements.targetLanguageInput?.appendChild(optionTarget);
     }
   });
 
+  // Add auto-detect option to source if not present
   if (
     !languageList.some(
       (l) => l.name === AUTO_DETECT_VALUE || l.promptName === AUTO_DETECT_VALUE
@@ -51,16 +58,13 @@ function populateLists() {
   ) {
     const autoOption = document.createElement("option");
     autoOption.value = AUTO_DETECT_VALUE;
-    elements.sourceLanguagesList?.prepend(autoOption);
+    autoOption.textContent = AUTO_DETECT_VALUE;
+    elements.sourceLanguageInput?.prepend(autoOption);
   }
 }
 
 async function setInitialValues() {
   elements.sourceLanguageInput.value = AUTO_DETECT_VALUE;
-  uiManager.toggleClearButtonVisibility(
-    elements.sourceLanguageInput,
-    elements.clearSourceLanguage
-  );
 
   try {
     const storedTargetLang = await getTargetLanguageAsync();
@@ -70,56 +74,10 @@ async function setInitialValues() {
   } catch (err) {
     logME("[LangManager]: Error getting target language:", err);
     elements.targetLanguageInput.value = getLanguageDisplayValue("en");
-  } finally {
-    uiManager.toggleClearButtonVisibility(
-      elements.targetLanguageInput,
-      elements.clearTargetLanguage
-    );
   }
 }
 
-function handleLanguageInputClick(inputElement) {
-  inputElement?.focus();
-}
-
 function setupEventListeners() {
-  elements.sourceLanguageInput?.addEventListener("click", () =>
-    handleLanguageInputClick(elements.sourceLanguageInput)
-  );
-  elements.targetLanguageInput?.addEventListener("click", () =>
-    handleLanguageInputClick(elements.targetLanguageInput)
-  );
-
-  elements.clearSourceLanguage?.addEventListener("click", () => {
-    elements.sourceLanguageInput.value = "";
-    uiManager.toggleClearButtonVisibility(
-      elements.sourceLanguageInput,
-      elements.clearSourceLanguage
-    );
-    elements.sourceLanguageInput.focus();
-  });
-
-  elements.clearTargetLanguage?.addEventListener("click", () => {
-    elements.targetLanguageInput.value = "";
-    uiManager.toggleClearButtonVisibility(
-      elements.targetLanguageInput,
-      elements.clearTargetLanguage
-    );
-    elements.targetLanguageInput.focus();
-  });
-
-  elements.sourceLanguageInput?.addEventListener("input", () =>
-    uiManager.toggleClearButtonVisibility(
-      elements.sourceLanguageInput,
-      elements.clearSourceLanguage
-    )
-  );
-  elements.targetLanguageInput?.addEventListener("input", () =>
-    uiManager.toggleClearButtonVisibility(
-      elements.targetLanguageInput,
-      elements.clearTargetLanguage
-    )
-  );
 
   elements.swapLanguagesBtn?.addEventListener("click", async () => {
     let sourceVal = elements.sourceLanguageInput.value;
@@ -159,15 +117,6 @@ function setupEventListeners() {
 
       elements.sourceLanguageInput.value = sourceDisplay || targetVal;
       elements.targetLanguageInput.value = targetDisplay || sourceVal;
-
-      uiManager.toggleClearButtonVisibility(
-        elements.sourceLanguageInput,
-        elements.clearSourceLanguage
-      );
-      uiManager.toggleClearButtonVisibility(
-        elements.targetLanguageInput,
-        elements.clearTargetLanguage
-      );
 
       // const sourceContent = elements.sourceText.value;
       const targetContent = elements.translationResult.textContent;
