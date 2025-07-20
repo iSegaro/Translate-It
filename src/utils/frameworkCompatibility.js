@@ -603,7 +603,7 @@ async function clearElementContent(element) {
 }
 
 /**
- * جایگزینی ساده با تایپ طبیعی یا fallback
+ * جایگزینی هوشمند متن با چندین استراتژی fallback
  * @param {HTMLElement} element - المان هدف
  * @param {string} newValue - مقدار جدید
  * @param {number} start - موقعیت شروع انتخاب (اختیاری)
@@ -614,62 +614,539 @@ export async function smartTextReplacement(element, newValue, start = null, end 
   if (!element) return false;
 
   try {
-    // برای سایت‌های خاص از تایپ طبیعی استفاده کن
+    logME('[smartTextReplacement] Starting with strategies:', {
+      tagName: element.tagName,
+      isContentEditable: element.isContentEditable,
+      hasSpellcheck: element.hasAttribute('spellcheck'),
+      spellcheckValue: element.getAttribute('spellcheck'),
+      hostname: window.location.hostname
+    });
+
+    // استراتژی 1: Universal Text Insertion (الهام از پروژه نمونه)
+    const universalSuccess = await universalTextInsertion(element, newValue, start, end);
+    if (universalSuccess) {
+      logME('[smartTextReplacement] ✅ Universal insertion succeeded');
+      return true;
+    }
+
+    // استراتژی 2: Natural Typing (برای سایت‌های خاص)
     const naturalTypingSites = ['deepseek.com', 'chat.openai.com', 'claude.ai', 'reddit.com'];
     const shouldUseNaturalTyping = useNaturalTyping && 
       naturalTypingSites.some(site => window.location.hostname.includes(site));
     
     if (shouldUseNaturalTyping) {
-      logME('[FrameworkCompatibility] Using natural typing for:', window.location.hostname);
+      logME('[smartTextReplacement] Trying natural typing for:', window.location.hostname);
       
       // بررسی انتخاب فعلی
       const hasCurrentSelection = checkTextSelection(element);
-      logME('[FrameworkCompatibility] Selection info:', {
-        hasCurrentSelection,
-        startParam: start,
-        endParam: end,
-        actualStart: element.selectionStart,
-        actualEnd: element.selectionEnd
-      });
       
       // اگر محدوده مشخص شده یا انتخاب فعلی داریم
       if ((start !== null && end !== null) || hasCurrentSelection) {
         if (start !== null && end !== null && !element.isContentEditable) {
-          // تنظیم انتخاب طبق محدوده مشخص شده
           element.setSelectionRange(start, end);
         }
-        logME('[FrameworkCompatibility] Using partial replacement mode');
-        // در صورت انتخاب، فقط قسمت انتخاب شده جایگزین می‌شود
         const success = await simulateNaturalTyping(element, newValue, 5, true);
-        
-        // اگر natural typing شکست بخورد، به fallback برگرد
-        if (!success) {
-          logME('[FrameworkCompatibility] Natural typing failed, trying handleSimpleReplacement fallback');
-          return handleSimpleReplacement(element, newValue, start, end);
+        if (success) {
+          logME('[smartTextReplacement] ✅ Natural typing (partial) succeeded');
+          return true;
         }
-        
-        return success;
       } else {
-        logME('[FrameworkCompatibility] Using full replacement mode');
-        // کل فیلد جایگزین می‌شود
         const success = await simulateNaturalTyping(element, newValue, 5, false);
-        
-        // اگر natural typing شکست بخورد، به fallback برگرد
-        if (!success) {
-          logME('[FrameworkCompatibility] Natural typing failed, trying handleSimpleReplacement fallback');
-          return handleSimpleReplacement(element, newValue, start, end);
+        if (success) {
+          logME('[smartTextReplacement] ✅ Natural typing (full) succeeded');
+          return true;
         }
-        
-        return success;
       }
-    } else {
-      // fallback به روش معمولی
-      return handleSimpleReplacement(element, newValue, start, end);
     }
+
+    // استراتژی 3: Simple Replacement (fallback نهایی)
+    logME('[smartTextReplacement] Falling back to simple replacement');
+    return handleSimpleReplacement(element, newValue, start, end);
     
   } catch (error) {
-    logME('[FrameworkCompatibility] Error in smart replacement:', error);
+    logME('[smartTextReplacement] Error in smart replacement:', error);
     return false;
+  }
+}
+
+/**
+ * جایگذاری عمومی متن - الهام گرفته از پروژه Mouse Tooltip Translator
+ * استراتژی چندلایه: execCommand → pasteText → fallback
+ * @param {HTMLElement} element - المان هدف
+ * @param {string} text - متن برای جایگذاری
+ * @param {number} start - موقعیت شروع انتخاب (اختیاری)
+ * @param {number} end - موقعیت پایان انتخاب (اختیاری)
+ */
+export async function universalTextInsertion(element, text, start = null, end = null) {
+  if (!element || !text) return false;
+
+  try {
+    // Focus کردن المان
+    element.focus();
+    await smartDelay(10);
+
+    // تنظیم انتخاب در صورت نیاز
+    if (start !== null && end !== null) {
+      if (element.isContentEditable) {
+        // برای contentEditable از selection API استفاده کن
+        const selection = window.getSelection();
+        const range = document.createRange();
+        
+        // پیدا کردن text node مناسب
+        const textNode = findTextNodeAtPosition(element, start);
+        if (textNode) {
+          range.setStart(textNode, Math.min(start, textNode.textContent.length));
+          range.setEnd(textNode, Math.min(end, textNode.textContent.length));
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } else {
+        // برای input/textarea
+        element.setSelectionRange(start, end);
+      }
+    }
+
+    // بررسی انتخاب موجود
+    const hasSelection = checkTextSelection(element);
+    logME('[universalTextInsertion] Initial state:', {
+      hasSelection,
+      isContentEditable: element.isContentEditable,
+      tagName: element.tagName
+    });
+
+    // استراتژی 1: execCommand insertText (بهترین حفظ undo/redo)
+    const execSuccess = await tryExecCommandInsertion(element, text, hasSelection);
+    if (execSuccess) {
+      logME('[universalTextInsertion] ✅ execCommand succeeded');
+      return true;
+    }
+
+    // استراتژی 2: Paste Event Simulation (سازگار با frameworks)
+    const pasteSuccess = await tryPasteInsertion(element, text, hasSelection);
+    if (pasteSuccess) {
+      logME('[universalTextInsertion] ✅ Paste event succeeded');
+      return true;
+    }
+
+    // استراتژی 3: Conditional strategy based on element type
+    if (element.isContentEditable) {
+      // Google Docs ویژه
+      if (window.location.hostname.includes('docs.google.com')) {
+        const googleDocsSuccess = await tryGoogleDocsInsertion(element, text);
+        if (googleDocsSuccess) {
+          logME('[universalTextInsertion] ✅ Google Docs method succeeded');
+          return true;
+        }
+      }
+      
+      // contentEditable عمومی
+      const contentEditableSuccess = await tryContentEditableInsertion(element, text, hasSelection);
+      if (contentEditableSuccess) {
+        logME('[universalTextInsertion] ✅ ContentEditable method succeeded');
+        return true;
+      }
+    } else {
+      // Input/textarea
+      const inputSuccess = await tryInputInsertion(element, text, hasSelection, start, end);
+      if (inputSuccess) {
+        logME('[universalTextInsertion] ✅ Input method succeeded');
+        return true;
+      }
+    }
+
+    logME('[universalTextInsertion] ❌ All methods failed');
+    return false;
+
+  } catch (error) {
+    logME('[universalTextInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * تلاش برای جایگذاری با execCommand (بهترین روش برای حفظ undo)
+ */
+async function tryExecCommandInsertion(element, text, hasSelection) {
+  try {
+    // بررسی پشتیبانی از execCommand
+    if (typeof document.execCommand !== 'function') {
+      return false;
+    }
+
+    logME('[tryExecCommandInsertion] Attempting execCommand insertText', {
+      hasSelection,
+      isContentEditable: element.isContentEditable,
+      tagName: element.tagName
+    });
+    
+    // Focus element first
+    element.focus();
+    await smartDelay(10);
+    
+    // برای input/textarea
+    if (!element.isContentEditable) {
+      if (hasSelection) {
+        // اگر انتخاب دارد، مستقیماً جایگزین کن
+        const result = document.execCommand('insertText', false, text);
+        if (result) {
+          logME('[tryExecCommandInsertion] ✅ execCommand succeeded for input/textarea with selection');
+          await smartDelay(50);
+          return true;
+        }
+      } else {
+        // اگر انتخاب ندارد، ابتدا همه را انتخاب کن سپس جایگزین کن
+        element.setSelectionRange(0, element.value.length);
+        await smartDelay(10);
+        const result = document.execCommand('insertText', false, text);
+        if (result) {
+          logME('[tryExecCommandInsertion] ✅ execCommand succeeded for input/textarea full replacement');
+          await smartDelay(50);
+          return true;
+        }
+      }
+    }
+    
+    // برای contentEditable
+    if (element.isContentEditable) {
+      const selection = window.getSelection();
+      
+      if (hasSelection && selection && !selection.isCollapsed) {
+        // اگر انتخاب دارد، حذف سپس درج
+        const deleteResult = document.execCommand('delete', false);
+        await smartDelay(10);
+        const insertResult = document.execCommand('insertText', false, text);
+        if (deleteResult && insertResult) {
+          logME('[tryExecCommandInsertion] ✅ execCommand succeeded for contentEditable with selection');
+          await smartDelay(50);
+          return true;
+        }
+      } else {
+        // اگر انتخاب ندارد، ابتدا همه را انتخاب کن
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        await smartDelay(10);
+        
+        // حذف محتوای انتخاب شده
+        const deleteResult = document.execCommand('delete', false);
+        await smartDelay(10);
+        
+        // درج متن جدید
+        const insertResult = document.execCommand('insertText', false, text);
+        if (deleteResult && insertResult) {
+          logME('[tryExecCommandInsertion] ✅ execCommand succeeded for contentEditable full replacement');
+          await smartDelay(50);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    logME('[tryExecCommandInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * تلاش برای جایگذاری با Paste Event
+ */
+async function tryPasteInsertion(element, text, hasSelection) {
+  try {
+    logME('[tryPasteInsertion] Attempting paste event simulation');
+
+    // ایجاد DataTransfer object
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', text);
+
+    // ایجاد paste event
+    const pasteEvent = new ClipboardEvent('paste', {
+      clipboardData,
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    });
+
+    // اضافه کردن ویژگی‌های اضافی برای سازگاری بیشتر
+    Object.defineProperties(pasteEvent, {
+      data: { value: text, writable: false },
+      dataType: { value: 'text/plain', writable: false }
+    });
+
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن (برای حفظ undo)
+    if (!hasSelection) {
+      if (element.isContentEditable) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        logME('[tryPasteInsertion] Selected all content in contentEditable for undo preservation');
+      } else {
+        element.setSelectionRange(0, element.value.length);
+        logME('[tryPasteInsertion] Selected all content in input/textarea for undo preservation');
+      }
+    }
+
+    // ارسال event
+    element.dispatchEvent(pasteEvent);
+    
+    // تأیید موفقیت
+    await smartDelay(100);
+    
+    // بررسی اینکه متن واقعاً اضافه شده
+    const currentText = element.isContentEditable ? 
+      (element.textContent || element.innerText) : element.value;
+    
+    if (currentText && currentText.includes(text)) {
+      logME('[tryPasteInsertion] Success verified');
+      clipboardData.clearData();
+      return true;
+    }
+
+    clipboardData.clearData();
+    return false;
+  } catch (error) {
+    logME('[tryPasteInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * روش خاص Google Docs
+ */
+async function tryGoogleDocsInsertion(element, text) {
+  try {
+    logME('[tryGoogleDocsInsertion] Attempting Google Docs specific method');
+    
+    // پیدا کردن iframe Google Docs
+    const iframe = document.querySelector('.docs-texteventtarget-iframe');
+    if (iframe && iframe.contentDocument) {
+      const editableElement = iframe.contentDocument.querySelector('[contenteditable=true]');
+      if (editableElement) {
+        return await tryPasteInsertion(editableElement, text, false);
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    logME('[tryGoogleDocsInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * روش عمومی contentEditable (با حفظ undo)
+ */
+async function tryContentEditableInsertion(element, text, hasSelection) {
+  try {
+    logME('[tryContentEditableInsertion] Attempting contentEditable insertion with undo preservation');
+    
+    // Focus element
+    element.focus();
+    await smartDelay(10);
+    
+    const selection = window.getSelection();
+    
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن
+    if (!hasSelection) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      await smartDelay(10);
+      logME('[tryContentEditableInsertion] Selected all content for full replacement');
+    }
+    
+    // تلاش برای استفاده از execCommand برای حفظ undo
+    if (typeof document.execCommand === 'function' && selection.rangeCount > 0) {
+      // حذف محتوای انتخاب شده
+      const deleteResult = document.execCommand('delete', false);
+      await smartDelay(10);
+      
+      if (deleteResult) {
+        // درج متن جدید با حفظ خطوط جدید
+        const lines = text.split('\n');
+        let insertSuccess = true;
+        
+        for (let i = 0; i < lines.length; i++) {
+          if (i > 0) {
+            // اضافه کردن line break
+            const brResult = document.execCommand('insertHTML', false, '<br>');
+            if (!brResult) insertSuccess = false;
+          }
+          
+          if (lines[i]) {
+            // اضافه کردن خط متن
+            const textResult = document.execCommand('insertText', false, lines[i]);
+            if (!textResult) insertSuccess = false;
+          }
+        }
+        
+        if (insertSuccess) {
+          logME('[tryContentEditableInsertion] ✅ Used execCommand for undo preservation');
+          
+          // رویدادهای ضروری
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          
+          return true;
+        }
+      }
+    }
+    
+    // fallback: جایگزینی مستقیم (بدون undo)
+    logME('[tryContentEditableInsertion] ⚠️ Falling back to direct DOM manipulation (no undo)');
+    
+    if (hasSelection && selection.rangeCount > 0) {
+      // جایگزینی انتخاب
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      
+      // تبدیل متن به HTML ساده با حفظ خطوط جدید
+      const lines = text.split('\n');
+      const fragment = document.createDocumentFragment();
+      
+      lines.forEach((line, index) => {
+        if (index > 0) {
+          fragment.appendChild(document.createElement('br'));
+        }
+        if (line) {
+          fragment.appendChild(document.createTextNode(line));
+        }
+      });
+      
+      range.insertNode(fragment);
+      
+      // تنظیم cursor بعد از متن
+      range.setStartAfter(fragment.lastChild || fragment);
+      range.setEndAfter(fragment.lastChild || fragment);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      // جایگزینی کل محتوا
+      element.innerHTML = '';
+      const lines = text.split('\n');
+      
+      lines.forEach((line, index) => {
+        if (index > 0) {
+          element.appendChild(document.createElement('br'));
+        }
+        if (line) {
+          element.appendChild(document.createTextNode(line));
+        }
+      });
+      
+      // تنظیم cursor در انتها
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    // رویدادهای ضروری
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    return true;
+  } catch (error) {
+    logME('[tryContentEditableInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * روش عمومی input/textarea (با حفظ undo)
+ */
+async function tryInputInsertion(element, text, hasSelection, start, end) {
+  try {
+    logME('[tryInputInsertion] Attempting input/textarea insertion with undo preservation');
+    
+    // Focus element
+    element.focus();
+    await smartDelay(10);
+    
+    const currentValue = element.value || '';
+    let startPos, endPos;
+    
+    if (start !== null && end !== null) {
+      startPos = start;
+      endPos = end;
+    } else if (hasSelection) {
+      startPos = element.selectionStart;
+      endPos = element.selectionEnd;
+    } else {
+      startPos = 0;
+      endPos = currentValue.length;
+    }
+    
+    // تنظیم انتخاب
+    element.setSelectionRange(startPos, endPos);
+    await smartDelay(10);
+    
+    // تلاش برای استفاده از execCommand برای حفظ undo
+    if (typeof document.execCommand === 'function') {
+      const execResult = document.execCommand('insertText', false, text);
+      if (execResult) {
+        logME('[tryInputInsertion] ✅ Used execCommand for undo preservation');
+        
+        // رویدادهای ضروری
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        return true;
+      }
+    }
+    
+    // fallback: جایگزینی مستقیم (بدون undo)
+    logME('[tryInputInsertion] ⚠️ Falling back to direct value assignment (no undo)');
+    const newValue = currentValue.substring(0, startPos) + text + currentValue.substring(endPos);
+    element.value = newValue;
+    
+    // تنظیم cursor
+    const newCursorPosition = startPos + text.length;
+    element.setSelectionRange(newCursorPosition, newCursorPosition);
+    
+    // رویدادهای ضروری
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    return true;
+  } catch (error) {
+    logME('[tryInputInsertion] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * پیدا کردن text node در موقعیت مشخص
+ */
+function findTextNodeAtPosition(element, position) {
+  try {
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+    
+    let currentPos = 0;
+    let node;
+    
+    while ((node = walker.nextNode())) {
+      const length = node.textContent.length;
+      if (currentPos + length >= position) {
+        return node;
+      }
+      currentPos += length;
+    }
+    
+    return element.firstChild || element;
+  } catch (error) {
+    logME('[findTextNodeAtPosition] Error:', error);
+    return element.firstChild || element;
   }
 }
 

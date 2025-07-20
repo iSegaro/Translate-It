@@ -95,42 +95,36 @@ export async function translateFieldViaSmartHandler({
     // تعیین حالت عملیات: جایگزینی یا کپی
     let isReplaceMode = false;
     
-    // بررسی اولویت: اگر متن انتخاب شده باشد، همیشه جایگزین می‌کنیم
     const hasTextSelection = hasActiveElementTextSelection();
     
     if (mode === TranslationMode.Field) {
-      if (hasTextSelection) {
-        // اگر متن انتخاب شده باشد، بدون توجه به تنظیمات، جایگزین می‌کنیم
-        isReplaceMode = true;
-        logME("[SmartTranslationHandler] replace mode due to text selection");
-      } else {
-        // اگر متن انتخاب نشده باشد، طبق تنظیمات عمل می‌کنیم
-        const is_copy = await getCOPY_REPLACEAsync();
-        if (platform === Platform.Default) {
-          // فقط برای platform پیش‌فرض، بررسی ویرایشگر پیچیده
-          const activeElement = document.activeElement;
-          const isComplexEditorDetected = activeElement ? isComplexEditor(activeElement) : false;
-          
-          if (isComplexEditorDetected) {
-            logME("[SmartTranslationHandler] Complex editor detected on default platform - forcing copy mode");
-            isReplaceMode = false; // همیشه copy mode
-          } else if (is_copy === "replace") {
-            isReplaceMode = true;
-            logME("[SmartTranslationHandler] replace on default (no selection)");
-          } else {
-            logME("[SmartTranslationHandler] copy on default (no selection)");
-          }
+      // بررسی تنظیمات کلی
+      const is_copy = await getCOPY_REPLACEAsync();
+      
+      if (platform === Platform.Default) {
+        // فقط برای platform پیش‌فرض، بررسی ویرایشگر پیچیده
+        const activeElement = document.activeElement;
+        const isComplexEditorDetected = activeElement ? isComplexEditor(activeElement) : false;
+        
+        if (isComplexEditorDetected) {
+          logME("[SmartTranslationHandler] Complex editor detected on default platform - forcing copy mode");
+          isReplaceMode = false; // همیشه copy mode
+        } else if (is_copy === "replace") {
+          isReplaceMode = true;
+          logME(`[SmartTranslationHandler] replace on default (hasSelection: ${hasTextSelection})`);
         } else {
-          // برای platform‌های خاص، از استراتژی موجود استفاده کن
-          if (is_copy === "replace") {
+          logME(`[SmartTranslationHandler] copy on default (hasSelection: ${hasTextSelection})`);
+        }
+      } else {
+        // برای platform‌های خاص، از استراتژی موجود استفاده کن
+        if (is_copy === "replace") {
+          isReplaceMode = true;
+          logME(`[SmartTranslationHandler] replace on platform (hasSelection: ${hasTextSelection})`);
+        } else {
+          const is_special_replace = await getREPLACE_SPECIAL_SITESAsync();
+          logME(`REPLACE_SPECIAL_SITES ${is_special_replace} (hasSelection: ${hasTextSelection})`);
+          if (is_special_replace === true) {
             isReplaceMode = true;
-            logME("[SmartTranslationHandler] replace on platform (no selection)");
-          } else {
-            const is_special_replace = await getREPLACE_SPECIAL_SITESAsync();
-            logME(`REPLACE_SPECIAL_SITES ${is_special_replace}`);
-            if (is_special_replace === true) {
-              isReplaceMode = true;
-            }
           }
         }
       }
