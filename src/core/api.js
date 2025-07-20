@@ -105,6 +105,43 @@ class ApiService {
     this.sessionContext = null;
   }
 
+  /**
+   * تبدیل dictionary output Google Translate به فرمت markdown
+   * @param {string} candidateText - متن dictionary خام
+   * @returns {string} - متن فرماتبندی شده markdown
+   */
+  _formatDictionaryAsMarkdown(candidateText) {
+    if (!candidateText || candidateText.trim() === '') {
+      return '';
+    }
+
+    const lines = candidateText.trim().split('\n').filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) {
+      return '';
+    }
+
+    // ساخت فرمت markdown
+    let markdownOutput = '';
+    
+    lines.forEach(line => {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const partOfSpeech = line.substring(0, colonIndex).trim();
+        const terms = line.substring(colonIndex + 1).trim();
+        
+        if (partOfSpeech && terms) {
+          markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
+        }
+      } else if (line.trim()) {
+        // اگر خط نقطه‌ای ندارد، به عنوان عنوان در نظر بگیریم
+        markdownOutput += `**${line.trim()}**\n\n`;
+      }
+    });
+    
+    return markdownOutput.trim();
+  }
+
   _isSpecificTextJsonFormat(obj) {
     return (
       Array.isArray(obj) &&
@@ -360,7 +397,8 @@ class ApiService {
     } else {
       // Return both translation and dictionary data
       if (result.candidateText) {
-        return `${result.resultText}\n\n${result.candidateText}`;
+        const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
+        return `${result.resultText}\n\n${formattedDictionary}`;
       }
       return result.resultText;
     }
