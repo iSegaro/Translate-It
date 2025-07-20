@@ -15,8 +15,7 @@ export function toggleInlineToolbarVisibility(element) {
   const text = (element.value || element.textContent || "").trim();
   container.classList.toggle(
     "has-content",
-    (text && text !== getTranslationString("popup_string_during_translate")) ||
-      "در حال ترجمه..."
+    text && text !== getTranslationString("popup_string_during_translate") && text !== "در حال ترجمه..."
   );
 }
 
