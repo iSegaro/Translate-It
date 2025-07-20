@@ -145,12 +145,12 @@ export const openOptionsPage_from_Background = (message) => {
     console.log('[openOptionsPage_from_Background] All tab URLs:', tabs.map(tab => tab.url));
     
     // پیدا کردن همه تب‌های مربوط به صفحه تنظیمات - فقط path را چک کنیم (بدون extension ID)
-    const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^\/]+/, '');
+    const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, '');
     console.log('[openOptionsPage_from_Background] Looking for path:', targetPath);
     
     const existingTabs = tabs.filter((tab) => {
       if (!tab.url) return false;
-      const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^\/]+/, '');
+      const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^/]+/, '');
       const matches = tabPath === targetPath;
       console.log('[openOptionsPage_from_Background] Comparing path:', tabPath, '===', targetPath, '→', matches);
       return matches;
@@ -209,12 +209,12 @@ export function focusOrCreateTab(url) {
       console.log('[focusOrCreateTab] All tab URLs:', tabs.map(tab => tab.url));
       
       // پیدا کردن همه تب‌های مربوط به این صفحه - فقط path را چک کنیم (بدون extension ID)
-      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^\/]+/, '');
+      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, '');
       console.log('[focusOrCreateTab] Looking for path:', targetPath);
       
       const existingTabs = tabs.filter(tab => {
         if (!tab.url) return false;
-        const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^\/]+/, '');
+        const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^/]+/, '');
         const matches = tabPath === targetPath;
         console.log('[focusOrCreateTab] Comparing path:', tabPath, '===', targetPath, '→', matches);
         return matches;
