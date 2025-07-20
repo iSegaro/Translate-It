@@ -45,8 +45,12 @@ export async function handleFetchTranslation(
     const { promptText, targetLanguage, sourceLanguage, translateMode } =
       message.payload;
 
+    logME("[Handler:Translation] Received promptText:", promptText);
+    logME("[Handler:Translation] Received payload:", message.payload);
+
     // اعتبارسنجی ورودی
     if (!promptText) {
+      logME("[Handler:Translation] ERROR: promptText is empty or undefined");
       const err = new Error(ErrorTypes.TEXT_EMPTY);
       err.type = ErrorTypes.TEXT_EMPTY;
       throw err;
@@ -60,8 +64,11 @@ export async function handleFetchTranslation(
       targetLanguage
     );
 
+    logME("[Handler:Translation] Translation result:", translation);
+
     // بررسی نتیجه
     if (typeof translation !== "string" || !translation.trim()) {
+      logME("[Handler:Translation] ERROR: Translation is empty or invalid");
       const err = new Error(ErrorTypes.TRANSLATION_FAILED);
       err.type = ErrorTypes.API;
       throw err;

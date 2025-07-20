@@ -93,18 +93,22 @@ export async function buildPrompt(
     userRules
   );
 
-  logME("Prompt : ", finalPromptWithUserRules);
+  logME("Prompt template: ", finalPromptWithUserRules);
+  logME("Text for translation: ", textForTranslation);
 
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
   let finalPrompt;
   if (finalPromptWithUserRules.includes("$_{TEXT}")) {
+    // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
     finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
       textForTranslation
     );
+    logME("Final prompt with TEXT replacement: ", finalPrompt);
   } else {
-    finalPrompt = `${finalPromptWithUserRules}\n\n \`\`\` ${textForTranslation}  \`\`\` \n\n`;
+    finalPrompt = `${finalPromptWithUserRules}\n\n${textForTranslation}\n\n`;
+    logME("Final prompt with appended text: ", finalPrompt);
   }
 
   return finalPrompt;

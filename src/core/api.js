@@ -158,8 +158,14 @@ class ApiService {
    * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
    */
   async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
+    logME(`[API] _executeApiCall starting for context: ${context}`);
+    logME(`[API] _executeApiCall URL: ${url}`);
+    logME(`[API] _executeApiCall fetchOptions:`, fetchOptions);
+    
     try {
       const response = await fetch(url, fetchOptions);
+      logME(`[API] _executeApiCall response status: ${response.status} ${response.statusText}`);
+      
       if (!response.ok) {
         // Extract error details if available
         let body = {};
@@ -174,6 +180,8 @@ class ApiService {
           body.error?.message ||
           response.statusText ||
           `HTTP ${response.status}`;
+        
+        logME(`[API] _executeApiCall HTTP error: ${msg}`, body);
         const err = new Error(msg);
         // Mark as HTTP error (status codes 4xx/5xx)
         err.type = ErrorTypes.HTTP_ERROR;
@@ -184,8 +192,13 @@ class ApiService {
 
       // Parse successful response
       const data = await response.json();
+      logME(`[API] _executeApiCall response data:`, data);
+      
       const result = extractResponse(data, response.status);
+      logME(`[API] _executeApiCall extracted result:`, result);
+      
       if (result === undefined) {
+        logME(`[API] _executeApiCall result is undefined - treating as invalid response`);
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
         err.type = ErrorTypes.API;
         err.statusCode = response.status;
@@ -193,6 +206,7 @@ class ApiService {
         throw err;
       }
 
+      logME(`[API] _executeApiCall success for context: ${context}`);
       return result;
     } catch (err) {
       // Handle fetch network errors (e.g., offline)
@@ -306,12 +320,14 @@ class ApiService {
       throw err;
     }
 
+    logME("[API] handleGeminiTranslation input text:", text);
     const prompt = await buildPrompt(
       text,
       sourceLang,
       targetLang,
       translateMode
     );
+    logME("[API] handleGeminiTranslation built prompt:", prompt);
     const url = `${apiUrl}?key=${apiKey}`;
     const fetchOptions = {
       method: "POST",
@@ -319,13 +335,26 @@ class ApiService {
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     };
 
-    return this._executeApiCall({
-      url,
-      fetchOptions,
-      extractResponse: (data) =>
-        data?.candidates?.[0]?.content?.parts?.[0]?.text,
-      context: "api-gemini-translation",
+    logME("[API] handleGeminiTranslation about to call _executeApiCall with:", {
+      url: url.replace(/key=[^&]+/, 'key=***'),
+      context: "api-gemini-translation"
     });
+
+    try {
+      const result = await this._executeApiCall({
+        url,
+        fetchOptions,
+        extractResponse: (data) =>
+          data?.candidates?.[0]?.content?.parts?.[0]?.text,
+        context: "api-gemini-translation",
+      });
+      
+      logME("[API] handleGeminiTranslation _executeApiCall completed with result:", result);
+      return result;
+    } catch (error) {
+      logME("[API] handleGeminiTranslation _executeApiCall failed with error:", error);
+      throw error;
+    }
   }
 
   async handleWebAITranslation(text, sourceLang, targetLang, translateMode) {
