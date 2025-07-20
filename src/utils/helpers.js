@@ -136,41 +136,114 @@ export const openOptionsPage_from_Background = (message) => {
   const baseUrl = Browser.runtime.getURL(optionsPath);
   const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
 
+  console.log('[openOptionsPage_from_Background] baseUrl:', baseUrl);
+  console.log('[openOptionsPage_from_Background] finalUrl:', finalUrl);
+
   // This logic runs safely in the background context
   Browser.tabs.query({}).then((tabs) => {
-    const existingTab = tabs.find(
-      (tab) => tab.url && tab.url.startsWith(baseUrl)
-    );
-    if (existingTab) {
+    // لاگ کردن همه URLs برای debugging
+    console.log('[openOptionsPage_from_Background] All tab URLs:', tabs.map(tab => tab.url));
+    
+    // پیدا کردن همه تب‌های مربوط به صفحه تنظیمات - فقط path را چک کنیم (بدون extension ID)
+    const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^\/]+/, '');
+    console.log('[openOptionsPage_from_Background] Looking for path:', targetPath);
+    
+    const existingTabs = tabs.filter((tab) => {
+      if (!tab.url) return false;
+      const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^\/]+/, '');
+      const matches = tabPath === targetPath;
+      console.log('[openOptionsPage_from_Background] Comparing path:', tabPath, '===', targetPath, '→', matches);
+      return matches;
+    });
+    console.log('[openOptionsPage_from_Background] Found existing tabs:', existingTabs.length, existingTabs.map(tab => tab.url));
+    
+    if (existingTabs.length > 0) {
+      // استفاده از اولین تب موجود و بستن بقیه
+      const firstTab = existingTabs[0];
+      const duplicateTabs = existingTabs.slice(1);
+      
+      // بستن تب‌های اضافی (duplicate)
+      if (duplicateTabs.length > 0) {
+        const duplicateTabIds = duplicateTabs.map(tab => tab.id);
+        Browser.tabs.remove(duplicateTabIds).catch(err => {
+          console.error("Error closing duplicate options tabs:", err);
+        });
+      }
+      
+      // به‌روزرسانی و فوکوس کردن اولین تب
       Browser.tabs
-        .update(existingTab.id, { active: true, url: finalUrl })
+        .update(firstTab.id, { active: true, url: finalUrl })
         .then((updatedTab) => {
           if (updatedTab)
             Browser.windows.update(updatedTab.windowId, { focused: true });
+        })
+        .catch(err => {
+          console.error("Error updating options tab:", err);
+          // اگر خطا رخ داد، تب جدید ایجاد کن
+          Browser.tabs.create({ url: finalUrl });
         });
     } else {
+      // هیچ تب موجودی یافت نشد، تب جدید ایجاد کن
       Browser.tabs.create({ url: finalUrl });
     }
+  }).catch(err => {
+    console.error("Error querying tabs:", err);
+    // در صورت خطا، مستقیماً تب جدید ایجاد کن
+    Browser.tabs.create({ url: finalUrl });
   });
 };
 
 /**
  * A robust function to open an extension page.
- * It checks if a tab with the same base URL is already open to avoid duplicates.
+ * It checks if tabs with the same base URL are already open, closes duplicates, and focuses one.
  * If found, it updates and focuses the existing tab. Otherwise, it creates a new one.
  * @param {string} url - The full URL of the extension page to open (e.g., including #anchor).
  */
 export function focusOrCreateTab(url) {
   const baseUrl = url.split('#')[0]; 
+  console.log('[focusOrCreateTab] Looking for tabs with baseUrl:', baseUrl);
+  
   Browser.tabs.query({})
     .then(tabs => {
-      const existingTab = tabs.find(tab => tab.url && tab.url.startsWith(baseUrl));
-      if (existingTab) {
-        Browser.tabs.update(existingTab.id, { active: true, url: url })
+      // لاگ کردن همه URLs برای debugging
+      console.log('[focusOrCreateTab] All tab URLs:', tabs.map(tab => tab.url));
+      
+      // پیدا کردن همه تب‌های مربوط به این صفحه - فقط path را چک کنیم (بدون extension ID)
+      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^\/]+/, '');
+      console.log('[focusOrCreateTab] Looking for path:', targetPath);
+      
+      const existingTabs = tabs.filter(tab => {
+        if (!tab.url) return false;
+        const tabPath = tab.url.split('#')[0].replace(/^chrome-extension:\/\/[^\/]+/, '');
+        const matches = tabPath === targetPath;
+        console.log('[focusOrCreateTab] Comparing path:', tabPath, '===', targetPath, '→', matches);
+        return matches;
+      });
+      console.log('[focusOrCreateTab] Found existing tabs:', existingTabs.length, existingTabs.map(tab => tab.url));
+      
+      if (existingTabs.length > 0) {
+        // استفاده از اولین تب موجود و بستن بقیه
+        const firstTab = existingTabs[0];
+        const duplicateTabs = existingTabs.slice(1);
+        
+        // بستن تب‌های اضافی (duplicate)
+        if (duplicateTabs.length > 0) {
+          const duplicateTabIds = duplicateTabs.map(tab => tab.id);
+          Browser.tabs.remove(duplicateTabIds).catch(err => {
+            console.error("Error closing duplicate tabs:", err);
+          });
+        }
+        
+        // به‌روزرسانی و فوکوس کردن اولین تب
+        Browser.tabs.update(firstTab.id, { active: true, url: url })
           .then(updatedTab => {
             if (updatedTab) {
               Browser.windows.update(updatedTab.windowId, { focused: true });
             }
+          })
+          .catch(err => {
+            console.error("Error updating tab:", err);
+            Browser.tabs.create({ url: url });
           });
       } else {
         Browser.tabs.create({ url: url });

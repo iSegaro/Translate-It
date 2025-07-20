@@ -1,7 +1,7 @@
 // src/listeners/onContextMenu.js
 
 import Browser from "webextension-polyfill";
-import { logME } from "../utils/helpers.js";
+import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
 
@@ -213,7 +213,7 @@ Browser.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       break;
     case ACTION_CONTEXT_MENU_OPTIONS_ID:
-      Browser.runtime.openOptionsPage();
+      focusOrCreateTab(Browser.runtime.getURL("html/options.html"));
       break;
     case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
       try {
@@ -232,7 +232,7 @@ Browser.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       break;
     case HELP_MENU_ID:
-      Browser.tabs.create({ url: "html/options.html#help" });
+      focusOrCreateTab(Browser.runtime.getURL("html/options.html#help"));
       break;
   }
 });
