@@ -320,6 +320,11 @@ function setupEventListeners() {
       return;
     }
     deactivateSelectElementMode();
+    
+    // توقف هر گونه تلفظ در حال پخش با کلیک در sidepanel
+    Browser.runtime.sendMessage({ action: "stopTTS" }).catch(() => {
+      // خطا را نادیده می‌گیریم چون ممکن است TTS فعال نباشد
+    });
   });
 
   const sourceContainer = elements.sourceText.parentElement;
