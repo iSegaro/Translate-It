@@ -32,7 +32,7 @@ html {
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-size: 14px;
+  font-size: 15px;
   height: 100%;
   overflow: hidden;
   width: 100%; /* اضافه شد */
@@ -48,13 +48,13 @@ html {
 
 /* --- Vertical Toolbar --- */
 .side-toolbar {
-  width: 55px;
+  width: 38px;
   background-color: var(--toolbar-bg);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: 6px 0;
   flex-shrink: 0;
   z-index: 20; /* بالاتر از history panel */
   position: relative;
@@ -71,10 +71,10 @@ html {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  width: 40px;
-  height: 40px;
+  padding: 4px;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,8 +84,8 @@ html {
   background-color: var(--toolbar-button-hover-bg);
 }
 .toolbar-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   filter: var(--icon-filter);
 }
 
@@ -102,7 +102,7 @@ html {
 .main-content {
   width: 100%;
   height: 100%;
-  padding: 15px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   overflow-y: hidden;
@@ -120,9 +120,9 @@ html {
 /* Language Controls */
 .language-controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   flex-shrink: 0;
   flex-wrap: wrap;
   width: 100%; /* اضافه شد */
@@ -135,7 +135,7 @@ html {
   flex-basis: 120px;
   min-width: 0; /* اضافه شد - مهم برای flex items */
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 14px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background-color: var(--bg-secondary);
@@ -187,7 +187,7 @@ html[dir="rtl"] .language-select {
 }
 
 .textarea-container.source-container {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
@@ -198,16 +198,16 @@ textarea#sourceText {
   resize: none;
   box-sizing: border-box;
   padding-top: 32px;
-  padding-bottom: 10px;
-  padding-inline-start: 10px;
-  padding-inline-end: 10px;
+  padding-bottom: 12px;
+  padding-inline-start: 14px;
+  padding-inline-end: 14px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--bg-secondary);
   color: var(--text-color);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.7;
   direction: ltr;
   text-align: left;
   min-width: 0; /* اضافه شد */
@@ -218,7 +218,7 @@ textarea#sourceText {
 .action-bar {
   display: flex;
   justify-content: center;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   flex-shrink: 0; /* جلوگیری از تغییر مکان دکمه */
 }
 .translate-button-main {
@@ -227,7 +227,7 @@ textarea#sourceText {
   border: none;
   border-radius: 5px;
   padding: 10px 20px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -263,13 +263,13 @@ textarea#sourceText {
   height: 100%;
   box-sizing: border-box;
   padding-top: 32px;
-  padding-bottom: 10px;
-  padding-inline-start: 10px;
-  padding-inline-end: 10px;
+  padding-bottom: 12px;
+  padding-inline-start: 14px;
+  padding-inline-end: 14px;
   color: var(--text-color);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.7;
   direction: ltr;
   text-align: left;
   white-space: pre-wrap;
@@ -404,7 +404,7 @@ html[dir="rtl"] .paste-icon-separate {
   z-index: 30; /* بالاترین z-index */
   display: none;
   min-width: 200px;
-  left: 60px;
+  left: 44px;
   padding: 4px 0;
 }
 
@@ -416,6 +416,7 @@ html[dir="rtl"] .paste-icon-separate {
   cursor: pointer;
   transition: background-color 0.2s ease;
   color: var(--text-color);
+  font-size: 14px;
 }
 
 .dropdown-item:hover {
@@ -459,7 +460,7 @@ html[dir="rtl"] .paste-icon-separate {
 
 .history-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
 }
 
@@ -510,7 +511,7 @@ html[dir="rtl"] .paste-icon-separate {
 }
 
 .history-item-source {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-color);
   opacity: 0.8;
   margin-bottom: 6px;
@@ -540,7 +541,7 @@ html[dir="rtl"] .paste-icon-separate {
 
 /* Markdown styles in history items */
 .history-item-target {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-color);
   font-weight: 400; /* از 500 به 400 تغییر دادیم */
   display: -webkit-box;
@@ -656,7 +657,7 @@ html[dir="rtl"] .paste-icon-separate {
   border-radius: 6px;
   color: var(--text-color);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   transition: all 0.2s ease;
   opacity: 0.8;
 }
@@ -743,4 +744,144 @@ html[dir="rtl"] .history-item-time {
   padding: 40px 20px;
   color: var(--text-color);
   opacity: 0.6;
+}
+
+/* ==========================================================================
+   Markdown Styles for Main Result Area
+   ========================================================================== */
+
+/* Base markdown styles for the main result container */
+.result p {
+  margin: 0 0 10px 0;
+  line-height: 1.7;
+}
+
+.result p:last-child {
+  margin-bottom: 0;
+}
+
+.result h1, .result h2, .result h3, 
+.result h4, .result h5, .result h6 {
+  margin: 12px 0 8px 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.result h1 { font-size: 1.3em; }
+.result h2 { font-size: 1.2em; }
+.result h3 { font-size: 1.1em; }
+.result h4, .result h5, .result h6 { font-size: 1em; }
+
+.result strong {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.result em {
+  font-style: italic;
+}
+
+.result ul, .result ol {
+  margin: 8px 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.result li {
+  margin: 4px 0;
+}
+
+.result code {
+  background-color: var(--toolbar-button-hover-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Monaco', 'Menlo', monospace;
+  font-size: 0.9em;
+  border: 1px solid var(--border-color);
+}
+
+.result pre {
+  background-color: var(--toolbar-button-hover-bg);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 10px 0;
+  border: 1px solid var(--border-color);
+  line-height: 1.5;
+}
+
+.result pre code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: 0.85em;
+}
+
+.result blockquote {
+  border-left: 4px solid var(--primary-color);
+  padding-left: 16px;
+  margin: 12px 0;
+  opacity: 0.9;
+  font-style: italic;
+  background-color: rgba(var(--primary-color-rgb, 0, 123, 255), 0.05);
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+}
+
+.result a {
+  color: var(--primary-color);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.result a:hover {
+  border-bottom-color: var(--primary-color);
+}
+
+/* Table styles */
+.result table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 0.95em;
+}
+
+.result th, .result td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.result th {
+  background-color: var(--toolbar-button-hover-bg);
+  font-weight: 600;
+}
+
+/* Horizontal rule */
+.result hr {
+  border: none;
+  border-top: 2px solid var(--border-color);
+  margin: 16px 0;
+  border-radius: 1px;
+}
+
+/* Better spacing for nested elements */
+.result ul ul, .result ol ol, .result ul ol, .result ol ul {
+  margin: 4px 0;
+}
+
+/* RTL support for markdown */
+html[dir="rtl"] .result ul, 
+html[dir="rtl"] .result ol {
+  padding-right: 20px;
+  padding-left: 0;
+}
+
+html[dir="rtl"] .result blockquote {
+  border-left: none;
+  border-right: 4px solid var(--primary-color);
+  padding-left: 0;
+  padding-right: 16px;
+  border-radius: 6px 0 0 6px;
 }
