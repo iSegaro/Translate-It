@@ -342,7 +342,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!extensionEnabledCheckbox) return;
 
     const isMasterEnabled = extensionEnabledCheckbox.checked;
-    const isGoogleApi = translationApiSelect.value === "google";
 
     const topLevelControls = [
       translateOnTextFieldsCheckbox,

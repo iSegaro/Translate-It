@@ -692,7 +692,7 @@ function handleSimpleReplacement(element, newValue, start, end) {
 /**
  * جایگزینی contentEditable با حفظ undo
  */
-function handleContentEditableWithUndo(element, newValue, start, end) {
+function handleContentEditableWithUndo(element, newValue) {
   try {
     // استفاده از execCommand برای حفظ undo (deprecated ولی هنوز کار می‌کند)
     const selection = window.getSelection();
