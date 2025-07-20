@@ -104,11 +104,10 @@ Translation quality requirements:
 - Do **not** include any additional explanations, comments, markdown, or extra content.
 
 Output only the translated text:
-\`\`\`
+
 $_{TEXT}
-\`\`\`
 `,
-/*--- End PROMPT_BASE_SELECT ---*/
+/*--- End PROMPT_BASE_FIELD ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
   PROMPT_BASE_SELECT: `Act as a fluent and natural JSON translation service. The input is a JSON array where each object contains a "text" property.
@@ -123,9 +122,7 @@ Your task:
 
 Return **only** the translated JSON array. Do not include explanations, markdown, or any extra content.
 
-\`\`\`json input
 $_{TEXT}
-\`\`\`
 `,
 /*--- End PROMPT_BASE_SELECT ---*/
 
@@ -146,9 +143,7 @@ Stylistic guidelines:
   - Do **not** include markdown, comments, or any additional explanation.
   - Output **only** the dictionary entry — nothing more.
 
-\`\`\`text input
 $_{TEXT}
-\`\`\`
 `,
 /*--- End PROMPT_BASE_DICTIONARY ---*/
 
@@ -163,9 +158,7 @@ Instructions:
 
 Return **only** the translated text. Do not include explanations, markdown, or any other content.
 
-\`\`\`text input
 $_{TEXT}
-\`\`\`
 `,
   /*--- End PROMPT_BASE_POPUP_TRANSLATE ---*/
 
