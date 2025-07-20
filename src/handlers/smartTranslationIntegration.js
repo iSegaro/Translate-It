@@ -163,7 +163,7 @@ export async function translateFieldViaSmartHandler({
         try {
           const res = await Browser.runtime.sendMessage({
             action: "applyTranslationToActiveElement",
-            payload: { translatedText: translated },
+            payload: { translatedText: translated, copyOnly: false },
           });
 
           // پاسخ از contentMain.js را بررسی می‌کنیم
@@ -200,7 +200,7 @@ export async function translateFieldViaSmartHandler({
       }
     } else {
       // --- حالت کپی فعال است ---
-      logME("[SmartTranslateHandler] Executing Copy Mode.");
+      logME("[SmartTranslateHandler] Executing Copy Mode - no field modifications.");
       await copyToClipboard(translated, translationHandler);
     }
   } catch (err) {

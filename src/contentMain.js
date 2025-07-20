@@ -408,74 +408,88 @@ export function initContentScript() {
           case "applyTranslationToActiveElement": {
             const active = document.activeElement;
             const translated = message.payload?.translatedText;
+            const copyOnly = message.payload?.copyOnly || false; // پارامتر جدید برای copy mode
             let didApply = false;
 
             if (active && typeof translated === "string") {
               try {
-                const platform =
-                  this.translationHandler.detectPlatform?.(active) ??
-                  detectPlatform(active);
-
-                // تلاش برای جایگزینی با استراتژی پلتفرم
-                if (
-                  this.translationHandler.strategies[platform]?.updateElement &&
-                  typeof this.translationHandler.strategies[platform]
-                    .updateElement === "function"
-                ) {
-                  didApply = await this.translationHandler.strategies[
-                    platform
-                  ].updateElement(active, translated);
+                // اگر copy mode فعال است، فقط در کلیپ‌بورد کپی می‌کنیم
+                if (copyOnly) {
+                  logME("[ContentMain] Copy mode requested - copying to clipboard only");
+                  try {
+                    await navigator.clipboard.writeText(translated);
+                    didApply = true;
+                  } catch (error) {
+                    logME("[ContentMain] Clipboard copy failed:", error);
+                    didApply = false;
+                  }
                 } else {
-                  // بررسی وجود متن انتخاب شده در فیلد متنی
-                  const hasSelection = this._hasTextSelection(active);
-                  
-                  // تعیین محدوده انتخاب در صورت وجود
-                  let selectionStart = null;
-                  let selectionEnd = null;
-                  
-                  if (hasSelection && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-                    selectionStart = active.selectionStart;
-                    selectionEnd = active.selectionEnd;
-                  }
-                  
-                  // استفاده از smart replacement برای سازگاری بهتر
-                  didApply = await smartTextReplacement(active, translated, selectionStart, selectionEnd);
-                  
-                  if (!didApply) {
-                    // fallback به روش قدیمی
-                    if (hasSelection) {
-                      // ترجمه فقط متن انتخاب شده
-                      didApply = this._replaceSelectedText(active, translated);
-                    } else {
-                      // ترجمه کل فیلد متنی
-                      if (active.isContentEditable) {
-                        active.innerText = translated;
-                      } else if ("value" in active) {
-                        active.value = translated;
-                      }
-                      didApply = true;
-                    }
+                  // replace mode
+                  const platform =
+                    this.translationHandler.detectPlatform?.(active) ??
+                    detectPlatform(active);
 
-                    if (didApply) {
-                      // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
-                      active.dispatchEvent(
-                        new Event("input", { bubbles: true, cancelable: true })
-                      );
-                      active.dispatchEvent(
-                        new Event("change", { bubbles: true, cancelable: true })
-                      );
-
-                      // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
-                      await new Promise((resolve) => setTimeout(resolve, 50));
-                    }
+                  // تلاش برای جایگزینی با استراتژی پلتفرم
+                  if (
+                    this.translationHandler.strategies[platform]?.updateElement &&
+                    typeof this.translationHandler.strategies[platform]
+                      .updateElement === "function"
+                  ) {
+                    didApply = await this.translationHandler.strategies[
+                      platform
+                    ].updateElement(active, translated);
                   } else {
-                    // اگر smart replacement موفق بود، تاخیر هوشمند اعمال کنیم
-                    await smartDelay(100);
-                  }
+                    // بررسی وجود متن انتخاب شده در فیلد متنی
+                    const hasSelection = this._hasTextSelection(active);
+                    
+                    // تعیین محدوده انتخاب در صورت وجود
+                    let selectionStart = null;
+                    let selectionEnd = null;
+                    
+                    if (hasSelection && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+                      selectionStart = active.selectionStart;
+                      selectionEnd = active.selectionEnd;
+                    }
+                    
+                    // استفاده از smart replacement برای سازگاری بهتر
+                    didApply = await smartTextReplacement(active, translated, selectionStart, selectionEnd);
+                    
+                    if (!didApply) {
+                      // fallback به روش قدیمی
+                      if (hasSelection) {
+                        // ترجمه فقط متن انتخاب شده
+                        didApply = this._replaceSelectedText(active, translated);
+                      } else {
+                        // ترجمه کل فیلد متنی
+                        if (active.isContentEditable) {
+                          active.innerText = translated;
+                        } else if ("value" in active) {
+                          active.value = translated;
+                        }
+                        didApply = true;
+                      }
 
-                  logME(
-                    `[Content] Apply attempt finished. Success: ${didApply}. Has selection: ${hasSelection}. Used smart replacement: ${didApply && !hasSelection}`
-                  );
+                      if (didApply) {
+                        // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
+                        active.dispatchEvent(
+                          new Event("input", { bubbles: true, cancelable: true })
+                        );
+                        active.dispatchEvent(
+                          new Event("change", { bubbles: true, cancelable: true })
+                        );
+
+                        // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                      }
+                    } else {
+                      // اگر smart replacement موفق بود، تاخیر هوشمند اعمال کنیم
+                      await smartDelay(100);
+                    }
+
+                    logME(
+                      `[Content] Apply attempt finished. Success: ${didApply}. Has selection: ${hasSelection}. Used smart replacement: ${didApply && !hasSelection}`
+                    );
+                  }
                 }
 
                 Promise.resolve({ success: didApply }).then(sendResponse);
