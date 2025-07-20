@@ -222,8 +222,40 @@ class ApiService {
     }
   }
 
-  async handleGoogleTranslate(text, sourceLang, targetLang) {
+  async handleGoogleTranslate(text, sourceLang, targetLang, translateMode = null) {
     if (sourceLang === targetLang) return null;
+
+    // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
+    // اگر در Field mode هستیم، language swapping انجام می‌دهیم
+    if (translateMode === TranslationMode.Field) {
+      // در Field mode، targetLang را به sourceLanguage تبدیل می‌کنیم (reverse translation)
+      targetLang = sourceLang;
+      sourceLang = AUTO_DETECT_VALUE;
+    } else {
+      // برای سایر حالت‌ها، منطق language detection و swapping
+      try {
+        const detectionResult = await Browser.i18n.detectLanguage(text);
+        if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
+          const mainDetection = detectionResult.languages[0];
+          const detectedLangCode = mainDetection.language.split("-")[0];
+          const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+
+          if (detectedLangCode === targetLangCode) {
+            // زبان‌ها را جابجا کن
+            [sourceLang, targetLang] = [targetLang, sourceLang];
+          }
+        } else {
+          // Regex fallback
+          const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+          if (isPersianText(text) && (targetLangCode === "fa" || targetLangCode === "ar")) {
+            [sourceLang, targetLang] = [targetLang, sourceLang];
+          }
+        }
+      } catch (e) {
+        logME('[handleGoogleTranslate] Language detection failed:', e);
+      }
+    }
+    // ▲▲▲ پایان منطق اختصاصی Google Translate ▲▲▲
 
     // --- JSON Mode Detection ---
     let isJsonMode = false;
@@ -257,8 +289,9 @@ class ApiService {
 
     const url = new URL(apiUrl);
     
-    // بررسی تنظیمات دیکشنری
+    // بررسی تنظیمات دیکشنری - در Field mode هرگز دیکشنری نباشد
     const isDictionaryEnabled = await getEnableDictionaryAsync();
+    const shouldIncludeDictionary = isDictionaryEnabled && translateMode !== TranslationMode.Field;
     
     // ساخت query string دستی برای پشتیبانی از چندین dt
     const queryParams = [
@@ -267,9 +300,9 @@ class ApiService {
       `tl=${tl}`,
       `dt=t`, // Translation text
     ];
-    
-    // فقط در صورت فعال بودن دیکشنری، پارامتر bd اضافه شود
-    if (isDictionaryEnabled) {
+
+    // فقط در صورت فعال بودن دیکشنری و غیرفیلد بودن translateMode، پارامتر bd اضافه شود
+    if (shouldIncludeDictionary) {
       queryParams.push(`dt=bd`); // Dictionary data
     }
     
@@ -290,9 +323,9 @@ class ApiService {
         // Extract main translation
         const translatedText = data[0].map((segment) => segment[0] || "").join("");
         
-        // Extract dictionary data if available and enabled
+        // Extract dictionary data if available and enabled (but never in Field mode)
         let candidateText = "";
-        if (isDictionaryEnabled && data[1]) { // data[1] contains dictionary information
+        if (shouldIncludeDictionary && data[1]) { // data[1] contains dictionary information
           candidateText = data[1]
             .map((dict) => {
               const pos = dict[0] || ""; // Part of speech
@@ -654,90 +687,7 @@ class ApiService {
 
     const api = await getTranslationApiAsync();
 
-    // ▼▼▼ شروع منطق اختصاصی برای Google Translate ▼▼▼
-    if (api === "google") {
-      // سناریو ۱: ترجمه در فیلدهای متنی (مانند Ctrl+/)
-      // عملکرد: این حالت همیشه یک ترجمه معکوس به زبان مبدأ کاربر انجام می‌دهد.
-      if (translateMode === TranslationMode.Field) {
-        const newTargetLanguage = sourceLanguage;
-        const newSourceLanguage = AUTO_DETECT_VALUE;
-
-        // با پارامترهای جدید، تابع را فراخوانی کرده و از ادامه اجرای تابع اصلی خارج شو
-        return this.handleGoogleTranslate(
-          text,
-          newSourceLanguage,
-          newTargetLanguage,
-          translateMode
-        );
-      }
-
-      // سناریو ۲: سایر حالت‌های ترجمه (SelectElement, Selection, Popup)
-      // عملکرد: این بخش تصمیم می‌گیرد که آیا زبان‌ها را جابجا کند یا زبان مبدأ را برای دقت بیشتر تثبیت کند.
-      try {
-        const detectionResult = await Browser.i18n.detectLanguage(text);
-
-        // لایه اول: بررسی نتیجه تشخیص زبان قابل اعتماد
-        if (
-          detectionResult?.isReliable &&
-          detectionResult.languages.length > 0
-        ) {
-          const mainDetection = detectionResult.languages[0];
-          const detectedLangCode = mainDetection.language.split("-")[0];
-          const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
-
-          let performSwap = false;
-          let reason = "";
-
-          // اولویت اول: آیا متن از قبل به زبان مقصد است؟
-          // اگر بله، زبان‌ها را برای ترجمه معکوس جابجا (swap) کن.
-          if (detectedLangCode === targetLangCode) {
-            performSwap = true;
-            reason = `Detected language (${detectedLangCode}) matches target.`;
-          } else if (
-            translateMode === TranslationMode.SelectElement &&
-            mainDetection.percentage > 85
-          ) {
-            sourceLanguage = mainDetection.language;
-            logME(
-              `[API Logic] Overriding source. Reason: High confidence (${mainDetection.percentage}%) in Select Element.`
-            );
-          }
-
-          if (performSwap) {
-            logME(`[API Logic] Swapping languages. Reason: ${reason}`);
-            [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
-          }
-        }
-        // لایه دوم: اگر تشخیص زبان قابل اعتماد نبود، از Regex به عنوان راهکار جایگزین استفاده کن
-        // TODO: این روش هنوز ۱۰۰ دردصد تست نشده و احتمال داره که باعث تداخل شود
-        else {
-          logME(
-            "[API Logic] Language detection was not reliable. Using Regex fallback."
-          );
-          const targetLangCode = getLanguageCode(targetLanguage).split("-")[0];
-
-          // اگر متن حاوی حروف فارسی/عربی است و زبان مقصد هم یکی از این زبان‌هاست
-
-          if (
-            isPersianText(text) &&
-            (targetLangCode === "fa" || targetLangCode === "ar")
-          ) {
-            logME(
-              "[API Logic] Regex fallback: Detected RTL text matches RTL target. Swapping languages."
-            );
-            // زبان‌ها را جابجا کن تا به زبان مبدأ کاربر (مثلاً انگلیسی) ترجمه شود
-            [sourceLanguage, targetLanguage] = [targetLanguage, sourceLanguage];
-          }
-          // شرط‌های مشابهی برای زبان‌های دیگر نیز در اینجا اضافه کنید
-        }
-      } catch (e) {
-        logME(
-          "[API Logic] Language detection failed. Proceeding with default target.",
-          e
-        );
-      }
-    }
-    // ▲▲▲ پایان منطق اختصاصی برای Google Translate ▲▲▲
+    // منطق language swapping به تابع handleGoogleTranslate منتقل شد
 
     if (
       sourceLanguage === targetLanguage &&
@@ -749,7 +699,7 @@ class ApiService {
 
     switch (api) {
       case "google":
-        return this.handleGoogleTranslate(text, sourceLanguage, targetLanguage);
+        return this.handleGoogleTranslate(text, sourceLanguage, targetLanguage, translateMode);
       case "gemini":
         return this.handleGeminiTranslation(
           text,
