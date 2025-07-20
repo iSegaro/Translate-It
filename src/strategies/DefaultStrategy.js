@@ -2,8 +2,9 @@
 
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers.js";
+import { delay, logME } from "../utils/helpers.js";
 import { filterXSS } from "xss";
+import { smartTextReplacement, smartDelay } from "../utils/frameworkCompatibility.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -53,69 +54,105 @@ export default class DefaultStrategy extends PlatformStrategy {
 
         // بررسی وجود انتخاب متن
         const hasSelection = this._hasTextSelection(element);
-
-        if (element.isContentEditable) {
-          if (hasSelection) {
-            // جایگزینی فقط متن انتخاب شده
+        
+        // تعیین محدوده انتخاب در صورت وجود
+        let selectionStart = null;
+        let selectionEnd = null;
+        
+        if (hasSelection) {
+          if (element.isContentEditable) {
+            // برای contentEditable از selection API استفاده می‌کنیم
             const selection = window.getSelection();
             if (selection && !selection.isCollapsed) {
-              selection.deleteContents();
-              const textNode = document.createTextNode(translatedText);
-              selection.getRangeAt(0).insertNode(textNode);
-              selection.removeAllRanges();
+              // استفاده از smart replacement
+              const success = smartTextReplacement(element, translatedText);
+              if (success) {
+                this.applyTextDirection(element, translatedText);
+                await smartDelay(200);
+                return true;
+              }
             }
           } else {
-            // جایگزینی کل محتوا
-            const htmlText = translatedText.replace(/\n/g, "<br>");
-            const trustedHTML = filterXSS(htmlText, {
-              whiteList: {
-                br: []
-              },
-              stripIgnoreTag: true,
-              stripIgnoreTagBody: ['script', 'style'],
-              onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
-                // Block javascript: and data: URLs
-                if (name === 'href' || name === 'src') {
-                  if (value.match(/^(javascript|data|vbscript):/i)) {
-                    return '';
-                  }
-                }
-                return false;
-              }
-            });
-
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(
-              trustedHTML,
-              "text/html"
-            );
-
-            element.textContent = "";
-            Array.from(doc.body.childNodes).forEach((node) => {
-              element.appendChild(node);
-            });
+            // برای input/textarea
+            selectionStart = element.selectionStart;
+            selectionEnd = element.selectionEnd;
           }
-          this.applyTextDirection(element, translatedText);
-        } else {
-          if (hasSelection) {
-            // جایگزینی فقط متن انتخاب شده در input/textarea
-            const start = element.selectionStart;
-            const end = element.selectionEnd;
-            const value = element.value;
-            const newValue = value.substring(0, start) + translatedText + value.substring(end);
-            element.value = newValue;
-            
-            // تنظیم موقعیت کرسر
-            const newCursorPosition = start + translatedText.length;
-            element.setSelectionRange(newCursorPosition, newCursorPosition);
-          } else {
-            // جایگزینی کل محتوا
-            element.value = translatedText;
-          }
-          this.applyTextDirection(element, translatedText);
         }
 
-        await delay(500);
+        // استفاده از smart replacement
+        const success = await smartTextReplacement(element, translatedText, selectionStart, selectionEnd);
+        logME('[DefaultStrategy] Smart replacement result:', success);
+        
+        if (success) {
+          this.applyTextDirection(element, translatedText);
+          await smartDelay(200);
+          logME('[DefaultStrategy] Update completed successfully');
+          return true;
+        } else {
+          // fallback به روش قدیمی
+          if (element.isContentEditable) {
+            if (hasSelection) {
+              // جایگزینی فقط متن انتخاب شده
+              const selection = window.getSelection();
+              if (selection && !selection.isCollapsed) {
+                selection.deleteContents();
+                const textNode = document.createTextNode(translatedText);
+                selection.getRangeAt(0).insertNode(textNode);
+                selection.removeAllRanges();
+              }
+            } else {
+              // جایگزینی کل محتوا
+              const htmlText = translatedText.replace(/\n/g, "<br>");
+              const trustedHTML = filterXSS(htmlText, {
+                whiteList: {
+                  br: []
+                },
+                stripIgnoreTag: true,
+                stripIgnoreTagBody: ['script', 'style'],
+                onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
+                  // Block javascript: and data: URLs
+                  if (name === 'href' || name === 'src') {
+                    if (value.match(/^(javascript|data|vbscript):/i)) {
+                      return '';
+                    }
+                  }
+                  return false;
+                }
+              });
+
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(
+                trustedHTML,
+                "text/html"
+              );
+
+              element.textContent = "";
+              Array.from(doc.body.childNodes).forEach((node) => {
+                element.appendChild(node);
+              });
+            }
+            this.applyTextDirection(element, translatedText);
+          } else {
+            if (hasSelection) {
+              // جایگزینی فقط متن انتخاب شده در input/textarea
+              const start = element.selectionStart;
+              const end = element.selectionEnd;
+              const value = element.value;
+              const newValue = value.substring(0, start) + translatedText + value.substring(end);
+              element.value = newValue;
+              
+              // تنظیم موقعیت کرسر
+              const newCursorPosition = start + translatedText.length;
+              element.setSelectionRange(newCursorPosition, newCursorPosition);
+            } else {
+              // جایگزینی کل محتوا
+              element.value = translatedText;
+            }
+            this.applyTextDirection(element, translatedText);
+          }
+
+          await delay(500);
+        }
 
         return true;
       }

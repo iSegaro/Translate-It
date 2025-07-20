@@ -1,7 +1,6 @@
 // src/strategies/PlatformStrategy.js
 
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { CONFIG } from "../config.js";
 
 export default class PlatformStrategy {
   constructor(notifier = null, errorHandler = null) {
@@ -75,25 +74,10 @@ export default class PlatformStrategy {
     }
   }
 
-  applyTextDirection(element, translatedText) {
-    try {
-      const isRtl = CONFIG.RTL_REGEX.test(translatedText);
-
-      // برای input/textarea
-      if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-        element.setAttribute("dir", isRtl ? "rtl" : "ltr");
-      } else {
-        element.style.direction = isRtl ? "rtl" : "ltr";
-        element.style.textAlign = isRtl ? "right" : "left";
-      }
-    } catch (error) {
-      const handleError = this.errorHandler?.handle(error, {
-        type: ErrorTypes.UI,
-        code: "text-direction-error",
-        context: "platform-strategy-TextDirection",
-      });
-      throw handleError;
-    }
+  applyTextDirection(_element, _translatedText) {
+    // غیرفعال شده - جهت متن تغییر نمی‌کند
+    // در استراتژی‌های خاص در صورت نیاز فعال خواهد شد
+    return;
   }
 
   handleFieldError(errorName, platformName) {

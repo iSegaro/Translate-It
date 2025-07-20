@@ -13,6 +13,7 @@ import { revertTranslations } from "./utils/textExtraction.js";
 import { getTranslationHandlerInstance } from "./core/InstanceManager.js";
 import { detectPlatform } from "./utils/platformDetector.js";
 import { ErrorTypes } from "./services/ErrorTypes.js";
+import { smartTextReplacement, smartDelay } from "./utils/frameworkCompatibility.js";
 
 // اکشن‌های پیام برای پاپ‌آپ (باید با پاپ‌آپ یکسان باشند)
 const MSG_POPUP_OPENED_CHECK_MOUSE = "POPUP_OPENED_CHECK_MOUSE_V3";
@@ -428,34 +429,52 @@ export function initContentScript() {
                   // بررسی وجود متن انتخاب شده در فیلد متنی
                   const hasSelection = this._hasTextSelection(active);
                   
-                  if (hasSelection) {
-                    // ترجمه فقط متن انتخاب شده
-                    didApply = this._replaceSelectedText(active, translated);
-                  } else {
-                    // ترجمه کل فیلد متنی
-                    if (active.isContentEditable) {
-                      active.innerText = translated;
-                    } else if ("value" in active) {
-                      active.value = translated;
-                    }
-                    didApply = true;
+                  // تعیین محدوده انتخاب در صورت وجود
+                  let selectionStart = null;
+                  let selectionEnd = null;
+                  
+                  if (hasSelection && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+                    selectionStart = active.selectionStart;
+                    selectionEnd = active.selectionEnd;
                   }
+                  
+                  // استفاده از smart replacement برای سازگاری بهتر
+                  didApply = await smartTextReplacement(active, translated, selectionStart, selectionEnd);
+                  
+                  if (!didApply) {
+                    // fallback به روش قدیمی
+                    if (hasSelection) {
+                      // ترجمه فقط متن انتخاب شده
+                      didApply = this._replaceSelectedText(active, translated);
+                    } else {
+                      // ترجمه کل فیلد متنی
+                      if (active.isContentEditable) {
+                        active.innerText = translated;
+                      } else if ("value" in active) {
+                        active.value = translated;
+                      }
+                      didApply = true;
+                    }
 
-                  if (didApply) {
-                    // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
-                    active.dispatchEvent(
-                      new Event("input", { bubbles: true, cancelable: true })
-                    );
-                    active.dispatchEvent(
-                      new Event("change", { bubbles: true, cancelable: true })
-                    );
+                    if (didApply) {
+                      // رویدادها را برای اطلاع‌رسانی به فریم‌ورک‌ها ارسال می‌کنیم
+                      active.dispatchEvent(
+                        new Event("input", { bubbles: true, cancelable: true })
+                      );
+                      active.dispatchEvent(
+                        new Event("change", { bubbles: true, cancelable: true })
+                      );
 
-                    // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
-                    await new Promise((resolve) => setTimeout(resolve, 50));
+                      // صبر کوتاهی می‌کنیم تا فریم‌ورک فرصت واکنش داشته باشد
+                      await new Promise((resolve) => setTimeout(resolve, 50));
+                    }
+                  } else {
+                    // اگر smart replacement موفق بود، تاخیر هوشمند اعمال کنیم
+                    await smartDelay(100);
                   }
 
                   logME(
-                    `[Content] Apply attempt finished. Success: ${didApply}. Has selection: ${hasSelection}`
+                    `[Content] Apply attempt finished. Success: ${didApply}. Has selection: ${hasSelection}. Used smart replacement: ${didApply && !hasSelection}`
                   );
                 }
 
