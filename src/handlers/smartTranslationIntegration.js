@@ -21,6 +21,7 @@ import { getTranslationString } from "../utils/i18n.js";
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { isComplexEditor } from "../utils/frameworkCompatibility.js";
 
 /**
  * بررسی اینکه آیا متنی در المان فعال انتخاب شده است یا نه
@@ -106,13 +107,21 @@ export async function translateFieldViaSmartHandler({
         // اگر متن انتخاب نشده باشد، طبق تنظیمات عمل می‌کنیم
         const is_copy = await getCOPY_REPLACEAsync();
         if (platform === Platform.Default) {
-          if (is_copy === "replace") {
+          // فقط برای platform پیش‌فرض، بررسی ویرایشگر پیچیده
+          const activeElement = document.activeElement;
+          const isComplexEditorDetected = activeElement ? isComplexEditor(activeElement) : false;
+          
+          if (isComplexEditorDetected) {
+            logME("[SmartTranslationHandler] Complex editor detected on default platform - forcing copy mode");
+            isReplaceMode = false; // همیشه copy mode
+          } else if (is_copy === "replace") {
             isReplaceMode = true;
             logME("[SmartTranslationHandler] replace on default (no selection)");
           } else {
             logME("[SmartTranslationHandler] copy on default (no selection)");
           }
         } else {
+          // برای platform‌های خاص، از استراتژی موجود استفاده کن
           if (is_copy === "replace") {
             isReplaceMode = true;
             logME("[SmartTranslationHandler] replace on platform (no selection)");

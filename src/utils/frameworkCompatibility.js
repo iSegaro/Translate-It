@@ -3,6 +3,167 @@
 import { logME } from "./helpers.js";
 
 /**
+ * تشخیص ویرایشگرهای پیچیده که نیاز به copy-only دارند
+ * @param {HTMLElement} element - المان هدف
+ * @returns {boolean} آیا این ویرایشگر پیچیده است
+ */
+export function isComplexEditor(element) {
+  if (!element) return false;
+
+  try {
+    // بررسی ویرایشگرهای شناخته شده
+    const isKnownEditor = checkKnownEditors(element);
+    if (isKnownEditor) {
+      logME('[isComplexEditor] Known editor detected:', isKnownEditor);
+      return true;
+    }
+
+    // بررسی URL سایت
+    const hostname = window.location.hostname.toLowerCase();
+    const complexSites = [
+      'docs.google.com',
+      'office.live.com',
+      'sharepoint.com',
+      'onedrive.live.com',
+      'office365.com',
+      'outlook.live.com',
+      'outlook.office.com',
+      'teams.microsoft.com'
+    ];
+
+    const isComplexSite = complexSites.some(site => hostname.includes(site));
+    if (isComplexSite) {
+      logME('[isComplexEditor] Complex site detected:', hostname);
+      return true;
+    }
+
+    // بررسی ساختار DOM پیچیده
+    const hasDangerousStructure = checkDangerousStructure(element);
+    if (hasDangerousStructure) {
+      logME('[isComplexEditor] Dangerous DOM structure detected');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    logME('[isComplexEditor] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * بررسی ویرایشگرهای شناخته شده
+ */
+function checkKnownEditors(element) {
+  // بررسی CKEditor (هم نسخه قدیمی هم جدید)
+  if (element.classList?.contains('cke_editable') || 
+      element.classList?.contains('ck-editor__editable') ||
+      element.closest?.('.cke_contents, .cke_inner, .cke_wysiwyg_frame, .ck-editor, .ck-content')) {
+    return 'CKEditor';
+  }
+
+  // بررسی TinyMCE
+  if (element.classList?.contains('mce-content-body') ||
+      element.closest?.('.mce-edit-area, .tox-edit-area')) {
+    return 'TinyMCE';
+  }
+
+  // بررسی Quill
+  if (element.classList?.contains('ql-editor') ||
+      element.closest?.('.ql-container, .ql-toolbar')) {
+    return 'Quill';
+  }
+
+  // بررسی Draft.js
+  if (element.classList?.contains('DraftEditor-root') ||
+      element.closest?.('.DraftEditor-editorContainer')) {
+    return 'Draft.js';
+  }
+
+  // بررسی Medium Editor
+  if (element.classList?.contains('medium-editor-element') ||
+      element.hasAttribute?.('data-medium-element')) {
+    return 'Medium Editor';
+  }
+
+  // بررسی Monaco Editor (VSCode)
+  if (element.classList?.contains('monaco-editor') ||
+      element.closest?.('.monaco-editor-background')) {
+    return 'Monaco Editor';
+  }
+
+  // بررسی CodeMirror
+  if (element.classList?.contains('CodeMirror') ||
+      element.closest?.('.CodeMirror-wrap, .CodeMirror-scroll')) {
+    return 'CodeMirror';
+  }
+
+  // بررسی Google Docs
+  if (element.closest?.('.kix-paginateddocumentplugin, .docs-texteventtarget-iframe')) {
+    return 'Google Docs';
+  }
+
+  return null;
+}
+
+/**
+ * بررسی ساختار DOM خطرناک
+ */
+function checkDangerousStructure(element) {
+  try {
+    // بررسی تعداد المان‌های فرزند
+    const childElementCount = element.querySelectorAll?.('*').length || 0;
+    if (childElementCount > 20) {
+      logME('[checkDangerousStructure] Too many child elements:', childElementCount);
+      return true;
+    }
+
+    // بررسی iframe ها
+    if (element.querySelector?.('iframe')) {
+      logME('[checkDangerousStructure] Contains iframe');
+      return true;
+    }
+
+    // بررسی script tags
+    if (element.querySelector?.('script')) {
+      logME('[checkDangerousStructure] Contains script tags');
+      return true;
+    }
+
+    // بررسی Shadow DOM
+    if (element.shadowRoot) {
+      logME('[checkDangerousStructure] Has shadow root');
+      return true;
+    }
+
+    // بررسی data attributes مشکوک
+    const suspiciousAttributes = ['data-reactroot', 'data-slate-editor', 'data-lexical'];
+    const hasSuspiciousAttrs = suspiciousAttributes.some(attr => 
+      element.hasAttribute?.(attr) || element.closest?.(`[${attr}]`)
+    );
+
+    if (hasSuspiciousAttrs) {
+      logME('[checkDangerousStructure] Has suspicious data attributes');
+      return true;
+    }
+
+    // بررسی کلاس‌های ویرایشگر CKEditor جدید
+    const ckClasses = Array.from(element.classList || []);
+    const hasCkClasses = ckClasses.some(cls => cls.startsWith('ck-') || cls.startsWith('ck '));
+    
+    if (hasCkClasses) {
+      logME('[checkDangerousStructure] Has CKEditor classes:', ckClasses.filter(cls => cls.startsWith('ck')));
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    logME('[checkDangerousStructure] Error:', error);
+    return false;
+  }
+}
+
+/**
  * شبیه‌سازی تایپ طبیعی برای فریب فریم‌ورک‌های React
  * این روش ساده‌تر و مؤثرتر از event triggering پیچیده است
  */

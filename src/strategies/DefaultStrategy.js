@@ -4,7 +4,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay, logME } from "../utils/helpers.js";
 import { filterXSS } from "xss";
-import { smartTextReplacement, smartDelay } from "../utils/frameworkCompatibility.js";
+import { smartTextReplacement, smartDelay, isComplexEditor } from "../utils/frameworkCompatibility.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -107,6 +107,26 @@ export default class DefaultStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (translatedText !== undefined && translatedText !== null) {
+        // بررسی ویرایشگر پیچیده - اگر باشد، از copy استفاده کن
+        if (isComplexEditor(element)) {
+          logME('[DefaultStrategy] Complex editor detected - skipping element update');
+          
+          // کپی کردن در کلیپ‌بورد
+          try {
+            await navigator.clipboard.writeText(translatedText);
+            this.notifier.show(
+              "ترجمه در حافظه کپی شد (ویرایشگر پیچیده) - Ctrl+V",
+              "success",
+              true,
+              3000
+            );
+            return true;
+          } catch (clipboardError) {
+            logME('[DefaultStrategy] Clipboard copy failed:', clipboardError);
+            return false;
+          }
+        }
+
         this.applyVisualFeedback(element);
 
         // بررسی وجود انتخاب متن
