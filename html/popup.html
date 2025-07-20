@@ -132,15 +132,27 @@
           type="submit"
           form="translationForm"
           id="translateBtn"
-          class="translate-button"
+          class="split-translate-button"
           title="ترجمه"
           data-i18n-title="popup_translate_button_title"
         >
-          <img
-            src="../icons/translate.png"
-            alt="Translate"
-            data-i18n="popup_translate_button_alt_icon"
-          />
+          <div class="translate-main-area">
+            <img
+              id="apiProviderIcon"
+              src="../icons/api-providers/google.svg"
+              alt="API Provider"
+              class="api-provider-icon"
+            />
+            <span data-i18n="popup_translate_button_text">ترجمه</span>
+          </div>
+          <div id="apiProviderBtn" class="provider-dropdown-area">
+            <img
+              id="dropdownArrowIcon"
+              src="../icons/dropdown-arrow.svg"
+              alt="Dropdown"
+              class="dropdown-arrow"
+            />
+          </div>
         </button>
       </div>
 
@@ -210,6 +222,38 @@
           <div id="translationResult" class="result aiwc-popup-markdown"></div>
         </div>
       </form>
+
+      <!-- API Provider Dropdown -->
+      <div id="apiProviderDropdown" class="dropdown-menu">
+        <div class="dropdown-item" data-provider="google">
+          <img src="../icons/api-providers/google.svg" alt="Google" />
+          <span>Google Translate</span>
+        </div>
+        <div class="dropdown-item" data-provider="gemini">
+          <img src="../icons/api-providers/gemini.svg" alt="Gemini" />
+          <span>Gemini</span>
+        </div>
+        <div class="dropdown-item" data-provider="webai">
+          <img src="../icons/api-providers/webai.svg" alt="WebAI" />
+          <span>WebAI</span>
+        </div>
+        <div class="dropdown-item" data-provider="openai">
+          <img src="../icons/api-providers/openai.svg" alt="OpenAI" />
+          <span>OpenAI</span>
+        </div>
+        <div class="dropdown-item" data-provider="openrouter">
+          <img src="../icons/api-providers/openrouter.svg" alt="OpenRouter" />
+          <span>OpenRouter</span>
+        </div>
+        <div class="dropdown-item" data-provider="deepseek">
+          <img src="../icons/api-providers/deepseek.svg" alt="DeepSeek" />
+          <span>DeepSeek</span>
+        </div>
+        <div class="dropdown-item" data-provider="custom">
+          <img src="../icons/api-providers/custom.svg" alt="Custom" />
+          <span>Custom (OpenAI)</span>
+        </div>
+      </div>
     </div>
     <script type="application/javascript" src="../browser-polyfill.js"></script>
     <script src="../popup.bundle.js"></script>

@@ -14,6 +14,7 @@ import * as initializationManager from "./initializationManager.js";
 import * as popupInteractionManager from "./popupInteractionManager.js";
 import { app_localize_popup } from "../utils/i18n.js";
 import * as excludeManager from "./excludeManager.js";
+import { ApiProviderManager } from "./apiProviderManager.js";
 import Browser from "webextension-polyfill";
 import { applyTheme } from "../utils/theme.js";
 
@@ -61,6 +62,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initializationManager.init();
     await popupInteractionManager.init();
     await excludeManager.init();
+
+    // Initialize API Provider Manager
+    const apiProviderBtn = document.getElementById("apiProviderBtn");
+    const apiProviderIcon = document.getElementById("apiProviderIcon");
+    const apiProviderDropdown = document.getElementById("apiProviderDropdown");
+    const translateBtn = document.getElementById("translateBtn");
+    const dropdownArrowIcon = document.getElementById("dropdownArrowIcon");
+    
+    if (apiProviderBtn && apiProviderIcon && apiProviderDropdown && translateBtn && dropdownArrowIcon) {
+      new ApiProviderManager({
+        button: apiProviderBtn,
+        icon: apiProviderIcon,
+        dropdown: apiProviderDropdown,
+        translateButton: translateBtn,
+        dropdownArrow: dropdownArrowIcon,
+      });
+    }
 
     SetupSidePanelBtn();
 
