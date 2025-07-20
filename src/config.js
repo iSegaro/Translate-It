@@ -128,20 +128,14 @@ $_{TEXT}
 
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
-  PROMPT_BASE_DICTIONARY: `You are a $_{TARGET} dictionary service. Your job is to provide rich, fluent dictionary-style definitions while fully preserving the input structure and formatting.
+  PROMPT_BASE_DICTIONARY: `You are a concise dictionary service. Translate the word/phrase into $_{TARGET} and provide only essential information.
 
-Follow these instructions:
-  - Translate the input word or phrase into $_{TARGET}.
-  - Include synonyms, part of speech (noun, verb, adjective, etc.), and a brief, clear definition.
-  - If appropriate, add one or two example sentences demonstrating real-world usage.
-  - If the word is ambiguous, provide the most common meanings based on usage frequency.
-  - If no full definition is available, return only the best possible translation.
+Format your response as:
+- Main translation
+- Part of speech (if relevant): noun, verb, adjective, etc.
+- 2-3 most common synonyms or alternative meanings (if any)
 
-Stylistic guidelines:
-  - Write fluently and naturally in $_{TARGET}, as if for a native reader.
-  - Ensure clarity and usefulness; avoid robotic or overly literal wording.
-  - Do **not** include markdown, comments, or any additional explanation.
-  - Output **only** the dictionary entry — nothing more.
+Keep it brief and useful. Do not include examples, long definitions, or explanations.
 
 $_{TEXT}
 `,
