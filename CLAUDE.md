@@ -323,3 +323,32 @@ The Firefox build is optimized to pass validation without warnings:
 - Removed markdown code blocks from prompt templates to prevent AI misinterpretation
 - Streamlined prompt structure for better translation accuracy
 - Enhanced error handling and fallback mechanisms for API failures
+
+**Configuration Migration System (January 2025):**
+- Implemented automatic config migration in `src/listeners/onInstalled.js`
+- New configuration keys are automatically added to user storage during extension updates
+- User settings are preserved while new defaults are merged seamlessly
+- Detailed logging for debugging migration process
+
+**Dictionary Enhancement (January 2025):**
+- Improved Google Translate dictionary output formatting with markdown rendering
+- Enhanced `src/core/api.js` with `_formatDictionaryAsMarkdown()` helper function
+- Cleaner, more readable dictionary entries with proper formatting
+- Better integration with existing markdown rendering system
+
+**Prompt Template Refinements (January 2025):**
+- Fixed inconsistent comment tags in `src/config.js` prompt templates
+- Removed unnecessary code block wrappers from all AI prompts
+- Simplified dictionary prompt for more concise, useful output
+- Improved prompt clarity and reduced AI confusion
+
+**UI/UX Improvements (January 2025):**
+- **Popup Interface**: Enhanced typography with increased font sizes (14px→15px)
+- **Popup Interface**: Improved font-family consistency with sidepanel (`"Vazirmatn", "Segoe UI", sans-serif`)
+- **Popup Interface**: Reduced source textarea height from 4 rows to 2 rows for better space utilization
+- **Popup Interface**: Enhanced markdown rendering with comprehensive styles (headers, code blocks, links, blockquotes)
+- **Sidepanel Interface**: Reduced toolbar width from 45px to 38px for more content space
+- **Sidepanel Interface**: Improved font sizes across all components (13px→14px, 14px→15px)
+- **Sidepanel Interface**: Enhanced markdown rendering system with better typography and spacing
+- **Cross-Platform Consistency**: Unified font choices and sizing between popup and sidepanel
+- **Provider Dropdown**: Fixed hover effects and improved visual consistency
