@@ -55,13 +55,41 @@ export const CONFIG = {
   WEBAI_API_MODEL: "gemini-2.0-flash",
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
-  OPENAI_API_MODEL: "gpt-3.5-turbo",
+  OPENAI_API_MODEL: "gpt-4o",
+  OPENAI_MODELS: [
+    { value: "gpt-4.1", name: "GPT-4.1" },
+    { value: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+    { value: "gpt-4.1-nano", name: "GPT-4.1 Nano" },
+    { value: "gpt-4o", name: "GPT-4o" },
+    { value: "gpt-4o-mini", name: "GPT-4o Mini" },
+    { value: "gpt-4.5-preview", name: "GPT-4.5 Preview" },
+    { value: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+    { value: "custom", name: "Custom Model" }
+  ],
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-4o",
+  OPENROUTER_MODELS: [
+    { value: "openai/gpt-4o", name: "OpenAI GPT-4o" },
+    { value: "openai/gpt-4o-mini", name: "OpenAI GPT-4o Mini" },
+    { value: "openai/gpt-4.1", name: "OpenAI GPT-4.1" },
+    { value: "openai/gpt-4.1-mini", name: "OpenAI GPT-4.1 Mini" },
+    { value: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
+    { value: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku" },
+    { value: "google/gemini-2.5-pro", name: "Google Gemini 2.5 Pro" },
+    { value: "google/gemini-2.5-flash", name: "Google Gemini 2.5 Flash" },
+    { value: "meta-llama/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
+    { value: "mistralai/mistral-large", name: "Mistral Large" },
+    { value: "custom", name: "Custom Model" }
+  ],
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
   DEEPSEEK_API_MODEL: "deepseek-chat",
+  DEEPSEEK_MODELS: [
+    { value: "deepseek-chat", name: "DeepSeek Chat (V3)" },
+    { value: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
+    { value: "custom", name: "Custom Model" }
+  ],
   CUSTOM_API_URL: "",
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
@@ -470,4 +498,17 @@ export const getREPLACE_SPECIAL_SITESAsync = async () => {
     "REPLACE_SPECIAL_SITES",
     CONFIG.REPLACE_SPECIAL_SITES
   );
+};
+
+// --- Model Selection Getters for API Providers ---
+export const getOpenAIModelSelectionAsync = async () => {
+  return getSettingValueAsync("OPENAI_API_MODEL", CONFIG.OPENAI_API_MODEL);
+};
+
+export const getDeepSeekModelSelectionAsync = async () => {
+  return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
+};
+
+export const getOpenRouterModelSelectionAsync = async () => {
+  return getSettingValueAsync("OPENROUTER_API_MODEL", CONFIG.OPENROUTER_API_MODEL);
 };

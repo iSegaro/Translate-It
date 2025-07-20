@@ -202,7 +202,7 @@
   "webai_api_url_label": { "message": "آدرس" },
   "webai_api_url_placeholder": { "message": "آدرس API را وارد کنید" },
   "webai_api_model_label": { "message": "مدل" },
-  "webai_api_model_placeholder": { "message": "مدل WebAI را وارد کنید" },
+  "webai_api_model_placeholder": { "message": "مدل" },
   "openai_api_settings_title": { "message": "تنظیمات OpenAI" },
   "openai_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت OpenAI دریافت کنید."
@@ -377,8 +377,20 @@
     "message": "خطا در بازیابی تنظیمات. فایل نامعتبر است؟"
   },
   "OPTIONS_STATUS_LOAD_FAILED": { "message": "خطا در بارگذاری تنظیمات." },
-  "GEMINI_MODEL_LABEL": {
+  "PROVIDER_MODEL_LABEL": {
     "message": "مدل"
+  },
+  "gemini_model_title": {
+    "message": "انتخاب مدل Gemini یا آدرس سفارشی"
+  },
+  "openai_custom_model_placeholder": {
+    "message": "نام مدل سفارشی را وارد کنید"
+  },
+  "openrouter_custom_model_placeholder": {
+    "message": "نام مدل سفارشی را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
+  },
+  "deepseek_custom_model_placeholder": {
+    "message": "نام مدل سفارشی را وارد کنید"
   },
 
   "ERRORS_UNKNOWN": { "message": "خطای ناشناخته رخ داد." },

@@ -533,7 +533,7 @@
                   >
                 </div>
                 <div class="setting-group">
-                  <label for="apiKey">API Key</label
+                  <label for="apiKey" data-i18n="custom_api_settings_api_key_label">API Key</label
                   ><input
                     type="text"
                     id="apiKey"
@@ -542,7 +542,7 @@
                   />
                 </div>
                 <div class="setting-group">
-                  <label for="geminiModel" data-i18n="GEMINI_MODEL_LABEL">Model</label>
+                  <label for="geminiModel" data-i18n="PROVIDER_MODEL_LABEL">Model</label>
                   <select id="geminiModel">
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -584,7 +584,7 @@
                   >
                 </div>
                 <div class="setting-group">
-                  <label for="openaiApiKey">API Key</label
+                  <label for="openaiApiKey" data-i18n="custom_api_settings_api_key_label">API Key</label
                   ><input
                     type="text"
                     id="openaiApiKey"
@@ -593,12 +593,25 @@
                   />
                 </div>
                 <div class="setting-group">
-                  <label for="openaiApiModel">Model</label
-                  ><input
+                  <label for="openaiApiModel" data-i18n="PROVIDER_MODEL_LABEL">Model</label>
+                  <select id="openaiApiModel">
+                    <option value="gpt-4.1">GPT-4.1</option>
+                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                    <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4.5-preview">GPT-4.5 Preview</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="custom">Custom Model</option>
+                  </select>
+                </div>
+                <div class="setting-group" id="openaiCustomModelGroup" style="display: none;">
+                  <label for="openaiCustomModel">Custom Model Name</label>
+                  <input
                     type="text"
-                    id="openaiApiModel"
-                    data-i18n-placeholder="openai_api_model_placeholder"
-                    placeholder="Enter OpenAI model"
+                    id="openaiCustomModel"
+                    data-i18n-placeholder="openai_custom_model_placeholder"
+                    placeholder="Enter custom model name"
                   />
                 </div>
               </div>
@@ -621,7 +634,7 @@
                   >
                 </div>
                 <div class="setting-group">
-                  <label for="openrouterApiKey">API Key</label
+                  <label for="openrouterApiKey" data-i18n="custom_api_settings_api_key_label">API Key</label
                   ><input
                     type="text"
                     id="openrouterApiKey"
@@ -630,12 +643,28 @@
                   />
                 </div>
                 <div class="setting-group">
-                  <label for="openrouterApiModel">Model</label
-                  ><input
+                  <label for="openrouterApiModel" data-i18n="PROVIDER_MODEL_LABEL">Model</label>
+                  <select id="openrouterApiModel">
+                    <option value="openai/gpt-4o">OpenAI GPT-4o</option>
+                    <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini</option>
+                    <option value="openai/gpt-4.1">OpenAI GPT-4.1</option>
+                    <option value="openai/gpt-4.1-mini">OpenAI GPT-4.1 Mini</option>
+                    <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                    <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku</option>
+                    <option value="google/gemini-2.5-pro">Google Gemini 2.5 Pro</option>
+                    <option value="google/gemini-2.5-flash">Google Gemini 2.5 Flash</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct">Meta Llama 3.3 70B</option>
+                    <option value="mistralai/mistral-large">Mistral Large</option>
+                    <option value="custom">Custom Model</option>
+                  </select>
+                </div>
+                <div class="setting-group" id="openrouterCustomModelGroup" style="display: none;">
+                  <label for="openrouterCustomModel">Custom Model Name</label>
+                  <input
                     type="text"
-                    id="openrouterApiModel"
-                    data-i18n-placeholder="openrouter_api_model_placeholder"
-                    placeholder="Enter OpenRouter model (e.g., openai/gpt-4o)"
+                    id="openrouterCustomModel"
+                    data-i18n-placeholder="openrouter_custom_model_placeholder"
+                    placeholder="Enter custom model name (e.g., provider/model-name)"
                   />
                 </div>
               </div>
@@ -658,7 +687,7 @@
                   >
                 </div>
                 <div class="setting-group">
-                  <label for="deepseekApiKey">API Key</label
+                  <label for="deepseekApiKey" data-i18n="custom_api_settings_api_key_label">API Key</label
                   ><input
                     type="text"
                     id="deepseekApiKey"
@@ -667,12 +696,20 @@
                   />
                 </div>
                 <div class="setting-group">
-                  <label for="deepseekApiModel">Model</label
-                  ><input
+                  <label for="deepseekApiModel" data-i18n="PROVIDER_MODEL_LABEL">Model</label>
+                  <select id="deepseekApiModel">
+                    <option value="deepseek-chat">DeepSeek Chat (V3)</option>
+                    <option value="deepseek-reasoner">DeepSeek Reasoner (R1)</option>
+                    <option value="custom">Custom Model</option>
+                  </select>
+                </div>
+                <div class="setting-group" id="deepseekCustomModelGroup" style="display: none;">
+                  <label for="deepseekCustomModel">Custom Model Name</label>
+                  <input
                     type="text"
-                    id="deepseekApiModel"
-                    data-i18n-placeholder="deepseek_api_model_placeholder"
-                    placeholder="Enter DeepSeek model (e.g., deepseek-chat)"
+                    id="deepseekCustomModel"
+                    data-i18n-placeholder="deepseek_custom_model_placeholder"
+                    placeholder="Enter custom model name"
                   />
                 </div>
               </div>

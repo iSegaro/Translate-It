@@ -213,9 +213,9 @@
   "gemini_api_settings_api_url_label": { "message": "API URL" },
   "gemini_api_url_placeholder": { "message": "Enter API URL" },
   "webai_api_settings_title": { "message": "WebAI Settings" },
-  "webai_api_url_label": { "message": "WebAI API URL" },
+  "webai_api_url_label": { "message": "API URL" },
   "webai_api_url_placeholder": { "message": "Enter WebAI API URL" },
-  "webai_api_model_label": { "message": "WebAI API Model" },
+  "webai_api_model_label": { "message": "Model" },
   "webai_api_model_placeholder": { "message": "Enter WebAI API model" },
   "openai_api_settings_title": { "message": "OpenAI Settings" },
   "openai_api_settings_api_key_label": { "message": "API Key" },
@@ -382,8 +382,20 @@
   "OPTIONS_STATUS_LOAD_FAILED": {
     "message": "Failed to load settings."
   },
-  "GEMINI_MODEL_LABEL": {
+  "PROVIDER_MODEL_LABEL": {
     "message": "Model"
+  },
+  "gemini_model_title": {
+    "message": "Select Gemini model or custom URL"
+  },
+  "openai_custom_model_placeholder": {
+    "message": "Enter custom model name"
+  },
+  "openrouter_custom_model_placeholder": {
+    "message": "Enter custom model name (e.g., provider/model-name)"
+  },
+  "deepseek_custom_model_placeholder": {
+    "message": "Enter custom model name"
   },
 
   "ERRORS_UNKNOWN": { "message": "An unknown error occurred." },

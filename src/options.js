@@ -148,14 +148,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const openAIApiSettings = document.getElementById("openAIApiSettings");
   const openAIApiKeyInput = document.getElementById("openaiApiKey");
   const openAIModelInput = document.getElementById("openaiApiModel");
+  const openAICustomModelGroup = document.getElementById("openaiCustomModelGroup");
+  const openAICustomModelInput = document.getElementById("openaiCustomModel");
   const openRouterApiSettings = document.getElementById(
     "openRouterApiSettings"
   );
   const openRouterApiKeyInput = document.getElementById("openrouterApiKey");
   const openRouterApiModelInput = document.getElementById("openrouterApiModel");
+  const openRouterCustomModelGroup = document.getElementById("openrouterCustomModelGroup");
+  const openRouterCustomModelInput = document.getElementById("openrouterCustomModel");
   const deepseekApiSettings = document.getElementById("deepseekApiSettings");
   const deepseekApiKeyInput = document.getElementById("deepseekApiKey");
   const deepseekApiModelInput = document.getElementById("deepseekApiModel");
+  const deepseekCustomModelGroup = document.getElementById("deepseekCustomModelGroup");
+  const deepseekCustomModelInput = document.getElementById("deepseekCustomModel");
   const customApiSettings = document.getElementById("customApiSettings");
   const customApiUrlInput = document.getElementById("customApiUrl");
   const customApiKeyInput = document.getElementById("customApiKey");
@@ -558,6 +564,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     geminiModelSelect.addEventListener("change", handleGeminiModelChange);
   }
 
+  // --- OpenAI Model Selection Logic ---
+  function handleOpenAIModelChange() {
+    if (!openAIModelInput || !openAICustomModelGroup) return;
+    const selectedModel = openAIModelInput.value;
+    const isCustom = selectedModel === "custom";
+    
+    // Show/hide custom model group based on selection
+    openAICustomModelGroup.style.display = isCustom ? "block" : "none";
+  }
+
+  if (openAIModelInput) {
+    openAIModelInput.addEventListener("change", handleOpenAIModelChange);
+  }
+
+  // --- OpenRouter Model Selection Logic ---
+  function handleOpenRouterModelChange() {
+    if (!openRouterApiModelInput || !openRouterCustomModelGroup) return;
+    const selectedModel = openRouterApiModelInput.value;
+    const isCustom = selectedModel === "custom";
+    
+    // Show/hide custom model group based on selection
+    openRouterCustomModelGroup.style.display = isCustom ? "block" : "none";
+  }
+
+  if (openRouterApiModelInput) {
+    openRouterApiModelInput.addEventListener("change", handleOpenRouterModelChange);
+  }
+
+  // --- DeepSeek Model Selection Logic ---
+  function handleDeepSeekModelChange() {
+    if (!deepseekApiModelInput || !deepseekCustomModelGroup) return;
+    const selectedModel = deepseekApiModelInput.value;
+    const isCustom = selectedModel === "custom";
+    
+    // Show/hide custom model group based on selection
+    deepseekCustomModelGroup.style.display = isCustom ? "block" : "none";
+  }
+
+  if (deepseekApiModelInput) {
+    deepseekApiModelInput.addEventListener("change", handleDeepSeekModelChange);
+  }
+
   // --- Save & Load Settings ---
   saveSettingsButton.addEventListener("click", async () => {
     const sourceLangValue = sourceLanguageInput.value.trim();
@@ -636,15 +684,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         webAIApiModelInput?.value?.trim() || CONFIG.WEBAI_API_MODEL,
       OPENAI_API_KEY: openAIApiKeyInput?.value?.trim() || CONFIG.OPENAI_API_KEY,
       OPENAI_API_MODEL:
-        openAIModelInput?.value?.trim() || CONFIG.OPENAI_API_MODEL,
+        openAIModelInput?.value === "custom" 
+          ? (openAICustomModelInput?.value?.trim() || CONFIG.OPENAI_API_MODEL)
+          : (openAIModelInput?.value || CONFIG.OPENAI_API_MODEL),
       OPENROUTER_API_KEY:
         openRouterApiKeyInput?.value?.trim() || CONFIG.OPENROUTER_API_KEY,
       OPENROUTER_API_MODEL:
-        openRouterApiModelInput?.value?.trim() || CONFIG.OPENROUTER_API_MODEL,
+        openRouterApiModelInput?.value === "custom"
+          ? (openRouterCustomModelInput?.value?.trim() || CONFIG.OPENROUTER_API_MODEL)
+          : (openRouterApiModelInput?.value || CONFIG.OPENROUTER_API_MODEL),
       DEEPSEEK_API_KEY:
         deepseekApiKeyInput?.value?.trim() || CONFIG.DEEPSEEK_API_KEY,
       DEEPSEEK_API_MODEL:
-        deepseekApiModelInput?.value?.trim() || CONFIG.DEEPSEEK_API_MODEL,
+        deepseekApiModelInput?.value === "custom"
+          ? (deepseekCustomModelInput?.value?.trim() || CONFIG.DEEPSEEK_API_MODEL)
+          : (deepseekApiModelInput?.value || CONFIG.DEEPSEEK_API_MODEL),
       CUSTOM_API_URL: customApiUrlInput?.value?.trim() || CONFIG.CUSTOM_API_URL,
       CUSTOM_API_KEY: customApiKeyInput?.value?.trim() || CONFIG.CUSTOM_API_KEY,
       CUSTOM_API_MODEL:
@@ -791,21 +845,51 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (openAIApiKeyInput)
         openAIApiKeyInput.value =
           settings.OPENAI_API_KEY || CONFIG.OPENAI_API_KEY;
-      if (openAIModelInput)
-        openAIModelInput.value =
-          settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
+      if (openAIModelInput) {
+        const openAIModel = settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
+        const isCustomModel = !CONFIG.OPENAI_MODELS?.some(model => model.value === openAIModel);
+        
+        if (isCustomModel) {
+          openAIModelInput.value = "custom";
+          if (openAICustomModelInput) {
+            openAICustomModelInput.value = openAIModel;
+          }
+        } else {
+          openAIModelInput.value = openAIModel;
+        }
+      }
       if (openRouterApiKeyInput)
         openRouterApiKeyInput.value =
           settings.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
-      if (openRouterApiModelInput)
-        openRouterApiModelInput.value =
-          settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
+      if (openRouterApiModelInput) {
+        const openRouterModel = settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
+        const isCustomModel = !CONFIG.OPENROUTER_MODELS?.some(model => model.value === openRouterModel);
+        
+        if (isCustomModel) {
+          openRouterApiModelInput.value = "custom";
+          if (openRouterCustomModelInput) {
+            openRouterCustomModelInput.value = openRouterModel;
+          }
+        } else {
+          openRouterApiModelInput.value = openRouterModel;
+        }
+      }
       if (deepseekApiKeyInput)
         deepseekApiKeyInput.value =
           settings.DEEPSEEK_API_KEY || CONFIG.DEEPSEEK_API_KEY;
-      if (deepseekApiModelInput)
-        deepseekApiModelInput.value =
-          settings.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
+      if (deepseekApiModelInput) {
+        const deepSeekModel = settings.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
+        const isCustomModel = !CONFIG.DEEPSEEK_MODELS?.some(model => model.value === deepSeekModel);
+        
+        if (isCustomModel) {
+          deepseekApiModelInput.value = "custom";
+          if (deepseekCustomModelInput) {
+            deepseekCustomModelInput.value = deepSeekModel;
+          }
+        } else {
+          deepseekApiModelInput.value = deepSeekModel;
+        }
+      }
       if (customApiUrlInput)
         customApiUrlInput.value =
           settings.CUSTOM_API_URL || CONFIG.CUSTOM_API_URL;
@@ -839,6 +923,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // --- Trigger UI updates that depend on the loaded settings ---
       toggleApiSettings();
       handleGeminiModelChange(); // Initialize Gemini model UI state
+      handleOpenAIModelChange(); // Initialize OpenAI model UI state
+      handleOpenRouterModelChange(); // Initialize OpenRouter model UI state
+      handleDeepSeekModelChange(); // Initialize DeepSeek model UI state
       handleTextSelectionDependency();
       updateOverallExtensionDependency();
       await updatePromptHelpText(settings);
