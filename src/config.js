@@ -39,16 +39,17 @@ export const CONFIG = {
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
   API_KEY: "", // Gemini specific
   GEMINI_MODEL: "gemini-2.5-flash", // Selected Gemini model
+  GEMINI_THINKING_ENABLED: true, // Enable/disable thinking for supported models
   GEMINI_MODELS: [
-    { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent" },
-    { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" },
-    { value: "gemini-2.5-flash-lite-preview", name: "Gemini 2.5 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview:generateContent" },
-    { value: "gemini-2.0-flash", name: "Gemini 2.0 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent" },
-    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent" },
-    { value: "gemini-1.5-pro", name: "Gemini 1.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent" },
-    { value: "gemini-1.5-flash", name: "Gemini 1.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent" },
-    { value: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash-8B", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent" },
-    { value: "custom", name: "Custom URL", url: "" }
+    { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent", thinking: { supported: true, controllable: false, defaultEnabled: true } },
+    { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: true } },
+    { value: "gemini-2.5-flash-lite-preview", name: "Gemini 2.5 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
+    { value: "gemini-2.0-flash", name: "Gemini 2.0 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "gemini-1.5-pro", name: "Gemini 1.5 Pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "gemini-1.5-flash", name: "Gemini 1.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash-8B", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
+    { value: "custom", name: "Custom URL", url: "", thinking: { supported: false, controllable: false, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
   WEBAI_API_URL: "http://localhost:6969/translate",
@@ -328,6 +329,9 @@ export const getApiUrlAsync = async () => {
 
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
+};
+export const getGeminiThinkingEnabledAsync = async () => {
+  return getSettingValueAsync("GEMINI_THINKING_ENABLED", CONFIG.GEMINI_THINKING_ENABLED);
 };
 
 // Google Translate Specific

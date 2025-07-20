@@ -433,5 +433,12 @@
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "سهمیه Gemini به پایان رسیده است (احتمالاً به دلیل محدودیت منطقه‌ای)."
+  },
+
+  "gemini_thinking_label": {
+    "message": "فعال‌سازی حالت تفکر"
+  },
+  "gemini_thinking_description": {
+    "message": "اجازه دهید مدل قبل از پاسخ، گام به گام فکر کند."
   }
 }

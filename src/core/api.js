@@ -6,6 +6,7 @@ import {
   getUseMockAsync,
   getApiUrlAsync,
   getGeminiModelAsync,
+  getGeminiThinkingEnabledAsync,
   getSourceLanguageAsync,
   getTargetLanguageAsync,
   getTranslationApiAsync,
@@ -408,9 +409,10 @@ class ApiService {
   async handleGeminiTranslation(text, sourceLang, targetLang, translateMode) {
     if (sourceLang === targetLang) return null;
 
-    const [apiKey, geminiModel] = await Promise.all([
+    const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
       getApiKeyAsync(),
       getGeminiModelAsync(),
+      getGeminiThinkingEnabledAsync(),
     ]);
 
     // Build API URL based on selected model
@@ -444,11 +446,36 @@ class ApiService {
       translateMode
     );
     logME("[API] handleGeminiTranslation built prompt:", prompt);
+    // Determine thinking budget based on model and user settings
+    let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
+    
+    // Add thinking parameter for supported models
+    const modelConfig = CONFIG.GEMINI_MODELS?.find(m => m.value === geminiModel);
+    if (modelConfig?.thinking?.supported) {
+      if (modelConfig.thinking.controllable) {
+        // For controllable models (2.5 Flash, 2.5 Flash Lite)
+        if (thinkingEnabled) {
+          requestBody.generationConfig = { 
+            thinkingConfig: { thinkingBudget: -1 } // Enable dynamic thinking
+          };
+        } else {
+          requestBody.generationConfig = { 
+            thinkingConfig: { thinkingBudget: 0 } // Disable thinking
+          };
+        }
+      } else if (modelConfig.thinking.defaultEnabled) {
+        // For non-controllable models with thinking enabled by default (2.5 Pro)
+        requestBody.generationConfig = { 
+          thinkingConfig: { thinkingBudget: -1 } // Always enabled
+        };
+      }
+    }
+
     const url = `${apiUrl}?key=${apiKey}`;
     const fetchOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      body: JSON.stringify(requestBody),
     };
 
     logME("[API] handleGeminiTranslation about to call _executeApiCall with:", {
@@ -468,6 +495,30 @@ class ApiService {
       logME("[API] handleGeminiTranslation _executeApiCall completed with result:", result);
       return result;
     } catch (error) {
+      // If thinking-related error occurs, retry without thinking config
+      if (error.message && error.message.includes('thinkingBudget') && requestBody.generationConfig?.thinkingConfig) {
+        logME("[API] handleGeminiTranslation thinking parameter not supported, retrying without thinking...");
+        
+        // Remove thinking config and retry
+        delete requestBody.generationConfig;
+        const fallbackFetchOptions = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        };
+        
+        const fallbackResult = await this._executeApiCall({
+          url,
+          fetchOptions: fallbackFetchOptions,
+          extractResponse: (data) =>
+            data?.candidates?.[0]?.content?.parts?.[0]?.text,
+          context: "api-gemini-translation-fallback",
+        });
+        
+        logME("[API] handleGeminiTranslation fallback _executeApiCall completed with result:", fallbackResult);
+        return fallbackResult;
+      }
+      
       logME("[API] handleGeminiTranslation _executeApiCall failed with error:", error);
       throw error;
     }

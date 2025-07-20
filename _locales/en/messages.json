@@ -442,5 +442,12 @@
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "Gemini quota exceeded, which may be due to a region-specific limit."
+  },
+
+  "gemini_thinking_label": {
+    "message": "Enable Thinking Mode"
+  },
+  "gemini_thinking_description": {
+    "message": "Allow the model to think step-by-step before responding."
   }
 }

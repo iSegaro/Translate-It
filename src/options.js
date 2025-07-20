@@ -145,6 +145,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const geminiApiSettings = document.getElementById("geminiApiSettings");
   const geminiModelSelect = document.getElementById("geminiModel");
   const geminiCustomUrlGroup = document.getElementById("geminiCustomUrlGroup");
+  const geminiThinkingGroup = document.getElementById("geminiThinkingGroup");
+  const geminiThinkingCheckbox = document.getElementById("geminiThinking");
   const openAIApiSettings = document.getElementById("openAIApiSettings");
   const openAIApiKeyInput = document.getElementById("openaiApiKey");
   const openAIModelInput = document.getElementById("openaiApiModel");
@@ -558,6 +560,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         apiUrlInput.value = selectedModelConfig.url;
       }
     }
+
+    // Handle thinking control visibility and state
+    if (geminiThinkingGroup && geminiThinkingCheckbox) {
+      const models = CONFIG.GEMINI_MODELS || [];
+      const selectedModelConfig = models.find(model => model.value === selectedModel);
+      
+      if (selectedModelConfig && selectedModelConfig.thinking) {
+        const { supported, controllable, defaultEnabled } = selectedModelConfig.thinking;
+        
+        if (supported) {
+          // Show thinking group for supported models
+          geminiThinkingGroup.style.display = "block";
+          
+          if (controllable) {
+            // Enable control for controllable models
+            geminiThinkingCheckbox.disabled = false;
+            // Set default value if checkbox value seems uninitialized (during first load)
+            if (geminiThinkingCheckbox.checked === false && defaultEnabled === true) {
+              geminiThinkingCheckbox.checked = defaultEnabled;
+            }
+          } else {
+            // Disable control but show status for non-controllable models (like 2.5 Pro)
+            geminiThinkingCheckbox.disabled = true;
+            geminiThinkingCheckbox.checked = defaultEnabled;
+          }
+          
+          // Update description based on model
+          const descElement = document.getElementById("geminiThinkingDescription");
+          if (descElement) {
+            if (!controllable && selectedModel === "gemini-2.5-pro") {
+              descElement.textContent = "Thinking mode is always enabled for Gemini 2.5 Pro and cannot be disabled.";
+            } else if (controllable) {
+              descElement.textContent = "Allow the model to think step-by-step before responding.";
+            }
+          }
+        } else {
+          // Hide thinking group for unsupported models
+          geminiThinkingGroup.style.display = "none";
+        }
+      } else {
+        // Hide for unknown models
+        geminiThinkingGroup.style.display = "none";
+      }
+    }
   }
 
   if (geminiModelSelect) {
@@ -704,6 +750,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       CUSTOM_API_MODEL:
         customApiModelInput?.value?.trim() || CONFIG.CUSTOM_API_MODEL,
       GEMINI_MODEL: geminiModelSelect?.value || CONFIG.GEMINI_MODEL,
+      GEMINI_THINKING_ENABLED:
+        geminiThinkingCheckbox?.checked ?? CONFIG.GEMINI_THINKING_ENABLED,
       TRANSLATE_ON_TEXT_FIELDS:
         translateOnTextFieldsCheckbox?.checked ??
         CONFIG.TRANSLATE_ON_TEXT_FIELDS,
@@ -910,6 +958,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Load Gemini model selection
       if (geminiModelSelect)
         geminiModelSelect.value = settings.GEMINI_MODEL || CONFIG.GEMINI_MODEL;
+
+      // Load Gemini thinking setting
+      if (geminiThinkingCheckbox)
+        geminiThinkingCheckbox.checked =
+          settings.GEMINI_THINKING_ENABLED ?? CONFIG.GEMINI_THINKING_ENABLED;
 
       // Populate radio buttons
       if (selectionModeImmediateRadio && selectionModeOnClickRadio) {
