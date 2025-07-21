@@ -1,6 +1,6 @@
 ### Changelog – Translate It!
 
-#### v0.9.0 – Released on January 21, 2025
+#### v0.9.0 – Released on January 22, 2025
 
 ##### Added
 
@@ -17,7 +17,8 @@
 ##### Changed
 
 - **Enhanced XSS Security**: Implemented comprehensive XSS protection using filterXSS library across all translation outputs and UI components
-- **Firefox Validation Compliance**: Achieved zero-warning Firefox addon validation with complete addons-linter compatibility testing
+- **Firefox Validation Compliance**: Achieved zero warnings in Firefox addon validation through full `addons-linter` compatibility testing
+- **Chrome Extension Validation**: Achieved zero warnings in Chrome extension validation using complete `web-ext` compatibility testing
 - **Improved Language Selection**: Fixed and enhanced language selection dropdowns in popup interface
 - **Typography Improvements**: Enhanced font sizes and consistency across popup and side panel interfaces (14px→15px, unified font families)
 - **Optimized AI Prompts**: Improved prompt templates, particularly dictionary prompts, for better translation accuracy and reduced AI confusion
