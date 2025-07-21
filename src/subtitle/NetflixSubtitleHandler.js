@@ -259,7 +259,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
       container.appendChild(originalSpan);
 
       // جایگزینی محتوا در parent container
-      parentContainer.innerHTML = "";
+      parentContainer.textContent = "";
       parentContainer.appendChild(container);
       parentContainer.dataset.translated = "true";
       parentContainer.dataset.originalText = originalText;

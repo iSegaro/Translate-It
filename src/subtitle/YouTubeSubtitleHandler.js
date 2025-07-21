@@ -2,6 +2,7 @@
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
 import { logME } from "../utils/helpers.js";
+import { safeSetText } from "../utils/safeHtml.js";
 
 export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {
@@ -190,7 +191,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       // پاک کردن محتوای خطوط نیز
       if (this.subtitleLines) {
         this.subtitleLines.forEach(line => {
-          line.innerHTML = '';
+          line.textContent = '';
           line.className = 'subtitle-line empty';
         });
       }
@@ -429,7 +430,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // دریافت ابعاد کانتینر
     const containerRect = this.subtitleContainer.getBoundingClientRect();
     const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
+    // const containerHeight = containerRect.height; // Currently unused
     
     // محاسبه محدوده مجاز
     const minLeft = 0;
@@ -643,17 +644,24 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
       // شیفت دادن محتوای موجود به بالا
       if (this.subtitleLines.length >= 2) {
-        // انتقال محتوای خط دوم به خط اول
-        const line2Content = this.subtitleLines[1].innerHTML;
+        // انتقال محتوای خط دوم به خط اول - safely copy content
+        const line2Content = this.subtitleLines[1].cloneNode(true);
         const line2Classes = this.subtitleLines[1].classList.contains('empty') ? 'empty' : 'recent';
         
-        this.subtitleLines[0].innerHTML = line2Content;
+        // Clear and replace content safely
+        this.subtitleLines[0].textContent = '';
+        Array.from(line2Content.childNodes).forEach(node => {
+          this.subtitleLines[0].appendChild(node.cloneNode(true));
+        });
         this.subtitleLines[0].className = `subtitle-line ${line2Classes}`;
       }
 
-      // اضافه کردن محتوای جدید به خط دوم
-      this.subtitleLines[1].innerHTML = `
-        <div style="
+      // اضافه کردن محتوای جدید به خط دوم - create elements safely
+      this.subtitleLines[1].textContent = '';
+
+      // Create translated text div
+      const translatedDiv = document.createElement('div');
+      translatedDiv.style.cssText = `
           font-weight: bold !important;
           font-size: 1.4em !important;
           line-height: 1.3 !important;
@@ -663,8 +671,12 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
           overflow: hidden !important;
           text-overflow: ellipsis !important;
           white-space: nowrap !important;
-        ">${translatedText}</div>
-        <div style="
+      `;
+      safeSetText(translatedDiv, translatedText);
+
+      // Create original text div
+      const originalDiv = document.createElement('div');
+      originalDiv.style.cssText = `
           font-size: 1.1em !important;
           opacity: 0.8 !important;
           line-height: 1.2 !important;
@@ -673,8 +685,12 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
           overflow: hidden !important;
           text-overflow: ellipsis !important;
           white-space: nowrap !important;
-        ">${originalText}</div>
       `;
+      safeSetText(originalDiv, originalText);
+
+      // Append both divs
+      this.subtitleLines[1].appendChild(translatedDiv);
+      this.subtitleLines[1].appendChild(originalDiv);
 
       // تنظیم کلاس‌ها
       this.subtitleLines[1].className = 'subtitle-line active';

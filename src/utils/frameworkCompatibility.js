@@ -1026,7 +1026,7 @@ async function tryContentEditableInsertion(element, text, hasSelection) {
       selection.addRange(range);
     } else {
       // جایگزینی کل محتوا
-      element.innerHTML = '';
+      element.textContent = '';
       const lines = text.split('\n');
       
       lines.forEach((line, index) => {

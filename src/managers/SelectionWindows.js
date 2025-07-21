@@ -784,7 +784,7 @@ export default class SelectionWindows {
     
     // Add close button
     const closeButton = document.createElement("span");
-    closeButton.innerHTML = "✕";
+    closeButton.textContent = "✕";
     closeButton.style.opacity = "0.7";
     closeButton.style.fontSize = "14px";
     closeButton.style.cursor = "pointer";

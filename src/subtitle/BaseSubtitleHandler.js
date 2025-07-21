@@ -3,7 +3,6 @@
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { TranslationMode } from "../config.js";
-import { getTranslationString } from "../utils/i18n.js";
 
 export default class BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {
@@ -95,7 +94,7 @@ export default class BaseSubtitleHandler {
     const checkInterval = 500;
     let elapsed = 0;
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
       const check = () => {
         const container = document.querySelector(selectors.container);
         if (container) {
@@ -266,7 +265,7 @@ export default class BaseSubtitleHandler {
       container.appendChild(originalSpan);
 
       // جایگزینی محتوا
-      element.innerHTML = "";
+      element.textContent = "";
       element.appendChild(container);
       element.dataset.translated = "true";
       element.dataset.originalText = originalText;
