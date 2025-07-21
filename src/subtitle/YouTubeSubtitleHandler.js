@@ -8,7 +8,21 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     super(translationProvider, errorHandler, notifier);
     this.currentVideoId = null;
     this.currentLineIndex = 0; // ایندکس خط فعلی برای نوشتن
-    this.maxLines = 3; // تعداد ثابت خطوط در کادر
+    this.maxLines = 2; // تعداد ثابت خطوط در کادر
+    
+    // متغیرهای drag
+    this.isDragging = false;
+    this.dragOffsetX = 0;
+    this.dragOffsetY = 0;
+    this.lastTranslatedText = null; // برای جلوگیری از نمایش تکراری
+    
+    // متغیرهای timing برای کنترل سرعت نمایش
+    this.lastDisplayTime = 0;
+    this.minDisplayDuration = 1500; // حداقل 1.5 ثانیه فاصله بین زیرنویس‌ها
+    this.currentSubtitleText = ''; // متن زیرنویس فعلی در حال نمایش
+    this.recentSubtitles = new Set(); // ذخیره زیرنویس‌های اخیر برای جلوگیری از تکرار
+    this.subtitleCleanupTimeout = null; // تایمر پاک‌سازی
+    
     this.setupNavigationListener();
   }
 
@@ -123,9 +137,97 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     
     if (result) {
       this.setupHoverPause();
+      this.setupSubtitleStateMonitoring();
     }
     
     return result;
+  }
+  
+  // نظارت بر وضعیت زیرنویس یوتیوب
+  setupSubtitleStateMonitoring() {
+    // MutationObserver برای نظارت بر تغییرات در دکمه زیرنویس
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && 
+            mutation.attributeName === 'aria-pressed') {
+          this.updateContainerVisibility();
+        }
+      });
+    });
+    
+    // پیدا کردن دکمه زیرنویس و شروع نظارت
+    const subtitleButton = document.querySelector('#movie_player .ytp-subtitles-button');
+    if (subtitleButton) {
+      observer.observe(subtitleButton, { attributes: true });
+      this.subtitleStateObserver = observer;
+    }
+    
+    // بررسی اولیه وضعیت
+    this.updateContainerVisibility();
+    
+    // بررسی دوره‌ای هم برای اطمینان (هر 2 ثانیه)
+    this.subtitleCheckInterval = setInterval(() => {
+      this.updateContainerVisibility();
+    }, 2000);
+  }
+  
+  // بروزرسانی نمایش کانتینر بر اساس وضعیت زیرنویس
+  updateContainerVisibility() {
+    if (!this.subtitleContainer) return;
+    
+    const subtitlesEnabled = this.areSubtitlesEnabled();
+    
+    if (subtitlesEnabled) {
+      this.subtitleContainer.style.display = 'block';
+      if (this.subtitleBox) {
+        this.subtitleBox.style.display = 'flex';
+      }
+    } else {
+      this.subtitleContainer.style.display = 'none';
+      // پاک کردن محتوای خطوط نیز
+      if (this.subtitleLines) {
+        this.subtitleLines.forEach(line => {
+          line.innerHTML = '';
+          line.className = 'subtitle-line empty';
+        });
+      }
+      // پاک کردن کلاس visible
+      if (this.subtitleBox) {
+        this.subtitleBox.classList.remove('visible');
+      }
+      // پاک کردن زیرنویس فعلی
+      this.currentSubtitleText = '';
+      this.recentSubtitles.clear();
+      if (this.subtitleCleanupTimeout) {
+        clearTimeout(this.subtitleCleanupTimeout);
+        this.subtitleCleanupTimeout = null;
+      }
+    }
+    
+    logME(`[YouTubeSubtitleHandler] Container visibility updated: ${subtitlesEnabled ? 'visible' : 'hidden'}`);
+  }
+  
+  // بررسی وضعیت زیرنویس در پلیر یوتیوب
+  areSubtitlesEnabled() {
+    // بررسی کلاس‌های مختلف که نشان‌دهنده فعال بودن زیرنویس هستند
+    const player = document.querySelector('#movie_player');
+    if (!player) return false;
+    
+    // بررسی دکمه زیرنویس در کنترل‌های پلیر
+    const subtitleButton = player.querySelector('.ytp-subtitles-button');
+    if (subtitleButton) {
+      // اگر دکمه آریا-pressed="true" داشته باشد، زیرنویس فعال است
+      return subtitleButton.getAttribute('aria-pressed') === 'true';
+    }
+    
+    // بررسی وجود کانتینر زیرنویس و اینکه مخفی نباشد
+    const captionContainer = document.querySelector('.ytp-caption-window-container');
+    if (captionContainer) {
+      const style = window.getComputedStyle(captionContainer);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    }
+    
+    return false;
   }
 
   // تنظیم pause on hover
@@ -144,34 +246,37 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
           display: none !important;
         }
         
-        /* کانتینر ثابت ما */
+        /* کانتینر قابل drag ما */
         #translate-it-subtitle-container {
           position: absolute !important;
           bottom: 60px !important;
           left: 50% !important;
           transform: translateX(-50%) !important;
           z-index: 10000 !important;
-          pointer-events: none !important;
+          pointer-events: auto !important;
           width: 80% !important;
           max-width: 600px !important;
+          cursor: move !important;
         }
         
-        /* کادر زیرنویس ثابت */
+        #translate-it-subtitle-container.dragging {
+          user-select: none !important;
+        }
+        
+        /* کادر زیرنویس متغیر */
         .translate-it-subtitle-box {
           display: flex !important;
           flex-direction: column !important;
           align-items: center !important;
           text-align: center !important;
-          gap: 8px !important;
-          background: rgba(8, 8, 8, 0.7) !important;
+          gap: 6px !important;
+          background: rgba(8, 8, 8, 0.5) !important;
           color: white !important;
           font-family: YouTube Noto, Roboto, Arial, Helvetica, sans-serif !important;
-          padding: 12px 14px !important;
+          padding: 12px 16px !important;
           border-radius: 8px !important;
           box-shadow: rgba(0, 0, 0, 0.8) 0px 4px 12px !important;
-          height: 165px !important;
-          min-height: 165px !important;
-          max-height: 165px !important;
+          min-height: 50px !important;
           justify-content: flex-start !important;
           opacity: 0 !important;
           transition: opacity 0.3s ease !important;
@@ -179,18 +284,19 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
           overflow: hidden !important;
         }
         
-        /* هر خط زیرنویس - ثابت */
+        /* هر خط زیرنویس - متغیر */
         .subtitle-line {
           width: 100% !important;
-          height: 45px !important;
-          min-height: 45px !important;
-          max-height: 45px !important;
           margin-bottom: 6px !important;
           opacity: 0.60 !important;
           display: flex !important;
           flex-direction: column !important;
           justify-content: center !important;
           align-items: center !important;
+        }
+        
+        .subtitle-line.empty {
+          display: none !important;
         }
         
         .subtitle-line.active {
@@ -206,7 +312,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
         }
         
         .translate-it-subtitle-box:hover {
-          background: rgba(8, 8, 8, 0.8) !important;
+          background: rgba(8, 8, 8, 0.65) !important;
         }
       `;
       document.head.appendChild(style);
@@ -243,18 +349,12 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.subtitleBox = document.createElement("div");
     this.subtitleBox.className = "translate-it-subtitle-box";
     
-    // ایجاد 3 سطر ثابت
+    // ایجاد 3 سطر خالی
     this.subtitleLines = [];
     for (let i = 0; i < this.maxLines; i++) {
       const lineContainer = document.createElement("div");
-      lineContainer.className = "subtitle-line";
+      lineContainer.className = "subtitle-line empty";
       lineContainer.dataset.lineIndex = i;
-      
-      // متن خالی برای شروع
-      lineContainer.innerHTML = `
-        <div style="font-weight: bold; font-size: 1.4em; color: transparent;">مکان‌دار</div>
-        <div style="font-size: 1.1em; color: transparent;">مکان‌دار</div>
-      `;
       
       this.subtitleBox.appendChild(lineContainer);
       this.subtitleLines.push(lineContainer);
@@ -266,22 +366,121 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // تنظیم hover events بعد از ایجاد کادر
     this.setupDirectHoverEvents();
     
-    logME("[YouTubeSubtitleHandler] Fixed subtitle container created with 3 static lines");
+    logME("[YouTubeSubtitleHandler] Fixed subtitle container created with 2 static lines");
   }
 
-  // تنظیم hover events مستقیم روی کادر زیرنویس
+  // تنظیم hover events و drag events مستقیم روی کادر زیرنویس
   setupDirectHoverEvents() {
-    if (!this.subtitleBox) return;
+    if (!this.subtitleContainer || !this.subtitleBox) return;
 
+    // Hover events for pause/resume
     this.subtitleBox.addEventListener('mouseenter', () => {
-      logME("[YouTubeSubtitleHandler] Direct hover enter on subtitle box");
-      this.pauseVideo();
+      if (!this.isDragging) {
+        logME("[YouTubeSubtitleHandler] Direct hover enter on subtitle box");
+        this.pauseVideo();
+      }
     });
 
     this.subtitleBox.addEventListener('mouseleave', () => {
-      logME("[YouTubeSubtitleHandler] Direct hover leave from subtitle box");
-      this.resumeVideo();
+      if (!this.isDragging) {
+        logME("[YouTubeSubtitleHandler] Direct hover leave from subtitle box");
+        this.resumeVideo();
+      }
     });
+
+    // Drag events
+    this.subtitleContainer.addEventListener('mousedown', this.handleDragStart.bind(this));
+    document.addEventListener('mousemove', this.handleDragMove.bind(this));
+    document.addEventListener('mouseup', this.handleDragEnd.bind(this));
+  }
+
+  handleDragStart(e) {
+    this.isDragging = true;
+    this.subtitleContainer.classList.add('dragging');
+    
+    // محاسبه offset نسبت به گوشه بالا-چپ کانتینر
+    const rect = this.subtitleContainer.getBoundingClientRect();
+    this.dragOffsetX = e.clientX - rect.left;
+    this.dragOffsetY = e.clientY - rect.top;
+    
+    // متوقف کردن propagation برای جلوگیری از تداخل
+    e.preventDefault();
+    e.stopPropagation();
+    
+    logME("[YouTubeSubtitleHandler] Drag started");
+  }
+
+  handleDragMove(e) {
+    if (!this.isDragging) return;
+    
+    // محاسبه موقعیت جدید با offset درست
+    const newLeft = e.clientX - this.dragOffsetX;
+    const newTop = e.clientY - this.dragOffsetY;
+    
+    // دریافت ابعاد کانتینر
+    const containerRect = this.subtitleContainer.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    // محاسبه محدوده مجاز
+    const minLeft = 0;
+    const maxLeft = window.innerWidth - containerWidth;
+    const minTop = 0;
+    // اجازه خروج از پایین تا حد مشخص شدن خط دوم (حدود 40px از بالای کانتینر)
+    const maxTop = window.innerHeight - 40;
+    
+    // اعمال محدودیت‌ها
+    const boundedLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+    const boundedTop = Math.max(minTop, Math.min(newTop, maxTop));
+    
+    // تنظیم موقعیت جدید
+    this.subtitleContainer.style.left = boundedLeft + 'px';
+    this.subtitleContainer.style.top = boundedTop + 'px';
+    this.subtitleContainer.style.bottom = 'auto';
+    this.subtitleContainer.style.transform = 'none';
+    
+    e.preventDefault();
+  }
+
+  handleDragEnd(e) {
+    if (!this.isDragging) return;
+    
+    this.isDragging = false;
+    this.subtitleContainer.classList.remove('dragging');
+    
+    // بررسی اینکه آیا کادر هنوز در viewport قابل مشاهده است
+    this.ensureContainerVisible();
+    
+    logME("[YouTubeSubtitleHandler] Drag ended");
+    
+    e.preventDefault();
+  }
+
+  // اطمینان از قابل مشاهده بودن کادر
+  ensureContainerVisible() {
+    const rect = this.subtitleContainer.getBoundingClientRect();
+    
+    // بررسی اینکه آیا کادر به طور کامل خارج از viewport رفته
+    // فقط اگر کاملاً خارج شده باشد، بازگردانی می‌کنیم
+    const isCompletelyOutOfBounds = (
+      rect.right <= 0 ||  // کاملاً از چپ خارج شده
+      rect.left >= window.innerWidth ||  // کاملاً از راست خارج شده
+      rect.top >= window.innerHeight  // کاملاً از پایین خارج شده (بالا را چک نمی‌کنیم)
+    );
+    
+    if (isCompletelyOutOfBounds) {
+      // بازگرداندن به موقعیت پیش‌فرض (وسط-پایین)
+      this.resetContainerPosition();
+      logME("[YouTubeSubtitleHandler] Container was completely out of bounds, reset to default position");
+    }
+  }
+
+  // بازگرداندن کادر به موقعیت پیش‌فرض
+  resetContainerPosition() {
+    this.subtitleContainer.style.left = '50%';
+    this.subtitleContainer.style.top = 'auto';
+    this.subtitleContainer.style.bottom = '60px';
+    this.subtitleContainer.style.transform = 'translateX(-50%)';
   }
 
   handleSubtitleHover(event) {
@@ -326,10 +525,67 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     }
   }
 
-  // Override updateSubtitleElement برای نوشتن چرخشی در سطوح ثابت
-  updateSubtitleElement(element, originalText, translatedText) {
+  // بررسی اینکه آیا ویدیو در حال پخش است
+  isVideoPlaying() {
     try {
-      logME(`[YouTubeSubtitleHandler] Writing to line ${this.currentLineIndex}: "${originalText}" -> "${translatedText}"`);
+      const video = document.querySelector(this.getSelectors().player);
+      return video && !video.paused;
+    } catch {
+      return false;
+    }
+  }
+  
+  // بررسی اینکه آیا زیرنویس واقعاً جدید است
+  shouldUpdateSubtitle(originalText, translatedText) {
+    // اگر ویدیو متوقف است، اپدیت نکن
+    if (!this.isVideoPlaying()) {
+      logME('[YouTubeSubtitleHandler] Video is paused, not updating subtitles');
+      return false;
+    }
+    
+    // بررسی تکرار با زیرنویس‌های اخیر
+    if (this.recentSubtitles.has(translatedText)) {
+      logME(`[YouTubeSubtitleHandler] Duplicate subtitle in recent history, ignoring: "${translatedText}"`);
+      return false;
+    }
+    
+    // بررسی تکراری بودن با زیرنویس فعلی
+    if (this.currentSubtitleText === translatedText) {
+      logME(`[YouTubeSubtitleHandler] Same as current subtitle, not updating: "${translatedText}"`);
+      return false;
+    }
+    
+    // بررسی فاصله زمانی
+    const currentTime = Date.now();
+    const timeSinceLastDisplay = currentTime - this.lastDisplayTime;
+    
+    if (this.lastDisplayTime > 0 && timeSinceLastDisplay < this.minDisplayDuration) {
+      logME(`[YouTubeSubtitleHandler] Too soon to update subtitle (${timeSinceLastDisplay}ms < ${this.minDisplayDuration}ms)`);
+      return false;
+    }
+    
+    return true;
+  }
+  
+  // اضافه کردن زیرنویس به تاریخچه اخیر
+  addToRecentHistory(translatedText) {
+    this.recentSubtitles.add(translatedText);
+    
+    // پاک کردن تاریخچه پس از 3 ثانیه
+    if (this.subtitleCleanupTimeout) {
+      clearTimeout(this.subtitleCleanupTimeout);
+    }
+    
+    this.subtitleCleanupTimeout = setTimeout(() => {
+      this.recentSubtitles.clear();
+      logME('[YouTubeSubtitleHandler] Recent subtitles history cleared');
+    }, 3000);
+  }
+  
+  // نمایش فوری زیرنویس (بدون صف)
+  async displaySubtitleImmediate(originalText, translatedText) {
+    try {
+      logME(`[YouTubeSubtitleHandler] Displaying subtitle: "${originalText}" -> "${translatedText}"`);
       
       // اگر کانتینر ثابت وجود ندارد، ایجاد کن
       if (!this.subtitleBox || !this.subtitleLines) {
@@ -340,21 +596,25 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
         logME("[YouTubeSubtitleHandler] Subtitle box not available");
         return;
       }
-
-      // پیدا کردن سطر فعلی برای نوشتن
-      const targetLine = this.subtitleLines[this.currentLineIndex];
-      if (!targetLine) {
-        logME("[YouTubeSubtitleHandler] Target line not found");
+      
+      // بررسی اینکه آیا زیرنویس فعال است
+      if (!this.areSubtitlesEnabled()) {
+        logME("[YouTubeSubtitleHandler] Subtitles are disabled, not updating");
         return;
       }
 
-      // پاک کردن کلاس‌های قبلی از همه سطرها
-      this.subtitleLines.forEach(line => {
-        line.classList.remove('active', 'recent');
-      });
+      // شیفت دادن محتوای موجود به بالا
+      if (this.subtitleLines.length >= 2) {
+        // انتقال محتوای خط دوم به خط اول
+        const line2Content = this.subtitleLines[1].innerHTML;
+        const line2Classes = this.subtitleLines[1].classList.contains('empty') ? 'empty' : 'recent';
+        
+        this.subtitleLines[0].innerHTML = line2Content;
+        this.subtitleLines[0].className = `subtitle-line ${line2Classes}`;
+      }
 
-      // نوشتن محتوای جدید در سطر فعلی
-      targetLine.innerHTML = `
+      // اضافه کردن محتوای جدید به خط دوم
+      this.subtitleLines[1].innerHTML = `
         <div style="
           font-weight: bold !important;
           font-size: 1.4em !important;
@@ -378,25 +638,37 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
         ">${originalText}</div>
       `;
 
-      // تنظیم کلاس فعال برای سطر جدید
-      targetLine.classList.add('active');
-
-      // تنظیم کلاس recent برای سطر قبلی
-      const previousIndex = (this.currentLineIndex - 1 + this.maxLines) % this.maxLines;
-      this.subtitleLines[previousIndex].classList.add('recent');
+      // تنظیم کلاس‌ها
+      this.subtitleLines[1].className = 'subtitle-line active';
 
       // نمایش کادر
       this.subtitleBox.classList.add("visible");
 
-      // انتقال به سطر بعدی (چرخشی)
-      this.currentLineIndex = (this.currentLineIndex + 1) % this.maxLines;
-
-      logME(`[YouTubeSubtitleHandler] Successfully wrote to line. Next line: ${this.currentLineIndex}`);
+      logME(`[YouTubeSubtitleHandler] Successfully displayed subtitle`);
     } catch (error) {
-      logME(`[YouTubeSubtitleHandler] Error updating subtitle:`, error);
-      // Fallback to parent method
-      super.updateSubtitleElement(element, originalText, translatedText);
+      logME(`[YouTubeSubtitleHandler] Error displaying subtitle:`, error);
     }
+  }
+  
+  // Override updateSubtitleElement با کنترل هوشمند
+  updateSubtitleElement(element, originalText, translatedText) {
+    // بررسی اینکه آیا باید اپدیت کرد
+    if (!this.shouldUpdateSubtitle(originalText, translatedText)) {
+      return;
+    }
+    
+    logME(`[YouTubeSubtitleHandler] New subtitle accepted: "${originalText}" -> "${translatedText}"`);
+    
+    // نمایش زیرنویس جدید
+    this.displaySubtitleImmediate(originalText, translatedText);
+    
+    // به‌روزرسانی زمان و متن فعلی
+    this.lastDisplayTime = Date.now();
+    this.currentSubtitleText = translatedText;
+    this.lastTranslatedText = translatedText;
+    
+    // اضافه کردن به تاریخچه اخیر
+    this.addToRecentHistory(translatedText);
   }
 
 
@@ -406,14 +678,47 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     document.removeEventListener("mouseenter", this.handleSubtitleHover, true);
     document.removeEventListener("mouseleave", this.handleSubtitleLeave, true);
     
+    // Remove drag event listeners
+    document.removeEventListener("mousemove", this.handleDragMove);
+    document.removeEventListener("mouseup", this.handleDragEnd);
+    
+    // پاک‌سازی subtitle state monitoring
+    if (this.subtitleStateObserver) {
+      this.subtitleStateObserver.disconnect();
+      this.subtitleStateObserver = null;
+    }
+    
+    if (this.subtitleCheckInterval) {
+      clearInterval(this.subtitleCheckInterval);
+      this.subtitleCheckInterval = null;
+    }
+    
+    // پاک‌سازی timing
+    this.lastDisplayTime = 0;
+    this.currentSubtitleText = '';
+    this.recentSubtitles.clear();
+    if (this.subtitleCleanupTimeout) {
+      clearTimeout(this.subtitleCleanupTimeout);
+      this.subtitleCleanupTimeout = null;
+    }
+    
     // Remove fixed subtitle container
     if (this.subtitleContainer) {
       this.subtitleContainer.remove();
       this.subtitleContainer = null;
     }
     
-    // Reset line index
+    // Reset state variables
     this.currentLineIndex = 0;
+    this.isDragging = false;
+    this.lastTranslatedText = null;
+    this.lastDisplayTime = 0;
+    this.currentSubtitleText = '';
+    this.recentSubtitles.clear();
+    if (this.subtitleCleanupTimeout) {
+      clearTimeout(this.subtitleCleanupTimeout);
+      this.subtitleCleanupTimeout = null;
+    }
     
     // Clear subtitle lines array
     this.subtitleLines = [];
