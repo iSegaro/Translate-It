@@ -10,6 +10,7 @@
 - **Dictionary Mode for Google Translate**: Implemented dictionary functionality for Google Translate with enhanced formatting and markdown rendering
 - **Enhanced Floating Window**: Improved selection window with drag functionality and copy button for better user experience
 - **Model Selection in Settings**: Added comprehensive model selection options in settings page for each translation provider (Gemini, OpenAI, OpenRouter, DeepSeek)
+- **Secure AES-256 Import/Export**: Settings can now be exported and imported in AES-256 encrypted format, recoverable using a password
 - **YouTube Subtitle Translation** (Experimental): Implemented real-time subtitle translation for YouTube videos with dual-language display
     - **Subtitle Icon Control**: Added a setting to independently control YouTube translation icon visibility
 
