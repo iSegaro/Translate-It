@@ -292,6 +292,11 @@ class ApiService {
     if (translateMode === TranslationMode.Field) {
       sourceLang = AUTO_DETECT_VALUE;
     }
+    
+    // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
+    if (translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
     // ▲▲▲ پایان منطق اختصاصی Google Translate ▲▲▲
 
     // --- JSON Mode Detection ---
