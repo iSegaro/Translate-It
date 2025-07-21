@@ -146,7 +146,9 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("check quota") ||
     msg.includes("requires more credits") ||
     msg.includes("fewer max_tokens") ||
-    msg.includes("insufficient balance")
+    msg.includes("insufficient balance") ||
+    msg.includes("exceeded your current quota") ||
+    msg.includes("check your plan and billing details")
   )
     return ErrorTypes.QUOTA_EXCEEDED;
 
