@@ -18,7 +18,8 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     
     // متغیرهای timing برای کنترل سرعت نمایش
     this.lastDisplayTime = 0;
-    this.minDisplayDuration = 1500; // حداقل 1.5 ثانیه فاصله بین زیرنویس‌ها
+    this.minDisplayDuration = 3000; // حداقل 3 ثانیه فاصله بین زیرنویس‌ها
+    this.minClearSubtitle = 3000;
     this.currentSubtitleText = ''; // متن زیرنویس فعلی در حال نمایش
     this.recentSubtitles = new Set(); // ذخیره زیرنویس‌های اخیر برای جلوگیری از تکرار
     this.subtitleCleanupTimeout = null; // تایمر پاک‌سازی
@@ -579,7 +580,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.subtitleCleanupTimeout = setTimeout(() => {
       this.recentSubtitles.clear();
       logME('[YouTubeSubtitleHandler] Recent subtitles history cleared');
-    }, 3000);
+    }, this.minClearSubtitle);
   }
   
   // نمایش فوری زیرنویس (بدون صف)
