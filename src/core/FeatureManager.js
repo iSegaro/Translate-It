@@ -5,7 +5,7 @@ import { logME } from "../utils/helpers.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
- *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"} FeatureKey
+ *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SUBTITLE_TRANSLATION"} FeatureKey
  */
 
 export default class FeatureManager {
@@ -20,6 +20,7 @@ export default class FeatureManager {
       TRANSLATE_WITH_SELECT_ELEMENT: "SELECT_ELEMENT",
       TRANSLATE_ON_TEXT_SELECTION: "TEXT_SELECTION",
       ENABLE_DICTIONARY: "DICTIONARY",
+      ENABLE_SUBTITLE_TRANSLATION: "SUBTITLE_TRANSLATION",
     };
 
     // استفاده از initialFlags ارسال شده به constructor و fallback به مقادیر CONFIG
@@ -34,6 +35,7 @@ export default class FeatureManager {
       TEXT_SELECTION:
         initialFlags.TEXT_SELECTION ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION,
       DICTIONARY: initialFlags.DICTIONARY ?? CONFIG.ENABLE_DICTIONARY,
+      SUBTITLE_TRANSLATION: initialFlags.SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
     };
 
     this._subscribers = {};

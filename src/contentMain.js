@@ -14,6 +14,7 @@ import { getTranslationHandlerInstance } from "./core/InstanceManager.js";
 import { detectPlatform } from "./utils/platformDetector.js";
 import { ErrorTypes } from "./services/ErrorTypes.js";
 import { smartTextReplacement, smartDelay } from "./utils/frameworkCompatibility.js";
+import { createSubtitleIntegration } from "./handlers/subtitleHandler.js";
 
 // اکشن‌های پیام برای پاپ‌آپ (باید با پاپ‌آپ یکسان باشند)
 const MSG_POPUP_OPENED_CHECK_MOUSE = "POPUP_OPENED_CHECK_MOUSE_V3";
@@ -37,6 +38,7 @@ export function initContentScript() {
       this.initialMousePositionOnPageForContent = null;
       this.popupJustClosedForSelection = false;
       this.popupJustClosedForSelectionTimeout = null;
+      this.subtitleIntegration = null; // مدیریت ترجمه زیرنویس
 
       injectStyle();
       this.translationHandler = getTranslationHandlerInstance();
@@ -138,6 +140,7 @@ export function initContentScript() {
       this.setupPagehideListener();
       this.setupMessageListener(); // شنونده پیام اصلی افزونه
       this.setupBridgeListener();
+      this.initializeSubtitleIntegration(); // راه‌اندازی ترجمه زیرنویس
 
       logME("[Translate-It] ✅ Extension initialized successfully!");
     }
@@ -155,6 +158,8 @@ export function initContentScript() {
         if (this.popupJustClosedForSelectionTimeout)
           clearTimeout(this.popupJustClosedForSelectionTimeout);
         this.popupJustClosedForSelection = false;
+        // پاک‌سازی منابع ترجمه زیرنویس
+        this.cleanup();
       });
 
       window.addEventListener("blur", () => {
@@ -579,6 +584,27 @@ export function initContentScript() {
           );
         }
       });
+    }
+
+    // راه‌اندازی ترجمه زیرنویس
+    async initializeSubtitleIntegration() {
+      try {
+        this.subtitleIntegration = createSubtitleIntegration(this.translationHandler);
+        await this.subtitleIntegration.initialize();
+      } catch (error) {
+        this.translationHandler.errorHandler.handle(error, {
+          type: ErrorTypes.SUBTITLE,
+          context: "contentScript-initializeSubtitleIntegration",
+        });
+      }
+    }
+
+    // پاک‌سازی منابع
+    cleanup() {
+      if (this.subtitleIntegration) {
+        this.subtitleIntegration.destroy();
+        this.subtitleIntegration = null;
+      }
     }
   } // پایان کلاس ContentScript
 

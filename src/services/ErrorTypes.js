@@ -12,6 +12,7 @@ export class ErrorTypes {
   static CONTEXT = "CONTEXT";
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
+  static SUBTITLE = "SUBTITLE";
   static UNKNOWN = "UNKNOWN";
 
   // کلیدهای اعتبارسنجی (همان errorKeys بدون پیشوند ERRORS_)
