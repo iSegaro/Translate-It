@@ -323,12 +323,15 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
 
 **Protected Components:**
 - ✅ `src/utils/simpleMarkdown.js` - Markdown renderer with XSS filtering
+- ✅ `src/utils/safeHtml.js` - Safe HTML utility with comprehensive XSS protection and DOM manipulation
 - ✅ `src/strategies/*.js` - All content injection strategies with selective text replacement
-- ✅ `src/managers/SelectionWindows.js` - Translation popup windows
+- ✅ `src/managers/SelectionWindows.js` - Translation popup windows with safe DOM manipulation
 - ✅ `src/popup/translationManager.js` - Popup translation display
 - ✅ `src/sidepanel/sidepanel.js` - Side panel translation rendering
 - ✅ `src/contentMain.js` - Content script with secure text selection and replacement utilities
 - ✅ `src/handlers/smartTranslationIntegration.js` - Smart translation logic with selection detection
+- ✅ `src/subtitle/*.js` - All subtitle handlers using safe DOM element creation instead of innerHTML
+- ✅ `src/utils/frameworkCompatibility.js` - Framework-aware text replacement with secure content clearing
 
 **Additional Security Measures:**
 - Strict CSP policies are enforced
@@ -357,6 +360,7 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
   - `frameworkCompatibility.js` - Advanced text replacement for modern web frameworks
   - `promptBuilder.js` - AI prompt construction and template management
   - `textDetection.js` - Language and text pattern detection
+  - `safeHtml.js` - Secure HTML manipulation with comprehensive XSS protection
 - `src/managers/` - UI and resource management
 - `src/services/` - Service layer (errors, APIs)
 - `src/handlers/` - Event and message handlers
@@ -460,3 +464,13 @@ The Firefox build is optimized to pass validation without warnings:
 - **EXTENSION_ENABLED Compliance**: Fixed subtitle features to properly respect global `EXTENSION_ENABLED` setting
 - **Race Condition Fix**: Resolved YouTube icon display issues when toggling `SHOW_SUBTITLE_ICON` setting
 - **Subtitle Notifications Localization**: Implemented proper i18n support for subtitle start/stop notifications using `getTranslationString()` method
+
+**Security and Validation Improvements (January 2025):**
+- **Complete innerHTML Security Fix**: Eliminated all unsafe innerHTML assignments to resolve Firefox addons-linter warnings
+- **Safe HTML Utility**: Created `src/utils/safeHtml.js` utility with comprehensive XSS protection and proper DOM manipulation
+- **Subtitle System Security**: Replaced all innerHTML assignments in subtitle handlers with safe DOM element creation
+- **Framework Compatibility Security**: Updated `frameworkCompatibility.js` to use `textContent` instead of innerHTML for content clearing
+- **ESLint Compliance**: Resolved all unused import and variable warnings for clean code quality
+- **Zero-Warning Achievement**: Achieved complete Firefox addons-linter validation with 0 errors, 0 warnings, and 0 notices
+- **Security-First DOM Manipulation**: All dynamic content insertion now uses safe DOM methods with XSS filtering
+- **Cross-Browser Build Verification**: Ensured both Chrome and Firefox builds compile successfully with security improvements
