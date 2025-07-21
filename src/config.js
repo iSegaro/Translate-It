@@ -103,7 +103,7 @@ export const CONFIG = {
   TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
-  ENABLE_SUBTITLE_TRANSLATION: true, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
+  ENABLE_SUBTITLE_TRANSLATION: false, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
   SHOW_SUBTITLE_ICON: true, // نمایش آیکون ترجمه در پلیر یوتوب
 
   // --- UI & Styling ---
