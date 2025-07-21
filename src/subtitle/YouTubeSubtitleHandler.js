@@ -19,10 +19,12 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // متغیرهای timing برای کنترل سرعت نمایش
     this.lastDisplayTime = 0;
     this.minDisplayDuration = 3000; // حداقل 3 ثانیه فاصله بین زیرنویس‌ها
-    this.minClearSubtitle = 3000;
+    this.minClearSubtitleLines = 3000;
     this.currentSubtitleText = ''; // متن زیرنویس فعلی در حال نمایش
     this.recentSubtitles = new Set(); // ذخیره زیرنویس‌های اخیر برای جلوگیری از تکرار
     this.subtitleCleanupTimeout = null; // تایمر پاک‌سازی
+    this.subtitleHideTimeout = null; // تایمر مخفی کردن کادر زیرنویس
+    this.autoHideDelay = 15000; // 5 ثانیه برای مخفی شدن کادر بعد از آخرین زیرنویس
     
     this.setupNavigationListener();
   }
@@ -203,6 +205,10 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
         clearTimeout(this.subtitleCleanupTimeout);
         this.subtitleCleanupTimeout = null;
       }
+      if (this.subtitleHideTimeout) {
+        clearTimeout(this.subtitleHideTimeout);
+        this.subtitleHideTimeout = null;
+      }
     }
     
     logME(`[YouTubeSubtitleHandler] Container visibility updated: ${subtitlesEnabled ? 'visible' : 'hidden'}`);
@@ -379,6 +385,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       if (!this.isDragging) {
         logME("[YouTubeSubtitleHandler] Direct hover enter on subtitle box");
         this.pauseVideo();
+        this.pauseSubtitleHide(); // متوقف کردن تایمر مخفی شدن
       }
     });
 
@@ -386,6 +393,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       if (!this.isDragging) {
         logME("[YouTubeSubtitleHandler] Direct hover leave from subtitle box");
         this.resumeVideo();
+        this.scheduleSubtitleHide(); // شروع مجدد تایمر مخفی شدن
       }
     });
 
@@ -580,7 +588,36 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.subtitleCleanupTimeout = setTimeout(() => {
       this.recentSubtitles.clear();
       logME('[YouTubeSubtitleHandler] Recent subtitles history cleared');
-    }, this.minClearSubtitle);
+    }, this.minClearSubtitleLines);
+  }
+  
+  // مخفی کردن کادر زیرنویس با تاخیر
+  scheduleSubtitleHide() {
+    // پاک کردن تایمر قبلی اگر وجود دارد
+    if (this.subtitleHideTimeout) {
+      clearTimeout(this.subtitleHideTimeout);
+      this.subtitleHideTimeout = null;
+    }
+
+    // تنظیم تایمر جدید برای مخفی کردن کادر
+    this.subtitleHideTimeout = setTimeout(() => {
+      if (this.subtitleBox) {
+        this.subtitleBox.classList.remove('visible');
+        logME('[YouTubeSubtitleHandler] Subtitle box auto-hidden after timeout');
+      }
+      this.subtitleHideTimeout = null;
+    }, this.autoHideDelay);
+
+    logME(`[YouTubeSubtitleHandler] Scheduled subtitle hide in ${this.autoHideDelay}ms`);
+  }
+
+  // متوقف کردن تایمر مخفی شدن
+  pauseSubtitleHide() {
+    if (this.subtitleHideTimeout) {
+      clearTimeout(this.subtitleHideTimeout);
+      this.subtitleHideTimeout = null;
+      logME('[YouTubeSubtitleHandler] Subtitle hide timer paused');
+    }
   }
   
   // نمایش فوری زیرنویس (بدون صف)
@@ -645,6 +682,9 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       // نمایش کادر
       this.subtitleBox.classList.add("visible");
 
+      // تنظیم تایمر برای مخفی کردن کادر بعد از مدت زمان مشخص
+      this.scheduleSubtitleHide();
+
       logME(`[YouTubeSubtitleHandler] Successfully displayed subtitle`);
     } catch (error) {
       logME(`[YouTubeSubtitleHandler] Error displaying subtitle:`, error);
@@ -702,6 +742,10 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       clearTimeout(this.subtitleCleanupTimeout);
       this.subtitleCleanupTimeout = null;
     }
+    if (this.subtitleHideTimeout) {
+      clearTimeout(this.subtitleHideTimeout);
+      this.subtitleHideTimeout = null;
+    }
     
     // Remove fixed subtitle container
     if (this.subtitleContainer) {
@@ -719,6 +763,10 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     if (this.subtitleCleanupTimeout) {
       clearTimeout(this.subtitleCleanupTimeout);
       this.subtitleCleanupTimeout = null;
+    }
+    if (this.subtitleHideTimeout) {
+      clearTimeout(this.subtitleHideTimeout);
+      this.subtitleHideTimeout = null;
     }
     
     // Clear subtitle lines array
