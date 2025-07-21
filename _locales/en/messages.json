@@ -61,11 +61,13 @@
   "activation_group_subtitle_title": { "message": "Video Subtitle" },
 
   "enable_subtitle_translation_label": {
-    "message": "Enable subtitle translation on youtube"
+    "message": "Enable subtitle translation on Youtube"
   },
   "enable_subtitle_translation_description": {
     "message": "When enabled, this feature automatically translates subtitles on YouTube videos (if available) and replaces the default YouTube subtitles with the translated version."
   },
+  "icon_subtitle_translation_label": { "message": "Show Icon on Youtube Player" },
+  "icon_subtitle_translation_description":{"message":"Display a translation icon in the YouTube player bar for quick access to enable/disable subtitle translation."},
 
   "import_export_export_title": { "message": "Export Settings" },
   "import_export_import_title": { "message": "Import Settings" },

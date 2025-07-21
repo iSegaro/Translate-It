@@ -125,8 +125,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   const enableDictionraryCheckbox =
     document.getElementById("enableDictionrary");
-  const enableSubtitleCheckbox =
-    document.getElementById("enableSubtitle");
+  const enableSubtitleCheckbox = document.getElementById("enableSubtitle");
+  const showSubtitleIconCheckbox = document.getElementById("iconSubtitle");
   const translationApiSelect = document.getElementById("translationApi");
   const googleApiSettingsInfo = document.getElementById(
     "googleApiSettingsInfo"
@@ -152,20 +152,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   const openAIApiSettings = document.getElementById("openAIApiSettings");
   const openAIApiKeyInput = document.getElementById("openaiApiKey");
   const openAIModelInput = document.getElementById("openaiApiModel");
-  const openAICustomModelGroup = document.getElementById("openaiCustomModelGroup");
+  const openAICustomModelGroup = document.getElementById(
+    "openaiCustomModelGroup"
+  );
   const openAICustomModelInput = document.getElementById("openaiCustomModel");
   const openRouterApiSettings = document.getElementById(
     "openRouterApiSettings"
   );
   const openRouterApiKeyInput = document.getElementById("openrouterApiKey");
   const openRouterApiModelInput = document.getElementById("openrouterApiModel");
-  const openRouterCustomModelGroup = document.getElementById("openrouterCustomModelGroup");
-  const openRouterCustomModelInput = document.getElementById("openrouterCustomModel");
+  const openRouterCustomModelGroup = document.getElementById(
+    "openrouterCustomModelGroup"
+  );
+  const openRouterCustomModelInput = document.getElementById(
+    "openrouterCustomModel"
+  );
   const deepseekApiSettings = document.getElementById("deepseekApiSettings");
   const deepseekApiKeyInput = document.getElementById("deepseekApiKey");
   const deepseekApiModelInput = document.getElementById("deepseekApiModel");
-  const deepseekCustomModelGroup = document.getElementById("deepseekCustomModelGroup");
-  const deepseekCustomModelInput = document.getElementById("deepseekCustomModel");
+  const deepseekCustomModelGroup = document.getElementById(
+    "deepseekCustomModelGroup"
+  );
+  const deepseekCustomModelInput = document.getElementById(
+    "deepseekCustomModel"
+  );
   const customApiSettings = document.getElementById("customApiSettings");
   const customApiUrlInput = document.getElementById("customApiUrl");
   const customApiKeyInput = document.getElementById("customApiKey");
@@ -240,7 +250,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const markdownText = await response.text();
-      
+
       // Use our custom markdown parser
       const renderedContent = SimpleMarkdown.render(markdownText);
 
@@ -252,7 +262,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const errorPara = document.createElement("p");
       errorPara.textContent = `Could not load changelog. Error: ${error.message}`;
       errorPara.style.color = "red";
-      
+
       container.textContent = "";
       container.appendChild(errorPara);
 
@@ -297,7 +307,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     textSelectionCtrlGroup.style.opacity = isCtrlGroupEnabled ? "1" : "0.2";
     textSelectionCtrlGroup.style.pointerEvents =
       isCtrlGroupEnabled ? "auto" : "none";
-    
+
     // اگر حالت onClick انتخاب شده، چک‌باکس Ctrl را خاموش کن
     if (!isImmediateModeEnabled && selectionModeOnClickRadio.checked) {
       requireCtrlForTextSelectionCheckbox.checked = false;
@@ -380,7 +390,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldDictionaryBeDisabled);
     }
-    
+
     if (enableSubtitleCheckbox) {
       // گزینه‌ی دیکشنری فقط باید غیرفعال شود اگر کل افزونه غیرفعال باشد
       const shouldSubtitleBeDisabled = !isMasterEnabled;
@@ -388,6 +398,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       enableSubtitleCheckbox
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldSubtitleBeDisabled);
+    }
+
+    if (showSubtitleIconCheckbox) {
+      const shouldSubtitleIconBeDisabled = !isMasterEnabled;
+      showSubtitleIconCheckbox.disabled = !isMasterEnabled;
+      showSubtitleIconCheckbox
+        .closest(".setting-group")
+        ?.classList.toggle("disabled", shouldSubtitleIconBeDisabled);
     }
 
     // این شرط مشخص می‌کند که آیا زیرمجموعه‌ها باید بر اساس کنترل‌کننده‌هایشان غیرفعال شوند یا خیر
@@ -559,14 +577,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!geminiModelSelect || !geminiCustomUrlGroup) return;
     const selectedModel = geminiModelSelect.value;
     const isCustom = selectedModel === "custom";
-    
+
     // Show/hide custom URL group based on selection
     geminiCustomUrlGroup.style.display = isCustom ? "block" : "none";
-    
+
     // Update API URL for predefined models
     if (!isCustom && apiUrlInput) {
       const models = CONFIG.GEMINI_MODELS || [];
-      const selectedModelConfig = models.find(model => model.value === selectedModel);
+      const selectedModelConfig = models.find(
+        (model) => model.value === selectedModel
+      );
       if (selectedModelConfig && selectedModelConfig.url) {
         apiUrlInput.value = selectedModelConfig.url;
       }
@@ -575,20 +595,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Handle thinking control visibility and state
     if (geminiThinkingGroup && geminiThinkingCheckbox) {
       const models = CONFIG.GEMINI_MODELS || [];
-      const selectedModelConfig = models.find(model => model.value === selectedModel);
-      
+      const selectedModelConfig = models.find(
+        (model) => model.value === selectedModel
+      );
+
       if (selectedModelConfig && selectedModelConfig.thinking) {
-        const { supported, controllable, defaultEnabled } = selectedModelConfig.thinking;
-        
+        const { supported, controllable, defaultEnabled } =
+          selectedModelConfig.thinking;
+
         if (supported) {
           // Show thinking group for supported models
           geminiThinkingGroup.style.display = "block";
-          
+
           if (controllable) {
             // Enable control for controllable models
             geminiThinkingCheckbox.disabled = false;
             // Set default value if checkbox value seems uninitialized (during first load)
-            if (geminiThinkingCheckbox.checked === false && defaultEnabled === true) {
+            if (
+              geminiThinkingCheckbox.checked === false &&
+              defaultEnabled === true
+            ) {
               geminiThinkingCheckbox.checked = defaultEnabled;
             }
           } else {
@@ -596,14 +622,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             geminiThinkingCheckbox.disabled = true;
             geminiThinkingCheckbox.checked = defaultEnabled;
           }
-          
+
           // Update description based on model
-          const descElement = document.getElementById("geminiThinkingDescription");
+          const descElement = document.getElementById(
+            "geminiThinkingDescription"
+          );
           if (descElement) {
             if (!controllable && selectedModel === "gemini-2.5-pro") {
-              descElement.textContent = "Thinking mode is always enabled for Gemini 2.5 Pro and cannot be disabled.";
+              descElement.textContent =
+                "Thinking mode is always enabled for Gemini 2.5 Pro and cannot be disabled.";
             } else if (controllable) {
-              descElement.textContent = "Allow the model to think step-by-step before responding.";
+              descElement.textContent =
+                "Allow the model to think step-by-step before responding.";
             }
           }
         } else {
@@ -626,7 +656,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!openAIModelInput || !openAICustomModelGroup) return;
     const selectedModel = openAIModelInput.value;
     const isCustom = selectedModel === "custom";
-    
+
     // Show/hide custom model group based on selection
     openAICustomModelGroup.style.display = isCustom ? "block" : "none";
   }
@@ -640,13 +670,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!openRouterApiModelInput || !openRouterCustomModelGroup) return;
     const selectedModel = openRouterApiModelInput.value;
     const isCustom = selectedModel === "custom";
-    
+
     // Show/hide custom model group based on selection
     openRouterCustomModelGroup.style.display = isCustom ? "block" : "none";
   }
 
   if (openRouterApiModelInput) {
-    openRouterApiModelInput.addEventListener("change", handleOpenRouterModelChange);
+    openRouterApiModelInput.addEventListener(
+      "change",
+      handleOpenRouterModelChange
+    );
   }
 
   // --- DeepSeek Model Selection Logic ---
@@ -654,7 +687,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!deepseekApiModelInput || !deepseekCustomModelGroup) return;
     const selectedModel = deepseekApiModelInput.value;
     const isCustom = selectedModel === "custom";
-    
+
     // Show/hide custom model group based on selection
     deepseekCustomModelGroup.style.display = isCustom ? "block" : "none";
   }
@@ -741,21 +774,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         webAIApiModelInput?.value?.trim() || CONFIG.WEBAI_API_MODEL,
       OPENAI_API_KEY: openAIApiKeyInput?.value?.trim() || CONFIG.OPENAI_API_KEY,
       OPENAI_API_MODEL:
-        openAIModelInput?.value === "custom" 
-          ? (openAICustomModelInput?.value?.trim() || CONFIG.OPENAI_API_MODEL)
-          : (openAIModelInput?.value || CONFIG.OPENAI_API_MODEL),
+        openAIModelInput?.value === "custom" ?
+          openAICustomModelInput?.value?.trim() || CONFIG.OPENAI_API_MODEL
+        : openAIModelInput?.value || CONFIG.OPENAI_API_MODEL,
       OPENROUTER_API_KEY:
         openRouterApiKeyInput?.value?.trim() || CONFIG.OPENROUTER_API_KEY,
       OPENROUTER_API_MODEL:
-        openRouterApiModelInput?.value === "custom"
-          ? (openRouterCustomModelInput?.value?.trim() || CONFIG.OPENROUTER_API_MODEL)
-          : (openRouterApiModelInput?.value || CONFIG.OPENROUTER_API_MODEL),
+        openRouterApiModelInput?.value === "custom" ?
+          openRouterCustomModelInput?.value?.trim() ||
+          CONFIG.OPENROUTER_API_MODEL
+        : openRouterApiModelInput?.value || CONFIG.OPENROUTER_API_MODEL,
       DEEPSEEK_API_KEY:
         deepseekApiKeyInput?.value?.trim() || CONFIG.DEEPSEEK_API_KEY,
       DEEPSEEK_API_MODEL:
-        deepseekApiModelInput?.value === "custom"
-          ? (deepseekCustomModelInput?.value?.trim() || CONFIG.DEEPSEEK_API_MODEL)
-          : (deepseekApiModelInput?.value || CONFIG.DEEPSEEK_API_MODEL),
+        deepseekApiModelInput?.value === "custom" ?
+          deepseekCustomModelInput?.value?.trim() || CONFIG.DEEPSEEK_API_MODEL
+        : deepseekApiModelInput?.value || CONFIG.DEEPSEEK_API_MODEL,
       CUSTOM_API_URL: customApiUrlInput?.value?.trim() || CONFIG.CUSTOM_API_URL,
       CUSTOM_API_KEY: customApiKeyInput?.value?.trim() || CONFIG.CUSTOM_API_KEY,
       CUSTOM_API_MODEL:
@@ -770,6 +804,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY,
       ENABLE_SUBTITLE_TRANSLATION:
         enableSubtitleCheckbox?.checked ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
+      SHOW_SUBTITLE_ICON:
+        showSubtitleIconCheckbox?.checked ?? CONFIG.SHOW_SUBTITLE_ICON,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS:
         enableShortcutForTextFieldsCheckbox?.checked ??
         CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
@@ -887,7 +923,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
       if (enableSubtitleCheckbox)
         enableSubtitleCheckbox.checked =
-          settings.ENABLE_SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION;
+          settings.ENABLE_SUBTITLE_TRANSLATION ??
+          CONFIG.ENABLE_SUBTITLE_TRANSLATION;
+      if (showSubtitleIconCheckbox)
+        showSubtitleIconCheckbox.checked =
+          settings.SHOW_SUBTITLE_ICON ??
+          CONFIG.SHOW_SUBTITLE_ICON;
 
       // Populate text inputs and textareas
       if (sourceLanguageInput)
@@ -910,9 +951,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         openAIApiKeyInput.value =
           settings.OPENAI_API_KEY || CONFIG.OPENAI_API_KEY;
       if (openAIModelInput) {
-        const openAIModel = settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
-        const isCustomModel = !CONFIG.OPENAI_MODELS?.some(model => model.value === openAIModel);
-        
+        const openAIModel =
+          settings.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
+        const isCustomModel = !CONFIG.OPENAI_MODELS?.some(
+          (model) => model.value === openAIModel
+        );
+
         if (isCustomModel) {
           openAIModelInput.value = "custom";
           if (openAICustomModelInput) {
@@ -926,9 +970,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         openRouterApiKeyInput.value =
           settings.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
       if (openRouterApiModelInput) {
-        const openRouterModel = settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
-        const isCustomModel = !CONFIG.OPENROUTER_MODELS?.some(model => model.value === openRouterModel);
-        
+        const openRouterModel =
+          settings.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
+        const isCustomModel = !CONFIG.OPENROUTER_MODELS?.some(
+          (model) => model.value === openRouterModel
+        );
+
         if (isCustomModel) {
           openRouterApiModelInput.value = "custom";
           if (openRouterCustomModelInput) {
@@ -942,9 +989,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         deepseekApiKeyInput.value =
           settings.DEEPSEEK_API_KEY || CONFIG.DEEPSEEK_API_KEY;
       if (deepseekApiModelInput) {
-        const deepSeekModel = settings.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
-        const isCustomModel = !CONFIG.DEEPSEEK_MODELS?.some(model => model.value === deepSeekModel);
-        
+        const deepSeekModel =
+          settings.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
+        const isCustomModel = !CONFIG.DEEPSEEK_MODELS?.some(
+          (model) => model.value === deepSeekModel
+        );
+
         if (isCustomModel) {
           deepseekApiModelInput.value = "custom";
           if (deepseekCustomModelInput) {
@@ -970,7 +1020,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (translationApiSelect)
         translationApiSelect.value =
           settings.TRANSLATION_API || CONFIG.TRANSLATION_API;
-      
+
       // Load Gemini model selection
       if (geminiModelSelect)
         geminiModelSelect.value = settings.GEMINI_MODEL || CONFIG.GEMINI_MODEL;

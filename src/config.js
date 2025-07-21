@@ -104,9 +104,10 @@ export const CONFIG = {
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SUBTITLE_TRANSLATION: true, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
+  SHOW_SUBTITLE_ICON: true, // نمایش آیکون ترجمه در پلیر یوتوب
 
   // --- UI & Styling ---
-  HIGHTLIH_NEW_ELEMETN_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
+  HIGHTLIH_NEW_ELEMENT_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
   TRANSLATION_ICON_TITLE: "Translate Text",
   HIGHLIGHT_STYLE: "2px solid red",
   ICON_TRANSLATION: "🌐",

@@ -69,6 +69,8 @@
   "enable_subtitle_translation_description": {
     "message": "زمانی که این قابلیت فعال باشد، در ویدیوهای یوتیوبی که دارای زیرنویس هستند، ترجمه به‌صورت خودکار انجام شده و جایگزین زیرنویس پیش‌فرض یوتیوب می‌شود."
   },
+  "icon_subtitle_translation_label": { "message": "آیکون ترجمه زیرنویس در پخش کننده یوتوب" },
+  "icon_subtitle_translation_description":{"message":"نمایش آیکون ترجمه در نوار پخش یوتیوب برای دسترسی سریع به فعال/غیرفعال کردن ترجمه زیرنویس."},
 
   "import_export_export_title": { "message": "پشتیبان‌گیری تنظیمات" },
   "import_export_import_title": { "message": "بازیابی تنظیمات" },
