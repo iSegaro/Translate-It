@@ -58,6 +58,14 @@
   "activation_group_text_fields_title": { "message": "Text Field Translation" },
   "activation_group_page_selection_title": { "message": "On-Page Selection" },
   "activation_group_dictionary_title": { "message": "Dictionary Mode" },
+  "activation_group_subtitle_title": { "message": "Video Subtitle" },
+
+  "enable_subtitle_translation_label": {
+    "message": "Enable subtitle translation on youtube"
+  },
+  "enable_subtitle_translation_description": {
+    "message": "When enabled, this feature automatically translates subtitles on YouTube videos (if available) and replaces the default YouTube subtitles with the translated version."
+  },
 
   "import_export_export_title": { "message": "Export Settings" },
   "import_export_import_title": { "message": "Import Settings" },

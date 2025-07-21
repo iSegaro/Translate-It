@@ -125,6 +125,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   const enableDictionraryCheckbox =
     document.getElementById("enableDictionrary");
+  const enableSubtitleCheckbox =
+    document.getElementById("enableSubtitle");
   const translationApiSelect = document.getElementById("translationApi");
   const googleApiSettingsInfo = document.getElementById(
     "googleApiSettingsInfo"
@@ -377,6 +379,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       enableDictionraryCheckbox
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldDictionaryBeDisabled);
+    }
+    
+    if (enableSubtitleCheckbox) {
+      // گزینه‌ی دیکشنری فقط باید غیرفعال شود اگر کل افزونه غیرفعال باشد
+      const shouldSubtitleBeDisabled = !isMasterEnabled;
+      enableSubtitleCheckbox.disabled = shouldSubtitleBeDisabled;
+      enableSubtitleCheckbox
+        .closest(".setting-group")
+        ?.classList.toggle("disabled", shouldSubtitleBeDisabled);
     }
 
     // این شرط مشخص می‌کند که آیا زیرمجموعه‌ها باید بر اساس کنترل‌کننده‌هایشان غیرفعال شوند یا خیر
@@ -757,6 +768,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         CONFIG.TRANSLATE_ON_TEXT_FIELDS,
       ENABLE_DICTIONARY:
         enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY,
+      ENABLE_SUBTITLE_TRANSLATION:
+        enableSubtitleCheckbox?.checked ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS:
         enableShortcutForTextFieldsCheckbox?.checked ??
         CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
@@ -872,6 +885,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (enableDictionraryCheckbox)
         enableDictionraryCheckbox.checked =
           settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
+      if (enableSubtitleCheckbox)
+        enableSubtitleCheckbox.checked =
+          settings.ENABLE_SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION;
 
       // Populate text inputs and textareas
       if (sourceLanguageInput)

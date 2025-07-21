@@ -61,6 +61,14 @@
   "activation_group_text_fields_title": { "message": "ترجمه فیلدهای متنی" },
   "activation_group_page_selection_title": { "message": "انتخاب در صفحه" },
   "activation_group_dictionary_title": { "message": "حالت دیکشنری" },
+  "activation_group_subtitle_title": { "message": "زیرنویس ویدیو" },
+
+  "enable_subtitle_translation_label": {
+    "message": "فعالسازی ترجمه زیرنویس در یوتوب"
+  },
+  "enable_subtitle_translation_description": {
+    "message": "زمانی که این قابلیت فعال باشد، در ویدیوهای یوتیوبی که دارای زیرنویس هستند، ترجمه به‌صورت خودکار انجام شده و جایگزین زیرنویس پیش‌فرض یوتیوب می‌شود."
+  },
 
   "import_export_export_title": { "message": "پشتیبان‌گیری تنظیمات" },
   "import_export_import_title": { "message": "بازیابی تنظیمات" },
