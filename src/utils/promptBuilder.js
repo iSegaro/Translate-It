@@ -111,7 +111,12 @@ export async function buildPrompt(
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
   let finalPrompt;
-  if (finalPromptWithUserRules.includes("\$_{TEXT}")) {
+    if (finalPromptWithUserRules.includes("$_{TEXT}")) {
+    // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
+    finalPrompt = finalPromptWithUserRules.replace(
+      /\$_{TEXT}/g,
+      textForTranslation
+    );
     // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
     finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
