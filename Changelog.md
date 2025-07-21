@@ -1,11 +1,47 @@
 ### Changelog – Translate It!
 
+#### v0.9.0 – Released on January 21, 2025
+
+##### Added
+
+- **Translation History in Side Panel**: Added comprehensive translation history tracking in the side panel for easy access to previous translations
+- **Provider Selection in Side Panel**: Added ability to change translation providers directly from the side panel interface
+- **Provider Selection in Popup**: Added translation provider selection dropdown to the popup interface
+- **Dictionary Mode for Google Translate**: Implemented dictionary functionality for Google Translate with enhanced formatting and markdown rendering
+- **Enhanced Floating Window**: Improved selection window with drag functionality and copy button for better user experience
+- **Model Selection in Settings**: Added comprehensive model selection options in settings page for each translation provider (Gemini, OpenAI, OpenRouter, DeepSeek)
+- **YouTube Subtitle Translation** (Experimental): Implemented real-time subtitle translation for YouTube videos with dual-language display
+    - **Subtitle Icon Control**: Added a setting to independently control YouTube translation icon visibility
+
+##### Changed
+
+- **Enhanced XSS Security**: Implemented comprehensive XSS protection using filterXSS library across all translation outputs and UI components
+- **Firefox Validation Compliance**: Achieved zero-warning Firefox addon validation with complete addons-linter compatibility testing
+- **Improved Language Selection**: Fixed and enhanced language selection dropdowns in popup interface
+- **Typography Improvements**: Enhanced font sizes and consistency across popup and side panel interfaces (14px→15px, unified font families)
+- **Optimized AI Prompts**: Improved prompt templates, particularly dictionary prompts, for better translation accuracy and reduced AI confusion
+- **Text Insertion Framework**: Enhanced text replacement system with multi-strategy approach and framework compatibility for React, Vue, Angular
+- **Google Translate API Enhancements**: Fixed language detection and swapping logic, improved auto-detect functionality
+
+##### Fixed
+
+- **Text Field Insertion**: Resolved text insertion issues across more websites with enhanced framework compatibility system
+- **Field Translation Settings**: Fixed incompatibility issues related to text field translation settings
+- **Discord Text Insertion**: Resolved text placement issues specifically for Discord platform
+- **Text Field Optimization**: Optimized text insertion mechanism for better reliability across various input field types
+- **UI Bug Fixes**: Resolved various user interface inconsistencies and visual issues
+- **TTS Character Limit**: Removed 200-character restriction from Google TTS functionality
+
+---
+
 #### v0.8.0 – Released on July 14, 2025
 
 ##### Added
+
 - Introduced Side Panel support for display in the browser's sidebar
 
 ##### Changed
+
 - Improved various UI and UX elements for a better user experience
 
 ---
