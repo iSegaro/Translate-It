@@ -457,3 +457,6 @@ The Firefox build is optimized to pass validation without warnings:
 - **Enhanced Initialization**: Improved `SubtitleHandler` initialization to respect both `ENABLE_SUBTITLE_TRANSLATION` and `SHOW_SUBTITLE_ICON` settings
 - **Real-time Toggle**: Icon visibility changes take effect immediately without requiring page refresh
 - **Storage Sync**: Enhanced `waitForFeatureManagerReady()` to properly sync both subtitle and icon settings from storage
+- **EXTENSION_ENABLED Compliance**: Fixed subtitle features to properly respect global `EXTENSION_ENABLED` setting
+- **Race Condition Fix**: Resolved YouTube icon display issues when toggling `SHOW_SUBTITLE_ICON` setting
+- **Subtitle Notifications Localization**: Implemented proper i18n support for subtitle start/stop notifications using `getTranslationString()` method
