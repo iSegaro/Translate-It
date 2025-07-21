@@ -58,7 +58,7 @@
   "activation_group_text_fields_title": { "message": "Text Field Translation" },
   "activation_group_page_selection_title": { "message": "On-Page Selection" },
   "activation_group_dictionary_title": { "message": "Dictionary Mode" },
-  "activation_group_subtitle_title": { "message": "Video Subtitle" },
+  "activation_group_subtitle_title": { "message": "Video Subtitle (Experimental)" },
 
   "enable_subtitle_translation_label": {
     "message": "Enable subtitle translation on Youtube"
