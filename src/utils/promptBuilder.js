@@ -82,19 +82,28 @@ export async function buildPrompt(
     }
   }
 
-  // جایگزینی مقادیر متغیرهای کاربر
-  const userRules = promptTemplate
-    .replace(/\$_{SOURCE}/g, sourceLang)
-    .replace(/\$_{TARGET}/g, targetLang);
+  let finalPromptWithUserRules;
 
-  const baseClean = promptBase
-    .replace(/\$_{SOURCE}/g, sourceLang)
-    .replace(/\$_{TARGET}/g, targetLang);
+  if (translateMode === TranslationMode.Subtitle) {
+    // For subtitles, user rules are not needed as the prompt is self-contained.
+    finalPromptWithUserRules = promptBase
+      .replace(/\$_{SOURCE}/g, sourceLang)
+      .replace(/\$_{TARGET}/g, targetLang);
+  } else {
+    // جایگزینی مقادیر متغیرهای کاربر
+    const userRules = promptTemplate
+      .replace(/\$_{SOURCE}/g, sourceLang)
+      .replace(/\$_{TARGET}/g, targetLang);
 
-  const finalPromptWithUserRules = baseClean.replace(
-    /\$_{USER_RULES}/g,
-    userRules
-  );
+    const baseClean = promptBase
+      .replace(/\$_{SOURCE}/g, sourceLang)
+      .replace(/\$_{TARGET}/g, targetLang);
+
+    finalPromptWithUserRules = baseClean.replace(
+      /\$_{USER_RULES}/g,
+      userRules
+    );
+  }
 
   logME("Prompt template: ", finalPromptWithUserRules);
   logME("Text for translation: ", textForTranslation);
@@ -102,7 +111,7 @@ export async function buildPrompt(
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
   let finalPrompt;
-  if (finalPromptWithUserRules.includes("$_{TEXT}")) {
+  if (finalPromptWithUserRules.includes("\$_{TEXT}")) {
     // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
     finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
