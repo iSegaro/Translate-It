@@ -26,18 +26,21 @@ const outputFilePath = path.resolve(
 
 // لیست فایل‌ها و پوشه‌هایی که باید در سورس کد نهایی گنجانده شوند
 const sourceFilesAndDirs = [
+  ".gitignore",
   "build-scripts",
+  "Backlog.md",
   "Changelog.md",
+  "CLAUDE.md",
   "eslint.config.mjs",
   "html",
   "icons",
   "_locales",
   "package.json",
-  "package-lock.json",
   "pnpm-lock.yaml",
   "Privacy.md",
   "Prompt.ai",
   "README.md",
+  "README_FARSI.md",
   "src",
   "styles",
   "webpack.chrome.js",
@@ -80,6 +83,13 @@ archive.pipe(output);
 // افزودن فایل‌ها و پوشه‌ها به آرشیو
 sourceFilesAndDirs.forEach((item) => {
   const itemPath = path.resolve(rootPath, item);
+  
+  // بررسی وجود فایل یا پوشه قبل از افزودن
+  if (!fs.existsSync(itemPath)) {
+    console.log(chalk.yellow(`⚠️  Skipping ${item} (not found)`));
+    return;
+  }
+  
   if (fs.statSync(itemPath).isDirectory()) {
     archive.directory(itemPath, item);
   } else {

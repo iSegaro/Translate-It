@@ -18,7 +18,7 @@
     "format": "prettier --write src/**/*.js",
     "source": "node ./build-scripts/create-source-zip.mjs",
     "pre-submit": "pnpm run lint && pnpm run build && pnpm run validate",
-    "publish": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Publishing All Artifacts'))\" && cross-env PUBLISH_MODE=true pnpm run source && cross-env PUBLISH_MODE=true pnpm run pre-submit"
+    "publish": "node -e \"import('./build-scripts/logger.mjs').then(m => m.logStep('Publishing All Artifacts'))\" && cross-env PUBLISH_MODE=true pnpm run source && pnpm run lint && cross-env PUBLISH_MODE=true pnpm run build && pnpm run validate"
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
