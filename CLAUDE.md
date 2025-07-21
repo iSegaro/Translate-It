@@ -474,3 +474,16 @@ The Firefox build is optimized to pass validation without warnings:
 - **Zero-Warning Achievement**: Achieved complete Firefox addons-linter validation with 0 errors, 0 warnings, and 0 notices
 - **Security-First DOM Manipulation**: All dynamic content insertion now uses safe DOM methods with XSS filtering
 - **Cross-Browser Build Verification**: Ensured both Chrome and Firefox builds compile successfully with security improvements
+
+**API Key Security Enhancements (January 2025):**
+- **Visual API Key Protection**: Implemented hover-based masking system for all API key input fields in settings page
+- **CSS-Based Masking**: API key content hidden with dot patterns, revealed only on hover or focus for enhanced security
+- **Comprehensive Coverage**: Automatic masking applied to all API providers (Gemini, OpenAI, OpenRouter, DeepSeek, Custom)
+- **User Experience**: Maintains full input functionality while protecting against shoulder surfing and accidental exposure
+
+**Import/Export User Experience Improvements (January 2025):**
+- **Smart File Preservation**: Fixed file browser clearing issue during encrypted settings import password errors
+- **Enhanced Error Detection**: Integrated ErrorMatcher system for comprehensive password error categorization
+- **Seamless Password Retry**: Users can attempt multiple passwords without re-selecting the settings file
+- **Auto-Focus Recovery**: Password input field automatically focused after errors for immediate retry
+- **Intelligent Error Handling**: File browser preserved for password errors, cleared only for format/success cases
