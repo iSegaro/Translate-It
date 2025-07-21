@@ -24,7 +24,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.recentSubtitles = new Set(); // ذخیره زیرنویس‌های اخیر برای جلوگیری از تکرار
     this.subtitleCleanupTimeout = null; // تایمر پاک‌سازی
     this.subtitleHideTimeout = null; // تایمر مخفی کردن کادر زیرنویس
-    this.autoHideDelay = 15000; // 5 ثانیه برای مخفی شدن کادر بعد از آخرین زیرنویس
+    this.autoHideDelay = 15000; // 15 ثانیه برای مخفی شدن کادر بعد از آخرین زیرنویس
     
     this.setupNavigationListener();
   }
