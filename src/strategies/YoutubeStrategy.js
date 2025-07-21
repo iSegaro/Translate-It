@@ -16,7 +16,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
       return false;
     }
     return (
-      target.getAttribute("name") === "search_query" ||
+      // target.getAttribute("name") === "search_query" ||
       target.getAttribute("id") === "end"
     );
   }
