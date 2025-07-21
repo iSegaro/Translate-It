@@ -56,8 +56,31 @@ export class SubtitleHandler {
       this.initializeYouTubeUI();
     }
 
+    // Wait for FeatureManager to load from storage before initial check
+    await this.waitForFeatureManagerReady();
+    
     // Perform initial check to start or stop the integration
     this.handleSubtitleFeatureToggle();
+  }
+
+  /**
+   * Waits for FeatureManager to load settings from storage.
+   */
+  async waitForFeatureManagerReady() {
+    // Check if we can access actual storage values directly
+    try {
+      const result = await Browser.storage.local.get("ENABLE_SUBTITLE_TRANSLATION");
+      const actualValue = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      
+      // If FeatureManager hasn't loaded the value yet, wait a bit
+      if (this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualValue) {
+        logME("[SubtitleHandler] Waiting for FeatureManager to sync with storage...");
+        // Give FeatureManager time to load from storage
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } catch (error) {
+      logME("[SubtitleHandler] Error checking storage, proceeding with current state:", error);
+    }
   }
 
   /**
