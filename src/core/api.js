@@ -113,25 +113,28 @@ class ApiService {
    * @returns {string} - متن فرماتبندی شده markdown
    */
   _formatDictionaryAsMarkdown(candidateText) {
-    if (!candidateText || candidateText.trim() === '') {
-      return '';
+    if (!candidateText || candidateText.trim() === "") {
+      return "";
     }
 
-    const lines = candidateText.trim().split('\n').filter(line => line.trim() !== '');
-    
+    const lines = candidateText
+      .trim()
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+
     if (lines.length === 0) {
-      return '';
+      return "";
     }
 
     // ساخت فرمت markdown
-    let markdownOutput = '';
-    
-    lines.forEach(line => {
-      const colonIndex = line.indexOf(':');
+    let markdownOutput = "";
+
+    lines.forEach((line) => {
+      const colonIndex = line.indexOf(":");
       if (colonIndex > 0) {
         const partOfSpeech = line.substring(0, colonIndex).trim();
         const terms = line.substring(colonIndex + 1).trim();
-        
+
         if (partOfSpeech && terms) {
           markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
         }
@@ -140,7 +143,7 @@ class ApiService {
         markdownOutput += `**${line.trim()}**\n\n`;
       }
     });
-    
+
     return markdownOutput.trim();
   }
 
@@ -201,11 +204,13 @@ class ApiService {
     logME(`[API] _executeApiCall starting for context: ${context}`);
     logME(`[API] _executeApiCall URL: ${url}`);
     logME(`[API] _executeApiCall fetchOptions:`, fetchOptions);
-    
+
     try {
       const response = await fetch(url, fetchOptions);
-      logME(`[API] _executeApiCall response status: ${response.status} ${response.statusText}`);
-      
+      logME(
+        `[API] _executeApiCall response status: ${response.status} ${response.statusText}`
+      );
+
       if (!response.ok) {
         // Extract error details if available
         let body = {};
@@ -220,7 +225,7 @@ class ApiService {
           body.error?.message ||
           response.statusText ||
           `HTTP ${response.status}`;
-        
+
         logME(`[API] _executeApiCall HTTP error: ${msg}`, body);
         const err = new Error(msg);
         // Mark as HTTP error (status codes 4xx/5xx)
@@ -233,12 +238,14 @@ class ApiService {
       // Parse successful response
       const data = await response.json();
       logME(`[API] _executeApiCall response data:`, data);
-      
+
       const result = extractResponse(data, response.status);
       logME(`[API] _executeApiCall extracted result:`, result);
-      
+
       if (result === undefined) {
-        logME(`[API] _executeApiCall result is undefined - treating as invalid response`);
+        logME(
+          `[API] _executeApiCall result is undefined - treating as invalid response`
+        );
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
         err.type = ErrorTypes.API;
         err.statusCode = response.status;
@@ -261,7 +268,12 @@ class ApiService {
     }
   }
 
-  async handleGoogleTranslate(text, sourceLang, targetLang, translateMode = null) {
+  async handleGoogleTranslate(
+    text,
+    sourceLang,
+    targetLang,
+    translateMode = null
+  ) {
     if (sourceLang === targetLang) return null;
 
     // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
@@ -280,19 +292,22 @@ class ApiService {
       } else {
         // Regex fallback
         const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-        if (isPersianText(text) && (targetLangCode === "fa" || targetLangCode === "ar")) {
+        if (
+          isPersianText(text) &&
+          (targetLangCode === "fa" || targetLangCode === "ar")
+        ) {
           [sourceLang, targetLang] = [targetLang, sourceLang];
         }
       }
     } catch (e) {
-      logME('[handleGoogleTranslate] Language detection failed:', e);
+      logME("[handleGoogleTranslate] Language detection failed:", e);
     }
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
     if (translateMode === TranslationMode.Field) {
       sourceLang = AUTO_DETECT_VALUE;
     }
-    
+
     // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
     if (translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
@@ -312,7 +327,7 @@ class ApiService {
         originalJsonStruct = parsed;
         textsToTranslate = originalJsonStruct.map((item) => item.text);
       }
-    } catch  {
+    } catch {
       // Not a valid JSON, proceed in plain text mode.
     }
 
@@ -330,11 +345,14 @@ class ApiService {
     if (sl === tl && !isJsonMode) return text;
 
     const url = new URL(apiUrl);
-    
+
     // بررسی تنظیمات دیکشنری - در Field mode هرگز دیکشنری نباشد
     const isDictionaryEnabled = await getEnableDictionaryAsync();
-    const shouldIncludeDictionary = isDictionaryEnabled && translateMode !== TranslationMode.Field;
-    
+    const shouldIncludeDictionary =
+      isDictionaryEnabled &&
+      translateMode !== TranslationMode.Field &&
+      translateMode !== TranslationMode.Subtitle;
+
     // ساخت query string دستی برای پشتیبانی از چندین dt
     const queryParams = [
       `client=gtx`,
@@ -347,9 +365,11 @@ class ApiService {
     if (shouldIncludeDictionary) {
       queryParams.push(`dt=bd`); // Dictionary data
     }
-    
-    queryParams.push(`q=${encodeURIComponent(textsToTranslate.join(TEXT_DELIMITER))}`);
-    url.search = queryParams.join('&');
+
+    queryParams.push(
+      `q=${encodeURIComponent(textsToTranslate.join(TEXT_DELIMITER))}`
+    );
+    url.search = queryParams.join("&");
 
     // --- API Call using the centralized handler ---
     const result = await this._executeApiCall({
@@ -361,13 +381,16 @@ class ApiService {
           // Returning undefined will trigger an API_RESPONSE_INVALID error in _executeApiCall
           return undefined;
         }
-        
+
         // Extract main translation
-        const translatedText = data[0].map((segment) => segment[0] || "").join("");
-        
+        const translatedText = data[0]
+          .map((segment) => segment[0] || "")
+          .join("");
+
         // Extract dictionary data if available and enabled (but never in Field mode)
         let candidateText = "";
-        if (shouldIncludeDictionary && data[1]) { // data[1] contains dictionary information
+        if (shouldIncludeDictionary && data[1]) {
+          // data[1] contains dictionary information
           candidateText = data[1]
             .map((dict) => {
               const pos = dict[0] || ""; // Part of speech
@@ -376,10 +399,10 @@ class ApiService {
             })
             .join("");
         }
-        
+
         return {
           resultText: translatedText,
-          candidateText: candidateText.trim()
+          candidateText: candidateText.trim(),
         };
       },
       context: context,
@@ -402,7 +425,9 @@ class ApiService {
     } else {
       // Return both translation and dictionary data
       if (result.candidateText) {
-        const formattedDictionary = this._formatDictionaryAsMarkdown(result.candidateText);
+        const formattedDictionary = this._formatDictionaryAsMarkdown(
+          result.candidateText
+        );
         return `${result.resultText}\n\n${formattedDictionary}`;
       }
       return result.resultText;
@@ -424,7 +449,9 @@ class ApiService {
       apiUrl = await getApiUrlAsync(); // Use custom URL from user input
     } else {
       // Use predefined URL for selected model
-      const modelConfig = CONFIG.GEMINI_MODELS?.find(m => m.value === geminiModel);
+      const modelConfig = CONFIG.GEMINI_MODELS?.find(
+        (m) => m.value === geminiModel
+      );
       apiUrl = modelConfig?.url || CONFIG.API_URL; // Fallback to default
     }
 
@@ -451,25 +478,27 @@ class ApiService {
     logME("[API] handleGeminiTranslation built prompt:", prompt);
     // Determine thinking budget based on model and user settings
     let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
-    
+
     // Add thinking parameter for supported models
-    const modelConfig = CONFIG.GEMINI_MODELS?.find(m => m.value === geminiModel);
+    const modelConfig = CONFIG.GEMINI_MODELS?.find(
+      (m) => m.value === geminiModel
+    );
     if (modelConfig?.thinking?.supported) {
       if (modelConfig.thinking.controllable) {
         // For controllable models (2.5 Flash, 2.5 Flash Lite)
         if (thinkingEnabled) {
-          requestBody.generationConfig = { 
-            thinkingConfig: { thinkingBudget: -1 } // Enable dynamic thinking
+          requestBody.generationConfig = {
+            thinkingConfig: { thinkingBudget: -1 }, // Enable dynamic thinking
           };
         } else {
-          requestBody.generationConfig = { 
-            thinkingConfig: { thinkingBudget: 0 } // Disable thinking
+          requestBody.generationConfig = {
+            thinkingConfig: { thinkingBudget: 0 }, // Disable thinking
           };
         }
       } else if (modelConfig.thinking.defaultEnabled) {
         // For non-controllable models with thinking enabled by default (2.5 Pro)
-        requestBody.generationConfig = { 
-          thinkingConfig: { thinkingBudget: -1 } // Always enabled
+        requestBody.generationConfig = {
+          thinkingConfig: { thinkingBudget: -1 }, // Always enabled
         };
       }
     }
@@ -482,8 +511,8 @@ class ApiService {
     };
 
     logME("[API] handleGeminiTranslation about to call _executeApiCall with:", {
-      url: url.replace(/key=[^&]+/, 'key=***'),
-      context: "api-gemini-translation"
+      url: url.replace(/key=[^&]+/, "key=***"),
+      context: "api-gemini-translation",
     });
 
     try {
@@ -494,14 +523,23 @@ class ApiService {
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: "api-gemini-translation",
       });
-      
-      logME("[API] handleGeminiTranslation _executeApiCall completed with result:", result);
+
+      logME(
+        "[API] handleGeminiTranslation _executeApiCall completed with result:",
+        result
+      );
       return result;
     } catch (error) {
       // If thinking-related error occurs, retry without thinking config
-      if (error.message && error.message.includes('thinkingBudget') && requestBody.generationConfig?.thinkingConfig) {
-        logME("[API] handleGeminiTranslation thinking parameter not supported, retrying without thinking...");
-        
+      if (
+        error.message &&
+        error.message.includes("thinkingBudget") &&
+        requestBody.generationConfig?.thinkingConfig
+      ) {
+        logME(
+          "[API] handleGeminiTranslation thinking parameter not supported, retrying without thinking..."
+        );
+
         // Remove thinking config and retry
         delete requestBody.generationConfig;
         const fallbackFetchOptions = {
@@ -509,7 +547,7 @@ class ApiService {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         };
-        
+
         const fallbackResult = await this._executeApiCall({
           url,
           fetchOptions: fallbackFetchOptions,
@@ -517,12 +555,18 @@ class ApiService {
             data?.candidates?.[0]?.content?.parts?.[0]?.text,
           context: "api-gemini-translation-fallback",
         });
-        
-        logME("[API] handleGeminiTranslation fallback _executeApiCall completed with result:", fallbackResult);
+
+        logME(
+          "[API] handleGeminiTranslation fallback _executeApiCall completed with result:",
+          fallbackResult
+        );
         return fallbackResult;
       }
-      
-      logME("[API] handleGeminiTranslation _executeApiCall failed with error:", error);
+
+      logME(
+        "[API] handleGeminiTranslation _executeApiCall failed with error:",
+        error
+      );
       throw error;
     }
   }
@@ -802,7 +846,12 @@ class ApiService {
 
     switch (api) {
       case "google":
-        return this.handleGoogleTranslate(text, sourceLanguage, targetLanguage, translateMode);
+        return this.handleGoogleTranslate(
+          text,
+          sourceLanguage,
+          targetLanguage,
+          translateMode
+        );
       case "gemini":
         return this.handleGeminiTranslation(
           text,
