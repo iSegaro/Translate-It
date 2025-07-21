@@ -95,6 +95,7 @@ The extension supports multiple translation modes:
 - **Element Selection**: Translate entire page elements
 - **Text Field Integration**: Inline translation in input fields with intelligent selection handling
 - **Shortcut Translation**: Ctrl+/ keyboard shortcut
+- **Subtitle Translation**: Real-time translation of video subtitles on YouTube and Netflix
 
 ### Text Field Translation Behavior
 
@@ -122,6 +123,80 @@ The extension implements intelligent text field translation with prioritized sel
 - `src/contentMain.js` - Content script handlers with selection utilities
 - `src/strategies/DefaultStrategy.js` - Platform-specific text extraction and replacement
 - `src/utils/frameworkCompatibility.js` - Framework-aware text replacement utilities
+
+### Subtitle Translation System
+
+The extension includes a comprehensive subtitle translation system for video platforms:
+
+**Supported Platforms:**
+- **YouTube**: Regular videos, Shorts, and embedded videos
+- **Netflix**: Movies and TV shows
+
+**Architecture Components:**
+- `src/subtitle/BaseVideoStrategy.js` - Abstract base class for video platform strategies
+- `src/subtitle/YoutubeSubtitleStrategy.js` - YouTube-specific subtitle handling
+- `src/subtitle/NetflixSubtitleStrategy.js` - Netflix-specific subtitle handling
+- `src/subtitle/SubtitleManager.js` - Central manager for subtitle translation
+- `src/subtitle/index.js` - Main exports for subtitle system
+
+**Key Features:**
+- **Real-time Translation**: Subtitles are translated as they appear
+- **Dual-language Display**: Shows both original and translated text
+- **Platform-specific Optimization**: Handles YouTube SPA navigation and Netflix API
+- **Smart Caching**: Prevents redundant translations of the same text
+- **Performance Optimized**: Uses debouncing and efficient DOM monitoring
+- **Error Handling**: Robust error management with fallback mechanisms
+
+**User Experience:**
+- **Automatic Detection**: Automatically activates on supported video sites
+- **Pause on Hover**: Video pauses when hovering over subtitles for better readability
+- **Customizable**: Can be enabled/disabled via extension settings
+- **Visual Consistency**: Maintains platform-specific styling and appearance
+
+**Technical Implementation:**
+- Uses MutationObserver for efficient subtitle detection
+- Handles SPA navigation for YouTube
+- Integrates with Netflix player API when available
+- Implements translation caching to minimize API calls
+- Supports both contentEditable and standard subtitle formats
+
+**Configuration:**
+- Controlled by `ENABLE_SUBTITLE_TRANSLATION` flag in FeatureManager
+- YouTube UI visibility controlled by `SHOW_SUBTITLE_ICON` flag in FeatureManager
+- Automatically initializes when visiting supported video sites
+- Respects user's translation provider and language settings
+- Default enabled: `true` (can be disabled in extension settings)
+- Uses dedicated `TranslationMode.Subtitle` for optimized subtitle translation
+- Leverages specialized `PROMPT_BASE_SUBTITLE` template for video content context
+
+**YouTube Icon Control:**
+- `SHOW_SUBTITLE_ICON=true` → Translation icon appears in YouTube player controls
+- `SHOW_SUBTITLE_ICON=false` → No icon is displayed, but subtitle translation still works via other methods
+- Icon toggle is handled independently from subtitle translation functionality
+- Changes take effect immediately without page refresh
+- Icon provides visual feedback for current subtitle translation state (active/inactive)
+
+**Development Guidelines:**
+- **Handler Pattern**: Each video platform has its own handler class extending `BaseSubtitleHandler`
+- **Selector Management**: Platform-specific CSS selectors are centralized in `getSelectors()` method
+- **Error Resilience**: Extensive try-catch blocks with graceful fallbacks
+- **Performance Optimization**: Uses MutationObserver with debouncing and caching
+- **Memory Management**: Proper cleanup of event listeners and observers on destroy
+
+**Testing Considerations:**
+- Test on both regular and embedded video players
+- Verify subtitle detection across different video qualities
+- Check performance impact with long videos
+- Ensure proper cleanup when navigating between videos
+- Test with different subtitle languages and formats
+
+**Subtitle-Specific Translation Features:**
+- **Specialized Prompt Template**: `PROMPT_BASE_SUBTITLE` optimized for video content translation
+- **Context-Aware Translation**: Understands subtitle timing constraints and readability requirements
+- **Conversational Tone**: Maintains natural spoken dialogue feel in translations
+- **Conciseness Priority**: Optimizes for quick readability (2-4 second display time)
+- **Cultural Adaptation**: Handles idioms and cultural references appropriately for subtitle context
+- **Technical Optimization**: Uses `TranslationMode.Subtitle` for dedicated subtitle processing pipeline
 
 ### Error Handling
 
@@ -373,3 +448,12 @@ The Firefox build is optimized to pass validation without warnings:
 - **Character Limit Removal**: Removed 200-character restriction from Google TTS in `src/handlers/ttsHandler.js`
 - **Unified TTS Control**: Added click-to-stop TTS functionality in sidepanel for better user control
 - **Enhanced Audio Management**: Improved TTS stopping mechanism across all interfaces (popup, sidepanel, selection windows)
+
+**Subtitle Translation UI Control (January 2025):**
+- **New SHOW_SUBTITLE_ICON Setting**: Added `SHOW_SUBTITLE_ICON` configuration flag to control YouTube icon visibility
+- **Independent Icon Control**: YouTube subtitle translation icon can be hidden while keeping subtitle translation functionality active
+- **FeatureManager Integration**: Proper integration with FeatureManager for real-time settings updates
+- **Clean UI Management**: Added `cleanupYouTubeUI()` method for selective YouTube UI cleanup without affecting translation functionality
+- **Enhanced Initialization**: Improved `SubtitleHandler` initialization to respect both `ENABLE_SUBTITLE_TRANSLATION` and `SHOW_SUBTITLE_ICON` settings
+- **Real-time Toggle**: Icon visibility changes take effect immediately without requiring page refresh
+- **Storage Sync**: Enhanced `waitForFeatureManagerReady()` to properly sync both subtitle and icon settings from storage
