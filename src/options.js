@@ -9,6 +9,7 @@ import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { applyTheme } from "./utils/theme.js";
 import { SimpleMarkdown } from "./utils/simpleMarkdown.js";
+import secureStorage from "./utils/secureStorage.js";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -181,7 +182,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const customApiKeyInput = document.getElementById("customApiKey");
   const customApiModelInput = document.getElementById("customApiModel");
   const exportSettingsButton = document.getElementById("exportSettings");
+  const exportPasswordInput = document.getElementById("exportPassword");
   const importFile = document.getElementById("importFile");
+  const importPasswordInput = document.getElementById("importPassword");
+  const importPasswordGroup = document.getElementById("importPasswordGroup");
+  const importSettingsButton = document.getElementById("importSettingsButton");
   const statusElement = document.getElementById("status");
   const manifest_Name = document.getElementById("options_app_name");
   const manifest_Version = document.getElementById("options_app_version");
@@ -1116,41 +1121,132 @@ document.addEventListener("DOMContentLoaded", async () => {
   exportSettingsButton.addEventListener("click", async () => {
     try {
       const settings = await getSettingsAsync();
-      const blob = new Blob([JSON.stringify(settings, null, 2)], {
+      const exportPassword = exportPasswordInput?.value?.trim() || null;
+      
+      // Show warning if no password is provided for security
+      if (!exportPassword) {
+        // Get localized warning messages
+        const warningTitle = await getTranslationString("security_warning_title") || "⚠️ SECURITY WARNING ⚠️";
+        const warningMessage = await getTranslationString("security_warning_message") || 
+          "You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it's STRONGLY recommended to use a password.";
+        const warningQuestion = await getTranslationString("security_warning_question") || "Do you want to continue without password protection?";
+        
+        const proceed = window.confirm(
+          `${warningTitle}\n\n${warningMessage}\n\n${warningQuestion}`
+        );
+        
+        if (!proceed) {
+          // Focus on password field to encourage user to enter one
+          if (exportPasswordInput) {
+            exportPasswordInput.focus();
+          }
+          return;
+        }
+      }
+      
+      // Prepare settings for export (with optional encryption)
+      const exportData = await secureStorage.prepareForExport(settings, exportPassword);
+      
+      // Create filename with encryption indicator
+      const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const securitySuffix = exportPassword ? "_Encrypted" : "";
+      const filename = `${CONFIG.APP_NAME}_Settings${securitySuffix}_${timestamp}.json`;
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${CONFIG.APP_NAME}_Settings.json`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      showStatus(
-        await getTranslationString("OPTIONS_STATUS_EXPORT_SUCCESS"),
-        "success"
-      );
-      setTimeout(() => showStatus(""), 2000);
+      
+      // Clear password field after successful export
+      if (exportPasswordInput) {
+        exportPasswordInput.value = "";
+      }
+      
+      // Show success message with encryption status
+      const successMessage = exportPassword ? 
+        "Settings exported successfully with encrypted API keys!" :
+        "Settings exported successfully (API keys in plain text)";
+      
+      showStatus(successMessage, "success");
+      setTimeout(() => showStatus(""), 3000);
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "exportSettings",
       });
-      showStatus(
-        await getTranslationString("OPTIONS_STATUS_EXPORT_FAILED"),
-        "error"
-      );
+      
+      let errorMessage = "Failed to export settings";
+      if (error.message.includes("Password")) {
+        errorMessage = "Export failed: " + error.message;
+      }
+      
+      showStatus(errorMessage, "error");
       setTimeout(() => showStatus(""), 3000);
     }
   });
 
-  importFile.addEventListener("change", async (event) => {
+  // Function to show/hide import password field based on file content
+  const checkImportFileEncryption = async (file) => {
     try {
-      const file = event.target.files[0];
-      if (!file) return;
-      const importedSettings = JSON.parse(await file.text());
-      await Browser.storage.local.set(importedSettings);
+      const content = await file.text();
+      const data = JSON.parse(content);
+      
+      if (data._hasEncryptedKeys && data._secureKeys) {
+        // File has encrypted keys - show password field
+        if (importPasswordGroup) {
+          importPasswordGroup.style.display = "block";
+        }
+        return true; // Encryption detected
+      } else {
+        // No encryption - hide password field
+        if (importPasswordGroup) {
+          importPasswordGroup.style.display = "none";
+        }
+        return false; // No encryption
+      }
+    } catch {
+      // Invalid JSON or other error
+      if (importPasswordGroup) {
+        importPasswordGroup.style.display = "none";
+      }
+      return false;
+    }
+  };
+
+  // Create actual import button functionality
+  const handleImportSettings = async () => {
+    try {
+      const file = importFile?.files[0];
+      if (!file) {
+        showStatus("Please select a file to import", "error");
+        return;
+      }
+      
+      const fileContent = await file.text();
+      const importedSettings = JSON.parse(fileContent);
+      const importPassword = importPasswordInput?.value?.trim() || null;
+      
+      // Process imported settings (with optional decryption)
+      const processedSettings = await secureStorage.processImportedSettings(
+        importedSettings, 
+        importPassword
+      );
+      
+      // Save to storage
+      await Browser.storage.local.set(processedSettings);
+      
+      // Clear form
+      if (importFile) importFile.value = "";
+      if (importPasswordInput) importPasswordInput.value = "";
+      if (importPasswordGroup) importPasswordGroup.style.display = "none";
+      
       showStatus(
-        await getTranslationString("OPTIONS_STATUS_IMPORT_SUCCESS_RELOADING"),
+        "Settings imported successfully! Reloading...",
         "success"
       );
       setTimeout(() => window.location.reload(), 1500);
@@ -1159,14 +1255,56 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: ErrorTypes.UI,
         context: "importSettings",
       });
-      showStatus(
-        await getTranslationString("OPTIONS_STATUS_IMPORT_FAILED"),
-        "error"
-      );
+      
+      let errorMessage = "Failed to import settings";
+      if (error.message.includes("Password")) {
+        errorMessage = "Import failed: " + error.message;
+      } else if (error.message.includes("JSON")) {
+        errorMessage = "Import failed: Invalid file format";
+      }
+      
+      showStatus(errorMessage, "error");
       if (importFile) importFile.value = "";
-      setTimeout(() => showStatus(""), 3000);
+      if (importPasswordInput) importPasswordInput.value = "";
+      setTimeout(() => showStatus(""), 4000);
     }
+  };
+
+  // Handle file selection - check encryption and auto-import if no password needed
+  importFile.addEventListener("change", async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      if (importPasswordGroup) {
+        importPasswordGroup.style.display = "none";
+      }
+      return;
+    }
+    
+    const hasEncryption = await checkImportFileEncryption(file);
+    
+    // If no encryption detected, automatically proceed with import
+    if (!hasEncryption) {
+      // Small delay to let user see the file was selected
+      setTimeout(() => {
+        handleImportSettings();
+      }, 500);
+    }
+    // If encryption detected, wait for user to enter password and press Enter
   });
+
+  // Add click handler for import button
+  if (importSettingsButton) {
+    importSettingsButton.addEventListener("click", handleImportSettings);
+  }
+
+  // Add click handler for import when Enter is pressed in password field
+  if (importPasswordInput) {
+    importPasswordInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") {
+        handleImportSettings();
+      }
+    });
+  }
 
   // Initial call to load all settings and set up the page
   await loadSettings();

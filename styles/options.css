@@ -317,6 +317,7 @@ label {
 }
 
 input[type="text"],
+input[type="password"],
 select,
 textarea {
   width: 100%;
@@ -337,6 +338,68 @@ textarea:focus {
   outline: none;
   border-color: var(--input-focus-border-color);
   box-shadow: 0 0 0 2px var(--input-focus-shadow-color);
+}
+
+/* --- IMPORT/EXPORT SPECIFIC STYLES --- */
+.export-controls-row,
+.import-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.export-password-input,
+.import-password-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.export-button,
+.import-button {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.export-button:hover,
+.import-button:hover {
+  background-color: var(--button-hover-bg-color);
+}
+
+.export-button:disabled,
+.import-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive behavior for smaller screens */
+@media (max-width: 768px) {
+  .export-controls-row,
+  .import-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .export-password-input,
+  .import-password-input {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .export-button,
+  .import-button {
+    width: 100%;
+  }
 }
 
 /* --- THEME CONTROLS --- */

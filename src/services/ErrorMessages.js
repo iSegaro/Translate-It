@@ -32,6 +32,10 @@ export const errorMessages = {
     "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
 
 
+  // Import/Export password errors
+  [ErrorTypes.IMPORT_PASSWORD_REQUIRED]: "Password is required to import encrypted settings",
+  [ErrorTypes.IMPORT_PASSWORD_INCORRECT]: "Incorrect password or corrupted data",
+
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
   [ErrorTypes.HTTP_ERROR]: "HTTP error",

@@ -819,12 +819,30 @@
                     Export your current settings to a JSON file for backup or
                     sharing.
                   </p>
-                  <button
-                    id="exportSettings"
-                    data-i18n="export_settings_button"
-                  >
-                    Export Settings
-                  </button>
+                </div>
+                <div class="setting-group">
+                  <label for="exportPassword" data-i18n="export_password_label">
+                    🔐 Export Password (Recommended for Security)
+                  </label>
+                  <div class="export-controls-row">
+                    <input
+                      type="password"
+                      id="exportPassword"
+                      data-i18n-placeholder="export_password_placeholder"
+                      placeholder="Create a strong password to protect your API keys"
+                      autocomplete="new-password"
+                      class="export-password-input"
+                    />
+                    <button
+                      id="exportSettings"
+                      data-i18n="export_settings_button"
+                      class="export-button"
+                    >
+                      Export Settings
+                    </button>
+                  </div>
+                  <span class="setting-description" data-i18n-html="export_password_description">
+                  </span>
                 </div>
               </fieldset>
 
@@ -838,6 +856,30 @@
                   >
                   <input type="file" id="importFile" accept=".json" />
                 </div>
+                <div class="setting-group" id="importPasswordGroup" style="display: none;">
+                  <label for="importPassword" data-i18n="import_password_label">
+                    🔑 Import Password Required
+                  </label>
+                  <div class="import-controls-row">
+                    <input
+                      type="password"
+                      id="importPassword"
+                      data-i18n-placeholder="import_password_placeholder"
+                      placeholder="Enter the password used during export"
+                      autocomplete="current-password"
+                      class="import-password-input"
+                    />
+                    <button
+                      id="importSettingsButton"
+                      data-i18n="import_settings_button"
+                      class="import-button"
+                    >
+                      Import Settings
+                    </button>
+                  </div>
+                  <span class="setting-description" data-i18n-html="import_password_description">
+                  </span>
+                </div>
                 <div class="setting-group">
                   <p
                     class="setting-description"
@@ -847,12 +889,6 @@
                     Importing will overwrite your current settings. The page
                     will reload after a successful import.
                   </p>
-                  <button
-                    id="importSettings"
-                    data-i18n="import_settings_button"
-                  >
-                    Import Settings
-                  </button>
                 </div>
               </fieldset>
             </section>

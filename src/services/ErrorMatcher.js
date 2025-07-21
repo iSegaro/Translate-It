@@ -82,6 +82,21 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
 
+  // Import/Export password issues
+  if (
+    msg.includes("password is required to import") ||
+    msg.includes("password is required for decryption") ||
+    msg.includes("password required to decrypt")
+  )
+    return ErrorTypes.IMPORT_PASSWORD_REQUIRED;
+  if (
+    msg.includes("incorrect password") ||
+    msg.includes("wrong password") ||
+    msg.includes("invalid password") ||
+    msg.includes("password or corrupted data")
+  )
+    return ErrorTypes.IMPORT_PASSWORD_INCORRECT;
+
   // API Key issues
   if (
     msg.includes("wrong api key") ||

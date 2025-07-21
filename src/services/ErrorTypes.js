@@ -35,4 +35,8 @@ export class ErrorTypes {
   static GEMINI_QUOTA_REGION = "GEMINI_QUOTA_REGION";
   static SERVER_ERROR = "SERVER_ERROR";
   static RATE_LIMIT_REACHED = "RATE_LIMIT_REACHED"; // برای خطای 429
+
+  // Import/Export password errors
+  static IMPORT_PASSWORD_REQUIRED = "IMPORT_PASSWORD_REQUIRED";
+  static IMPORT_PASSWORD_INCORRECT = "IMPORT_PASSWORD_INCORRECT";
 };

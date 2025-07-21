@@ -265,8 +265,23 @@
 
   "import_export_section_title": { "message": "Import/Export Settings" },
   "export_settings_button": { "message": "Export Settings" },
+  "export_password_label": { "message": "🔐 Export Password (Recommended for Security)" },
+  "export_password_placeholder": { "message": "Create a strong password to protect your API keys" },
+  "export_password_description": { 
+    "message": "<strong>🔒 Strongly Recommended:</strong> Enter a password to encrypt your API keys using military-grade AES-256 encryption.<br><strong>⚠️ Without password:</strong> Your API keys will be exported in plain text and visible to anyone who accesses the file.<br><strong>📝 Remember:</strong> You'll need this same password when importing these settings."
+  },
   "import_settings_label": { "message": "Import Settings" },
   "import_settings_button": { "message": "Import Settings" },
+  "import_password_label": { "message": "🔑 Import Password Required" },
+  "import_password_placeholder": { "message": "Enter the password used during export" },
+  "import_password_description": { 
+    "message": "<strong>🔐 Encrypted File Detected:</strong> This settings file contains encrypted API keys.<br><strong>🔑 Enter Password:</strong> Use the same password you created during export.<br><strong>⏎ Press Enter:</strong> After entering the password, press Enter to import."
+  },
+  "security_warning_title": { "message": "⚠️ SECURITY WARNING ⚠️" },
+  "security_warning_message": { 
+    "message": "You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it's STRONGLY recommended to use a password."
+  },
+  "security_warning_question": { "message": "Do you want to continue without password protection?" },
   "save_settings_button": { "message": "Save Settings" },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
@@ -452,6 +467,12 @@
   },
   "ERRORS_GEMINI_QUOTA_REGION": {
     "message": "Gemini quota exceeded, which may be due to a region-specific limit."
+  },
+  "ERRORS_IMPORT_PASSWORD_REQUIRED": {
+    "message": "Password is required to import encrypted settings."
+  },
+  "ERRORS_IMPORT_PASSWORD_INCORRECT": {
+    "message": "Incorrect password or corrupted data."
   },
 
   "gemini_thinking_label": {
