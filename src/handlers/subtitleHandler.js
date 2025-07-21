@@ -3,6 +3,7 @@ import Browser from "webextension-polyfill";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
+import { isUrlExcluded } from "../utils/exclusion.js";
 
 export class SubtitleHandler {
   /**
@@ -47,6 +48,11 @@ export class SubtitleHandler {
       return;
     }
 
+    // Listen for global extension enable/disable
+    this.featureManager.on("EXTENSION_ENABLED", () => {
+      this.handleExtensionToggle();
+    });
+
     this.featureManager.on("SUBTITLE_TRANSLATION", () => {
       this.handleSubtitleFeatureToggle();
     });
@@ -56,13 +62,26 @@ export class SubtitleHandler {
       this.handleSubtitleIconToggle();
     });
 
+    // Wait for FeatureManager to load from storage before initial check
+    await this.waitForFeatureManagerReady();
+    
+    // Check if extension is globally enabled first
+    if (!this.featureManager.isOn("EXTENSION_ENABLED")) {
+      logME("[SubtitleHandler] Extension globally disabled, skipping initialization");
+      return;
+    }
+
+    // Check if current site is excluded
+    const isExcluded = await this.checkSiteExclusion();
+    if (isExcluded) {
+      logME("[SubtitleHandler] Current site is excluded, skipping initialization");
+      return;
+    }
+
     // Initialize site-specific UI elements
     if (this.site === "youtube") {
       this.initializeYouTubeUI();
     }
-
-    // Wait for FeatureManager to load from storage before initial check
-    await this.waitForFeatureManagerReady();
     
     // Perform initial check to start or stop the integration
     this.handleSubtitleFeatureToggle();
@@ -74,20 +93,37 @@ export class SubtitleHandler {
   }
 
   /**
+   * Checks if the current site is in the excluded sites list.
+   */
+  async checkSiteExclusion() {
+    try {
+      const settings = await Browser.storage.local.get(["EXCLUDED_SITES"]);
+      const excludedSites = settings.EXCLUDED_SITES || [];
+      return isUrlExcluded(window.location.href, excludedSites);
+    } catch (error) {
+      logME("[SubtitleHandler] Error checking site exclusion:", error);
+      return false; // If error, don't exclude
+    }
+  }
+
+  /**
    * Waits for FeatureManager to load settings from storage.
    */
   async waitForFeatureManagerReady() {
     // Check if we can access actual storage values directly
     try {
       const result = await Browser.storage.local.get([
+        "EXTENSION_ENABLED",
         "ENABLE_SUBTITLE_TRANSLATION",
         "SHOW_SUBTITLE_ICON"
       ]);
+      const actualExtensionValue = result.EXTENSION_ENABLED ?? true;
       const actualSubtitleValue = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
       const actualIconValue = result.SHOW_SUBTITLE_ICON ?? true;
       
       // If FeatureManager hasn't loaded the values yet, wait a bit
-      if (this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualSubtitleValue ||
+      if (this.featureManager.isOn("EXTENSION_ENABLED") !== actualExtensionValue ||
+          this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualSubtitleValue ||
           this.featureManager.isOn("SHOW_SUBTITLE_ICON") !== actualIconValue) {
         logME("[SubtitleHandler] Waiting for FeatureManager to sync with storage...");
         // Give FeatureManager time to load from storage
@@ -158,6 +194,12 @@ export class SubtitleHandler {
    * Creates and injects the subtitle toggle button into the YouTube player controls.
    */
   createYouTubeButton() {
+    // Check if we should create the button at all
+    if (!this.featureManager.isOn("EXTENSION_ENABLED") || 
+        !this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
+      return;
+    }
+
     const controls = document.querySelector(".ytp-right-controls");
     if (!controls || document.getElementById("translate-it-yt-btn")) {
       return;
@@ -321,11 +363,27 @@ export class SubtitleHandler {
   /**
    * Handles the feature toggle for subtitle translation.
    */
-  handleSubtitleFeatureToggle() {
+  async handleSubtitleFeatureToggle() {
     if (!this.featureManager) {
       logME("[SubtitleHandler] FeatureManager not available for toggle.");
       return;
     }
+
+    // Check if extension is globally enabled first
+    if (!this.featureManager.isOn("EXTENSION_ENABLED")) {
+      logME("[SubtitleHandler] Extension globally disabled, stopping subtitle integration");
+      this.stopSubtitleIntegration();
+      return;
+    }
+
+    // Check site exclusion
+    const isExcluded = await this.checkSiteExclusion();
+    if (isExcluded) {
+      logME("[SubtitleHandler] Site is excluded, stopping subtitle integration");
+      this.stopSubtitleIntegration();
+      return;
+    }
+
     const isEnabled = this.featureManager.isOn("SUBTITLE_TRANSLATION");
     logME(`[SubtitleHandler] Feature toggled. Enabled: ${isEnabled}`);
 
@@ -343,8 +401,21 @@ export class SubtitleHandler {
   /**
    * Handles the toggle for showing/hiding subtitle icon in YouTube.
    */
-  handleSubtitleIconToggle() {
+  async handleSubtitleIconToggle() {
     if (this.site !== "youtube") {
+      return;
+    }
+
+    // Check if extension is globally enabled first
+    if (!this.featureManager.isOn("EXTENSION_ENABLED")) {
+      this.cleanupYouTubeUI();
+      return;
+    }
+
+    // Check site exclusion
+    const isExcluded = await this.checkSiteExclusion();
+    if (isExcluded) {
+      this.cleanupYouTubeUI();
       return;
     }
 
@@ -357,8 +428,46 @@ export class SubtitleHandler {
         this.initializeYouTubeUI();
       }
     } else {
-      // Remove the YouTube UI
+      // Remove the YouTube UI completely
       this.cleanupYouTubeUI();
+      
+      // Extra cleanup: make sure no button exists after cleanup
+      setTimeout(() => {
+        const button = document.getElementById("translate-it-yt-btn");
+        if (button) {
+          button.remove();
+          logME("[SubtitleHandler] Removed lingering YouTube button.");
+        }
+      }, 50);
+    }
+  }
+
+  /**
+   * Handles the global extension enable/disable toggle.
+   */
+  async handleExtensionToggle() {
+    const isExtensionEnabled = this.featureManager.isOn("EXTENSION_ENABLED");
+    logME(`[SubtitleHandler] Extension toggle. Enabled: ${isExtensionEnabled}`);
+
+    if (!isExtensionEnabled) {
+      // Extension is disabled - stop everything
+      this.stopSubtitleIntegration();
+      if (this.site === "youtube") {
+        this.cleanupYouTubeUI();
+      }
+    } else {
+      // Check site exclusion before re-enabling
+      const isExcluded = await this.checkSiteExclusion();
+      if (isExcluded) {
+        logME("[SubtitleHandler] Site is excluded, not re-enabling features");
+        return;
+      }
+
+      // Extension is re-enabled - reinitialize based on current settings
+      if (this.site === "youtube") {
+        this.handleSubtitleIconToggle();
+      }
+      this.handleSubtitleFeatureToggle();
     }
   }
 
@@ -367,14 +476,26 @@ export class SubtitleHandler {
    */
   cleanupYouTubeUI() {
     logME("[SubtitleHandler] Cleaning up YouTube UI.");
+    
+    // Stop the button creation interval first
     if (this.youtubeButtonInterval) {
       clearInterval(this.youtubeButtonInterval);
       this.youtubeButtonInterval = null;
     }
+    
+    // Remove the button element
     const button = document.getElementById("translate-it-yt-btn");
-    if (button) button.remove();
+    if (button) {
+      button.remove();
+      logME("[SubtitleHandler] YouTube button removed.");
+    }
+    
+    // Remove the style element
     const style = document.getElementById("translate-it-yt-button-style");
-    if (style) style.remove();
+    if (style) {
+      style.remove();
+      logME("[SubtitleHandler] YouTube button styles removed.");
+    }
   }
 
   /**
