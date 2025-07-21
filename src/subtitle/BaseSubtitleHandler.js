@@ -3,6 +3,7 @@
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { TranslationMode } from "../config.js";
+import { getTranslationString } from "../utils/i18n.js";
 
 export default class BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {
@@ -50,7 +51,8 @@ export default class BaseSubtitleHandler {
       this.setupPeriodicCheck();
       
       logME(`[${this.constructor.name}] Subtitle translation started`);
-      this.notifier?.show("ترجمه زیرنویس فعال شد", "success", 2000);
+      const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
+      this.notifier?.show(startMessage, "success", 2000);
       return true;
     } catch (error) {
       this.isActive = false;
@@ -63,7 +65,7 @@ export default class BaseSubtitleHandler {
   }
 
   // توقف نظارت
-  stop() {
+  async stop() {
     if (!this.isActive) return;
 
     this.isActive = false;
@@ -82,7 +84,8 @@ export default class BaseSubtitleHandler {
     this.lastProcessedText = "";
     
     logME(`[${this.constructor.name}] Subtitle translation stopped`);
-    this.notifier?.show("ترجمه زیرنویس متوقف شد", "info", 2000);
+    const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
+    this.notifier?.show(stopMessage, "info", 2000);
   }
 
   // انتظار برای کانتینر زیرنویس

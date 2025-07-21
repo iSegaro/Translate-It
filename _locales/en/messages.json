@@ -459,5 +459,12 @@
   },
   "gemini_thinking_description": {
     "message": "Allow the model to think step-by-step before responding."
+  },
+
+  "SUBTITLE_TRANSLATION_STARTED": {
+    "message": "Subtitle translation activated"
+  },
+  "SUBTITLE_TRANSLATION_STOPPED": {
+    "message": "Subtitle translation stopped"
   }
 }
