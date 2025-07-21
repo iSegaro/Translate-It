@@ -91,7 +91,7 @@ export class SubtitleHandler {
       .translate-it-yt-icon {
         width: 20px;
         height: 18px;
-        filter: grayscale(1) invert(1);
+        filter: grayscale(1) invert(0);
       }
       .translate-it-yt-button.translate-it-active .translate-it-yt-icon {
         filter: none;
