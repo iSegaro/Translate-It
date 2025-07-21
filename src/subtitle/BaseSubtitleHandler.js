@@ -51,8 +51,8 @@ export default class BaseSubtitleHandler {
       this.setupPeriodicCheck();
       
       logME(`[${this.constructor.name}] Subtitle translation started`);
-      const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
-      this.notifier?.show(startMessage, "success", 2000);
+      // const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
+      // this.notifier?.show(startMessage, "success", 2000);
       return true;
     } catch (error) {
       this.isActive = false;
@@ -84,8 +84,8 @@ export default class BaseSubtitleHandler {
     this.lastProcessedText = "";
     
     logME(`[${this.constructor.name}] Subtitle translation stopped`);
-    const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
-    this.notifier?.show(stopMessage, "info", 2000);
+    // const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
+    // this.notifier?.show(stopMessage, "info", 2000);
   }
 
   // انتظار برای کانتینر زیرنویس
