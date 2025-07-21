@@ -551,3 +551,7 @@ export const getDeepSeekModelSelectionAsync = async () => {
 export const getOpenRouterModelSelectionAsync = async () => {
   return getSettingValueAsync("OPENROUTER_API_MODEL", CONFIG.OPENROUTER_API_MODEL);
 };
+
+export const getShowSubtitleIconAsync = async () => {
+  return getSettingValueAsync("SHOW_SUBTITLE_ICON", CONFIG.SHOW_SUBTITLE_ICON);
+};

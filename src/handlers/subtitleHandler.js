@@ -51,6 +51,11 @@ export class SubtitleHandler {
       this.handleSubtitleFeatureToggle();
     });
 
+    // Listen for SHOW_SUBTITLE_ICON changes to toggle YouTube UI
+    this.featureManager.on("SHOW_SUBTITLE_ICON", () => {
+      this.handleSubtitleIconToggle();
+    });
+
     // Initialize site-specific UI elements
     if (this.site === "youtube") {
       this.initializeYouTubeUI();
@@ -61,6 +66,11 @@ export class SubtitleHandler {
     
     // Perform initial check to start or stop the integration
     this.handleSubtitleFeatureToggle();
+
+    // Perform initial check for icon visibility (in case it was disabled initially)
+    if (this.site === "youtube") {
+      this.handleSubtitleIconToggle();
+    }
   }
 
   /**
@@ -69,11 +79,16 @@ export class SubtitleHandler {
   async waitForFeatureManagerReady() {
     // Check if we can access actual storage values directly
     try {
-      const result = await Browser.storage.local.get("ENABLE_SUBTITLE_TRANSLATION");
-      const actualValue = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      const result = await Browser.storage.local.get([
+        "ENABLE_SUBTITLE_TRANSLATION",
+        "SHOW_SUBTITLE_ICON"
+      ]);
+      const actualSubtitleValue = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      const actualIconValue = result.SHOW_SUBTITLE_ICON ?? true;
       
-      // If FeatureManager hasn't loaded the value yet, wait a bit
-      if (this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualValue) {
+      // If FeatureManager hasn't loaded the values yet, wait a bit
+      if (this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualSubtitleValue ||
+          this.featureManager.isOn("SHOW_SUBTITLE_ICON") !== actualIconValue) {
         logME("[SubtitleHandler] Waiting for FeatureManager to sync with storage...");
         // Give FeatureManager time to load from storage
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -87,6 +102,12 @@ export class SubtitleHandler {
    * Sets up the UI elements specific to YouTube.
    */
   initializeYouTubeUI() {
+    // Only initialize UI if SHOW_SUBTITLE_ICON is enabled
+    if (!this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
+      logME("[SubtitleHandler] SHOW_SUBTITLE_ICON is disabled, skipping YouTube UI initialization");
+      return;
+    }
+
     this.injectYouTubeButtonStyles();
     this.youtubeButtonInterval = setInterval(
       () => this.createYouTubeButton(),
@@ -320,18 +341,49 @@ export class SubtitleHandler {
   }
 
   /**
+   * Handles the toggle for showing/hiding subtitle icon in YouTube.
+   */
+  handleSubtitleIconToggle() {
+    if (this.site !== "youtube") {
+      return;
+    }
+
+    const showIcon = this.featureManager.isOn("SHOW_SUBTITLE_ICON");
+    logME(`[SubtitleHandler] Subtitle icon toggle. Show: ${showIcon}`);
+
+    if (showIcon) {
+      // Start the YouTube UI if not already started
+      if (!this.youtubeButtonInterval) {
+        this.initializeYouTubeUI();
+      }
+    } else {
+      // Remove the YouTube UI
+      this.cleanupYouTubeUI();
+    }
+  }
+
+  /**
+   * Cleans up YouTube UI elements only.
+   */
+  cleanupYouTubeUI() {
+    logME("[SubtitleHandler] Cleaning up YouTube UI.");
+    if (this.youtubeButtonInterval) {
+      clearInterval(this.youtubeButtonInterval);
+      this.youtubeButtonInterval = null;
+    }
+    const button = document.getElementById("translate-it-yt-btn");
+    if (button) button.remove();
+    const style = document.getElementById("translate-it-yt-button-style");
+    if (style) style.remove();
+  }
+
+  /**
    * Cleans up all resources used by the handler.
    */
   cleanup() {
     logME("[SubtitleHandler] Cleanup initiated.");
     if (this.site === "youtube") {
-      if (this.youtubeButtonInterval) {
-        clearInterval(this.youtubeButtonInterval);
-      }
-      const button = document.getElementById("translate-it-yt-btn");
-      if (button) button.remove();
-      const style = document.getElementById("translate-it-yt-button-style");
-      if (style) style.remove();
+      this.cleanupYouTubeUI();
     }
 
     this.stopSubtitleIntegration();
