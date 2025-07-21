@@ -4,6 +4,7 @@ import Browser from "webextension-polyfill";
 import { getSettingsAsync, CONFIG } from "./config.js";
 import { ErrorHandler } from "./services/ErrorService.js";
 import { ErrorTypes } from "./services/ErrorTypes.js";
+import { matchErrorToType } from "./services/ErrorMatcher.js";
 import { logME } from "./utils/helpers.js";
 import { app_localize, getTranslationString } from "./utils/i18n.js";
 import { fadeOutInElement } from "./utils/i18n.helper.js";
@@ -195,6 +196,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sourceLangNameSpan = document.getElementById("sourceLangName");
   const targetLangNameSpan = document.getElementById("targetLangName");
   const excludedSites = document.getElementById("excludedSites");
+
+  // --- Initialize API Key Masking ---
+  function initializeApiKeyMasking() {
+    const apiKeyInputs = [
+      apiKeyInput,
+      openAIApiKeyInput,
+      openRouterApiKeyInput,
+      deepseekApiKeyInput,
+      customApiKeyInput
+    ];
+    
+    apiKeyInputs.forEach(input => {
+      if (input) {
+        input.classList.add('api-key-input');
+      }
+    });
+  }
+  
+  // Initialize API key masking immediately
+  initializeApiKeyMasking();
 
   // --- Event Listener for the new Reset Button ---
   if (resetPromptButton && promptTemplateInput) {
@@ -1061,6 +1082,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         app_localize(currentAppLocalize);
       }
 
+
       // --- START: GENERALIZED HASH HANDLING LOGIC ---
 
       const hash = window.location.hash;
@@ -1240,7 +1262,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Save to storage
       await Browser.storage.local.set(processedSettings);
       
-      // Clear form
+      // Clear form only on successful import
       if (importFile) importFile.value = "";
       if (importPasswordInput) importPasswordInput.value = "";
       if (importPasswordGroup) importPasswordGroup.style.display = "none";
@@ -1257,15 +1279,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       
       let errorMessage = "Failed to import settings";
-      if (error.message.includes("Password")) {
+      
+      // Use ErrorMatcher for comprehensive error categorization
+      const errorType = matchErrorToType(error);
+      const isPasswordError = errorType === ErrorTypes.IMPORT_PASSWORD_REQUIRED || 
+                             errorType === ErrorTypes.IMPORT_PASSWORD_INCORRECT;
+      
+      if (isPasswordError) {
         errorMessage = "Import failed: " + error.message;
       } else if (error.message.includes("JSON")) {
         errorMessage = "Import failed: Invalid file format";
       }
       
       showStatus(errorMessage, "error");
-      if (importFile) importFile.value = "";
-      if (importPasswordInput) importPasswordInput.value = "";
+      
+      // Only clear file input for non-password errors
+      if (!isPasswordError && importFile) {
+        importFile.value = "";
+      }
+      
+      // Always clear password input on error
+      if (importPasswordInput) {
+        importPasswordInput.value = "";
+        
+        // Focus password input on password errors for immediate retry
+        if (isPasswordError) {
+          setTimeout(() => {
+            importPasswordInput.focus();
+          }, 100);
+        }
+      }
+      
       setTimeout(() => showStatus(""), 4000);
     }
   };

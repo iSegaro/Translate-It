@@ -340,6 +340,45 @@ textarea:focus {
   box-shadow: 0 0 0 2px var(--input-focus-shadow-color);
 }
 
+/* --- API KEY MASKING STYLES --- */
+.api-key-input {
+  position: relative;
+  font-family: monospace;
+  letter-spacing: 0.1em;
+}
+
+.api-key-input:not(:hover):not(:focus) {
+  color: transparent;
+  text-shadow: 0 0 0 #666;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 0.8ch,
+    #666 0.8ch,
+    #666 1ch
+  );
+  background-size: 1ch 1em;
+  background-repeat: repeat;
+  background-position: 0 center;
+}
+
+.api-key-input:not(:hover):not(:focus)::placeholder {
+  color: transparent;
+}
+
+/* Show content on hover or focus */
+.api-key-input:hover,
+.api-key-input:focus {
+  color: var(--input-text-color);
+  text-shadow: none;
+  background-image: none;
+}
+
+.api-key-input:hover::placeholder,
+.api-key-input:focus::placeholder {
+  color: var(--input-placeholder-color);
+}
+
 /* --- IMPORT/EXPORT SPECIFIC STYLES --- */
 .export-controls-row,
 .import-controls-row {
@@ -471,6 +510,11 @@ input:checked + .slider {
 }
 input:checked + .slider:before {
   transform: translateX(20px);
+}
+
+/* RTL Support for Theme Switch - Swap icon order */
+body[style*="direction: rtl"] .theme-switch-row {
+  flex-direction: row-reverse;
 }
 
 /* --- LANGUAGE LIST --- */
