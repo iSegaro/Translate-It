@@ -281,7 +281,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
           background: rgba(8, 8, 8, 0.5) !important;
           color: white !important;
           font-family: YouTube Noto, Roboto, Arial, Helvetica, sans-serif !important;
-          padding: 12px 16px !important;
+          padding: 10px 14px !important;
           border-radius: 8px !important;
           box-shadow: rgba(0, 0, 0, 0.8) 0px 4px 12px !important;
           min-height: 50px !important;
@@ -663,7 +663,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       const translatedDiv = document.createElement('div');
       translatedDiv.style.cssText = `
           font-weight: bold !important;
-          font-size: 1.4em !important;
+          font-size: 1.6em !important;
           line-height: 1.3 !important;
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9) !important;
           color: white !important;
@@ -677,7 +677,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       // Create original text div
       const originalDiv = document.createElement('div');
       originalDiv.style.cssText = `
-          font-size: 1.1em !important;
+          font-size: 1.3em !important;
           opacity: 0.8 !important;
           line-height: 1.2 !important;
           text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
