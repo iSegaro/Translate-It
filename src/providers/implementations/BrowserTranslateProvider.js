@@ -4,6 +4,8 @@ import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
 import { AUTO_DETECT_VALUE } from "tts-utils";
 import { ErrorTypes } from "../../services/ErrorTypes.js";
+import { TranslationMode } from "../../config.js";
+import Browser from "webextension-polyfill";
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -106,8 +108,97 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
    */
   _getLangCode(lang) {
     if (!lang || typeof lang !== "string") return "en";
+    // AUTO_DETECT_VALUE should not reach this function - handled separately
+    if (lang === AUTO_DETECT_VALUE) {
+      logME(`[${this.providerName}] WARNING: AUTO_DETECT_VALUE reached _getLangCode - this should be handled earlier`);
+      return "en";
+    }
     const lowerCaseLang = lang.toLowerCase();
     return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
+  }
+
+  /**
+   * Detect language for swapping logic (similar to GoogleTranslateProvider)
+   * @param {string} text - Text to analyze
+   * @param {string} targetLang - Target language for comparison
+   * @returns {Promise<string|null>} - Detected language code or null if failed
+   */
+  async _detectLanguageForSwapping(text, _targetLang) {
+    let detectedLangCode = null;
+    
+    // Try Chrome's built-in LanguageDetector first
+    if (typeof globalThis.LanguageDetector !== 'undefined') {
+      try {
+        if (!BrowserTranslateProvider.detector) {
+          BrowserTranslateProvider.detector = await globalThis.LanguageDetector.create();
+        }
+        const results = await BrowserTranslateProvider.detector.detect(text);
+        
+        if (results && results.length > 0 && results[0].confidence > 0.5) {
+          detectedLangCode = results[0].detectedLanguage;
+        }
+      } catch (detectorError) {
+        logME(`[${this.providerName}] LanguageDetector failed for swapping, trying Browser.i18n fallback:`, detectorError);
+      }
+    }
+    
+    // Fallback to Browser.i18n.detectLanguage if LanguageDetector failed
+    if (!detectedLangCode) {
+      try {
+        logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage for swapping...`);
+        const detectionResult = await Browser.i18n.detectLanguage(text);
+        logME(`[${this.providerName}] Browser.i18n.detectLanguage swapping result:`, detectionResult);
+        if (detectionResult?.languages && detectionResult.languages.length > 0) {
+          detectedLangCode = detectionResult.languages[0].language.split("-")[0];
+          const percentage = detectionResult.languages[0].percentage || 0;
+          logME(`[${this.providerName}] Detected language for swapping: ${detectedLangCode} (${percentage}% confidence, reliable: ${detectionResult.isReliable})`);
+        }
+      } catch (i18nError) {
+        logME(`[${this.providerName}] Browser.i18n.detectLanguage failed for swapping:`, i18nError);
+      }
+    }
+    
+    return detectedLangCode;
+  }
+
+  /**
+   * Apply language swapping logic if detected language matches target language
+   * @param {string} text - Text for regex fallback
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language  
+   * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
+   */
+  async _applyLanguageSwapping(text, sourceLang, targetLang) {
+    try {
+      const detectedLangCode = await this._detectLanguageForSwapping(text, targetLang);
+      
+      // Apply language swapping if detection successful
+      if (detectedLangCode) {
+        const targetLangCode = this._getLangCode(targetLang);
+        if (detectedLangCode === targetLangCode) {
+          // Swap languages similar to Google Translate
+          logME(`[${this.providerName}] Languages swapped: ${detectedLangCode} → ${targetLangCode}`);
+          return [targetLang, sourceLang];
+        }
+      } else {
+        // Final regex fallback for Persian text
+        const targetLangCode = this._getLangCode(targetLang);
+        if (isPersianText(text) && (targetLangCode === "fa")) {
+          logME(`[${this.providerName}] Languages swapped using regex fallback`);
+          return [targetLang, sourceLang];
+        }
+      }
+    } catch (error) {
+      logME(`[${this.providerName}] Language detection for swapping failed:`, error);
+      // Regex fallback
+      const targetLangCode = this._getLangCode(targetLang);
+      if (isPersianText(text) && (targetLangCode === "fa")) {
+        return [targetLang, sourceLang];
+      }
+    }
+
+    // No swapping needed
+    return [sourceLang, targetLang];
   }
 
   /**
@@ -121,32 +212,49 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
       return this._getLangCode(sourceLang);
     }
 
+    // Try Chrome's built-in LanguageDetector first (if available)
     try {
-      // Create detector if not exists
-      if (!BrowserTranslateProvider.detector) {
-        BrowserTranslateProvider.detector = await globalThis.LanguageDetector.create();
-      }
-
-      const results = await BrowserTranslateProvider.detector.detect(text);
-      
-      if (results && results.length > 0 && results[0].confidence > 0.5) {
-        return results[0].detectedLanguage;
-      } else {
-        // Fallback to simple regex detection for Persian
-        if (isPersianText(text)) {
-          return "fa";
+      if (typeof globalThis.LanguageDetector !== 'undefined') {
+        // Create detector if not exists
+        if (!BrowserTranslateProvider.detector) {
+          BrowserTranslateProvider.detector = await globalThis.LanguageDetector.create();
         }
-        return "en"; // Default to English
+
+        const results = await BrowserTranslateProvider.detector.detect(text);
+        
+        if (results && results.length > 0 && results[0].confidence > 0.5) {
+          logME(`[${this.providerName}] Language detected using LanguageDetector: ${results[0].detectedLanguage}`);
+          return results[0].detectedLanguage;
+        }
       }
     } catch (error) {
-      logME(`[${this.providerName}] Language detection failed:`, error);
-      
-      // Fallback to simple regex detection
-      if (isPersianText(text)) {
-        return "fa";
-      }
-      return "en"; // Default to English
+      logME(`[${this.providerName}] LanguageDetector failed (${error.message}), falling back to Browser.i18n.detectLanguage`);
     }
+
+    // Fallback to Browser.i18n.detectLanguage (available in all Chrome versions)
+    try {
+      logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
+      const detectionResult = await Browser.i18n.detectLanguage(text);
+      logME(`[${this.providerName}] Browser.i18n.detectLanguage result:`, detectionResult);
+      
+      if (detectionResult?.languages && detectionResult.languages.length > 0) {
+        const detectedLang = detectionResult.languages[0].language.split("-")[0];
+        const percentage = detectionResult.languages[0].percentage || 0;
+        logME(`[${this.providerName}] Language detected using Browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})`);
+        return detectedLang;
+      } else {
+        logME(`[${this.providerName}] Browser.i18n.detectLanguage result empty`);
+      }
+    } catch (error) {
+      logME(`[${this.providerName}] Browser.i18n.detectLanguage failed:`, error);
+    }
+
+    // Final fallback to regex detection
+    logME(`[${this.providerName}] Using regex fallback for language detection`);
+    if (isPersianText(text)) {
+      return "fa";
+    }
+    return "en"; // Default to English
   }
 
   /**
@@ -176,13 +284,14 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     }
 
     // Create new translator with progress monitoring
+    const providerName = this.providerName; // Capture this context for callback
     const translator = await globalThis.Translator.create({
       sourceLanguage: sourceLang,
       targetLanguage: targetLang,
       monitor(monitor) {
         monitor.addEventListener("downloadprogress", (e) => {
           const progress = Math.floor(e.loaded * 100);
-          logME(`[${this.providerName}] Language pack download: ${progress}%`);
+          logME(`[${providerName}] Language pack download: ${progress}%`);
         });
       },
     });
@@ -203,26 +312,47 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // --- Language Detection and Processing ---
-    let detectedSourceLang = sourceLang;
+    // --- Language Detection and Swapping (similar to Google Translate) ---
+    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang);
+
+    // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
+    if (_translateMode === TranslationMode.Field) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
+    if (_translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // --- Language Code Conversion ---
+    // For BrowserTranslateProvider, we need to handle AUTO_DETECT_VALUE differently
+    // than GoogleTranslateProvider because Browser API works with specific language codes
+    let sourceLanguageCode, targetLanguageCode;
     
-    try {
-      detectedSourceLang = await this._detectLanguage(text, sourceLang);
-    } catch (error) {
-      logME(`[${this.providerName}] Language detection error:`, error);
-      detectedSourceLang = this._getLangCode(sourceLang);
+    if (sourceLang === AUTO_DETECT_VALUE) {
+      // When auto-detect is requested, detect the language first
+      try {
+        sourceLanguageCode = await this._detectLanguage(text, sourceLang);
+      } catch (error) {
+        logME(`[${this.providerName}] Language detection error:`, error);
+        sourceLanguageCode = "en"; // fallback
+      }
+    } else {
+      // Use provided source language
+      sourceLanguageCode = this._getLangCode(sourceLang);
     }
 
     // Convert target language to proper code
-    let targetLangCode = this._getLangCode(targetLang);
+    targetLanguageCode = this._getLangCode(targetLang);
 
     // Language swapping logic similar to Google Translate
-    if (detectedSourceLang === targetLangCode) {
-      [detectedSourceLang, targetLangCode] = [targetLangCode, detectedSourceLang];
+    if (sourceLanguageCode === targetLanguageCode) {
+      [sourceLanguageCode, targetLanguageCode] = [targetLanguageCode, sourceLanguageCode];
     }
 
     // Skip if same language after detection
-    if (detectedSourceLang === targetLangCode) {
+    if (sourceLanguageCode === targetLanguageCode) {
       return text;
     }
 
@@ -244,7 +374,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
 
     // --- Translation Process ---
     try {
-      const translator = await this._getTranslator(detectedSourceLang, targetLangCode);
+      const translator = await this._getTranslator(sourceLanguageCode, targetLanguageCode);
       
       let translatedResults;
       if (isJsonMode) {
