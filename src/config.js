@@ -33,7 +33,7 @@ export const CONFIG = {
 
 
   // --- API Settings ---
-  TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google
+  TRANSLATION_API: "google", // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   API_URL:
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", // Gemini specific
@@ -91,6 +91,10 @@ export const CONFIG = {
   CUSTOM_API_URL: "",
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
+
+  // --- Browser Translation API Settings (Chrome 138+) ---
+  BROWSER_TRANSLATE_ENABLED: true, // Enable/disable Browser Translation API
+  BROWSER_TRANSLATE_AUTO_DOWNLOAD: true, // Automatically download language packs when needed
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
@@ -533,6 +537,21 @@ export const getREPLACE_SPECIAL_SITESAsync = async () => {
   return getSettingValueAsync(
     "REPLACE_SPECIAL_SITES",
     CONFIG.REPLACE_SPECIAL_SITES
+  );
+};
+
+// --- Browser Translation API Getters ---
+export const getBrowserTranslateEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "BROWSER_TRANSLATE_ENABLED", 
+    CONFIG.BROWSER_TRANSLATE_ENABLED
+  );
+};
+
+export const getBrowserTranslateAutoDownloadAsync = async () => {
+  return getSettingValueAsync(
+    "BROWSER_TRANSLATE_AUTO_DOWNLOAD", 
+    CONFIG.BROWSER_TRANSLATE_AUTO_DOWNLOAD
   );
 };
 

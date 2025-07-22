@@ -4,6 +4,7 @@ import Browser from "webextension-polyfill";
 import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
+import { ProviderRegistry } from "../core/ProviderRegistry.js";
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
@@ -14,32 +15,15 @@ const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 const COMMAND_NAME = "toggle-select-element";
 
-// --- Data structure for API Providers ---
-const API_PROVIDERS = [
-  {
-    id: "google",
-    i18nKey: "api_provider_google",
-    defaultTitle: "Google Translate",
-  },
-  { id: "gemini", i18nKey: "api_provider_gemini", defaultTitle: "Gemini" },
-  { id: "webai", i18nKey: "api_provider_webai", defaultTitle: "WebAI" },
-  { id: "openai", i18nKey: "api_provider_openai", defaultTitle: "OpenAI" },
-  {
-    id: "openrouter",
-    i18nKey: "api_provider_openrouter",
-    defaultTitle: "OpenRouter",
-  },
-  {
-    id: "deepseek",
-    i18nKey: "api_provider_deepseek",
-    defaultTitle: "DeepSeek",
-  },
-  {
-    id: "custom",
-    i18nKey: "api_provider_custom",
-    defaultTitle: "Custom (OpenAI)",
-  },
-];
+// --- Get API Providers from Registry ---
+function getApiProviders() {
+  const availableProviders = ProviderRegistry.getAvailableProviders();
+  return availableProviders.map(provider => ({
+    id: provider.id,
+    i18nKey: `api_provider_${provider.id}`,
+    defaultTitle: provider.displayName
+  }));
+}
 
 // ▼▼▼ تابع کمکی برای غیرفعال کردن حالت انتخاب المنت ▼▼▼
 /**
@@ -124,7 +108,8 @@ export async function setupContextMenus() {
     });
 
     // --- API Provider Sub-Menus (Radio Buttons) ---
-    for (const provider of API_PROVIDERS) {
+    const apiProviders = getApiProviders();
+    for (const provider of apiProviders) {
       Browser.contextMenus.create({
         id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
         parentId: API_PROVIDER_PARENT_ID,

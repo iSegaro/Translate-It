@@ -21,6 +21,7 @@
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
   "api_provider_custom": { "message": "Custom (OpenAI)" },
+  "api_provider_browserapi": { "message": "Chrome Translation" },
 
   "google_translate_settings_title": { "message": "Google Translate" },
   "google_translate_description": {
@@ -407,6 +408,19 @@
   "OPTIONS_STATUS_LOAD_FAILED": {
     "message": "Failed to load settings."
   },
+
+  "browser_api_settings_title": {"message": "Chrome Translation API"},
+  "browser_api_description": {"message": "Built-in Chrome translation API. Requires Chrome 138+ and works offline."},
+  "browser_api_requirements": { "message": "Requirements:" },
+  "browser_api_requirements_chrome": {
+    "message": "Chrome 138+ (Desktop Only)"
+  },
+  "browser_api_requirements_gpu": { "message": "GPU with 4GB+ VRAM" },
+  "browser_api_requirements_storage": { "message": "Larg free storage space" },
+  "browser_api_requirements_internet": {
+    "message": "Unmetered network connection for initial download"
+  },
+
   "PROVIDER_MODEL_LABEL": {
     "message": "Model"
   },
@@ -473,6 +487,9 @@
   },
   "ERRORS_IMPORT_PASSWORD_INCORRECT": {
     "message": "Incorrect password or corrupted data."
+  },
+  "ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED": {
+    "message": "The selected language pair is not supported by Chrome Translation API. Please try a different translation service or language combination."
   },
 
   "gemini_thinking_label": {

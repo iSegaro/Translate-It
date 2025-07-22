@@ -7,3 +7,4 @@ export { OpenRouterProvider } from "./OpenRouterProvider.js";
 export { DeepSeekProvider } from "./DeepSeekProvider.js";
 export { WebAIProvider } from "./WebAIProvider.js";
 export { CustomProvider } from "./CustomProvider.js";
+export { BrowserTranslateProvider } from "./BrowserTranslateProvider.js";

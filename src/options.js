@@ -11,6 +11,7 @@ import { fadeOutInElement } from "./utils/i18n.helper.js";
 import { applyTheme } from "./utils/theme.js";
 import { SimpleMarkdown } from "./utils/simpleMarkdown.js";
 import secureStorage from "./utils/secureStorage.js";
+import { ProviderHtmlGenerator } from "./utils/providerHtmlGenerator.js";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -215,6 +216,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Initialize API key masking immediately
   initializeApiKeyMasking();
+
+  // --- Initialize Dynamic Provider Options ---
+  function initializeProviderOptions() {
+    if (!translationApiSelect) return;
+    
+    try {
+      // Get provider array directly instead of HTML
+      const providers = ProviderHtmlGenerator.generateProviderArray();
+      
+      // Clear existing options safely
+      translationApiSelect.textContent = '';
+      
+      // Create option elements using safe DOM methods
+      providers.forEach(provider => {
+        const option = document.createElement('option');
+        option.value = provider.id;
+        option.textContent = provider.name;
+        if (provider.description) {
+          option.title = provider.description;
+        }
+        translationApiSelect.appendChild(option);
+      });
+      
+      logME("[Options] Dynamic provider options loaded successfully");
+    } catch (error) {
+      logME("[Options] Error loading dynamic provider options:", error);
+      // Fallback to minimal options using safe DOM methods
+      translationApiSelect.textContent = '';
+      
+      const googleOption = document.createElement('option');
+      googleOption.value = 'google';
+      googleOption.textContent = 'Google Translate';
+      translationApiSelect.appendChild(googleOption);
+      
+      const geminiOption = document.createElement('option');
+      geminiOption.value = 'gemini';
+      geminiOption.textContent = 'Gemini API';
+      translationApiSelect.appendChild(geminiOption);
+    }
+  }
+  
+  // Initialize provider options immediately
+  initializeProviderOptions();
 
   // --- Event Listener for the new Reset Button ---
   if (resetPromptButton && promptTemplateInput) {
@@ -545,6 +589,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const allApiSections = {
       google: googleApiSettingsInfo,
+      browserapi: document.getElementById("browserApiSettingsInfo"),
       webai: webAIApiSettings,
       gemini: geminiApiSettings,
       openai: openAIApiSettings,
@@ -554,10 +599,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     // Hide all sections first
-
-    // ... (کدهای موجود در این تابع برای نمایش و پنهان‌سازی بخش‌های API) ...
-    // ... (منطق مربوط به غیرفعال کردن تب Prompt) ...
-
     Object.values(allApiSections).forEach((section) => {
       if (section) section.style.display = "none";
     });

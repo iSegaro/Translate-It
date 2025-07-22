@@ -81,6 +81,12 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("translation not found"))
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
+  
+  // Browser Translation API specific errors
+  if (msg.includes("translation not available") ||
+      msg.includes("language pair not supported") ||
+      msg.includes("language not supported"))
+    return ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
 
   // Import/Export password issues
   if (

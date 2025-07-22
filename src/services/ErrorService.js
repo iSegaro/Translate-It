@@ -30,6 +30,7 @@ const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.TEXT_TOO_LONG,
   ErrorTypes.TRANSLATION_NOT_FOUND,
   ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
   ErrorTypes.TAB_AVAILABILITY,
   ErrorTypes.IMPORT_PASSWORD_INCORRECT,
   ErrorTypes.IMPORT_PASSWORD_REQUIRED,
@@ -100,11 +101,12 @@ export class ErrorHandler {
       [ErrorTypes.MODEL_OVERLOADED]: "warning",
       [ErrorTypes.QUOTA_EXCEEDED]: "warning",
       [ErrorTypes.GEMINI_QUOTA_REGION]: "warning",
+      [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "warning",
     };
     const toastType = typeMap[type] || "error";
-    this.notifier.show(message, toastType, true, 4000, action);
+    this.notifier.show(message, toastType, true, 5000, action);
     this.displayedErrors.add(message);
-    setTimeout(() => this.displayedErrors.delete(message), 4500);
+    setTimeout(() => this.displayedErrors.delete(message), 5500);
   }
 }
 

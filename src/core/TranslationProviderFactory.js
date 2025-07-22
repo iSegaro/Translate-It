@@ -7,6 +7,7 @@ import {
   DeepSeekProvider,
   WebAIProvider,
   CustomProvider,
+  BrowserTranslateProvider,
 } from "./providers/index.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 
@@ -55,6 +56,9 @@ export class TranslationProviderFactory {
       case "custom":
         provider = new CustomProvider();
         break;
+      case "browserapi":
+        provider = new BrowserTranslateProvider();
+        break;
       default: {
         const err = new Error(`Unsupported translation API type: ${apiType}`);
         err.type = ErrorTypes.API;
@@ -80,7 +84,8 @@ export class TranslationProviderFactory {
       "openrouter",
       "deepseek",
       "webai",
-      "custom"
+      "custom",
+      "browserapi"
     ];
   }
 

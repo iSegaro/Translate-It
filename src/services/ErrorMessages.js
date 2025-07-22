@@ -10,6 +10,7 @@ export const errorMessages = {
   [ErrorTypes.TEXT_TOO_LONG]: "Text is too long",
   [ErrorTypes.TRANSLATION_NOT_FOUND]: "Translation not found",
   [ErrorTypes.TRANSLATION_FAILED]: "Translation failed",
+  [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "Language pair not supported by the selected translation service",
 
   // API settings errors
   [ErrorTypes.API]: "API error",

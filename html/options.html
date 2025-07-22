@@ -487,13 +487,7 @@
                 <label for="translationApi" data-i18n="translation_api_label"
                   >API Choice</label
                 ><select id="translationApi">
-                  <option value="google">Google Translate</option>
-                  <option value="gemini">Gemini API</option>
-                  <option value="webai">WebAI API</option>
-                  <option value="openai">OpenAI API</option>
-                  <option value="openrouter">OpenRouter API</option>
-                  <option value="deepseek">DeepSeek API</option>
-                  <option value="custom">Custom (OpenAI Compatible)</option>
+                  <!-- Dynamic provider options will be loaded here by options.js -->
                 </select>
               </div>
               <div id="googleApiSettingsInfo" style="display: none">
@@ -508,6 +502,26 @@
                     Uses the free, public Google Translate endpoint. No API key
                     is required.
                   </span>
+                </div>
+              </div>
+              <div id="browserApiSettingsInfo" style="display: none">
+                <h3 data-i18n="browser_api_settings_title">Chrome Translation API</h3>
+                <div class="setting-group api-key-info">
+                  <span
+                    class="setting-description"
+                    data-i18n="browser_api_description"
+                  >
+                    Built-in Chrome translation API. Requires Chrome 138+ and works offline.
+                  </span>
+                  <div class="browser-api-requirements">
+                    <p><strong data-i18n="browser_api_requirements">Requirements:</strong></p>
+                    <ul>
+                      <li data-i18n="browser_api_requirements_chrome">Chrome 138+ (Desktop only)</li>
+                      <li data-i18n="browser_api_requirements_gpu">GPU with 4GB+ VRAM</li>
+                      <li data-i18n="browser_api_requirements_storage">Larg free storage space</li>
+                      <li data-i18n="browser_api_requirements_internet">Unmetered network connection for initial download</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
               <div id="webAIApiSettings">

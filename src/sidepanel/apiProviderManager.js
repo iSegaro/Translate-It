@@ -2,16 +2,8 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getSettingsAsync } from "../config.js";
-
-const API_PROVIDERS = [
-  { id: "google", name: "Google Translate", icon: "google.svg" },
-  { id: "gemini", name: "Gemini", icon: "gemini.svg" },
-  { id: "webai", name: "WebAI", icon: "webai.svg" },
-  { id: "openai", name: "OpenAI", icon: "openai.svg" },
-  { id: "openrouter", name: "OpenRouter", icon: "openrouter.svg" },
-  { id: "deepseek", name: "DeepSeek", icon: "deepseek.svg" },
-  { id: "custom", name: "Custom", icon: "custom.svg" },
-];
+import { ProviderRegistry } from "../core/ProviderRegistry.js";
+import { ProviderHtmlGenerator } from "../utils/providerHtmlGenerator.js";
 
 export class ApiProviderManager {
   constructor(options) {
@@ -19,36 +11,52 @@ export class ApiProviderManager {
     this.icon = options.icon;
     this.dropdown = options.dropdown;
     this.currentProvider = null;
-    
+
     this.init();
   }
 
   async init() {
+    // Load available providers
+    this.availableProviders = ProviderHtmlGenerator.generateProviderArray();
+    logME(
+      `[ApiProviderManager] Loaded ${this.availableProviders.length} available providers`
+    );
+
+    // Populate dropdown with available providers
+    this.populateDropdown();
+
     // Load current provider
     const settings = await getSettingsAsync();
     this.currentProvider = settings.TRANSLATION_API || "google";
+
+    // Check if current provider is available, fallback if needed
+    const fallbackProvider = ProviderRegistry.getFallbackProvider(
+      this.currentProvider
+    );
+    if (fallbackProvider !== this.currentProvider) {
+      logME(
+        `[ApiProviderManager] Provider ${this.currentProvider} not available, using fallback: ${fallbackProvider}`
+      );
+      this.currentProvider = fallbackProvider;
+      // Update settings with fallback
+      await Browser.storage.local.set({ TRANSLATION_API: fallbackProvider });
+    }
+
     this.updateIcon(this.currentProvider);
-    
+
     // Setup event listeners
     this.button.addEventListener("click", (e) => {
       e.stopPropagation();
       this.toggleDropdown();
     });
-    
-    // Handle dropdown item clicks
-    this.dropdown.querySelectorAll(".dropdown-item").forEach(item => {
-      item.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const provider = item.dataset.provider;
-        await this.selectProvider(provider);
-      });
-    });
-    
+
+    // Event handlers for dropdown items are added in populateDropdown()
+
     // Close dropdown when clicking outside
     document.addEventListener("click", () => {
       this.closeDropdown();
     });
-    
+
     // Listen for provider changes from other parts of the extension
     Browser.storage.onChanged.addListener((changes) => {
       if (changes.TRANSLATION_API) {
@@ -57,6 +65,48 @@ export class ApiProviderManager {
         this.updateDropdownState();
       }
     });
+  }
+
+  populateDropdown() {
+    if (!this.dropdown) return;
+
+    // Clear existing content
+    this.dropdown.textContent = "";
+
+    // Create dropdown items for each provider
+    this.availableProviders.forEach((provider) => {
+      const dropdownItem = document.createElement("div");
+      dropdownItem.className = "dropdown-item";
+      dropdownItem.dataset.provider = provider.id;
+
+      // Create icon
+      const img = document.createElement("img");
+      const iconPath = `icons/api-providers/${provider.icon}`;
+      img.src = Browser.runtime.getURL(iconPath);
+      img.alt = provider.name;
+      img.width = 16;
+      img.height = 16;
+
+      // Create text span
+      const span = document.createElement("span");
+      span.textContent = provider.name;
+
+      // Append elements
+      dropdownItem.appendChild(img);
+      dropdownItem.appendChild(span);
+
+      // Add click handler
+      dropdownItem.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await this.selectProvider(provider.id);
+      });
+
+      this.dropdown.appendChild(dropdownItem);
+    });
+
+    logME(
+      `[ApiProviderManager] Populated dropdown with ${this.availableProviders.length} providers`
+    );
   }
 
   toggleDropdown() {
@@ -81,7 +131,7 @@ export class ApiProviderManager {
   }
 
   updateDropdownState() {
-    this.dropdown.querySelectorAll(".dropdown-item").forEach(item => {
+    this.dropdown.querySelectorAll(".dropdown-item").forEach((item) => {
       const isActive = item.dataset.provider === this.currentProvider;
       item.classList.toggle("active", isActive);
     });
@@ -100,11 +150,21 @@ export class ApiProviderManager {
   }
 
   updateIcon(providerId) {
-    const provider = API_PROVIDERS.find(p => p.id === providerId);
+    const provider = this.availableProviders?.find((p) => p.id === providerId);
     if (provider) {
-      this.icon.src = Browser.runtime.getURL(`icons/api-providers/${provider.icon}`);
+      // Handle different icon paths for different providers
+      const iconPath = `icons/api-providers/${provider.icon}`;
+
+      this.icon.src = Browser.runtime.getURL(iconPath);
       this.icon.alt = provider.name;
       this.button.title = provider.name;
+    } else {
+      // Fallback for unknown providers
+      this.icon.src = Browser.runtime.getURL(
+        "icons/api-providers/provider.svg"
+      );
+      this.icon.alt = "Translation Provider";
+      this.button.title = "Translation Provider";
     }
   }
 }
