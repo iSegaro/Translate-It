@@ -28,7 +28,7 @@
 <br>
 
 <p align="center">
-  <img src="./docs/Images/Options.png" alt="Options page of the extension" height="420" />
+  <img src="./docs/Images/Options.jpg" alt="Options page of the extension" height="420" />
 </p>
 
 <br>
@@ -40,7 +40,7 @@ This is a lightweight and efficient personal tool for translating text on websit
 Alternatively, a small translation icon can appear below the selected text—clicking it will show the translation.
 
   <p align="center">
-    <img src="./docs/Images/Selection.png" alt="Popup showing translation of selected text" height="280" />
+    <img src="./docs/Images/Selection.jpg" alt="Popup showing translation of selected text" height="280" />
     <img src="./docs/Images/Selection_Icon.png" alt="Small translation icon showing" height="120" />
   </p>
 
@@ -48,21 +48,32 @@ Alternatively, a small translation icon can appear below the selected text—cli
 
 <p align="center">
   <img src="./docs/Images/Select_Element_Item.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
-  <img src="./docs/Images/Select_Element_Before.png" alt="Webpage before element-selection mode is activated" height="120" />
-  <img src="./docs/Images/Select_Element_After.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
+  <img src="./docs/Images/Select_Element_Before.jpg" alt="Webpage before element-selection mode is activated" height="120" />
+  <img src="./docs/Images/Select_Element_After.jpg" alt="Webpage after element-selection mode has highlighted an element" height="120" />
 </p>
 
 - **In-Field Translation:** When typing inside a form or text field, press the `Ctrl + /` shortcut or click the inline translator icon to instantly translate the content before sending.
 
 <p align="center">
-  <img src="./docs/Images/Icon.png" alt="Small translation icon next to text input field" height="240" />
+  <img src="./docs/Images/Icon.jpg" alt="Small translation icon next to text input field" height="240" />
 </p>
 
-- **Advanced Popup Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support.
+
+- **Video Subtitle Translation:**
+Automatically translates video subtitles on YouTube and Netflix in real-time. The extension detects when subtitles are available and provides instant translation without interrupting your viewing experience.
 
 <p align="center">
-  <img src="./docs/Images/Popup.png" alt="Extension popup interface with translation and dictionary features" height="280" />
+  <img src="./docs/Images/Youtube_Subtitle.jpg" alt="Extension popup interface with translation and dictionary features" height="280" />
 </p>
+
+- **Advanced Popup/Sidepanel Translation:** Clicking the extension icon opens a popup with extended features such as multi-accent pronunciation and dictionary support and history.
+
+<p align="center">
+  <img src="./docs/Images/Popup.jpg" alt="Extension popup interface with translation and dictionary features" height="120" />
+  <img src="./docs/Images/Sidepanel.png" alt="Extension popup interface with translation and dictionary features" height="120" />
+  <img src="./docs/Images/History.png" alt="Extension popup interface with translation and dictionary features" height="120" />
+</p>
+
 
 This extension is developed solely for personal use and keeps smart and fast translation always within reach.
 
@@ -80,9 +91,6 @@ Each translation comes with audio playback for accurate pronunciation. You can a
 
 📙 **Dictionary Mode:**  
 When selecting a word, you'll not only get a translation but also helpful information like definitions, synonyms, word type, and usage examples.
-
-🎬 **Video Subtitle Translation:**  
-Automatically translates video subtitles on YouTube and Netflix in real-time. The extension detects when subtitles are available and provides instant translation without interrupting your viewing experience.
 
 ✅ **Supports Multiple Translation Providers:**  
 You can choose from several AI-powered translation providers:
