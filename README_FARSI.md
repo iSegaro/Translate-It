@@ -98,6 +98,7 @@
 
 - [Google Translate][google-translate-url] (✔ رایگان)
 - [Gemini][gemini-url] (✔ رایگان)
+- [Browser Translator][browserapi-url] (✔ رایگان)
 - [WebAI to API][webai-to-api-url] (✔ رایگان)
 - [OpenAI][openai-url]
 - [OpenRouter][openrouter-url]
@@ -570,6 +571,7 @@ pnpm run publish
 [deepseek-url]: https://chat.deepseek.com/
 [openrouter-url]: https://openrouter.ai/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
+[browserapi-url]: https://developer.chrome.com/docs/ai/translator-api/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
 [firefox-zip-url]: https://github.com/iSegaro/Translate-It/tree/main/Build-Extension/Publish/
