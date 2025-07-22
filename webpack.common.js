@@ -15,7 +15,6 @@ module.exports = {
     options: "./src/options.js",
     popup: "./src/popup/main.js",
     sidepanel: "./src/sidepanel/sidepanel.js",
-    offscreen: "./src/offscreen.js",
   },
   resolve: {
     extensions: [".js"],
