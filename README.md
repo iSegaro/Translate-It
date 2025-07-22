@@ -44,7 +44,7 @@ Alternatively, a small translation icon can appear below the selected text—cli
     <img src="./docs/Images/Selection_Icon.png" alt="Small translation icon showing" height="120" />
   </p>
 
-- **Element Selection Translation:** Activate “Select Element” mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
+- **Element Selection Translation:** Activate `Select Element` mode from the extension icon. Then click on any part of the page (e.g., paragraph or button) to translate it entirely, without breaking the page layout.
 
 <p align="center">
   <img src="./docs/Images/Select_Element_Item.png" alt="Webpage after element-selection mode has highlighted an element" height="120" />
@@ -79,7 +79,10 @@ Always free, powered by open-source code.
 Each translation comes with audio playback for accurate pronunciation. You can also choose from different accents. Click the extension icon to access advanced pronunciation options.
 
 📙 **Dictionary Mode:**  
-When selecting a word, you’ll not only get a translation but also helpful information like definitions, synonyms, word type, and usage examples.
+When selecting a word, you'll not only get a translation but also helpful information like definitions, synonyms, word type, and usage examples.
+
+🎬 **Video Subtitle Translation:**  
+Automatically translates video subtitles on YouTube and Netflix in real-time. The extension detects when subtitles are available and provides instant translation without interrupting your viewing experience.
 
 ✅ **Supports Multiple Translation Providers:**  
 You can choose from several AI-powered translation providers:
@@ -162,15 +165,15 @@ _Note:_ After installation, click the **extension icon**, go to **Settings**, an
 
 To use AI-based translation, you’ll need an API key from one of the providers listed below:
 
-| Provider         | How to Get API Key                            | Cost                     |
-| ---------------- | --------------------------------------------- | ------------------------ |
-| Google Translate | _Dont Need_                                   | Free                     |
-| Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free                     |
-| WebAI to API     | _[Local Server][webai-to-api-url]_            | Free                     |
-| OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free                     |
-| OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid                     |
-| DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid                     |
-| Custom OpenAI    | -                                             | -                        |
+| Provider         | How to Get API Key                            | Cost |
+| ---------------- | --------------------------------------------- | ---- |
+| Google Translate | _Dont Need_                                   | Free |
+| Google Gemini    | [Google AI Studio][gemini-api-key-url]        | Free |
+| WebAI to API     | _[Local Server][webai-to-api-url]_            | Free |
+| OpenRouter       | [OpenRouter API Keys][openrouter-api-key-url] | Free |
+| OpenAI           | [OpenAI API Keys][openai-api-key-url]         | Paid |
+| DeepSeek         | [DeepSeek API Keys][deepseek-api-key-url]     | Paid |
+| Custom OpenAI    | -                                             | -    |
 
 **Note:** `WebAI to API` is a local Python-based server that allows you to use AI translation without an API key.
 
@@ -191,7 +194,7 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 
 2. **Activate "Element Selection Mode"**
 
-   To translate any specific part of a web page, you first need to activate *Element Selection Mode*. You can do this using one of the following methods:
+   To translate any specific part of a web page, you first need to activate `Element Selection Mode`. You can do this using one of the following methods:
 
    - Click on the extension icon and select the relevant option.
    - Right-click anywhere on the page and choose the option from the context menu.
@@ -221,7 +224,7 @@ To use AI-based translation, you’ll need an API key from one of the providers 
 
 ### <div id="keyboard-shortcuts">Keyboard Shortcuts</div>
 
-To quickly activate *Element Selection Mode*, you can use configurable keyboard shortcuts.
+To quickly activate `Element Selection Mode`, you can use configurable keyboard shortcuts.
 We recommend setting them manually to avoid conflicts with browser or system shortcuts.
 
 #### Customize Shortcuts:
@@ -238,7 +241,6 @@ You can modify the default shortcuts as needed:
   3. Select `Manage Extension Shortcuts`.
 
 </details>
-
 
 <br>
 
@@ -273,8 +275,7 @@ In the API Settings page of the extension, each provider has customizable option
 
 - **Custom (OpenAI Compatible)**
 
-    For maximum flexibility, this option lets you connect to any API service that uses the OpenAI chat completions format. Simply enter the custom `API URL`, `API Key`, and `Model Name` in the settings. This is ideal for using self-hosted models, local LLMs (e.g., through Ollama), or other compatible third-party providers. For the required format, see the [OpenAI API reference][openai-url-docs].
-
+  For maximum flexibility, this option lets you connect to any API service that uses the OpenAI chat completions format. Simply enter the custom `API URL`, `API Key`, and `Model Name` in the settings. This is ideal for using self-hosted models, local LLMs (e.g., through Ollama), or other compatible third-party providers. For the required format, see the [OpenAI API reference][openai-url-docs].
 
 > These options let you balance between cost, quality, and speed.  
 > The extension uses default models with minimum setup required — but upgrading the model will improve translation results.
@@ -306,7 +307,6 @@ If this project helped you and you’d like to support it, you can buy me a coff
 | **USDT (Ethereum)** | `0x76DAF7D7C3f7af9B90e16B5C25d063ff3A1A0f8f`                                                                                                                                                                            |
 | **Bitcoin (BTC)**   | `bc1qgxj96s6nks6nyhzlncw65nnuf7pyngyyxmfrsw`                                                                                                                                                                            |
 | **PayPal**          | [![کمک مالی PayPal](https://img.shields.io/badge/Donate-Paypal-00457C?logo=paypal&labelColor=gold)](https://www.paypal.com/donate/?hosted_button_id=DUZBXEKUJGKLE)                                                      |
-
 
 </details>
 
@@ -341,6 +341,16 @@ cd Translate-It
 pnpm install
 ```
 
+### Initial Setup
+
+After installing dependencies, run the setup command to ensure all development tools are configured:
+
+```bash
+pnpm run setup
+```
+
+This will configure the development environment and install any additional tools needed for validation.
+
 ### Building for Development
 
 To generate the unpacked extension files for development, run:
@@ -364,15 +374,51 @@ pnpm run watch:chrome
 pnpm run watch:firefox
 ```
 
-### Lint Check
+### Code Quality and Validation
+
+#### Linting
 
 To ensure code quality and catch potential issues early, you can run ESLint:
 
 ```bash
+# Lint source code for both browsers
 pnpm run lint
+
+# Lint for specific browser
+pnpm run lint:source:chrome
+pnpm run lint:source:firefox
 ```
 
 This command will scan all `src/**/*.js` files and report any syntax errors or unsafe patterns.
+
+#### Extension Validation
+
+Validate the built extensions to ensure they meet browser store requirements:
+
+```bash
+# Validate both browsers
+pnpm run validate
+
+# Validate specific browsers
+pnpm run validate:firefox
+pnpm run validate:chrome
+```
+
+**Note:** For Chrome validation, you need web-ext installed. If it's not available, install it with:
+
+```bash
+pnpm run setup:chrome-validator
+```
+
+#### Pre-submission Workflow
+
+Before submitting your changes, run the comprehensive pre-submission check:
+
+```bash
+pnpm run pre-submit
+```
+
+This command runs linting, builds the extension, and validates both browser versions.
 
 ### Packaging for Distribution
 
@@ -396,15 +442,15 @@ pnpm run publish
 
 After running, the `Build-Extension/Publish` directory will contain:
 
-  * `Source-vX.X.X.zip`
-  * `Translate-It-vX.X.X-for-Chrome.zip`
-  * `Translate-It-vX.X.X-for-Firefox.zip`
+- `Source-vX.X.X.zip`
+- `Translate-It-vX.X.X-for-Chrome.zip`
+- `Translate-It-vX.X.X-for-Firefox.zip`
 
 </details>
 
 <br>
 
------
+---
 
 ## 🤝 Contributing
 
@@ -421,8 +467,8 @@ After running, the `Build-Extension/Publish` directory will contain:
   <h2>🖼️ Icons Credit</h2>
 
 Icons used in this project are provided by [Flaticon](https://www.flaticon.com) and created by:
-</summary>
 
+</summary>
 
 - <img src="icons/page.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Main icon)
 - <img src="icons/select.png" width="24px"> — [Pixel perfect](https://www.flaticon.com/authors/pixel-perfect) (Select)
