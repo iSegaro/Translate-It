@@ -1,5 +1,5 @@
 // src/utils/providerHtmlGenerator.js
-import { ProviderRegistry } from "../core/ProviderRegistry.js";
+import { ProviderRegistry } from "../providers/index.js";
 import { logME } from "./helpers.js";
 
 /**

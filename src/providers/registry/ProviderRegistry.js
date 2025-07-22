@@ -1,5 +1,5 @@
-// src/core/ProviderRegistry.js
-import { logME } from "../utils/helpers.js";
+// src/providers/registry/ProviderRegistry.js
+import { logME } from "../../utils/helpers.js";
 
 /**
  * Centralized registry for all translation providers

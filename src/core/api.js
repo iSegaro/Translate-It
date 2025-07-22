@@ -10,7 +10,7 @@ import {
 import { delay, isExtensionContextValid } from "../utils/helpers.js";
 import { isPersianText } from "../utils/textDetection.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { translationProviderFactory } from "./TranslationProviderFactory.js";
+import { translationProviderFactory } from "../providers/index.js";
 
 const MOCK_DELAY = 500;
 const TEXT_DELIMITER = "\n\n---\n\n";

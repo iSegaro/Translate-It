@@ -2,7 +2,7 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getSettingsAsync } from "../config.js";
-import { ProviderRegistry } from "../core/ProviderRegistry.js";
+import { ProviderRegistry } from "../providers/index.js";
 import { ProviderHtmlGenerator } from "../utils/providerHtmlGenerator.js";
 
 export class ApiProviderManager {

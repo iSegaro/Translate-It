@@ -4,7 +4,7 @@ import Browser from "webextension-polyfill";
 import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
-import { ProviderRegistry } from "../core/ProviderRegistry.js";
+import { ProviderRegistry } from "../providers/index.js";
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";

@@ -1,4 +1,4 @@
-// src/core/TranslationProviderFactory.js
+// src/providers/factory/TranslationProviderFactory.js
 import {
   GoogleTranslateProvider,
   GeminiProvider,
@@ -8,8 +8,8 @@ import {
   WebAIProvider,
   CustomProvider,
   BrowserTranslateProvider,
-} from "./providers/index.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+} from "../implementations/index.js";
+import { ErrorTypes } from "../../services/ErrorTypes.js";
 
 /**
  * Factory class for creating translation provider instances
