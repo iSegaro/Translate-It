@@ -7,9 +7,10 @@ import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 
-const SILENT = new Set([ErrorTypes.CONTEXT]);
+const SILENT = new Set([ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]);
 const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.CONTEXT,
+  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
   ErrorTypes.API,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_KEY_MISSING,

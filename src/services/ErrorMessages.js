@@ -40,6 +40,7 @@ export const errorMessages = {
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
   [ErrorTypes.HTTP_ERROR]: "HTTP error",
   [ErrorTypes.CONTEXT]: "Extension context lost",
+  [ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]: "Extension reloaded, please refresh page",
   [ErrorTypes.UNKNOWN]: "An unknown error occurred",
   [ErrorTypes.TAB_AVAILABILITY]: "Tab not available",
   [ErrorTypes.UI]: "User Interface error",

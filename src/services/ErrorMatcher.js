@@ -187,13 +187,19 @@ export function matchErrorToType(rawOrError = "") {
   )
     return ErrorTypes.HTTP_ERROR;
 
-  // Context
+  // Extension Context Invalidated (specific case)
+  if (
+    msg.includes("extension context invalidated") ||
+    (msg.includes("extension context") && msg.includes("invalidated"))
+  )
+    return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+
+  // General Context
   if (
     msg.includes("context") ||
     msg.includes("context invalid") ||
     msg.includes("extension context") ||
     msg.includes("context invalidated") ||
-    msg.includes("extension context invalidated") ||
     msg.includes("not establish") ||
     msg.includes("not establish connection")
   )

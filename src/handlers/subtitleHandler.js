@@ -4,6 +4,7 @@ import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";
+import { matchErrorToType } from "../services/ErrorMatcher.js";
 
 export class SubtitleHandler {
   /**
@@ -194,51 +195,87 @@ export class SubtitleHandler {
    * Creates and injects the subtitle toggle button into the YouTube player controls.
    */
   createYouTubeButton() {
-    // Check if we should create the button at all
-    if (!this.featureManager.isOn("EXTENSION_ENABLED") || 
-        !this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
-      return;
+    try {
+      // Check if we should create the button at all
+      if (!this.featureManager.isOn("EXTENSION_ENABLED") || 
+          !this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
+        return;
+      }
+
+      const controls = document.querySelector(".ytp-right-controls");
+      if (!controls || document.getElementById("translate-it-yt-btn")) {
+        return;
+      }
+
+      const captionsButton = controls.querySelector(".ytp-subtitles-button");
+      if (!captionsButton) {
+        return;
+      }
+
+      const button = document.createElement("button");
+      button.id = "translate-it-yt-btn";
+      button.className = "ytp-button translate-it-yt-button";
+      button.title = "Toggle Translate-It Subtitles";
+
+      const icon = document.createElement("img");
+      icon.src = Browser.runtime.getURL("icons/extension_icon_48.png");
+      icon.className = "translate-it-yt-icon";
+      button.appendChild(icon);
+
+      button.addEventListener("click", () => this.toggleSubtitleSetting());
+
+      controls.insertBefore(button, captionsButton);
+      logME("[SubtitleHandler] YouTube button created.");
+
+      this.updateYouTubeButtonState();
+    } catch (error) {
+      const errorType = matchErrorToType(error);
+      
+      // Handle extension context invalidation
+      if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+        logME("[SubtitleHandler] Extension context invalidated, cannot create YouTube button");
+        return;
+      }
+      
+      // Log other errors but don't crash
+      logME("[SubtitleHandler] Error creating YouTube button:", error);
     }
-
-    const controls = document.querySelector(".ytp-right-controls");
-    if (!controls || document.getElementById("translate-it-yt-btn")) {
-      return;
-    }
-
-    const captionsButton = controls.querySelector(".ytp-subtitles-button");
-    if (!captionsButton) {
-      return;
-    }
-
-    const button = document.createElement("button");
-    button.id = "translate-it-yt-btn";
-    button.className = "ytp-button translate-it-yt-button";
-    button.title = "Toggle Translate-It Subtitles";
-
-    const icon = document.createElement("img");
-    icon.src = Browser.runtime.getURL("icons/extension_icon_48.png");
-    icon.className = "translate-it-yt-icon";
-    button.appendChild(icon);
-
-    button.addEventListener("click", () => this.toggleSubtitleSetting());
-
-    controls.insertBefore(button, captionsButton);
-    logME("[SubtitleHandler] YouTube button created.");
-
-    this.updateYouTubeButtonState();
   }
 
   /**
    * Toggles the ENABLE_SUBTITLE_TRANSLATION setting in storage.
    */
   async toggleSubtitleSetting() {
-    const key = "ENABLE_SUBTITLE_TRANSLATION";
-    const result = await Browser.storage.local.get(key);
-    const currentVal = result[key] ?? true;
-    await Browser.storage.local.set({ [key]: !currentVal });
-    // The storage listener will trigger the update, but we call this directly for immediate feedback.
-    if (this.site === "youtube") {
-      this.updateYouTubeButtonState(!currentVal);
+    try {
+      const key = "ENABLE_SUBTITLE_TRANSLATION";
+      const result = await Browser.storage.local.get(key);
+      const currentVal = result[key] ?? true;
+      await Browser.storage.local.set({ [key]: !currentVal });
+      // The storage listener will trigger the update, but we call this directly for immediate feedback.
+      if (this.site === "youtube") {
+        this.updateYouTubeButtonState(!currentVal);
+      }
+    } catch (error) {
+      const errorType = matchErrorToType(error);
+      
+      // Handle extension context invalidation
+      if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+        logME("[SubtitleHandler] Extension context invalidated, cannot toggle subtitle setting");
+        // Optionally disable the button to prevent further clicks
+        const button = document.querySelector(".translate-it-yt-button");
+        if (button) {
+          button.disabled = true;
+          button.style.opacity = "0.5";
+          button.title = "Extension reloaded, please refresh page";
+        }
+        return;
+      }
+      
+      // Handle other errors through the error service
+      this.translationHandler.errorHandler.handle(error, {
+        type: errorType,
+        context: "subtitle-toggle-setting",
+      });
     }
   }
 
@@ -252,10 +289,29 @@ export class SubtitleHandler {
 
     let enabled = isEnabled;
     if (typeof enabled !== "boolean") {
-      const result = await Browser.storage.local.get(
-        "ENABLE_SUBTITLE_TRANSLATION"
-      );
-      enabled = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      try {
+        const result = await Browser.storage.local.get(
+          "ENABLE_SUBTITLE_TRANSLATION"
+        );
+        enabled = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      } catch (error) {
+        const errorType = matchErrorToType(error);
+        
+        // Handle extension context invalidation
+        if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+          logME("[SubtitleHandler] Extension context invalidated, cannot update button state");
+          // Default to disabled state and mark button as non-functional
+          enabled = false;
+          button.disabled = true;
+          button.style.opacity = "0.5";
+          button.title = "Extension reloaded, please refresh page";
+          return;
+        }
+        
+        // For other errors, default to true
+        logME("[SubtitleHandler] Error getting button state, defaulting to enabled:", error);
+        enabled = true;
+      }
     }
 
     button.classList.toggle("translate-it-active", enabled);
@@ -315,7 +371,29 @@ export class SubtitleHandler {
               return text; // Return original text on failure
             }
           } catch (error) {
-            logME("[SubtitleHandler] Translation provider error:", error);
+            const errorType = matchErrorToType(error);
+            
+            // Handle extension context invalidation specifically
+            if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+              logME("[SubtitleHandler] Extension context invalidated, disabling subtitle translation");
+              // Stop subtitle translation to prevent further errors
+              if (this.subtitleIntegration) {
+                try {
+                  this.subtitleIntegration.destroy();
+                  this.subtitleIntegration = null;
+                } catch (destroyError) {
+                  logME("[SubtitleHandler] Error stopping subtitle integration:", destroyError);
+                }
+              }
+              return text; // Return original text
+            }
+            
+            // Use the error service to handle other errors properly
+            this.translationHandler.errorHandler.handle(error, {
+              type: errorType,
+              context: "subtitle-translation-provider",
+            });
+            
             return text; // Return original text on error
           }
         },

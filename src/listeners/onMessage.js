@@ -3,6 +3,7 @@
 import Browser from "webextension-polyfill";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { matchErrorToType } from "../services/ErrorMatcher.js";
 import {
   focusOrCreateTab,
   logME,
@@ -37,6 +38,14 @@ async function safeSendMessage(tabId, message) {
     return await Browser.tabs.sendMessage(tabId, message);
   } catch (err) {
     const msg = err.message || "";
+    const errorType = matchErrorToType(err);
+    
+    // Handle extension context invalidation specifically
+    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+      logME("[onMessage] Extension context invalidated - content script connection lost");
+      return { error: "Extension context invalidated" };
+    }
+    
     if (
       msg.includes("message port closed") ||
       msg.includes("Could not establish connection")
@@ -44,6 +53,7 @@ async function safeSendMessage(tabId, message) {
       logME("[onMessage] No receiver (ignored).");
       return {};
     }
+    
     logME("[onMessage] Error:", msg);
     return { error: msg };
   }

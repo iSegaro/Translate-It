@@ -10,6 +10,7 @@ export class ErrorTypes {
   static VALIDATION = "VALIDATION";
   static TAB_AVAILABILITY = "TAB";
   static CONTEXT = "CONTEXT";
+  static EXTENSION_CONTEXT_INVALIDATED = "EXTENSION_CONTEXT_INVALIDATED";
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
   static SUBTITLE = "SUBTITLE";
