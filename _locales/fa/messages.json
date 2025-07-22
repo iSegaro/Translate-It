@@ -20,8 +20,8 @@
   "api_provider_openai": { "message": "OpenAI" },
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
+  "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "(OpenAI) سفارشی" },
-  "api_provider_browserapi": { "message": "ترجمه کروم" },
 
   "google_translate_settings_title": { "message": "مترجم Google" },
   "google_translate_description": {
