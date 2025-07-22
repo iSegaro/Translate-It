@@ -12,6 +12,8 @@ import { applyTheme } from "./utils/theme.js";
 import { SimpleMarkdown } from "./utils/simpleMarkdown.js";
 import secureStorage from "./utils/secureStorage.js";
 import { ProviderHtmlGenerator } from "./utils/providerHtmlGenerator.js";
+import { languageList } from "./utils/languages.js";
+import { AUTO_DETECT_VALUE } from "tts-utils";
 import "./utils/localization.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -219,6 +221,43 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Initialize API key masking immediately
   initializeApiKeyMasking();
+
+  // --- Initialize Language Options ---
+  function initializeLanguageOptions() {
+    if (!sourceLanguageInput || !targetLanguageInput) return;
+
+    // پاک کردن گزینه‌های موجود
+    sourceLanguageInput.textContent = '';
+    targetLanguageInput.textContent = '';
+
+    // افزودن گزینه "Auto-Detect" به لیست زبان مبدأ
+    const autoOption = document.createElement("option");
+    autoOption.value = AUTO_DETECT_VALUE;
+    autoOption.textContent = "Auto-Detect";
+    sourceLanguageInput.appendChild(autoOption);
+
+    // پر کردن لیست زبان‌ها
+    languageList.forEach((lang) => {
+      const displayName = lang.promptName || lang.name;
+
+      // افزودن به لیست مبدأ
+      const sourceOption = document.createElement("option");
+      sourceOption.value = displayName;
+      sourceOption.textContent = displayName;
+      sourceLanguageInput.appendChild(sourceOption);
+
+      // افزودن به لیست مقصد (به جز Auto-Detect)
+      if (lang.code !== AUTO_DETECT_VALUE) {
+        const targetOption = document.createElement("option");
+        targetOption.value = displayName;
+        targetOption.textContent = displayName;
+        targetLanguageInput.appendChild(targetOption);
+      }
+    });
+  }
+
+  // Initialize language options immediately
+  initializeLanguageOptions();
 
   // --- Initialize Dynamic Provider Options ---
   function initializeProviderOptions() {

@@ -190,24 +190,24 @@
               <div class="setting-group">
                 <label for="sourceLanguage" data-i18n="source_language_label"
                   >Source Language</label
-                ><input
-                  type="text"
+                ><select
                   id="sourceLanguage"
-                  list="allLanguages"
-                  data-i18n-placeholder="source_language_placeholder"
-                  placeholder="Enter source language"
-                />
+                  class="language-select"
+                  data-i18n-title="source_language_placeholder"
+                >
+                  <!-- Language options will be populated by JavaScript -->
+                </select>
               </div>
               <div class="setting-group">
                 <label for="targetLanguage" data-i18n="target_language_label"
                   >Target Language</label
-                ><input
-                  type="text"
+                ><select
                   id="targetLanguage"
-                  list="allLanguages"
-                  data-i18n-placeholder="target_language_placeholder"
-                  placeholder="Enter target language"
-                />
+                  class="language-select"
+                  data-i18n-title="target_language_placeholder"
+                >
+                  <!-- Language options will be populated by JavaScript -->
+                </select>
               </div>
             </section>
           </div>
@@ -999,68 +999,5 @@
         </div>
       </main>
     </div>
-    <datalist id="allLanguages">
-      <option value="English"></option>
-      <option value="Farsi"></option>
-      <option value="German"></option>
-      <option value="French"></option>
-      <option value="Chinese (Simplified)"></option>
-      <option value="Spanish"></option>
-      <option value="Hindi"></option>
-      <option value="Arabic"></option>
-      <option value="Bengali"></option>
-      <option value="Portuguese"></option>
-      <option value="Russian"></option>
-      <option value="Japanese"></option>
-      <option value="Urdu"></option>
-      <option value="Indonesian"></option>
-      <option value="Italian"></option>
-      <option value="Swahili"></option>
-      <option value="Marathi"></option>
-      <option value="Telugu"></option>
-      <option value="Tamil"></option>
-      <option value="Turkish"></option>
-      <option value="Vietnamese"></option>
-      <option value="Korean"></option>
-      <option value="Thai"></option>
-      <option value="Malay"></option>
-      <option value="Polish"></option>
-      <option value="Dutch"></option>
-      <option value="Filipino"></option>
-      <option value="Ukrainian"></option>
-      <option value="Romanian"></option>
-      <option value="Greek"></option>
-      <option value="Czech"></option>
-      <option value="Hungarian"></option>
-      <option value="Swedish"></option>
-      <option value="Norwegian"></option>
-      <option value="Danish"></option>
-      <option value="Finnish"></option>
-      <option value="Hebrew"></option>
-      <option value="Afrikaans"></option>
-      <option value="Albanian"></option>
-      <option value="Bulgarian"></option>
-      <option value="Catalan"></option>
-      <option value="Croatian"></option>
-      <option value="Estonian"></option>
-      <option value="Latvian"></option>
-      <option value="Lithuanian"></option>
-      <option value="Slovak"></option>
-      <option value="Slovenian"></option>
-      <option value="Serbian"></option>
-      <option value="Malayalam"></option>
-      <option value="Kannada"></option>
-      <option value="Odia"></option>
-      <option value="Punjabi"></option>
-      <option value="Sinhala"></option>
-      <option value="Nepali"></option>
-      <option value="Azerbaijani"></option>
-      <option value="Belarusian"></option>
-      <option value="Kazakh"></option>
-      <option value="Uzbek"></option>
-      <option value="Pashto"></option>
-      <option value="Tagalog"></option>
-      <option value="Cebuano"></option>
-    </datalist>
   </body>
 </html>

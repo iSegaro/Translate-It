@@ -179,9 +179,10 @@ async function triggerTranslation() {
   }
 
   let sourceLangCheck = getLanguagePromptName(sourceLangIdentifier);
-  if (!sourceLangCheck || sourceLangCheck === AUTO_DETECT_VALUE) {
-    sourceLangCheck = null;
+  if (!sourceLangCheck) {
+    sourceLangCheck = AUTO_DETECT_VALUE; // Use AUTO_DETECT_VALUE for empty/null values
   }
+  // Don't convert AUTO_DETECT_VALUE to null - let it pass through to providers!
 
   // Show spinner
   const spinnerOverlay = document.createElement("div");
