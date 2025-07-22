@@ -5,6 +5,7 @@
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
+import { getSettingsAsync } from "../config.js";
 
 /**
  * Toggle “select element” mode in the content script, with automatic injection fallback.
@@ -38,8 +39,8 @@ export async function handleActivateSelectElementMode(
     tabId = tabs[0].id;
 
     // 2) Determine new state
-    const { selectElementState = false } =
-      await Browser.storage.local.get("selectElementState");
+    const settings = await getSettingsAsync();
+    const selectElementState = settings.selectElementState || false;
     const newState =
       typeof message.data === "boolean" ? message.data : !selectElementState;
 

@@ -3,7 +3,7 @@
 import Browser from "webextension-polyfill";
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { CONFIG, TranslationMode, getThemeAsync } from "../config.js";
+import { CONFIG, TranslationMode, getThemeAsync, getSettingsAsync } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "tts-utils";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
@@ -159,9 +159,8 @@ export default class SelectionWindows {
     this.dismiss(false);
     if (!selectedText) return;
 
-    const { selectionTranslationMode } = await Browser.storage.local.get({
-      selectionTranslationMode: CONFIG.selectionTranslationMode,
-    });
+    const settings = await getSettingsAsync();
+    const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
     if (selectionTranslationMode === "onClick") {
       this.isIconMode = true;

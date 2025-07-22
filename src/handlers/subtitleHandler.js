@@ -5,6 +5,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";
 import { matchErrorToType } from "../services/ErrorMatcher.js";
+import { getSettingsAsync } from "../config.js";
 
 export class SubtitleHandler {
   /**
@@ -98,7 +99,7 @@ export class SubtitleHandler {
    */
   async checkSiteExclusion() {
     try {
-      const settings = await Browser.storage.local.get(["EXCLUDED_SITES"]);
+      const settings = await getSettingsAsync();
       const excludedSites = settings.EXCLUDED_SITES || [];
       return isUrlExcluded(window.location.href, excludedSites);
     } catch (error) {
@@ -113,14 +114,10 @@ export class SubtitleHandler {
   async waitForFeatureManagerReady() {
     // Check if we can access actual storage values directly
     try {
-      const result = await Browser.storage.local.get([
-        "EXTENSION_ENABLED",
-        "ENABLE_SUBTITLE_TRANSLATION",
-        "SHOW_SUBTITLE_ICON"
-      ]);
-      const actualExtensionValue = result.EXTENSION_ENABLED ?? true;
-      const actualSubtitleValue = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
-      const actualIconValue = result.SHOW_SUBTITLE_ICON ?? true;
+      const settings = await getSettingsAsync();
+      const actualExtensionValue = settings.EXTENSION_ENABLED ?? true;
+      const actualSubtitleValue = settings.ENABLE_SUBTITLE_TRANSLATION ?? true;
+      const actualIconValue = settings.SHOW_SUBTITLE_ICON ?? true;
       
       // If FeatureManager hasn't loaded the values yet, wait a bit
       if (this.featureManager.isOn("EXTENSION_ENABLED") !== actualExtensionValue ||
@@ -248,8 +245,8 @@ export class SubtitleHandler {
   async toggleSubtitleSetting() {
     try {
       const key = "ENABLE_SUBTITLE_TRANSLATION";
-      const result = await Browser.storage.local.get(key);
-      const currentVal = result[key] ?? true;
+      const settings = await getSettingsAsync();
+      const currentVal = settings[key] ?? true;
       await Browser.storage.local.set({ [key]: !currentVal });
       // The storage listener will trigger the update, but we call this directly for immediate feedback.
       if (this.site === "youtube") {
@@ -290,10 +287,8 @@ export class SubtitleHandler {
     let enabled = isEnabled;
     if (typeof enabled !== "boolean") {
       try {
-        const result = await Browser.storage.local.get(
-          "ENABLE_SUBTITLE_TRANSLATION"
-        );
-        enabled = result.ENABLE_SUBTITLE_TRANSLATION ?? true;
+        const settings = await getSettingsAsync();
+        enabled = settings.ENABLE_SUBTITLE_TRANSLATION ?? true;
       } catch (error) {
         const errorType = matchErrorToType(error);
         

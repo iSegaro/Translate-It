@@ -4,6 +4,7 @@ import { logME } from "../utils/helpers.js";
 import { correctTextDirection } from "../utils/textDetection.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { getTranslationString } from "../utils/i18n.js";
+import { getSettingsAsync } from "../config.js";
 
 const MAX_HISTORY_ITEMS = 100;
 
@@ -67,8 +68,8 @@ export class HistoryManager {
 
   async loadHistory() {
     try {
-      const { translationHistory = [] } =
-        await Browser.storage.local.get("translationHistory");
+      const settings = await getSettingsAsync();
+      const translationHistory = settings.translationHistory || [];
       logME(
         "[HistoryManager] Loaded history items:",
         translationHistory.length
@@ -215,8 +216,8 @@ export class HistoryManager {
 
   async deleteHistoryItem(index) {
     try {
-      const { translationHistory = [] } =
-        await Browser.storage.local.get("translationHistory");
+      const settings = await getSettingsAsync();
+      const translationHistory = settings.translationHistory || [];
 
       if (index >= 0 && index < translationHistory.length) {
         translationHistory.splice(index, 1);
@@ -251,8 +252,8 @@ export class HistoryManager {
 
   async addToHistory(translationData) {
     try {
-      const { translationHistory = [] } =
-        await Browser.storage.local.get("translationHistory");
+      const settings = await getSettingsAsync();
+      const translationHistory = settings.translationHistory || [];
 
       translationHistory.push({
         ...translationData,

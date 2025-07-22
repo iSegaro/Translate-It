@@ -1,17 +1,14 @@
 // src/content.js
 
-import Browser from "webextension-polyfill";
 import { initContentScript } from "./contentMain.js";
 import { isUrlExcluded } from "./utils/exclusion.js";
 import { logME } from "./utils/helpers.js";
+import { getSettingsAsync } from "./config.js";
 
 (async () => {
   try {
     // ابتدا تنظیمات را از حافظه افزونه دریافت کن
-    const settings = await Browser.storage.local.get([
-      "EXTENSION_ENABLED",
-      "EXCLUDED_SITES",
-    ]);
+    const settings = await getSettingsAsync();
 
     const isEnabled = settings.EXTENSION_ENABLED !== false; // اگر تعریف نشده باشد، فعال در نظر گرفته شود
     const excludedSites = settings.EXCLUDED_SITES || [];

@@ -5,6 +5,7 @@ import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { DEFAULT_EXCLUDED_SITES } from "../utils/exclusion.js";
+import { getSettingsAsync } from "../config.js";
 
 // Helper to extract origin from a URL
 function getOrigin(url) {
@@ -72,8 +73,8 @@ export async function init() {
       return;
     }
     // Refresh list in case it changed elsewhere
-    let { EXCLUDED_SITES: list = [] } =
-      await Browser.storage.local.get("EXCLUDED_SITES");
+    const refreshedSettings = await getSettingsAsync();
+    let list = refreshedSettings.EXCLUDED_SITES || [];
     // Remove this origin
     list = list.filter((item) => item !== origin);
     if (!toggle.checked) {

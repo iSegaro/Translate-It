@@ -1,6 +1,7 @@
 // src/popup/apiProviderManager.js
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import { getSettingsAsync } from "../config.js";
 
 const API_PROVIDERS = [
   { id: "google", name: "Google Translate", icon: "google.svg" },
@@ -26,7 +27,7 @@ export class ApiProviderManager {
 
   async init() {
     // Load current provider
-    const settings = await Browser.storage.local.get("TRANSLATION_API");
+    const settings = await getSettingsAsync();
     this.currentProvider = settings.TRANSLATION_API || "google";
     this.updateIcon(this.currentProvider);
     

@@ -503,10 +503,10 @@ function setupEventListeners() {
  */
 async function loadLastTranslation() {
   try {
-    const result = await Browser.storage.local.get("lastTranslation");
-    if (result.lastTranslation) {
+    const settings = await getSettingsAsync();
+    if (settings.lastTranslation) {
       const { sourceText, translatedText, sourceLanguage, targetLanguage } =
-        result.lastTranslation;
+        settings.lastTranslation;
       if (sourceText) {
         elements.sourceText.value = sourceText;
         correctTextDirection(elements.sourceText, sourceText);

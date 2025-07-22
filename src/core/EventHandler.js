@@ -5,6 +5,7 @@ import {
   state,
   TranslationMode,
   CONFIG,
+  getSettingsAsync,
 } from "../config.js";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
@@ -128,9 +129,8 @@ export default class EventHandler {
         /** requireCtrlForTextSelection
          * بررسی نیاز به Ctrl فقط در حالت immediate، نه onClick
          */
-        const { selectionTranslationMode } = await Browser.storage.local.get({
-          selectionTranslationMode: CONFIG.selectionTranslationMode,
-        });
+        const settings1 = await getSettingsAsync();
+        const selectionTranslationMode = settings1.selectionTranslationMode || CONFIG.selectionTranslationMode;
         
         // فقط در حالت immediate باید Ctrl را چک کنیم
         if (selectionTranslationMode === "immediate") {
@@ -238,9 +238,8 @@ export default class EventHandler {
      if (selectedText) {
       if (!this.selectionTimeoutId) {
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
-        const { selectionTranslationMode } = await Browser.storage.local.get({
-          selectionTranslationMode: CONFIG.selectionTranslationMode,
-        });
+        const settings2 = await getSettingsAsync();
+        const selectionTranslationMode = settings2.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
         // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
         //    - برای حالت آیکون (onClick)، تأخیر کمتر (10ms)
@@ -256,9 +255,8 @@ export default class EventHandler {
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
       }
     } else {
-      const { selectionTranslationMode } = await Browser.storage.local.get({
-        selectionTranslationMode: CONFIG.selectionTranslationMode,
-      });
+      const settings3 = await getSettingsAsync();
+      const selectionTranslationMode = settings3.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
       if (selectionTranslationMode === "onClick") {
         return;

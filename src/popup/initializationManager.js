@@ -3,7 +3,7 @@
 import Browser from "webextension-polyfill";
 import elements from "./domElements.js";
 import * as uiManager from "./uiManager.js";
-import { getTargetLanguageAsync } from "../config.js";
+import { getTargetLanguageAsync, getSettingsAsync } from "../config.js";
 import { getLanguageDisplayValue } from "./languageManager.js"; // Use lookup
 import { AUTO_DETECT_VALUE } from "tts-utils";
 import { logME } from "../utils/helpers.js";
@@ -12,7 +12,7 @@ import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 
 async function loadLastTranslationFromStorage(setDefaultTargetLang = true) {
   try {
-    const result = await Browser.storage.local.get(["lastTranslation"]);
+    const result = await getSettingsAsync();
     let targetLangValue = "";
 
     if (result.lastTranslation) {

@@ -3,7 +3,7 @@ import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { setupContextMenus } from "./onContextMenu.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, getSettingsAsync } from "../config.js";
 
 /**
  * Merges new configuration keys with existing user settings
@@ -15,7 +15,7 @@ async function migrateConfigSettings() {
     logME("[onInstalled] Starting config migration...");
     
     // Get current user settings from storage
-    const currentSettings = await Browser.storage.local.get(null);
+    const currentSettings = await getSettingsAsync();
     
     // Check if any new keys were added
     const newKeys = Object.keys(CONFIG).filter(key => !(key in currentSettings));

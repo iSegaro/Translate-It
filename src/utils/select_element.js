@@ -3,6 +3,7 @@ import Browser from "webextension-polyfill";
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
 import { isExtensionContextValid, logME } from "./helpers.js";
+import { getSettingsAsync } from "../config.js";
 
 getEventRouterInstance();
 
@@ -22,7 +23,7 @@ export async function Active_SelectElement(
 
     let currentState = false;
 
-    const result = await Browser.storage.local.get(["selectElementState"]);
+    const result = await getSettingsAsync();
     currentState = result.selectElementState;
 
     if (active === null) {

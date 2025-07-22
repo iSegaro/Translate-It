@@ -54,10 +54,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Initial theme load
   if (themeSwitch && themeAuto) {
-    Browser.storage.local
-      .get("THEME")
-      .then((result) => {
-        const savedTheme = result.THEME || CONFIG.THEME || "auto";
+    getSettingsAsync()
+      .then((settings) => {
+        const savedTheme = settings.THEME || CONFIG.THEME || "auto";
         setThemeControlsState(savedTheme);
       })
       .catch((err) => {
