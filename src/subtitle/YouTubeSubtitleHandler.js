@@ -19,8 +19,8 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     
     // متغیرهای timing برای کنترل سرعت نمایش
     this.lastDisplayTime = 0;
-    this.minDisplayDuration = 3000; // حداقل 3 ثانیه فاصله بین زیرنویس‌ها
-    this.minClearSubtitleLines = 3000;
+    this.minDisplayDuration = 2000; // حداقل 3 ثانیه فاصله بین زیرنویس‌ها
+    this.minClearSubtitleLines = 2000;
     this.currentSubtitleText = ''; // متن زیرنویس فعلی در حال نمایش
     this.recentSubtitles = new Set(); // ذخیره زیرنویس‌های اخیر برای جلوگیری از تکرار
     this.subtitleCleanupTimeout = null; // تایمر پاک‌سازی
