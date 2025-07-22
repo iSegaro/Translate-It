@@ -429,7 +429,7 @@
     "message": "نام مدل سفارشی را وارد کنید"
   },
 
-  "browser_api_settings_title": { "message": "رابط ترجمه Chrome" },
+  "browser_api_settings_title": { "message": "رابط ترجمه مرورگر" },
   "browser_api_description": {
     "message": "API ترجمه داخلی کروم. نیاز به نسخه ۱۳۸ یا بالاتر کروم دارد و به‌صورت آفلاین کار می‌کند."
   },

@@ -409,7 +409,7 @@
     "message": "Failed to load settings."
   },
 
-  "browser_api_settings_title": {"message": "Chrome Translation API"},
+  "browser_api_settings_title": {"message": "Browser Translation API"},
   "browser_api_description": {"message": "Built-in Chrome translation API. Requires Chrome 138+ and works offline."},
   "browser_api_requirements": { "message": "Requirements:" },
   "browser_api_requirements_chrome": {

@@ -85,7 +85,7 @@ export class ProviderRegistry {
     {
       id: "browserapi", 
       name: "Browser API",
-      displayName: "Chrome Translation",
+      displayName: "Browser Translation",
       icon: "chrome-translate.svg",
       description: "Built-in Chrome translation API. Requires Chrome 138+ and works offline.",
       requirements: {

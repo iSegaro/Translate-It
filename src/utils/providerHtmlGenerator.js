@@ -160,7 +160,7 @@ export class ProviderHtmlGenerator {
   static _generateBrowserApiSettingsHtml(provider) {
     return `
       <div id="browserApiSettingsInfo" style="display: none">
-        <h3 data-i18n="browser_api_settings_title">Chrome Translation API</h3>
+        <h3 data-i18n="browser_api_settings_title">Browser Translation API</h3>
         <div class="setting-group api-key-info">
           <span class="setting-description" data-i18n="browser_api_description">
             ${provider.description}
