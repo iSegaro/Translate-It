@@ -110,6 +110,14 @@ export class SimpleMarkdown {
         currentSection = null;
         listItems = [];
       }
+      // Horizontal rules (---)
+      else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+        this._finishSection(container, currentSection, listItems);
+        const hr = document.createElement('hr');
+        container.appendChild(hr);
+        currentSection = null;
+        listItems = [];
+      }
       // Blockquotes
       else if (trimmed.startsWith('> ')) {
         this._finishSection(container, currentSection, listItems);
