@@ -18,8 +18,7 @@ const MSG_POPUP_OPENED_CHECK_MOUSE = "POPUP_OPENED_CHECK_MOUSE_V3";
 const MSG_MOUSE_MOVED_ON_PAGE = "MOUSE_MOVED_ON_PAGE_BY_CONTENT_SCRIPT_V3";
 const MSG_STOP_MOUSE_MOVE_CHECK = "STOP_MOUSE_MOVE_CHECK_BY_POPUP_V3";
 
-// eslint-disable-next-line no-unused-vars
-let isMouseOverPopup = false;
+
 let hasEnteredPopup = false;
 let hoverStayTimer = null;
 let autoCloseTimer = null;
@@ -68,7 +67,7 @@ async function tellContentScriptToStopMouseCheck(reason = "unknown") {
 }
 
 function resetState() {
-  isMouseOverPopup = false;
+  
   hasEnteredPopup = false;
   interactionLocked = false;
   mouseConfirmedOnPageByContentScript = false;
@@ -173,7 +172,7 @@ function setupInteractionListeners() {
   // اگر می‌خواهید کلیک روی قسمت خالی خود پنجره پاپ‌آپ (نه المنت‌ها) را مدیریت کنید، منطق آن متفاوت خواهد بود.
 
   elements.popupContainer?.addEventListener("mouseenter", async () => {
-    isMouseOverPopup = true;
+    
     hasEnteredPopup = true;
     // اگر موس وارد پاپ‌آپ شد، دیگر بررسی حرکت موس روی صفحه توسط اسکریپت محتوا برای این جریان اهمیتی ندارد.
     // همچنین noInteractionTimer باید پاک شود.
@@ -193,7 +192,7 @@ function setupInteractionListeners() {
   });
 
   elements.popupContainer?.addEventListener("mouseleave", () => {
-    isMouseOverPopup = false;
+    
     if (hoverStayTimer) {
       clearTimeout(hoverStayTimer);
       hoverStayTimer = null;
