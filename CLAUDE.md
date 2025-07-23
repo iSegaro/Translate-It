@@ -75,6 +75,14 @@ pnpm run publish
 - `src/core/FeatureManager.js` - Feature flag management
 - `src/core/api.js` - API communication layer
 
+**Screen Capture System:**
+- `src/capture/CaptureManager.js` - Central capture workflow orchestrator (background script)
+- `src/capture/ScreenSelector.js` - Interactive area selection with viewport-relative coordinates
+- `src/capture/CapturePreview.js` - Image preview and confirmation interface
+- `src/capture/CaptureResult.js` - Translation result display system
+- `src/handlers/ContentCaptureHandler.js` - Content script capture coordinator
+- `src/utils/imageProcessing.js` - Image cropping and device pixel ratio handling
+
 **Translation Provider System:**
 - `src/providers/registry/ProviderRegistry.js` - Centralized provider metadata and availability management
 - `src/providers/factory/TranslationProviderFactory.js` - Provider instance creation and lifecycle management
@@ -132,6 +140,7 @@ The extension supports multiple translation modes:
 - **Text Field Integration**: Inline translation in input fields with intelligent selection handling
 - **Shortcut Translation**: Ctrl+/ keyboard shortcut
 - **Subtitle Translation**: Real-time translation of video subtitles on YouTube and Netflix
+- **Screen Capture Translation**: Visual area selection and OCR-based translation of screen content
 
 ### Text Field Translation Behavior
 
@@ -239,6 +248,93 @@ The extension includes a comprehensive subtitle translation system for video pla
 - **Conciseness Priority**: Optimizes for quick readability (2-4 second display time)
 - **Cultural Adaptation**: Handles idioms and cultural references appropriately for subtitle context
 - **Technical Optimization**: Uses `TranslationMode.Subtitle` for dedicated subtitle processing pipeline
+
+### Screen Capture Translation System
+
+The extension includes a comprehensive screen capture translation system that allows users to visually select screen areas and translate text content using OCR and AI providers:
+
+**Core Functionality:**
+- **Visual Area Selection**: Interactive overlay for selecting screen regions
+- **Screen Capture API**: Browser-native screenshot functionality
+- **Image Processing**: Coordinate-accurate cropping and processing
+- **AI-Powered Translation**: Integration with vision-capable AI providers (Gemini Vision, OpenAI Vision)
+
+**Architecture Components:**
+- `src/capture/CaptureManager.js` - Central orchestrator for capture workflow (background script)
+- `src/capture/ScreenSelector.js` - Interactive area selection overlay system
+- `src/capture/CapturePreview.js` - Preview window for captured images
+- `src/capture/CaptureResult.js` - Translation result display system
+- `src/capture/TextExtractor.js` - OCR and text extraction utilities
+- `src/capture/index.js` - Unified exports for capture system
+- `src/handlers/ContentCaptureHandler.js` - Content script coordinator for capture workflow
+- `src/utils/imageProcessing.js` - Image cropping and processing utilities
+
+**Cross-Context Communication Architecture:**
+The screen capture system implements a sophisticated message-passing architecture due to browser extension context limitations:
+
+1. **Sidepanel Initiation**: User triggers capture from sidepanel interface
+2. **Background Orchestration**: CaptureManager coordinates the workflow
+3. **Content Script Execution**: ContentCaptureHandler manages UI and interaction
+4. **Screen Capture**: Browser API captures visible viewport
+5. **Image Processing**: Coordinate-accurate cropping in content script context
+6. **AI Translation**: Vision API integration for text extraction and translation
+
+**Coordinate System Architecture:**
+The system uses a **viewport-relative coordinate system** to ensure pixel-perfect accuracy:
+
+- **Browser Capture Behavior**: `Browser.tabs.captureVisibleTab()` captures the visible viewport only
+- **Coordinate Strategy**: Uses `clientX/clientY` (viewport coordinates) instead of `pageX/pageY` (document coordinates)
+- **Scroll Independence**: Works correctly regardless of page scroll position
+- **Device Pixel Ratio Support**: Automatic scaling for high-DPI displays (Retina, 4K)
+- **Cross-Browser Compatibility**: Consistent behavior across Chrome and Firefox
+
+**Key Technical Implementation:**
+```javascript
+// Viewport-relative coordinates for browser capture API compatibility
+_getCaptureCoordinates(event) {
+  return {
+    x: Math.round(event.clientX),
+    y: Math.round(event.clientY)
+  };
+}
+
+// Device pixel ratio scaling in image processing
+const actualX = selectionData.x * devicePixelRatio;
+const actualY = selectionData.y * devicePixelRatio;
+```
+
+**User Experience Flow:**
+1. **Activation**: Click screen capture button in sidepanel
+2. **Area Selection**: Drag to select screen region with visual overlay
+3. **Preview**: Review captured image with confirm/cancel/retry options
+4. **Translation**: AI processes image and displays translated text
+5. **Result Display**: Translation shown in overlay with copy/close options
+
+**Error Handling and Edge Cases:**
+- **DOM Context Separation**: All DOM operations moved to content script context
+- **Coordinate Accuracy**: Comprehensive coordinate calculation with debugging
+- **Image Bounds Checking**: Safe boundary validation for image cropping
+- **Retry Mechanisms**: Built-in retry for failed captures with proper timing
+- **Cross-Browser Support**: Unified behavior across Chrome and Firefox
+
+**Performance Optimizations:**
+- **Lazy Initialization**: ContentCaptureHandler created only when needed
+- **Memory Management**: Proper cleanup of overlay elements and event listeners
+- **Image Optimization**: Efficient canvas-based cropping and processing
+- **Debug Logging**: Comprehensive coordinate debugging for troubleshooting
+
+**Integration Points:**
+- **FeatureManager**: Controlled by capture-related feature flags
+- **AI Providers**: Seamless integration with vision-capable translation providers
+- **Error Service**: Centralized error handling with specific capture error types
+- **Message Routing**: Integration with existing background script message system
+
+**Development Guidelines:**
+- **Coordinate System**: Always use viewport-relative coordinates for capture accuracy
+- **Context Awareness**: Ensure DOM operations only in content script context
+- **Cross-Browser Testing**: Test coordinate accuracy across different browsers and zoom levels
+- **Error Recovery**: Implement proper retry mechanisms with appropriate delays
+- **Memory Cleanup**: Always clean up overlay elements and event listeners
 
 ### Error Handling
 
@@ -440,15 +536,24 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
     - `BaseTranslationProvider.js` - Abstract base class for all providers
     - `GoogleTranslateProvider.js`, `GeminiProvider.js`, etc. - Specific provider implementations
   - `index.js` - Unified entry point for all provider imports
+- `src/capture/` - Screen capture translation system
+  - `CaptureManager.js` - Background script capture orchestrator
+  - `ScreenSelector.js` - Interactive area selection with viewport coordinates
+  - `CapturePreview.js` - Image preview and confirmation interface
+  - `CaptureResult.js` - Translation result display system
+  - `TextExtractor.js` - OCR and text extraction utilities
+  - `index.js` - Unified exports for capture system
 - `src/strategies/` - Platform-specific implementations
 - `src/utils/` - Utility functions and helpers
   - `framework-compat/` - Modular text replacement system for modern web frameworks
+  - `imageProcessing.js` - Screen capture image cropping and device pixel ratio handling
   - `promptBuilder.js` - AI prompt construction and template management
   - `textDetection.js` - Language and text pattern detection
   - `safeHtml.js` - Secure HTML manipulation with comprehensive XSS protection
 - `src/managers/` - UI and resource management
 - `src/services/` - Service layer (errors, APIs)
 - `src/handlers/` - Event and message handlers
+  - `ContentCaptureHandler.js` - Content script coordinator for screen capture workflow
   - `smartTranslationIntegration.js` - Intelligent translation mode determination and execution
 - `src/listeners/` - Background script listeners
 
