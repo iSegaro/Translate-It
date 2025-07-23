@@ -178,6 +178,25 @@ export default class SelectionWindows {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
+    const topDocument = this._getTopDocument();
+    if (!topDocument?.body) {
+      logME("[SelectionWindows] Cannot access top document body.");
+      return;
+    }
+
+    const hostId = "aiwc-selection-icon-host";
+    let iconHost = topDocument.getElementById(hostId);
+    if (!iconHost) {
+      try {
+        iconHost = topDocument.createElement("div");
+        iconHost.id = hostId;
+        topDocument.body.appendChild(iconHost);
+      } catch (e) {
+        logME("[SelectionWindows] Failed to create icon host container.", e);
+        return;
+      }
+    }
+
     this.icon = document.createElement("div");
     this.icon.id = "translate-it-icon";
 
@@ -186,11 +205,10 @@ export default class SelectionWindows {
     // Calculate position for iframe escape
     const iconPosition = this._calculateCoordsForTopWindow({
       x: window.scrollX + rect.left + rect.width / 2 - 12,
-      y: window.scrollY + rect.bottom + 5
+      y: window.scrollY + rect.bottom + 5,
     });
 
     // Get top window for positioning
-    const topDocument = this._getTopDocument();
     const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
 
     // --- شروع تغییرات برای افزودن انیمیشن ---
@@ -221,9 +239,8 @@ export default class SelectionWindows {
         "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
     });
 
-    // 2. افزودن آیکون به صفحه (top document برای iframe escape)
-    const iconTopDocument = this._getTopDocument();
-    iconTopDocument.body.appendChild(this.icon);
+    // 2. افزودن آیکون به صفحه (top document's HOST برای iframe escape)
+    iconHost.appendChild(this.icon);
 
     // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
     setTimeout(() => {

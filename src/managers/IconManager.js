@@ -2,11 +2,63 @@
 
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import injectIconStyle from "../utils/helpers.js";
+import injectIconStyle, { logME } from "../utils/helpers.js";
 
 export default class IconManager {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
+    this.container = null;
+    this.canShowIcons = false;
+  }
+
+  _ensureContainerExists() {
+    if (this.container && document.body.contains(this.container)) {
+      this.canShowIcons = true;
+      return;
+    }
+
+    if (
+      typeof document === "undefined" ||
+      !document.body ||
+      typeof document.createElement !== "function"
+    ) {
+      logME("[IconManager] DOM not ready for icon container.");
+      this.canShowIcons = false;
+      return;
+    }
+
+    try {
+      const id = "AIWritingCompanion-icon-container";
+      let el = document.getElementById(id);
+      if (el) {
+        this.container = el;
+        this.canShowIcons = true;
+        logME("[IconManager] Re-attached to existing icon container.");
+        return;
+      }
+
+      el = document.createElement("div");
+      el.id = id;
+      document.body.appendChild(el);
+
+      this.container = el;
+      this.canShowIcons = true;
+      logME("[IconManager] Icon container created and appended successfully.");
+    } catch (error) {
+      logME(
+        "[IconManager] Environment not compatible for icons due to error:",
+        error.message
+      );
+      this.canShowIcons = false;
+      if (this.container) {
+        try {
+          this.container.remove();
+        } catch {
+          /* ignore */
+        }
+        this.container = null;
+      }
+    }
   }
 
   cleanup() {
@@ -14,14 +66,17 @@ export default class IconManager {
       state.highlightedElement.style.outline = "";
       state.highlightedElement = null;
     }
-    // Remove all icons
-    document
-      .querySelectorAll(".AIWritingCompanion-translation-icon-extension")
-      .forEach((icon) => {
-        icon.classList.add("fade-out");
-        // حذف آیکون بعد از اتمام انیمیشن fade-out
-        setTimeout(() => icon.remove(), 50); // 50 میلی ثانیه (مطابق با مدت زمان transition در CSS)
-      });
+
+    const iconsSelector = ".AIWritingCompanion-translation-icon-extension";
+    const icons = this.container
+      ? this.container.querySelectorAll(iconsSelector)
+      : document.querySelectorAll(iconsSelector);
+
+    icons.forEach((icon) => {
+      icon.classList.add("fade-out");
+      setTimeout(() => icon.remove(), 50);
+    });
+
     state.activeTranslateIcon = null;
   }
 
@@ -33,6 +88,12 @@ export default class IconManager {
   }
 
   createTranslateIcon(target) {
+    this._ensureContainerExists();
+
+    if (!this.canShowIcons) {
+      return null;
+    }
+
     try {
       if (!target?.isConnected) {
         return null;
@@ -45,19 +106,17 @@ export default class IconManager {
       icon.title = CONFIG.TRANSLATION_ICON_TITLE;
       icon.style.display = "none";
 
-      // یک z-index بالا تضمین می‌کند که آیکون روی دیگر عناصر صفحه، از جمله خود فیلد متنی، قرار می‌گیرد.
       icon.style.zIndex = "2147483640";
 
-      document.body.appendChild(icon);
+      this.container.appendChild(icon);
 
       requestAnimationFrame(() => {
-        if (!target.isConnected) return;
+        if (!target.isConnected) {
+          if (icon.parentNode) icon.remove();
+          return;
+        }
         const rect = target.getBoundingClientRect();
 
-        // [نکته]: این بخش از کد دیگر موقعیت را تنظیم نمی‌کند،
-        // زیرا این مسئولیت به تابع updatePosition در IconBehavior.js منتقل شده است.
-        // با این حال، نگه داشتن آن ضرری ندارد، چون بلافاصله توسط updatePosition بازنویسی می‌شود.
-        // برای تمیز بودن کد، می‌توانید این بلاک requestAnimationFrame را حذف کنید، اما ضروری نیست.
         icon.style.top = `${rect.top + window.scrollY + 10}px`;
         icon.style.left = `${rect.left + window.scrollX + rect.width + 10}px`;
         icon.style.display = "block";
@@ -72,7 +131,7 @@ export default class IconManager {
         type: ErrorTypes.UI,
         context: "IconManager-createTranslateIcon",
       });
-      return null; // این مقدار بازگشتی null خیلی مهم است
+      return null;
     }
   }
 }

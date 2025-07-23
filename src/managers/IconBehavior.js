@@ -24,23 +24,23 @@ export default function setupIconBehavior(
     if (isCleanedUp) return;
     isCleanedUp = true;
 
-    // 1. لغو فریم‌های انیمیشن
     rafIds.forEach((id) => cancelAnimationFrame(id));
-    // 2. قطع observerها
     resizeObserver?.disconnect();
-    // mutationObserver?.disconnect();
 
-    // 3. حذف event listenerها
     icon.removeEventListener("click", clickHandler);
     icon.removeEventListener("blur", blurHandler);
     target.removeEventListener("blur", blurHandler);
 
-    // 4. حذف فیزیکی المان با افکت fade
     icon.classList.add("fade-out");
-    setTimeout(() => icon.remove(), 50);
+    setTimeout(() => {
+      if (icon.parentNode) {
+        icon.remove();
+      }
+    }, 50);
 
-    // 5. ریست وضعیت
-    state.activeTranslateIcon = null;
+    if (state.activeTranslateIcon === icon) {
+      state.activeTranslateIcon = null;
+    }
   };
 
   const clickHandler = async (e) => {
@@ -61,7 +61,7 @@ export default function setupIconBehavior(
       if (!text) return;
       statusNode = notifier.show(
         (await getTranslationString("STATUS_TRANSLATING_ICON")) ||
-          "در حال ترجمه...",
+          "Translating...",
         "status",
         false
       );
@@ -76,7 +76,6 @@ export default function setupIconBehavior(
 
   const blurHandler = (e) => {
     if (!e.relatedTarget || !icon.contains(e.relatedTarget)) {
-      // تأخیر برای جلوگیری از تداخل با کلیک
       setTimeout(cleanupIcon, 50);
     }
   };
@@ -90,39 +89,15 @@ export default function setupIconBehavior(
       const rect = target.getBoundingClientRect();
       const iconHeight = icon.offsetHeight || 24;
 
-      // --- شروع منطق شرطی جدید ---
-
-      // آستانه فاصله از بالای صفحه (به پیکسل)
-      // اگر بالای فیلد از این مقدار به بالای صفحه نزدیک‌تر باشد، آیکون به زیر منتقل می‌شود.
-      // این مقدار باید حداقل به اندازه ارتفاع آیکون + حاشیه باشد تا منطقی باشد.
       const topThreshold = 40;
 
-      // بررسی شرط: آیا فیلد متنی به بالای صفحه خیلی نزدیک است؟
       if (rect.top < topThreshold) {
-        
-        // حالت ۱: فیلد نزدیک به بالای صفحه است -> آیکون را زیر فیلد قرار بده
-        
-        // محاسبه موقعیت عمودی (top):
-        // rect.bottom: موقعیت لبه‌ی پایینی فیلد.
-        // + 5: یک حاشیه ۵ پیکسلی از پایین.
         icon.style.top = `${rect.bottom + window.scrollY + 5}px`;
-
       } else {
-        
-        // حالت ۲: فیلد به اندازه کافی از بالای صفحه فاصله دارد -> آیکون را بالای فیلد قرار بده (رفتار پیش‌فرض)
-
-        // محاسبه موقعیت عمودی (top):
-        // rect.top: موقعیت لبه‌ی بالایی فیلد.
-        // - iconHeight: ارتفاع خود آیکون را کم می‌کنیم تا به بالا منتقل شود.
-        // - 5: یک حاشیه ۵ پیکسلی از بالا.
         icon.style.top = `${rect.top + window.scrollY - iconHeight - 5}px`;
       }
 
-      // محاسبه موقعیت افقی (left) در هر دو حالت یکسان است:
-      // آیکون در سمت راست فیلد قرار می‌گیرد.
       icon.style.left = `${rect.right + window.scrollX + 5}px`;
-
-      // --- پایان منطق شرطی ---
 
       icon.style.display = "block";
       icon.classList.add("fade-in");
@@ -131,32 +106,29 @@ export default function setupIconBehavior(
   };
 
   try {
-    // اعتبارسنجی اولیه
     if (!(icon instanceof HTMLElement) || !icon.isConnected) {
-      // throw new Error("آیکون معتبر نیست");
-      logME("[IconBehavior] آیکون معتبر نیست");
+      logME("[IconBehavior] Icon is not a valid or connected element.");
+      return;
     }
 
     if (!target.isConnected || !document.contains(target)) {
-      // throw new Error("[IconBehavior] المان هدف در DOM وجود ندارد");
-      logME("[IconBehavior] المان هدف در DOM وجود ندارد");
+      logME("[IconBehavior] Target element is not in the DOM.");
+      cleanupIcon();
+      return;
     }
 
-    // تنظیمات اولیه موقعیت
+    icon.style.position = "absolute";
     icon.style.display = "none";
-    document.body.appendChild(icon);
 
-    // 1. تنظیم observer برای تغییر سایز
     resizeObserver = new ResizeObserver(updatePosition);
     resizeObserver.observe(target);
 
     icon.addEventListener("click", clickHandler);
     icon.addEventListener("blur", blurHandler);
     target.addEventListener("blur", blurHandler);
-    // 6. موقعیت دهی اولیه
+
     updatePosition();
 
-    // 7. ثبت در state
     state.activeTranslateIcon = icon;
   } catch (err) {
     cleanupIcon();
