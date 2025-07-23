@@ -106,6 +106,7 @@ export const CONFIG = {
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SUBTITLE_TRANSLATION: false, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
   SHOW_SUBTITLE_ICON: true, // نمایش آیکون ترجمه در پلیر یوتوب
+  ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
 
   // --- UI & Styling ---
   HIGHTLIH_NEW_ELEMENT_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
@@ -228,6 +229,39 @@ $_{TEXT}
 $_{TEXT}`,
   /*--- End PROMPT_BASE_SUBTITLE ---*/
 
+  /*--- Start PROMPT_BASE_SCREEN_CAPTURE ---*/
+  PROMPT_BASE_SCREEN_CAPTURE: `You are a professional image text extraction and translation service. Your task is to extract all readable text from the provided image and translate it into $_{TARGET}.
+
+**Your responsibilities:**
+1. **Extract ALL visible text** from the image, including:
+   - Main text content, titles, headers, and paragraphs
+   - UI elements, buttons, labels, and menu items
+   - Captions, annotations, and overlaid text
+   - Signs, logos, and watermarks with readable text
+   - Any other textual information visible in the image
+
+2. **Translation Guidelines:**
+   - Automatically detect the language of extracted text
+   - Translate all extracted text into $_{TARGET}
+   - Maintain **natural, fluent, and idiomatic** translations
+   - Preserve the **original meaning and context**
+   - Use **appropriate terminology** for the content type (technical, casual, formal, etc.)
+   - Keep **spatial relationships** when multiple text elements exist
+
+3. **Output Format:**
+   - If the image contains **single text block**: Output only the translated text
+   - If the image contains **multiple separate text elements**: Use clear formatting to distinguish between different text areas
+   - **DO NOT** include explanations, descriptions, or metadata about the image
+   - **DO NOT** describe non-text visual elements (colors, layout, graphics, etc.)
+
+4. **Quality Requirements:**
+   - Ensure **accuracy** in text extraction - don't miss any readable text
+   - Provide **high-quality translations** that sound natural in $_{TARGET}
+   - Maintain **consistency** in terminology throughout the translation
+   - Handle **special characters, numbers, and symbols** appropriately
+
+**Important:** Output ONLY the translated text content. Do not include any analysis, descriptions, or additional commentary.`,
+  /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
@@ -254,6 +288,7 @@ export const TranslationMode = {
   Popup_Translate: "popup_translate",
   Sidepanel_Translate: "sidepanel_translate",
   Subtitle: "subtitle",
+  ScreenCapture: "screen_capture",
 };
 
 export const state = {
@@ -428,6 +463,10 @@ export const getPromptBASESubtitleAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_SUBTITLE", CONFIG.PROMPT_BASE_SUBTITLE);
 };
 
+export const getPromptBASEScreenCaptureAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_SCREEN_CAPTURE", CONFIG.PROMPT_BASE_SCREEN_CAPTURE);
+};
+
 export const getTranslationApiAsync = async () => {
   return getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
 };
@@ -570,4 +609,8 @@ export const getOpenRouterModelSelectionAsync = async () => {
 
 export const getShowSubtitleIconAsync = async () => {
   return getSettingValueAsync("SHOW_SUBTITLE_ICON", CONFIG.SHOW_SUBTITLE_ICON);
+};
+
+export const getEnableScreenCaptureAsync = async () => {
+  return getSettingValueAsync("ENABLE_SCREEN_CAPTURE", CONFIG.ENABLE_SCREEN_CAPTURE);
 };

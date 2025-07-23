@@ -9,6 +9,7 @@ import {
 } from "../../config.js";
 import { buildPrompt } from "../../utils/promptBuilder.js";
 import { logME } from "../../utils/helpers.js";
+import { getPromptBASEScreenCaptureAsync } from "../../config.js";
 
 export class GeminiProvider extends BaseTranslationProvider {
   constructor() {
@@ -146,5 +147,124 @@ export class GeminiProvider extends BaseTranslationProvider {
       );
       throw error;
     }
+  }
+
+  /**
+   * Translate text from image using Gemini Vision
+   * @param {string} imageData - Base64 encoded image data
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @returns {Promise<string>} - Translated text
+   */
+  async translateImage(imageData, sourceLang, targetLang, translateMode) {
+    if (this._isSameLanguage(sourceLang, targetLang)) return null;
+
+    const [apiKey, geminiModel] = await Promise.all([
+      getApiKeyAsync(),
+      getGeminiModelAsync(),
+    ]);
+
+    // Build API URL based on selected model
+    let apiUrl;
+    if (geminiModel === "custom") {
+      apiUrl = await getApiUrlAsync();
+    } else {
+      const modelConfig = CONFIG.GEMINI_MODELS?.find(
+        (m) => m.value === geminiModel
+      );
+      apiUrl = modelConfig?.url || CONFIG.API_URL;
+    }
+
+    // Validate configuration
+    this._validateConfig(
+      { apiKey, apiUrl },
+      ["apiKey", "apiUrl"],
+      `${this.providerName.toLowerCase()}-image-translation`
+    );
+
+    logME(`[${this.providerName}] translateImage called with mode:`, translateMode);
+
+    // Build prompt for screen capture translation
+    const basePrompt = await getPromptBASEScreenCaptureAsync();
+    const prompt = basePrompt
+      .replace(/\$_\{TARGET\}/g, targetLang)
+      .replace(/\$_\{SOURCE\}/g, sourceLang);
+
+    logME(`[${this.providerName}] translateImage built prompt:`, prompt);
+
+    // Extract image format and data
+    const imageMatch = imageData.match(/^data:image\/([^;]+);base64,(.+)/);
+    if (!imageMatch) {
+      throw this._createError(
+        "IMAGE_PROCESSING_FAILED",
+        "Invalid image data format"
+      );
+    }
+
+    const [, imageFormat, base64Data] = imageMatch;
+
+    // Prepare request body with image
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: `image/${imageFormat}`,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const url = `${apiUrl}?key=${apiKey}`;
+    const fetchOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    };
+
+    const context = `${this.providerName.toLowerCase()}-image-translation`;
+    logME(`[${this.providerName}] about to call _executeApiCall for image translation`);
+
+    try {
+      const result = await this._executeApiCall({
+        url,
+        fetchOptions,
+        extractResponse: (data) =>
+          data?.candidates?.[0]?.content?.parts?.[0]?.text,
+        context: context,
+      });
+
+      logME(
+        `[${this.providerName}] image translation completed with result:`,
+        result
+      );
+      return result;
+    } catch (error) {
+      logME(
+        `[${this.providerName}] image translation failed with error:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Create error with proper type
+   * @param {string} type - Error type
+   * @param {string} message - Error message
+   * @returns {Error} Error object
+   * @private
+   */
+  _createError(type, message) {
+    const error = new Error(message);
+    error.type = type;
+    error.context = `${this.providerName.toLowerCase()}-provider`;
+    return error;
   }
 }

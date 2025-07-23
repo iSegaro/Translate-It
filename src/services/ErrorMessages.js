@@ -37,6 +37,13 @@ export const errorMessages = {
   [ErrorTypes.IMPORT_PASSWORD_REQUIRED]: "Password is required to import encrypted settings",
   [ErrorTypes.IMPORT_PASSWORD_INCORRECT]: "Incorrect password or corrupted data",
 
+  // Screen Capture errors
+  [ErrorTypes.SCREEN_CAPTURE_FAILED]: "Failed to capture screen. Please try again.",
+  [ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED]: "Screen capture permission denied. Please enable permissions and try again.",
+  [ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED]: "Screen capture is not supported in this browser or context.",
+  [ErrorTypes.IMAGE_PROCESSING_FAILED]: "Failed to process captured image. Please try again.",
+  [ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED]: "Current translation provider does not support image translation. Please select an AI provider.",
+
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
   [ErrorTypes.HTTP_ERROR]: "HTTP error",

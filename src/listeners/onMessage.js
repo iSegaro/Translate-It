@@ -21,6 +21,18 @@ import {
   handleRevertBackground,
 } from "../handlers/backgroundHandlers.js";
 import { handleActivateSelectElementMode } from "../handlers/elementModeHandler.js";
+import { 
+  handleStartAreaCapture,
+  handleStartFullScreenCapture,
+  handleRequestFullScreenCapture,
+  handleProcessAreaCaptureImage,
+  handlePreviewConfirmed,
+  handlePreviewCancelled,
+  handlePreviewRetry,
+  handleResultClosed,
+  handleCaptureError,
+  handleAreaSelectionCancel
+} from "../handlers/screenCaptureHandler.js";
 import { playTTS, stopTTS } from "tts-player";
 import { setupContextMenus } from "./onContextMenu.js";
 import { openSidePanel } from "../sidepanel/action-helpers.js";
@@ -204,6 +216,81 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           injectionState
         );
         return true;
+
+      // Screen Capture Actions
+      case "startAreaCapture":
+        handleStartAreaCapture(
+          message,
+          sender,
+          sendResponse,
+          safeSendMessage,
+          errorHandler,
+          injectionState
+        );
+        return true;
+
+      case "startFullScreenCapture":
+        handleStartFullScreenCapture(
+          message,
+          sender,
+          sendResponse,
+          safeSendMessage,
+          errorHandler,
+          injectionState
+        );
+        return true;
+
+      case "requestFullScreenCapture":
+        handleRequestFullScreenCapture(
+          message,
+          sender,
+          sendResponse,
+          errorHandler
+        );
+        return true;
+
+      case "processAreaCaptureImage":
+        handleProcessAreaCaptureImage(
+          message,
+          sender,
+          sendResponse,
+          errorHandler
+        );
+        return true;
+
+      case "previewConfirmed":
+        handlePreviewConfirmed(
+          message,
+          sender,
+          sendResponse,
+          errorHandler
+        );
+        return true;
+
+      case "previewCancelled":
+        handlePreviewCancelled(message, sender, sendResponse);
+        return false;
+
+      case "previewRetry":
+        handlePreviewRetry(
+          message,
+          sender,
+          sendResponse,
+          errorHandler
+        );
+        return true;
+
+      case "resultClosed":
+        handleResultClosed(message, sender, sendResponse);
+        return false;
+
+      case "captureError":
+        handleCaptureError(message, sender, sendResponse);
+        return false;
+
+      case "areaSelectionCancel":
+        handleAreaSelectionCancel(message, sender, sendResponse);
+        return false;
 
       case "applyTranslationToActiveElement": {
         // ارسال مستقیم به تب جاری که درخواست داده

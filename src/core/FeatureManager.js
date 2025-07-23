@@ -5,7 +5,7 @@ import { logME } from "../utils/helpers.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
- *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SUBTITLE_TRANSLATION"|"SHOW_SUBTITLE_ICON"} FeatureKey
+ *           "SELECT_ELEMENT"|"TEXT_SELECTION"|"DICTIONARY"|"SUBTITLE_TRANSLATION"|"SHOW_SUBTITLE_ICON"|"SCREEN_CAPTURE"} FeatureKey
  */
 
 export default class FeatureManager {
@@ -22,6 +22,7 @@ export default class FeatureManager {
       ENABLE_DICTIONARY: "DICTIONARY",
       ENABLE_SUBTITLE_TRANSLATION: "SUBTITLE_TRANSLATION",
       SHOW_SUBTITLE_ICON: "SHOW_SUBTITLE_ICON",
+      ENABLE_SCREEN_CAPTURE: "SCREEN_CAPTURE",
     };
 
     // استفاده از initialFlags ارسال شده به constructor و fallback به مقادیر CONFIG
@@ -38,6 +39,7 @@ export default class FeatureManager {
       DICTIONARY: initialFlags.DICTIONARY ?? CONFIG.ENABLE_DICTIONARY,
       SUBTITLE_TRANSLATION: initialFlags.SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
       SHOW_SUBTITLE_ICON: initialFlags.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON,
+      SCREEN_CAPTURE: initialFlags.SCREEN_CAPTURE ?? CONFIG.ENABLE_SCREEN_CAPTURE,
     };
 
     this._subscribers = {};

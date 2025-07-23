@@ -25,6 +25,18 @@ export class BaseTranslationProvider {
   }
 
   /**
+   * Abstract method for image translation - implemented by AI providers only
+   * @param {string} imageData - Base64 encoded image data
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @returns {Promise<string>} - Translated text extracted from image
+   */
+  async translateImage(_imageData, _sourceLang, _targetLang, _translateMode) {
+    throw new Error(`translateImage method not supported by ${this.constructor.name}`);
+  }
+
+  /**
    * Executes a fetch call and normalizes HTTP, API-response-invalid, and network errors.
    * @param {Object} params
    * @param {string} params.url - The endpoint URL

@@ -5,6 +5,10 @@ import { getSettingsAsync, getSourceLanguageAsync } from "../config.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { ApiProviderManager } from "./apiProviderManager.js";
 import { HistoryManager } from "./historyManager.js";
+import { getTranslationApiAsync, getEnableScreenCaptureAsync } from "../config.js";
+import { ProviderRegistry } from "../providers/registry/ProviderRegistry.js";
+import { handleUIError } from "../services/ErrorService.js";
+import { ErrorTypes } from "../services/ErrorTypes.js";
 
 // Import utilities
 import { app_localize_popup } from "../utils/i18n.js";
@@ -59,6 +63,7 @@ const elements = {
   historyList: null,
   closeHistoryBtn: null,
   clearAllHistoryBtn: null,
+  captureBtn: null,
 
 };
 
@@ -116,6 +121,7 @@ function initializeElements() {
   elements.apiProviderIcon = document.getElementById("apiProviderIcon");
   elements.apiProviderDropdown = document.getElementById("apiProviderDropdown");
   elements.historyBtn = document.getElementById("historyBtn");
+  elements.captureBtn = document.getElementById("captureBtn");
   elements.historyPanel = document.getElementById("historyPanel");
   elements.historyList = document.getElementById("historyList");
   elements.closeHistoryBtn = document.getElementById("closeHistoryBtn");
@@ -566,6 +572,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       dropdown: elements.apiProviderDropdown,
     });
 
+    // Screen Capture button event listeners
+    elements.captureBtn?.addEventListener("click", handleCaptureClick);
+    elements.captureBtn?.addEventListener("contextmenu", handleCaptureRightClick);
+
     const historyManager = new HistoryManager({
       historyBtn: elements.historyBtn,
       historyPanel: elements.historyPanel,
@@ -612,6 +622,124 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.appendChild(errorDiv);
   }
 });
+
+/**
+ * Handle capture button left click - area selection
+ */
+async function handleCaptureClick(event) {
+  event.preventDefault();
+  
+  try {
+    logME("[SidePanel] Capture button clicked - starting area capture");
+
+    // Check if screen capture is enabled
+    const screenCaptureEnabled = await getEnableScreenCaptureAsync();
+    if (!screenCaptureEnabled) {
+      const error = new Error("Screen capture feature is disabled");
+      error.type = ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+      return;
+    }
+
+    // Get current settings for translation
+    const [sourceLanguage, targetLanguage, provider] = await Promise.all([
+      getSourceLanguageAsync(),
+      getTargetLanguageAsync(),
+      getTranslationApiAsync()
+    ]);
+
+    // Validate provider supports image translation
+    const providerInfo = ProviderRegistry.getProvider(provider);
+    if (!providerInfo || providerInfo.category !== "ai") {
+      const error = new Error("Current provider does not support image translation. Please select an AI provider.");
+      error.type = ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+      return;
+    }
+
+    // Send area capture request to background script
+    const response = await Browser.runtime.sendMessage({
+      action: "startAreaCapture",
+      data: {
+        sourceLanguage,
+        targetLanguage,
+        provider
+      }
+    });
+
+    if (!response.success) {
+      const error = new Error(response.error || "Failed to start area capture");
+      error.type = ErrorTypes.SCREEN_CAPTURE_FAILED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+    }
+
+  } catch (error) {
+    logME("[SidePanel] Error in capture click handler:", error);
+    handleUIError(error);
+  }
+}
+
+/**
+ * Handle capture button right click - full screen capture
+ */
+async function handleCaptureRightClick(event) {
+  event.preventDefault();
+  
+  try {
+    logME("[SidePanel] Capture button right-clicked - starting full screen capture");
+
+    // Check if screen capture is enabled
+    const screenCaptureEnabled = await getEnableScreenCaptureAsync();
+    if (!screenCaptureEnabled) {
+      const error = new Error("Screen capture feature is disabled");
+      error.type = ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+      return;
+    }
+
+    // Get current settings for translation
+    const [sourceLanguage, targetLanguage, provider] = await Promise.all([
+      getSourceLanguageAsync(),
+      getTargetLanguageAsync(),
+      getTranslationApiAsync()
+    ]);
+
+    // Validate provider supports image translation
+    const providerInfo = ProviderRegistry.getProvider(provider);
+    if (!providerInfo || providerInfo.category !== "ai") {
+      const error = new Error("Current provider does not support image translation. Please select an AI provider.");
+      error.type = ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+      return;
+    }
+
+    // Send full screen capture request to background script
+    const response = await Browser.runtime.sendMessage({
+      action: "startFullScreenCapture",
+      data: {
+        sourceLanguage,
+        targetLanguage,
+        provider
+      }
+    });
+
+    if (!response.success) {
+      const error = new Error(response.error || "Failed to start full screen capture");
+      error.type = ErrorTypes.SCREEN_CAPTURE_FAILED;
+      error.context = "sidepanel-capture";
+      handleUIError(error);
+    }
+
+  } catch (error) {
+    logME("[SidePanel] Error in capture right click handler:", error);
+    handleUIError(error);
+  }
+}
 
 // --- Listen for settings changes from other parts of the extension ---
 Browser.storage.onChanged.addListener((changes, areaName) => {

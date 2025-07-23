@@ -15,6 +15,7 @@ import { detectPlatform } from "./utils/platformDetector.js";
 import { ErrorTypes } from "./services/ErrorTypes.js";
 import { smartTextReplacement, smartDelay } from "./utils/framework-compat/index.js";
 import { SubtitleHandler } from "./handlers/subtitleHandler.js";
+import { ContentCaptureHandler } from "./handlers/ContentCaptureHandler.js";
 
 // اکشن‌های پیام برای پاپ‌آپ (باید با پاپ‌آپ یکسان باشند)
 const MSG_POPUP_OPENED_CHECK_MOUSE = "POPUP_OPENED_CHECK_MOUSE_V3";
@@ -39,6 +40,7 @@ export function initContentScript() {
       this.popupJustClosedForSelection = false;
       this.popupJustClosedForSelectionTimeout = null;
       this.subtitleHandler = null; // مدیریت ترجمه زیرنویس
+      this.captureHandler = null; // مدیریت Screen Capture
 
       injectStyle();
       this.translationHandler = getTranslationHandlerInstance();
@@ -385,6 +387,22 @@ export function initContentScript() {
             return true;
           }
 
+          // Screen Capture Cases
+          case "START_SCREEN_AREA_SELECTION":
+            logME("[ContentCS] Starting screen area selection", message.data);
+            this.getCaptureHandler().startScreenAreaSelection(message.data);
+            return false;
+
+          case "SHOW_CAPTURE_PREVIEW":
+            logME("[ContentCS] Showing capture preview", message.data);
+            this.getCaptureHandler().showCapturePreview(message.data);
+            return false;
+
+          case "SHOW_CAPTURE_RESULT":
+            logME("[ContentCS] Showing capture result", message.data);
+            this.getCaptureHandler().showCaptureResult(message.data);
+            return false;
+
           case "CONTEXT_INVALID":
           case "EXTENSION_RELOADED": {
             Browser.runtime.sendMessage({
@@ -573,6 +591,17 @@ export function initContentScript() {
           );
         }
       });
+    }
+
+    /**
+     * Get or create capture handler instance
+     * @returns {ContentCaptureHandler} Capture handler instance
+     */
+    getCaptureHandler() {
+      if (!this.captureHandler) {
+        this.captureHandler = new ContentCaptureHandler();
+      }
+      return this.captureHandler;
     }
   } // پایان کلاس ContentScript
 

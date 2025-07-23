@@ -14,6 +14,7 @@ export class ErrorTypes {
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
   static SUBTITLE = "SUBTITLE";
+  static SCREEN_CAPTURE = "SCREEN_CAPTURE";
   static UNKNOWN = "UNKNOWN";
 
   // کلیدهای اعتبارسنجی (همان errorKeys بدون پیشوند ERRORS_)
@@ -41,4 +42,11 @@ export class ErrorTypes {
   // Import/Export password errors
   static IMPORT_PASSWORD_REQUIRED = "IMPORT_PASSWORD_REQUIRED";
   static IMPORT_PASSWORD_INCORRECT = "IMPORT_PASSWORD_INCORRECT";
+
+  // Screen Capture specific errors
+  static SCREEN_CAPTURE_FAILED = "SCREEN_CAPTURE_FAILED";
+  static SCREEN_CAPTURE_PERMISSION_DENIED = "SCREEN_CAPTURE_PERMISSION_DENIED";
+  static SCREEN_CAPTURE_NOT_SUPPORTED = "SCREEN_CAPTURE_NOT_SUPPORTED";
+  static IMAGE_PROCESSING_FAILED = "IMAGE_PROCESSING_FAILED";
+  static PROVIDER_IMAGE_NOT_SUPPORTED = "PROVIDER_IMAGE_NOT_SUPPORTED";
 };
