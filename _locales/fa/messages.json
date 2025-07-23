@@ -28,6 +28,11 @@
     "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست."
   },
 
+  "bing_translate_settings_title": { "message": "مترجم Microsoft Bing" },
+  "bing_translate_description": {
+    "message": "از سرویس رایگان و عمومی Microsoft Bing Translator استفاده می کند. کلید API لازم نیست."
+  },
+
   "notification_update_title": { "message": "افزونه به‌روز شد" },
   "notification_update_message": {
     "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد."

@@ -80,6 +80,8 @@ export class ProviderHtmlGenerator {
     switch (providerId) {
       case 'google':
         return this._generateGoogleSettingsHtml(provider);
+      case 'bing':
+        return this._generateBingSettingsHtml(provider);
       case 'browserapi':
         return this._generateBrowserApiSettingsHtml(provider);
       case 'gemini':
@@ -147,6 +149,22 @@ export class ProviderHtmlGenerator {
         <h3 data-i18n="google_translate_settings_title">Google Translate</h3>
         <div class="setting-group api-key-info">
           <span class="setting-description" data-i18n="google_translate_description">
+            ${provider.description}
+          </span>
+        </div>
+      </div>`;
+  }
+
+  /**
+   * Generate Google Translate settings HTML
+   * @private
+   */
+  static _generateBingSettingsHtml(provider) {
+    return `
+      <div id="bingApiSettingsInfo" style="display: none">
+        <h3 data-i18n="bing_translate_settings_title">Microsoft Bing Translate</h3>
+        <div class="setting-group api-key-info">
+          <span class="setting-description" data-i18n="bing_translate_description">
             ${provider.description}
           </span>
         </div>

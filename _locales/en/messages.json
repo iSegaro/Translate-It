@@ -27,6 +27,11 @@
   "google_translate_description": {
     "message": "Uses the free, public Google Translate endpoint. No API key is required."
   },
+  
+  "bing_translate_settings_title": { "message": "Microsoft Bing Translator" },
+  "bing_translate_description": {
+    "message": "Uses the free, public Microsoft Bing Translator endpoint. No API key is required."
+  },
 
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },

@@ -135,6 +135,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const googleApiSettingsInfo = document.getElementById(
     "googleApiSettingsInfo"
   );
+  const bingApiSettingsInfo = document.getElementById(
+    "bingApiSettingsInfo"
+  );
   const browserApiSettingsInfo = document.getElementById(
     "browserApiSettingsInfo"
   );
@@ -209,16 +212,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       openAIApiKeyInput,
       openRouterApiKeyInput,
       deepseekApiKeyInput,
-      customApiKeyInput
+      customApiKeyInput,
     ];
-    
-    apiKeyInputs.forEach(input => {
+
+    apiKeyInputs.forEach((input) => {
       if (input) {
-        input.classList.add('api-key-input');
+        input.classList.add("api-key-input");
       }
     });
   }
-  
+
   // Initialize API key masking immediately
   initializeApiKeyMasking();
 
@@ -227,8 +230,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!sourceLanguageInput || !targetLanguageInput) return;
 
     // پاک کردن گزینه‌های موجود
-    sourceLanguageInput.textContent = '';
-    targetLanguageInput.textContent = '';
+    sourceLanguageInput.textContent = "";
+    targetLanguageInput.textContent = "";
 
     // افزودن گزینه "Auto-Detect" به لیست زبان مبدأ
     const autoOption = document.createElement("option");
@@ -262,17 +265,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   // --- Initialize Dynamic Provider Options ---
   function initializeProviderOptions() {
     if (!translationApiSelect) return;
-    
+
     try {
       // Get provider array directly instead of HTML
       const providers = ProviderHtmlGenerator.generateProviderArray();
-      
+
       // Clear existing options safely
-      translationApiSelect.textContent = '';
-      
+      translationApiSelect.textContent = "";
+
       // Create option elements using safe DOM methods
-      providers.forEach(provider => {
-        const option = document.createElement('option');
+      providers.forEach((provider) => {
+        const option = document.createElement("option");
         option.value = provider.id;
         option.textContent = provider.name;
         if (provider.description) {
@@ -280,25 +283,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         translationApiSelect.appendChild(option);
       });
-      
+
       logME("[Options] Dynamic provider options loaded successfully");
     } catch (error) {
       logME("[Options] Error loading dynamic provider options:", error);
       // Fallback to minimal options using safe DOM methods
-      translationApiSelect.textContent = '';
-      
-      const googleOption = document.createElement('option');
-      googleOption.value = 'google';
-      googleOption.textContent = 'Google Translate';
+      translationApiSelect.textContent = "";
+
+      const googleOption = document.createElement("option");
+      googleOption.value = "google";
+      googleOption.textContent = "Google Translate";
       translationApiSelect.appendChild(googleOption);
-      
-      const geminiOption = document.createElement('option');
-      geminiOption.value = 'gemini';
-      geminiOption.textContent = 'Gemini API';
+
+      const geminiOption = document.createElement("option");
+      geminiOption.value = "gemini";
+      geminiOption.textContent = "Gemini API";
       translationApiSelect.appendChild(geminiOption);
     }
   }
-  
+
   // Initialize provider options immediately
   initializeProviderOptions();
 
@@ -631,6 +634,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const allApiSections = {
       google: googleApiSettingsInfo,
+      bing: bingApiSettingsInfo,
       browserapi: browserApiSettingsInfo,
       webai: webAIApiSettings,
       gemini: geminiApiSettings,
@@ -657,7 +661,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // --- Logic to disable/enable prompt tab ---
     if (promptTabButton) {
-      const isGoogleTranslateForPrompt = selectedApi === "google" || selectedApi === "browserapi";
+      const isGoogleTranslateForPrompt =
+        selectedApi === "google" ||
+        selectedApi === "browserapi" ||
+        selectedApi === "bing";
       promptTabButton.classList.toggle("disabled", isGoogleTranslateForPrompt);
 
       // If the prompt tab is now disabled and was active, switch to the API tab
@@ -1035,8 +1042,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           CONFIG.ENABLE_SUBTITLE_TRANSLATION;
       if (showSubtitleIconCheckbox)
         showSubtitleIconCheckbox.checked =
-          settings.SHOW_SUBTITLE_ICON ??
-          CONFIG.SHOW_SUBTITLE_ICON;
+          settings.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON;
 
       // Populate text inputs and textareas
       if (sourceLanguageInput)
@@ -1164,7 +1170,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         app_localize(currentAppLocalize);
       }
 
-
       // --- START: GENERALIZED HASH HANDLING LOGIC ---
 
       const hash = window.location.hash;
@@ -1226,19 +1231,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const settings = await getSettingsAsync();
       const exportPassword = exportPasswordInput?.value?.trim() || null;
-      
+
       // Show warning if no password is provided for security
       if (!exportPassword) {
         // Get localized warning messages
-        const warningTitle = await getTranslationString("security_warning_title") || "⚠️ SECURITY WARNING ⚠️";
-        const warningMessage = await getTranslationString("security_warning_message") || 
+        const warningTitle =
+          (await getTranslationString("security_warning_title")) ||
+          "⚠️ SECURITY WARNING ⚠️";
+        const warningMessage =
+          (await getTranslationString("security_warning_message")) ||
           "You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it's STRONGLY recommended to use a password.";
-        const warningQuestion = await getTranslationString("security_warning_question") || "Do you want to continue without password protection?";
-        
+        const warningQuestion =
+          (await getTranslationString("security_warning_question")) ||
+          "Do you want to continue without password protection?";
+
         const proceed = window.confirm(
           `${warningTitle}\n\n${warningMessage}\n\n${warningQuestion}`
         );
-        
+
         if (!proceed) {
           // Focus on password field to encourage user to enter one
           if (exportPasswordInput) {
@@ -1247,15 +1257,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
       }
-      
+
       // Prepare settings for export (with optional encryption)
-      const exportData = await secureStorage.prepareForExport(settings, exportPassword);
-      
+      const exportData = await secureStorage.prepareForExport(
+        settings,
+        exportPassword
+      );
+
       // Create filename with encryption indicator
       const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const securitySuffix = exportPassword ? "_Encrypted" : "";
       const filename = `${CONFIG.APP_NAME}_Settings${securitySuffix}_${timestamp}.json`;
-      
+
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: "application/json",
       });
@@ -1265,17 +1278,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      
+
       // Clear password field after successful export
       if (exportPasswordInput) {
         exportPasswordInput.value = "";
       }
-      
+
       // Show success message with encryption status
-      const successMessage = exportPassword ? 
-        "Settings exported successfully with encrypted API keys!" :
-        "Settings exported successfully (API keys in plain text)";
-      
+      const successMessage =
+        exportPassword ?
+          "Settings exported successfully with encrypted API keys!"
+        : "Settings exported successfully (API keys in plain text)";
+
       showStatus(successMessage, "success");
       setTimeout(() => showStatus(""), 3000);
     } catch (error) {
@@ -1283,12 +1297,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: ErrorTypes.UI,
         context: "exportSettings",
       });
-      
+
       let errorMessage = "Failed to export settings";
       if (error.message.includes("Password")) {
         errorMessage = "Export failed: " + error.message;
       }
-      
+
       showStatus(errorMessage, "error");
       setTimeout(() => showStatus(""), 3000);
     }
@@ -1299,7 +1313,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const content = await file.text();
       const data = JSON.parse(content);
-      
+
       if (data._hasEncryptedKeys && data._secureKeys) {
         // File has encrypted keys - show password field
         if (importPasswordGroup) {
@@ -1330,60 +1344,58 @@ document.addEventListener("DOMContentLoaded", async () => {
         showStatus("Please select a file to import", "error");
         return;
       }
-      
+
       const fileContent = await file.text();
       const importedSettings = JSON.parse(fileContent);
       const importPassword = importPasswordInput?.value?.trim() || null;
-      
+
       // Process imported settings (with optional decryption)
       const processedSettings = await secureStorage.processImportedSettings(
-        importedSettings, 
+        importedSettings,
         importPassword
       );
-      
+
       // Save to storage
       await Browser.storage.local.set(processedSettings);
-      
+
       // Clear form only on successful import
       if (importFile) importFile.value = "";
       if (importPasswordInput) importPasswordInput.value = "";
       if (importPasswordGroup) importPasswordGroup.style.display = "none";
-      
-      showStatus(
-        "Settings imported successfully! Reloading...",
-        "success"
-      );
+
+      showStatus("Settings imported successfully! Reloading...", "success");
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "importSettings",
       });
-      
+
       let errorMessage = "Failed to import settings";
-      
+
       // Use ErrorMatcher for comprehensive error categorization
       const errorType = matchErrorToType(error);
-      const isPasswordError = errorType === ErrorTypes.IMPORT_PASSWORD_REQUIRED || 
-                             errorType === ErrorTypes.IMPORT_PASSWORD_INCORRECT;
-      
+      const isPasswordError =
+        errorType === ErrorTypes.IMPORT_PASSWORD_REQUIRED ||
+        errorType === ErrorTypes.IMPORT_PASSWORD_INCORRECT;
+
       if (isPasswordError) {
         errorMessage = "Import failed: " + error.message;
       } else if (error.message.includes("JSON")) {
         errorMessage = "Import failed: Invalid file format";
       }
-      
+
       showStatus(errorMessage, "error");
-      
+
       // Only clear file input for non-password errors
       if (!isPasswordError && importFile) {
         importFile.value = "";
       }
-      
+
       // Always clear password input on error
       if (importPasswordInput) {
         importPasswordInput.value = "";
-        
+
         // Focus password input on password errors for immediate retry
         if (isPasswordError) {
           setTimeout(() => {
@@ -1391,7 +1403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           }, 100);
         }
       }
-      
+
       setTimeout(() => showStatus(""), 4000);
     }
   };
@@ -1405,9 +1417,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       return;
     }
-    
+
     const hasEncryption = await checkImportFileEncryption(file);
-    
+
     // If no encryption detected, automatically proceed with import
     if (!hasEncryption) {
       // Small delay to let user see the file was selected
