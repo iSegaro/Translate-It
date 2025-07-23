@@ -148,7 +148,13 @@ The extension implements intelligent text field translation with prioritized sel
   - `COPY_REPLACE="copy"` → Translation is copied to clipboard only (field content remains unchanged)
 
 **Framework Compatibility System:**
-- `src/utils/frameworkCompatibility.js` - Advanced text replacement system for modern web frameworks
+- `src/utils/framework-compat/` - Modular text replacement system for modern web frameworks
+  - `index.js` - Main coordinator and public API
+  - `editorDetection.js` - Complex editor and dangerous structure detection
+  - `textInsertion.js` - Universal text insertion strategies with multi-layer fallback
+  - `naturalTyping.js` - Natural typing simulation for React/frameworks
+  - `selectionUtils.js` - Text selection utilities
+  - `simpleReplacement.js` - Fallback simple replacement methods
 - Supports React, Vue, Angular, and other reactive frameworks
 - Multi-layer fallback system for contentEditable elements
 - Natural typing simulation for sites requiring character-by-character input
@@ -158,7 +164,7 @@ The extension implements intelligent text field translation with prioritized sel
 - `src/handlers/smartTranslationIntegration.js` - Main logic for selection detection and mode determination
 - `src/contentMain.js` - Content script handlers with selection utilities
 - `src/strategies/DefaultStrategy.js` - Platform-specific text extraction and replacement
-- `src/utils/frameworkCompatibility.js` - Framework-aware text replacement utilities
+- `src/utils/framework-compat/` - Modular framework-aware text replacement utilities
 
 ### Subtitle Translation System
 
@@ -285,9 +291,9 @@ When working with text field translation features:
 - Test both selected text scenarios and full field replacement scenarios
 
 **Framework Compatibility Guidelines:**
-- Use `smartTextReplacement()` from `frameworkCompatibility.js` for text replacement
+- Use `smartTextReplacement()` from `framework-compat/index.js` for text replacement
 - For React-based sites: Enable natural typing simulation to bypass virtual DOM detection
-- For contentEditable elements: Implement multi-layer fallback (simple → natural typing → handleSimpleReplacement → DefaultStrategy)
+- For contentEditable elements: Implement multi-layer fallback (universal insertion → natural typing → simple replacement)
 - Always validate replacement success before reporting completion
 - Include comprehensive logging for debugging complex DOM manipulation scenarios
 
@@ -401,7 +407,7 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
 - ✅ `src/contentMain.js` - Content script with secure text selection and replacement utilities
 - ✅ `src/handlers/smartTranslationIntegration.js` - Smart translation logic with selection detection
 - ✅ `src/subtitle/*.js` - All subtitle handlers using safe DOM element creation instead of innerHTML
-- ✅ `src/utils/frameworkCompatibility.js` - Framework-aware text replacement with secure content clearing
+- ✅ `src/utils/framework-compat/` - Modular framework-aware text replacement with secure content clearing
 
 **Additional Security Measures:**
 - Strict CSP policies are enforced
@@ -436,7 +442,7 @@ The extension uses a robust multi-layer TTS system with browser-specific impleme
   - `index.js` - Unified entry point for all provider imports
 - `src/strategies/` - Platform-specific implementations
 - `src/utils/` - Utility functions and helpers
-  - `frameworkCompatibility.js` - Advanced text replacement for modern web frameworks
+  - `framework-compat/` - Modular text replacement system for modern web frameworks
   - `promptBuilder.js` - AI prompt construction and template management
   - `textDetection.js` - Language and text pattern detection
   - `safeHtml.js` - Secure HTML manipulation with comprehensive XSS protection
@@ -513,7 +519,8 @@ The Firefox build is optimized to pass validation without warnings:
 - **Provider Dropdown**: Fixed hover effects and improved visual consistency
 
 **Text Insertion and Framework Compatibility Enhancements (January 2025):**
-- **Enhanced Text Replacement System**: Implemented `universalTextInsertion()` in `src/utils/frameworkCompatibility.js` with multi-strategy approach
+- **Modular Architecture**: Refactored `frameworkCompatibility.js` into organized `framework-compat/` module structure
+- **Enhanced Text Replacement System**: Implemented `universalTextInsertion()` with multi-strategy approach
 - **Undo Capability Preservation**: All text insertion methods now prioritize `execCommand` to maintain browser undo/redo functionality
 - **Multi-Layer Fallback System**: execCommand → paste event simulation → direct value assignment with comprehensive error handling
 - **Framework-Specific Optimizations**: Enhanced compatibility for React, Vue, Angular with natural typing simulation
@@ -548,7 +555,7 @@ The Firefox build is optimized to pass validation without warnings:
 - **Complete innerHTML Security Fix**: Eliminated all unsafe innerHTML assignments to resolve Firefox addons-linter warnings
 - **Safe HTML Utility**: Created `src/utils/safeHtml.js` utility with comprehensive XSS protection and proper DOM manipulation
 - **Subtitle System Security**: Replaced all innerHTML assignments in subtitle handlers with safe DOM element creation
-- **Framework Compatibility Security**: Updated `frameworkCompatibility.js` to use `textContent` instead of innerHTML for content clearing
+- **Framework Compatibility Security**: Updated `framework-compat/` modules to use `textContent` instead of innerHTML for content clearing
 - **ESLint Compliance**: Resolved all unused import and variable warnings for clean code quality
 - **Zero-Warning Achievement**: Achieved complete Firefox addons-linter validation with 0 errors, 0 warnings, and 0 notices
 - **Security-First DOM Manipulation**: All dynamic content insertion now uses safe DOM methods with XSS filtering
@@ -574,3 +581,29 @@ The Firefox build is optimized to pass validation without warnings:
 - **Improved Scalability**: Provider system now supports easier addition of new translation providers
 - **Clean Dependencies**: Updated all import paths across codebase to use new modular structure
 - **Benefits**: Better code organization, clearer separation of concerns, enhanced developer experience
+
+**Advanced Text Insertion System for Complex Editors (January 2025):**
+- **Universal Text Insertion**: Implemented comprehensive `universalTextInsertion()` system in `src/utils/framework-compat/textInsertion.js`
+- **Multi-Strategy Approach**: 5-layer fallback system: execCommand → beforeinput → paste events → MutationObserver → direct manipulation
+- **Modern Editor Support**: Enhanced compatibility with AI chat platforms (Kimi.com, Claude.ai, ChatGPT) and modern editors (Lexical, Slate, ProseMirror)
+- **Intelligent Complex Editor Detection**: Refined `isComplexEditor()` to distinguish truly complex editors from simple AI chat inputs
+- **Verification System**: Added `verifyTextInsertion()` to confirm successful text replacement across all strategies
+- **beforeinput Event Support**: Implemented modern `beforeinput` event simulation for contemporary web applications
+- **MutationObserver Integration**: Advanced DOM monitoring for complex reactive frameworks
+- **Smart Fallback Logic**: Intelligent decision-making in `smartTranslationIntegration.js` respects user preferences while enabling advanced insertion
+- **AI Platform Optimization**: Specific enhancements for Kimi.com, Claude.ai, Poe.com, Character.ai, and other AI chat platforms
+- **Framework Compatibility**: Enhanced support for React, Vue, Angular applications with proper event simulation and undo preservation
+
+**Framework Compatibility Modularization (January 2025):**
+- **Modular Architecture**: Refactored monolithic `frameworkCompatibility.js` (1558 lines) into organized module structure
+- **Separation of Concerns**: Each module handles specific responsibilities:
+  - `editorDetection.js` - Complex editor identification and dangerous structure detection
+  - `textInsertion.js` - Universal text insertion strategies with multi-layer fallback
+  - `naturalTyping.js` - Character-by-character typing simulation for React/frameworks
+  - `selectionUtils.js` - Text selection detection and handling utilities
+  - `simpleReplacement.js` - Fallback replacement methods with undo preservation
+  - `index.js` - Main coordinator orchestrating all strategies
+- **Enhanced Maintainability**: Smaller, focused files easier to understand, test, and maintain
+- **Backward Compatibility**: All existing imports work seamlessly with automatic re-exports
+- **Documentation**: Comprehensive README.md explaining module architecture and usage patterns
+- **Build Validation**: Both Chrome and Firefox builds successful with zero functionality loss
