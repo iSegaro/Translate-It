@@ -416,7 +416,7 @@
     "message": "Chrome 138+ (Desktop Only)"
   },
   "browser_api_requirements_gpu": { "message": "GPU with 4GB+ VRAM" },
-  "browser_api_requirements_storage": { "message": "Larg free storage space" },
+  "browser_api_requirements_storage": { "message": "A large free storage space (at least 22 GB)" },
   "browser_api_requirements_internet": {
     "message": "Unmetered network connection for initial download"
   },

@@ -438,7 +438,7 @@
     "message": "+Chrome 138 (دسکتاپ)"
   },
   "browser_api_requirements_gpu": { "message": "GPU with 4GB+ VRAM" },
-  "browser_api_requirements_storage": { "message": "فضای ذخیره سازی زیاد" },
+  "browser_api_requirements_storage": { "message": "فضای ذخیره سازی (حداقل ۲۲ گیگابایت)" },
   "browser_api_requirements_internet": {
     "message": "یک اتصال نامحدود اینترنت، برای دانلودهای اولیه"
   },
