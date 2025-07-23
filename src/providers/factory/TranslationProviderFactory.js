@@ -1,6 +1,7 @@
 // src/providers/factory/TranslationProviderFactory.js
 import {
   GoogleTranslateProvider,
+  BingTranslateProvider,
   GeminiProvider,
   OpenAIProvider,
   OpenRouterProvider,
@@ -37,6 +38,9 @@ export class TranslationProviderFactory {
     switch (apiType.toLowerCase()) {
       case "google":
         provider = new GoogleTranslateProvider();
+        break;
+      case "bing":
+        provider = new BingTranslateProvider();
         break;
       case "gemini":
         provider = new GeminiProvider();
@@ -79,6 +83,7 @@ export class TranslationProviderFactory {
   getSupportedProviders() {
     return [
       "google",
+      "bing",
       "gemini", 
       "openai",
       "openrouter",

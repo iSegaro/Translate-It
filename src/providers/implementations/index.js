@@ -1,6 +1,7 @@
 // src/core/providers/index.js
 export { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 export { GoogleTranslateProvider } from "./GoogleTranslateProvider.js";
+export { BingTranslateProvider } from "./BingTranslateProvider.js";
 export { GeminiProvider } from "./GeminiProvider.js";
 export { OpenAIProvider } from "./OpenAIProvider.js";
 export { OpenRouterProvider } from "./OpenRouterProvider.js";

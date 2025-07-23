@@ -23,6 +23,21 @@ export class ProviderRegistry {
       category: "free",
     },
     {
+      id: "bing",
+      name: "Bing Translate",
+      displayName: "Bing Translate",
+      icon: "bing.svg",
+      description: "Microsoft Bing Translate service. Free translation with high quality.",
+      requirements: {
+        browsers: ["chrome", "firefox", "safari", "edge"],
+        minVersion: null,
+        features: [],
+      },
+      needsApiKey: false,
+      needsUrl: false,
+      category: "free",
+    },
+    {
       id: "gemini",
       name: "Gemini",
       displayName: "Google Gemini",
