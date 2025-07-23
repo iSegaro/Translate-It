@@ -2,7 +2,7 @@
 
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { createSafeElement, safeSetText, safeSetHTML } from "../utils/safeHtml.js";
+import { createSafeElement, safeSetText } from "../utils/safeHtml.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { getTranslationString } from "../utils/i18n.js";
 

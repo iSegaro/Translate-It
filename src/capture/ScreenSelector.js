@@ -164,6 +164,22 @@ export class ScreenSelector {
   }
 
   /**
+   * Convert viewport coordinates to capture coordinates
+   * Browser capture API captures visible viewport, so we need viewport-relative coordinates
+   * @param {MouseEvent} event - Mouse event with clientX/clientY
+   * @returns {Object} Capture coordinates {x, y}
+   * @private
+   */
+  _getCaptureCoordinates(event) {
+    // For screen capture, we need viewport-relative coordinates
+    // Browser.tabs.captureVisibleTab() captures what's currently visible in viewport
+    return {
+      x: Math.round(event.clientX),
+      y: Math.round(event.clientY)
+    };
+  }
+
+  /**
    * Handle mouse down - start selection
    * @param {MouseEvent} event
    * @private
@@ -174,12 +190,15 @@ export class ScreenSelector {
     logME("[ScreenSelector] Mouse down, starting selection");
 
     this.isSelecting = true;
+    
+    // Use viewport coordinates for capture (since browser captures viewport)
+    const captureCoords = this._getCaptureCoordinates(event);
     this.startPoint = {
-      x: event.clientX,
-      y: event.clientY
+      x: captureCoords.x,
+      y: captureCoords.y
     };
 
-    // Show selection box
+    // Show selection box using same coordinates
     this.selectionBox.style.display = "block";
     this.selectionBox.style.left = event.clientX + "px";
     this.selectionBox.style.top = event.clientY + "px";
@@ -198,23 +217,30 @@ export class ScreenSelector {
   _handleMouseMove(event) {
     if (!this.isSelecting || !this.startPoint) return;
 
-    const currentX = event.clientX;
-    const currentY = event.clientY;
+    // Get capture coordinates (viewport-relative)
+    const captureCoords = this._getCaptureCoordinates(event);
+    const currentX = captureCoords.x;
+    const currentY = captureCoords.y;
 
-    // Calculate selection rectangle
+    // Calculate selection rectangle using viewport coordinates
     const left = Math.min(this.startPoint.x, currentX);
     const top = Math.min(this.startPoint.y, currentY);
     const width = Math.abs(currentX - this.startPoint.x);
     const height = Math.abs(currentY - this.startPoint.y);
 
-    // Update selection box
+    // Update selection box using same coordinates
     this.selectionBox.style.left = left + "px";
     this.selectionBox.style.top = top + "px";
     this.selectionBox.style.width = width + "px";
     this.selectionBox.style.height = height + "px";
 
-    // Store current selection
-    this.currentSelection = { left, top, width, height };
+    // Store current selection using capture coordinates
+    this.currentSelection = { 
+      left: left, 
+      top: top, 
+      width: width, 
+      height: height 
+    };
   }
 
   /**
@@ -266,14 +292,36 @@ export class ScreenSelector {
   _completeSelection() {
     if (!this.currentSelection) return;
 
-    logME("[ScreenSelector] Completing selection:", this.currentSelection);
+    // Debug logging for coordinate analysis
+    const debugInfo = {
+      selection: this.currentSelection,
+      coordinateSystem: "viewport-relative", 
+      devicePixelRatio: window.devicePixelRatio || 1,
+      scrollOffset: {
+        x: window.pageXOffset || document.documentElement.scrollLeft || 0,
+        y: window.pageYOffset || document.documentElement.scrollTop || 0
+      },
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      documentSize: {
+        width: document.documentElement.scrollWidth,
+        height: document.documentElement.scrollHeight
+      },
+      note: "Using viewport coordinates because browser capture API captures visible viewport only"
+    };
+
+    logME("[ScreenSelector] Completing selection with debug info:", debugInfo);
 
     const selectionData = {
       x: this.currentSelection.left,
       y: this.currentSelection.top,
       width: this.currentSelection.width,
       height: this.currentSelection.height,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      // Add debug info for troubleshooting
+      debug: debugInfo
     };
 
     // Clean up before callback

@@ -30,17 +30,45 @@ export async function cropImageData(imageDataUrl, selectionData) {
       
       img.onload = () => {
         try {
+          // Get device pixel ratio for high-DPI displays
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          
+          // Calculate actual coordinates on the captured image
+          // Browser capture may be at device pixel ratio
+          const actualX = selectionData.x * devicePixelRatio;
+          const actualY = selectionData.y * devicePixelRatio;
+          const actualWidth = selectionData.width * devicePixelRatio;
+          const actualHeight = selectionData.height * devicePixelRatio;
+          
+          // Ensure coordinates are within image bounds
+          const maxX = Math.min(actualX, img.naturalWidth - actualWidth);
+          const maxY = Math.min(actualY, img.naturalHeight - actualHeight);
+          const safeX = Math.max(0, maxX);
+          const safeY = Math.max(0, maxY);
+          const safeWidth = Math.min(actualWidth, img.naturalWidth - safeX);
+          const safeHeight = Math.min(actualHeight, img.naturalHeight - safeY);
+
+          logME("[ImageProcessing] Coordinate calculation:", {
+            original: { x: selectionData.x, y: selectionData.y, width: selectionData.width, height: selectionData.height },
+            devicePixelRatio: devicePixelRatio,
+            calculated: { x: actualX, y: actualY, width: actualWidth, height: actualHeight },
+            safe: { x: safeX, y: safeY, width: safeWidth, height: safeHeight },
+            imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+            coordinateSystem: "viewport-relative (matches browser capture)",
+            debug: selectionData.debug || {}
+          });
+
           // Draw cropped area to canvas
           ctx.drawImage(
             img,
-            selectionData.x, // source x
-            selectionData.y, // source y  
-            selectionData.width, // source width
-            selectionData.height, // source height
+            safeX, // source x
+            safeY, // source y  
+            safeWidth, // source width
+            safeHeight, // source height
             0, // dest x
             0, // dest y
-            selectionData.width, // dest width
-            selectionData.height // dest height
+            selectionData.width, // dest width (original size for display)
+            selectionData.height // dest height (original size for display)
           );
 
           // Convert to data URL
@@ -49,6 +77,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
           logME("[ImageProcessing] Image cropped successfully", {
             originalSize: `${img.naturalWidth}x${img.naturalHeight}`,
             croppedSize: `${selectionData.width}x${selectionData.height}`,
+            actualCroppedSize: `${safeWidth}x${safeHeight}`,
             croppedDataLength: croppedDataUrl.length
           });
 
