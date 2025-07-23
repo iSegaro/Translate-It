@@ -21,7 +21,7 @@ import { getTranslationString } from "../utils/i18n.js";
 import Browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
-import { isComplexEditor } from "../utils/frameworkCompatibility.js";
+import { isComplexEditor } from "../utils/framework-compat/index.js";
 
 /**
  * بررسی اینکه آیا متنی در المان فعال انتخاب شده است یا نه
@@ -107,8 +107,15 @@ export async function translateFieldViaSmartHandler({
         const isComplexEditorDetected = activeElement ? isComplexEditor(activeElement) : false;
         
         if (isComplexEditorDetected) {
-          logME("[SmartTranslationHandler] Complex editor detected on default platform - forcing copy mode");
-          isReplaceMode = false; // همیشه copy mode
+          // اگر کاربر صریحاً replace mode انتخاب کرده، به آن احترام بگذاریم
+          // سیستم universalTextInsertion جدید ما می‌تواند با complex editors کار کند
+          if (is_copy === "replace") {
+            logME("[SmartTranslationHandler] Complex editor detected but user chose replace mode - attempting advanced insertion");
+            isReplaceMode = true;
+          } else {
+            logME("[SmartTranslationHandler] Complex editor detected with copy mode - forcing copy mode");
+            isReplaceMode = false;
+          }
         } else if (is_copy === "replace") {
           isReplaceMode = true;
           logME(`[SmartTranslationHandler] replace on default (hasSelection: ${hasTextSelection})`);

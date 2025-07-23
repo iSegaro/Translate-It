@@ -13,7 +13,7 @@ import { revertTranslations } from "./utils/textExtraction.js";
 import { getTranslationHandlerInstance } from "./core/InstanceManager.js";
 import { detectPlatform } from "./utils/platformDetector.js";
 import { ErrorTypes } from "./services/ErrorTypes.js";
-import { smartTextReplacement, smartDelay } from "./utils/frameworkCompatibility.js";
+import { smartTextReplacement, smartDelay } from "./utils/framework-compat/index.js";
 import { SubtitleHandler } from "./handlers/subtitleHandler.js";
 
 // اکشن‌های پیام برای پاپ‌آپ (باید با پاپ‌آپ یکسان باشند)

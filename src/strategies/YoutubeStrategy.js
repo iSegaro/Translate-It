@@ -3,7 +3,7 @@ import { ErrorTypes } from "../services/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { logME } from "../utils/helpers.js";
 import { filterXSS } from "xss";
-import { smartTextReplacement, smartDelay } from "../utils/frameworkCompatibility.js";
+import { smartTextReplacement, smartDelay } from "../utils/framework-compat/index.js";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
