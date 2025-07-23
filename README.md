@@ -98,6 +98,7 @@ You can choose from several AI-powered translation providers:
 - [Google Translate][google-translate-url] (✔ Free)
 - [Gemini][gemini-url] (✔ Free)
 - [Microsoft Bing Translator][bing-url] (✔ Free)
+- [Yandex Translate][yandex-url] (✔ Free)
 - [Browser Translator][browserapi-url] (✔ Free)
 - [WebAI to API][webai-to-api-url] (✔ Free)
 - [OpenRouter][openrouter-url]
@@ -526,6 +527,7 @@ year 2025
 [openrouter-url]: https://openrouter.ai/
 [browserapi-url]: https://developer.chrome.com/docs/ai/translator-api/
 [bing-url]: https://www.bing.com/translator/
+[bing-url]: https://translate.yandex.com/en/
 [webai-to-api-url]: https://github.com/Amm1rr/WebAI-to-API/
 [firefox-store]: https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/
 [chrome-store]: https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/
