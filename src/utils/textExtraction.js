@@ -183,7 +183,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
         // اطمینان از اینکه context.errorHandler موجود است
         if (context.errorHandler && typeof context.errorHandler.handle === 'function') {
           context.errorHandler.handle(processedError, {
-            type: ErrorTypes.PARSE_SELECT_ELEMENT,
+            type: ErrorTypes.UI,
             context: "textExtraction-apply-translations-replace",
             elementId: "multiple", // یا uniqueId اگر مربوط به یک المنت خاص است
           });
@@ -231,7 +231,7 @@ export async function revertTranslations(context) {
       } catch (error) {
         const errorMessage = `Failed to revert container with original text.`;
         context.errorHandler.handle(error, {
-          type: ErrorTypes.PARSE_SELECT_ELEMENT,
+          type: ErrorTypes.UI,
           context: "revert-translations-replace",
           elementId: container.getAttribute("data-aiwc-original-id"),
         });
@@ -276,7 +276,7 @@ export function parseAndCleanTranslationResponse(
     logME("No JSON structure (array or object) found in the response string.");
     const error = new Error("هیچ ساختار JSON معتبری در پاسخ یافت نشد.");
     context.errorHandler.handle(error, {
-      type: ErrorTypes.PARSE_SELECT_ELEMENT,
+      type: ErrorTypes.API_RESPONSE_INVALID,
       context: "parseAndCleanTranslationResponse-NoJsonFound",
     });
     return []; // برگرداندن آرایه خالی
@@ -340,7 +340,7 @@ export function parseAndCleanTranslationResponse(
           // خطای اولیه را به handler ارسال کن چون ریشه مشکل همان بود
           const processedError = ErrorHandler.processError(initialError);
           context.errorHandler.handle(processedError, {
-            type: ErrorTypes.PARSE_SELECT_ELEMENT,
+            type: ErrorTypes.API_RESPONSE_INVALID,
             context: "parseAndCleanTranslationResponse-RepairFailed",
           });
           logME("Original problematic string:", potentialJsonString); // لاگ کردن رشته مشکل‌دار اصلی
@@ -353,7 +353,7 @@ export function parseAndCleanTranslationResponse(
         );
         const processedError = ErrorHandler.processError(initialError);
         context.errorHandler.handle(processedError, {
-          type: ErrorTypes.PARSE_SELECT_ELEMENT,
+          type: ErrorTypes.API_RESPONSE_INVALID,
           context: "parseAndCleanTranslationResponse-NoCommaForRepair",
         });
         logME("Original problematic string:", potentialJsonString);
@@ -366,7 +366,7 @@ export function parseAndCleanTranslationResponse(
       );
       const processedError = ErrorHandler.processError(initialError);
       context.errorHandler.handle(processedError, {
-        type: ErrorTypes.PARSE_SELECT_ELEMENT,
+        type: ErrorTypes.API_RESPONSE_INVALID,
         context: "parseAndCleanTranslationResponse-InitialErrorNotRepaired",
       });
       logME("Original problematic string:", potentialJsonString);
