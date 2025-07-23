@@ -2,6 +2,7 @@
 export { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 export { GoogleTranslateProvider } from "./GoogleTranslateProvider.js";
 export { BingTranslateProvider } from "./BingTranslateProvider.js";
+export { YandexTranslateProvider } from "./YandexTranslateProvider.js";
 export { GeminiProvider } from "./GeminiProvider.js";
 export { OpenAIProvider } from "./OpenAIProvider.js";
 export { OpenRouterProvider } from "./OpenRouterProvider.js";

@@ -28,6 +28,11 @@
     "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست."
   },
 
+  "yandex_translate_settings_title": { "message": "مترجم Yandex" },
+  "yandex_translate_description": {
+    "message": "از سرویس رایگان و عمومی Yandex Translate استفاده می کند. کلید API لازم نیست."
+  },
+
   "bing_translate_settings_title": { "message": "مترجم Microsoft Bing" },
   "bing_translate_description": {
     "message": "از سرویس رایگان و عمومی Microsoft Bing Translator استفاده می کند. کلید API لازم نیست."

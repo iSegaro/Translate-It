@@ -135,8 +135,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const googleApiSettingsInfo = document.getElementById(
     "googleApiSettingsInfo"
   );
-  const bingApiSettingsInfo = document.getElementById(
-    "bingApiSettingsInfo"
+  const bingApiSettingsInfo = document.getElementById("bingApiSettingsInfo");
+  const yandexApiSettingsInfo = document.getElementById(
+    "yandexApiSettingsInfo"
   );
   const browserApiSettingsInfo = document.getElementById(
     "browserApiSettingsInfo"
@@ -635,6 +636,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const allApiSections = {
       google: googleApiSettingsInfo,
       bing: bingApiSettingsInfo,
+      yandex: yandexApiSettingsInfo,
       browserapi: browserApiSettingsInfo,
       webai: webAIApiSettings,
       gemini: geminiApiSettings,
@@ -663,8 +665,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (promptTabButton) {
       const isGoogleTranslateForPrompt =
         selectedApi === "google" ||
+        selectedApi === "bing" ||
         selectedApi === "browserapi" ||
-        selectedApi === "bing";
+        selectedApi === "yandex";
       promptTabButton.classList.toggle("disabled", isGoogleTranslateForPrompt);
 
       // If the prompt tab is now disabled and was active, switch to the API tab

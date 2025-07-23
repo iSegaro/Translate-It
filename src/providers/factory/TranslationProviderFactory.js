@@ -2,6 +2,7 @@
 import {
   GoogleTranslateProvider,
   BingTranslateProvider,
+  YandexTranslateProvider,
   GeminiProvider,
   OpenAIProvider,
   OpenRouterProvider,
@@ -41,6 +42,9 @@ export class TranslationProviderFactory {
         break;
       case "bing":
         provider = new BingTranslateProvider();
+        break;
+      case "yandex":
+        provider = new YandexTranslateProvider();
         break;
       case "gemini":
         provider = new GeminiProvider();
@@ -84,6 +88,7 @@ export class TranslationProviderFactory {
     return [
       "google",
       "bing",
+      "yandex",
       "gemini", 
       "openai",
       "openrouter",

@@ -38,6 +38,21 @@ export class ProviderRegistry {
       category: "free",
     },
     {
+      id: "yandex",
+      name: "Yandex Translate",
+      displayName: "Yandex Translate",
+      icon: "yandex.svg",
+      description: "Yandex Translate service. Free translation with auto-detect support.",
+      requirements: {
+        browsers: ["chrome", "firefox", "safari", "edge"],
+        minVersion: null,
+        features: [],
+      },
+      needsApiKey: false,
+      needsUrl: false,
+      category: "free",
+    },
+    {
       id: "gemini",
       name: "Gemini",
       displayName: "Google Gemini",
