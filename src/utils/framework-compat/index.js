@@ -6,8 +6,9 @@ import { simulateNaturalTyping } from "./naturalTyping.js";
 import {
   universalTextInsertion,
   optimizedTextInsertion,
-} from "./textInsertion.js";
+} from "./text-insertion/index.js";
 import { handleSimpleReplacement } from "./simpleReplacement.js";
+
 
 /**
  * جایگزینی هوشمند متن با چندین استراتژی fallback
@@ -121,6 +122,6 @@ export { simulateNaturalTyping } from "./naturalTyping.js";
 export {
   universalTextInsertion,
   optimizedTextInsertion,
-  smartDelay,
-} from "./textInsertion.js";
+} from "./text-insertion/index.js";
+export { smartDelay } from "./text-insertion/helpers.js";
 export { handleSimpleReplacement } from "./simpleReplacement.js";
