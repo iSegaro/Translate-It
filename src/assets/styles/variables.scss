@@ -1,0 +1,97 @@
+// Color Variables
+:root {
+  // Primary colors
+  --color-primary: #1976d2;
+  --color-primary-light: #42a5f5;
+  --color-primary-dark: #1565c0;
+  
+  // Secondary colors
+  --color-secondary: #dc004e;
+  --color-secondary-light: #ff6090;
+  --color-secondary-dark: #9a0036;
+  
+  // Neutral colors
+  --color-background: #ffffff;
+  --color-surface: #f5f5f5;
+  --color-border: #e0e0e0;
+  --color-text: #212121;
+  --color-text-secondary: #757575;
+  --color-text-disabled: #bdbdbd;
+  
+  // Success, warning, error colors
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-error: #f44336;
+  --color-info: #2196f3;
+  
+  // Dark theme colors (for future use)
+  --color-dark-background: #121212;
+  --color-dark-surface: #1e1e1e;
+  --color-dark-border: #333333;
+  --color-dark-text: #ffffff;
+  --color-dark-text-secondary: #b3b3b3;
+}
+
+// Typography
+$font-family-base: "Vazirmatn", "Segoe UI", sans-serif;
+$font-size-xs: 11px;
+$font-size-sm: 12px;
+$font-size-base: 14px;
+$font-size-md: 15px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-xxl: 20px;
+
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// Spacing
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-base: 12px;
+$spacing-md: 16px;
+$spacing-lg: 20px;
+$spacing-xl: 24px;
+$spacing-xxl: 32px;
+
+// Borders
+$border-radius-sm: 4px;
+$border-radius-base: 6px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+$border-width: 1px;
+$border-style: solid;
+$border-color: var(--color-border);
+
+// Shadows
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-base: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+$shadow-md: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
+$shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.10);
+
+// Transitions
+$transition-fast: 0.15s ease;
+$transition-base: 0.2s ease;
+$transition-slow: 0.3s ease;
+
+// Z-index layers
+$z-tooltip: 1000;
+$z-dropdown: 1010;
+$z-modal: 1020;
+$z-notification: 1030;
+$z-overlay: 1040;
+
+// Extension specific
+$popup-width: 400px;
+$popup-max-height: 600px;
+$sidepanel-width: 400px;
+$selection-window-max-width: 300px;
+
+// Responsive breakpoints (for options page)
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;

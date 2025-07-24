@@ -3,7 +3,9 @@ import Browser from "webextension-polyfill";
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
-import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
+// import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
+const AUTO_DETECT_VALUE = 'auto';
+const getLanguageCode = (lang) => lang;
 import { ErrorTypes } from "../../services/ErrorTypes.js";
 import { TranslationMode } from "../../config.js";
 

@@ -15,7 +15,9 @@
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "scripts": ["background.bundle.js"]
+    "scripts": [
+      "src/background/index.js"
+    ]
   },
   "sidebar_action": {
     "default_panel": "html/sidepanel.html",
