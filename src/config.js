@@ -1,5 +1,5 @@
 // src/config.js
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 import { logME } from "./utils/helpers";
 
 export const TRANSLATION_ERRORS = {
@@ -309,7 +309,8 @@ export const getSettingsAsync = async () => {
     return settingsCache;
   }
   // Otherwise, fetch from storage
-  return getBrowser().storage.local
+  const Browser = await getBrowserAsync();
+  return Browser.storage.local
     .get(null)
     .then((items) => {
       // Combine fetched items with defaults to ensure all keys exist
@@ -324,37 +325,30 @@ export const getSettingsAsync = async () => {
     });
 };
 
-// Listener to update cache when settings change in storage
-if (getBrowser() && getBrowser().storage && getBrowser().storage.onChanged) {
-  getBrowser().storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "local" && settingsCache) {
-      // let updated = false;
-      Object.keys(changes).forEach((key) => {
-        // Check if the key exists in our CONFIG or was already in cache
-        if (
-          Object.prototype.hasOwnProperty.call(CONFIG, key) ||
-          (settingsCache &&
-            Object.prototype.hasOwnProperty.call(settingsCache, key))
-        ) {
-          const newValue = changes[key].newValue;
-          // Update cache only if the value actually changed
-          if (settingsCache[key] !== newValue) {
-            settingsCache[key] = newValue;
-            // updated = true;
+export const initializeSettingsListener = async (Browser) => {
+  if (Browser.storage && Browser.storage.onChanged) {
+    Browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local" && settingsCache) {
+        Object.keys(changes).forEach((key) => {
+          if (
+            Object.prototype.hasOwnProperty.call(CONFIG, key) ||
+            (settingsCache &&
+              Object.prototype.hasOwnProperty.call(settingsCache, key))
+          ) {
+            const newValue = changes[key].newValue;
+            if (settingsCache[key] !== newValue) {
+              settingsCache[key] = newValue;
+            }
           }
-        }
-      });
-      // Optional: Log if cache was updated
-      // if (updated) {
-      //   logME("Settings cache updated by storage change listener.");
-      // }
-    }
-  });
-} else {
-  console.log(
-    "Browser.storage.onChanged not available. Settings cache might become stale."
-  );
-}
+        });
+      }
+    });
+  } else {
+    console.log(
+      "Browser.storage.onChanged not available. Settings cache might become stale."
+    );
+  }
+};
 
 // --- Individual Setting Getters (Using Cache) ---
 

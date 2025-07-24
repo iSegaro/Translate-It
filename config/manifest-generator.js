@@ -111,7 +111,7 @@ function generateChromeManifest(baseManifest) {
     
     // Chrome action (popup)
     action: {
-      default_popup: 'popup.html',
+      default_popup: 'html/popup.html',
       default_title: 'Translate It',
       default_icon: {
         16: 'icons/extension_icon_16.png',
@@ -123,11 +123,11 @@ function generateChromeManifest(baseManifest) {
     
     // Chrome side panel
     side_panel: {
-      default_path: 'sidepanel.html'
+      default_path: 'html/sidepanel.html'
     },
     
     // Options page
-    options_page: 'options.html',
+    options_page: 'html/options.html',
     
     // Content Security Policy for development
     content_security_policy: {
@@ -165,13 +165,13 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox uses sidebar_action instead of side_panel
     sidebar_action: {
-      default_panel: 'sidepanel.html',
+      default_panel: 'html/sidepanel.html',
       default_title: '__MSG_name__'
     },
     
     // Firefox action (popup) - similar to Chrome but with Firefox naming
     action: {
-      default_popup: 'popup.html',
+      default_popup: 'html/popup.html',
       default_title: '__MSG_name__',
       default_icon: {
         16: 'icons/extension_icon_16.png',
@@ -186,7 +186,7 @@ function generateFirefoxManifest(baseManifest) {
     
     // Options UI
     options_ui: {
-      page: 'options.html',
+      page: 'html/options.html',
       open_in_tab: true
     },
     

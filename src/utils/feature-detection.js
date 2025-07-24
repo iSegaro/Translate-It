@@ -99,6 +99,11 @@ export class FeatureDetector {
   async checkOffscreenAPI() {
     return this.cachedCheck('offscreen', () => {
       try {
+        // Offscreen API is only available in background/service worker context
+        const context = this.detectContext();
+        if (context !== 'service-worker' && context !== 'extension-page') {
+          return false;
+        }
         return typeof chrome !== 'undefined' && 
                typeof chrome.offscreen !== 'undefined' &&
                typeof chrome.offscreen.createDocument === 'function';
@@ -114,6 +119,11 @@ export class FeatureDetector {
   async checkSidePanelAPI() {
     return this.cachedCheck('sidePanel', () => {
       try {
+        // SidePanel API is only available in background/service worker context
+        const context = this.detectContext();
+        if (context !== 'service-worker' && context !== 'extension-page') {
+          return false;
+        }
         return typeof chrome !== 'undefined' && 
                typeof chrome.sidePanel !== 'undefined';
       } catch {
@@ -128,6 +138,11 @@ export class FeatureDetector {
   async checkTTSAPI() {
     return this.cachedCheck('tts', () => {
       try {
+        // TTS API is only available in background/service worker context
+        const context = this.detectContext();
+        if (context !== 'service-worker' && context !== 'extension-page') {
+          return false;
+        }
         return typeof chrome !== 'undefined' && 
                typeof chrome.tts !== 'undefined' &&
                typeof chrome.tts.speak === 'function';

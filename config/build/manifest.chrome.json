@@ -11,7 +11,8 @@
     "scripting",
     "contextMenus",
     "notifications",
-    "offscreen"
+    "offscreen",
+    "commands"
   ],
   
   "host_permissions": [

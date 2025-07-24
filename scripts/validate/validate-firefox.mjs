@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
-const FIREFOX_BUILD_DIR = path.join(rootDir, `dist/Firefox/Translate-It-v${pkg.version}`)
+const FIREFOX_BUILD_DIR = path.join(rootDir, `dist/firefox/Translate-It-v${pkg.version}`)
 
 /**
  * Validate Firefox extension build

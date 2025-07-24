@@ -67,5 +67,14 @@
     }
   },
   
-  "default_locale": "en"
+  "default_locale": "en",
+  "commands": {
+    "toggle-select-element": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Toggle Select Element Mode"
+    }
+  }
 }

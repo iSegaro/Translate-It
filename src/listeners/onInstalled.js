@@ -81,7 +81,7 @@ class InstallationListener extends BaseListener {
     logME(`[Translate-It!] 🌟 Success: ${details.reason}`);
 
     // Setup all context menus on installation or update
-    await setupContextMenus();
+    await setupContextMenus(this.browser);
 
     // Migrate configuration settings for both install and update scenarios
     try {

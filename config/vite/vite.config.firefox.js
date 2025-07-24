@@ -4,13 +4,10 @@ import webExtension from 'vite-plugin-web-extension'
 import fs from 'fs-extra'
 import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
+import pkg from '../../package.json' with { type: 'json' };
 
 const baseConfig = createBaseConfig('firefox')
 
-// Firefox script polyfill stub (ESM) for service worker and content scripts
-const polyfillPath = resolve(process.cwd(), 'public', 'browser-polyfill.esm.js')
-
-// Merge with base config
 export default defineConfig({
   ...baseConfig,
   
@@ -23,7 +20,7 @@ export default defineConfig({
   
   build: {
     ...baseConfig.build,
-    outDir: 'dist/firefox'
+    outDir: `dist/firefox/Translate-It-v${pkg.version}`,
   },
   
   plugins: [
@@ -32,76 +29,97 @@ export default defineConfig({
     webExtension({
       // Generate dynamic manifest for Firefox
       manifest: async () => {
-        console.log('🦊 Generating Firefox manifest...');
-        const manifest = generateValidatedManifest('firefox');
-        console.log('✅ Firefox manifest generated and validated');
-        return manifest;
-      },
+          console.log('🦊 Generating Firefox manifest...');
+          const manifest = generateValidatedManifest('firefox');
+          // Add background script entry point for Manifest V2
+          manifest.background = {
+            scripts: ['src/background/index.js'],
+            persistent: false // Or true, depending on project needs for MV2
+          };
+          // Add content script entry point
+          manifest.content_scripts = manifest.content_scripts || [];
+          manifest.content_scripts.push({
+            matches: ["<all_urls>"],
+            js: ["src/content-scripts/index.js"],
+            run_at: "document_end"
+          });
+          console.log('✅ Firefox manifest generated and validated');
+          return manifest;
+        },
       
       // Firefox HTML config
       htmlViteConfig: {
         ...baseConfig,
         resolve: {
           ...baseConfig.resolve,
-          alias: {
-            ...baseConfig.resolve.alias,
-            'webextension-polyfill': polyfillPath
-          }
+        },
+        build: {
+          ...baseConfig.build,
+          outDir: `dist/firefox/Translate-It-v${pkg.version}`,
+          modulePreload: false
         }
       },
       
       // Firefox script config
       scriptViteConfig: {
-        plugins: baseConfig.plugins,
-        resolve: {
-          ...baseConfig.resolve,
-          alias: {
-            ...baseConfig.resolve.alias,
-            'webextension-polyfill': polyfillPath
-          }
-        },
+        ...baseConfig,
         build: {
           ...baseConfig.build,
-          outDir: 'dist/firefox',
+          outDir: `dist/firefox/Translate-It-v${pkg.version}`,
           emptyOutDir: false,
           rollupOptions: {
-            external: [/^browser-polyfill\.js$/],
             output: { format: 'es' }
           }
         }
       },
       
-      // Copy additional resources for Firefox
+      // Write generated manifest.json to disk for dev mode to enable extension auto-install
       transformManifest: async (manifest) => {
-        const outDir = 'dist/firefox'
-        await fs.ensureDir(outDir)
+        const outDir = `dist/firefox/Translate-It-v${pkg.version}`;
+        await fs.ensureDir(outDir);
+        await fs.ensureDir(resolve(outDir, 'html'));
         
-        // Write manifest to disk
-        const manifestFile = resolve(outDir, 'manifest.json')
-        await fs.writeJson(manifestFile, manifest, { spaces: 2 })
+        // Copy required assets
+        const srcDir = process.cwd();
+        await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
+        await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
         
-        // Copy icons directory
-        const iconsDir = resolve(process.cwd(), 'icons')
-        if (await fs.pathExists(iconsDir)) {
-          await fs.copy(iconsDir, resolve(outDir, 'icons'))
-          console.log('📋 Copied icons for Firefox build');
+        // Move HTML files to html/ directory and fix their paths
+        const htmlFiles = [
+          { file: 'popup.html', jsFile: 'popup.js', cssFile: 'popup.css' },
+          { file: 'sidepanel.html', jsFile: 'sidepanel.js', cssFile: 'sidepanel.css' },
+          { file: 'options.html', jsFile: 'options.js', cssFile: 'options.css' }
+        ];
+        
+        for (const {file, jsFile, cssFile} of htmlFiles) {
+          const srcFile = resolve(outDir, file);
+          const destFile = resolve(outDir, 'html', file);
+          
+          if (await fs.pathExists(srcFile)) {
+            // Read HTML content
+            let htmlContent = await fs.readFile(srcFile, 'utf-8');
+            
+            // Fix all absolute paths to relative paths
+            htmlContent = htmlContent.replace(/src="\//g, 'src="../');
+            htmlContent = htmlContent.replace(/href="\//g, 'href="../');
+            htmlContent = htmlContent.replace(/src='\//g, "src='../");
+            htmlContent = htmlContent.replace(/href='\//g, "href='../");
+            // Fix double html/ paths
+            htmlContent = htmlContent.replace(/src="..\/ html\//g, 'src="../');
+            htmlContent = htmlContent.replace(/href="..\/ html\//g, 'href="../');
+            htmlContent = htmlContent.replace(/src='..\/ html\//g, "src='../");
+            htmlContent = htmlContent.replace(/href='..\/ html\//g, "href='../");
+            
+            // Write corrected HTML to html/ directory
+            await fs.writeFile(destFile, htmlContent);
+            
+            // Remove original file
+            await fs.remove(srcFile);
+          }
         }
         
-        // Copy localization files
-        const localesDir = resolve(process.cwd(), '_locales')
-        if (await fs.pathExists(localesDir)) {
-          await fs.copy(localesDir, resolve(outDir, '_locales'))
-          console.log('🌐 Copied localization files for Firefox build');
-        }
-        
-        // Copy browser polyfill
-        const polyfillSrc = resolve(process.cwd(), 'public', 'browser-polyfill.js')
-        if (await fs.pathExists(polyfillSrc)) {
-          await fs.copy(polyfillSrc, resolve(outDir, 'browser-polyfill.js'))
-          console.log('🔗 Copied browser polyfill for Firefox build');
-        }
-        
-        console.log('✅ Firefox build resources copied successfully');
+        const file = resolve(outDir, 'manifest.json');
+        await fs.writeJson(file, manifest, { spaces: 2 });
         return manifest;
       },
       // Disable automatic browser launch in dev mode to avoid connection errors

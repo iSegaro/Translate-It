@@ -1,12 +1,12 @@
 // Background script entry point for Vue build
 // Cross-browser service worker for Manifest V3
 
-import 'webextension-polyfill';
 import { environment } from '../utils/environment.js';
 import { getBrowserAPI } from '../utils/browser-unified.js';
 import { featureLoader } from './feature-loader.js';
 import { VueMessageHandler } from './vue-message-handler.js';
 import NotificationManager from '../managers/NotificationManager.js';
+import { initializeSettingsListener } from '../config.js';
 
 /**
  * Background Service class
@@ -83,7 +83,11 @@ class BackgroundService {
     }
 
     const browserName = environment.getBrowser();
+
     console.log(`✅ Browser API initialized for ${browserName}`);
+
+    // Initialize settings listener with the fully initialized Browser object
+    await initializeSettingsListener(this.browser);
   }
 
   /**

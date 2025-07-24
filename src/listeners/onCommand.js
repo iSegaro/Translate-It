@@ -4,8 +4,7 @@
 import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 
-export async function initialize() {
-  const Browser = await getBrowserAsync();
+export async function initialize(Browser) {
   Browser.commands.onCommand.addListener(async (command) => {
     logME(`[onCommand] Command received: ${command}`);
 
@@ -22,7 +21,7 @@ export async function initialize() {
           // به اسکریپت محتوای تب فعال ارسال می‌کنیم تا حالت انتخاب را فعال کند.
           logME(`[onCommand] Sending 'TOGGLE_SELECT_ELEMENT_MODE' to tab ${activeTab.id}`);
           Browser.tabs.sendMessage(activeTab.id, {
-            action: "TOGGLE_SELECT_ELEMENT_MODE",
+            action: "TOGGLE_SELECT_ELEMENT_ELEMENT_MODE",
             data: true // به اسکریپت محتوا می‌گوییم حالت انتخاب را فعال کند
           }).catch(err => {
             logME(`[onCommand] Could not send message to tab ${activeTab.id}:`, err.message);

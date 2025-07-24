@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
-const CHROME_BUILD_DIR = path.join(rootDir, `dist/Chrome/Translate-It-v${pkg.version}`)
+const CHROME_BUILD_DIR = path.join(rootDir, `dist/chrome/Translate-It-v${pkg.version}`)
 const TEMP_ARTIFACTS_DIR = path.join(rootDir, 'temp/validation/chrome')
 
 /**

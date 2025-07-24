@@ -3,6 +3,7 @@
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 
 class ContentScriptVueBridge {
   constructor() {
@@ -88,7 +89,8 @@ class ContentScriptVueBridge {
   /**
    * Setup message listener for extension commands
    */
-  setupMessageListener() {
+  async setupMessageListener() {
+    const Browser = await getBrowserAsync();
     this.messageHandler = (message, sender, sendResponse) => {
       if (message.source !== 'vue-app') return
 
@@ -126,7 +128,7 @@ class ContentScriptVueBridge {
       return true // Keep channel open for async response
     }
 
-    browser.runtime.onMessage.addListener(this.messageHandler)
+    Browser.runtime.onMessage.addListener(this.messageHandler)
   }
 
   /**
@@ -284,7 +286,7 @@ class ContentScriptVueBridge {
         onSelect: async (result) => {
           try {
             // Send selection result to background script
-            const response = await browser.runtime.sendMessage({
+            const response = await Browser.runtime.sendMessage({
               action: 'PROCESS_SCREEN_CAPTURE',
               data: { 
                 coordinates: result.coordinates,
@@ -312,7 +314,7 @@ class ContentScriptVueBridge {
           this.destroyMicroApp(instanceId)
           
           // Notify background script of cancellation
-          browser.runtime.sendMessage({
+          Browser.runtime.sendMessage({
             action: 'SCREEN_CAPTURE_CANCELLED',
             source: 'content-script'
           })
@@ -353,7 +355,7 @@ class ContentScriptVueBridge {
         },
         onTranslate: (result) => {
           // Handle translation result
-          browser.runtime.sendMessage({
+          Browser.runtime.sendMessage({
             action: 'TRANSLATION_COMPLETED',
             data: result,
             source: 'content-script'
@@ -361,7 +363,7 @@ class ContentScriptVueBridge {
         },
         onSave: (result) => {
           // Handle save to history
-          browser.runtime.sendMessage({
+          Browser.runtime.sendMessage({
             action: 'SAVE_TRANSLATION',
             data: result,
             source: 'content-script'
@@ -447,7 +449,7 @@ class ContentScriptVueBridge {
   async performAutoCapture(detectText, autoTranslate, sendResponse) {
     try {
       // Send request to background for full screen capture
-      const captureResponse = await browser.runtime.sendMessage({
+      const captureResponse = await Browser.runtime.sendMessage({
         action: 'CAPTURE_FULL_SCREEN',
         source: 'content-script'
       })
@@ -458,7 +460,7 @@ class ContentScriptVueBridge {
       
       if (detectText) {
         // Analyze image for text regions
-        const analysisResponse = await browser.runtime.sendMessage({
+        const analysisResponse = await Browser.runtime.sendMessage({
           action: 'ANALYZE_IMAGE_TEXT',
           data: { imageData: captureResponse.data.imageData },
           source: 'content-script'
@@ -523,7 +525,7 @@ class ContentScriptVueBridge {
    */
   async performDirectTranslation(imageData, sendResponse = null) {
     try {
-      const translationResponse = await browser.runtime.sendMessage({
+      const translationResponse = await Browser.runtime.sendMessage({
         action: 'TRANSLATE_IMAGE_DIRECT',
         data: { imageData },
         source: 'content-script'
@@ -648,7 +650,7 @@ class ContentScriptVueBridge {
   /**
    * Cleanup all instances
    */
-  cleanup() {
+  async cleanup() {
     console.log('[Vue Bridge] Cleaning up all instances...')
     
     for (const instanceId of this.vueInstances.keys()) {
@@ -656,7 +658,8 @@ class ContentScriptVueBridge {
     }
     
     if (this.messageHandler) {
-      browser.runtime.onMessage.removeListener(this.messageHandler)
+      const Browser = await getBrowserAsync(); // Get Browser object for cleanup
+      Browser.runtime.onMessage.removeListener(this.messageHandler)
       this.messageHandler = null
     }
     

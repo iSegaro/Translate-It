@@ -4,109 +4,174 @@ import webExtension from 'vite-plugin-web-extension'
 import fs from 'fs-extra'
 import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
+import pkg from '../../package.json' with { type: 'json' };
+
+// Plugin to fix HTML paths for extension structure
+function fixExtensionPaths() {
+  const fixHtmlPaths = async (outDir) => {
+    const htmlDir = resolve(outDir, 'html');
+    
+    // Ensure html directory exists
+    await fs.ensureDir(htmlDir);
+    
+    // Fix paths in HTML files
+    const htmlFiles = ['popup.html', 'sidepanel.html', 'options.html'];
+    
+    for (const htmlFile of htmlFiles) {
+      const srcPath = resolve(outDir, htmlFile);
+      const destPath = resolve(htmlDir, htmlFile);
+      
+      if (await fs.pathExists(srcPath)) {
+        let content = await fs.readFile(srcPath, 'utf-8');
+        
+        // Fix all absolute paths to relative paths
+        content = content.replace(/src="\/([^"]+)"/g, 'src="../$1"');
+        content = content.replace(/href="\/([^"]+)"/g, 'href="../$1"');
+        content = content.replace(/src='\/([^']+)'/g, "src='../$1'");
+        content = content.replace(/href='\/([^']+)'/g, "href='../$1'");
+        
+        // Write to html/ directory
+        await fs.writeFile(destPath, content);
+        
+        // Remove original
+        await fs.remove(srcPath);
+      }
+    }
+  };
+  
+  return {
+    name: 'fix-extension-paths',
+    // Production build
+    writeBundle: {
+      order: 'pre',
+      handler: async (options) => {
+        await fixHtmlPaths(options.dir);
+      }
+    },
+    // Development server mode  
+    configureServer(server) {
+      // Serve HTML files from /html/ path with correct structure
+      server.middlewares.use('/html', (req, res, next) => {
+        if (req.url.endsWith('.html')) {
+          const filename = req.url.substring(1); // Remove leading slash
+          const rootPath = resolve(process.cwd(), filename);
+          
+          if (fs.existsSync(rootPath)) {
+            let content = fs.readFileSync(rootPath, 'utf-8');
+            
+            // For development server, keep original paths but ensure they work from /html/ context
+            // The development server will serve assets from root, so relative paths from html/ should go up one level
+            content = content.replace(/src="\/src\/app\/main\/([^"]+)"/g, 'src="/src/app/main/$1"');
+            
+            res.setHeader('Content-Type', 'text/html');
+            res.end(content);
+            return;
+          }
+        }
+        next();
+      });
+      
+      // Also handle direct HTML file access from root
+      server.middlewares.use((req, res, next) => {
+        if (req.url.match(/\/(popup|sidepanel|options)\.html$/)) {
+          const filename = req.url.substring(1);
+          const rootPath = resolve(process.cwd(), filename);
+          
+          if (fs.existsSync(rootPath)) {
+            let content = fs.readFileSync(rootPath, 'utf-8');
+            
+            // For root-level access, paths should work as-is for development
+            res.setHeader('Content-Type', 'text/html');
+            res.end(content);
+            return;
+          }
+        }
+        next();
+      });
+    },
+    // Handle hot updates in watch mode
+    handleHotUpdate: {
+      order: 'pre',
+      handler: async (ctx) => {
+        if (ctx.file.endsWith('.html')) {
+          console.log('🔄 HTML file updated, fixing paths...');
+          
+          // Get the output directory from build options
+          const outDir = resolve(process.cwd(), `dist/chrome/Translate-It-v${pkg.version}`);
+          
+          // Only fix paths if the output directory exists (not in pure dev mode)
+          if (await fs.pathExists(outDir)) {
+            await fixHtmlPaths(outDir);
+          }
+        }
+      }
+    }
+  };
+}
 
 const baseConfig = createBaseConfig('chrome')
 
-// Always point script polyfill to the ESM stub in public
-const polyfillPath = resolve(process.cwd(), 'public', 'browser-polyfill.esm.js')
-
-// Merge with base config (omit base rollupOptions for script build compatibility)
-const { rollupOptions: _, ...baseBuild } = baseConfig.build
 export default defineConfig({
   ...baseConfig,
-  // Alias webextension-polyfill to ESM wrapper for UI and script builds
-  resolve: {
-    alias: {
-      ...baseConfig.resolve.alias
-    }
+  build: {
+    ...baseConfig.build,
+    outDir: `dist/chrome/Translate-It-v${pkg.version}`,
   },
-  build: baseBuild,
   plugins: [
     ...(baseConfig.plugins || []),
+    fixExtensionPaths(),
     webExtension({
-      // Generate dynamic manifest for Chrome
       manifest: async () => {
-        console.log('🚀 Generating Chrome manifest...');
-        const manifest = generateValidatedManifest('chrome');
-        console.log('✅ Chrome manifest generated and validated');
-        return manifest;
-      },
-      // Use base config for HTML entry builds, but alias polyfill to ESM UMD bundle in node_modules
+          console.log('🚀 Generating Chrome manifest...');
+          const manifest = generateValidatedManifest('chrome');
+          manifest.background = {
+            service_worker: 'src/background/index.js',
+            type: 'module'
+          };
+          manifest.content_scripts = manifest.content_scripts || [];
+          manifest.content_scripts.push({
+            matches: ["<all_urls>"],
+            js: ["src/content-scripts/index.js"],
+            run_at: "document_end"
+          });
+          console.log('✅ Chrome manifest generated and validated');
+          return manifest;
+        },
       htmlViteConfig: {
         ...baseConfig,
-        resolve: {
-          ...baseConfig.resolve
-        },
         build: {
           ...baseConfig.build,
-          rollupOptions: {
-            ...baseConfig.build?.rollupOptions,
-            external: [/^browser-polyfill\.js$/]
-          }
+          outDir: `dist/chrome/Translate-It-v${pkg.version}`,
+          modulePreload: false
         }
       },
       scriptViteConfig: {
-        plugins: baseConfig.plugins,
-        resolve: {
-          ...baseConfig.resolve
-        },
+        ...baseConfig,
         build: {
-          // Use same outDir as HTML build; omit base rollupOptions to avoid inlineDynamicImports error
-          ...baseBuild,
+          ...baseConfig.build,
+          outDir: `dist/chrome/Translate-It-v${pkg.version}`,
           emptyOutDir: false,
-          outDir: baseBuild.outDir,
           rollupOptions: {
             output: { format: 'es' }
           }
         }
       },
-      // Write generated manifest.json to disk for dev mode to enable extension auto-install
       transformManifest: async (manifest) => {
-        const outDir = baseConfig.build?.outDir || 'dist/chrome'
-        await fs.ensureDir(outDir)
-        const file = resolve(outDir, 'manifest.json')
-        await fs.writeJson(file, manifest, { spaces: 2 })
-        if (process.env.NODE_ENV !== 'production') {
-          const root = process.cwd()
-          // Copy localization messages for dev mode
-          const localesDir = resolve(root, '_locales')
-          console.log('Copying locales...');
-          if (await fs.pathExists(localesDir)) {
-            await fs.copy(localesDir, resolve(outDir, '_locales'))
-            console.log('Locales copied.');
-          } else {
-            console.log('Locales directory not found.');
-          }
-          // Copy browser-polyfill for service worker & content scripts
-          const polyfillSrc = resolve(root, 'public', 'browser-polyfill.js')
-          console.log('Copying browser-polyfill...');
-          if (await fs.pathExists(polyfillSrc)) {
-            await fs.copy(polyfillSrc, resolve(outDir, 'browser-polyfill.js'))
-            console.log('Browser-polyfill copied.');
-          } else {
-            console.log('Browser-polyfill not found.');
-          }
-          // Copy icons directory for extension icons
-          const iconsDir = resolve(root, 'icons')
-          console.log('Copying icons...');
-          if (await fs.pathExists(iconsDir)) {
-            await fs.copy(iconsDir, resolve(outDir, 'icons'))
-            console.log('Icons copied.');
-          } else {
-            console.log('Icons directory not found.');
-          }
-          // Copy generated CSS assets to extension root (e.g. for content scripts)
-          const rootCss = resolve(outDir, 'index.css')
-          console.log('Copying CSS assets...');
-          if (await fs.pathExists(rootCss)) {
-            console.log('Copied root CSS file.');
-          } else {
-            console.log('CSS directory and root CSS file not found.');
-          }
-        }
-        return manifest
+        const outDir = `dist/chrome/Translate-It-v${pkg.version}`;
+        await fs.ensureDir(outDir);
+        await fs.ensureDir(resolve(outDir, 'html'));
+        
+        // Copy required assets
+        const srcDir = process.cwd();
+        await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
+        await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
+        
+        // HTML files are now handled by the fixExtensionPaths plugin
+        
+        const file = resolve(outDir, 'manifest.json');
+        await fs.writeJson(file, manifest, { spaces: 2 });
+        return manifest;
       },
-      // Disable automatic browser launch in dev mode to avoid connection errors
       disableAutoLaunch: true
     }),
   ],

@@ -45,8 +45,8 @@ async function buildAll() {
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
     const version = pkg.version
     
-    const chromeZip = path.join(rootDir, `dist/Chrome/Translate-It-v${version}.zip`)
-    const firefoxZip = path.join(rootDir, `dist/Firefox/Translate-It-v${version}.zip`)
+    const chromeZip = path.join(rootDir, `dist/chrome/Translate-It-v${version}.zip`)
+    const firefoxZip = path.join(rootDir, `dist/firefox/Translate-It-v${version}.zip`)
     
     if (fs.existsSync(chromeZip)) {
       fs.copyFileSync(chromeZip, path.join(publishDir, `Translate-It-v${version}-for-Chrome.zip`))

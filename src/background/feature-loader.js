@@ -3,6 +3,7 @@
 
 import { environment } from '../utils/environment.js';
 import { featureDetector } from '../utils/feature-detection.js';
+import { getBrowserAPI } from '../utils/browser-unified.js';
 
 /**
  * Feature loader class
@@ -269,7 +270,7 @@ export class FeatureLoader {
    * @param {string} listenerName - Name of the listener to load
    * @returns {Promise<Object>} Listener module
    */
-  async loadListener(listenerName) {
+  async loadListener(listenerName, Browser) {
     const cacheKey = `listener-${listenerName}`;
     
     if (this.loadedFeatures.has(cacheKey)) {
@@ -279,7 +280,7 @@ export class FeatureLoader {
     try {
       const module = await import(`../listeners/${listenerName}.js`);
       if (typeof module.initialize === 'function') {
-        await module.initialize();
+        await module.initialize(Browser);
       }
       this.loadedFeatures.set(cacheKey, module);
       console.log(`✅ Loaded listener: ${listenerName}`);
@@ -305,8 +306,11 @@ export class FeatureLoader {
 
     console.log('🎧 Loading all listeners...');
 
+    // Get the Browser API once for all listeners
+    const Browser = await getBrowserAPI();
+
     const results = await Promise.allSettled(
-      listenerNames.map(name => this.loadListener(name))
+      listenerNames.map(name => this.loadListener(name, Browser))
     );
 
     const loadedListeners = [];

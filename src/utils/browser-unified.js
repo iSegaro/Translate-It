@@ -11,7 +11,6 @@ class UnifiedBrowserAPI {
   constructor() {
     this.api = null;
     this.initialized = false;
-    this.polyfillPromise = null;
   }
 
   /**
@@ -24,15 +23,27 @@ class UnifiedBrowserAPI {
     try {
       await environment.initialize();
       
-      const browser = environment.getBrowser();
-      console.log(`🔗 Initializing unified API for ${browser}`);
+      const browserEnv = environment.getBrowser();
+      const manifestVersion = environment.getManifestVersion();
+      console.log(`🔗 Initializing unified API for ${browserEnv} (Manifest V${manifestVersion})`);
 
-      if (browser === 'firefox') {
-        await this.initializeFirefoxAPI();
-      } else if (browser === 'chrome') {
-        await this.initializeChromeAPI();
+      if (manifestVersion === 3 && typeof chrome !== 'undefined') {
+        // Chrome (Manifest V3) - use native chrome API and wrap it
+        this.api = this.wrapChromeAPI(chrome);
+        console.log('🌐 Using wrapped Chrome native API (Manifest V3)');
+      } else if (manifestVersion === 2 && typeof browser !== 'undefined') {
+        // Firefox (Manifest V2) - use native browser API
+        this.api = browser;
+        console.log('🦊 Using Firefox native browser API (Manifest V2)');
       } else {
-        throw new Error(`Unsupported browser: ${browser}`);
+        throw new Error(`Unsupported browser or API not available: ${browserEnv} (Manifest V${manifestVersion})`);
+      }
+
+      console.log('Debug: this.api after initialization:', this.api);
+      if (this.api && this.api.storage) {
+        console.log('Debug: this.api.storage is available.');
+      } else {
+        console.log('Debug: this.api.storage is NOT available.');
       }
 
       // Make API globally available
@@ -48,70 +59,6 @@ class UnifiedBrowserAPI {
   }
 
   /**
-   * Initialize Firefox API
-   * @private
-   */
-  async initializeFirefoxAPI() {
-    if (typeof browser !== 'undefined') {
-      // Firefox native API
-      this.api = browser;
-      console.log('🦊 Using Firefox native browser API');
-    } else {
-      // Import webextension-polyfill for Firefox
-      try {
-        const polyfill = await this.importPolyfill();
-        this.api = polyfill;
-        console.log('🦊 Using webextension-polyfill for Firefox');
-      } catch (error) {
-        console.error('Failed to load webextension-polyfill:', error);
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Initialize Chrome API
-   * @private
-   */
-  async initializeChromeAPI() {
-    if (typeof chrome !== 'undefined') {
-      // Try to use webextension-polyfill for consistency
-      try {
-        const polyfill = await this.importPolyfill();
-        this.api = polyfill;
-        console.log('🌐 Using webextension-polyfill for Chrome');
-      } catch (error) {
-        // Fallback to native chrome API
-        console.warn('webextension-polyfill not available, using native chrome API');
-        this.api = this.wrapChromeAPI(chrome);
-        console.log('🌐 Using wrapped Chrome native API');
-      }
-    } else {
-      throw new Error('Chrome API not available');
-    }
-  }
-
-  /**
-   * Import webextension-polyfill dynamically
-   * @private
-   */
-  async importPolyfill() {
-    if (this.polyfillPromise) {
-      return this.polyfillPromise;
-    }
-
-    this.polyfillPromise = (async () => {
-      if (typeof browser !== 'undefined') {
-        return browser;
-      } else {
-        throw new Error('webextension-polyfill not loaded globally.');
-      }
-    })();
-
-    return this.polyfillPromise;
-  }
-
-  /**
    * Wrap Chrome API to provide promise-based interface similar to webextension-polyfill
    * @private
    */
@@ -120,11 +67,24 @@ class UnifiedBrowserAPI {
 
     // Wrap common APIs
     wrapped.runtime = this.wrapRuntimeAPI(chromeAPI.runtime);
-    wrapped.storage = this.wrapStorageAPI(chromeAPI.storage);
-    wrapped.tabs = this.wrapTabsAPI(chromeAPI.tabs);
-    wrapped.contextMenus = this.wrapContextMenusAPI(chromeAPI.contextMenus);
-    wrapped.notifications = this.wrapNotificationsAPI(chromeAPI.notifications);
+    if (chromeAPI.storage) {
+      wrapped.storage = this.wrapStorageAPI(chromeAPI.storage);
+    }
+    if (chromeAPI.tabs) {
+      wrapped.tabs = this.wrapTabsAPI(chromeAPI.tabs);
+    }
+    if (chromeAPI.contextMenus) {
+      wrapped.contextMenus = this.wrapContextMenusAPI(chromeAPI.contextMenus);
+    }
+    if (chromeAPI.notifications) {
+      wrapped.notifications = this.wrapNotificationsAPI(chromeAPI.notifications);
+    }
     
+    // Add commands API wrapping
+    if (chromeAPI.commands) {
+      wrapped.commands = this.wrapCommandsAPI(chromeAPI.commands);
+    }
+
     // Chrome-specific APIs (optional)
     if (chromeAPI.sidePanel) {
       wrapped.sidePanel = chromeAPI.sidePanel;
@@ -137,6 +97,18 @@ class UnifiedBrowserAPI {
     }
 
     return wrapped;
+  }
+
+  /**
+   * Wrap Chrome commands API
+   * @private
+   */
+  wrapCommandsAPI(commands) {
+    return {
+      ...commands,
+      getAll: this.promisifyCallback(commands.getAll.bind(commands)),
+      onCommand: commands.onCommand // onCommand is an event, not a method to promisify
+    };
   }
 
   /**
@@ -341,4 +313,3 @@ export async function getBrowserAPI() {
 
   return browserAPIPromise;
 }
-

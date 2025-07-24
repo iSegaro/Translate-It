@@ -25,43 +25,7 @@ function getApiProviders() {
   }));
 }
 
-// ▼▼▼ تابع کمکی برای غیرفعال کردن حالت انتخاب المنت ▼▼▼
-/**
- * Sends a message to all tabs to deactivate the "Select Element" mode.
- * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
- */
-async function deactivateSelectElementModeInAllTabs() {
-  const Browser = await getBrowserAsync();
-  try {
-    const tabs = await Browser.tabs.query({});
-    for (const tab of tabs) {
-      if (tab.id) {
-        // We send the message but don't wait for a response.
-        // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
-        getBrowser().tabs
-          .sendMessage(tab.id, {
-            action: "TOGGLE_SELECT_ELEMENT_MODE",
-            data: false, // `false` signals deactivation
-          })
-          .catch(() => {
-            // It's normal for this to fail on tabs without the content script; ignore the error.
-          });
-      }
-    }
-    logME(
-      "[ContextMenu] Sent deactivation signal for Select Element mode to all tabs."
-    );
-  } catch (e) {
-    logME("Error trying to deactivate select element mode in all tabs:", e);
-  }
-}
-
-/**
- * Creates or updates all context menus for the extension.
- * This function is centralized and can be called from onInstalled or on-demand.
- */
-export async function setupContextMenus() {
-  const Browser = await getBrowserAsync();
+export async function setupContextMenus(Browser) {
   // Clear all previous context menus to prevent duplicate errors
   await Browser.contextMenus.removeAll();
   logME("[ContextMenuSetup] All previous context menus removed.");
@@ -79,7 +43,7 @@ export async function setupContextMenus() {
     if (command && command.shortcut) {
       pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
     }
-    getBrowser().contextMenus.create({
+    Browser.contextMenus.create({
       id: PAGE_CONTEXT_MENU_ID,
       title: pageMenuTitle,
       contexts: ["page", "selection", "link", "image", "video", "audio"],
@@ -94,14 +58,14 @@ export async function setupContextMenus() {
   // --- 2. Create Action (Browser Action) Context Menus ---
   try {
     // --- Options Menu ---
-    getBrowser().contextMenus.create({
+    Browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_OPTIONS_ID,
       title: (await getTranslationString("context_menu_options")) || "Options",
       contexts: ["action"],
     });
 
     // --- API Provider Parent Menu ---
-    getBrowser().contextMenus.create({
+    Browser.contextMenus.create({
       id: API_PROVIDER_PARENT_ID,
       title:
         (await getTranslationString("context_menu_api_provider")) ||
@@ -112,7 +76,7 @@ export async function setupContextMenus() {
     // --- API Provider Sub-Menus (Radio Buttons) ---
     const apiProviders = getApiProviders();
     for (const provider of apiProviders) {
-      getBrowser().contextMenus.create({
+      Browser.contextMenus.create({
         id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
         parentId: API_PROVIDER_PARENT_ID,
         title:
@@ -128,7 +92,7 @@ export async function setupContextMenus() {
     );
 
     // --- Other Action Menus ---
-    getBrowser().contextMenus.create({
+    Browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
       title:
         (await getTranslationString("context_menu_shortcuts")) ||
@@ -136,7 +100,7 @@ export async function setupContextMenus() {
       contexts: ["action"],
     });
 
-    getBrowser().contextMenus.create({
+    Browser.contextMenus.create({
       id: HELP_MENU_ID,
       title:
         (await getTranslationString("context_menu_help")) || "Help & Support",
@@ -148,133 +112,33 @@ export async function setupContextMenus() {
   }
 }
 
-export async function initialize() {
-  const Browser = await getBrowserAsync();
-
-  // ▼▼▼ تابع کمکی برای غیرفعال کردن حالت انتخاب المنت ▼▼▼
-  /**
-   * Sends a message to all tabs to deactivate the "Select Element" mode.
-   * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
-   */
-  async function deactivateSelectElementModeInAllTabs() {
-    try {
-      const tabs = await Browser.tabs.query({});
-      for (const tab of tabs) {
-        if (tab.id) {
-          // We send the message but don't wait for a response.
-          // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
-          Browser.tabs
-            .sendMessage(tab.id, {
-              action: "TOGGLE_SELECT_ELEMENT_MODE",
-              data: false, // `false` signals deactivation
-            })
-            .catch(() => {
-              // It's normal for this to fail on tabs without the content script; ignore the error.
-            });
-        }
+async function deactivateSelectElementModeInAllTabs(Browser) {
+  try {
+    const tabs = await Browser.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        // We send the message but don't wait for a response.
+        // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
+        Browser.tabs
+          .sendMessage(tab.id, {
+            action: "TOGGLE_SELECT_ELEMENT_MODE",
+            data: false, // `false` signals deactivation
+          })
+          .catch(() => {
+            // It's normal for this to fail on tabs without the content script; ignore the error.
+          });
       }
-      logME(
-        "[ContextMenu] Sent deactivation signal for Select Element mode to all tabs."
-      );
-    } catch (e) {
-      logME("Error trying to deactivate select element mode in all tabs:", e);
     }
+    logME(
+      "[ContextMenu] Sent deactivation signal for Select Element mode to all tabs."
+    );
+  } catch (e) {
+    logME("Error trying to deactivate select element mode in all tabs:", e);
   }
+}
 
-  /**
-   * Creates or updates all context menus for the extension.
-   * This function is centralized and can be called from onInstalled or on-demand.
-   */
-  async function setupContextMenus() {
-    // Clear all previous context menus to prevent duplicate errors
-    await Browser.contextMenus.removeAll();
-    logME("[ContextMenuSetup] All previous context menus removed.");
-
-    // Get the currently active API to set the 'checked' state
-    const currentApi = await getTranslationApiAsync();
-
-    // --- 1. Create Page Context Menu ---
-    try {
-      let pageMenuTitle =
-        (await getTranslationString("context_menu_translate_with_selection")) ||
-        "Translate Element";
-      const commands = await Browser.commands.getAll();
-      const command = commands.find((c) => c.name === COMMAND_NAME);
-      if (command && command.shortcut) {
-        pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
-      }
-      Browser.contextMenus.create({
-        id: PAGE_CONTEXT_MENU_ID,
-        title: pageMenuTitle,
-        contexts: ["page", "selection", "link", "image", "video", "audio"],
-      });
-      logME(
-        `[ContextMenuSetup] Page context menu created with title: "${pageMenuTitle}"`
-      );
-    } catch (e) {
-      logME("Error creating page context menu:", e);
-    }
-
-    // --- 2. Create Action (Browser Action) Context Menus ---
-    try {
-      // --- Options Menu ---
-      Browser.contextMenus.create({
-        id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-        title: (await getTranslationString("context_menu_options")) || "Options",
-        contexts: ["action"],
-      });
-
-      // --- API Provider Parent Menu ---
-      Browser.contextMenus.create({
-        id: API_PROVIDER_PARENT_ID,
-        title:
-          (await getTranslationString("context_menu_api_provider")) ||
-          "API Provider",
-        contexts: ["action"],
-      });
-
-      // --- API Provider Sub-Menus (Radio Buttons) ---
-      const apiProviders = getApiProviders();
-      for (const provider of apiProviders) {
-        Browser.contextMenus.create({
-          id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
-          parentId: API_PROVIDER_PARENT_ID,
-          title:
-            (await getTranslationString(provider.i18nKey)) ||
-            provider.defaultTitle,
-          type: "radio",
-          checked: provider.id === currentApi,
-          contexts: ["action"],
-        });
-      }
-      logME(
-        `[ContextMenuSetup] API Provider sub-menus created. Current API: ${currentApi}`
-      );
-
-      // --- Other Action Menus ---
-      Browser.contextMenus.create({
-        id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
-        title:
-          (await getTranslationString("context_menu_shortcuts")) ||
-          "Manage Shortcuts",
-        contexts: ["action"],
-      });
-
-      Browser.contextMenus.create({
-        id: HELP_MENU_ID,
-        title:
-          (await getTranslationString("context_menu_help")) || "Help & Support",
-        contexts: ["action"],
-      });
-      logME("[ContextMenuSetup] Action context menus created successfully.");
-    } catch (e) {
-      logME("Error creating action context menus:", e);
-    }
-  }
-
-  /**
-   * Listener for when a context menu item is clicked.
-   */
+export async function initialize(Browser) {
+  // Listener for when a context menu item is clicked.
   Browser.contextMenus.onClicked.addListener(async (info, tab) => {
     logME(`[ContextMenu] Clicked menu item: ${info.menuItemId}`);
 
@@ -290,17 +154,21 @@ export async function initialize() {
 
     // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
     if (isApiProviderClick || isStaticActionClick) {
-      await deactivateSelectElementModeInAllTabs();
+      await deactivateSelectElementModeInAllTabs(Browser);
     }
 
     // --- Handler for API Provider selection ---
     if (isApiProviderClick) {
       const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
-      try {
-        await Browser.storage.local.set({ TRANSLATION_API: newApiId });
-        logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
-      } catch (e) {
-        logME(`[ContextMenu] Error setting new API provider:`, e);
+      if (Browser.storage && Browser.storage.local) {
+        try {
+          await Browser.storage.local.set({ TRANSLATION_API: newApiId });
+          logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
+        } catch (e) {
+          logME(`[ContextMenu] Error setting new API provider:`, e);
+        }
+      } else {
+        logME(`[ContextMenu] Browser.storage.local is not available. Cannot set API provider.`);
       }
       return; // Stop further processing
     }
@@ -352,14 +220,18 @@ export async function initialize() {
    * Listener to keep the context menu synchronized with storage changes.
    * This runs if the user changes the API from the options page.
    */
-  Browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "local" && changes.TRANSLATION_API) {
-      logME(
-        "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
-      );
-      setupContextMenus();
-    }
-  });
+  if (Browser.storage && Browser.storage.onChanged) {
+    Browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local" && changes.TRANSLATION_API) {
+        logME(
+          "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+        );
+        setupContextMenus(Browser);
+      }
+    });
+  } else {
+    logME(`[ContextMenu] Browser.storage.onChanged is not available. Cannot synchronize context menus.`);
+  }
 
   logME("[ContextMenu] Listeners are active.");
 }
