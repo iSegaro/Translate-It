@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import postcss from 'rollup-plugin-postcss'
 import { resolve } from 'path'
 
 // Base configuration shared across all builds
@@ -12,6 +13,7 @@ export const createBaseConfig = (browser, options = {}) => {
   return defineConfig({
     plugins: [
       vue(),
+      postcss({ extract: true }),
       ...(options.extraPlugins || [])
     ],
 

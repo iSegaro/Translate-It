@@ -96,24 +96,12 @@ export default defineConfig({
             console.log('Icons directory not found.');
           }
           // Copy generated CSS assets to extension root (e.g. for content scripts)
-          const cssDir = resolve(outDir, 'css')
+          const rootCss = resolve(outDir, 'index.css')
           console.log('Copying CSS assets...');
-          if (await fs.pathExists(cssDir)) {
-            for (const file of await fs.readdir(cssDir)) {
-              if (file.endsWith('.css')) {
-                await fs.copy(resolve(cssDir, file), resolve(outDir, file))
-                console.log(`Copied CSS file: ${file}`);
-              }
-            }
-            console.log('CSS assets copied.');
+          if (await fs.pathExists(rootCss)) {
+            console.log('Copied root CSS file.');
           } else {
-            const rootCss = resolve(root, 'dist/translate-it.css')
-            if (await fs.pathExists(rootCss)) {
-              await fs.copy(rootCss, resolve(outDir, 'translate-it.css'))
-              console.log('Copied root CSS file.');
-            } else {
-              console.log('CSS directory and root CSS file not found.');
-            }
+            console.log('CSS directory and root CSS file not found.');
           }
         }
         return manifest
