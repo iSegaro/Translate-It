@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
-import '@/assets/styles/global.scss'
+import '@/main.scss'
 import '@/utils/browser-polyfill.js'
 
 // Create Vue app

@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
 import OptionsApp from '@/views/options/OptionsApp.vue'
-import '@/assets/styles/global.scss'
+import '@/main.scss'
 
 // Import route components (lazy loaded)
 const GeneralSettings = () => import('@/views/options/GeneralSettings.vue')

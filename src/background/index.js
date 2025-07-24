@@ -2,7 +2,6 @@
 // Cross-browser service worker for Manifest V3
 
 import 'webextension-polyfill';
-import '../main.scss';
 import { environment } from '../utils/environment.js';
 import { getBrowserAPI } from '../utils/browser-unified.js';
 import { featureLoader } from './feature-loader.js';

@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
 import SidepanelApp from '@/views/sidepanel/SidepanelApp.vue'
-import '@/assets/styles/global.scss'
+import '@/main.scss'
 
 // Create Vue app
 const app = createApp(SidepanelApp)

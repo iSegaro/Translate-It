@@ -51,6 +51,7 @@
     "happy-dom": "^18.0.1",
     "jsdom": "^26.1.0",
     "playwright": "^1.54.1",
+    "postcss-preset-env": "^10.2.4",
     "prettier": "^3.3.0",
     "rimraf": "^6.0.1",
     "rollup-plugin-analyzer": "^4.0.0",
