@@ -1,5 +1,5 @@
 // src/utils/helpers.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { IsDebug } from "../config.js";
@@ -115,14 +115,14 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
 
 export const isExtensionContextValid = () => {
   try {
-    return !!Browser?.runtime?.id && !!Browser?.storage?.local;
+    return !!getBrowser()?.runtime?.id && !!getBrowser()?.storage?.local;
   } catch {
     return false;
   }
 };
 
 export const openOptionsPage = (anchor = null) => {
-  Browser.runtime
+  getBrowser().runtime
     .sendMessage({
       action: "open_options_page",
       data: { anchor: anchor },
@@ -135,14 +135,14 @@ export const openOptionsPage = (anchor = null) => {
 export const openOptionsPage_from_Background = (message) => {
   const anchor = message.data?.anchor;
   const optionsPath = "html/options.html";
-  const baseUrl = Browser.runtime.getURL(optionsPath);
+  const baseUrl = getBrowser().runtime.getURL(optionsPath);
   const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
 
   console.log('[openOptionsPage_from_Background] baseUrl:', baseUrl);
   console.log('[openOptionsPage_from_Background] finalUrl:', finalUrl);
 
   // This logic runs safely in the background context
-  Browser.tabs.query({}).then((tabs) => {
+  getBrowser().tabs.query({}).then((tabs) => {
     // لاگ کردن همه URLs برای debugging
     console.log('[openOptionsPage_from_Background] All tab URLs:', tabs.map(tab => tab.url));
     
@@ -167,31 +167,31 @@ export const openOptionsPage_from_Background = (message) => {
       // بستن تب‌های اضافی (duplicate)
       if (duplicateTabs.length > 0) {
         const duplicateTabIds = duplicateTabs.map(tab => tab.id);
-        Browser.tabs.remove(duplicateTabIds).catch(err => {
+        getBrowser().tabs.remove(duplicateTabIds).catch(err => {
           console.error("Error closing duplicate options tabs:", err);
         });
       }
       
       // به‌روزرسانی و فوکوس کردن اولین تب
-      Browser.tabs
+      getBrowser().tabs
         .update(firstTab.id, { active: true, url: finalUrl })
         .then((updatedTab) => {
           if (updatedTab)
-            Browser.windows.update(updatedTab.windowId, { focused: true });
+            getBrowser().windows.update(updatedTab.windowId, { focused: true });
         })
         .catch(err => {
           console.error("Error updating options tab:", err);
           // اگر خطا رخ داد، تب جدید ایجاد کن
-          Browser.tabs.create({ url: finalUrl });
+          getBrowser().tabs.create({ url: finalUrl });
         });
     } else {
       // هیچ تب موجودی یافت نشد، تب جدید ایجاد کن
-      Browser.tabs.create({ url: finalUrl });
+      getBrowser().tabs.create({ url: finalUrl });
     }
   }).catch(err => {
     console.error("Error querying tabs:", err);
     // در صورت خطا، مستقیماً تب جدید ایجاد کن
-    Browser.tabs.create({ url: finalUrl });
+    getBrowser().tabs.create({ url: finalUrl });
   });
 };
 
@@ -205,7 +205,7 @@ export function focusOrCreateTab(url) {
   const baseUrl = url.split('#')[0]; 
   console.log('[focusOrCreateTab] Looking for tabs with baseUrl:', baseUrl);
   
-  Browser.tabs.query({})
+  getBrowser().tabs.query({})
     .then(tabs => {
       // لاگ کردن همه URLs برای debugging
       console.log('[focusOrCreateTab] All tab URLs:', tabs.map(tab => tab.url));
@@ -231,29 +231,29 @@ export function focusOrCreateTab(url) {
         // بستن تب‌های اضافی (duplicate)
         if (duplicateTabs.length > 0) {
           const duplicateTabIds = duplicateTabs.map(tab => tab.id);
-          Browser.tabs.remove(duplicateTabIds).catch(err => {
+          getBrowser().tabs.remove(duplicateTabIds).catch(err => {
             console.error("Error closing duplicate tabs:", err);
           });
         }
         
         // به‌روزرسانی و فوکوس کردن اولین تب
-        Browser.tabs.update(firstTab.id, { active: true, url: url })
+        getBrowser().tabs.update(firstTab.id, { active: true, url: url })
           .then(updatedTab => {
             if (updatedTab) {
-              Browser.windows.update(updatedTab.windowId, { focused: true });
+              getBrowser().windows.update(updatedTab.windowId, { focused: true });
             }
           })
           .catch(err => {
             console.error("Error updating tab:", err);
-            Browser.tabs.create({ url: url });
+            getBrowser().tabs.create({ url: url });
           });
       } else {
-        Browser.tabs.create({ url: url });
+        getBrowser().tabs.create({ url: url });
       }
     })
     .catch(err => {
       console.error("Error in focusOrCreateTab:", err);
-      Browser.tabs.create({ url: url });
+      getBrowser().tabs.create({ url: url });
     });
 }
 
@@ -310,7 +310,7 @@ const injectCSS = (filePath) => {
       throw new Error(ErrorTypes.INTEGRATION || "document.head not available");
 
     const linkElement = document.createElement("link");
-    linkElement.href = Browser.runtime.getURL(filePath);
+    linkElement.href = getBrowser().runtime.getURL(filePath);
     linkElement.rel = "stylesheet";
     document.head.appendChild(linkElement);
   } catch (error) {
@@ -346,6 +346,6 @@ export default function injectIconStyle(cssFileName) {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.type = "text/css";
-  link.href = Browser.runtime.getURL(cssFileName);
+  link.href = getBrowser().runtime.getURL(cssFileName);
   document.head.appendChild(link);
 }

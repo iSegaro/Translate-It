@@ -1,6 +1,6 @@
 // src/utils/localization.js
 
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 import { logME } from "./helpers.js";

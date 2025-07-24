@@ -1,13 +1,22 @@
 // Background script Vue message handler
 // Handles messages from Vue applications (popup, sidepanel, options)
 
+import { getBrowserAsync } from '../utils/browser-polyfill.js'
 import { translationProviderFactory } from '../providers/factory/TranslationProviderFactory.js'
 import { ErrorTypes } from '../services/ErrorTypes.js'
 
 export class VueMessageHandler {
   constructor() {
     this.handlers = new Map()
+    this.browser = null
     this.setupHandlers()
+  }
+
+  async initializeBrowser() {
+    if (!this.browser) {
+      this.browser = await getBrowserAsync()
+    }
+    return this.browser
   }
 
   setupHandlers() {
@@ -229,6 +238,7 @@ export class VueMessageHandler {
   async handleStartScreenCapture(data, sender) {
     try {
       // Get active tab
+      const browser = await this.initializeBrowser()
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
       if (!tab) {
         throw new Error('No active tab found')
@@ -254,6 +264,7 @@ export class VueMessageHandler {
     
     try {
       // Capture visible tab
+      const browser = await this.initializeBrowser()
       const imageData = await browser.tabs.captureVisibleTab({
         format: 'png'
       })
@@ -276,6 +287,7 @@ export class VueMessageHandler {
     
     try {
       // Remove existing context menu items
+      const browser = await this.initializeBrowser()
       await browser.contextMenus.removeAll()
       
       // Add new menu items
@@ -296,6 +308,7 @@ export class VueMessageHandler {
 
   async handleGetExtensionInfo() {
     try {
+      const browser = await this.initializeBrowser()
       const manifest = browser.runtime.getManifest()
       
       return {
@@ -312,18 +325,21 @@ export class VueMessageHandler {
 
   // Helper methods for storage
   async storeProviderConfig(provider, config) {
+    const browser = await this.initializeBrowser()
     const key = `provider_config_${provider}`
     await browser.storage.local.set({ [key]: config })
   }
 
   async getStoredProviderConfig(provider) {
+    const browser = await this.initializeBrowser()
     const key = `provider_config_${provider}`
     const result = await browser.storage.local.get(key)
     return result[key] || null
   }
 
   // Method to register this handler with the existing message system
-  register() {
+  async register() {
+    const browser = await this.initializeBrowser()
     // Add listener for runtime messages
     browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
       if (message.source === 'vue-app') {
@@ -334,5 +350,3 @@ export class VueMessageHandler {
   }
 }
 
-// Create and register the handler
-export const vueMessageHandler = new VueMessageHandler()

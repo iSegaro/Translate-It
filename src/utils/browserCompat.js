@@ -38,17 +38,17 @@ export async function getTTSPlayer() {
   try {
     if (await isFirefox()) {
       // Use dynamic import with webpack magic comment for proper chunking
-      const module = await import(/* webpackChunkName: "tts-firefox" */ '../managers/tts-player-firefox.js');
+      const module = await import(/* webpackChunkName: "tts-firefox" */ '../managers/tts-player/tts-player-firefox.js');
       return module;
     } else {
       // Use dynamic import with webpack magic comment for proper chunking
-      const module = await import(/* webpackChunkName: "tts-chrome" */ '../managers/tts-player-chrome.js');
+      const module = await import(/* webpackChunkName: "tts-chrome" */ '../managers/tts-player/tts-player-chrome.js');
       return module;
     }
   } catch (error) {
     console.error('[BrowserCompat] Error loading TTS player:', error);
     // Fallback to chrome implementation
-    const module = await import(/* webpackChunkName: "tts-chrome-fallback" */ '../managers/tts-player-chrome.js');
+    const module = await import(/* webpackChunkName: "tts-chrome-fallback" */ '../managers/tts-player/tts-player-chrome.js');
     return module;
   }
 }

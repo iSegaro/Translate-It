@@ -1,6 +1,6 @@
 // src/utils/i18n.js
 
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { applyElementDirection } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
@@ -28,7 +28,7 @@ async function loadTranslationsForLanguageCached(lang) {
   }
 
   try {
-    const url = Browser.runtime.getURL(`_locales/${lang}/messages.json`);
+    const url = getBrowser().runtime.getURL(`_locales/${lang}/messages.json`);
     const response = await fetch(url);
     if (!response.ok) {
       // logME(`⚠️ ترجمه برای زبان "${lang}" یافت نشد.`);
@@ -95,7 +95,7 @@ export async function app_localize(lang_code) {
     translations = await loadTranslationsForLanguageCached(langCode);
     isRtl = parseBoolean(translations["IsRTL"]?.message);
   } else {
-    isRtl = parseBoolean(Browser.i18n.getMessage("IsRTL"));
+    isRtl = parseBoolean(getBrowser().i18n.getMessage("IsRTL"));
   }
 
   const bodyContainer = document.body;
@@ -139,7 +139,7 @@ function localizeContainer(container, translations) {
   const textItems = container.querySelectorAll("[data-i18n]");
   textItems.forEach((item) => {
     const key = item.getAttribute("data-i18n");
-    const translation = translations?.[key]?.message || Browser.i18n.getMessage(key);
+    const translation = translations?.[key]?.message || getBrowser().i18n.getMessage(key);
     
     if (item.matches("input, textarea")) {
       item.value = translation;
@@ -154,7 +154,7 @@ function localizeContainer(container, translations) {
   const titleItems = container.querySelectorAll("[data-i18n-title]");
   titleItems.forEach((item) => {
     const titleKey = item.getAttribute("data-i18n-title");
-    const titleTranslation = translations?.[titleKey]?.message || Browser.i18n.getMessage(titleKey);
+    const titleTranslation = translations?.[titleKey]?.message || getBrowser().i18n.getMessage(titleKey);
     item.setAttribute("title", titleTranslation);
   });
   
@@ -162,7 +162,7 @@ function localizeContainer(container, translations) {
   const placeholderItems = container.querySelectorAll("[data-i18n-placeholder]");
   placeholderItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-placeholder");
-    const translation = translations?.[key]?.message || Browser.i18n.getMessage(key);
+    const translation = translations?.[key]?.message || getBrowser().i18n.getMessage(key);
     if (translation) {
       item.placeholder = translation;
     }
@@ -172,7 +172,7 @@ function localizeContainer(container, translations) {
   const markdownItems = container.querySelectorAll("[data-i18n-markdown]");
   markdownItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-markdown");
-    const markdownString = translations?.[key]?.message || Browser.i18n.getMessage(key);
+    const markdownString = translations?.[key]?.message || getBrowser().i18n.getMessage(key);
 
     if (markdownString) {
       // Use our custom markdown parser

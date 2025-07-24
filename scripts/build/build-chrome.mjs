@@ -40,16 +40,17 @@ async function buildChromeExtension() {
     
     reporter.logBuildStep('Vite compilation...', 'completed')
     
-    // Step 3: Copy manifest
+    // Step 3: Generate manifest dynamically
     logStep('Generating Chrome manifest...')
-    const manifestSource = path.join(rootDir, 'config/build/manifest.chrome.json')
-    const manifestDest = path.join(rootDir, CHROME_BUILD_DIR, 'manifest.json')
+    const { generateValidatedManifest } = await import('../../config/manifest-generator.js')
+    const manifest = generateValidatedManifest('chrome')
     
-    if (!fs.existsSync(manifestSource)) {
-      throw new Error('Chrome manifest template not found')
-    }
+    // Ensure build directory exists
+    const buildDir = path.join(rootDir, CHROME_BUILD_DIR)
+    fs.mkdirSync(buildDir, { recursive: true })
     
-    fs.copyFileSync(manifestSource, manifestDest)
+    const manifestDest = path.join(buildDir, 'manifest.json')
+    fs.writeFileSync(manifestDest, JSON.stringify(manifest, null, 2))
     
     // Step 4: Copy static assets
     logStep('Copying static assets...')

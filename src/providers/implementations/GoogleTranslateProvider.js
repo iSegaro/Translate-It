@@ -1,5 +1,5 @@
 // src/core/providers/GoogleTranslateProvider.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import { 
   getGoogleTranslateUrlAsync,
@@ -151,7 +151,7 @@ export class GoogleTranslateProvider extends BaseTranslationProvider {
     // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
     // برای همه حالت‌ها، ابتدا language detection و swapping انجام می‌دهیم
     try {
-      const detectionResult = await Browser.i18n.detectLanguage(text);
+      const detectionResult = await getBrowser().i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];

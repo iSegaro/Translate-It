@@ -1,6 +1,6 @@
 // src/managers/NotificationManager.js
 
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
@@ -33,6 +33,10 @@ export default class NotificationManager {
     // The container will be created on-demand by the `show` method.
     // this._initializeContainer(); 
     
+    
+  }
+
+  initialize() {
     this._setupLocaleListener();
   }
 
@@ -93,8 +97,8 @@ export default class NotificationManager {
   }
 
   _setupLocaleListener() {
-    if (Browser.storage && Browser.storage.onChanged) {
-      Browser.storage.onChanged.addListener((changes, area) => {
+    if (getBrowser().storage && getBrowser().storage.onChanged) {
+      getBrowser().storage.onChanged.addListener((changes, area) => {
         if (area === "local" && changes.APPLICATION_LOCALIZE) {
           // Only apply alignment if the container has already been created
           if (this.container) {
@@ -148,7 +152,7 @@ export default class NotificationManager {
     // Step 3: Fallback to a background script notification if in-page is not available or failed.
     logME(`[NotificationManager] In-page not available. Sending notification request to background for: "${msg}"`);
     if (isExtensionContextValid()) {
-      Browser.runtime.sendMessage({
+      getBrowser().runtime.sendMessage({
         action: "show_os_notification",
         payload: { message: msg, title: cfg.title, type: type },
       }).catch(error => {

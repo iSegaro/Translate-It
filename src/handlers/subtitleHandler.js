@@ -1,5 +1,5 @@
 // src/handlers/subtitleHandler.js
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";

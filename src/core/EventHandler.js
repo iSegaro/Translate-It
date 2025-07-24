@@ -1,5 +1,5 @@
 // src/core/EventHandler.js
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import {
   getRequireCtrlForTextSelectionAsync,
   state,

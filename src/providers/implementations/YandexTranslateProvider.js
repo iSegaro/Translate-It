@@ -1,5 +1,5 @@
 // src/providers/implementations/YandexTranslateProvider.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
@@ -231,7 +231,7 @@ export class YandexTranslateProvider extends BaseTranslationProvider {
   async _applyLanguageSwapping(text, sourceLang, targetLang) {
     try {
       // Use Browser.i18n.detectLanguage for detection (similar to other providers)
-      const detectionResult = await Browser.i18n.detectLanguage(text);
+      const detectionResult = await getBrowser().i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];

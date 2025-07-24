@@ -2,7 +2,7 @@
 // It toggles the mode on or off based on the message received from the popup.
 
 // src/handlers/elementModeHandler.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { getSettingsAsync } from "../config.js";
@@ -27,7 +27,7 @@ export async function handleActivateSelectElementMode(
   let tabId;
   try {
     // 1) Find active tab
-    const tabs = await Browser.tabs.query({
+    const tabs = await getBrowser().tabs.query({
       active: true,
       currentWindow: true,
     });
@@ -45,7 +45,7 @@ export async function handleActivateSelectElementMode(
       typeof message.data === "boolean" ? message.data : !selectElementState;
 
     logME(`[Handler:ElementMode] Setting selectElementState → ${newState}`);
-    await Browser.storage.local.set({ selectElementState: newState });
+    await getBrowser().storage.local.set({ selectElementState: newState });
 
     // 3) Send toggle command
     let response = await safeSendMessage(tabId, {
@@ -57,7 +57,7 @@ export async function handleActivateSelectElementMode(
     if (response?.error && !injectionState.inProgress) {
       injectionState.inProgress = true;
       try {
-        await Browser.scripting.executeScript({
+        await getBrowser().scripting.executeScript({
           target: { tabId },
           files: ["browser-polyfill.js", "content.bundle.js"],
         });

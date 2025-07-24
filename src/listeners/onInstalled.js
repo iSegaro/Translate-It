@@ -1,5 +1,8 @@
 // src/listeners/onInstalled.js
-import Browser from "webextension-polyfill";
+// Cross-browser installation listener with base listener architecture
+
+import { BaseListener } from './base-listener.js';
+import { getBrowserAPI } from '../utils/browser-unified.js';
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { setupContextMenus } from "./onContextMenu.js";
@@ -53,30 +56,65 @@ async function migrateConfigSettings() {
   }
 }
 
-Browser.runtime.onInstalled.addListener(async (details) => {
-  logME(`[Translate-It!] 🌟 Success: ${details.reason}`);
-
-  // Setup all context menus on installation or update
-  await setupContextMenus();
-
-  // Migrate configuration settings for both install and update scenarios
-  try {
-    await migrateConfigSettings();
-  } catch (error) {
-    logME("[onInstalled] Config migration failed, but continuing with other setup:", error);
+/**
+ * Installation Listener Class
+ * Handles extension installation and update events
+ */
+class InstallationListener extends BaseListener {
+  constructor() {
+    super('runtime', 'onInstalled', 'Installation Listener');
+    this.browser = null;
   }
 
-  // --- Scenario 1: Fresh Installation ---
-  if (details.reason === "install") {
-    logME("[onInstalled] First installation detected.");
-    const optionsUrl = Browser.runtime.getURL("html/options.html#languages");
-    Browser.tabs.create({ url: optionsUrl });
+  async initialize() {
+    await super.initialize();
+    this.browser = await getBrowserAPI();
+    
+    // Add main installation handler
+    this.addHandler(this.handleInstallation.bind(this), 'main-installation-handler');
   }
 
-  // --- Scenario 2: Extension Update ---
-  else if (details.reason === "update") {
+  /**
+   * Handle installation events
+   */
+  async handleInstallation(details) {
+    logME(`[Translate-It!] 🌟 Success: ${details.reason}`);
+
+    // Setup all context menus on installation or update
+    await setupContextMenus();
+
+    // Migrate configuration settings for both install and update scenarios
     try {
-      const manifest = Browser.runtime.getManifest();
+      await migrateConfigSettings();
+    } catch (error) {
+      logME("[onInstalled] Config migration failed, but continuing with other setup:", error);
+    }
+
+    // --- Scenario 1: Fresh Installation ---
+    if (details.reason === "install") {
+      await this.handleFreshInstallation();
+    }
+    // --- Scenario 2: Extension Update ---
+    else if (details.reason === "update") {
+      await this.handleExtensionUpdate();
+    }
+  }
+
+  /**
+   * Handle fresh installation
+   */
+  async handleFreshInstallation() {
+    logME("[onInstalled] First installation detected.");
+    const optionsUrl = this.browser.runtime.getURL("options.html#languages");
+    await this.browser.tabs.create({ url: optionsUrl });
+  }
+
+  /**
+   * Handle extension update
+   */
+  async handleExtensionUpdate() {
+    try {
+      const manifest = this.browser.runtime.getManifest();
       const version = manifest.version;
       const appName = (await getTranslationString("name")) || "Translate It!";
       const title =
@@ -90,30 +128,40 @@ Browser.runtime.onInstalled.addListener(async (details) => {
         .replace("{appName}", appName)
         .replace("{version}", version);
 
-      // --- START: BROWSER-AWARE NOTIFICATION OPTIONS ---
-
-      // Create a base options object with properties common to all browsers.
+      // Create a base options object with properties common to all browsers
       const notificationOptions = {
         type: "basic",
-        iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"),
+        iconUrl: this.browser.runtime.getURL("icons/extension_icon_128.png"),
         title: title,
         message: message,
       };
 
-      // --- Clear any existing notification with the same ID before creating a new one ---
-      await Browser.notifications.clear("update-notification");
+      // Clear any existing notification with the same ID before creating a new one
+      await this.browser.notifications.clear("update-notification");
       
-      // --- END: BROWSER-AWARE NOTIFICATION OPTIONS ---
-
-      // Create the notification using the compatible options object.
-      await Browser.notifications.create(
+      // Create the notification using the compatible options object
+      await this.browser.notifications.create(
         "update-notification",
         notificationOptions
       );
+      
       logME("[onInstalled] Update notification created with browser-specific options.");
     } catch (e) {
-      // This will now only catch unexpected errors, not the compatibility error.
       logME("[onInstalled] Failed to create update notification:", e);
     }
   }
+}
+
+// Create and initialize the installation listener
+const installationListener = new InstallationListener();
+
+// Initialize and register the listener
+installationListener.initialize().then(() => {
+  installationListener.register();
+  console.log('✅ Installation listener initialized and registered');
+}).catch(error => {
+  console.error('❌ Failed to initialize installation listener:', error);
 });
+
+// Export listener for cleanup if needed
+export { installationListener };

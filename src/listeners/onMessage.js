@@ -1,6 +1,8 @@
 // src/listeners/onMessage.js
+// Cross-browser message listener with base listener architecture
 
-import Browser from "webextension-polyfill";
+import { BaseListener } from './base-listener.js';
+import { getBrowserAPI } from '../utils/browser-unified.js';
 import { ErrorHandler } from "../services/ErrorService.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { matchErrorToType } from "../services/ErrorMatcher.js";
@@ -33,9 +35,7 @@ import {
   handleCaptureError,
   handleAreaSelectionCancel
 } from "../handlers/screenCaptureHandler.js";
-import { playTTS, stopTTS } from "tts-player";
 import { setupContextMenus } from "./onContextMenu.js";
-import { openSidePanel } from "../sidepanel/action-helpers.js";
 
 // --- State Management ---
 const selectElementStates = {};
@@ -71,20 +71,88 @@ async function safeSendMessage(tabId, message) {
   }
 }
 
-// Popup connection
-Browser.runtime.onConnect.addListener((port) => {
-  if (port.name === "popup") {
-    logME("[onMessage] Popup connected");
-    // هنگامی که Popup بسته شد، رویداد disconnect اجرا می‌شود
-    port.onDisconnect.addListener(() => {
-      logME("[onMessage] Popup closed. Sending stopTTS.");
-      stopTTS();
-    });
+/**
+ * Message Listener Class
+ * Handles all runtime message events with proper error isolation
+ */
+class MessageListener extends BaseListener {
+  constructor() {
+    super('runtime', 'onMessage', 'Message Listener');
+    this.browser = null;
   }
-});
 
-// --- Main Dispatcher ---
-Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  async initialize() {
+    await super.initialize();
+    this.browser = await getBrowserAPI();
+    
+    // Set up popup connection handler
+    this.setupPopupConnectionHandler();
+    
+    // Add main message handler
+    this.addHandler(this.handleMessage.bind(this), 'main-message-handler');
+  }
+
+  /**
+   * Set up popup connection handler for TTS cleanup
+   */
+  setupPopupConnectionHandler() {
+    if (this.browser.runtime.onConnect) {
+      this.browser.runtime.onConnect.addListener(async (port) => {
+        if (port.name === "popup") {
+          logME("[onMessage] Popup connected");
+          
+          port.onDisconnect.addListener(async () => {
+            logME("[onMessage] Popup closed. Sending stopTTS.");
+            await this.handleTTSStop();
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * Handle TTS stop with dynamic import
+   */
+  async handleTTSStop() {
+    try {
+      // Use feature loader to get TTS manager
+      const { featureLoader } = await import('../background/feature-loader.js');
+      const ttsManager = await featureLoader.loadTTSManager();
+      await ttsManager.stop();
+    } catch (error) {
+      logME("[onMessage] TTS not available in current context:", error);
+    }
+  }
+
+  /**
+   * Handle TTS speak with dynamic import
+   */
+  async handleTTSSpeak(message, sendResponse) {
+    try {
+      // Use feature loader to get TTS manager
+      const { featureLoader } = await import('../background/feature-loader.js');
+      const ttsManager = await featureLoader.loadTTSManager();
+      
+      // Speak with options from message
+      await ttsManager.speak(message.text || message.message, {
+        voice: message.voice,
+        rate: message.rate,
+        pitch: message.pitch,
+        volume: message.volume,
+        lang: message.lang
+      });
+      
+      sendResponse({ success: true });
+    } catch (error) {
+      logME("[onMessage] TTS speak failed:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Main message handler
+   */
+  async handleMessage(message, sender, sendResponse) {
   const action = message?.action || message?.type;
   logME(`[onMessage] Action: ${action}`, {
     message,
@@ -143,16 +211,26 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return false;
 
       case "speak":
-        playTTS(message)
-          .then(() => sendResponse({ success: true }))
-          .catch((error) =>
-            sendResponse({ success: false, error: error.message })
-          );
+        (async () => {
+          try {
+            await this.handleTTSSpeak(message, sendResponse);
+          } catch (error) {
+            logME("[onMessage] TTS speak failed:", error);
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
         return true;
 
       case "stopTTS":
-        stopTTS();
-        sendResponse({ success: true });
+        (async () => {
+          try {
+            await this.handleTTSStop();
+            sendResponse({ success: true });
+          } catch (error) {
+            logME("[onMessage] TTS stop failed:", error);
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
         return true;
 
       case "CONTENT_SCRIPT_WILL_RELOAD":
@@ -308,9 +386,11 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case "OPEN_SIDE_PANEL": {
+        // TODO: Implement openSidePanel functionality for Vue migration
         // چون ممکن است از پاپ‌آپ فراخوانی شود، tabId را از sender می‌گیریم
         const tabId = sender.tab?.id;
-        openSidePanel(tabId);
+        // openSidePanel(tabId);
+        console.log('OPEN_SIDE_PANEL called for tab:', tabId);
         return false; // نیازی به پاسخ نیست
       }
 
@@ -356,12 +436,47 @@ Browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ error: err.message });
     return false;
   }
+  }
+}
+
+// Create and initialize the message listener
+const messageListener = new MessageListener();
+
+// Initialize and register the listener
+messageListener.initialize().then(() => {
+  messageListener.register();
+  console.log('✅ Message listener initialized and registered');
+}).catch(error => {
+  console.error('❌ Failed to initialize message listener:', error);
 });
 
-// Clean up per‑tab state
-Browser.tabs.onRemoved.addListener((tabId) => {
-  if (selectElementStates[tabId] != null) {
-    delete selectElementStates[tabId];
-    logME(`[onMessage] Cleaned state for tab ${tabId}`);
+// Set up tab cleanup listener
+class TabCleanupListener extends BaseListener {
+  constructor() {
+    super('tabs', 'onRemoved', 'Tab Cleanup Listener');
   }
+
+  async initialize() {
+    await super.initialize();
+    this.addHandler(this.handleTabRemoved.bind(this), 'tab-cleanup-handler');
+  }
+
+  async handleTabRemoved(tabId) {
+    if (selectElementStates[tabId] != null) {
+      delete selectElementStates[tabId];
+      logME(`[onMessage] Cleaned state for tab ${tabId}`);
+    }
+  }
+}
+
+// Initialize tab cleanup listener
+const tabCleanupListener = new TabCleanupListener();
+tabCleanupListener.initialize().then(() => {
+  tabCleanupListener.register();
+  console.log('✅ Tab cleanup listener initialized and registered');
+}).catch(error => {
+  console.error('❌ Failed to initialize tab cleanup listener:', error);
 });
+
+// Export listeners for cleanup if needed
+export { messageListener, tabCleanupListener };

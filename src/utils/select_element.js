@@ -1,5 +1,5 @@
 // src/utils/select_element.js
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
 import { isExtensionContextValid, logME } from "./helpers.js";

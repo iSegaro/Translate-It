@@ -6,7 +6,7 @@ import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { cropImageData } from "../utils/imageProcessing.js";
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 
 /**
  * Content Script handler for Screen Capture functionality

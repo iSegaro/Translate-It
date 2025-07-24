@@ -18,7 +18,7 @@ import {
 } from "../config.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import { getTranslationString } from "../utils/i18n.js";
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { isComplexEditor } from "../utils/framework-compat/index.js";

@@ -1,5 +1,5 @@
 // src/utils/tts.js
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { logME } from "../helpers.js";
 import { languageList } from "../languages.js";
 
@@ -221,4 +221,29 @@ export function getLanguageCode(langIdentifier) {
       l.voiceCode === trimmedId
   );
   return lang ? lang.voiceCode : null;
+}
+
+/**
+ * Uses Web Speech API for text-to-speech
+ * @param {string} text The text to speak
+ * @param {string} langCode The language code
+ * @returns {Promise} Promise that resolves when speech is complete
+ */
+export function playAudioWebSpeechAPI(text, langCode) {
+  return new Promise((resolve, reject) => {
+    if (!window.speechSynthesis) {
+      reject(new Error("Web Speech API not available"));
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    if (langCode) {
+      utterance.lang = langCode;
+    }
+
+    utterance.onend = () => resolve({ success: true });
+    utterance.onerror = (error) => reject(error);
+
+    window.speechSynthesis.speak(utterance);
+  });
 }

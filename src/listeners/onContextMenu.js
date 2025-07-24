@@ -1,6 +1,6 @@
 // src/listeners/onContextMenu.js
 
-import Browser from "webextension-polyfill";
+import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
@@ -31,6 +31,7 @@ function getApiProviders() {
  * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
  */
 async function deactivateSelectElementModeInAllTabs() {
+  const Browser = await getBrowserAsync();
   try {
     const tabs = await Browser.tabs.query({});
     for (const tab of tabs) {
@@ -60,6 +61,7 @@ async function deactivateSelectElementModeInAllTabs() {
  * This function is centralized and can be called from onInstalled or on-demand.
  */
 export async function setupContextMenus() {
+  const Browser = await getBrowserAsync();
   // Clear all previous context menus to prevent duplicate errors
   await Browser.contextMenus.removeAll();
   logME("[ContextMenuSetup] All previous context menus removed.");
@@ -146,93 +148,95 @@ export async function setupContextMenus() {
   }
 }
 
-/**
- * Listener for when a context menu item is clicked.
- */
-Browser.contextMenus.onClicked.addListener(async (info, tab) => {
-  logME(`[ContextMenu] Clicked menu item: ${info.menuItemId}`);
+export async function initialize() {
+  /**
+   * Listener for when a context menu item is clicked.
+   */
+  Browser.contextMenus.onClicked.addListener(async (info, tab) => {
+    logME(`[ContextMenu] Clicked menu item: ${info.menuItemId}`);
 
-  // --- شناسایی و مدیریت کلیک روی منوی آیکون افزونه (Action Context) ---
-  const isApiProviderClick = info.menuItemId.startsWith(
-    API_PROVIDER_ITEM_ID_PREFIX
-  );
-  const isStaticActionClick = [
-    ACTION_CONTEXT_MENU_OPTIONS_ID,
-    ACTION_CONTEXT_MENU_SHORTCUTS_ID,
-    HELP_MENU_ID,
-  ].includes(info.menuItemId);
-
-  // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
-  if (isApiProviderClick || isStaticActionClick) {
-    await deactivateSelectElementModeInAllTabs();
-  }
-
-  // --- Handler for API Provider selection ---
-  if (isApiProviderClick) {
-    const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
-    try {
-      await Browser.storage.local.set({ TRANSLATION_API: newApiId });
-      logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
-    } catch (e) {
-      logME(`[ContextMenu] Error setting new API provider:`, e);
-    }
-    return; // Stop further processing
-  }
-
-  // --- Handler for other menu items ---
-  switch (info.menuItemId) {
-    case PAGE_CONTEXT_MENU_ID:
-      if (tab && tab.id) {
-        // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
-        Browser.tabs
-          .sendMessage(tab.id, {
-            action: "TOGGLE_SELECT_ELEMENT_MODE",
-            data: true,
-          })
-          .catch((err) => {
-            logME(
-              `[ContextMenu] Could not send message to tab ${tab.id}:`,
-              err.message
-            );
-          });
-      }
-      break;
-    case ACTION_CONTEXT_MENU_OPTIONS_ID:
-      focusOrCreateTab(Browser.runtime.getURL("html/options.html"));
-      break;
-    case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
-      try {
-        const browserInfo = await Browser.runtime.getBrowserInfo();
-        const url =
-          browserInfo.name === "Firefox" ?
-            "html/options.html#help=shortcut"
-          : "chrome://extensions/shortcuts";
-        Browser.tabs.create({ url });
-      } catch (e) {
-        logME(
-          "Could not determine browser type, opening for Chrome as default.",
-          e
-        );
-        Browser.tabs.create({ url: "chrome://extensions/shortcuts" });
-      }
-      break;
-    case HELP_MENU_ID:
-      focusOrCreateTab(Browser.runtime.getURL("html/options.html#help"));
-      break;
-  }
-});
-
-/**
- * Listener to keep the context menu synchronized with storage changes.
- * This runs if the user changes the API from the options page.
- */
-Browser.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes.TRANSLATION_API) {
-    logME(
-      "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+    // --- شناسایی و مدیریت کلیک روی منوی آیکون افزونه (Action Context) ---
+    const isApiProviderClick = info.menuItemId.startsWith(
+      API_PROVIDER_ITEM_ID_PREFIX
     );
-    setupContextMenus();
-  }
-});
+    const isStaticActionClick = [
+      ACTION_CONTEXT_MENU_OPTIONS_ID,
+      ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+      HELP_MENU_ID,
+    ].includes(info.menuItemId);
 
-logME("[ContextMenu] Listeners are active.");
+    // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
+    if (isApiProviderClick || isStaticActionClick) {
+      await deactivateSelectElementModeInAllTabs();
+    }
+
+    // --- Handler for API Provider selection ---
+    if (isApiProviderClick) {
+      const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
+      try {
+        await Browser.storage.local.set({ TRANSLATION_API: newApiId });
+        logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
+      } catch (e) {
+        logME(`[ContextMenu] Error setting new API provider:`, e);
+      }
+      return; // Stop further processing
+    }
+
+    // --- Handler for other menu items ---
+    switch (info.menuItemId) {
+      case PAGE_CONTEXT_MENU_ID:
+        if (tab && tab.id) {
+          // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
+          Browser.tabs
+            .sendMessage(tab.id, {
+              action: "TOGGLE_SELECT_ELEMENT_MODE",
+              data: true,
+            })
+            .catch((err) => {
+              logME(
+                `[ContextMenu] Could not send message to tab ${tab.id}:`,
+                err.message
+              );
+            });
+        }
+        break;
+      case ACTION_CONTEXT_MENU_OPTIONS_ID:
+        focusOrCreateTab(Browser.runtime.getURL("html/options.html"));
+        break;
+      case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
+        try {
+          const browserInfo = await Browser.runtime.getBrowserInfo();
+          const url =
+            browserInfo.name === "Firefox" ?
+              "html/options.html#help=shortcut"
+            : "chrome://extensions/shortcuts";
+          Browser.tabs.create({ url });
+        } catch (e) {
+          logME(
+            "Could not determine browser type, opening for Chrome as default.",
+            e
+          );
+          Browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+        }
+        break;
+      case HELP_MENU_ID:
+        focusOrCreateTab(Browser.runtime.getURL("html/options.html#help"));
+        break;
+    }
+  });
+
+  /**
+   * Listener to keep the context menu synchronized with storage changes.
+   * This runs if the user changes the API from the options page.
+   */
+  Browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && changes.TRANSLATION_API) {
+      logME(
+        "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+      );
+      setupContextMenus();
+    }
+  });
+
+  logME("[ContextMenu] Listeners are active.");
+}

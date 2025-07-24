@@ -1,6 +1,6 @@
 // src/handlers/screenCaptureHandler.js
 
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { getEnableScreenCaptureAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from "../config.js";
@@ -58,7 +58,7 @@ export async function handleStartAreaCapture(
     }
 
     // 4. Find active tab
-    const tabs = await Browser.tabs.query({
+    const tabs = await getBrowser().tabs.query({
       active: true,
       currentWindow: true,
     });
@@ -89,7 +89,7 @@ export async function handleStartAreaCapture(
       
       injectionState.inProgress = true;
       try {
-        await Browser.scripting.executeScript({
+        await getBrowser().scripting.executeScript({
           target: { tabId },
           files: ["browser-polyfill.js", "content.bundle.js"],
         });
@@ -224,7 +224,7 @@ export async function handleRequestFullScreenCapture(
 
   try {
     // Get active tab
-    const tabs = await Browser.tabs.query({
+    const tabs = await getBrowser().tabs.query({
       active: true,
       currentWindow: true,
     });
@@ -239,7 +239,7 @@ export async function handleRequestFullScreenCapture(
     const activeTab = tabs[0];
 
     // Capture visible tab
-    const dataUrl = await Browser.tabs.captureVisibleTab(activeTab.windowId, {
+    const dataUrl = await getBrowser().tabs.captureVisibleTab(activeTab.windowId, {
       format: "png",
       quality: 100
     });

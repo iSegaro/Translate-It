@@ -7,7 +7,7 @@ import {
   playAudioGoogleTTS,
   playAudioWebSpeechAPI as playAudioWebSpeech,
   getSpeechApiLangCode,
-} from "tts-utils";
+} from "../../utils/tts/tts.js";
 import { detectTextLanguage } from "../../utils/textDetection.js";
 import { resolveLangCode } from "../../utils/langUtils.js";
 

@@ -6,7 +6,7 @@ import {
   AUTO_DETECT_VALUE,
   playAudioViaOffscreen,
   playAudioChromeTTS,
-} from "tts-utils";
+} from "../../utils/tts/tts.js";
 import { detectTextLanguage } from "../../utils/textDetection.js";
 import { resolveLangCode } from "../../utils/langUtils.js";
 

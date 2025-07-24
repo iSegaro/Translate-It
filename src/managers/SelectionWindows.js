@@ -1,11 +1,11 @@
 // src/managers/SelectionWindows.js
 
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 import { CONFIG, TranslationMode, getThemeAsync, getSettingsAsync } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
-import { AUTO_DETECT_VALUE } from "tts-utils";
+import { AUTO_DETECT_VALUE } from "../utils/tts/tts.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 

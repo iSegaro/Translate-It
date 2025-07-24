@@ -6,7 +6,7 @@ import { isPersianText } from "../../utils/textDetection.js";
 const AUTO_DETECT_VALUE = 'auto';
 import { ErrorTypes } from "../../services/ErrorTypes.js";
 import { TranslationMode } from "../../config.js";
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -147,7 +147,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     if (!detectedLangCode) {
       try {
         logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage for swapping...`);
-        const detectionResult = await Browser.i18n.detectLanguage(text);
+        const detectionResult = await getBrowser().i18n.detectLanguage(text);
         logME(`[${this.providerName}] Browser.i18n.detectLanguage swapping result:`, detectionResult);
         if (detectionResult?.languages && detectionResult.languages.length > 0) {
           detectedLangCode = detectionResult.languages[0].language.split("-")[0];
@@ -235,7 +235,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     // Fallback to Browser.i18n.detectLanguage (available in all Chrome versions)
     try {
       logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
-      const detectionResult = await Browser.i18n.detectLanguage(text);
+      const detectionResult = await getBrowser().i18n.detectLanguage(text);
       logME(`[${this.providerName}] Browser.i18n.detectLanguage result:`, detectionResult);
       
       if (detectionResult?.languages && detectionResult.languages.length > 0) {

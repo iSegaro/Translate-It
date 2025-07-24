@@ -7,11 +7,26 @@ export const createBaseConfig = (browser, options = {}) => {
   const isProduction = process.env.NODE_ENV === 'production'
   const isDevelopment = !isProduction
 
+  console.log(`🔧 Creating base config for ${browser} (${isProduction ? 'production' : 'development'} mode)`);
+
   return defineConfig({
     plugins: [
       vue(),
       ...(options.extraPlugins || [])
     ],
+
+    // Browser-specific definitions  
+    define: {
+      __BROWSER__: JSON.stringify(browser),
+      __IS_PRODUCTION__: isProduction,
+      __IS_DEVELOPMENT__: isDevelopment,
+      __VUE_OPTIONS_API__: false,
+      __VUE_PROD_DEVTOOLS__: isDevelopment,
+      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: isDevelopment,
+      'process.env.BROWSER': `"${browser}"`,
+      'process.env.NODE_ENV': `"${process.env.NODE_ENV || 'development'}"`,
+      ...(options.extraDefines || {})
+    },
     
     resolve: {
       alias: {
@@ -172,14 +187,6 @@ export const createBaseConfig = (browser, options = {}) => {
       }
     },
     
-    // Define global constants
-    define: {
-      __VUE_OPTIONS_API__: false,
-      __VUE_PROD_DEVTOOLS__: isDevelopment,
-      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: isDevelopment,
-      'process.env.BROWSER': `"${browser}"`,
-      'process.env.NODE_ENV': `"${process.env.NODE_ENV || 'development'}"`
-    },
     
     // Development server
     server: {

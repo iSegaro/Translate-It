@@ -1,5 +1,5 @@
 // src/config.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "./utils/helpers";
 
 export const TRANSLATION_ERRORS = {
@@ -309,7 +309,7 @@ export const getSettingsAsync = async () => {
     return settingsCache;
   }
   // Otherwise, fetch from storage
-  return Browser.storage.local
+  return getBrowser().storage.local
     .get(null)
     .then((items) => {
       // Combine fetched items with defaults to ensure all keys exist
@@ -318,15 +318,15 @@ export const getSettingsAsync = async () => {
     })
     .catch((error) => {
       // Handle error (e.g., log it, return default CONFIG)
-      logME("Error fetching settings:", error);
+      console.error("Error fetching settings:", error);
       settingsCache = { ...CONFIG }; // Use defaults on error
       return settingsCache;
     });
 };
 
 // Listener to update cache when settings change in storage
-if (Browser && Browser.storage && Browser.storage.onChanged) {
-  Browser.storage.onChanged.addListener((changes, areaName) => {
+if (getBrowser() && getBrowser().storage && getBrowser().storage.onChanged) {
+  getBrowser().storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && settingsCache) {
       // let updated = false;
       Object.keys(changes).forEach((key) => {
@@ -351,7 +351,7 @@ if (Browser && Browser.storage && Browser.storage.onChanged) {
     }
   });
 } else {
-  logME(
+  console.log(
     "Browser.storage.onChanged not available. Settings cache might become stale."
   );
 }

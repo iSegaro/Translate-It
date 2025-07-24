@@ -1,5 +1,5 @@
 // src/core/FeatureManager.js
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { CONFIG } from "../config.js";
 import { logME } from "../utils/helpers.js";
 

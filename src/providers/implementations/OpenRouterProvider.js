@@ -1,5 +1,5 @@
 // src/core/providers/OpenRouterProvider.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import {
   CONFIG,
@@ -40,8 +40,8 @@ export class OpenRouterProvider extends BaseTranslationProvider {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": Browser.runtime.getURL("/"),
-        "X-Title": Browser.runtime.getManifest().name,
+        "HTTP-Referer": getBrowser().runtime.getURL("/"),
+        "X-Title": getBrowser().runtime.getManifest().name,
       },
       body: JSON.stringify({
         model: model || "openai/gpt-3.5-turbo",

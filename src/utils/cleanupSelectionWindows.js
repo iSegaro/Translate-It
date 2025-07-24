@@ -1,6 +1,6 @@
 // src/utils/cleanupSelectionWindows.js
 
-import Browser from "webextension-polyfill";
+import { Browser } from "@/utils/browser-polyfill.js";
 import { logME } from "./helpers";
 
 /**

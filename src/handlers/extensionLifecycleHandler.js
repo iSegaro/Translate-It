@@ -1,5 +1,5 @@
 // src/handlers/extensionLifecycleHandler.js
-import Browser from "webextension-polyfill";
+import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../services/ErrorTypes.js";
 
@@ -15,7 +15,7 @@ export function handleExtensionLifecycle(
   logME(`[Handler:Lifecycle] Handling action: ${action}`);
   try {
     logME(`[Handler:Lifecycle] Reloading extension due to action: ${action}`);
-    Browser.runtime.reload();
+    getBrowser().runtime.reload();
     // sendResponse might not be reached
   } catch (error) {
     logME(
@@ -23,7 +23,7 @@ export function handleExtensionLifecycle(
       error
     );
     if (sender.tab?.id) {
-      Browser.scripting
+      getBrowser().scripting
         .executeScript({
           target: { tabId: sender.tab.id },
           files: ["content.bundle.js"],
