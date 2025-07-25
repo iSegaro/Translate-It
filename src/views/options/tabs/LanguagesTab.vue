@@ -44,7 +44,7 @@ const { sourceLanguages, targetLanguages } = useLanguages()
 const sourceLanguage = computed({
   get: () => settingsStore.settings?.SOURCE_LANGUAGE || 'auto',
   set: async (value) => {
-    await settingsStore.updateSetting('SOURCE_LANGUAGE', value)
+    settingsStore.updateSettingLocally('SOURCE_LANGUAGE', value)
     await validateLanguages()
   }
 })
@@ -52,7 +52,7 @@ const sourceLanguage = computed({
 const targetLanguage = computed({
   get: () => settingsStore.settings?.TARGET_LANGUAGE || 'English',
   set: async (value) => {
-    await settingsStore.updateSetting('TARGET_LANGUAGE', value)
+    settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
     await validateLanguages()
   }
 })

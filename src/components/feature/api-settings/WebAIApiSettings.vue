@@ -39,13 +39,13 @@ import BaseInput from '@/components/base/BaseInput.vue'
 const settingsStore = useSettingsStore()
 
 const webAIApiUrl = computed({
-  get: () => settingsStore.settings?.WEB_AI_API_URL || '',
-  set: (value) => settingsStore.updateSetting('WEB_AI_API_URL', value)
+  get: () => settingsStore.settings?.WEBAI_API_URL || '',
+  set: (value) => settingsStore.updateSetting('WEBAI_API_URL', value)
 })
 
 const webAIApiModel = computed({
-  get: () => settingsStore.settings?.WEB_AI_API_MODEL || '',
-  set: (value) => settingsStore.updateSetting('WEB_AI_API_MODEL', value)
+  get: () => settingsStore.settings?.WEBAI_API_MODEL || '',
+  set: (value) => settingsStore.updateSetting('WEBAI_API_MODEL', value)
 })
 </script>
 

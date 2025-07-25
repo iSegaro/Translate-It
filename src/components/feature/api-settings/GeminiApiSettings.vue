@@ -59,22 +59,22 @@ const settingsStore = useSettingsStore()
 
 const geminiApiKey = computed({
   get: () => settingsStore.settings?.API_KEY || '',
-  set: (value) => settingsStore.updateSetting('API_KEY', value)
+  set: (value) => settingsStore.updateSettingLocally('API_KEY', value)
 })
 
 const geminiModel = computed({
   get: () => settingsStore.settings?.GEMINI_MODEL || 'gemini-2.5-flash',
-  set: (value) => settingsStore.updateSetting('GEMINI_MODEL', value)
+  set: (value) => settingsStore.updateSettingLocally('GEMINI_MODEL', value)
 })
 
 const geminiThinking = computed({
-  get: () => settingsStore.settings?.GEMINI_THINKING || false,
-  set: (value) => settingsStore.updateSetting('GEMINI_THINKING', value)
+  get: () => settingsStore.settings?.GEMINI_THINKING_ENABLED || false,
+  set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_ENABLED', value)
 })
 
 const geminiCustomUrl = computed({
-  get: () => settingsStore.settings?.GEMINI_CUSTOM_URL || '',
-  set: (value) => settingsStore.updateSetting('GEMINI_CUSTOM_URL', value)
+  get: () => settingsStore.settings?.API_URL || '',
+  set: (value) => settingsStore.updateSettingLocally('API_URL', value)
 })
 
 const geminiModelOptions = ref([

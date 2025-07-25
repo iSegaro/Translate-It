@@ -36,12 +36,12 @@ const settingsStore = useSettingsStore()
 // Advanced settings
 const useMock = computed({
   get: () => settingsStore.settings?.USE_MOCK || false,
-  set: (value) => settingsStore.updateSetting('USE_MOCK', value)
+  set: (value) => settingsStore.updateSettingLocally('USE_MOCK', value)
 })
 
 const debugMode = computed({
   get: () => settingsStore.settings?.DEBUG_MODE || false,
-  set: (value) => settingsStore.updateSetting('DEBUG_MODE', value)
+  set: (value) => settingsStore.updateSettingLocally('DEBUG_MODE', value)
 })
 
 const excludedSites = computed({
@@ -54,7 +54,7 @@ const excludedSites = computed({
       .split(',')
       .map(s => s.trim())
       .filter(Boolean)
-    settingsStore.updateSetting('EXCLUDED_SITES', sites)
+    settingsStore.updateSettingLocally('EXCLUDED_SITES', sites)
   }
 })
 </script>

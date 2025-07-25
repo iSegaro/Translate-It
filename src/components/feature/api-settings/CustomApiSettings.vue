@@ -39,17 +39,17 @@ const settingsStore = useSettingsStore()
 
 const customApiUrl = computed({
   get: () => settingsStore.settings?.CUSTOM_API_URL || '',
-  set: (value) => settingsStore.updateSetting('CUSTOM_API_URL', value)
+  set: (value) => settingsStore.updateSettingLocally('CUSTOM_API_URL', value)
 })
 
 const customApiKey = computed({
   get: () => settingsStore.settings?.CUSTOM_API_KEY || '',
-  set: (value) => settingsStore.updateSetting('CUSTOM_API_KEY', value)
+  set: (value) => settingsStore.updateSettingLocally('CUSTOM_API_KEY', value)
 })
 
 const customApiModel = computed({
   get: () => settingsStore.settings?.CUSTOM_API_MODEL || '',
-  set: (value) => settingsStore.updateSetting('CUSTOM_API_MODEL', value)
+  set: (value) => settingsStore.updateSettingLocally('CUSTOM_API_MODEL', value)
 })
 </script>
 

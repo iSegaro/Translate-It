@@ -51,17 +51,29 @@ const settingsStore = useSettingsStore()
 
 const deepseekApiKey = computed({
   get: () => settingsStore.settings?.DEEPSEEK_API_KEY || '',
-  set: (value) => settingsStore.updateSetting('DEEPSEEK_API_KEY', value)
+  set: (value) => settingsStore.updateSettingLocally('DEEPSEEK_API_KEY', value)
 })
 
 const deepseekApiModel = computed({
-  get: () => settingsStore.settings?.DEEPSEEK_MODEL || 'deepseek-chat',
-  set: (value) => settingsStore.updateSetting('DEEPSEEK_MODEL', value)
+  get: () => settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat',
+  set: (value) => {
+    if (value === 'custom') {
+      // Handled by deepseekCustomModel's setter
+    } else {
+      settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+    }
+  }
 })
 
 const deepseekCustomModel = computed({
-  get: () => settingsStore.settings?.DEEPSEEK_CUSTOM_MODEL || '',
-  set: (value) => settingsStore.updateSetting('DEEPSEEK_CUSTOM_MODEL', value)
+  get: () => {
+    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL;
+    const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+    return isPredefined ? '' : currentModel;
+  },
+  set: (value) => {
+    settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value);
+  }
 })
 
 const deepseekApiModelOptions = ref([

@@ -94,13 +94,21 @@ export const useSettingsStore = defineStore('settings', () => {
       // Get all settings from storage
       const stored = await browser.storage.local.get(null)
       console.log('📦 Loaded from storage:', stored)
+      // Debugging: Log EXCLUDED_SITES directly from stored data
+      console.log(`[Settings Store] loadSettings: EXCLUDED_SITES from storage:`, stored.EXCLUDED_SITES);
       
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
         if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
           if (key === 'EXCLUDED_SITES') {
-            // Ensure EXCLUDED_SITES is always an array
-            settings.value[key] = Array.isArray(stored[key]) ? stored[key] : [];
+            if (Array.isArray(stored[key])) {
+              settings.value[key] = stored[key];
+            } else if (typeof stored[key] === 'object' && stored[key] !== null) {
+              // Attempt to convert object to array of strings
+              settings.value[key] = Object.values(stored[key]).filter(s => typeof s === 'string');
+            } else {
+              settings.value[key] = [];
+            }
           } else {
             settings.value[key] = stored[key]
           }
@@ -118,41 +126,34 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
-  const saveSettings = async (settingsToSave = null) => {
+  const saveAllSettings = async () => {
     isSaving.value = true
     try {
-      // Get browser API
       const browser = await getBrowserAPI()
-      
-      const dataToSave = settingsToSave || settings.value
-      await browser.storage.local.set(dataToSave)
-      
-      // If we're saving external settings, update our local state
-      if (settingsToSave) {
-        Object.assign(settings.value, settingsToSave)
-      }
-      
+      await browser.storage.local.set(settings.value)
       return true
     } catch (error) {
-      console.error('Failed to save settings:', error)
+      console.error('Failed to save all settings:', error)
       throw error
     } finally {
       isSaving.value = false
     }
   }
   
-  const updateSetting = async (key, value) => {
+  // Action to update a single setting in the local store state (without immediate persistence)
+  const updateSettingLocally = (key, value) => {
+    settings.value[key] = value
+  }
+
+  // Action to update a single setting and immediately persist it to storage
+  const updateSettingAndPersist = async (key, value) => {
     try {
-      // Update local state immediately
-      settings.value[key] = value
-      
-      // Get browser API and save to storage
+      settings.value[key] = value // Update local state
       const browser = await getBrowserAPI()
-      await browser.storage.local.set({ [key]: value })
-      
+      await browser.storage.local.set({ [key]: value }) // Persist immediately
       return true
     } catch (error) {
-      console.error(`Failed to update setting ${key}:`, error)
+      console.error(`Failed to update and persist setting ${key}:`, error)
       throw error
     }
   }
@@ -164,7 +165,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // Get browser API and save to storage
       const browser = await getBrowserAPI()
-      await browser.storage.local.set(updates)
+      await browser.storage.local.set(settings.value)
       
       return true
     } catch (error) {
@@ -220,7 +221,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       
       settings.value = { ...defaultSettings }
-      await saveSettings()
+      await saveAllSettings()
       
       return true
     } catch (error) {
@@ -267,7 +268,8 @@ export const useSettingsStore = defineStore('settings', () => {
       const { _exported, _timestamp, _version, _hasEncryptedKeys, ...cleanData } = importData
       
       // Update settings
-      await saveSettings(cleanData)
+      Object.assign(settings.value, cleanData)
+      await saveAllSettings()
       
       return true
     } catch (error) {
@@ -338,7 +340,7 @@ export const useSettingsStore = defineStore('settings', () => {
         EXTENSION_VERSION: manifest.version
       }
       
-      await updateMultipleSettings(migrationData)
+      await saveAllSettings()
       
       console.log('Migration status updated:', migrationData)
       return true
@@ -369,8 +371,9 @@ export const useSettingsStore = defineStore('settings', () => {
     
     // Actions
     loadSettings,
-    saveSettings,
-    updateSetting,
+    saveAllSettings,
+    updateSettingLocally,
+    updateSettingAndPersist,
     updateMultipleSettings,
     resetSettings,
     exportSettings,

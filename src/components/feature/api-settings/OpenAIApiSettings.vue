@@ -51,17 +51,33 @@ const settingsStore = useSettingsStore()
 
 const openaiApiKey = computed({
   get: () => settingsStore.settings?.OPENAI_API_KEY || '',
-  set: (value) => settingsStore.updateSetting('OPENAI_API_KEY', value)
+  set: (value) => settingsStore.updateSettingLocally('OPENAI_API_KEY', value)
 })
 
 const openaiApiModel = computed({
-  get: () => settingsStore.settings?.OPENAI_MODEL || 'gpt-3.5-turbo',
-  set: (value) => settingsStore.updateSetting('OPENAI_MODEL', value)
+  get: () => settingsStore.settings?.OPENAI_API_MODEL || 'gpt-3.5-turbo',
+  set: (value) => {
+    // If custom model is selected, update OPENAI_API_MODEL with the custom value
+    if (value === 'custom') {
+      // This will be handled by the custom model input's v-model directly updating openaiCustomModel
+      // and then openaiCustomModel's setter updating OPENAI_API_MODEL
+    } else {
+      settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+    }
+  }
 })
 
 const openaiCustomModel = computed({
-  get: () => settingsStore.settings?.OPENAI_CUSTOM_MODEL || '',
-  set: (value) => settingsStore.updateSetting('OPENAI_CUSTOM_MODEL', value)
+  get: () => {
+    // If the current OPENAI_API_MODEL is not in the predefined options, it's a custom model
+    const currentModel = settingsStore.settings?.OPENAI_API_MODEL;
+    const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+    return isPredefined ? '' : currentModel;
+  },
+  set: (value) => {
+    // When custom model input changes, update the main OPENAI_API_MODEL setting
+    settingsStore.updateSettingLocally('OPENAI_API_MODEL', value);
+  }
 })
 
 const openaiApiModelOptions = ref([

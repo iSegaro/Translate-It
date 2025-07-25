@@ -149,65 +149,65 @@ const settingsStore = useSettingsStore()
 // Extension enabled state
 const extensionEnabled = computed({
   get: () => settingsStore.settings?.EXTENSION_ENABLED ?? true,
-  set: (value) => settingsStore.updateSetting('EXTENSION_ENABLED', value)
+  set: (value) => settingsStore.updateSettingLocally('EXTENSION_ENABLED', value)
 })
 
 // Text field settings
 const translateOnTextFields = computed({
   get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_FIELDS || false,
-  set: (value) => settingsStore.updateSetting('TRANSLATE_ON_TEXT_FIELDS', value)
+  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_FIELDS', value)
 })
 
 const enableShortcutForTextFields = computed({
   get: () => settingsStore.settings?.ENABLE_SHORTCUT_FOR_TEXT_FIELDS || false,
-  set: (value) => settingsStore.updateSetting('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', value)
+  set: (value) => settingsStore.updateSettingLocally('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', value)
 })
 
 const textFieldMode = computed({
   get: () => settingsStore.settings?.COPY_REPLACE === 'replace' ? 'replace' : 'copy',
-  set: (value) => settingsStore.updateSetting('COPY_REPLACE', value)
+  set: (value) => settingsStore.updateSettingLocally('COPY_REPLACE', value)
 })
 
 const replaceOnSpecialSites = computed({
   get: () => settingsStore.settings?.REPLACE_SPECIAL_SITES || false,
-  set: (value) => settingsStore.updateSetting('REPLACE_SPECIAL_SITES', value)
+  set: (value) => settingsStore.updateSettingLocally('REPLACE_SPECIAL_SITES', value)
 })
 
 // Selection settings
 const translateWithSelectElement = computed({
   get: () => settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT || false,
-  set: (value) => settingsStore.updateSetting('TRANSLATE_WITH_SELECT_ELEMENT', value)
+  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_WITH_SELECT_ELEMENT', value)
 })
 
 const translateOnTextSelection = computed({
   get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION || false,
-  set: (value) => settingsStore.updateSetting('TRANSLATE_ON_TEXT_SELECTION', value)
+  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_SELECTION', value)
 })
 
 const selectionTranslationMode = computed({
   get: () => settingsStore.settings?.selectionTranslationMode || 'immediate',
-  set: (value) => settingsStore.updateSetting('selectionTranslationMode', value)
+  set: (value) => settingsStore.updateSettingLocally('selectionTranslationMode', value)
 })
 
 const requireCtrlForTextSelection = computed({
   get: () => settingsStore.settings?.REQUIRE_CTRL_FOR_TEXT_SELECTION || false,
-  set: (value) => settingsStore.updateSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', value)
+  set: (value) => settingsStore.updateSettingLocally('REQUIRE_CTRL_FOR_TEXT_SELECTION', value)
 })
 
 // Dictionary and subtitle settings
 const enableDictionary = computed({
   get: () => settingsStore.settings?.ENABLE_DICTIONARY || false,
-  set: (value) => settingsStore.updateSetting('ENABLE_DICTIONARY', value)
+  set: (value) => settingsStore.updateSettingLocally('ENABLE_DICTIONARY', value)
 })
 
 const enableSubtitle = computed({
   get: () => settingsStore.settings?.ENABLE_SUBTITLE_TRANSLATION || false,
-  set: (value) => settingsStore.updateSetting('ENABLE_SUBTITLE_TRANSLATION', value)
+  set: (value) => settingsStore.updateSettingLocally('ENABLE_SUBTITLE_TRANSLATION', value)
 })
 
 const iconSubtitle = computed({
   get: () => settingsStore.settings?.SHOW_SUBTITLE_ICON || false,
-  set: (value) => settingsStore.updateSetting('SHOW_SUBTITLE_ICON', value)
+  set: (value) => settingsStore.updateSettingLocally('SHOW_SUBTITLE_ICON', value)
 })
 </script>
 

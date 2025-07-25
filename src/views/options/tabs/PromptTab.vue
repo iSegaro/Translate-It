@@ -65,7 +65,7 @@ const validationError = ref('')
 const promptTemplate = computed({
   get: () => settingsStore.settings?.PROMPT_TEMPLATE || DEFAULT_PROMPT,
   set: async (value) => {
-    settingsStore.updateSetting('PROMPT_TEMPLATE', value)
+    settingsStore.updateSettingLocally('PROMPT_TEMPLATE', value)
     await validatePrompt()
   }
 })

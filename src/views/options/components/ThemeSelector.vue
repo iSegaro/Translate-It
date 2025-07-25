@@ -70,7 +70,7 @@ const isDarkMode = computed({
   get: () => settingsStore.settings.THEME === 'dark',
   set: (value) => {
     if (!isAutoMode.value) {
-      settingsStore.updateSetting('THEME', value ? 'dark' : 'light')
+      settingsStore.updateSettingAndPersist('THEME', value ? 'dark' : 'light')
     }
   }
 })
@@ -79,11 +79,11 @@ const isAutoMode = computed({
   get: () => settingsStore.settings.THEME === 'auto',
   set: (value) => {
     if (value) {
-      settingsStore.updateSetting('THEME', 'auto')
+      settingsStore.updateSettingAndPersist('THEME', 'auto')
     } else {
       // When disabling auto mode, set to current system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      settingsStore.updateSetting('THEME', prefersDark ? 'dark' : 'light')
+      settingsStore.updateSettingAndPersist('THEME', prefersDark ? 'dark' : 'light')
     }
   }
 })

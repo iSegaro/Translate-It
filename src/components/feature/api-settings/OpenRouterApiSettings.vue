@@ -51,17 +51,29 @@ const settingsStore = useSettingsStore()
 
 const openrouterApiKey = computed({
   get: () => settingsStore.settings?.OPENROUTER_API_KEY || '',
-  set: (value) => settingsStore.updateSetting('OPENROUTER_API_KEY', value)
+  set: (value) => settingsStore.updateSettingLocally('OPENROUTER_API_KEY', value)
 })
 
 const openrouterApiModel = computed({
-  get: () => settingsStore.settings?.OPENROUTER_MODEL || 'openai/gpt-4o',
-  set: (value) => settingsStore.updateSetting('OPENROUTER_MODEL', value)
+  get: () => settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o',
+  set: (value) => {
+    if (value === 'custom') {
+      // Handled by openrouterCustomModel's setter
+    } else {
+      settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+    }
+  }
 })
 
 const openrouterCustomModel = computed({
-  get: () => settingsStore.settings?.OPENROUTER_CUSTOM_MODEL || '',
-  set: (value) => settingsStore.updateSetting('OPENROUTER_CUSTOM_MODEL', value)
+  get: () => {
+    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL;
+    const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+    return isPredefined ? '' : currentModel;
+  },
+  set: (value) => {
+    settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value);
+  }
 })
 
 const openrouterApiModelOptions = ref([

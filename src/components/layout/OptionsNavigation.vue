@@ -59,7 +59,7 @@ const saveAllSettings = async () => {
   statusMessage.value = ''
   
   try {
-    await settingsStore.saveSettings()
+    await settingsStore.saveAllSettings()
     statusType.value = 'success'
     statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     

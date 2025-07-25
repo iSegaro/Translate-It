@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import GeminiApiSettings from '@/components/feature/api-settings/GeminiApiSettings.vue'
@@ -50,9 +50,11 @@ import CustomApiSettings from '@/components/feature/api-settings/CustomApiSettin
 const settingsStore = useSettingsStore()
 
 // Selected provider
-const selectedProvider = computed({
-  get: () => settingsStore.settings?.TRANSLATION_API || 'google',
-  set: (value) => settingsStore.updateSetting('TRANSLATION_API', value)
+const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
+
+// Watch for changes in selectedProvider and update the store locally
+watch(selectedProvider, (newValue) => {
+  settingsStore.updateSettingLocally('TRANSLATION_API', newValue)
 })
 </script>
 
