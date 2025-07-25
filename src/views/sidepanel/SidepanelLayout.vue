@@ -4,6 +4,8 @@
     <SidepanelToolbar 
       @history-toggle="handleHistoryToggle"
       @api-dropdown-toggle="handleApiDropdownToggle"
+      :is-api-dropdown-visible="isApiDropdownVisible"
+      :is-history-visible="isHistoryVisible"
     />
 
     <!-- Content area -->
@@ -13,7 +15,7 @@
 
       <!-- History Panel -->
       <SidepanelHistory 
-        :is-visible="isHistoryVisible"
+        v-model:is-visible="isHistoryVisible"
         @close="handleHistoryClose"
         @select-history-item="handleHistoryItemSelect"
       />
@@ -21,7 +23,7 @@
 
     <!-- API Provider Dropdown -->
     <SidepanelApiDropdown 
-      :is-visible="isApiDropdownVisible"
+      v-model:is-visible="isApiDropdownVisible"
       @close="isApiDropdownVisible = false"
       @provider-selected="handleProviderSelect"
     />
@@ -29,15 +31,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
+import { useApiProvider } from '@/composables/useApiProvider.js'
 import SidepanelToolbar from './components/SidepanelToolbar.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue';
 
-// Get history composable to sync state
-const { closeHistoryPanel, openHistoryPanel } = useHistory()
+// Get composables to sync state
+const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
+const { closeDropdown: closeApiDropdown, setDropdownOpen } = useApiProvider()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
@@ -51,18 +55,31 @@ const handleHistoryToggle = (visible) => {
   } else {
     closeHistoryPanel()
   }
+  console.log('[SidepanelLayout] isHistoryVisible toggled to:', visible)
 }
 
 // Handle history panel close
 const handleHistoryClose = () => {
   isHistoryVisible.value = false
   closeHistoryPanel() // Sync with composable state
+  console.log('[SidepanelLayout] handleHistoryClose: isHistoryVisible set to false')
 }
 
 // Handle API dropdown toggle
 const handleApiDropdownToggle = (visible) => {
   isApiDropdownVisible.value = visible
+  console.log('[SidepanelLayout] isApiDropdownVisible toggled to:', visible)
 }
+
+// Watch for changes in isApiDropdownVisible and sync with composable
+watch(isApiDropdownVisible, (newVal) => {
+  setDropdownOpen(newVal)
+})
+
+// Watch for changes in isHistoryVisible and sync with composable
+watch(isHistoryVisible, (newVal) => {
+  setHistoryPanelOpen(newVal)
+})
 
 // Handle history item selection
 const handleHistoryItemSelect = (item) => {

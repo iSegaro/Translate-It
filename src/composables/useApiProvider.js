@@ -101,19 +101,9 @@ export function useApiProvider() {
     }
   }
 
-  // Toggle dropdown
-  const toggleDropdown = () => {
-    isDropdownOpen.value = !isDropdownOpen.value
-  }
-
-  // Open dropdown
-  const openDropdown = () => {
-    isDropdownOpen.value = true
-  }
-
-  // Close dropdown
-  const closeDropdown = () => {
-    isDropdownOpen.value = false
+  // Set dropdown open state externally
+  const setDropdownOpen = (value) => {
+    isDropdownOpen.value = value
   }
 
   // Get provider icon URL
@@ -235,14 +225,14 @@ export function useApiProvider() {
     loadAvailableProviders,
     loadCurrentProvider,
     selectProvider,
-    toggleDropdown,
-    openDropdown,
-    closeDropdown,
     getProviderIconUrl,
     createProviderItems,
 
     // Utilities
     initialize,
-    cleanup
+    cleanup,
+
+    // External state setters
+    setDropdownOpen
   }
 }

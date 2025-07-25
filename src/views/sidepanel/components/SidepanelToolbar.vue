@@ -93,6 +93,17 @@ import deepseekIcon from '@/assets/icons/api-providers/deepseek.svg'
 import openrouterIcon from '@/assets/icons/api-providers/openrouter.svg'
 import webaiIcon from '@/assets/icons/api-providers/webai.svg'
 
+const props = defineProps({
+  isApiDropdownVisible: {
+    type: Boolean,
+    default: false
+  },
+  isHistoryVisible: {
+    type: Boolean,
+    default: false
+  }
+})
+
 // Emits
 const emit = defineEmits(['historyToggle', 'apiDropdownToggle'])
 
@@ -223,13 +234,12 @@ const handleClearFields = () => {
 // Handle API provider button click
 const handleApiProviderClick = () => {
   try {
-    toggleApiDropdown()
-    emit('apiDropdownToggle', isApiDropdownOpen.value)
+    emit('apiDropdownToggle', !props.isApiDropdownVisible)
     
     const button = document.getElementById('apiProviderBtn')
     showVisualFeedback(button, 'success', 300)
     
-    console.log('[SidepanelToolbar] API provider dropdown toggled:', isApiDropdownOpen.value)
+    console.log('[SidepanelToolbar] API provider dropdown toggled:', !props.isApiDropdownVisible)
   } catch (error) {
     console.error('[SidepanelToolbar] Error toggling API provider dropdown:', error)
   }
@@ -238,13 +248,12 @@ const handleApiProviderClick = () => {
 // Handle history button click
 const handleHistoryClick = () => {
   try {
-    toggleHistoryPanel()
-    emit('historyToggle', isHistoryPanelOpen.value)
+    emit('historyToggle', !props.isHistoryVisible)
     
     const button = document.getElementById('historyBtn')
     showVisualFeedback(button, 'success', 300)
     
-    console.log('[SidepanelToolbar] History panel toggled:', isHistoryPanelOpen.value)
+    console.log('[SidepanelToolbar] History panel toggled:', !props.isHistoryVisible)
   } catch (error) {
     console.error('[SidepanelToolbar] Error toggling history panel:', error)
   }
@@ -369,18 +378,20 @@ watch(isSelectElementModeActive, (active) => {
 })
 
 // Watch for API dropdown state changes
-watch(isApiDropdownOpen, (open) => {
+watch(() => props.isApiDropdownVisible, (open) => {
   const button = document.getElementById('apiProviderBtn')
   if (button) {
     button.classList.toggle('active', open)
+    console.log('[SidepanelToolbar] API dropdown visibility changed to:', open, '-> button active state:', button.classList.contains('active'))
   }
 })
 
 // Watch for history panel state changes
-watch(isHistoryPanelOpen, (open) => {
+watch(() => props.isHistoryVisible, (open) => {
   const button = document.getElementById('historyBtn')
   if (button) {
     button.classList.toggle('active', open)
+    console.log('[SidepanelToolbar] History panel visibility changed to:', open, '-> button active state:', button.classList.contains('active'))
   }
 })
 

@@ -34,7 +34,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'providerSelected'])
+const emit = defineEmits(['close', 'providerSelected', 'update:isVisible'])
 
 // Composables
 const { 
@@ -42,7 +42,8 @@ const {
   currentProvider,
   selectProvider,
   createProviderItems,
-  getProviderIconUrl
+  getProviderIconUrl,
+  closeDropdown: closeApiDropdownComposable // Use the composable's close method
 } = useApiProvider()
 
 const { showVisualFeedback } = useUI()
@@ -188,7 +189,9 @@ const handleOutsideClick = (event) => {
   if (apiButton && 
       !dropdownMenu.value.contains(event.target) && 
       !apiButton.contains(event.target)) {
-    emit('close')
+    emit('update:isVisible', false)
+    closeApiDropdownComposable() // Sync composable state
+    console.log('[SidepanelApiDropdown] Outside click detected, emitting update:isVisible(false)')
   }
 }
 

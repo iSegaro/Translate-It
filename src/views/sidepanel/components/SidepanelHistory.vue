@@ -2,15 +2,51 @@
   <div id="historyPanel" class="history-panel">
     <div class="history-header">
       <h3 :data-i18n="$i18n('SIDEPANEL_HISTORY_TITLE')">Translation History</h3>
-      <button id="closeHistoryBtn" class="close-btn">✕</button>
+      <button id="closeHistoryBtn" class="close-btn" @click="handleClose">✕</button>
     </div>
-    <div id="historyList" class="history-list"></div>
+    <div id="historyList" class="history-list">
+      <template v-if="isLoading">
+        <div class="loading-message">Loading history...</div>
+      </template>
+      <template v-else-if="historyError">
+        <div class="error-message">{{ historyError }}</div>
+      </template>
+      <template v-else-if="!hasHistory">
+        <div class="empty-message">No translation history yet</div>
+      </template>
+      <template v-else>
+        <div
+          v-for="item in formattedHistoryItems"
+          :key="item.index"
+          class="history-item"
+          @click="handleHistoryItemClick(item)"
+        >
+          <div class="history-item-header">
+            <div class="language-info">
+              <span class="language-pair">{{ item.sourceLanguageName }} → {{ item.targetLanguageName }}</span>
+            </div>
+            <div class="history-item-actions">
+              <span class="timestamp">{{ item.formattedTime }}</span>
+              <button class="delete-btn" title="Delete this item" @click.stop="handleDeleteHistoryItem(item.index, $event)">
+                <img src="@/assets/icons/trash-small.svg" alt="Delete" class="delete-icon" />
+              </button>
+            </div>
+          </div>
+          <div class="history-item-content">
+            <div class="source-text">{{ truncateText(item.sourceText) }}</div>
+            <div class="arrow">↓</div>
+            <div class="translated-text">{{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}</div>
+          </div>
+        </div>
+      </template>
+    </div>
     <!-- Footer with clear all button -->
     <div class="history-footer">
       <button
         id="clearAllHistoryBtn"
         class="clear-all-btn"
         :title="$i18n('SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP')"
+        @click="handleClearAllHistory"
       >
         <img
           src="@assets/icons/trash.svg"
@@ -38,6 +74,12 @@ const getLanguageNameByCode = (code) => {
   return lang?.name || code
 }
 
+// Truncate long text for display
+const truncateText = (text, maxLength = 100) => {
+  if (!text) return ''
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
 // Props
 const props = defineProps({
   isVisible: {
@@ -47,7 +89,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'selectHistoryItem'])
+const emit = defineEmits(['close', 'selectHistoryItem', 'update:isVisible'])
 
 // Composables
 const { 
@@ -88,8 +130,9 @@ const formattedHistoryItems = computed(() => {
 const handleClose = () => {
   isClosing.value = true
   
-  // Only emit close, let the layout handle the composable state
-  emit('close')
+  // Emit update:isVisible to sync with parent (SidepanelLayout)
+  emit('update:isVisible', false)
+  console.log('[SidepanelHistory] handleClose: Emitting update:isVisible(false)')
   
   setTimeout(() => {
     isClosing.value = false
@@ -153,67 +196,8 @@ const handleDeleteHistoryItem = async (index, event) => {
 
 // Render history items
 const renderHistoryItems = () => {
-  if (!historyList.value) return
-
-  historyList.value.innerHTML = ''
-
-  if (isLoading.value) {
-    historyList.value.innerHTML = '<div class="loading-message">Loading history...</div>'
-    return
-  }
-
-  if (historyError.value) {
-    historyList.value.innerHTML = `<div class="error-message">${historyError.value}</div>`
-    return
-  }
-
-  if (!hasHistory.value) {
-    historyList.value.innerHTML = '<div class="empty-message">No translation history yet</div>'
-    return
-  }
-
-  // Create history items
-  formattedHistoryItems.value.forEach(item => {
-    const historyItem = document.createElement('div')
-    historyItem.className = 'history-item'
-    historyItem.setAttribute('data-history-index', item.index)
-    
-    // Truncate long text for display
-    const truncateText = (text, maxLength = 100) => {
-      if (!text) return ''
-      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-    }
-
-    historyItem.innerHTML = `
-      <div class="history-item-header">
-        <div class="language-info">
-          <span class="language-pair">${item.sourceLanguageName} → ${item.targetLanguageName}</span>
-        </div>
-        <div class="history-item-actions">
-          <span class="timestamp">${item.formattedTime}</span>
-          <button class="delete-btn" title="Delete this item">
-            <img src="@/assets/icons/trash-small.svg" alt="Delete" class="delete-icon" />
-          </button>
-        </div>
-      </div>
-      <div class="history-item-content">
-        <div class="source-text">${truncateText(item.sourceText)}</div>
-        <div class="arrow">↓</div>
-        <div class="translated-text">${item.markdownContent ? item.markdownContent : truncateText(item.translatedText)}</div>
-      </div>
-    `
-
-    // Add click event for item selection
-    historyItem.addEventListener('click', () => handleHistoryItemClick(item))
-
-    // Add click event for delete button
-    const deleteBtn = historyItem.querySelector('.delete-btn')
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', (e) => handleDeleteHistoryItem(item.index, e))
-    }
-
-    historyList.value.appendChild(historyItem)
-  })
+  // No longer manually rendering, Vue will handle it
+  console.log('[SidepanelHistory] Finished rendering', formattedHistoryItems.value.length, 'items')
 }
 
 // Setup event listeners
@@ -239,17 +223,6 @@ const cleanupEventListeners = () => {
   const clearAllBtn = document.getElementById('clearAllHistoryBtn')
   if (clearAllBtn) {
     clearAllBtn.removeEventListener('click', handleClearAllHistory)  
-  }
-
-  // Cleanup history item listeners
-  if (historyList.value) {
-    const historyItems = historyList.value.querySelectorAll('.history-item')
-    historyItems.forEach(item => {
-      const deleteBtn = item.querySelector('.delete-btn')
-      if (deleteBtn) {
-        deleteBtn.removeEventListener('click', handleDeleteHistoryItem)
-      }
-    })
   }
 }
 

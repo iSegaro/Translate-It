@@ -152,23 +152,9 @@ export function useHistory() {
     }
   }
 
-  // Toggle history panel
-  const toggleHistoryPanel = () => {
-    isHistoryPanelOpen.value = !isHistoryPanelOpen.value
-    if (isHistoryPanelOpen.value) {
-      loadHistory()
-    }
-  }
-
-  // Open history panel
-  const openHistoryPanel = () => {
-    isHistoryPanelOpen.value = true
-    loadHistory()
-  }
-
-  // Close history panel
-  const closeHistoryPanel = () => {
-    isHistoryPanelOpen.value = false
+  // Set history panel open state externally
+  const setHistoryPanelOpen = (value) => {
+    isHistoryPanelOpen.value = value
   }
 
   // Handle storage changes from other parts of extension
@@ -262,9 +248,7 @@ export function useHistory() {
     selectHistoryItem,
     
     // Panel Management
-    toggleHistoryPanel,
-    openHistoryPanel,
-    closeHistoryPanel,
+    setHistoryPanelOpen,
 
     // Utilities
     formatTime,
