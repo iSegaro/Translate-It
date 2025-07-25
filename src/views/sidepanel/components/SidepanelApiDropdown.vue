@@ -1,7 +1,20 @@
 <template>
   <div id="apiProviderDropdown" class="dropdown-menu" ref="dropdownMenu">
     <div class="dropdown-content" ref="dropdownContent">
-      <!-- Provider options will be rendered here -->
+      <template v-if="isLoading">
+        <div class="loading-message">Loading providers...</div>
+      </template>
+      <template v-else-if="!hasProviders">
+        <div class="empty-message">No providers available</div>
+      </template>
+      <template v-else>
+        <ApiProviderItem
+          v-for="item in providerItems"
+          :key="item.id"
+          :item="item"
+          @select="handleProviderSelect"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -10,6 +23,7 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useUI } from '@/composables/useUI.js'
+import ApiProviderItem from './ApiProviderItem.vue'
 
 // Props
 const props = defineProps({
@@ -59,10 +73,10 @@ const handleProviderSelect = async (providerId) => {
       emit('providerSelected', providerId)
       emit('close')
       
-      // Visual feedback
-      const providerElement = document.querySelector(`[data-provider-id="${providerId}"]`)
-      if (providerElement) {
-        showVisualFeedback(providerElement, 'success', 300)
+      // Visual feedback - assuming the button is the target
+      const apiButton = document.getElementById('apiProviderBtn')
+      if (apiButton) {
+        showVisualFeedback(apiButton, 'success', 300)
       }
       
       console.log(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
@@ -70,9 +84,9 @@ const handleProviderSelect = async (providerId) => {
   } catch (error) {
     console.error('[SidepanelApiDropdown] Error selecting provider:', error)
     
-    const providerElement = document.querySelector(`[data-provider-id="${providerId}"]`)
-    if (providerElement) {
-      showVisualFeedback(providerElement, 'error')
+    const apiButton = document.getElementById('apiProviderBtn')
+    if (apiButton) {
+      showVisualFeedback(apiButton, 'error')
     }
   } finally {
     isLoading.value = false
@@ -91,54 +105,16 @@ const renderProviderItems = async () => {
   console.log('[SidepanelApiDropdown] hasProviders:', hasProviders.value)  
   console.log('[SidepanelApiDropdown] providerItems count:', providerItems.value.length)
 
-  dropdownContent.value.innerHTML = ''
-
   if (isLoading.value) {
-    dropdownContent.value.innerHTML = '<div class="loading-message">Loading providers...</div>'
-    console.log('[SidepanelApiDropdown] Showing loading message')
+    // Handled by template
     return
   }
 
   if (!hasProviders.value) {
-    dropdownContent.value.innerHTML = '<div class="empty-message">No providers available</div>'
-    console.log('[SidepanelApiDropdown] Showing empty message')
+    // Handled by template
     return
   }
-
-  console.log('[SidepanelApiDropdown] Creating provider items...')
-
-  // Create provider items
-  for (const item of providerItems.value) {
-    console.log('[SidepanelApiDropdown] Creating item for:', item.name)
-    
-    const providerElement = document.createElement('div')
-    providerElement.className = `provider-item ${item.isActive ? 'active' : ''}`
-    providerElement.setAttribute('data-provider-id', item.id)
-    
-    // Get icon URL
-    const iconUrl = await getProviderIconUrl(`icons/api-providers/${item.icon}`)
-    console.log('[SidepanelApiDropdown] Icon URL for', item.name, ':', iconUrl)
-    
-    providerElement.innerHTML = `
-      <div class="provider-icon">
-        <img src="${iconUrl}" alt="${item.name}" />
-      </div>
-      <div class="provider-info">
-        <span class="provider-name">${item.name}</span>
-        ${item.isActive ? '<span class="active-indicator">Current</span>' : ''}
-      </div>
-    `
-
-    // Add click event
-    providerElement.addEventListener('click', () => {
-      if (!item.isActive) {
-        handleProviderSelect(item.id)
-      }
-    })
-
-    dropdownContent.value.appendChild(providerElement)
-  }
-  
+  // No longer manually rendering, Vue will handle it
   console.log('[SidepanelApiDropdown] Finished rendering', providerItems.value.length, 'items')
 }
 
@@ -201,14 +177,6 @@ const setupEventListeners = () => {
 // Cleanup event listeners
 const cleanupEventListeners = () => {
   document.removeEventListener('click', handleOutsideClick)
-  
-  // Cleanup provider item listeners
-  if (dropdownContent.value) {
-    const providerItems = dropdownContent.value.querySelectorAll('.provider-item')
-    providerItems.forEach(item => {
-      item.removeEventListener('click', handleProviderSelect)
-    })
-  }
 }
 
 // Handle outside clicks
