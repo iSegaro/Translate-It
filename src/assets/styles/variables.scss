@@ -65,6 +65,7 @@
   // Neutral colors (mapped from theme)
   --color-background: var(--bg-color, #ffffff);
   --color-surface: var(--sidebar-bg-color, #f5f5f5);
+  --color-surface-alt: var(--main-bg-color, #fafafa);
   --color-border: var(--border-color, #e0e0e0);
   --color-text: var(--text-color, #212121);
   --color-text-secondary: var(--tab-button-color, #757575);
@@ -109,6 +110,7 @@ $spacing-xl: 24px;
 $spacing-xxl: 32px;
 
 // Borders
+$border-radius-xs: 2px;
 $border-radius-sm: 4px;
 $border-radius-base: 6px;
 $border-radius-md: 8px;

@@ -26,7 +26,285 @@
 </template>
 
 <script setup>
-// Add script logic here later
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { useHistory } from '@/composables/useHistory.js'
+import { useUI } from '@/composables/useUI.js'
+import { languageList } from '@/utils/languages.js'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
+
+// Helper function
+const getLanguageNameByCode = (code) => {
+  const lang = languageList.find(l => l.code === code)
+  return lang?.name || code
+}
+
+// Props
+const props = defineProps({
+  isVisible: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// Emits
+const emit = defineEmits(['close', 'selectHistoryItem'])
+
+// Composables
+const { 
+  historyItems,
+  sortedHistoryItems,
+  hasHistory,
+  isLoading,
+  historyError,
+  deleteHistoryItem,
+  clearAllHistory,
+  formatTime,
+  createMarkdownContent,
+  loadHistory
+} = useHistory()
+
+const { showVisualFeedback } = useUI()
+
+// Template refs
+const historyPanel = ref(null)
+const historyList = ref(null)
+
+// Local state
+const isClosing = ref(false)
+
+// Computed
+const formattedHistoryItems = computed(() => {
+  return sortedHistoryItems.value.map((item, index) => ({
+    ...item,
+    index,
+    formattedTime: formatTime(item.timestamp),
+    sourceLanguageName: getLanguageNameByCode(item.sourceLanguage) || item.sourceLanguage,
+    targetLanguageName: getLanguageNameByCode(item.targetLanguage) || item.targetLanguage,
+    markdownContent: createMarkdownContent(item.translatedText)
+  }))
+})
+
+// Handle close button click
+const handleClose = () => {
+  isClosing.value = true
+  
+  // Only emit close, let the layout handle the composable state
+  emit('close')
+  
+  setTimeout(() => {
+    isClosing.value = false
+  }, 300)
+}
+
+// Handle clear all history
+const handleClearAllHistory = async () => {
+  try {
+    const cleared = await clearAllHistory()
+    
+    if (cleared) {
+      const button = document.getElementById('clearAllHistoryBtn')
+      showVisualFeedback(button, 'success')
+      console.log('[SidepanelHistory] All history cleared')
+    }
+  } catch (error) {
+    console.error('[SidepanelHistory] Error clearing history:', error)
+    const button = document.getElementById('clearAllHistoryBtn')
+    showVisualFeedback(button, 'error')
+  }
+}
+
+// Handle history item click
+const handleHistoryItemClick = (item) => {
+  emit('selectHistoryItem', {
+    sourceText: item.sourceText,
+    translatedText: item.translatedText,
+    sourceLanguage: item.sourceLanguage,
+    targetLanguage: item.targetLanguage
+  })
+  
+  // Visual feedback
+  const itemElement = document.querySelector(`[data-history-index="${item.index}"]`)
+  if (itemElement) {
+    showVisualFeedback(itemElement, 'success', 400)
+  }
+}
+
+// Handle delete history item
+const handleDeleteHistoryItem = async (index, event) => {
+  event.stopPropagation() // Prevent item click
+  
+  try {
+    await deleteHistoryItem(index)
+    
+    const button = event.target.closest('.delete-btn')
+    if (button) {
+      showVisualFeedback(button, 'success', 400)
+    }
+    
+    console.log(`[SidepanelHistory] History item ${index} deleted`)
+  } catch (error) {
+    console.error('[SidepanelHistory] Error deleting history item:', error)
+    const button = event.target.closest('.delete-btn')
+    if (button) {
+      showVisualFeedback(button, 'error')
+    }
+  }
+}
+
+// Render history items
+const renderHistoryItems = () => {
+  if (!historyList.value) return
+
+  historyList.value.innerHTML = ''
+
+  if (isLoading.value) {
+    historyList.value.innerHTML = '<div class="loading-message">Loading history...</div>'
+    return
+  }
+
+  if (historyError.value) {
+    historyList.value.innerHTML = `<div class="error-message">${historyError.value}</div>`
+    return
+  }
+
+  if (!hasHistory.value) {
+    historyList.value.innerHTML = '<div class="empty-message">No translation history yet</div>'
+    return
+  }
+
+  // Create history items
+  formattedHistoryItems.value.forEach(item => {
+    const historyItem = document.createElement('div')
+    historyItem.className = 'history-item'
+    historyItem.setAttribute('data-history-index', item.index)
+    
+    // Truncate long text for display
+    const truncateText = (text, maxLength = 100) => {
+      if (!text) return ''
+      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+    }
+
+    historyItem.innerHTML = `
+      <div class="history-item-header">
+        <div class="language-info">
+          <span class="language-pair">${item.sourceLanguageName} → ${item.targetLanguageName}</span>
+        </div>
+        <div class="history-item-actions">
+          <span class="timestamp">${item.formattedTime}</span>
+          <button class="delete-btn" title="Delete this item">
+            <img src="@/assets/icons/trash-small.svg" alt="Delete" class="delete-icon" />
+          </button>
+        </div>
+      </div>
+      <div class="history-item-content">
+        <div class="source-text">${truncateText(item.sourceText)}</div>
+        <div class="arrow">↓</div>
+        <div class="translated-text">${item.markdownContent ? item.markdownContent : truncateText(item.translatedText)}</div>
+      </div>
+    `
+
+    // Add click event for item selection
+    historyItem.addEventListener('click', () => handleHistoryItemClick(item))
+
+    // Add click event for delete button
+    const deleteBtn = historyItem.querySelector('.delete-btn')
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => handleDeleteHistoryItem(item.index, e))
+    }
+
+    historyList.value.appendChild(historyItem)
+  })
+}
+
+// Setup event listeners
+const setupEventListeners = () => {
+  const closeBtn = document.getElementById('closeHistoryBtn')
+  if (closeBtn) {
+    closeBtn.addEventListener('click', handleClose)
+  }
+
+  const clearAllBtn = document.getElementById('clearAllHistoryBtn')
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', handleClearAllHistory)
+  }
+}
+
+// Cleanup event listeners
+const cleanupEventListeners = () => {
+  const closeBtn = document.getElementById('closeHistoryBtn')
+  if (closeBtn) {
+    closeBtn.removeEventListener('click', handleClose)
+  }
+
+  const clearAllBtn = document.getElementById('clearAllHistoryBtn')
+  if (clearAllBtn) {
+    clearAllBtn.removeEventListener('click', handleClearAllHistory)  
+  }
+
+  // Cleanup history item listeners
+  if (historyList.value) {
+    const historyItems = historyList.value.querySelectorAll('.history-item')
+    historyItems.forEach(item => {
+      const deleteBtn = item.querySelector('.delete-btn')
+      if (deleteBtn) {
+        deleteBtn.removeEventListener('click', handleDeleteHistoryItem)
+      }
+    })
+  }
+}
+
+// Initialize component
+const initialize = async () => {
+  try {
+    historyPanel.value = document.getElementById('historyPanel')
+    historyList.value = document.getElementById('historyList')
+    
+    setupEventListeners()
+    await loadHistory()
+    renderHistoryItems()
+    
+    console.log('[SidepanelHistory] Component initialized')
+  } catch (error) {
+    console.error('[SidepanelHistory] Initialization error:', error)
+  }
+}
+
+// Watch for visibility changes
+watch(() => props.isVisible, async (visible) => {
+  if (historyPanel.value) {
+    historyPanel.value.classList.toggle('active', visible)
+    
+    if (visible) {
+      await loadHistory()
+      await nextTick()
+      renderHistoryItems()
+    }
+  }
+})
+
+// Watch for history changes
+watch(historyItems, () => {
+  renderHistoryItems()
+}, { deep: true })
+
+// Watch for loading state changes
+watch(isLoading, () => {
+  renderHistoryItems()
+})
+
+// Watch for error changes
+watch(historyError, () => {
+  renderHistoryItems() 
+})
+
+// Lifecycle
+onMounted(() => {
+  initialize()
+})
+
+onUnmounted(() => {
+  cleanupEventListeners()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -112,5 +390,122 @@
     height: 18px;
     filter: invert(1);
   }
+}
+
+// History item styles
+.history-item {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $border-radius-sm;
+  margin-bottom: $spacing-sm;
+  padding: $spacing-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background-color: var(--color-background);
+    border-color: var(--color-primary);
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xs;
+}
+
+.language-info {
+  .language-pair {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    font-weight: $font-weight-medium;
+  }
+}
+
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  .timestamp {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: $border-radius-xs;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity $transition-fast;
+
+    &:hover {
+      opacity: 1;
+      background-color: rgba(244, 67, 54, 0.1);
+    }
+
+    .delete-icon {
+      width: 14px;
+      height: 14px;
+      filter: var(--icon-filter);
+    }
+  }
+}
+
+.history-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+
+  .source-text {
+    font-size: $font-size-sm;
+    color: var(--color-text);
+    padding: $spacing-xs;
+    background-color: var(--color-background);
+    border-radius: $border-radius-xs;
+    border-left: 3px solid var(--color-primary);
+  }
+
+  .arrow {
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    margin: 2px 0;
+  }
+
+  .translated-text {
+    font-size: $font-size-sm;
+    color: var(--color-text);
+    padding: $spacing-xs;
+    background-color: var(--color-surface-alt);
+    border-radius: $border-radius-xs;
+    border-left: 3px solid var(--color-success);
+  }
+}
+
+// State messages
+.loading-message, .error-message, .empty-message {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: $spacing-lg;
+}
+
+.error-message {
+  color: var(--color-error);
+}
+
+.empty-message {
+  opacity: 0.8;
 }
 </style>
