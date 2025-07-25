@@ -31,18 +31,18 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useEnhancedSettingsStore } from '@/store/core/enhanced-settings'
+import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/validation.js'
 import { useLanguages } from '@/composables/useLanguages.js'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
 
-const settingsStore = useEnhancedSettingsStore()
+const settingsStore = useSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
 const { sourceLanguages, targetLanguages } = useLanguages()
 
 // Form values
 const sourceLanguage = computed({
-  get: () => settingsStore.sourceLanguage,
+  get: () => settingsStore.settings?.SOURCE_LANGUAGE || 'auto',
   set: async (value) => {
     await settingsStore.updateSetting('SOURCE_LANGUAGE', value)
     await validateLanguages()
@@ -50,7 +50,7 @@ const sourceLanguage = computed({
 })
 
 const targetLanguage = computed({
-  get: () => settingsStore.targetLanguage,
+  get: () => settingsStore.settings?.TARGET_LANGUAGE || 'English',
   set: async (value) => {
     await settingsStore.updateSetting('TARGET_LANGUAGE', value)
     await validateLanguages()

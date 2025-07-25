@@ -51,8 +51,8 @@ const settingsStore = useSettingsStore()
 
 // Selected provider
 const selectedProvider = computed({
-  get: () => settingsStore.selectedProvider,
-  set: (value) => settingsStore.updateSetting('selectedProvider', value)
+  get: () => settingsStore.settings?.TRANSLATION_API || 'google',
+  set: (value) => settingsStore.updateSetting('TRANSLATION_API', value)
 })
 </script>
 

@@ -148,8 +148,8 @@ const settingsStore = useSettingsStore()
 
 // Extension enabled state
 const extensionEnabled = computed({
-  get: () => settingsStore.extensionEnabled,
-  set: (value) => settingsStore.updateSetting('extensionEnabled', value)
+  get: () => settingsStore.settings?.EXTENSION_ENABLED ?? true,
+  set: (value) => settingsStore.updateSetting('EXTENSION_ENABLED', value)
 })
 
 // Text field settings
@@ -164,8 +164,8 @@ const enableShortcutForTextFields = computed({
 })
 
 const textFieldMode = computed({
-  get: () => settingsStore.copyReplaceMode === 'replace' ? 'replace' : 'copy',
-  set: (value) => settingsStore.updateSetting('copyReplaceMode', value)
+  get: () => settingsStore.settings?.COPY_REPLACE === 'replace' ? 'replace' : 'copy',
+  set: (value) => settingsStore.updateSetting('COPY_REPLACE', value)
 })
 
 const replaceOnSpecialSites = computed({

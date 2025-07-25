@@ -71,8 +71,8 @@ const promptTemplate = computed({
 })
 
 // Language names for help text
-const sourceLanguageName = computed(() => settingsStore.sourceLanguage || 'Auto')
-const targetLanguageName = computed(() => settingsStore.targetLanguage || 'English')
+const sourceLanguageName = computed(() => settingsStore.settings?.SOURCE_LANGUAGE || 'Auto')
+const targetLanguageName = computed(() => settingsStore.settings?.TARGET_LANGUAGE || 'English')
 
 // Validation function
 const validatePrompt = async () => {

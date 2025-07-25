@@ -67,23 +67,23 @@ const settingsStore = useSettingsStore()
 
 // Theme state management
 const isDarkMode = computed({
-  get: () => settingsStore.theme === 'dark',
+  get: () => settingsStore.settings.THEME === 'dark',
   set: (value) => {
     if (!isAutoMode.value) {
-      settingsStore.updateSetting('theme', value ? 'dark' : 'light')
+      settingsStore.updateSetting('THEME', value ? 'dark' : 'light')
     }
   }
 })
 
 const isAutoMode = computed({
-  get: () => settingsStore.theme === 'auto',
+  get: () => settingsStore.settings.THEME === 'auto',
   set: (value) => {
     if (value) {
-      settingsStore.updateSetting('theme', 'auto')
+      settingsStore.updateSetting('THEME', 'auto')
     } else {
       // When disabling auto mode, set to current system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      settingsStore.updateSetting('theme', prefersDark ? 'dark' : 'light')
+      settingsStore.updateSetting('THEME', prefersDark ? 'dark' : 'light')
     }
   }
 })
@@ -101,14 +101,14 @@ const applyTheme = (theme) => {
 }
 
 // Watch for theme changes
-watch(() => settingsStore.theme, (newTheme) => {
+watch(() => settingsStore.settings.THEME, (newTheme) => {
   applyTheme(newTheme)
 }, { immediate: true })
 
 // Listen for system theme changes when in auto mode
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 mediaQuery.addEventListener('change', () => {
-  if (settingsStore.theme === 'auto') {
+  if (settingsStore.settings.THEME === 'auto') {
     applyTheme('auto')
   }
 })

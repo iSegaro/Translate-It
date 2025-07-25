@@ -71,8 +71,8 @@ const interfaceLanguages = ref([
 
 // Selected language
 const selectedLanguage = computed({
-  get: () => settingsStore.language,
-  set: (value) => settingsStore.updateSetting('language', value)
+  get: () => settingsStore.settings?.APPLICATION_LOCALIZE || 'English',
+  set: (value) => settingsStore.updateSetting('APPLICATION_LOCALIZE', value)
 })
 
 // Get manifest version
