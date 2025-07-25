@@ -4,20 +4,20 @@
     
     <div class="setting-group">
       <label>{{ $i18n('source_language_label') || 'Source Language' }}</label>
-      <BaseDropdown
+      <LanguageSelector
         v-model="sourceLanguage"
-        :options="sourceLanguageOptions"
-        :placeholder="$i18n('source_language_placeholder') || 'Select source language'"
+        :languages="sourceLanguages"
+        type="source"
         class="language-select"
       />
     </div>
     
     <div class="setting-group">
       <label>{{ $i18n('target_language_label') || 'Target Language' }}</label>
-      <BaseDropdown
+      <LanguageSelector
         v-model="targetLanguage"
-        :options="targetLanguageOptions"
-        :placeholder="$i18n('target_language_placeholder') || 'Select target language'"
+        :languages="targetLanguages"
+        type="target"
         class="language-select"
       />
     </div>
@@ -33,25 +33,12 @@
 import { computed, ref, watch } from 'vue'
 import { useEnhancedSettingsStore } from '@/store/core/enhanced-settings'
 import { useValidation } from '@/utils/validation.js'
-import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import { useLanguages } from '@/composables/useLanguages.js'
+import LanguageSelector from '@/components/feature/LanguageSelector.vue'
 
 const settingsStore = useEnhancedSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
-
-// Language options (simplified - would come from utils/languages.js)
-const sourceLanguageOptions = ref([
-  { value: 'auto', label: 'Auto-Detect' },
-  { value: 'English', label: 'English' },
-  { value: 'Persian', label: 'Persian' },
-  { value: 'Arabic', label: 'Arabic' },
-  { value: 'Spanish', label: 'Spanish' },
-  { value: 'French', label: 'French' },
-  { value: 'German', label: 'German' }
-])
-
-const targetLanguageOptions = computed(() => {
-  return sourceLanguageOptions.value.filter(lang => lang.value !== 'auto')
-})
+const { sourceLanguages, targetLanguages } = useLanguages()
 
 // Form values
 const sourceLanguage = computed({

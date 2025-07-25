@@ -6,7 +6,7 @@
         <LanguageSelector
           v-model="fromLanguage"
           type="source"
-          :languages="availableLanguages"
+          :languages="sourceLanguages"
           :disabled="disabled"
         />
         
@@ -22,7 +22,7 @@
         <LanguageSelector
           v-model="toLanguage"
           type="target"
-          :languages="availableLanguages"
+          :languages="targetLanguages"
           :disabled="disabled"
         />
       </div>
@@ -103,6 +103,7 @@ import { refDebounced } from '@vueuse/core'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useExtensionAPI } from '@/composables/useExtensionAPI'
+import { useLanguages } from '@/composables/useLanguages.js'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
@@ -125,6 +126,7 @@ const emit = defineEmits(['translate', 'clear'])
 const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
+const { sourceLanguages, targetLanguages } = useLanguages()
 
 // State
 const sourceTextRef = ref('')
@@ -134,20 +136,11 @@ const fromLanguage = ref('auto')
 const toLanguage = ref('en')
 const isTranslating = ref(false)
 
-// Mock data for now - will be replaced with real language data
-const availableLanguages = ref([
-  { code: 'auto', name: 'Auto Detect' },
-  { code: 'en', name: 'English' },
-  { code: 'fa', name: 'Persian' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'it', name: 'Italian' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'ko', name: 'Korean' },
-  { code: 'zh', name: 'Chinese' }
-])
+// Available languages based on context
+const availableLanguages = computed(() => {
+  // For source language selector, include auto-detect
+  return sourceLanguages.value
+})
 
 // Computed
 const canTranslate = computed(() => {
