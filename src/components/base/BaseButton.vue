@@ -80,7 +80,7 @@ const buttonClasses = computed(() => [
     'disabled': props.disabled || props.loading,
     'loading': props.loading,
     'full-width': props.fullWidth,
-    'icon-only': props.icon && !props.text && !props.$slots.default,
+    'icon-only': props.icon && !props.text && !(props.$slots && props.$slots.default),
     'has-icon': props.icon,
     [`icon-${props.iconPosition}`]: props.icon
   }
@@ -89,8 +89,8 @@ const buttonClasses = computed(() => [
 const iconClasses = computed(() => [
   'button-icon',
   {
-    'mr-2': props.iconPosition === 'left' && (props.text || props.$slots.default),
-    'ml-2': props.iconPosition === 'right' && (props.text || props.$slots.default)
+    'mr-2': props.iconPosition === 'left' && (props.text || (props.$slots && props.$slots.default)),
+    'ml-2': props.iconPosition === 'right' && (props.text || (props.$slots && props.$slots.default))
   }
 ])
 
