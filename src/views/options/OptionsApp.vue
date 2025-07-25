@@ -13,7 +13,7 @@
       <div class="options-content">
         <!-- Navigation Sidebar -->
         <OptionsNavigation 
-          :current-route="$route.name"
+          :current-route="$route?.name || 'general'"
           @navigate="handleNavigate"
         />
         

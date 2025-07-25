@@ -24,7 +24,7 @@ import { ref } from 'vue'
 defineProps({
   currentRoute: {
     type: String,
-    required: true
+    default: 'general'
   }
 })
 

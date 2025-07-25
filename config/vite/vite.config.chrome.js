@@ -166,6 +166,13 @@ export default defineConfig({
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
         
+        // Copy browser polyfill
+        const polyfillSrc = resolve(srcDir, 'node_modules/webextension-polyfill/dist/browser-polyfill.js');
+        const polyfillDest = resolve(outDir, 'browser-polyfill.js');
+        if (await fs.pathExists(polyfillSrc)) {
+          await fs.copy(polyfillSrc, polyfillDest);
+        }
+        
         // HTML files are now handled by the fixExtensionPaths plugin
         
         const file = resolve(outDir, 'manifest.json');

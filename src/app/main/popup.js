@@ -2,39 +2,54 @@ import { createApp } from 'vue'
 import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
-import '@/utils/browser-polyfill.js'
+import { browserAPIReady } from '@/utils/browser-polyfill.js'
 
-// Create Vue app
-const app = createApp(PopupApp)
-
-// Use Pinia for state management
-app.use(pinia)
-
-// Global properties for extension context
-app.config.globalProperties.$isExtension = true
-app.config.globalProperties.$context = 'popup'
-
-// Error handling
-app.config.errorHandler = (err, instance, info) => {
-  console.error('Popup Vue Error:', err, info)
-  
-  // Send error to background script for logging
+// Initialize and mount Vue app after browser API is ready
+async function initializeApp() {
   try {
-    browser.runtime.sendMessage({
-      action: 'LOG_ERROR',
-      data: {
-        error: err.message,
-        context: 'popup',
-        info
+    // Wait for browser API to be ready
+    await browserAPIReady
+    
+    // Create Vue app
+    const app = createApp(PopupApp)
+
+    // Use Pinia for state management
+    app.use(pinia)
+
+    // Global properties for extension context
+    app.config.globalProperties.$isExtension = true
+    app.config.globalProperties.$context = 'popup'
+
+    // Error handling
+    app.config.errorHandler = (err, instance, info) => {
+      console.error('Popup Vue Error:', err, info)
+      
+      // Send error to background script for logging
+      try {
+        browser.runtime.sendMessage({
+          action: 'LOG_ERROR',
+          data: {
+            error: err.message,
+            context: 'popup',
+            info
+          }
+        })
+      } catch (e) {
+        console.error('Failed to send error to background:', e)
       }
-    })
-  } catch (e) {
-    console.error('Failed to send error to background:', e)
+    }
+
+    // Mount the app
+    app.mount('#app')
+  } catch (error) {
+    console.error('Failed to initialize popup app:', error)
+    // Show error UI
+    document.getElementById('app').innerHTML = '<div style="padding: 16px; color: red;">Failed to load extension. Please try reloading.</div>'
   }
 }
 
-// Mount the app
-app.mount('#app')
+// Initialize the app
+initializeApp()
 
 // Lazy loading functions for heavy features
 export const loadTranslationFeatures = async () => {
