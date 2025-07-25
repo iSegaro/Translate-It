@@ -155,16 +155,22 @@ class UnifiedBrowserAPI {
    * @private
    */
   wrapTabsAPI(tabs) {
-    return {
+    const wrappedTabs = {
       ...tabs,
       query: this.promisifyCallback(tabs.query.bind(tabs)),
       create: this.promisifyCallback(tabs.create.bind(tabs)),
       update: this.promisifyCallback(tabs.update.bind(tabs)),
       sendMessage: this.promisifyCallback(tabs.sendMessage.bind(tabs)),
-      captureVisibleTab: this.promisifyCallback(tabs.captureVisibleTab.bind(tabs)),
       onUpdated: tabs.onUpdated,
       onActivated: tabs.onActivated
     };
+
+    // Conditionally wrap captureVisibleTab as it's not available in Firefox
+    if (tabs.captureVisibleTab && typeof tabs.captureVisibleTab === 'function') {
+      wrappedTabs.captureVisibleTab = this.promisifyCallback(tabs.captureVisibleTab.bind(tabs));
+    }
+
+    return wrappedTabs;
   }
 
   /**
