@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
 import { CONFIG } from '@/config.js'
+import secureStorage from '@/utils/secureStorage.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
@@ -253,27 +254,39 @@ export const useSettingsStore = defineStore('settings', () => {
   }
   
   const importSettings = async (importData, password = '') => {
+    console.log('[Import Settings] Starting import process.');
     try {
-      // Validate import data
-      if (!importData._exported) {
-        throw new Error('Invalid settings file format')
-      }
-      
-      // Note: In real implementation, decrypt if password provided
-      if (importData._hasEncryptedKeys && !password) {
-        throw new Error('Password required for encrypted settings')
-      }
-      
-      // Remove metadata
-      const { _exported, _timestamp, _version, _hasEncryptedKeys, ...cleanData } = importData
-      
+      console.log('[Import Settings] Raw importData:', importData);
+      console.log('[Import Settings] Password provided:', !!password);
+
+      // Process imported settings (with optional decryption)
+      const processedSettings = await secureStorage.processImportedSettings(
+        importData,
+        password
+      );
+      console.log('[Import Settings] Processed settings from secureStorage:', processedSettings);
+
       // Update settings
-      Object.assign(settings.value, cleanData)
+      Object.assign(settings.value, processedSettings)
+      console.log('[Import Settings] Settings after Object.assign:', settings.value);
+
+      // Special handling for RegExp objects that might be imported as empty objects
+      if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
+        settings.value.RTL_REGEX = CONFIG.RTL_REGEX;
+        console.log('[Import Settings] Corrected RTL_REGEX to default.');
+      }
+      if (typeof settings.value.PERSIAN_REGEX === 'object' && settings.value.PERSIAN_REGEX !== null && Object.keys(settings.value.PERSIAN_REGEX).length === 0) {
+        settings.value.PERSIAN_REGEX = CONFIG.PERSIAN_REGEX;
+        console.log('[Import Settings] Corrected PERSIAN_REGEX to default.');
+      }
+      console.log('[Import Settings] Settings before saving all:', settings.value);
+
       await saveAllSettings()
+      console.log('[Import Settings] saveAllSettings completed.');
       
       return true
     } catch (error) {
-      console.error('Failed to import settings:', error)
+      console.error('[Import Settings] Failed to import settings:', error)
       throw error
     }
   }
