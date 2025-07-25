@@ -4,6 +4,7 @@ import { pinia } from '@/store'
 import OptionsApp from '@/views/options/OptionsApp.vue'
 import '@/main.scss'
 import { browserAPIReady } from '@/utils/browser-polyfill.js'
+import DOMPurify from 'dompurify'
 
 // Import route components (lazy loaded)
 const LanguagesTab = () => import('@/views/options/tabs/LanguagesTab.vue')
@@ -114,7 +115,7 @@ async function initializeApp() {
     console.error('Error stack:', error.stack)
     
     // Show detailed error UI
-    document.getElementById('app').innerHTML = `
+    document.getElementById('app').innerHTML = DOMPurify.sanitize(`
       <div style="padding: 16px; color: red; font-family: monospace;">
         <h3>Failed to load extension options</h3>
         <details>
@@ -128,7 +129,7 @@ Stack: ${error.stack}
         <p>Please check the browser console for more details.</p>
         <button onclick="location.reload()" style="padding: 8px 16px; margin-top: 8px;">Reload</button>
       </div>
-    `
+    `)
   }
 }
 
@@ -154,7 +155,7 @@ setTimeout(() => {
     console.log('- #app element:', document.getElementById('app'))
     
     // Show simple recovery UI
-    appElement.innerHTML = `
+    appElement.innerHTML = DOMPurify.sanitize(`
       <div style="padding: 20px; max-width: 600px; margin: 40px auto; border: 2px solid #e74c3c; border-radius: 8px; background: #fff;">
         <h2 style="color: #e74c3c; margin-top: 0;">Extension Loading Issue</h2>
         <p>The Vue.js application failed to initialize. This might be due to:</p>
@@ -170,7 +171,7 @@ setTimeout(() => {
           <button onclick="chrome.runtime.openOptionsPage()" style="padding: 10px 20px; border: none; background: #95a5a6; color: white; border-radius: 4px; cursor: pointer;">Open New Options Tab</button>
         </div>
       </div>
-    `
+    `)
   }
 }, 2000)
 

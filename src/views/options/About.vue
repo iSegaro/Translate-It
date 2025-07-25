@@ -1,143 +1,136 @@
 <template>
   <div class="about-page">
-    <h2 class="page-title">About Translate It</h2>
+    <h2 class="page-title">{{ $i18n('about_section_title') || 'What\'s New' }}</h2>
     
-    <div class="about-card">
-      <div class="app-info">
-        <div class="app-icon">🌐</div>
-        <div class="app-details">
-          <h3 class="app-name">Translate It</h3>
-          <p class="app-version">Version 0.9.1</p>
-          <p class="app-description">
-            Smart Translation Assistant for your browser
-          </p>
-        </div>
+    <div class="changelog-container">
+      <div v-if="isLoadingChangelog" class="loading-changelog">
+        {{ $i18n('options_changelog_loading') || 'Loading changelog...' }}
       </div>
-      
-      <div class="features-list">
-        <h4 class="features-title">Features</h4>
-        <ul class="features">
-          <li>Multiple translation providers</li>
-          <li>Screen capture translation</li>
-          <li>Text to speech</li>
-          <li>Subtitle translation</li>
-          <li>Cross-browser support</li>
-        </ul>
+      <div v-else-if="changelogError" class="error-changelog">
+        {{ $i18n('options_changelog_error') || 'Failed to load changelog.' }}
       </div>
-      
-      <div class="links-section">
-        <h4 class="links-title">Links</h4>
-        <div class="links">
-          <a href="#" class="link">GitHub Repository</a>
-          <a href="#" class="link">Privacy Policy</a>
-          <a href="#" class="link">Support</a>
-        </div>
-      </div>
+      <div v-else v-html="renderedChangelog" class="changelog-content"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-// Component implementation
-</script>
+import { ref, onMounted } from 'vue'
+import { marked } from 'marked'
 
-<style scoped>
-.about-page {
-  max-width: 600px;
-}
+const isLoadingChangelog = ref(true)
+const changelogError = ref(false)
+const renderedChangelog = ref('')
 
-.page-title {
-  font-size: var(--font-size-xxl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-  margin: 0 0 24px 0;
-}
-
-.about-card {
-  padding: 24px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-md);
-  background-color: var(--color-background);
-}
-
-.app-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.app-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--border-radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  background-color: var(--color-primary);
-  color: white;
-}
-
-.app-details h3 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin: 0 0 4px 0;
-}
-
-.app-version {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin: 0 0 8px 0;
-}
-
-.app-description {
-  font-size: var(--font-size-base);
-  color: var(--color-text);
-  margin: 0;
-}
-
-.features-title,
-.links-title {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin: 0 0 12px 0;
-}
-
-.features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 24px 0;
-}
-
-.features li {
-  font-size: var(--font-size-base);
-  color: var(--color-text);
-  margin-bottom: 4px;
-  
-  &:before {
-    content: '✓';
-    color: var(--color-success);
-    font-weight: bold;
-    margin-right: 8px;
+const fetchChangelog = async () => {
+  try {
+    const response = await fetch('/Changelog.md') // Assuming Changelog.md is in the public directory or root
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const markdown = await response.text()
+    renderedChangelog.value = marked(markdown)
+  } catch (error) {
+    console.error('Error fetching changelog:', error)
+    changelogError.value = true
+  } finally {
+    isLoadingChangelog.value = false
   }
 }
 
-.links {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+onMounted(() => {
+  fetchChangelog()
+})
+</script>
+
+<style lang="scss" scoped>
+@import '@/assets/styles/variables.scss';
+
+.about-page {
+  max-width: 800px;
 }
 
-.link {
-  font-size: var(--font-size-base);
-  color: var(--color-primary);
-  text-decoration: none;
-  
-  &:hover {
-    text-decoration: underline;
+.page-title {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-medium;
+  margin-top: 0;
+  margin-bottom: $spacing-lg;
+  padding-bottom: $spacing-base;
+  border-bottom: $border-width $border-style var(--color-border);
+  color: var(--color-text);
+}
+
+.changelog-container {
+  padding: $spacing-md;
+  border: $border-width $border-style var(--color-border);
+  border-radius: $border-radius-base;
+  background-color: var(--color-background-soft);
+  max-height: 60vh;
+  overflow-y: auto;
+  line-height: 1.6;
+  color: var(--color-text);
+
+  .loading-changelog,
+  .error-changelog {
+    text-align: center;
+    padding: $spacing-xl;
+    color: var(--color-text-secondary);
+  }
+
+  .error-changelog {
+    color: var(--color-error);
+  }
+
+  .changelog-content {
+    // Basic markdown styling for readability
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--color-text);
+      margin-top: $spacing-lg;
+      margin-bottom: $spacing-sm;
+      padding-bottom: $spacing-xs;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    h1 { font-size: $font-size-xl; }
+    h2 { font-size: $font-size-lg; }
+    h3 { font-size: $font-size-md; }
+
+    p {
+      margin-bottom: $spacing-base;
+    }
+
+    ul, ol {
+      margin-bottom: $spacing-base;
+      padding-left: $spacing-lg;
+    }
+
+    li {
+      margin-bottom: $spacing-xs;
+    }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    pre {
+      background-color: var(--color-code-block-bg);
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-sm;
+      padding: $spacing-sm;
+      overflow-x: auto;
+      margin-bottom: $spacing-base;
+    }
+
+    code {
+      font-family: monospace;
+      background-color: var(--color-code-inline-bg);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
   }
 }
 </style>

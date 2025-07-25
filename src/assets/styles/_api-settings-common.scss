@@ -1,0 +1,111 @@
+@import '@/assets/styles/variables.scss';
+
+h3 {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-medium;
+  margin: 0 0 $spacing-base 0;
+  color: var(--color-text);
+}
+
+.setting-group {
+  margin-bottom: $spacing-lg;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: $spacing-base;
+  border-bottom: $border-width $border-style var(--color-border);
+  
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  
+  label {
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    margin-bottom: 0;
+    flex-grow: 1;
+    min-width: 200px;
+  }
+}
+
+.api-key-info {
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    margin-bottom: $spacing-md;
+    line-height: 1.5;
+  }
+  
+  .api-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: $font-weight-medium;
+    
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.api-key-input {
+  min-width: 300px;
+  flex-shrink: 0;
+  
+  :deep(input) {
+    font-family: monospace;
+    letter-spacing: 0.1em;
+    
+    &:not(:hover):not(:focus) {
+      color: transparent;
+      text-shadow: 0 0 0 #666;
+      background-image: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 0.8ch,
+        #666 0.8ch,
+        #666 1ch
+      );
+      background-size: 1ch 1em;
+      background-repeat: repeat;
+      background-position: 0 center;
+    }
+    
+    &:not(:hover):not(:focus)::placeholder {
+      color: transparent;
+    }
+    
+    &:hover,
+    &:focus {
+      color: var(--input-text-color, var(--color-text));
+      text-shadow: none;
+      background-image: none;
+    }
+  }
+}
+
+.model-select {
+  min-width: 250px;
+  flex-shrink: 0;
+}
+
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .setting-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: $spacing-sm;
+    
+    label {
+      min-width: auto;
+    }
+    
+    .api-key-input,
+    .model-select {
+      min-width: auto;
+      width: 100%;
+    }
+  }
+}

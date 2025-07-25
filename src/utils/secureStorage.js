@@ -5,7 +5,7 @@
  * Uses Web Crypto API for strong encryption
  */
 
-/* global crypto, TextEncoder, TextDecoder, btoa, atob */
+/* global TextEncoder, TextDecoder, btoa, atob */
 
 class SecureStorage {
   constructor() {

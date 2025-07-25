@@ -58,7 +58,7 @@ export class FeatureLoader {
 
     try {
       switch (ttsMethod) {
-        case 'offscreen-document':
+        case 'offscreen-document': {
           if (capabilities.offscreen) {
             const { OffscreenTTSManager } = await import('../managers/tts-offscreen.js');
             return new OffscreenTTSManager();
@@ -66,8 +66,9 @@ export class FeatureLoader {
           // Fallback to background page
           console.warn('Offscreen API not available, falling back to background page TTS');
           /* fallthrough */
+        }
 
-        case 'background-page':
+        case 'background-page': {
           if (capabilities.webAudio || capabilities.speechSynthesis) {
             const { BackgroundTTSManager } = await import('../managers/tts-background.js');
             return new BackgroundTTSManager();
@@ -75,10 +76,12 @@ export class FeatureLoader {
           // Fallback to content script
           console.warn('Background audio APIs not available, falling back to content script TTS');
           /* fallthrough */
+        }
 
-        default:
+        default: {
           const { ContentScriptTTSManager } = await import('../managers/tts-content.js');
           return new ContentScriptTTSManager();
+        }
       }
     } catch (error) {
       console.error('Failed to load TTS manager:', error);
@@ -275,6 +278,18 @@ export class FeatureLoader {
     
     if (this.loadedFeatures.has(cacheKey)) {
       return this.loadedFeatures.get(cacheKey);
+    }
+
+    const allowedListeners = [
+      'onInstalled',
+      'onCommand',
+      'onContextMenu',
+      'onMessage',
+      'onNotificationClicked'
+    ];
+
+    if (!allowedListeners.includes(listenerName)) {
+      throw new Error(`Attempted to load an unallowed listener: ${listenerName}`);
     }
 
     try {

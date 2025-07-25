@@ -69,6 +69,11 @@ const config = [
         alert: "readonly",
         URLSearchParams: "readonly",
         MutationObserver: "readonly",
+        self: "readonly",
+        global: "readonly",
+        crypto: "readonly",
+        performance: "readonly",
+        afterEach: "readonly",
       },
     },
     plugins: {

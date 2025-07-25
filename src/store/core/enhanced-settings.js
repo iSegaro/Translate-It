@@ -82,7 +82,7 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
       
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
-        if (stored.hasOwnProperty(key) && stored[key] !== undefined) {
+        if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
           settings.value[key] = stored[key]
         }
       })

@@ -54,7 +54,7 @@ export class FirefoxSidebarManager {
           type: 'popup',
           width: 400,
           height: 600,
-          left: screen.width - 420,
+          left: window.screen.width - 420,
           top: 100
         });
         console.log('📋 Firefox sidebar opened as popup window');

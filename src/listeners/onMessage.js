@@ -45,7 +45,7 @@ const injectionState = { inProgress: false };
 const errorHandler = new ErrorHandler();
 
 // --- Helper Functions ---
-async function safeSendMessage(tabId, message) {
+async function safeSendMessage(Browser, tabId, message) {
   try {
     return await Browser.tabs.sendMessage(tabId, message);
   } catch (err) {
@@ -202,7 +202,7 @@ class MessageListener extends BaseListener {
 
       case "getSelectedText":
         // handler itself will call sendResponse
-        handleGetSelectedText(message, sender, sendResponse, safeSendMessage);
+        handleGetSelectedText(message, sender, sendResponse, (tabId, msg) => safeSendMessage(this.browser, tabId, msg));
         return true;
 
       case "UPDATE_SELECT_ELEMENT_STATE":
@@ -249,7 +249,7 @@ class MessageListener extends BaseListener {
 
       case "translationAdded":
         // مستقیماً داده را ذخیره می‌کنیم
-        Browser.storage.local
+        this.browser.storage.local
           .get("translationHistory")
           .then(({ translationHistory = [] }) => {
             translationHistory.push({
@@ -262,7 +262,7 @@ class MessageListener extends BaseListener {
               translationHistory.splice(0, translationHistory.length - 100);
             }
 
-            Browser.storage.local.set({ translationHistory });
+            this.browser.storage.local.set({ translationHistory });
           })
           .catch((err) => {
             logME("[Background] Error saving translation history:", err);
@@ -289,7 +289,7 @@ class MessageListener extends BaseListener {
           message,
           sender,
           sendResponse,
-          safeSendMessage,
+          (tabId, msg) => safeSendMessage(this.browser, tabId, msg),
           errorHandler,
           injectionState
         );
@@ -301,7 +301,7 @@ class MessageListener extends BaseListener {
           message,
           sender,
           sendResponse,
-          safeSendMessage,
+          (tabId, msg) => safeSendMessage(this.browser, tabId, msg),
           errorHandler,
           injectionState
         );
@@ -312,7 +312,7 @@ class MessageListener extends BaseListener {
           message,
           sender,
           sendResponse,
-          safeSendMessage,
+          (tabId, msg) => safeSendMessage(this.browser, tabId, msg),
           errorHandler,
           injectionState
         );
@@ -373,7 +373,7 @@ class MessageListener extends BaseListener {
       case "applyTranslationToActiveElement": {
         // ارسال مستقیم به تب جاری که درخواست داده
         if (sender.tab?.id) {
-          safeSendMessage(sender.tab.id, message)
+          safeSendMessage(this.browser, sender.tab.id, message)
             .then((res) => sendResponse(res))
             .catch((e) => {
               logME("[onMessage] Forward error:", e);
@@ -396,11 +396,11 @@ class MessageListener extends BaseListener {
 
       case "show_os_notification": {
         const { title, message: msg } = message.payload;
-        if (Browser.notifications && msg) {
-          Browser.notifications
+        if (this.browser.notifications && msg) {
+          this.browser.notifications
             .create({
               type: "basic",
-              iconUrl: Browser.runtime.getURL("icons/extension_icon_128.png"), // Use a specific size
+              iconUrl: this.browser.runtime.getURL("icons/extension_icon_128.png"), // Use a specific size
               title: title || "Translate It!",
               message: msg,
             })
@@ -417,7 +417,7 @@ class MessageListener extends BaseListener {
       }
       case "open_url": {
         const anchor = message.data?.anchor;
-        const optionsUrl = Browser.runtime.getURL(
+        const optionsUrl = this.browser.runtime.getURL(
           `html/options.html${anchor ? `#${anchor}` : ""}`
         );
         focusOrCreateTab(optionsUrl);

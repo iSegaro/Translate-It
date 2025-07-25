@@ -13,7 +13,7 @@ import { CONFIG, getSettingsAsync } from "../config.js";
  * This ensures that when the extension updates with new config keys,
  * they are properly added to user's storage without overriding their existing settings
  */
-async function migrateConfigSettings() {
+async function migrateConfigSettings(Browser) {
   try {
     logME("[onInstalled] Starting config migration...");
     
@@ -85,7 +85,7 @@ class InstallationListener extends BaseListener {
 
     // Migrate configuration settings for both install and update scenarios
     try {
-      await migrateConfigSettings();
+      await migrateConfigSettings(this.browser);
     } catch (error) {
       logME("[onInstalled] Config migration failed, but continuing with other setup:", error);
     }
