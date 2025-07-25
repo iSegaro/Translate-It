@@ -243,7 +243,7 @@ const importSettings = async () => {
     )
     
     // Save to storage using settings store
-    await settingsStore.saveAllSettings()
+    await settingsStore.importSettings(processedSettings, importPasswordValue) // Call the store action
     
     // Clear form only on successful import
     if (importFileInput.value) importFileInput.value.value = ''

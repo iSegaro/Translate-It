@@ -57,22 +57,30 @@ import { useSettingsStore } from '@/store/core/settings'
 import ThemeSelector from './components/ThemeSelector.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { useLanguages } from '@/composables/useLanguages.js' // Import useLanguages
 
 const settingsStore = useSettingsStore()
+const { findLanguageByCode, getInterfaceLanguages } = useLanguages() // Destructure from useLanguages
 
 // Manifest version
 const manifestVersion = ref('v0.0.0')
 
 // Interface languages (available UI languages)
-const interfaceLanguages = ref([
-  { code: 'en', name: 'English' },
-  { code: 'fa', name: 'فارسی' }
-])
+const interfaceLanguages = computed(() => getInterfaceLanguages()) // Use computed from useLanguages
 
 // Selected language
 const selectedLanguage = computed({
-  get: () => settingsStore.settings?.APPLICATION_LOCALIZE || 'English',
-  set: (value) => settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', value)
+  get: () => {
+    const currentCode = settingsStore.settings?.APPLICATION_LOCALIZE || 'en'; // Default to 'en' code
+    const lang = findLanguageByCode(currentCode);
+    return lang ? lang.name : 'English'; // Return name, default to 'English' if not found
+  },
+  set: (value) => {
+    // When setting, convert name back to code for storage
+    const lang = interfaceLanguages.value.find(l => l.name === value);
+    const codeToStore = lang ? lang.code : 'en'; // Default to 'en' code
+    settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', codeToStore);
+  }
 })
 
 // Get manifest version
