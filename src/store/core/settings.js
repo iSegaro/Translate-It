@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -30,11 +31,21 @@ export const useSettingsStore = defineStore('settings', () => {
   
   // Actions
   const loadSettings = async () => {
-    if (isInitialized.value) return
+    if (isInitialized.value) {
+      console.log('🔄 Settings already initialized, skipping load')
+      return
+    }
     
+    console.log('📥 Loading settings from storage...')
     isLoading.value = true
     try {
+      // Get browser API
+      console.log('🌐 Getting browser API...')
+      const browser = await getBrowserAPI()
+      console.log('✅ Browser API ready')
+      
       // Load from extension storage
+      console.log('📦 Reading from extension storage...')
       const stored = await browser.storage.local.get([
         'theme',
         'language',
@@ -45,6 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
         'TRANSLATION_MODE',
         'COPY_REPLACE'
       ])
+      console.log('📋 Storage data:', stored)
       
       // Update state with stored values
       if (stored.theme) theme.value = stored.theme
@@ -56,16 +68,22 @@ export const useSettingsStore = defineStore('settings', () => {
       if (stored.TRANSLATION_MODE) translationMode.value = stored.TRANSLATION_MODE
       if (stored.COPY_REPLACE) copyReplaceMode.value = stored.COPY_REPLACE
       
+      console.log('✅ Settings applied to store')
       isInitialized.value = true
     } catch (error) {
-      console.error('Failed to load settings:', error)
+      console.error('❌ Failed to load settings:', error)
+      throw error
     } finally {
       isLoading.value = false
+      console.log('📥 Settings loading complete')
     }
   }
   
   const saveSettings = async () => {
     try {
+      // Get browser API
+      const browser = await getBrowserAPI()
+      
       await browser.storage.local.set({
         theme: theme.value,
         language: language.value,

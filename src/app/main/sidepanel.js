@@ -24,18 +24,22 @@ async function initializeApp() {
     app.config.errorHandler = (err, instance, info) => {
       console.error('Sidepanel Vue Error:', err, info)
       
-      // Send error to background script for logging
+      // Send error to background script for logging (optional, no response expected)
       try {
         browser.runtime.sendMessage({
+          source: 'vue-app',
           action: 'LOG_ERROR',
           data: {
             error: err.message,
             context: 'sidepanel',
             info
           }
+        }).catch(e => {
+          // Silently ignore if background script doesn't handle this
+          console.debug('Background script did not respond to LOG_ERROR:', e.message)
         })
       } catch (e) {
-        console.error('Failed to send error to background:', e)
+        console.debug('Failed to send error to background:', e.message)
       }
     }
 

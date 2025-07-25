@@ -14,10 +14,20 @@
 import { computed } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 // RTL detection using i18n plugin
 const isRTL = computed(() => {
-  return browser.i18n.getMessage('IsRTL') === 'true'
+  try {
+    // Access browser API safely
+    if (typeof window !== 'undefined' && window.browser && window.browser.i18n) {
+      return window.browser.i18n.getMessage('IsRTL') === 'true'
+    }
+    return false
+  } catch (e) {
+    console.debug('Failed to get RTL setting:', e.message)
+    return false
+  }
 })
 </script>
 

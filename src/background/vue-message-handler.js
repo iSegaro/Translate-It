@@ -37,6 +37,9 @@ export class VueMessageHandler {
     // Extension feature handlers
     this.handlers.set('UPDATE_CONTEXT_MENU', this.handleUpdateContextMenu.bind(this))
     this.handlers.set('GET_EXTENSION_INFO', this.handleGetExtensionInfo.bind(this))
+    
+    // Logging handlers
+    this.handlers.set('LOG_ERROR', this.handleLogError.bind(this))
   }
 
   async handleMessage(message, sender) {
@@ -323,6 +326,29 @@ export class VueMessageHandler {
     }
   }
 
+  /**
+   * Handle error logging from frontend apps
+   */
+  async handleLogError(data) {
+    try {
+      const { error, context, info } = data
+      console.warn(`[${context}] Vue Error:`, error, info)
+      
+      // In production, you might want to send to a logging service
+      // For now, just log to console and return success
+      return {
+        success: true,
+        logged: true
+      }
+    } catch (error) {
+      console.error('Failed to log error:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
   // Helper methods for storage
   async storeProviderConfig(provider, config) {
     const browser = await this.initializeBrowser()
@@ -341,11 +367,22 @@ export class VueMessageHandler {
   async register() {
     const browser = await this.initializeBrowser()
     // Add listener for runtime messages
-    browser.runtime.onMessage.addListener(async (message, _sender, _sendResponse) => {
+    browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.source === 'vue-app') {
-        const response = await this.handleMessage(message, _sender)
-        return response
+        // Handle async response properly
+        this.handleMessage(message, _sender)
+          .then(response => {
+            sendResponse(response)
+          })
+          .catch(error => {
+            console.error('Vue message handler error:', error)
+            sendResponse({ success: false, error: error.message })
+          })
+        // Return true to indicate we will send response asynchronously
+        return true
       }
+      // Don't handle other messages
+      return false
     })
   }
 }

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
   // State - complete settings object
@@ -77,6 +78,9 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
     
     isLoading.value = true
     try {
+      // Get browser API
+      const browser = await getBrowserAPI()
+      
       // Get all settings from storage
       const stored = await browser.storage.local.get(null)
       
@@ -100,6 +104,9 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
   const saveSettings = async (settingsToSave = null) => {
     isSaving.value = true
     try {
+      // Get browser API
+      const browser = await getBrowserAPI()
+      
       const dataToSave = settingsToSave || settings.value
       await browser.storage.local.set(dataToSave)
       
@@ -122,7 +129,8 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
       // Update local state immediately
       settings.value[key] = value
       
-      // Save to storage
+      // Get browser API and save to storage
+      const browser = await getBrowserAPI()
       await browser.storage.local.set({ [key]: value })
       
       return true
@@ -137,7 +145,8 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
       // Update local state
       Object.assign(settings.value, updates)
       
-      // Save to storage
+      // Get browser API and save to storage
+      const browser = await getBrowserAPI()
       await browser.storage.local.set(updates)
       
       return true
@@ -149,7 +158,8 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
   
   const resetSettings = async () => {
     try {
-      // Clear all storage
+      // Get browser API and clear all storage
+      const browser = await getBrowserAPI()
       await browser.storage.local.clear()
       
       // Reset to defaults

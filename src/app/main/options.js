@@ -67,42 +67,53 @@ async function initializeApp() {
     console.log('🎨 Creating Vue app...')
     const app = createApp(OptionsApp)
     console.log('✅ Vue app created successfully')
+    
+    // Add detailed debugging
+    app.config.performance = true
+    console.log('🔍 Vue performance tracking enabled')
 
-    // Use plugins
+    // Use plugins (order matters: i18n before router)
     console.log('🔌 Installing Pinia...')
     app.use(pinia)
     console.log('✅ Pinia installed')
     
-    console.log('🔌 Installing Router...')
-    app.use(router)
-    console.log('✅ Router installed')
-    
     console.log('🔌 Installing i18n...')
     app.use(i18n)
     console.log('✅ i18n installed')
+    
+    console.log('🔌 Installing Router...')
+    app.use(router)
+    console.log('✅ Router installed')
 
     // Global properties for extension context
     console.log('⚙️ Setting global properties...')
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = 'options'
+    
+    // $i18n is automatically provided by the plugin, no manual setup needed
+    console.log('✅ i18n global property will be available after plugin installation')
 
     // Error handling
     console.log('🛡️ Setting up error handler...')
     app.config.errorHandler = (err, instance, info) => {
       console.error('Options Vue Error:', err, info)
       
-      // Send error to background script for logging
+      // Send error to background script for logging (optional, no response expected)
       try {
         browser.runtime.sendMessage({
+          source: 'vue-app',
           action: 'LOG_ERROR',
           data: {
             error: err.message,
             context: 'options',
             info
           }
+        }).catch(e => {
+          // Silently ignore if background script doesn't handle this
+          console.debug('Background script did not respond to LOG_ERROR:', e.message)
         })
       } catch (e) {
-        console.error('Failed to send error to background:', e)
+        console.debug('Failed to send error to background:', e.message)
       }
     }
 
@@ -175,21 +186,4 @@ setTimeout(() => {
   }
 }, 2000)
 
-// Lazy loading functions for options-specific features
-export const loadSettingsModules = async () => {
-  const [providers, import_export, backup] = await Promise.all([
-    import('@/store/modules/providers.js'),
-    import('@/store/modules/import-export.js'),
-    import('@/store/modules/backup.js')
-  ])
-  return { providers, import_export, backup }
-}
-
-// Preload essential modules
-setTimeout(async () => {
-  try {
-    await loadSettingsModules()
-  } catch (error) {
-    console.error('Failed to preload settings modules:', error)
-  }
-}, 100)
+// Note: loadSettingsModules moved to @/utils/settings-modules.js to avoid circular imports

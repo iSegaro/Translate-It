@@ -5,6 +5,13 @@
       <span class="loading-text">{{ loadingText }}</span>
     </div>
     
+    <div v-else-if="hasError" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h2>Failed to Load Options</h2>
+      <p class="error-message">{{ errorMessage }}</p>
+      <button @click="retryLoading" class="retry-button">Retry</button>
+    </div>
+    
     <template v-else>
       <OptionsLayout />
     </template>
@@ -17,6 +24,7 @@ import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { loadSettingsModules } from '@/utils/settings-modules.js'
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -24,34 +32,67 @@ const settingsStore = useSettingsStore()
 // State
 const isLoading = ref(true)
 const loadingText = ref('Loading Settings...')
+const hasError = ref(false)
+const errorMessage = ref('')
 
 // Lifecycle
 onMounted(async () => {
+  console.log('🚀 OptionsApp mounting...')
+  
   try {
-    // Set loading text
+    // Step 1: Set loading text
+    console.log('📝 Setting loading text...')
     const browser = await getBrowserAPI()
     loadingText.value = browser.i18n.getMessage('options_loading') || 'Loading Settings...'
+    console.log('✅ Loading text set')
     
-    // Wait for settings to load
-    await settingsStore.loadSettings()
+    // Step 2: Load settings store
+    console.log('⚙️ Loading settings store...')
+    await Promise.race([
+      settingsStore.loadSettings(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
+      )
+    ])
+    console.log('✅ Settings store loaded')
     
-    // Initialize options-specific features
+    // Step 3: Load additional modules
+    console.log('🔧 Loading additional modules...')
     await initializeOptions()
+    console.log('✅ Additional modules loaded')
+    
   } catch (error) {
-    console.error('Failed to initialize options:', error)
+    console.error('❌ Failed to initialize options:', error)
+    hasError.value = true
+    errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
+    console.log('✨ OptionsApp initialization complete')
     isLoading.value = false
   }
 })
 
 const initializeOptions = async () => {
   try {
-    // Load settings modules
-    const { loadSettingsModules } = await import('@/app/main/options.js')
     await loadSettingsModules()
   } catch (error) {
-    console.warn('Failed to load settings modules:', error)
+    console.warn('⚠️ Failed to load settings modules:', error)
+    // Don't throw - this is optional
   }
+}
+
+const retryLoading = () => {
+  console.log('🔄 Retrying options loading...')
+  hasError.value = false
+  errorMessage.value = ''
+  isLoading.value = true
+  
+  // Reset store state
+  settingsStore.$reset && settingsStore.$reset()
+  
+  // Retry mounting logic
+  setTimeout(() => {
+    onMounted()
+  }, 100)
 }
 </script>
 
@@ -73,5 +114,45 @@ const initializeOptions = async () => {
   justify-content: center;
   gap: 1.5rem;
   padding: 3rem;
+}
+
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem;
+  max-width: 500px;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 3rem;
+}
+
+.error-container h2 {
+  color: var(--color-error, #ef4444);
+  margin: 0;
+}
+
+.error-message {
+  color: var(--color-text-secondary, #666);
+  margin: 0;
+}
+
+.retry-button {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--color-primary, #3b82f6);
+  color: var(--color-background, white);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: var(--color-primary-dark, #2563eb);
 }
 </style>

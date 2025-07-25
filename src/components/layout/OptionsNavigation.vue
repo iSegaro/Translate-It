@@ -24,9 +24,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/store/core/settings'
+
+// Access i18n function through current instance
+const { proxy } = getCurrentInstance()
+const $i18n = proxy.$i18n
 
 const route = useRoute()
 const settingsStore = useSettingsStore()
