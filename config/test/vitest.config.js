@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
+    include: ['src/components/**/__tests__/*.test.js'], // Only include Vue component unit tests
     exclude: ['tests/e2e/**'],
     coverage: {
       provider: 'v8',

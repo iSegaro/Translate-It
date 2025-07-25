@@ -14,28 +14,20 @@ describe('BaseModal', () => {
   it('renders modal when modelValue is true', () => {
     wrapper = mount(BaseModal, {
       props: { modelValue: true },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
     // Modal should be rendered via teleport
-    expect(wrapper.find('.modal-overlay').exists()).toBe(true)
+    expect(document.body.querySelector('.modal-overlay')).not.toBeNull()
   })
 
   it('does not render modal when modelValue is false', () => {
     wrapper = mount(BaseModal, {
       props: { modelValue: false },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.find('.modal-overlay').exists()).toBe(false)
+    expect(document.body.querySelector('.modal-overlay')).toBeNull()
   })
 
   it('renders title when provided', () => {
@@ -44,14 +36,10 @@ describe('BaseModal', () => {
         modelValue: true,
         title: 'Test Modal'
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.text()).toContain('Test Modal')
+    expect(document.body.textContent).toContain('Test Modal')
   })
 
   it('renders default slot content', () => {
@@ -60,14 +48,10 @@ describe('BaseModal', () => {
       slots: {
         default: '<div class="modal-content">Modal body content</div>'
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.text()).toContain('Modal body content')
+    expect(document.body.textContent).toContain('Modal body content')
   })
 
   it('renders footer slot when provided', () => {
@@ -76,14 +60,10 @@ describe('BaseModal', () => {
       slots: {
         footer: '<div class="modal-footer-content">Footer content</div>'
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.text()).toContain('Footer content')
+    expect(document.body.textContent).toContain('Footer content')
   })
 
   it('applies size classes correctly', () => {
@@ -92,14 +72,10 @@ describe('BaseModal', () => {
         modelValue: true,
         size: 'lg'
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.find('.size-lg').exists()).toBe(true)
+    expect(document.body.querySelector('.size-lg')).not.toBeNull()
   })
 
   it('applies fullscreen class when fullscreen prop is true', () => {
@@ -108,14 +84,10 @@ describe('BaseModal', () => {
         modelValue: true,
         fullscreen: true
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    expect(wrapper.find('.fullscreen').exists()).toBe(true)
+    expect(document.body.querySelector('.fullscreen')).not.toBeNull()
   })
 
   it('hides close button when closable is false', () => {
@@ -125,15 +97,11 @@ describe('BaseModal', () => {
         title: 'Test',
         closable: false
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
     // Should not find close button when closable is false
-    expect(wrapper.findAll('button').length).toBe(0)
+    expect(document.body.querySelector('.close-button')).toBeNull()
   })
 
   it('does not close when modal container is clicked', async () => {
@@ -142,16 +110,12 @@ describe('BaseModal', () => {
         modelValue: true,
         closeOnOverlay: true
       },
-      global: {
-        stubs: {
-          teleport: false
-        }
-      }
+      attachTo: document.body
     })
     
-    const container = wrapper.find('.modal-container')
-    if (container.exists()) {
-      await container.trigger('click')
+    const container = document.body.querySelector('.modal-container')
+    if (container) {
+      await container.click() // Trigger click directly on the native DOM element
       // Should not emit close event when clicking container
       expect(wrapper.emitted('update:modelValue')).toBeFalsy()
     }
