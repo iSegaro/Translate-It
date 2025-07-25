@@ -2,8 +2,16 @@
 // Dynamic feature loading based on browser capabilities
 
 import { environment } from '../utils/environment.js';
-import { featureDetector } from '../utils/feature-detection.js';
 import { getBrowserAPI } from '../utils/browser-unified.js';
+
+// Static map of listener modules for principled dynamic import
+const listenerModules = {
+  onInstalled: () => import('../listeners/onInstalled.js'),
+  onCommand: () => import('../listeners/onCommand.js'),
+  onContextMenu: () => import('../listeners/onContextMenu.js'),
+  onMessage: () => import('../listeners/onMessage.js'),
+  onNotificationClicked: () => import('../listeners/onNotificationClicked.js'),
+};
 
 /**
  * Feature loader class
@@ -293,7 +301,11 @@ export class FeatureLoader {
     }
 
     try {
-      const module = await import(`../listeners/${listenerName}.js`);
+      const moduleLoader = listenerModules[listenerName];
+      if (!moduleLoader) {
+        throw new Error(`Listener module not found for: ${listenerName}`);
+      }
+      const module = await moduleLoader();
       if (typeof module.initialize === 'function') {
         await module.initialize(Browser);
       }

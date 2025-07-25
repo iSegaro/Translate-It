@@ -89,7 +89,7 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .vertical-tabs {
   flex: 0 0 200px;

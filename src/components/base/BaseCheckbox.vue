@@ -31,7 +31,7 @@ defineEmits(['update:modelValue'])
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .base-checkbox {
   display: flex;

@@ -67,6 +67,13 @@ export default defineConfig({
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
         
+        // Copy Changelog.md for About page
+        const changelogSrc = resolve(srcDir, 'Changelog.md');
+        const changelogDest = resolve(outDir, 'Changelog.md');
+        if (await fs.pathExists(changelogSrc)) {
+          await fs.copy(changelogSrc, changelogDest);
+        }
+        
         // Move HTML files to html/ directory and fix their paths
         const htmlFiles = [
           { file: 'popup.html', jsFile: 'popup.js', cssFile: 'popup.css' },

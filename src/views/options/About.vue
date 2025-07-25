@@ -17,6 +17,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 const isLoadingChangelog = ref(true)
 const changelogError = ref(false)
@@ -24,7 +25,10 @@ const renderedChangelog = ref('')
 
 const fetchChangelog = async () => {
   try {
-    const response = await fetch('/Changelog.md') // Assuming Changelog.md is in the public directory or root
+    // Use browser extension URL to access the changelog
+    const browser = await getBrowserAPI()
+    const changelogUrl = browser.runtime.getURL('Changelog.md')
+    const response = await fetch(changelogUrl)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -44,7 +48,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .about-page {
   max-width: 800px;

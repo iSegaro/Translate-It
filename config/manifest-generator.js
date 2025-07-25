@@ -51,7 +51,8 @@ export function generateManifest(browser = 'chrome') {
           'icons/*.svg',
           'css/*.css',
           'js/*.js',
-          '_locales/*'
+          '_locales/*',
+          'Changelog.md'
         ],
         matches: ['<all_urls>'],
         use_dynamic_url: true
@@ -208,7 +209,8 @@ function generateFirefoxManifest(baseManifest) {
           'icons/*.svg', 
           'css/*.css',
           'js/*.js',
-          '_locales/*'
+          '_locales/*',
+          'Changelog.md'
         ],
         matches: ['<all_urls>']
         // Note: use_dynamic_url not supported in Firefox yet

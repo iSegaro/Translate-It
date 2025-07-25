@@ -95,7 +95,7 @@ watch([sourceLanguage, targetLanguage], () => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .languages-tab {
   max-width: 600px;

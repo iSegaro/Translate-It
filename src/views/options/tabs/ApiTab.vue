@@ -57,8 +57,8 @@ const selectedProvider = computed({
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
-@import '@/assets/styles/_api-settings-common.scss';
+@use '@/assets/styles/variables.scss' as *;
+@use '@/assets/styles/_api-settings-common.scss' as *;
 
 .api-tab {
   max-width: 800px;

@@ -22,7 +22,7 @@ const isRTL = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .options-layout {
   display: flex;

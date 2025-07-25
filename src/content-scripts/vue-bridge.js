@@ -94,7 +94,6 @@ class ContentScriptVueBridge {
    * Setup message listener for extension commands
    */
   async setupMessageListener() {
-    const Browser = await getBrowserAsync();
     this.messageHandler = (message, sender, sendResponse) => {
       if (message.source !== 'vue-app') return
 
@@ -501,7 +500,7 @@ class ContentScriptVueBridge {
       const instanceId = await this.createMicroApp('TextRegionSelector', {
         imageData,
         textRegions,
-        onRegionSelect: async (region) => {
+        onRegionSelect: async (_region) => {
           if (autoTranslate) {
             // Crop image to selected region and translate
             const croppedImageData = await this.cropImage(imageData, region)

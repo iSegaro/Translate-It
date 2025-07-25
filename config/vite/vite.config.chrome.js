@@ -166,6 +166,13 @@ export default defineConfig({
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
         
+        // Copy Changelog.md for About page
+        const changelogSrc = resolve(srcDir, 'Changelog.md');
+        const changelogDest = resolve(outDir, 'Changelog.md');
+        if (await fs.pathExists(changelogSrc)) {
+          await fs.copy(changelogSrc, changelogDest);
+        }
+        
         // Copy browser polyfill
         const polyfillSrc = resolve(srcDir, 'node_modules/webextension-polyfill/dist/browser-polyfill.js');
         const polyfillDest = resolve(outDir, 'browser-polyfill.js');

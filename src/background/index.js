@@ -170,9 +170,9 @@ class BackgroundService {
       console.log('🔧 Minimal initialization completed');
       this.initialized = true;
 
-    } catch (error) {
-      console.error('❌ Even minimal initialization failed:', error);
-      throw error;
+    } catch (_error) {
+      console.error('❌ Even minimal initialization failed:', _error);
+      throw _error;
     }
   }
 
@@ -247,15 +247,15 @@ class BackgroundService {
 const backgroundService = new BackgroundService();
 
 // Initialize immediately
-backgroundService.initialize().catch(error => {
-  console.error('💥 Critical: Background service initialization failed:', error);
+backgroundService.initialize().catch((_error) => {
+  console.error('💥 Critical: Background service initialization failed:', _error);
   
   // Report error to extension pages if possible
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.sendMessage({
       type: 'BACKGROUND_INIT_ERROR',
-      error: error.message,
-      stack: error.stack
+      error: _error.message,
+      stack: _error.stack
     }).catch(() => {
       // Ignore if no listeners
     });

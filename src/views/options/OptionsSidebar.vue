@@ -13,7 +13,7 @@
 
     <div class="sidebar-section localization-controls">
       <h2>{{ $i18n('localization_section_title') }}</h2>
-      <LanguageSelector v-model="selectedLanguage" />
+      <LanguageSelector v-model="selectedLanguage" :languages="interfaceLanguages" />
     </div>
 
     <div class="sidebar-footer">
@@ -56,11 +56,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import ThemeSelector from './components/ThemeSelector.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 const settingsStore = useSettingsStore()
 
 // Manifest version
 const manifestVersion = ref('v0.0.0')
+
+// Interface languages (available UI languages)
+const interfaceLanguages = ref([
+  { code: 'en', name: 'English' },
+  { code: 'fa', name: 'فارسی' }
+])
 
 // Selected language
 const selectedLanguage = computed({
@@ -71,6 +78,7 @@ const selectedLanguage = computed({
 // Get manifest version
 onMounted(async () => {
   try {
+    const browser = await getBrowserAPI()
     const manifest = browser.runtime.getManifest()
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {
@@ -80,7 +88,7 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .options-sidebar {
   flex: 0 0 280px;

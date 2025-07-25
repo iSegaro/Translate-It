@@ -170,7 +170,7 @@ export class VueMessageHandler {
     const { provider, config } = data
     
     try {
-      const providerInstance = translationProviderFactory.getProvider(provider)
+      const _providerInstance = translationProviderFactory.getProvider(provider)
       
       // For providers that need configuration, temporarily set it
       if (config) {
@@ -183,7 +183,7 @@ export class VueMessageHandler {
       
       // Test with a simple translation
       const testText = 'Hello'
-      const result = await providerInstance.translate(testText, 'en', 'es', 'simple')
+      const result = await _providerInstance.translate(testText, 'en', 'es', 'simple')
       
       return {
         success: true,
@@ -341,9 +341,9 @@ export class VueMessageHandler {
   async register() {
     const browser = await this.initializeBrowser()
     // Add listener for runtime messages
-    browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    browser.runtime.onMessage.addListener(async (message, _sender, _sendResponse) => {
       if (message.source === 'vue-app') {
-        const response = await this.handleMessage(message, sender)
+        const response = await this.handleMessage(message, _sender)
         return response
       }
     })

@@ -80,5 +80,5 @@ const openrouterApiModelOptions = ref([
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/_api-settings-common.scss';
+@use '@/assets/styles/_api-settings-common.scss' as *;
 </style>

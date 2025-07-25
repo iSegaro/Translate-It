@@ -2,7 +2,7 @@
   <div class="extension-options">
     <div v-if="isLoading" class="loading-container">
       <LoadingSpinner size="xl" />
-      <span class="loading-text">{{ browser.i18n.getMessage('options_loading') || 'Loading Settings...' }}</span>
+      <span class="loading-text">{{ loadingText }}</span>
     </div>
     
     <template v-else>
@@ -16,16 +16,22 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 // Stores
 const settingsStore = useSettingsStore()
 
 // State
 const isLoading = ref(true)
+const loadingText = ref('Loading Settings...')
 
 // Lifecycle
 onMounted(async () => {
   try {
+    // Set loading text
+    const browser = await getBrowserAPI()
+    loadingText.value = browser.i18n.getMessage('options_loading') || 'Loading Settings...'
+    
     // Wait for settings to load
     await settingsStore.loadSettings()
     

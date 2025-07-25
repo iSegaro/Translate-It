@@ -96,7 +96,7 @@ const toggleAccordion = (section) => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .help-tab {
   max-width: 800px;

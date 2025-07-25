@@ -105,7 +105,7 @@ const resetPrompt = async () => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .prompt-tab {
   max-width: 800px;

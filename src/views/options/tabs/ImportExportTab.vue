@@ -255,7 +255,7 @@ const importSettings = async () => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables.scss';
+@use '@/assets/styles/variables.scss' as *;
 
 .import-export-tab {
   max-width: 800px;

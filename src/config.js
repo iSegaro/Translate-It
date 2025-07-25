@@ -1,6 +1,5 @@
 // src/config.js
 import { getBrowserAsync } from "@/utils/browser-polyfill.js";
-import { logME } from "./utils/helpers";
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:

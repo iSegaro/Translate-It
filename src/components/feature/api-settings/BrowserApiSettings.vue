@@ -21,7 +21,7 @@
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/_api-settings-common.scss';
+@use '@/assets/styles/_api-settings-common.scss' as *;
 
 .browser-api-requirements {
   margin-top: $spacing-md;
