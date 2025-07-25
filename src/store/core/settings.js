@@ -85,7 +85,7 @@ export const useSettingsStore = defineStore('settings', () => {
   
   // Actions
   const loadSettings = async () => {
-    if (isInitialized.value) return settings.value
+    if (isInitialized.value) return settings.value // Temporarily disable cache
     
     isLoading.value = true
     try {
@@ -94,9 +94,6 @@ export const useSettingsStore = defineStore('settings', () => {
       
       // Get all settings from storage
       const stored = await browser.storage.local.get(null)
-      console.log('📦 Loaded from storage:', stored)
-      // Debugging: Log EXCLUDED_SITES directly from stored data
-      console.log(`[Settings Store] loadSettings: EXCLUDED_SITES from storage:`, stored.EXCLUDED_SITES);
       
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
@@ -283,6 +280,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
       await saveAllSettings()
       console.log('[Import Settings] saveAllSettings completed.');
+      
+      // Reload the page to ensure UI reflects new settings
+      window.location.reload();
       
       return true
     } catch (error) {

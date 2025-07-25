@@ -77,6 +77,13 @@
   --color-info: #2196f3;
 }
 
+// SCSS Variables (for Sass functions like darken, lighten)
+$color-error-sass: #f44336;
+$color-primary-sass: #1976d2;
+$color-success-sass: #4caf50;
+$color-warning-sass: #ff9800;
+$color-info-sass: #2196f3;
+
 // Typography
 $font-family-base: "Vazirmatn", "Segoe UI", sans-serif;
 $font-size-xs: 11px;

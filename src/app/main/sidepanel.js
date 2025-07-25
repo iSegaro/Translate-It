@@ -7,14 +7,44 @@ import { browserAPIReady } from '@/utils/browser-polyfill.js'
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
+    console.log('🚀 Starting sidepanel app initialization...')
+    
     // Wait for browser API to be ready
-    await browserAPIReady
+    console.log('⏳ Waiting for browser API to be ready...')
+    const browserAPI = await browserAPIReady
+    console.log('✅ Browser API is ready')
+
+    // Ensure browser API is globally available for i18n plugin
+    if (typeof window !== 'undefined') {
+      window.browser = browserAPI;
+      window.chrome = browserAPI; // Some plugins expect chrome object
+      
+      // Debug: Check if i18n is available
+      console.log('🔍 Checking i18n availability:', {
+        'browserAPI.i18n': !!browserAPI.i18n,
+        'browserAPI.i18n.getMessage': !!browserAPI.i18n?.getMessage,
+        'window.browser.i18n': !!window.browser.i18n,
+        'chrome.i18n (native)': !!chrome?.i18n
+      });
+    }
+
+    // Import i18n plugin after browser API is ready and globally available
+    console.log('📦 Importing i18n plugin...')
+    const { default: i18n } = await import('vue-plugin-webextension-i18n')
+    console.log('✅ i18n plugin imported successfully')
 
     // Create Vue app
+    console.log('🎨 Creating Vue app...')
     const app = createApp(SidepanelApp)
 
     // Use Pinia for state management
+    console.log('🔌 Installing Pinia...')
     app.use(pinia)
+    console.log('✅ Pinia installed')
+    
+    console.log('🔌 Installing i18n...')
+    app.use(i18n)
+    console.log('✅ i18n installed')
 
     // Global properties for extension context
     app.config.globalProperties.$isExtension = true

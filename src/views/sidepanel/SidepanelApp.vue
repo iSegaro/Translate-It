@@ -2,160 +2,89 @@
   <div class="extension-sidepanel">
     <div v-if="isLoading" class="loading-container">
       <LoadingSpinner size="lg" />
-      <span class="loading-text">Loading Sidepanel...</span>
+      <span class="loading-text">{{ loadingText }}</span>
+    </div>
+    
+    <div v-else-if="hasError" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h2>{{ $i18n('sidepanel_load_error_title') || 'Failed to Load Sidepanel' }}</h2>
+      <p class="error-message">{{ errorMessage }}</p>
+      <button @click="retryLoading" class="retry-button">{{ $i18n('retry_button') || 'Retry' }}</button>
     </div>
     
     <template v-else>
-      <!-- Sidepanel Header -->
-      <SidepanelHeader 
-        :extension-enabled="settingsStore.extensionEnabled"
-        @toggle-extension="handleToggleExtension"
-      />
-      
-      <!-- Main Content Area -->
-      <div class="sidepanel-content">
-        <!-- Translation Interface -->
-        <TranslationBox
-          mode="sidepanel"
-          :disabled="!settingsStore.canTranslate"
-          @translate="handleTranslation"
-        />
-        
-        <!-- Advanced Features -->
-        <AdvancedFeatures
-          v-if="showAdvancedFeatures"
-          :can-translate="settingsStore.canTranslate"
-          @screen-capture="handleScreenCapture"
-          @tts-toggle="handleTTSToggle"
-        />
-        
-        <!-- Translation History -->
-        <TranslationHistory
-          v-if="showHistory"
-          @retranslate="handleRetranslate"
-          @clear-history="handleClearHistory"
-        />
-      </div>
-      
-      <!-- Footer with Settings -->
-      <SidepanelFooter 
-        @open-options="handleOpenOptions"
-      />
+      <SidepanelLayout />
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useExtensionAPI } from '@/composables/useExtensionAPI'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
-import SidepanelHeader from '@/components/layout/SidepanelHeader.vue'
-import SidepanelFooter from '@/components/layout/SidepanelFooter.vue'
-import TranslationBox from '@/components/feature/TranslationBox.vue'
-import AdvancedFeatures from '@/components/feature/AdvancedFeatures.vue'
-import TranslationHistory from '@/components/feature/TranslationHistory.vue'
+import SidepanelLayout from './SidepanelLayout.vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 // Stores
 const settingsStore = useSettingsStore()
 
-// Composables
-const { sendMessage } = useExtensionAPI()
-
 // State
 const isLoading = ref(true)
-const showAdvancedFeatures = ref(true)
-const showHistory = ref(true)
-
-// Computed
-const canTranslate = computed(() => settingsStore.canTranslate)
-
-// Methods
-const handleToggleExtension = async (enabled) => {
-  try {
-    await settingsStore.updateSetting('extensionEnabled', enabled)
-    await sendMessage('EXTENSION_TOGGLED', { enabled })
-  } catch (error) {
-    console.error('Failed to toggle extension:', error)
-  }
-}
-
-const handleTranslation = async (result) => {
-  console.log('Translation completed in sidepanel:', result)
-  // Could trigger history update, notifications, etc.
-}
-
-const handleScreenCapture = async () => {
-  try {
-    await sendMessage('START_SCREEN_CAPTURE')
-  } catch (error) {
-    console.error('Failed to start screen capture:', error)
-  }
-}
-
-const handleTTSToggle = async (text, language) => {
-  try {
-    await sendMessage('TOGGLE_TTS', { text, language })
-  } catch (error) {
-    console.error('Failed to toggle TTS:', error)
-  }
-}
-
-const handleRetranslate = async (historyItem) => {
-  try {
-    // Trigger retranslation of history item
-    await sendMessage('RETRANSLATE', { historyItem })
-  } catch (error) {
-    console.error('Failed to retranslate:', error)
-  }
-}
-
-const handleClearHistory = async () => {
-  try {
-    await sendMessage('CLEAR_HISTORY')
-  } catch (error) {
-    console.error('Failed to clear history:', error)
-  }
-}
-
-const handleOpenOptions = async () => {
-  try {
-    await sendMessage('OPEN_OPTIONS_PAGE')
-  } catch (error) {
-    console.error('Failed to open options:', error)
-  }
-}
+const loadingText = ref('Loading Sidepanel...')
+const hasError = ref(false)
+const errorMessage = ref('')
 
 // Lifecycle
 onMounted(async () => {
+  console.log('🚀 SidepanelApp mounting...')
+  
   try {
-    // Wait for settings to load
-    await settingsStore.loadSettings()
+    // Step 1: Set loading text
+    console.log('📝 Setting loading text...')
+    const browser = await getBrowserAPI()
+    loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
+    console.log('✅ Loading text set')
     
-    // Initialize sidepanel-specific features
-    await initializeSidepanel()
+    // Step 2: Load settings store
+    console.log('⚙️ Loading settings store...')
+    await Promise.race([
+      settingsStore.loadSettings(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
+      )
+    ])
+    console.log('✅ Settings store loaded')
+    
   } catch (error) {
-    console.error('Failed to initialize sidepanel:', error)
+    console.error('❌ Failed to initialize sidepanel:', error)
+    hasError.value = true
+    errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
+    console.log('✨ SidepanelApp initialization complete')
     isLoading.value = false
   }
 })
 
-const initializeSidepanel = async () => {
-  try {
-    // Load advanced features
-    const { loadAdvancedFeatures } = await import('@/app/main/sidepanel.js')
-    await loadAdvancedFeatures()
-  } catch (error) {
-    console.warn('Failed to load advanced features:', error)
-  }
+const retryLoading = () => {
+  console.log('🔄 Retrying sidepanel loading...')
+  hasError.value = false
+  errorMessage.value = ''
+  isLoading.value = true
+  
+  // Reset store state
+  settingsStore.$reset && settingsStore.$reset()
+  
+  // Retry mounting logic
+  setTimeout(() => {
+    onMounted()
+  }, 100)
 }
 </script>
 
 <style scoped>
 .extension-sidepanel {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--color-background);
@@ -176,9 +105,43 @@ const initializeSidepanel = async () => {
   color: var(--color-text-secondary);
 }
 
-.sidepanel-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0;
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem;
+  max-width: 500px;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 3rem;
+}
+
+.error-container h2 {
+  color: var(--color-error, #ef4444);
+  margin: 0;
+}
+
+.error-message {
+  color: var(--color-text-secondary, #666);
+  margin: 0;
+}
+
+.retry-button {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--color-primary, #3b82f6);
+  color: var(--color-background, white);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: var(--color-primary-dark, #2563eb);
 }
 </style>

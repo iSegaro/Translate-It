@@ -65,7 +65,7 @@ export default defineConfig({
         // Copy required assets
         const srcDir = process.cwd();
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
-        await fs.copy(resolve(srcDir, 'icons'), resolve(outDir, 'icons'));
+        await fs.copy(resolve(srcDir, 'src/assets/icons'), resolve(outDir, 'icons'));
         
         // Copy Changelog.md for About page
         const changelogSrc = resolve(srcDir, 'Changelog.md');
