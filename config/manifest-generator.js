@@ -141,18 +141,15 @@ function generateChromeManifest(baseManifest) {
  * @private
  */
 function generateFirefoxManifest(baseManifest) {
-  return {
+  const manifest = {
     ...baseManifest,
     manifest_version: 3,
     name: '__MSG_nameFirefox__',
     
     // Firefox MV3 background configuration
-    // Use service worker but with persistent fallback if needed
     background: {
-      service_worker: 'src/background/index.js',
+      scripts: ['src/background/index.js'],
       type: 'module'
-      // Note: persistent: false is default in MV3
-      // If needed, Firefox will handle persistence internally
     },
     
     // Firefox-specific browser settings
@@ -218,6 +215,13 @@ function generateFirefoxManifest(baseManifest) {
       }
     ]
   };
+
+  // Ensure no persistent key is present for Firefox MV3
+  if (manifest.background && manifest.background.persistent) {
+    delete manifest.background.persistent;
+  }
+
+  return manifest;
 }
 
 /**

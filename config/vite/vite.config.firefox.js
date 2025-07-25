@@ -28,24 +28,7 @@ export default defineConfig({
     
     webExtension({
       // Generate dynamic manifest for Firefox
-      manifest: async () => {
-          console.log('🦊 Generating Firefox manifest...');
-          const manifest = generateValidatedManifest('firefox');
-          // Add background script entry point for Manifest V2
-          manifest.background = {
-            scripts: ['src/background/index.js'],
-            persistent: false // Or true, depending on project needs for MV2
-          };
-          // Add content script entry point
-          manifest.content_scripts = manifest.content_scripts || [];
-          manifest.content_scripts.push({
-            matches: ["<all_urls>"],
-            js: ["src/content-scripts/index.js"],
-            run_at: "document_end"
-          });
-          console.log('✅ Firefox manifest generated and validated');
-          return manifest;
-        },
+      manifest: () => generateValidatedManifest('firefox'),
       
       // Firefox HTML config
       htmlViteConfig: {
