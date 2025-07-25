@@ -98,7 +98,12 @@ export const useSettingsStore = defineStore('settings', () => {
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
         if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
-          settings.value[key] = stored[key]
+          if (key === 'EXCLUDED_SITES') {
+            // Ensure EXCLUDED_SITES is always an array
+            settings.value[key] = Array.isArray(stored[key]) ? stored[key] : [];
+          } else {
+            settings.value[key] = stored[key]
+          }
         }
       })
       

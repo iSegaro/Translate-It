@@ -106,6 +106,7 @@ export const CONFIG = {
   ENABLE_SUBTITLE_TRANSLATION: false, // فعال کردن ترجمه زیرنویس در YouTube و Netflix
   SHOW_SUBTITLE_ICON: true, // نمایش آیکون ترجمه در پلیر یوتوب
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
+  EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
 
   // --- UI & Styling ---
   HIGHTLIH_NEW_ELEMENT_RED: "2px solid red", // Note: typo in original key 'HIGHTLIH'? Should be HIGHLIGHT?
