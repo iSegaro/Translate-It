@@ -1,0 +1,169 @@
+<template>
+  <section class="languages-tab">
+    <h2>{{ $i18n('languages_section_title') || 'Languages' }}</h2>
+    
+    <div class="setting-group">
+      <label>{{ $i18n('source_language_label') || 'Source Language' }}</label>
+      <BaseDropdown
+        v-model="sourceLanguage"
+        :options="sourceLanguageOptions"
+        :placeholder="$i18n('source_language_placeholder') || 'Select source language'"
+        class="language-select"
+      />
+    </div>
+    
+    <div class="setting-group">
+      <label>{{ $i18n('target_language_label') || 'Target Language' }}</label>
+      <BaseDropdown
+        v-model="targetLanguage"
+        :options="targetLanguageOptions"
+        :placeholder="$i18n('target_language_placeholder') || 'Select target language'"
+        class="language-select"
+      />
+    </div>
+    
+    <!-- Validation errors -->
+    <div v-if="validationError" class="validation-error">
+      {{ validationError }}
+    </div>
+  </section>
+</template>
+
+<script setup>
+import { computed, ref, watch } from 'vue'
+import { useEnhancedSettingsStore } from '@/store/core/enhanced-settings'
+import { useValidation } from '@/utils/validation.js'
+import BaseDropdown from '@/components/base/BaseDropdown.vue'
+
+const settingsStore = useEnhancedSettingsStore()
+const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
+
+// Language options (simplified - would come from utils/languages.js)
+const sourceLanguageOptions = ref([
+  { value: 'auto', label: 'Auto-Detect' },
+  { value: 'English', label: 'English' },
+  { value: 'Persian', label: 'Persian' },
+  { value: 'Arabic', label: 'Arabic' },
+  { value: 'Spanish', label: 'Spanish' },
+  { value: 'French', label: 'French' },
+  { value: 'German', label: 'German' }
+])
+
+const targetLanguageOptions = computed(() => {
+  return sourceLanguageOptions.value.filter(lang => lang.value !== 'auto')
+})
+
+// Form values
+const sourceLanguage = computed({
+  get: () => settingsStore.sourceLanguage,
+  set: async (value) => {
+    await settingsStore.updateSetting('SOURCE_LANGUAGE', value)
+    await validateLanguages()
+  }
+})
+
+const targetLanguage = computed({
+  get: () => settingsStore.targetLanguage,
+  set: async (value) => {
+    await settingsStore.updateSetting('TARGET_LANGUAGE', value)
+    await validateLanguages()
+  }
+})
+
+// Validation
+const validationError = ref('')
+
+const validateLanguages = async () => {
+  clearErrors()
+  const isValid = await validate(sourceLanguage.value, targetLanguage.value)
+  
+  if (!isValid) {
+    validationError.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage')
+  } else {
+    validationError.value = ''
+  }
+  
+  return isValid
+}
+
+// Watch for changes and validate
+watch([sourceLanguage, targetLanguage], () => {
+  if (sourceLanguage.value && targetLanguage.value) {
+    validateLanguages()
+  }
+})
+</script>
+
+<style lang="scss" scoped>
+@import '@/assets/styles/variables.scss';
+
+.languages-tab {
+  max-width: 600px;
+}
+
+h2 {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-medium;
+  margin-top: 0;
+  margin-bottom: $spacing-lg;
+  padding-bottom: $spacing-base;
+  border-bottom: $border-width $border-style var(--color-border);
+  color: var(--color-text);
+}
+
+.setting-group {
+  margin-bottom: $spacing-lg;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: $spacing-base;
+  border-bottom: $border-width $border-style var(--color-border);
+  
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  
+  label {
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    margin-bottom: 0;
+    flex-grow: 1;
+    min-width: 200px;
+  }
+  
+  .language-select {
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+}
+
+.validation-error {
+  background-color: var(--color-error);
+  color: white;
+  padding: $spacing-base;
+  border-radius: $border-radius-base;
+  margin-top: $spacing-base;
+  font-size: $font-size-sm;
+}
+
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .setting-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: $spacing-sm;
+    
+    label {
+      min-width: auto;
+    }
+    
+    .language-select {
+      min-width: auto;
+      width: 100%;
+    }
+  }
+}
+</style>

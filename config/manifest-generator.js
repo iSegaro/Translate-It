@@ -129,9 +129,9 @@ function generateChromeManifest(baseManifest) {
     // Options page
     options_page: 'html/options.html',
     
-    // Content Security Policy for development
+    // Content Security Policy for Chrome MV3 (no unsafe-eval allowed)
     content_security_policy: {
-      extension_pages: 'script-src \'self\' http://localhost:*; object-src \'self\'; connect-src \'self\' ws://localhost:*;'
+      extension_pages: 'script-src \'self\'; object-src \'self\';'
     }
   };
 }

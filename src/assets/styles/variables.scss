@@ -1,21 +1,72 @@
-// Color Variables
+// Theme Variables for Options Page (from OLD CSS)
+:root.theme-light {
+  --bg-color: #ffffff;
+  --text-color: #202124;
+  --sidebar-bg-color: #ffffff;
+  --main-bg-color: #ffffff;
+  --border-color: #e0e0e0;
+  --tab-button-color: #5f6368;
+  --tab-button-active-color: #1967d2;
+  --tab-button-active-bg: #e8f0fe;
+  --tab-button-hover-bg: #f1f3f4;
+  --tab-button-active-border-color: #1967d2;
+  --input-bg-color: #fff;
+  --input-text-color: #202124;
+  --input-border-color: #dadce0;
+  --input-focus-border-color: #1967d2;
+  --input-focus-shadow-color: rgba(25, 103, 210, 0.2);
+  --button-bg-color: #1a73e8;
+  --button-text-color: #fff;
+  --button-hover-bg-color: #185abc;
+  --link-color: #1a73e8;
+  --link-hover-color: #0c5dc0;
+  --section-title-border: #dadce0;
+  --github-icon-filter: none;
+}
+
+:root.theme-dark {
+  --bg-color: #202124;
+  --text-color: #e8eaed;
+  --sidebar-bg-color: #292a2d;
+  --main-bg-color: #292a2d;
+  --border-color: #3c4043;
+  --tab-button-color: #bdc1c6;
+  --tab-button-active-color: #8ab4f8;
+  --tab-button-active-bg: #303741;
+  --tab-button-hover-bg: #3c4043;
+  --tab-button-active-border-color: #8ab4f8;
+  --input-bg-color: #202124;
+  --input-text-color: #e8eaed;
+  --input-border-color: #5f6368;
+  --input-focus-border-color: #8ab4f8;
+  --input-focus-shadow-color: rgba(138, 180, 248, 0.3);
+  --button-bg-color: #8ab4f8;
+  --button-text-color: #202124;
+  --button-hover-bg-color: #9ac0f9;
+  --link-color: #8ab4f8;
+  --link-hover-color: #a7c8fa;
+  --section-title-border: #5f6368;
+  --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+}
+
+// Map theme variables to component variables
 :root {
-  // Primary colors
-  --color-primary: #1976d2;
+  // Primary colors (mapped from theme)
+  --color-primary: var(--tab-button-active-color, #1976d2);
   --color-primary-light: #42a5f5;
-  --color-primary-dark: #1565c0;
+  --color-primary-dark: var(--button-hover-bg-color, #1565c0);
   
   // Secondary colors
   --color-secondary: #dc004e;
   --color-secondary-light: #ff6090;
   --color-secondary-dark: #9a0036;
   
-  // Neutral colors
-  --color-background: #ffffff;
-  --color-surface: #f5f5f5;
-  --color-border: #e0e0e0;
-  --color-text: #212121;
-  --color-text-secondary: #757575;
+  // Neutral colors (mapped from theme)
+  --color-background: var(--bg-color, #ffffff);
+  --color-surface: var(--sidebar-bg-color, #f5f5f5);
+  --color-border: var(--border-color, #e0e0e0);
+  --color-text: var(--text-color, #212121);
+  --color-text-secondary: var(--tab-button-color, #757575);
   --color-text-disabled: #bdbdbd;
   
   // Success, warning, error colors
@@ -23,13 +74,6 @@
   --color-warning: #ff9800;
   --color-error: #f44336;
   --color-info: #2196f3;
-  
-  // Dark theme colors (for future use)
-  --color-dark-background: #121212;
-  --color-dark-surface: #1e1e1e;
-  --color-dark-border: #333333;
-  --color-dark-text: #ffffff;
-  --color-dark-text-secondary: #b3b3b3;
 }
 
 // Typography

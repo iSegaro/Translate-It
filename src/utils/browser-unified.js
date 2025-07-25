@@ -95,6 +95,11 @@ class UnifiedBrowserAPI {
     if (chromeAPI.tts) {
       wrapped.tts = this.wrapTTSAPI(chromeAPI.tts);
     }
+    
+    // Add i18n API wrapping
+    if (chromeAPI.i18n) {
+      wrapped.i18n = this.wrapI18nAPI(chromeAPI.i18n);
+    }
 
     return wrapped;
   }
@@ -228,6 +233,20 @@ class UnifiedBrowserAPI {
       pause: tts.pause.bind(tts),
       resume: tts.resume.bind(tts),
       getVoices: this.promisifyCallback(tts.getVoices.bind(tts))
+    };
+  }
+
+  /**
+   * Wrap Chrome i18n API
+   * @private
+   */
+  wrapI18nAPI(i18n) {
+    return {
+      ...i18n,
+      getMessage: i18n.getMessage.bind(i18n),
+      getAcceptLanguages: this.promisifyCallback(i18n.getAcceptLanguages.bind(i18n)),
+      detectLanguage: this.promisifyCallback(i18n.detectLanguage.bind(i18n)),
+      getUILanguage: i18n.getUILanguage.bind(i18n)
     };
   }
 

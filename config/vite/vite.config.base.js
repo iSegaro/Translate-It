@@ -11,7 +11,16 @@ export const createBaseConfig = (browser, options = {}) => {
 
   return defineConfig({
     plugins: [
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            // Disable eval for Chrome MV3 compatibility
+            isCustomElement: (tag) => false,
+            // Compile templates at build time
+            whitespace: 'preserve'
+          }
+        }
+      }),
       ...(options.extraPlugins || [])
     ],
 
@@ -21,8 +30,8 @@ export const createBaseConfig = (browser, options = {}) => {
       __IS_PRODUCTION__: isProduction,
       __IS_DEVELOPMENT__: isDevelopment,
       __VUE_OPTIONS_API__: false,
-      __VUE_PROD_DEVTOOLS__: isDevelopment,
-      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: isDevelopment,
+      __VUE_PROD_DEVTOOLS__: false, // Disable devtools to avoid eval
+      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
       'process.env.BROWSER': `"${browser}"`,
       'process.env.NODE_ENV': `"${process.env.NODE_ENV || 'development'}"`,
       ...(options.extraDefines || {})

@@ -9,3 +9,4 @@ Build-Extension/Firefox/*
 Build-Extension/*.zip
 Build-Extension/Publish/Source-*.zip
 dist/
+OLD/
