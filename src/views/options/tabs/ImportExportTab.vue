@@ -78,11 +78,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, getCurrentInstance } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import secureStorage from '@/utils/secureStorage.js'
+
+// Access i18n function through current instance
+const { proxy } = getCurrentInstance()
+const $i18n = proxy.$i18n
 
 const settingsStore = useSettingsStore()
 
@@ -107,8 +112,14 @@ const exportSettings = async () => {
     
     // Show warning if no password provided
     if (!exportPassword.value.trim()) {
+      const warningTitle = $i18n('security_warning_title') || '⚠️ SECURITY WARNING ⚠️'
+      const warningMessage = $i18n('security_warning_message') || 
+        'You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it\'s STRONGLY recommended to use a password.'
+      const warningQuestion = $i18n('security_warning_question') || 
+        'Do you want to continue without password protection?'
+      
       const proceed = window.confirm(
-        '⚠️ SECURITY WARNING ⚠️\n\nYou are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it\'s STRONGLY recommended to use a password.\n\nDo you want to continue without password protection?'
+        `${warningTitle}\n\n${warningMessage}\n\n${warningQuestion}`
       )
       
       if (!proceed) {
@@ -117,16 +128,15 @@ const exportSettings = async () => {
       }
     }
     
-    // Simple export logic (would use secureStorage in real implementation)
-    const exportData = {
-      ...settings,
-      _exported: true,
-      _timestamp: new Date().toISOString()
-    }
+    // Use secureStorage for proper export handling
+    const exportData = await secureStorage.prepareForExport(
+      settings,
+      exportPassword.value.trim() || null
+    )
     
-    // Create filename
+    // Create filename with security indicator
     const timestamp = new Date().toISOString().slice(0, 10)
-    const securitySuffix = exportPassword.value ? '_Encrypted' : ''
+    const securitySuffix = exportPassword.value.trim() ? '_Encrypted' : ''
     const filename = `Translate-It_Settings${securitySuffix}_${timestamp}.json`
     
     // Download file
@@ -144,8 +154,8 @@ const exportSettings = async () => {
     exportPassword.value = ''
     statusType.value = 'success'
     statusMessage.value = exportPassword.value ? 
-      'Settings exported successfully with encrypted API keys!' :
-      'Settings exported successfully (API keys in plain text)'
+      ($i18n('export_success_encrypted') || 'Settings exported successfully with encrypted API keys!') :
+      ($i18n('export_success_plaintext') || 'Settings exported successfully (API keys in plain text)')
     
     setTimeout(() => {
       statusMessage.value = ''
@@ -153,7 +163,13 @@ const exportSettings = async () => {
     
   } catch (error) {
     statusType.value = 'error'
-    statusMessage.value = 'Failed to export settings!'
+    let errorMessage = $i18n('export_error_generic') || 'Failed to export settings'
+    
+    if (error.message.includes('Password')) {
+      errorMessage = `${$i18n('export_error_password') || 'Export failed'}: ${error.message}`
+    }
+    
+    statusMessage.value = errorMessage
     setTimeout(() => {
       statusMessage.value = ''
     }, 3000)
@@ -162,41 +178,53 @@ const exportSettings = async () => {
   }
 }
 
+// Check file encryption status
+const checkFileEncryption = async (file) => {
+  try {
+    const content = await file.text()
+    const data = JSON.parse(content)
+    
+    if (data._hasEncryptedKeys && data._secureKeys) {
+      // File has encrypted keys - show password field
+      return true
+    } else {
+      // No encryption - hide password field
+      return false
+    }
+  } catch {
+    // Invalid JSON or other error
+    return false
+  }
+}
+
 // Handle file selection
-const handleFileSelect = (event) => {
+const handleFileSelect = async (event) => {
   const file = event.target.files[0]
   if (!file) {
     showPasswordField.value = false
+    selectedFile.value = null
     return
   }
   
   selectedFile.value = file
   
-  // Check if file needs password (simplified check)
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result)
-      showPasswordField.value = data._hasEncryptedKeys || false
-      
-      // Auto-import if no encryption
-      if (!showPasswordField.value) {
-        setTimeout(() => {
-          importSettings()
-        }, 500)
-      }
-    } catch {
-      showPasswordField.value = false
-    }
+  // Check if file needs password
+  const hasEncryption = await checkFileEncryption(file)
+  showPasswordField.value = hasEncryption
+  
+  // Auto-import if no encryption detected
+  if (!hasEncryption) {
+    setTimeout(() => {
+      importSettings()
+    }, 500)
   }
-  reader.readAsText(file)
 }
 
 // Import settings
 const importSettings = async () => {
   if (!selectedFile.value) {
     statusType.value = 'error'
-    statusMessage.value = 'Please select a file to import'
+    statusMessage.value = $i18n('import_error_no_file') || 'Please select a file to import'
     return
   }
   
@@ -204,51 +232,68 @@ const importSettings = async () => {
   statusMessage.value = ''
   
   try {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const importedSettings = JSON.parse(e.target.result)
-        
-        // Simple validation
-        if (!importedSettings._exported) {
-          throw new Error('Invalid settings file format')
-        }
-        
-        // Save settings
-        await settingsStore.saveSettings(importedSettings)
-        
-        // Clear form
-        if (importFileInput.value) importFileInput.value.value = ''
-        importPassword.value = ''
-        showPasswordField.value = false
-        selectedFile.value = null
-        
-        statusType.value = 'success'
-        statusMessage.value = 'Settings imported successfully! Reloading...'
-        
-        // Reload page after 1.5 seconds
-        setTimeout(() => {
-          window.location.reload()
-        }, 1500)
-        
-      } catch (error) {
-        statusType.value = 'error'
-        statusMessage.value = 'Failed to import settings: ' + error.message
-        setTimeout(() => {
-          statusMessage.value = ''
-        }, 4000)
-      } finally {
-        isImporting.value = false
-      }
-    }
-    reader.readAsText(selectedFile.value)
+    const fileContent = await selectedFile.value.text()
+    const importedSettings = JSON.parse(fileContent)
+    const importPasswordValue = importPassword.value.trim() || null
+    
+    // Process imported settings using secureStorage (handles both encrypted and plain)
+    const processedSettings = await secureStorage.processImportedSettings(
+      importedSettings,
+      importPasswordValue
+    )
+    
+    // Save to storage using settings store
+    await settingsStore.saveSettings(processedSettings)
+    
+    // Clear form only on successful import
+    if (importFileInput.value) importFileInput.value.value = ''
+    importPassword.value = ''
+    showPasswordField.value = false
+    selectedFile.value = null
+    
+    statusType.value = 'success'
+    statusMessage.value = $i18n('import_success') || 'Settings imported successfully! Reloading...'
+    
+    // Reload page after 1.5 seconds
+    setTimeout(() => {
+      window.location.reload()
+    }, 1500)
     
   } catch (error) {
     statusType.value = 'error'
-    statusMessage.value = 'Failed to read file!'
+    let errorMessage = $i18n('import_error_generic') || 'Failed to import settings'
+    
+    // Handle specific error types
+    if (error.message.includes('Password') || error.message.includes('password')) {
+      errorMessage = `${$i18n('import_error_password') || 'Import failed'}: ${error.message}`
+      
+      // Only clear password input on password errors, keep file selected
+      importPassword.value = ''
+      
+      // Focus password input for immediate retry
+      setTimeout(() => {
+        const passwordInput = document.querySelector('.import-password-input input')
+        if (passwordInput) passwordInput.focus()
+      }, 100)
+    } else if (error.message.includes('JSON')) {
+      errorMessage = $i18n('import_error_invalid_format') || 'Import failed: Invalid file format'
+      
+      // Clear file input for non-password errors
+      if (importFileInput.value) importFileInput.value.value = ''
+      selectedFile.value = null
+      showPasswordField.value = false
+    } else {
+      // Clear file input for other errors
+      if (importFileInput.value) importFileInput.value.value = ''
+      selectedFile.value = null
+      showPasswordField.value = false
+    }
+    
+    statusMessage.value = errorMessage
     setTimeout(() => {
       statusMessage.value = ''
-    }, 3000)
+    }, 4000)
+  } finally {
     isImporting.value = false
   }
 }

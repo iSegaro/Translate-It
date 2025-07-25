@@ -46,6 +46,12 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
     USE_MOCK: false,
     EXCLUDED_SITES: [],
     
+    // Migration and versioning
+    VUE_MIGRATED: false,
+    MIGRATION_DATE: null,
+    MIGRATION_FROM_VERSION: null,
+    EXTENSION_VERSION: null,
+    
     // Import/Export
     EXPORT_PASSWORD: '',
     IMPORT_PASSWORD: ''
@@ -294,6 +300,38 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
     }
   }
   
+  const checkMigrationStatus = () => {
+    return {
+      isVueMigrated: settings.value.VUE_MIGRATED || false,
+      migrationDate: settings.value.MIGRATION_DATE,
+      migrationFromVersion: settings.value.MIGRATION_FROM_VERSION,
+      extensionVersion: settings.value.EXTENSION_VERSION,
+      hasLegacyData: !!(settings.value.translationHistory || settings.value.lastTranslation)
+    }
+  }
+  
+  const markMigrationComplete = async (fromVersion = 'legacy') => {
+    try {
+      const browser = await getBrowserAPI()
+      const manifest = browser.runtime.getManifest()
+      
+      const migrationData = {
+        VUE_MIGRATED: true,
+        MIGRATION_DATE: new Date().toISOString(),
+        MIGRATION_FROM_VERSION: fromVersion,
+        EXTENSION_VERSION: manifest.version
+      }
+      
+      await updateMultipleSettings(migrationData)
+      
+      console.log('Migration status updated:', migrationData)
+      return true
+    } catch (error) {
+      console.error('Failed to mark migration complete:', error)
+      throw error
+    }
+  }
+  
   // Initialize settings on store creation
   loadSettings()
   
@@ -320,7 +358,9 @@ export const useEnhancedSettingsStore = defineStore('enhanced-settings', () => {
     exportSettings,
     importSettings,
     getSetting,
-    validateSettings
+    validateSettings,
+    checkMigrationStatus,
+    markMigrationComplete
   }
 })
 
