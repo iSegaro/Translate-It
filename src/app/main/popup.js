@@ -49,7 +49,10 @@ async function initializeApp() {
 }
 
 // Initialize the app
-initializeApp()
+const appElement = document.getElementById('app')
+if (appElement && !appElement.__vue_app__) {
+  initializeApp()
+}
 
 // Lazy loading functions for heavy features
 export const loadTranslationFeatures = async () => {
