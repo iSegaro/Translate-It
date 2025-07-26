@@ -21,6 +21,7 @@
           id="swapLanguagesBtn"
           class="swap-button"
           title="Swap Languages"
+          @click="handleSwapLanguages"
         >
           <img src="@/assets/icons/swap.png" alt="Swap" />
         </button>
@@ -40,7 +41,10 @@
       </div>
 
       <!-- Source Text Area with Toolbar -->
-      <div class="textarea-container source-container">
+      <div 
+        class="textarea-container source-container" 
+        :class="{ 'has-content': hasSourceContent }"
+      >
         <div class="inline-toolbar source-toolbar">
           <img
             src="@/assets/icons/copy.png"
@@ -62,6 +66,7 @@
           id="pasteSourceBtn"
           class="inline-icon paste-icon-separate"
           title="Paste Source Text"
+          v-show="showPasteButton"
           @click="pasteSourceText"
         />
         <textarea
@@ -69,6 +74,7 @@
           rows="6"
           placeholder="Enter text to translate..."
           v-model="sourceText"
+          @input="handleSourceTextInput"
         ></textarea>
       </div>
 
@@ -85,7 +91,10 @@
       </div>
 
       <!-- Result Area with Toolbar -->
-      <div class="textarea-container result-container">
+      <div 
+        class="textarea-container result-container"
+        :class="{ 'has-content': hasTranslationContent }"
+      >
         <div class="inline-toolbar target-toolbar">
           <img
             src="@/assets/icons/copy.png"
@@ -105,9 +114,15 @@
         <div
           id="translationResult"  
           class="result"
-          :class="{ 'has-error': translationError }"
+          :class="{ 'has-error': translationError, 'fade-in': translationResult && !showSpinner }"
+          data-i18n-placeholder="Translation will appear here..."
         >
-          {{ translationError || translationResult || '' }}
+          <div v-if="showSpinner" class="spinner-center">
+            <div class="spinner"></div>
+          </div>
+          <template v-else>
+            {{ translationError || translationResult || '' }}
+          </template>
         </div>
       </div>
     </form>
@@ -115,11 +130,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useTTSSmart } from '@/composables/useTTSSmart.js'
 import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
 import { useDirectMessage } from '@/composables/useDirectMessage.js'
+import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 
 // Browser API, TTS, Background Warmup, and Direct Message
 const browserAPI = useBrowserAPI()
@@ -132,6 +148,17 @@ const sourceText = ref('')
 const translationResult = ref('')
 const translationError = ref('')
 const isTranslating = ref(false)
+const showPasteButton = ref(false)
+const showSpinner = ref(false)
+
+// Computed properties for toolbar visibility
+const hasSourceContent = computed(() => {
+  return sourceText.value.trim().length > 0
+})
+
+const hasTranslationContent = computed(() => {
+  return (translationResult.value || translationError.value || '').trim().length > 0
+})
 
 // Handle form submission
 const handleTranslationSubmit = async () => {
@@ -152,6 +179,7 @@ const handleTranslationSubmit = async () => {
     isTranslating.value = true
     translationError.value = ''
     translationResult.value = ''
+    showSpinner.value = true
     
     console.log('[SidepanelMainContent] Ensuring background script is ready...')
     await backgroundWarmup.ensureWarmedUp()
@@ -176,6 +204,7 @@ const handleTranslationSubmit = async () => {
     }
 
     if (response.success && response.data?.translatedText) {
+      showSpinner.value = false
       translationResult.value = response.data.translatedText
       console.log('[SidepanelMainContent] Translation displayed successfully')
     } else {
@@ -184,6 +213,7 @@ const handleTranslationSubmit = async () => {
 
   } catch (error) {
     console.error('[SidepanelMainContent] Translation failed:', error)
+    showSpinner.value = false
     translationError.value = error.message || 'Translation failed'
   } finally {
     isTranslating.value = false
@@ -215,10 +245,33 @@ const pasteSourceText = async () => {
   try {
     const text = await navigator.clipboard.readText()
     sourceText.value = text
+    // Trigger input event to update reactive properties
+    handleSourceTextInput()
     console.log('[SidepanelMainContent] Text pasted from clipboard')
   } catch (error) {
     console.error('[SidepanelMainContent] Failed to paste text:', error)
   }
+}
+
+// Handle source text input to update toolbar visibility
+const handleSourceTextInput = () => {
+  // Reactive hasSourceContent will automatically handle toolbar visibility
+  // This is called on input events
+}
+
+// Check clipboard for paste button visibility
+const checkClipboard = async () => {
+  try {
+    const text = await navigator.clipboard.readText()
+    showPasteButton.value = text.trim().length > 0
+  } catch (error) {
+    showPasteButton.value = false
+  }
+}
+
+// Listen for focus events to update paste button
+const handleFocus = () => {
+  checkClipboard()
 }
 
 // Helper function to convert language name to simple language code for Google TTS
@@ -260,6 +313,118 @@ const speakTranslationText = async () => {
   await tts.speak(translationResult.value, langCode)
   console.log('[SidepanelMainContent] Translation TTS started with language:', langCode)
 }
+
+// Handle language swap functionality
+const handleSwapLanguages = async () => {
+  try {
+    const sourceSelect = document.getElementById('sourceLanguageInput')
+    const targetSelect = document.getElementById('targetLanguageInput')
+    
+    if (!sourceSelect || !targetSelect) {
+      console.error('[SidepanelMainContent] Language select elements not found')
+      return
+    }
+
+    let sourceVal = sourceSelect.value
+    let targetVal = targetSelect.value
+    
+    // Get language codes - for simplification we use the values directly
+    let sourceCode = getLanguageCode(sourceVal)
+    let targetCode = getLanguageCode(targetVal)
+    
+    let resolvedSourceCode = sourceCode
+    let resolvedTargetCode = targetCode
+    
+    // If source is "auto-detect", try to get actual source language from settings
+    if (sourceCode === 'auto' || sourceVal === 'auto') {
+      try {
+        resolvedSourceCode = await getSourceLanguageAsync()
+        console.log('[SidepanelMainContent] Resolved source language from settings:', resolvedSourceCode)
+      } catch (err) {
+        console.error('[SidepanelMainContent] Failed to load source language from settings:', err)
+        resolvedSourceCode = null
+      }
+    }
+    
+    // In case target is somehow auto (shouldn't happen but for robustness)
+    if (targetCode === 'auto' || targetVal === 'auto') {
+      try {
+        resolvedTargetCode = await getTargetLanguageAsync()
+        console.log('[SidepanelMainContent] Resolved target language from settings:', resolvedTargetCode)
+      } catch (err) {
+        console.error('[SidepanelMainContent] Failed to load target language from settings:', err)
+        resolvedTargetCode = null
+      }
+    }
+    
+    // Only proceed if both languages are valid and source is not auto-detect
+    if (
+      resolvedSourceCode &&
+      resolvedTargetCode &&
+      resolvedSourceCode !== 'auto'
+    ) {
+      // Get display names for the resolved languages
+      const newSourceDisplay = getLanguageDisplayName(resolvedTargetCode)
+      const newTargetDisplay = getLanguageDisplayName(resolvedSourceCode)
+      
+      // Swap the language values
+      sourceSelect.value = newSourceDisplay || targetVal
+      targetSelect.value = newTargetDisplay || sourceVal
+      
+      console.log('[SidepanelMainContent] Languages swapped successfully')
+      
+    } else {
+      // Cannot swap - provide feedback
+      console.log('[SidepanelMainContent] Cannot swap - invalid language selection', {
+        resolvedSourceCode,
+        resolvedTargetCode
+      })
+      // Could add visual feedback here like in the OLD implementation
+    }
+    
+  } catch (error) {
+    console.error('[SidepanelMainContent] Error swapping languages:', error)
+  }
+}
+
+// Helper function to get display name for language code
+const getLanguageDisplayName = (langCode) => {
+  const languageMap = {
+    'en': 'English',
+    'fa': 'Persian', 
+    'ar': 'Arabic',
+    'fr': 'French',
+    'de': 'German',
+    'es': 'Spanish',
+    'zh': 'Chinese',
+    'hi': 'Hindi',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'it': 'Italian',
+    'nl': 'Dutch',
+    'tr': 'Turkish'
+  }
+  
+  return languageMap[langCode] || langCode
+}
+
+// Lifecycle - setup event listeners for paste button
+onMounted(() => {
+  // Initial clipboard check
+  checkClipboard()
+  
+  // Add focus listener for clipboard updates
+  document.addEventListener('focus', handleFocus, true)
+  window.addEventListener('focus', handleFocus)
+})
+
+onUnmounted(() => {
+  // Clean up event listeners
+  document.removeEventListener('focus', handleFocus, true)
+  window.removeEventListener('focus', handleFocus)
+})
 </script>
 
 <style scoped>
@@ -299,10 +464,10 @@ form {
   min-width: 0;
   padding: 8px 10px;
   font-size: 14px;
-  border: 1px solid var(--border-color, #ccc);
+  border: 1px solid var(--border-color, #dee2e6);
   border-radius: 4px;
-  background-color: var(--bg-secondary, white);
-  color: var(--text-color, black);
+  background-color: var(--bg-secondary, #ffffff);
+  color: var(--text-color, #212529);
   box-sizing: border-box;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -349,7 +514,7 @@ form {
   flex-shrink: 0;
 }
 
-/* Source textarea */
+/* Source textarea - Match OLD implementation */
 textarea#sourceText {
   width: 100%;
   height: 140px;
@@ -357,12 +522,12 @@ textarea#sourceText {
   box-sizing: border-box;
   padding-top: 32px;
   padding-bottom: 12px;
-  padding-left: 14px;
-  padding-right: 14px;
-  border: 1px solid var(--border-color, #ccc);
+  padding-inline-start: 14px;
+  padding-inline-end: 14px;
+  border: 1px solid var(--border-color, #dee2e6);
   border-radius: 5px;
-  background-color: var(--bg-secondary, white);
-  color: var(--text-color, black);
+  background-color: var(--bg-secondary, #ffffff);
+  color: var(--text-color, #212529);
   font-family: inherit;
   font-size: 15px;
   line-height: 1.7;
@@ -412,9 +577,9 @@ textarea#sourceText {
 .textarea-container.result-container {
   flex-grow: 1;
   min-height: 0;
-  border: 1px solid var(--border-color, #ccc);
+  border: 1px solid var(--border-color, #dee2e6);
   border-radius: 5px;
-  background-color: var(--bg-secondary, white);
+  background-color: var(--bg-secondary, #ffffff);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -428,9 +593,9 @@ textarea#sourceText {
   box-sizing: border-box;
   padding-top: 32px;
   padding-bottom: 12px;
-  padding-left: 14px;
-  padding-right: 14px;
-  color: var(--text-color, black);
+  padding-inline-start: 14px;
+  padding-inline-end: 14px;
+  color: var(--text-color, #212529);
   font-family: inherit;
   font-size: 15px;
   line-height: 1.7;
@@ -444,20 +609,40 @@ textarea#sourceText {
   min-width: 0;
 }
 
+/* Result placeholder - Match OLD implementation */
+.result:empty::before {
+  content: attr(data-i18n-placeholder);
+  color: #6c757d;
+  pointer-events: none;
+  position: absolute;
+  top: 32px;
+  left: 10px;
+  right: 10px;
+}
+
+html[dir="rtl"] .result:empty::before {
+  text-align: right;
+}
+
 .result.has-error {
   color: #d32f2f;
   background: #ffe6e6;
 }
 
-/* Inline Toolbar Styles */
+/* Inline Toolbar Styles - Match OLD implementation */
 .inline-toolbar {
   position: absolute;
   top: 5px;
   left: 18px;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 12px;
   z-index: 10;
+}
+
+/* Show toolbar only when container has content */
+.textarea-container.has-content .inline-toolbar {
+  display: flex;
 }
 
 .inline-icon {
@@ -477,7 +662,7 @@ textarea#sourceText {
   position: absolute;
   top: 5px;
   right: 8px;
-  display: block !important;
+  display: none;
   z-index: 10;
   opacity: 0.6;
   cursor: pointer;
@@ -489,5 +674,54 @@ textarea#sourceText {
 
 .paste-icon-separate:hover {
   opacity: 1;
+}
+
+/* RTL support for paste button - Match OLD implementation */
+html[dir="rtl"] .paste-icon-separate {
+  left: 18px;
+  right: auto;
+}
+
+/* Spinner styles - Match OLD implementation */
+.spinner-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border-color, #dee2e6);
+  border-top: 3px solid var(--primary-color, #007bff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Result fade-in animation */
+.result.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
