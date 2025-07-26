@@ -1,7 +1,7 @@
 // src/composables/useApiProvider.js
-// Vue composable for API provider management in sidepanel
+// Vue composable for API provider management in sidepanel with improved API handling
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { ProviderRegistry } from '@/providers/index.js'
 import { ProviderHtmlGenerator } from '@/utils/providerHtmlGenerator.js'
@@ -14,7 +14,8 @@ export function useApiProvider() {
   const isLoading = ref(false)
   const providerError = ref('')
 
-  // Store
+  // Composables
+  const browserAPI = useBrowserAPI()
   const settingsStore = useSettingsStore()
 
   // Computed
@@ -65,8 +66,7 @@ export function useApiProvider() {
         currentProvider.value = fallbackProvider
         
         // Update settings with fallback
-        const browser = await getBrowserAPI()
-        await browser.storage.local.set({ TRANSLATION_API: fallbackProvider })
+        await browserAPI.safeStorageSet({ TRANSLATION_API: fallbackProvider })
       }
     } catch (error) {
       console.error('[useApiProvider] Error loading current provider:', error)
@@ -84,8 +84,7 @@ export function useApiProvider() {
       isLoading.value = true
       providerError.value = ''
 
-      const browser = await getBrowserAPI()
-      await browser.storage.local.set({ TRANSLATION_API: providerId })
+      await browserAPI.safeStorageSet({ TRANSLATION_API: providerId })
       
       currentProvider.value = providerId
       isDropdownOpen.value = false
@@ -109,7 +108,7 @@ export function useApiProvider() {
   // Get provider icon URL
   const getProviderIconUrl = async (iconPath) => {
     try {
-      const browser = await getBrowserAPI()
+      const browser = await browserAPI.ensureReady()
       return browser.runtime.getURL(iconPath)
     } catch (error) {
       console.error('[useApiProvider] Error getting icon URL:', error)
@@ -152,17 +151,8 @@ export function useApiProvider() {
   // Setup storage listener
   const setupStorageListener = async () => {
     try {
-      // Add delay to ensure browser API is ready in sidepanel context
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      const browser = await getBrowserAPI()
-      if (browser && browser.storage && browser.storage.onChanged && browser.storage.onChanged.addListener) {
-        storageListener = (changes, areaName) => {
-          if (areaName === 'local') {
-            handleStorageChange(changes)
-          }
-        }
-        browser.storage.onChanged.addListener(storageListener)
+      storageListener = await browserAPI.setupStorageListener(handleStorageChange)
+      if (storageListener) {
         console.log('[useApiProvider] Storage listener setup successfully')
       } else {
         console.warn('[useApiProvider] Browser storage API not available, skipping listener setup')
@@ -176,10 +166,7 @@ export function useApiProvider() {
   const cleanupStorageListener = async () => {
     if (storageListener) {
       try {
-        const browser = await getBrowserAPI()
-        if (browser && browser.storage && browser.storage.onChanged) {
-          browser.storage.onChanged.removeListener(storageListener)
-        }
+        await browserAPI.removeStorageListener(storageListener)
         storageListener = null
       } catch (error) {
         console.error('[useApiProvider] Error cleaning up storage listener:', error)

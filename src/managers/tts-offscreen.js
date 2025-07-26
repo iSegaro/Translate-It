@@ -13,6 +13,8 @@ export class OffscreenTTSManager {
     this.offscreenCreated = false;
     this.currentSpeech = null;
     this.initialized = false;
+    this.readinessListenerAdded = false;
+    this.offscreenReady = false;
   }
 
   /**
@@ -31,6 +33,9 @@ export class OffscreenTTSManager {
 
       console.log('🔊 Initializing Chrome offscreen TTS manager');
       
+      // Setup readiness listener for faster detection
+      this.setupReadinessListener();
+      
       // Create offscreen document for audio playback
       await this.createOffscreenDocument();
       
@@ -41,6 +46,23 @@ export class OffscreenTTSManager {
       console.error('❌ Failed to initialize offscreen TTS manager:', error);
       throw error;
     }
+  }
+
+  /**
+   * Setup listener for offscreen readiness signal
+   * @private
+   */
+  setupReadinessListener() {
+    if (this.readinessListenerAdded) return;
+
+    this.browser.runtime.onMessage.addListener((message) => {
+      if (message.action === 'OFFSCREEN_READY') {
+        console.log('⚡ Offscreen document signaled readiness');
+        this.offscreenReady = true;
+      }
+    });
+
+    this.readinessListenerAdded = true;
   }
 
   /**
@@ -60,9 +82,9 @@ export class OffscreenTTSManager {
         return;
       }
 
-      // Create new offscreen document
+      // Create new offscreen document with absolute path
       await this.browser.offscreen.createDocument({
-        url: 'offscreen.html',
+        url: 'html/offscreen.html',
         reasons: ['AUDIO_PLAYBACK'],
         justification: 'TTS audio playback for translation extension'
       });
@@ -70,9 +92,68 @@ export class OffscreenTTSManager {
       this.offscreenCreated = true;
       console.log('📄 Offscreen document created for TTS');
 
+      // Minimal wait for script initialization
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Quick responsive test with shorter timeout
+      await this.testOffscreenConnection();
+
     } catch (error) {
       console.error('❌ Failed to create offscreen document:', error);
-      throw error;
+      
+      // Try alternative approach
+      try {
+        await this.browser.offscreen.createDocument({
+          url: chrome.runtime.getURL('html/offscreen.html'),
+          reasons: ['AUDIO_PLAYBACK'], 
+          justification: 'TTS audio playback for translation extension'
+        });
+        
+        this.offscreenCreated = true;
+        console.log('📄 Offscreen document created with alternative URL');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Quick responsive test with shorter timeout
+        await this.testOffscreenConnection();
+        
+      } catch (alternativeError) {
+        console.error('❌ Alternative offscreen creation also failed:', alternativeError);
+        throw new Error(`Offscreen document creation failed: ${error.message}. Alternative attempt: ${alternativeError.message}`);
+      }
+    }
+  }
+
+  /**
+   * Test if offscreen document is responsive
+   * @private
+   */
+  async testOffscreenConnection() {
+    try {
+      // First check if we received readiness signal
+      if (this.offscreenReady) {
+        console.log('✅ Offscreen document already signaled readiness');
+        return true;
+      }
+      
+      console.log('🔍 Testing offscreen document connection...');
+      
+      const response = await Promise.race([
+        this.browser.runtime.sendMessage({
+          action: 'TTS_TEST',
+          target: 'offscreen'
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection test timeout')), 800)
+        )
+      ]);
+      
+      console.log('✅ Offscreen document is ready and responsive');
+      return true;
+      
+    } catch (error) {
+      console.warn('⚠️ Offscreen document connection test failed:', error.message);
+      // Don't throw here, let the actual TTS call handle the error
+      return false;
     }
   }
 
@@ -106,10 +187,10 @@ export class OffscreenTTSManager {
 
       console.log('🔊 Speaking text via offscreen document:', text.substring(0, 50));
 
-      // Send message to offscreen document
+      // Send message to offscreen document with explicit target
       const response = await this.browser.runtime.sendMessage({
-        target: 'offscreen',
         action: 'TTS_SPEAK',
+        target: 'offscreen', // Explicitly target offscreen context
         data: ttsOptions
       });
 
@@ -128,7 +209,15 @@ export class OffscreenTTSManager {
 
     } catch (error) {
       console.error('❌ TTS speak failed:', error);
-      throw new Error(`TTS failed: ${error.message}`);
+      
+      // If offscreen fails, try to fallback to other TTS methods
+      console.log('🔄 Attempting TTS fallback...');
+      try {
+        await this.fallbackToAlternativeTTS(text, options);
+      } catch (fallbackError) {
+        console.error('❌ TTS fallback also failed:', fallbackError);
+        throw new Error(`TTS failed: ${error.message}. Fallback: ${fallbackError.message}`);
+      }
     }
   }
 
@@ -142,8 +231,8 @@ export class OffscreenTTSManager {
     try {
       // Stop speech in offscreen document
       await this.browser.runtime.sendMessage({
-        target: 'offscreen',
-        action: 'TTS_STOP'
+        action: 'TTS_STOP',
+        target: 'offscreen'
       });
 
       this.currentSpeech = null;
@@ -280,5 +369,39 @@ export class OffscreenTTSManager {
 
     this.initialized = false;
     this.currentSpeech = null;
+  }
+
+  /**
+   * Fallback to alternative TTS method when offscreen fails
+   * @private
+   */
+  async fallbackToAlternativeTTS(text, options) {
+    console.log('🔄 Using content script TTS fallback');
+    
+    try {
+      // Get active tab to inject TTS
+      const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab) {
+        throw new Error('No active tab found for TTS fallback');
+      }
+      
+      // Send TTS message to content script
+      await this.browser.tabs.sendMessage(tab.id, {
+        action: 'TTS_SPEAK_CONTENT',
+        data: {
+          text: text,
+          lang: options.lang || 'en-US',
+          rate: options.rate || 1,
+          pitch: options.pitch || 1,
+          volume: options.volume || 1
+        }
+      });
+      
+      console.log('✅ Content script TTS fallback successful');
+      
+    } catch (error) {
+      console.error('❌ Content script TTS fallback failed:', error);
+      throw error;
+    }
   }
 }

@@ -6,8 +6,24 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
-// Plugin to fix HTML paths for extension structure
+// Plugin to copy static files and fix HTML paths for extension structure
 function fixExtensionPaths() {
+  const copyStaticFiles = async (outDir) => {
+    // Copy offscreen files
+    const publicOffscreenJs = resolve(process.cwd(), 'public/offscreen.js');
+    const htmlOffscreenHtml = resolve(process.cwd(), 'html/offscreen.html');
+    
+    if (await fs.pathExists(publicOffscreenJs)) {
+      await fs.copy(publicOffscreenJs, resolve(outDir, 'offscreen.js'));
+      console.log('📄 Copied offscreen.js');
+    }
+    
+    if (await fs.pathExists(htmlOffscreenHtml)) {
+      await fs.copy(htmlOffscreenHtml, resolve(outDir, 'html/offscreen.html'));
+      console.log('📄 Copied offscreen.html');
+    }
+  };
+
   const fixHtmlPaths = async (outDir) => {
     const htmlDir = resolve(outDir, 'html');
     
@@ -15,7 +31,7 @@ function fixExtensionPaths() {
     await fs.ensureDir(htmlDir);
     
     // Fix paths in HTML files
-    const htmlFiles = ['popup.html', 'sidepanel.html', 'options.html'];
+    const htmlFiles = ['popup.html', 'sidepanel.html', 'options.html', 'offscreen.html'];
     
     for (const htmlFile of htmlFiles) {
       const srcPath = resolve(outDir, htmlFile);
@@ -45,6 +61,7 @@ function fixExtensionPaths() {
     writeBundle: {
       order: 'pre',
       handler: async (options) => {
+        await copyStaticFiles(options.dir);
         await fixHtmlPaths(options.dir);
       }
     },

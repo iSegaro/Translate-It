@@ -1,54 +1,74 @@
 <template>
   <div class="main-content">
-    <form id="translationForm">
+    <form @submit.prevent="handleTranslationSubmit">
       <div class="language-controls">
         <select
           id="sourceLanguageInput"
           class="language-select"
-          :title="$i18n('SIDEPANEL_SOURCE_LANGUAGE_TITLE')"
-        ></select>
+          title="Source Language"
+        >
+          <option value="auto">Auto-Detect</option>
+          <option value="English">English</option>
+          <option value="Persian">Persian</option>
+          <option value="Arabic">Arabic</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Spanish">Spanish</option>
+        </select>
+        
         <button
           type="button"
           id="swapLanguagesBtn"
           class="swap-button"
-          :title="$i18n('SIDEPANEL_SWAP_LANGUAGES_TITLE')"
+          title="Swap Languages"
         >
-          <img src="@assets/icons/swap.png" alt="Swap" />
+          <img src="@/assets/icons/swap.png" alt="Swap" />
         </button>
 
         <select
           id="targetLanguageInput"
           class="language-select"
-          :title="$i18n('SIDEPANEL_TARGET_LANGUAGE_TITLE')"
-        ></select>
+          title="Target Language"
+        >
+          <option value="English">English</option>
+          <option value="Persian" selected>Persian</option>
+          <option value="Arabic">Arabic</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Spanish">Spanish</option>
+        </select>
       </div>
 
       <!-- Source Text Area with Toolbar -->
       <div class="textarea-container source-container">
         <div class="inline-toolbar source-toolbar">
           <img
-            src="@assets/icons/copy.png"
+            src="@/assets/icons/copy.png"
             id="copySourceBtn"
             class="inline-icon"
-            :title="$i18n('SIDEPANEL_COPY_SOURCE_TITLE_ICON')"
+            title="Copy Source Text"
+            @click="copySourceText"
           />
           <img
-            src="@assets/icons/speaker.png"
+            src="@/assets/icons/speaker.png"
             id="voiceSourceIcon"
             class="inline-icon"
-            :title="$i18n('SIDEPANEL_VOICE_SOURCE_TITLE_ICON')"
+            title="Speak Source Text"
+            @click="speakSourceText"
           />
         </div>
         <img
-          src="@assets/icons/paste.png"
+          src="@/assets/icons/paste.png"
           id="pasteSourceBtn"
           class="inline-icon paste-icon-separate"
-          :title="$i18n('SIDEPANEL_PASTE_SOURCE_TITLE_ICON')"
+          title="Paste Source Text"
+          @click="pasteSourceText"
         />
         <textarea
           id="sourceText"
           rows="6"
-          :placeholder="$i18n('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER')"
+          placeholder="Enter text to translate..."
+          v-model="sourceText"
         ></textarea>
       </div>
 
@@ -56,13 +76,11 @@
       <div class="action-bar">
         <button
           type="submit"
-          id="translateBtn"
           class="translate-button-main"
+          :disabled="isTranslating || !sourceText.trim()"
         >
-          <span :data-i18n="$i18n('SIDEPANEL_TRANSLATE_BUTTON_TEXT')"
-            >Translate</span
-          >
-          <img src="@assets/icons/translate.png" alt="Translate" />
+          <span>{{ isTranslating ? 'Translating...' : 'Translate' }}</span>
+          <img src="@/assets/icons/translate.png" alt="Translate" />
         </button>
       </div>
 
@@ -70,758 +88,406 @@
       <div class="textarea-container result-container">
         <div class="inline-toolbar target-toolbar">
           <img
-            src="@assets/icons/copy.png"
+            src="@/assets/icons/copy.png"
             id="copyTargetBtn"
             class="inline-icon"
-            :title="$i18n('SIDEPANEL_COPY_TARGET_TITLE_ICON')"
+            title="Copy Translation"
+            @click="copyTranslationText"
           />
           <img
-            src="@assets/icons/speaker.png"
+            src="@/assets/icons/speaker.png"
             id="voiceTargetIcon"
             class="inline-icon"
-            :title="$i18n('SIDEPANEL_VOICE_TARGET_TITLE_ICON')"
+            title="Speak Translation"
+            @click="speakTranslationText"
           />
         </div>
-        <div id="translationResult" class="result"></div>
+        <div
+          id="translationResult"  
+          class="result"
+          :class="{ 'has-error': translationError }"
+        >
+          {{ translationError || translationResult || '' }}
+        </div>
       </div>
     </form>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useTranslation } from '@/composables/useTranslation.js'
-import { useClipboard } from '@/composables/useClipboard.js'
-import { useSidepanelTTS } from '@/composables/useSidepanelTTS.js'
-import { useUI } from '@/composables/useUI.js'
-import { useHistory } from '@/composables/useHistory.js'
-import { useSettingsStore } from '@/store/core/settings.js'
-import { languageList } from '@/utils/languages.js'
-import { AUTO_DETECT_VALUE } from '@/constants.js'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { ref } from 'vue'
+import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
+import { useTTSSmart } from '@/composables/useTTSSmart.js'
+import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
+import { useDirectMessage } from '@/composables/useDirectMessage.js'
 
-// Helper functions
-const getAllLanguages = async () => {
-  return languageList.map(lang => ({
-    code: lang.code,
-    name: lang.name,
-    promptName: lang.promptName,
-    voiceCode: lang.voiceCode
-  }))
-}
+// Browser API, TTS, Background Warmup, and Direct Message
+const browserAPI = useBrowserAPI()
+const tts = useTTSSmart()
+const backgroundWarmup = useBackgroundWarmup()
+const directMessage = useDirectMessage()
 
-const isValidLanguage = (code) => {
-  if (code === AUTO_DETECT_VALUE) return true
-  return languageList.some(l => l.code === code)
-}
-
-// Store
-const settingsStore = useSettingsStore()
-
-// Composables
-const { 
-  sourceText, 
-  translationResult, 
-  sourceLanguage, 
-  targetLanguage,
-  isTranslating,
-  translationError,
-  triggerTranslation,
-  swapLanguages,
-  clearTranslation,
-  setSourceText,
-  setSourceLanguage,
-  setTargetLanguage
-} = useTranslation()
-
-const { 
-  copyText, 
-  pasteText, 
-  handleCopySource, 
-  handleCopyTarget 
-} = useClipboard()
-
-const { 
-  speakText, 
-  handleSourceTTS, 
-  handleTargetTTS,
-  isSpeaking 
-} = useSidepanelTTS()
-
-const { 
-  showVisualFeedback, 
-  toggleInlineToolbarVisibility,
-  setupGlobalListeners,
-  cleanupGlobalListeners 
-} = useUI()
-
-const { addToHistory } = useHistory()
-
-// Template refs
-const sourceTextArea = ref(null)
-const translationResultDiv = ref(null)
-const sourceLanguageSelect = ref(null)
-const targetLanguageSelect = ref(null)
-const translateButton = ref(null)
-const sourceContainer = ref(null)
-const resultContainer = ref(null)
-
-// Local state
-const allLanguages = ref([])
-const isInitialized = ref(false)
-
-// Initialize languages
-const initializeLanguages = async () => {
-  try {
-    allLanguages.value = await getAllLanguages()
-    console.log('[SidepanelMainContent] Languages loaded:', allLanguages.value.length)
-  } catch (error) {
-    console.error('[SidepanelMainContent] Error loading languages:', error)
-  }
-}
-
-// Populate language dropdowns
-const populateLanguageDropdowns = () => {
-  if (!sourceLanguageSelect.value || !targetLanguageSelect.value) {
-    console.log('[SidepanelMainContent] Dropdown elements not ready')
-    return
-  }
-  
-  if (!allLanguages.value.length) {
-    console.log('[SidepanelMainContent] No languages loaded yet')
-    return
-  }
-
-  console.log('[SidepanelMainContent] Populating dropdowns with', allLanguages.value.length, 'languages')
-
-  // Store current selected values before clearing
-  const currentSourceValue = sourceLanguageSelect.value.value
-  const currentTargetValue = targetLanguageSelect.value.value
-
-  // Clear existing options
-  sourceLanguageSelect.value.innerHTML = ''
-  targetLanguageSelect.value.innerHTML = ''
-
-  // Add auto-detect option for source
-  const autoDetectOption = document.createElement('option')
-  autoDetectOption.value = 'Auto Detect'
-  autoDetectOption.textContent = 'Auto Detect'
-  sourceLanguageSelect.value.appendChild(autoDetectOption)
-
-  // Add all languages to both dropdowns
-  allLanguages.value.forEach(lang => {
-    // Source language option
-    const sourceOption = document.createElement('option')
-    sourceOption.value = lang.name
-    sourceOption.textContent = lang.name
-    sourceLanguageSelect.value.appendChild(sourceOption)
-
-    // Target language option (skip auto-detect)
-    if (lang.code !== AUTO_DETECT_VALUE) {
-      const targetOption = document.createElement('option')
-      targetOption.value = lang.name
-      targetOption.textContent = lang.name
-      targetLanguageSelect.value.appendChild(targetOption)
-    }
-  })
-
-  // Set values from composable state (loaded from settings)
-  const sourceValue = sourceLanguage.value || currentSourceValue || 'Auto Detect'
-  const targetValue = targetLanguage.value || currentTargetValue || 'English'
-  
-  sourceLanguageSelect.value.value = sourceValue
-  targetLanguageSelect.value.value = targetValue
-
-  console.log('[SidepanelMainContent] Dropdowns populated successfully with selections:', {
-    source: sourceValue,
-    target: targetValue,
-    sourceFromComposable: sourceLanguage.value,
-    targetFromComposable: targetLanguage.value,
-    actualSourceSelected: sourceLanguageSelect.value.value,
-    actualTargetSelected: targetLanguageSelect.value.value
-  })
-}
+// Simple state
+const sourceText = ref('')
+const translationResult = ref('')
+const translationError = ref('')
+const isTranslating = ref(false)
 
 // Handle form submission
-const handleTranslationSubmit = async (event) => {
-  event.preventDefault()
+const handleTranslationSubmit = async () => {
+  console.log('[SidepanelMainContent] Translation submit started')
   
-  const text = sourceTextArea.value?.value?.trim()
-  if (!text) {
-    showVisualFeedback(sourceTextArea.value, 'error')
+  if (!sourceText.value.trim()) {
+    console.warn('[SidepanelMainContent] No source text provided')
     return
   }
 
-  // Update source text in composable
-  setSourceText(text)
-  
-  // Trigger translation
-  const success = await triggerTranslation()
-  
-  if (success) {
-    // Add to history
-    await addToHistory({
-      sourceText: text,
-      translatedText: translationResult.value,
-      sourceLanguage: sourceLanguage.value,
-      targetLanguage: targetLanguage.value
-    })
-    
-    // Show success feedback
-    showVisualFeedback(translateButton.value, 'success')
-    
-    // Update toolbar visibility
-    await nextTick()
-    toggleInlineToolbarVisibility(resultContainer.value)
-  } else {
-    showVisualFeedback(translateButton.value, 'error')
-  }
-}
-
-// Helper function to convert language name to code
-const getLanguageCodeByName = (name) => {
-  if (name === 'Auto Detect') return AUTO_DETECT_VALUE
-  const lang = allLanguages.value.find(l => l.name === name)
-  return lang ? lang.code : name
-}
-
-// Handle language change
-const handleSourceLanguageChange = () => {
-  const newValue = sourceLanguageSelect.value?.value
-  if (newValue) {
-    const languageCode = getLanguageCodeByName(newValue)
-    if (isValidLanguage(languageCode)) {
-      setSourceLanguage(newValue) // Store the name, not code
-    }
-  }
-}
-
-const handleTargetLanguageChange = () => {
-  const newValue = targetLanguageSelect.value?.value
-  if (newValue) {
-    const languageCode = getLanguageCodeByName(newValue)
-    if (isValidLanguage(languageCode)) {
-      setTargetLanguage(newValue) // Store the name, not code
-    }
-  }
-}
-
-// Handle language swap
-const handleLanguageSwap = async () => {
-  const swapped = await swapLanguages()
-  if (swapped) {
-    // Update dropdowns
-    sourceLanguageSelect.value.value = sourceLanguage.value
-    targetLanguageSelect.value.value = targetLanguage.value
-    
-    // Swap text content
-    if (translationResult.value && sourceTextArea.value) {
-      const currentSource = sourceTextArea.value.value
-      const currentResult = translationResultDiv.value?.textContent || ''
-      
-      sourceTextArea.value.value = currentResult
-      setSourceText(currentResult)
-    }
-    
-    showVisualFeedback(document.querySelector('.swap-button'), 'success')
-  }
-}
-
-// Handle copy operations
-const handleCopySourceClick = async () => {
-  const text = sourceTextArea.value?.value
-  if (text) {
-    const success = await handleCopySource(text)
-    const element = document.getElementById('copySourceBtn')
-    showVisualFeedback(element, success ? 'success' : 'error')
-  }
-}
-
-const handleCopyTargetClick = async () => {
-  const text = translationResultDiv.value?.textContent
-  if (text) {
-    const success = await handleCopyTarget(text)
-    const element = document.getElementById('copyTargetBtn')
-    showVisualFeedback(element, success ? 'success' : 'error')
-  }
-}
-
-// Handle paste operation
-const handlePasteClick = async () => {
-  const pastedText = await pasteText()
-  if (pastedText && sourceTextArea.value) {
-    sourceTextArea.value.value = pastedText
-    setSourceText(pastedText)
-    
-    const element = document.getElementById('pasteSourceBtn')
-    showVisualFeedback(element, 'success')
-    
-    // Update toolbar visibility
-    toggleInlineToolbarVisibility(sourceContainer.value)
-  }
-}
-
-// Handle TTS operations
-const handleSourceTTSClick = async () => {
-  const text = sourceTextArea.value?.value
-  if (text) {
-    const success = await handleSourceTTS(text, sourceLanguage.value)
-    const element = document.getElementById('voiceSourceIcon')
-    showVisualFeedback(element, success ? 'success' : 'error')
-  }
-}
-
-const handleTargetTTSClick = async () => {
-  if (translationResultDiv.value) {
-    const success = await handleTargetTTS(translationResultDiv.value, targetLanguage.value)
-    const element = document.getElementById('voiceTargetIcon')
-    showVisualFeedback(element, success ? 'success' : 'error')
-  }
-}
-
-// Handle text input changes
-const handleSourceTextInput = () => {
-  const text = sourceTextArea.value?.value || ''
-  setSourceText(text)
-  toggleInlineToolbarVisibility(sourceContainer.value)
-}
-
-// Clear all content
-const handleClearAll = () => {
-  if (sourceTextArea.value) {
-    sourceTextArea.value.value = ''
-  }
-  clearTranslation()
-  
-  // Update toolbar visibility
-  toggleInlineToolbarVisibility(sourceContainer.value)
-  toggleInlineToolbarVisibility(resultContainer.value)
-}
-
-// Setup event listeners
-const setupEventListeners = () => {
-  // Form submission
-  const form = document.getElementById('translationForm')
-  if (form) {
-    form.addEventListener('submit', handleTranslationSubmit)
+  const targetLanguage = document.getElementById('targetLanguageInput')?.value
+  if (!targetLanguage) {
+    console.warn('[SidepanelMainContent] No target language selected')
+    return
   }
 
-  // Language dropdowns
-  if (sourceLanguageSelect.value) {
-    sourceLanguageSelect.value.addEventListener('change', handleSourceLanguageChange)
-  }
-  if (targetLanguageSelect.value) {
-    targetLanguageSelect.value.addEventListener('change', handleTargetLanguageChange)
-  }
-
-  // Swap button
-  const swapBtn = document.getElementById('swapLanguagesBtn')
-  if (swapBtn) {
-    swapBtn.addEventListener('click', handleLanguageSwap)
-  }
-
-  // Copy buttons
-  const copySourceBtn = document.getElementById('copySourceBtn')
-  if (copySourceBtn) {
-    copySourceBtn.addEventListener('click', handleCopySourceClick)
-  }
-
-  const copyTargetBtn = document.getElementById('copyTargetBtn')
-  if (copyTargetBtn) {
-    copyTargetBtn.addEventListener('click', handleCopyTargetClick)
-  }
-
-  // Paste button
-  const pasteBtn = document.getElementById('pasteSourceBtn')
-  if (pasteBtn) {
-    pasteBtn.addEventListener('click', handlePasteClick)
-  }
-
-  // TTS buttons
-  const voiceSourceBtn = document.getElementById('voiceSourceIcon')
-  if (voiceSourceBtn) {
-    voiceSourceBtn.addEventListener('click', handleSourceTTSClick)
-  }
-
-  const voiceTargetBtn = document.getElementById('voiceTargetIcon')
-  if (voiceTargetBtn) {
-    voiceTargetBtn.addEventListener('click', handleTargetTTSClick)
-  }
-
-  // Source text input
-  if (sourceTextArea.value) {
-    sourceTextArea.value.addEventListener('input', handleSourceTextInput)
-  }
-}
-
-// Cleanup event listeners
-const cleanupEventListeners = () => {
-  const form = document.getElementById('translationForm')
-  if (form) {
-    form.removeEventListener('submit', handleTranslationSubmit)
-  }
-
-  if (sourceLanguageSelect.value) {
-    sourceLanguageSelect.value.removeEventListener('change', handleSourceLanguageChange)
-  }
-  if (targetLanguageSelect.value) {
-    targetLanguageSelect.value.removeEventListener('change', handleTargetLanguageChange)
-  }
-
-  const swapBtn = document.getElementById('swapLanguagesBtn')
-  if (swapBtn) {
-    swapBtn.removeEventListener('click', handleLanguageSwap)
-  }
-
-  const copySourceBtn = document.getElementById('copySourceBtn')
-  if (copySourceBtn) {
-    copySourceBtn.removeEventListener('click', handleCopySourceClick)
-  }
-
-  const copyTargetBtn = document.getElementById('copyTargetBtn')
-  if (copyTargetBtn) {
-    copyTargetBtn.removeEventListener('click', handleCopyTargetClick)
-  }
-
-  const pasteBtn = document.getElementById('pasteSourceBtn')
-  if (pasteBtn) {
-    pasteBtn.removeEventListener('click', handlePasteClick)
-  }
-
-  const voiceSourceBtn = document.getElementById('voiceSourceIcon')
-  if (voiceSourceBtn) {
-    voiceSourceBtn.removeEventListener('click', handleSourceTTSClick)
-  }
-
-  const voiceTargetBtn = document.getElementById('voiceTargetIcon')
-  if (voiceTargetBtn) {
-    voiceTargetBtn.removeEventListener('click', handleTargetTTSClick)
-  }
-
-  if (sourceTextArea.value) {
-    sourceTextArea.value.removeEventListener('input', handleSourceTextInput)
-  }
-}
-
-// Initialize component
-const initialize = async () => {
   try {
-    await initializeLanguages()
-    await nextTick()
+    isTranslating.value = true
+    translationError.value = ''
+    translationResult.value = ''
     
-    // Get template refs
-    sourceTextArea.value = document.getElementById('sourceText')
-    translationResultDiv.value = document.getElementById('translationResult')
-    sourceLanguageSelect.value = document.getElementById('sourceLanguageInput')
-    targetLanguageSelect.value = document.getElementById('targetLanguageInput')
-    translateButton.value = document.getElementById('translateBtn')
-    sourceContainer.value = document.querySelector('.source-container')
-    resultContainer.value = document.querySelector('.result-container')
+    console.log('[SidepanelMainContent] Ensuring background script is ready...')
+    await backgroundWarmup.ensureWarmedUp()
     
-    // Load settings first
-    await loadLanguageSettings()
-    
-    // Wait for DOM and then populate dropdowns
-    await nextTick()
-    populateLanguageDropdowns()
-    
-    // Small delay to ensure DOM is updated
-    await new Promise(resolve => setTimeout(resolve, 50))
-    
-    // Set the selected values after population
-    if (sourceLanguageSelect.value && targetLanguageSelect.value) {
-      const finalSourceValue = sourceLanguage.value || 'Auto Detect'
-      const finalTargetValue = targetLanguage.value || 'English'
-      
-      sourceLanguageSelect.value.value = finalSourceValue
-      targetLanguageSelect.value.value = finalTargetValue
-      
-      // Force a refresh to ensure the selection is visible
-      sourceLanguageSelect.value.dispatchEvent(new Event('change'))
-      targetLanguageSelect.value.dispatchEvent(new Event('change'))
-      
-      console.log('[SidepanelMainContent] Final language selections applied:', {
-        source: finalSourceValue,
-        target: finalTargetValue,
-        sourceElement: sourceLanguageSelect.value.value,
-        targetElement: targetLanguageSelect.value.value,
-        sourceFromComposable: sourceLanguage.value,
-        targetFromComposable: targetLanguage.value
-      })
-    }
-    
-    setupEventListeners()
-    setupGlobalListeners()
-    
-    isInitialized.value = true
-    console.log('[SidepanelMainContent] Component initialized with', allLanguages.value.length, 'languages')
-  } catch (error) {
-    console.error('[SidepanelMainContent] Initialization error:', error)
-  }
-}
-
-// Load language settings from store
-const loadLanguageSettings = async () => {
-  try {
-    await settingsStore.loadSettings()
-    const settings = settingsStore.settings
-    
-    // Set source language (default to Auto Detect)
-    // Settings are stored as language names, not codes
-    const sourceLang = settings.SOURCE_LANGUAGE || 'Auto Detect'
-    setSourceLanguage(sourceLang)
-    
-    // Set target language (default to English)
-    const targetLang = settings.TARGET_LANGUAGE || 'English'
-    setTargetLanguage(targetLang)
-    
-    console.log('[SidepanelMainContent] Language settings loaded:', {
-      source: sourceLang,
-      target: targetLang,
-      settingsFormat: 'name-based'
+    console.log('[SidepanelMainContent] Sending translation request:', {
+      sourceText: sourceText.value.substring(0, 50) + '...',
+      targetLanguage
     })
+
+    // Try direct message first for debugging
+    const response = await directMessage.sendTranslation({
+      promptText: sourceText.value,
+      sourceLanguage: 'auto',
+      targetLanguage: targetLanguage,
+      translateMode: 'sidepanel'
+    })
+
+    console.log('[SidepanelMainContent] Translation response:', response)
+
+    if (response._isConnectionError) {
+      throw new Error('Translation service temporarily unavailable')
+    }
+
+    if (response.success && response.data?.translatedText) {
+      translationResult.value = response.data.translatedText
+      console.log('[SidepanelMainContent] Translation displayed successfully')
+    } else {
+      throw new Error(response.error || 'Translation failed')
+    }
+
   } catch (error) {
-    console.error('[SidepanelMainContent] Error loading language settings:', error)
+    console.error('[SidepanelMainContent] Translation failed:', error)
+    translationError.value = error.message || 'Translation failed'
+  } finally {
+    isTranslating.value = false
   }
 }
 
-// Watch for translation result changes
-watch(translationResult, (newResult) => {
-  console.log('[SidepanelMainContent] translationResult changed:', newResult)
-  if (translationResultDiv.value) {
-    translationResultDiv.value.textContent = newResult
-    toggleInlineToolbarVisibility(resultContainer.value)
-    console.log('[SidepanelMainContent] translationResultDiv updated with:', newResult)
+// Copy source text to clipboard
+const copySourceText = async () => {
+  try {
+    await navigator.clipboard.writeText(sourceText.value)
+    console.log('[SidepanelMainContent] Source text copied to clipboard')
+  } catch (error) {
+    console.error('[SidepanelMainContent] Failed to copy source text:', error)
   }
-})
+}
 
-// Watch for translation error
-watch(translationError, (error) => {
-  console.log('[SidepanelMainContent] translationError changed:', error)
-  if (error && translationResultDiv.value) {
-    translationResultDiv.value.innerHTML = `<span class="error-message">${error}</span>`
-    console.log('[SidepanelMainContent] translationResultDiv updated with error:', error)
+// Copy translation text to clipboard
+const copyTranslationText = async () => {
+  try {
+    await navigator.clipboard.writeText(translationResult.value)
+    console.log('[SidepanelMainContent] Translation copied to clipboard')
+  } catch (error) {
+    console.error('[SidepanelMainContent] Failed to copy translation:', error)
   }
-})
+}
 
-// Watch for loading state
-watch(isTranslating, (loading) => {
-  console.log('[SidepanelMainContent] isTranslating changed:', loading)
-  if (translateButton.value) {
-    translateButton.value.disabled = loading
-    translateButton.value.classList.toggle('loading', loading)
+// Paste text into source textarea
+const pasteSourceText = async () => {
+  try {
+    const text = await navigator.clipboard.readText()
+    sourceText.value = text
+    console.log('[SidepanelMainContent] Text pasted from clipboard')
+  } catch (error) {
+    console.error('[SidepanelMainContent] Failed to paste text:', error)
+  }
+}
+
+// Helper function to convert language name to simple language code for Google TTS
+const getLanguageCode = (languageName) => {
+  const languageMap = {
+    'English': 'en',
+    'Persian': 'fa', 
+    'Arabic': 'ar',
+    'French': 'fr',
+    'German': 'de',
+    'Spanish': 'es',
+    'Chinese': 'zh',
+    'Hindi': 'hi',
+    'Portuguese': 'pt',
+    'Russian': 'ru',
+    'Japanese': 'ja',
+    'Korean': 'ko',
+    'Italian': 'it',
+    'Dutch': 'nl',
+    'Turkish': 'tr',
+    'auto': 'en'
   }
   
-  if (loading && translationResultDiv.value) {
-    translationResultDiv.value.innerHTML = '<span class="loading-message">Translating...</span>'
-    console.log('[SidepanelMainContent] Displaying Translating... message')
-  } else if (!loading && translationResultDiv.value) {
-    // Clear the loading message when translation is done
-    // The translationResult watch will then populate the actual result
-    if (translationResult.value) {
-      translationResultDiv.value.textContent = translationResult.value
-      toggleInlineToolbarVisibility(resultContainer.value)
-    } else if (!translationError.value) {
-      // Only clear if there's no error and no result (e.g., initial state)
-      translationResultDiv.value.textContent = ''
-    }
-    console.log('[SidepanelMainContent] Loading state ended, clearing loading message if no result/error')
-  }
-})
+  return languageMap[languageName] || 'en'
+}
 
-// Lifecycle
-onMounted(() => {
-  initialize()
-})
+// Speak source text using TTS
+const speakSourceText = async () => {
+  const sourceLanguage = document.getElementById('sourceLanguageInput')?.value || 'auto'
+  const langCode = getLanguageCode(sourceLanguage)
+  await tts.speak(sourceText.value, langCode)
+  console.log('[SidepanelMainContent] Source text TTS started with language:', langCode)
+}
 
-onUnmounted(() => {
-  cleanupEventListeners()
-  cleanupGlobalListeners()
-})
+// Speak translation text using TTS  
+const speakTranslationText = async () => {
+  const targetLanguage = document.getElementById('targetLanguageInput')?.value || 'auto'
+  const langCode = getLanguageCode(targetLanguage)
+  await tts.speak(translationResult.value, langCode)
+  console.log('[SidepanelMainContent] Translation TTS started with language:', langCode)
+}
 </script>
 
-<style lang="scss" scoped>
-@use "@/assets/styles/variables.scss" as *;
-
+<style scoped>
 .main-content {
-  flex-grow: 1;
-  padding: $spacing-base;
-  overflow-y: auto;
-}
-
-#translationForm {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: $spacing-base;
+  overflow-y: hidden;
+  box-sizing: border-box;
 }
 
+form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Language Controls */
 .language-controls {
   display: flex;
-  gap: $spacing-xs;
+  gap: 6px;
   align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .language-select {
-  flex: 1;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: $border-radius-sm;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-size: $font-size-sm;
+  flex-grow: 1;
+  flex-basis: 120px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  background-color: var(--bg-secondary, white);
+  color: var(--text-color, black);
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 30px;
 }
 
 .swap-button {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
+  padding: 5px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-
-  img {
-    width: 18px;
-    height: 18px;
-    filter: var(--icon-filter);
-  }
+  flex-shrink: 0;
 }
 
+.swap-button:hover {
+  background-color: var(--toolbar-button-hover-bg, #dcdfe2);
+}
+
+.swap-button img {
+  width: 16px;
+  height: 16px;
+  filter: var(--icon-filter, none);
+}
+
+/* Textarea Container */
 .textarea-container {
   position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: $border-radius-sm;
-  background-color: var(--color-surface);
-  padding: $spacing-xs;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-textarea {
-  width: 100%;
-  border: none;
-  background: none;
-  resize: vertical;
-  min-height: 80px;
-  font-size: $font-size-base;
-  color: var(--color-text);
-  padding: $spacing-xs;
-  padding-top: $spacing-lg; /* Make space for inline toolbar */
+.textarea-container.source-container {
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
 
-  &:focus {
-    outline: none;
-  }
+/* Source textarea */
+textarea#sourceText {
+  width: 100%;
+  height: 140px;
+  resize: none;
+  box-sizing: border-box;
+  padding-top: 32px;
+  padding-bottom: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 5px;
+  background-color: var(--bg-secondary, white);
+  color: var(--text-color, black);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  direction: ltr;
+  text-align: left;
+  min-width: 0;
+}
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.translate-button-main {
+  background-color: var(--primary-color, #007bff);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.translate-button-main:hover:not(:disabled) {
+  background-color: var(--primary-color-hover, #0056b3);
+}
+
+.translate-button-main:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.translate-button-main img {
+  width: 18px;
+  height: 18px;
+}
+
+/* Result container */
+.textarea-container.result-container {
+  flex-grow: 1;
+  min-height: 0;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 5px;
+  background-color: var(--bg-secondary, white);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .result {
-  min-height: 80px;
-  padding: $spacing-xs;
-  padding-top: $spacing-lg; /* Make space for inline toolbar */
-  font-size: $font-size-base;
-  color: var(--color-text);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding-top: 32px;
+  padding-bottom: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+  color: var(--text-color, black);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  direction: ltr;
+  text-align: left;
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  min-width: 0;
 }
 
+.result.has-error {
+  color: #d32f2f;
+  background: #ffe6e6;
+}
+
+/* Inline Toolbar Styles */
 .inline-toolbar {
   position: absolute;
-  top: $spacing-xs;
-  right: $spacing-xs;
+  top: 5px;
+  left: 18px;
   display: flex;
-  gap: $spacing-xs;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
 }
 
 .inline-icon {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  filter: var(--icon-filter);
-  transition: opacity $transition-fast;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+  filter: var(--icon-filter, none);
+}
 
-  &:hover {
-    opacity: 0.7;
-  }
+.inline-icon:hover {
+  opacity: 1;
 }
 
 .paste-icon-separate {
   position: absolute;
-  top: $spacing-xs;
-  left: $spacing-xs;
-}
-
-.action-bar {
-  display: flex;
-  justify-content: center;
-}
-
-.translate-button-main {
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: $border-radius-sm;
-  padding: $spacing-xs $spacing-base;
+  top: 5px;
+  right: 8px;
+  display: block !important;
+  z-index: 10;
+  opacity: 0.6;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
-  transition: background-color $transition-fast;
-
-  &:hover {
-    background-color: var(--color-primary-dark);
-  }
-
-  img {
-    width: 18px;
-    height: 18px;
-    filter: invert(1);
-  }
-
-  &.loading {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  width: 16px;
+  height: 16px;
+  filter: var(--icon-filter, none);
+  transition: opacity 0.2s ease;
 }
 
-// Loading and error states
-.loading-message {
-  color: var(--color-text-secondary);
-  font-style: italic;
-  opacity: 0.8;
-}
-
-.error-message {
-  color: var(--color-error);
-  font-size: $font-size-sm;
-}
-
-// Visual feedback states
-.feedback-success {
-  background-color: rgba(76, 175, 80, 0.1);
-  transition: background-color $transition-fast;
-}
-
-.feedback-error {
-  background-color: rgba(244, 67, 54, 0.1);
-  transition: background-color $transition-fast;
-}
-
-// Toolbar visibility based on content
-.textarea-container.has-content {
-  .inline-toolbar {
-    opacity: 1;
-  }
-}
-
-.textarea-container:not(.has-content) {
-  .inline-toolbar {
-    opacity: 0.3;
-  }
+.paste-icon-separate:hover {
+  opacity: 1;
 }
 </style>

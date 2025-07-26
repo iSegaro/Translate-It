@@ -46,6 +46,8 @@ export function generateManifest(browser = 'chrome') {
       {
         resources: [
           'browser-polyfill.js',
+          'html/offscreen.html',
+          'offscreen.js',
           'icons/flags/*.svg',
           'icons/*.png', 
           'icons/*.svg',

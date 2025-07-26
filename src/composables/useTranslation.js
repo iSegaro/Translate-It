@@ -1,7 +1,7 @@
 // src/composables/useTranslation.js
-// Vue composable for translation functionality in sidepanel
+// Vue composable for translation functionality in sidepanel with improved error handling
 import { ref, computed, nextTick } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { languageList } from '@/utils/languages.js'
 import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
@@ -34,7 +34,8 @@ export function useTranslation() {
   const translationError = ref('')
   const translationResult = ref(null)
 
-  // Store
+  // Composables
+  const browserAPI = useBrowserAPI()
   const settingsStore = useSettingsStore()
 
   // Computed
@@ -84,10 +85,9 @@ export function useTranslation() {
     resultElement.textContent = ''
     translationError.value = ''
 
-    const browser = await getBrowserAPI()
-    
-    if (browser.runtime.lastError) {
-      const errorMsg = browser.runtime.lastError.message
+    // Handle connection errors
+    if (response._isConnectionError) {
+      const errorMsg = 'Translation service temporarily unavailable. Please try again.'
       translationError.value = errorMsg
       resultElement.textContent = errorMsg
       return
@@ -181,8 +181,7 @@ export function useTranslation() {
     )
 
     try {
-      const browser = await getBrowserAPI()
-      const response = await browser.runtime.sendMessage({
+      const response = await browserAPI.safeSendMessage({
         action: 'fetchTranslation',
         payload: {
           promptText: textToTranslate,

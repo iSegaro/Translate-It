@@ -68,18 +68,31 @@ export class FeatureLoader {
       switch (ttsMethod) {
         case 'offscreen-document': {
           if (capabilities.offscreen) {
-            const { OffscreenTTSManager } = await import('../managers/tts-offscreen.js');
-            return new OffscreenTTSManager();
+            try {
+              const { OffscreenTTSManager } = await import('../managers/tts-offscreen.js');
+              const manager = new OffscreenTTSManager();
+              // Mark as Chrome offscreen manager to handle messages with offscreen target  
+              manager.messageTarget = 'offscreen';
+              // Test initialization
+              await manager.initialize();
+              return manager;
+            } catch (error) {
+              console.warn('Offscreen TTS initialization failed, falling back to background page TTS:', error);
+              /* fallthrough */
+            }
+          } else {
+            console.warn('Offscreen API not available, falling back to background page TTS');
+            /* fallthrough */
           }
-          // Fallback to background page
-          console.warn('Offscreen API not available, falling back to background page TTS');
-          /* fallthrough */
         }
 
         case 'background-page': {
           if (capabilities.webAudio || capabilities.speechSynthesis) {
             const { BackgroundTTSManager } = await import('../managers/tts-background.js');
-            return new BackgroundTTSManager();
+            const manager = new BackgroundTTSManager();
+            // Mark as Firefox background manager to handle messages with background target
+            manager.messageTarget = 'background';
+            return manager;
           }
           // Fallback to content script
           console.warn('Background audio APIs not available, falling back to content script TTS');

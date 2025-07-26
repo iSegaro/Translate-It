@@ -123,7 +123,7 @@ class UnifiedBrowserAPI {
   wrapRuntimeAPI(runtime) {
     return {
       ...runtime,
-      sendMessage: this.promisifyCallback(runtime.sendMessage.bind(runtime)),
+      sendMessage: this.promisifyRuntimeSendMessage(runtime.sendMessage.bind(runtime)),
       getManifest: runtime.getManifest.bind(runtime),
       getURL: runtime.getURL.bind(runtime),
       onMessage: runtime.onMessage,
@@ -165,7 +165,7 @@ class UnifiedBrowserAPI {
       query: this.promisifyCallback(tabs.query.bind(tabs)),
       create: this.promisifyCallback(tabs.create.bind(tabs)),
       update: this.promisifyCallback(tabs.update.bind(tabs)),
-      sendMessage: this.promisifyCallback(tabs.sendMessage.bind(tabs)),
+      sendMessage: this.promisifyTabsSendMessage(tabs.sendMessage.bind(tabs)),
       onUpdated: tabs.onUpdated,
       onActivated: tabs.onActivated
     };
@@ -264,6 +264,74 @@ class UnifiedBrowserAPI {
             resolve(result);
           }
         });
+      });
+    };
+  }
+
+  /**
+   * Special promisify for runtime.sendMessage which has specific signature
+   * @private
+   */
+  promisifyRuntimeSendMessage(sendMessageFn) {
+    return (message, options = {}) => {
+      return new Promise((resolve, reject) => {
+        // Handle different call signatures
+        if (typeof options === 'function') {
+          // If options is actually a callback, treat it as legacy usage
+          const callback = options;
+          sendMessageFn(message, callback);
+          return;
+        }
+
+        // Normal promise-based usage
+        const callback = (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        };
+
+        // Call with proper signature: message, options (optional), callback
+        if (options && Object.keys(options).length > 0) {
+          sendMessageFn(message, options, callback);
+        } else {
+          sendMessageFn(message, callback);
+        }
+      });
+    };
+  }
+
+  /**
+   * Special promisify for tabs.sendMessage which has specific signature
+   * @private
+   */
+  promisifyTabsSendMessage(sendMessageFn) {
+    return (tabId, message, options = {}) => {
+      return new Promise((resolve, reject) => {
+        // Handle different call signatures
+        if (typeof options === 'function') {
+          // If options is actually a callback, treat it as legacy usage
+          const callback = options;
+          sendMessageFn(tabId, message, callback);
+          return;
+        }
+
+        // Normal promise-based usage
+        const callback = (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        };
+
+        // Call with proper signature: tabId, message, options (optional), callback
+        if (options && Object.keys(options).length > 0) {
+          sendMessageFn(tabId, message, options, callback);
+        } else {
+          sendMessageFn(tabId, message, callback);
+        }
       });
     };
   }

@@ -89,6 +89,7 @@ export async function handleFetchTranslation(
       });
     }
 
+    logME("[Handler:Translation] Sending success response:", { translatedText: translation });
     sendResponse({ success: true, data: { translatedText: translation } });
   } catch (err) {
     const processed = await errorHandler.handle(err, {
@@ -106,6 +107,7 @@ export async function handleFetchTranslation(
       (await getTranslationString("ERRORS_DURING_TRANSLATE_Fetch")) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 
+    logME("[Handler:Translation] Sending error response:", { error: safeMessage });
     sendResponse({ success: false, error: safeMessage });
   }
 }

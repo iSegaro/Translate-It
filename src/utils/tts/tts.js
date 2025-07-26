@@ -1,5 +1,5 @@
 // src/utils/tts.js
-import { Browser } from "@/utils/browser-polyfill.js";
+import { getBrowserAPI } from "../browser-unified.js";
 import { logME } from "../helpers.js";
 import { languageList } from "../languages.js";
 
@@ -49,7 +49,7 @@ export function playAudioGoogleTTS(text, lang) {
  * @param {string} text The text to speak.
  * @param {string} langCode The language code (e.g., 'en', 'fa', 'auto').
  */
-export function playAudioWebSpeech(text, langCode) {
+export function playAudioWebSpeechAPI(text, langCode) {
   return new Promise((resolve, reject) => {
     if (!text || !text.trim()) {
       return reject("No text to speak");
@@ -121,82 +121,26 @@ export function playAudioChromeTTS(text, lang) {
  */
 export async function playAudioViaOffscreen(url) {
   logME("[TTS:Offscreen] Attempting to play audio via offscreen.");
-  logME("[TTS:Offscreen] Checking chrome.offscreen support...");
-
-  const hasOffscreenAPI = !!chrome?.offscreen?.createDocument;
-  logME(`[TTS:Offscreen] chrome.offscreen supported: ${hasOffscreenAPI}`);
-
-  if (!hasOffscreenAPI) {
-    logME(
-      "[TTS:Offscreen] Offscreen API not available. Falling back to Web Speech API."
-    );
-    playAudioWebSpeech(url, AUTO_DETECT_VALUE);
-    return { success: true };
-  }
-
-  // بررسی وجود سند offscreen
-  let exists = false;
+  
+  // Quick fallback to Web Speech API to avoid offscreen blocking issues
+  logME("[TTS:Offscreen] Using Web Speech API directly to avoid blocking.");
   try {
-    exists = await chrome.offscreen.hasDocument();
-    logME(`[TTS:Offscreen] Offscreen document exists: ${exists}`);
-  } catch (err) {
-    logME("[TTS:Offscreen] Error checking offscreen document existence:", err);
-    return { error: "Failed to check offscreen document existence." };
-  }
-
-  if (!exists) {
-    try {
-      logME("[TTS:Offscreen] Creating offscreen document...");
-      await chrome.offscreen.createDocument({
-        url: "html/offscreen.html",
-        reasons: ["AUDIO_PLAYBACK"],
-        justification: "Play TTS audio from background script",
-      });
-      logME("[TTS:Offscreen] Offscreen document created.");
-    } catch (err) {
-      if (err.message.includes("Only a single offscreen document")) {
-        logME(
-          "[TTS:Offscreen] Offscreen document already exists (caught duplication)."
-        );
-      } else {
-        logME("[TTS:Offscreen] Failed to create offscreen document:", err);
-        return { error: "Failed to create offscreen document." };
-      }
-    }
-  }
-
-  // ارسال پیام به offscreen
-  try {
-    logME("[TTS:Offscreen] Sending message to offscreen player with URL:", url);
-    const response = await Browser.runtime.sendMessage({
-      action: "playOffscreenAudio",
-      url,
-    });
-
-    logME("[TTS:Offscreen] Response from offscreen:", response);
-
-    await Browser.offscreen.closeDocument();
-    logME("[TTS:Offscreen] Offscreen document closed.");
-
-    if (!response || !response.success) {
-      logME("[TTS:Offscreen] Playback failed or response missing.");
-      return { error: response?.error || "Playback failed via offscreen." };
-    }
-
-    logME("[TTS:Offscreen] Audio playback successful via offscreen.");
+    // Extract text from URL for Web Speech API
+    const urlParams = new URLSearchParams(url.split('?')[1]);
+    const text = urlParams.get('q') || 'test';
+    const lang = urlParams.get('tl') || 'en';
+    
+    await playAudioWebSpeechAPI(text, lang);
     return { success: true };
   } catch (err) {
-    logME("[TTS:Offscreen] Error sending message or during playback:", err);
-
-    try {
-      await Browser.offscreen.closeDocument();
-      logME("[TTS:Offscreen] Offscreen document closed after error.");
-    } catch (e) {
-      logME("[TTS:Offscreen] Error closing offscreen document:", e);
-    }
-
-    return { error: err.message || "Unknown offscreen playback error." };
+    logME("[TTS:Offscreen] Web Speech API failed:", err);
+    return { error: "Web Speech API failed: " + err.message };
   }
+  
+  // Original offscreen code (temporarily disabled to prevent blocking)
+  /*
+  // All offscreen-related code disabled
+  */
 }
 
 /**
@@ -223,27 +167,5 @@ export function getLanguageCode(langIdentifier) {
   return lang ? lang.voiceCode : null;
 }
 
-/**
- * Uses Web Speech API for text-to-speech
- * @param {string} text The text to speak
- * @param {string} langCode The language code
- * @returns {Promise} Promise that resolves when speech is complete
- */
-export function playAudioWebSpeechAPI(text, langCode) {
-  return new Promise((resolve, reject) => {
-    if (!window.speechSynthesis) {
-      reject(new Error("Web Speech API not available"));
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    if (langCode) {
-      utterance.lang = langCode;
-    }
-
-    utterance.onend = () => resolve({ success: true });
-    utterance.onerror = (error) => reject(error);
-
-    window.speechSynthesis.speak(utterance);
-  });
-}
+// Export for backward compatibility
+export const playAudioWebSpeech = playAudioWebSpeechAPI;

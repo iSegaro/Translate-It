@@ -1,7 +1,7 @@
 // src/composables/useHistory.js
-// Vue composable for translation history management in sidepanel
+// Vue composable for translation history management in sidepanel with improved API handling
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
 import { correctTextDirection } from '@/utils/textDetection.js'
@@ -16,7 +16,8 @@ export function useHistory() {
   const historyError = ref('')
   const isHistoryPanelOpen = ref(false)
 
-  // Store
+  // Composables
+  const browserAPI = useBrowserAPI()
   const settingsStore = useSettingsStore()
 
   // Computed
@@ -66,8 +67,7 @@ export function useHistory() {
       }
 
       // Save to storage
-      const browser = await getBrowserAPI()
-      await browser.storage.local.set({ translationHistory: historyItems.value })
+      await browserAPI.safeStorageSet({ translationHistory: historyItems.value })
       
       console.log('[useHistory] Added to history:', translationData.sourceText)
     } catch (error) {
@@ -82,8 +82,7 @@ export function useHistory() {
       if (index >= 0 && index < historyItems.value.length) {
         historyItems.value.splice(index, 1)
         
-        const browser = await getBrowserAPI()
-        await browser.storage.local.set({ translationHistory: historyItems.value })
+        await browserAPI.safeStorageSet({ translationHistory: historyItems.value })
         
         console.log('[useHistory] Deleted history item at index:', index)
       }
@@ -104,8 +103,7 @@ export function useHistory() {
       if (userConfirmed) {
         historyItems.value = []
         
-        const browser = await getBrowserAPI()
-        await browser.storage.local.set({ translationHistory: [] })
+        await browserAPI.safeStorageSet({ translationHistory: [] })
         
         console.log('[useHistory] Cleared all history')
         return true
@@ -174,17 +172,8 @@ export function useHistory() {
   // Setup storage listener
   const setupStorageListener = async () => {
     try {
-      // Add delay to ensure browser API is ready in sidepanel context
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      const browser = await getBrowserAPI()
-      if (browser && browser.storage && browser.storage.onChanged && browser.storage.onChanged.addListener) {
-        storageListener = (changes, areaName) => {
-          if (areaName === 'local') {
-            handleStorageChange(changes)
-          }
-        }
-        browser.storage.onChanged.addListener(storageListener)
+      storageListener = await browserAPI.setupStorageListener(handleStorageChange)
+      if (storageListener) {
         console.log('[useHistory] Storage listener setup successfully')
       } else {
         console.warn('[useHistory] Browser storage API not available, skipping listener setup')
@@ -198,10 +187,7 @@ export function useHistory() {
   const cleanupStorageListener = async () => {
     if (storageListener) {
       try {
-        const browser = await getBrowserAPI()
-        if (browser && browser.storage && browser.storage.onChanged) {
-          browser.storage.onChanged.removeListener(storageListener)
-        }
+        await browserAPI.removeStorageListener(storageListener)
         storageListener = null
       } catch (error) {
         console.error('[useHistory] Error cleaning up storage listener:', error)

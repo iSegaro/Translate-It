@@ -93,6 +93,61 @@ class MessageListener extends BaseListener {
   }
 
   /**
+   * Override the base listener's register method to properly handle Chrome extension message listeners
+   */
+  async register() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (this.isRegistered) {
+      console.log(`🔄 ${this.listenerName} listener already registered`);
+      return;
+    }
+
+    try {
+      const eventTarget = this.browser[this.eventType];
+      if (!eventTarget) {
+        throw new Error(`Browser API ${this.eventType} not available`);
+      }
+
+      const eventObject = eventTarget[this.eventName];
+      if (!eventObject) {
+        throw new Error(`Event ${this.eventName} not available on ${this.eventType}`);
+      }
+
+      // For message listeners, we need to handle the return value properly
+      // Chrome extension message listeners need to return true to keep the response channel open
+      eventObject.addListener((message, sender, sendResponse) => {
+        console.debug(`📨 ${this.listenerName} event received, calling ${this.handlers.length} handlers`);
+        
+        // Call the main message handler directly and return its result
+        // This preserves the synchronous return value needed for Chrome extensions
+        if (this.handlers.length > 0) {
+          const handler = this.handlers[0]; // We only have one handler for messages
+          try {
+            const result = handler.fn(message, sender, sendResponse);
+            return result; // This is crucial - return the handler's result to Chrome
+          } catch (error) {
+            console.error(`❌ Handler "${handler.name}" failed:`, error);
+            sendResponse({ success: false, error: error.message });
+            return false;
+          }
+        }
+        
+        return false;
+      });
+
+      this.isRegistered = true;
+      console.log(`✅ Registered ${this.listenerName} listener`);
+
+    } catch (error) {
+      console.error(`❌ Failed to register ${this.listenerName} listener:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Set up popup connection handler for TTS cleanup
    */
   setupPopupConnectionHandler() {
@@ -125,35 +180,66 @@ class MessageListener extends BaseListener {
   }
 
   /**
-   * Handle TTS speak with dynamic import
+   * Handle simple TTS speak - based on OLD implementation
    */
-  async handleTTSSpeak(message, sendResponse) {
+  async handleSimpleTTSSpeak(message, sendResponse) {
     try {
-      // Use feature loader to get TTS manager
-      const { featureLoader } = await import('../background/feature-loader.js');
-      const ttsManager = await featureLoader.loadTTSManager();
+      logME("[onMessage] Simple TTS speak request:", { text: message.text?.substring(0, 30), lang: message.lang });
       
-      // Speak with options from message
-      await ttsManager.speak(message.text || message.message, {
-        voice: message.voice,
-        rate: message.rate,
-        pitch: message.pitch,
-        volume: message.volume,
-        lang: message.lang
-      });
+      // Import TTS player dynamically like OLD version
+      const { playTTS } = await import('../utils/tts-player/tts-player.js');
+      
+      // Call playTTS with message (same as OLD pattern)
+      await playTTS(message);
       
       sendResponse({ success: true });
+      logME("[onMessage] Simple TTS speak completed successfully");
+      
     } catch (error) {
-      logME("[onMessage] TTS speak failed:", error);
-      throw error;
+      logME("[onMessage] Simple TTS speak failed:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Handle simple TTS stop - based on OLD implementation  
+   */
+  async handleSimpleTTSStop(sendResponse) {
+    try {
+      logME("[onMessage] Simple TTS stop request");
+      
+      // Import TTS player dynamically like OLD version
+      const { stopTTS } = await import('../utils/tts-player/tts-player.js');
+      
+      // Call stopTTS (same as OLD pattern)
+      stopTTS();
+      
+      sendResponse({ success: true });
+      logME("[onMessage] Simple TTS stop completed successfully");
+      
+    } catch (error) {
+      logME("[onMessage] Simple TTS stop failed:", error);
+      sendResponse({ success: false, error: error.message });
     }
   }
 
   /**
    * Main message handler
    */
-  async handleMessage(message, sender, sendResponse) {
+  handleMessage(message, sender, sendResponse) {
   const action = message?.action || message?.type;
+  
+  // Ignore messages forwarded from offscreen to prevent loops
+  if (message.forwardedFromOffscreen) {
+    logME('[onMessage] Ignoring message forwarded from offscreen:', action);
+    return false;
+  }
+
+  // Prioritize messages with explicit background target
+  if (message.target === 'background') {
+    logME(`[onMessage] Processing background-targeted message: ${action}`);
+  }
+  
   logME(`[onMessage] Action: ${action}`, {
     message,
     sender: { id: sender.id, url: sender.url, tab: sender.tab?.id },
@@ -211,40 +297,76 @@ class MessageListener extends BaseListener {
         return false;
 
       case "speak":
-        (async () => {
-          try {
-            await this.handleTTSSpeak(message, sendResponse);
-          } catch (error) {
-            logME("[onMessage] TTS speak failed:", error);
-            sendResponse({ success: false, error: error.message });
-          }
-        })();
-        return true;
+        // Only handle speak messages with explicit background target or no target
+        if (!message.target || message.target === 'background') {
+          this.handleSimpleTTSSpeak(message, sendResponse);
+          return true;
+        }
+        return false;
 
       case "stopTTS":
-        (async () => {
-          try {
-            await this.handleTTSStop();
-            sendResponse({ success: true });
-          } catch (error) {
-            logME("[onMessage] TTS stop failed:", error);
-            sendResponse({ success: false, error: error.message });
-          }
-        })();
-        return true;
+        // Only handle stopTTS messages with explicit background target or no target
+        if (!message.target || message.target === 'background') {
+          this.handleSimpleTTSStop(sendResponse);
+          return true;
+        }
+        return false;
+
+      case "ping":
+        logME("[onMessage] Ping received, responding with pong");
+        sendResponse({ success: true, message: "pong" });
+        return false;
 
       case "CONTENT_SCRIPT_WILL_RELOAD":
         logME("[onMessage] Content script will reload.");
         return false;
 
       case "fetchTranslation":
+        logME("[onMessage] Calling handleFetchTranslation");
+        
+        // Create a safe sendResponse wrapper that can only be called once
+        let responseAlreadySent = false;
+        let responseTimer = null;
+        
+        const safeSendResponse = (response) => {
+          if (responseAlreadySent) {
+            logME("[onMessage] WARNING: sendResponse already called, ignoring:", response);
+            return;
+          }
+          responseAlreadySent = true;
+          
+          // Clear the timeout if response is sent
+          if (responseTimer) {
+            clearTimeout(responseTimer);
+            responseTimer = null;
+          }
+          
+          logME("[onMessage] Sending response:", response);
+          sendResponse(response);
+        };
+        
+        // Set a timeout to ensure response is always sent
+        responseTimer = setTimeout(() => {
+          if (!responseAlreadySent) {
+            logME("[onMessage] Translation timeout, sending default error response");
+            safeSendResponse({ success: false, error: 'Translation timeout' });
+          }
+        }, 30000); // 30 seconds timeout
+        
         handleFetchTranslation(
           message,
           sender,
-          sendResponse,
+          safeSendResponse,
           translateText,
           errorHandler
-        );
+        ).catch(error => {
+          logME("[onMessage] handleFetchTranslation promise rejected:", error);
+          if (!responseAlreadySent) {
+            safeSendResponse({ success: false, error: error.message || 'Translation failed' });
+          }
+        });
+        
+        logME("[onMessage] handleFetchTranslation called, returning true");
         return true;
 
       case "translationAdded":
