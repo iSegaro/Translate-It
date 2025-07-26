@@ -4,7 +4,7 @@
 let currentAudio = null;
 let currentUtterance = null;
 
-console.log("🔊 Offscreen TTS script loaded");
+console.log("[Offscreen] TTS script loaded");
 
 // Signal readiness immediately to parent
 if (chrome.runtime) {
@@ -28,9 +28,10 @@ function isTTSMessage(message) {
     "stopOffscreenAudio",
     "speak",
     "stopTTS",
+    "playCachedAudio",
   ];
 
-  console.log("🔍 Checking if TTS message:", {
+  console.log("[Offscreen] Checking if TTS message:", {
     action: message.action,
     actionType: typeof message.action,
     isIncluded: ttsActions.includes(message.action),
@@ -41,17 +42,23 @@ function isTTSMessage(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("📨 Offscreen received message:", message);
+  console.log("[Offscreen] Received message:", message);
 
   // Only handle messages specifically targeted to offscreen context
   if (message.target && message.target !== "offscreen") {
-    console.log("🔀 Message not for offscreen, ignoring:", message.target);
+    console.log("[Offscreen] Message not for offscreen, ignoring:", message.target);
+    return false;
+  }
+
+  // Block direct TTS messages (should go through cache layer)
+  if (message.action === 'speak' && !message.fromTTSPlayer) {
+    console.log("[Offscreen] Ignoring direct speak message (should go through cache layer)");
     return false;
   }
 
   // Forward non-TTS messages to background service worker
   if (!isTTSMessage(message)) {
-    console.log("🔄 Forwarding non-TTS message to background:", message.action);
+    console.log("[Offscreen] Forwarding non-TTS message to background:", message.action);
     chrome.runtime
       .sendMessage({
         ...message,
@@ -61,7 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sendResponse) sendResponse(response);
       })
       .catch((error) => {
-        console.error("❌ Failed to forward message:", error);
+        console.error("[Offscreen] Failed to forward message:", error);
         if (sendResponse)
           sendResponse({ success: false, error: error.message });
       });
@@ -76,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Handle legacy 'speak' action from sidepanel/popup
   else if (message.action === "speak") {
-    console.log("🎤 Handling legacy speak action:", message);
+    console.log("[Offscreen] Handling legacy speak action:", message);
 
     // Convert legacy format to new format
     const ttsData = {
@@ -115,7 +122,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  console.warn("❓ Unknown offscreen message action:", message.action);
+  // Handle cached audio blob playback
+  else if (message.action === "playCachedAudio" && message.audioData) {
+    handleCachedAudioPlayback(message.audioData, sendResponse);
+    return true;
+  }
+
+  console.warn("[Offscreen] Unknown offscreen message action:", message.action);
   sendResponse({ success: false, error: "Unknown action" });
   return false;
 });
@@ -125,7 +138,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 function handleTTSSpeak(data, sendResponse) {
   try {
-    console.log("🗣️ Starting TTS speak:", data);
+    console.log("[Offscreen] Starting TTS speak:", data);
 
     // Stop any current speech
     if (currentUtterance || currentAudio) {
@@ -139,7 +152,7 @@ function handleTTSSpeak(data, sendResponse) {
     }
 
     // Use Google TTS URL directly (more reliable in offscreen)
-    console.log("🌐 Using Google TTS with language:", langCode);
+    console.log("[Offscreen] Using Google TTS with language:", langCode);
     const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(data.text)}&client=gtx`;
     handleAudioPlayback(googleTTSUrl, sendResponse);
     
@@ -177,7 +190,7 @@ function handleTTSSpeak(data, sendResponse) {
     }
     */
   } catch (error) {
-    console.error("❌ TTS speak failed:", error);
+    console.error("[Offscreen] TTS speak failed:", error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -194,7 +207,7 @@ function handleTTSStop(sendResponse) {
       speechSynthesis.cancel();
       currentUtterance = null;
       stopped = true;
-      console.log("🛑 TTS speech cancelled");
+      console.log("[Offscreen] TTS speech cancelled");
     }
 
     // Stop audio playback
@@ -203,12 +216,12 @@ function handleTTSStop(sendResponse) {
       currentAudio.src = "";
       currentAudio = null;
       stopped = true;
-      console.log("🛑 TTS audio stopped");
+      console.log("[Offscreen] TTS audio stopped");
     }
 
     sendResponse({ success: true, stopped });
   } catch (error) {
-    console.error("❌ TTS stop failed:", error);
+    console.error("[Offscreen] TTS stop failed:", error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -228,13 +241,13 @@ function handleAudioPlayback(url, sendResponse) {
     currentAudio.crossOrigin = "anonymous";
 
     currentAudio.addEventListener("ended", () => {
-      console.log("✅ Audio playback ended");
+      console.log("[Offscreen] Audio playback ended");
       currentAudio = null;
       sendResponse({ success: true });
     });
 
     currentAudio.addEventListener("error", (e) => {
-      console.error("❌ Audio playback error:", e);
+      console.error("[Offscreen] Audio playback error:", e);
       currentAudio = null;
       sendResponse({
         success: false,
@@ -243,21 +256,21 @@ function handleAudioPlayback(url, sendResponse) {
     });
 
     currentAudio.addEventListener("loadstart", () => {
-      console.log("🔊 Audio loading started");
+      console.log("[Offscreen] Audio loading started");
     });
 
     currentAudio
       .play()
       .then(() => {
-        console.log("▶️ Audio playback started");
+        console.log("[Offscreen] Audio playback started");
       })
       .catch((err) => {
-        console.error("❌ Audio play failed:", err);
+        console.error("[Offscreen] Audio play failed:", err);
         currentAudio = null;
         sendResponse({ success: false, error: err.message });
       });
   } catch (error) {
-    console.error("❌ Audio playback setup failed:", error);
+    console.error("[Offscreen] Audio playback setup failed:", error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -273,5 +286,75 @@ function handleAudioStop(sendResponse) {
     sendResponse({ success: true });
   } else {
     sendResponse({ success: false, error: "No offscreen audio playing" });
+  }
+}
+
+/**
+ * Handle cached audio blob playback
+ * @param {Array} audioData - Audio data as byte array
+ * @param {Function} sendResponse - Response callback
+ */
+function handleCachedAudioPlayback(audioData, sendResponse) {
+  try {
+    console.log("[Offscreen] Playing cached audio blob:", audioData.length, "bytes");
+    
+    // Stop any current audio
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+    }
+
+    // Convert byte array back to Blob
+    const uint8Array = new Uint8Array(audioData);
+    const audioBlob = new Blob([uint8Array], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    console.log("[Offscreen] Created blob URL for cached audio:", audioUrl);
+
+    // Create and setup audio element
+    currentAudio = new Audio(audioUrl);
+    currentAudio.crossOrigin = "anonymous";
+
+    currentAudio.addEventListener("ended", () => {
+      console.log("[Offscreen] Cached audio playback ended");
+      URL.revokeObjectURL(audioUrl); // Clean up memory
+      currentAudio = null;
+      sendResponse({ success: true });
+    });
+
+    currentAudio.addEventListener("error", (e) => {
+      console.error("[Offscreen] Cached audio playback error:", e);
+      URL.revokeObjectURL(audioUrl); // Clean up memory
+      currentAudio = null;
+      sendResponse({
+        success: false,
+        error: e.message || "Cached audio playback error",
+      });
+    });
+
+    currentAudio.addEventListener("loadstart", () => {
+      console.log("[Offscreen] Cached audio loading started");
+    });
+
+    currentAudio.addEventListener("canplaythrough", () => {
+      console.log("[Offscreen] Cached audio can play through");
+    });
+
+    // Start playback
+    currentAudio
+      .play()
+      .then(() => {
+        console.log("[Offscreen] Cached audio playback started successfully");
+      })
+      .catch((err) => {
+        console.error("[Offscreen] Cached audio play failed:", err);
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        sendResponse({ success: false, error: err.message });
+      });
+      
+  } catch (error) {
+    console.error("[Offscreen] Cached audio setup failed:", error);
+    sendResponse({ success: false, error: error.message });
   }
 }

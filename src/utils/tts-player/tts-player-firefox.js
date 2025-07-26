@@ -106,3 +106,31 @@ export function stopTTS() {
 
   activeTTS = null;
 }
+
+/**
+ * Get audio blob for caching purposes
+ * @param {string} text - Text to speak
+ * @param {string} lang - Language code  
+ * @returns {Promise<Blob>} Audio blob
+ */
+export async function getAudioBlob(text, lang) {
+  try {
+    // Create Google TTS URL (same as in playTTS)
+    const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}&client=gtx`;
+    
+    // Fetch audio as blob
+    const response = await fetch(googleTTSUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch TTS audio: ${response.status}`);
+    }
+    
+    const audioBlob = await response.blob();
+    logME("[TTS Firefox] Downloaded audio blob for caching:", audioBlob.size, "bytes");
+    
+    return audioBlob;
+    
+  } catch (error) {
+    logME("[TTS Firefox] Failed to get audio blob:", error);
+    throw error;
+  }
+}

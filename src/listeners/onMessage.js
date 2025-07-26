@@ -202,6 +202,28 @@ class MessageListener extends BaseListener {
   }
 
   /**
+   * Handle cached TTS speak - uses cache layer in tts-player.js
+   */
+  async handleCachedTTSSpeak(message, sendResponse) {
+    try {
+      logME("[onMessage] Cached TTS speak request:", { text: message.text?.substring(0, 30), lang: message.lang });
+      
+      // Import TTS player dynamically for cache layer
+      const { playTTS } = await import('../utils/tts-player/tts-player.js');
+      
+      // Use cache layer directly (single path to offscreen)
+      await playTTS(message);
+      
+      sendResponse({ success: true });
+      logME("[onMessage] Cached TTS speak completed successfully");
+      
+    } catch (error) {
+      logME("[onMessage] Cached TTS speak failed:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Handle simple TTS stop - based on OLD implementation  
    */
   async handleSimpleTTSStop(sendResponse) {
@@ -297,12 +319,9 @@ class MessageListener extends BaseListener {
         return false;
 
       case "speak":
-        // Only handle speak messages with explicit background target or no target
-        if (!message.target || message.target === 'background') {
-          this.handleSimpleTTSSpeak(message, sendResponse);
-          return true;
-        }
-        return false;
+        // New: Route through tts-player.js cache layer (single path)
+        this.handleCachedTTSSpeak(message, sendResponse);
+        return true;
 
       case "stopTTS":
         // Only handle stopTTS messages with explicit background target or no target
