@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/utils/secureStorage.js'
@@ -59,7 +59,10 @@ export const useSettingsStore = defineStore('settings', () => {
     VUE_MIGRATED: false,
     MIGRATION_DATE: null,
     MIGRATION_FROM_VERSION: null,
-    EXTENSION_VERSION: null
+    EXTENSION_VERSION: null,
+    
+    // History (newly added to settings for centralized management)
+    translationHistory: []
   })
   
   // Loading states
@@ -146,9 +149,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
+      console.log(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
       settings.value[key] = value // Update local state
       const browser = await getBrowserAPI()
       await browser.storage.local.set({ [key]: value }) // Persist immediately
+      console.log(`[settingsStore] Successfully saved ${key} to browser storage`)
       return true
     } catch (error) {
       console.error(`Failed to update and persist setting ${key}:`, error)
@@ -215,7 +220,8 @@ export const useSettingsStore = defineStore('settings', () => {
         SHOW_SUBTITLE_ICON: CONFIG.SHOW_SUBTITLE_ICON ?? true,
         DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
         USE_MOCK: CONFIG.USE_MOCK ?? false,
-        EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || []
+        EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
+        translationHistory: []
       }
       
       settings.value = { ...defaultSettings }
@@ -363,9 +369,67 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
   
-  // Initialize settings on store creation (with error handling)
-  loadSettings().catch(error => {
+  // Storage change listener
+  let storageListener = null
+
+  // Handle storage changes from other parts of extension
+  const handleStorageChange = (changes, areaName) => {
+    if (areaName === 'local') {
+      for (const key in changes) {
+        if (Object.prototype.hasOwnProperty.call(changes, key)) {
+          const newValue = changes[key].newValue
+          // Update the reactive settings ref
+          if (settings.value[key] !== newValue) {
+            settings.value[key] = newValue
+            console.log(`[SettingsStore] Setting '${key}' updated from storage:`, newValue)
+          }
+        }
+      }
+    }
+  }
+
+  // Setup storage listener
+  const setupStorageListener = async () => {
+    try {
+      const browser = await getBrowserAPI()
+      if (browser.storage && browser.storage.onChanged) {
+        storageListener = handleStorageChange
+        browser.storage.onChanged.addListener(storageListener)
+        console.log('[SettingsStore] Storage listener setup successfully')
+      } else {
+        console.log('[SettingsStore] browser.storage.onChanged is not available. Settings cache might become stale.')
+      }
+    } catch (error) {
+      console.warn('[SettingsStore] Unable to setup storage listener:', error.message)
+    }
+  }
+
+  // Cleanup storage listener
+  const cleanupStorageListener = async () => {
+    if (storageListener) {
+      try {
+        const browser = await getBrowserAPI()
+        if (browser.storage && browser.storage.onChanged) {
+          browser.storage.onChanged.removeListener(storageListener)
+          storageListener = null
+          console.log('[SettingsStore] Storage listener cleaned up')
+        }
+      } catch (error) {
+        console.error('[SettingsStore] Error cleaning up storage listener:', error)
+      }
+    }
+  }
+
+  // Initialize settings on store creation and setup listener
+  loadSettings().then(() => {
+    setupStorageListener()
+  }).catch(error => {
     console.error('Failed to initialize settings store:', error)
+  })
+
+  // Cleanup listener on store destruction
+  onUnmounted(() => {
+    cleanupStorageListener()
   })
   
   return {

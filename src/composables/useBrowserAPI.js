@@ -209,8 +209,10 @@ export function useBrowserAPI() {
         }
         browser.storage.onChanged.addListener(listener)
         return listener
+      } else {
+        console.warn('[useBrowserAPI] browser.storage.onChanged is not available. Settings cache might become stale.')
+        return null
       }
-      return null
     } catch (err) {
       console.warn('[useBrowserAPI] Storage listener setup failed:', err)
       return null

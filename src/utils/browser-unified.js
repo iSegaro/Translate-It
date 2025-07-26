@@ -31,10 +31,10 @@ class UnifiedBrowserAPI {
         // Chrome (Manifest V3) - use native chrome API and wrap it
         this.api = this.wrapChromeAPI(chrome);
         console.log('🌐 Using wrapped Chrome native API (Manifest V3)');
-      } else if (manifestVersion === 2 && typeof browser !== 'undefined') {
-        // Firefox (Manifest V2) - use native browser API
+      } else if (typeof browser !== 'undefined') {
+        // Firefox (Manifest V2/V3) - use native browser API or polyfill
         this.api = browser;
-        console.log('🦊 Using Firefox native browser API (Manifest V2)');
+        console.log('🦊 Using Firefox native browser API or polyfill');
       } else {
         throw new Error(`Unsupported browser or API not available: ${browserEnv} (Manifest V${manifestVersion})`);
       }
@@ -151,7 +151,13 @@ class UnifiedBrowserAPI {
         set: this.promisifyCallback(storage.sync.set.bind(storage.sync)),
         remove: this.promisifyCallback(storage.sync.remove.bind(storage.sync)),
         clear: this.promisifyCallback(storage.sync.clear.bind(storage.sync))
-      }
+      },
+      // Add onChanged listener support
+      onChanged: storage.onChanged ? {
+        addListener: storage.onChanged.addListener.bind(storage.onChanged),
+        removeListener: storage.onChanged.removeListener.bind(storage.onChanged),
+        hasListener: storage.onChanged.hasListener ? storage.onChanged.hasListener.bind(storage.onChanged) : undefined
+      } : undefined
     };
   }
 

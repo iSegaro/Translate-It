@@ -208,7 +208,7 @@ export async function getAudioBlob(text, lang) {
 }
 
 /**
- * Play cached audio blob via offscreen (using direct runtime message)
+ * Play cached audio blob via offscreen (using direct runtime message with auto-recreation)
  * @param {Blob} audioBlob - Cached audio blob to play
  * @returns {Promise<Object>} Result object
  */
@@ -216,43 +216,133 @@ export async function playAudioBlobViaOffscreen(audioBlob) {
   try {
     logME("[TTS Chrome] Playing cached audio blob via offscreen:", audioBlob.size, "bytes");
     
-    // Load TTS Manager to ensure offscreen readiness
+    // Load TTS Manager and attempt recreation if needed
     const { featureLoader } = await import('../../background/feature-loader.js');
     const ttsManager = await featureLoader.loadTTSManager();
     
-    // TTS Manager is already initialized, no need to call ensureReady()
+    // First attempt: Try with current offscreen state
+    let playbackSuccess = false;
+    let lastError = null;
     
-    // Convert blob to ArrayBuffer for message passing
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioData = Array.from(new Uint8Array(arrayBuffer));
-    
-    logME("[TTS Chrome] Sending cached audio data to offscreen:", audioData.length, "bytes");
-    
-    // Send cached audio directly to offscreen document
-    const response = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: 'playCachedAudio',
-        audioData: audioData,
-        fromTTSPlayer: true
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        logME(`[TTS Chrome] Cached audio playback attempt ${attempt}/2`);
+        
+        // Check if offscreen is available and try to recreate if needed
+        if (attempt === 2) {
+          logME("[TTS Chrome] First attempt failed, trying offscreen recreation...");
+          
+          // Try to recreate offscreen using TTS Manager
+          if (typeof ttsManager.recreateOffscreenIfNeeded === 'function') {
+            const recreated = await ttsManager.recreateOffscreenIfNeeded();
+            if (!recreated) {
+              throw new Error("Offscreen recreation failed");
+            }
+            logME("[TTS Chrome] Offscreen recreation successful, retrying playback");
+          } else {
+            logME("[TTS Chrome] TTS Manager doesn't support recreation, checking availability manually");
+            const isAvailable = await checkOffscreenAvailability();
+            if (!isAvailable) {
+              throw new Error("Offscreen document not available and cannot be recreated");
+            }
+          }
         } else {
-          resolve(response);
+          // First attempt: Quick availability check
+          const isOffscreenAvailable = await checkOffscreenAvailability();
+          if (!isOffscreenAvailable) {
+            throw new Error("Offscreen document not available");
+          }
         }
-      });
-    });
+        
+        // Convert blob to ArrayBuffer for message passing
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioData = Array.from(new Uint8Array(arrayBuffer));
+        
+        logME("[TTS Chrome] Sending cached audio data to offscreen:", audioData.length, "bytes");
+        
+        // Send cached audio directly to offscreen document with timeout
+        const response = await Promise.race([
+          new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+              action: 'playCachedAudio',
+              audioData: audioData,
+              fromTTSPlayer: true
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(response);
+              }
+            });
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Offscreen playback timeout")), 5000)
+          )
+        ]);
 
-    if (!response || !response.success) {
-      throw new Error(response?.error || "Offscreen cached audio playback failed");
+        if (!response || !response.success) {
+          throw new Error(response?.error || "Offscreen cached audio playback failed");
+        }
+
+        logME("[TTS Chrome] Offscreen cached audio playback completed successfully");
+        playbackSuccess = true;
+        return { success: true };
+        
+      } catch (attemptError) {
+        lastError = attemptError;
+        logME(`[TTS Chrome] Attempt ${attempt} failed:`, attemptError.message);
+        
+        if (attempt === 2) {
+          // Final attempt failed
+          break;
+        }
+        
+        // Continue to next attempt
+        continue;
+      }
     }
-
-    logME("[TTS Chrome] Offscreen cached audio playback completed successfully");
-    return { success: true };
+    
+    // If we get here, all attempts failed
+    logME("[TTS Chrome] All cached audio playback attempts failed");
+    throw lastError;
     
   } catch (error) {
     logME("[TTS Chrome] Failed to play cached audio via offscreen:", error);
     throw error;
+  }
+}
+
+/**
+ * Check if offscreen document is available and ready
+ * @returns {Promise<boolean>} True if offscreen is available
+ */
+async function checkOffscreenAvailability() {
+  try {
+    // Test if offscreen API exists
+    if (!chrome.offscreen) {
+      logME("[TTS Chrome] Offscreen API not available");
+      return false;
+    }
+    
+    // Test if we can communicate with offscreen
+    const testResponse = await Promise.race([
+      new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'ping',
+          target: 'offscreen'
+        }, (response) => {
+          resolve(response && response.success);
+        });
+      }),
+      new Promise((resolve) => setTimeout(() => resolve(false), 2000))
+    ]);
+    
+    logME("[TTS Chrome] Offscreen availability check:", testResponse);
+    return testResponse === true;
+    
+  } catch (error) {
+    logME("[TTS Chrome] Offscreen availability check failed:", error);
+    return false;
   }
 }
 

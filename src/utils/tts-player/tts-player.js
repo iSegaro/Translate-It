@@ -40,11 +40,13 @@ class SimpleTTSCache {
     const key = this.generateKey(text, lang);
     if (this.cache.has(key)) {
       // Move to end (mark as most recently used)
-      const audioBlob = this.cache.get(key);
+      const cacheEntry = this.cache.get(key);
       this.cache.delete(key);
-      this.cache.set(key, audioBlob);
+      this.cache.set(key, cacheEntry);
       console.log("[TTS Cache] Cache HIT for:", key.substring(0, 30) + "...");
-      return audioBlob;
+      
+      // Return the cache entry (contains audioBlob + metadata)
+      return cacheEntry;
     }
     console.log("[TTS Cache] Cache MISS for:", key.substring(0, 30) + "...");
     return null;
@@ -66,7 +68,15 @@ class SimpleTTSCache {
       this.cache.delete(firstKey);
     }
     
-    this.cache.set(key, audioBlob);
+    // Store both audio blob and metadata for fallback purposes
+    const cacheEntry = {
+      audioBlob,
+      text,
+      lang,
+      timestamp: Date.now()
+    };
+    
+    this.cache.set(key, cacheEntry);
     console.log("[TTS Cache] Cached new audio:", key.substring(0, 30) + "...", `(${this.cache.size}/${this.maxSize})`);
   }
 
@@ -120,10 +130,10 @@ export async function playTTS(message) {
   }
   
   // 1. Check cache first for instant playback
-  const cachedAudio = ttsCache.get(text, lang);
-  if (cachedAudio) {
+  const cacheEntry = ttsCache.get(text, lang);
+  if (cacheEntry) {
     console.log("[TTS Player] Using cached audio (⚡ instant)");
-    return playAudioBlob(cachedAudio);
+    return playAudioBlob(cacheEntry.audioBlob, cacheEntry.text, cacheEntry.lang);
   }
   
   // 2. Cache miss - download and cache for next time
@@ -144,11 +154,13 @@ export async function playTTS(message) {
 }
 
 /**
- * Play audio from cached blob via browser-specific implementation
+ * Play audio from cached blob via browser-specific implementation with fallback support
  * @param {Blob} audioBlob - Cached audio blob
+ * @param {string} text - Original text (for fallback)
+ * @param {string} lang - Language code (for fallback)
  * @returns {Promise<Object>} Result object
  */
-async function playAudioBlob(audioBlob) {
+async function playAudioBlob(audioBlob, text = null, lang = null) {
   try {
     console.log("[TTS Player] Playing cached audio blob:", audioBlob.size, "bytes");
     
@@ -158,7 +170,32 @@ async function playAudioBlob(audioBlob) {
     // Check if player has cached blob playback support
     if (typeof player.playAudioBlobViaOffscreen === 'function') {
       console.log("[TTS Player] Using browser-specific cached blob playback");
-      return await player.playAudioBlobViaOffscreen(audioBlob);
+      try {
+        return await player.playAudioBlobViaOffscreen(audioBlob);
+      } catch (offscreenError) {
+        console.warn("[TTS Player] Offscreen cached playback failed, trying fallbacks:", offscreenError.message);
+        
+        // Fallback 1: Try Web Speech API if we have text
+        if (text && lang) {
+          try {
+            console.log("[TTS Player] Offscreen failed, trying Web Speech API fallback");
+            return await fallbackToWebSpeech(text, lang);
+          } catch (webSpeechError) {
+            console.warn("[TTS Player] Web Speech API fallback failed:", webSpeechError.message);
+          }
+        }
+        
+        // Fallback 2: Try content script injection (for future implementation)
+        try {
+          return await fallbackToContentScript(audioBlob);
+        } catch (contentScriptError) {
+          console.warn("[TTS Player] Content script fallback failed:", contentScriptError.message);
+          
+          // All fallbacks failed
+          console.warn("[TTS Player] All playback methods failed - service worker limitations");
+          throw new Error("Cached audio playback failed: " + offscreenError.message);
+        }
+      }
     }
     
     // Fallback: Try direct Audio object (may not work in service worker context)
@@ -194,6 +231,124 @@ async function playAudioBlob(audioBlob) {
   } catch (error) {
     console.error("[TTS Player] Failed to play cached audio:", error);
     throw new Error("Failed to play cached audio: " + error.message);
+  }
+}
+
+/**
+ * Fallback to Web Speech API via content script for text-to-speech
+ * @param {string} text - Text to speak
+ * @param {string} lang - Language code
+ * @returns {Promise<Object>} Result object
+ */
+async function fallbackToWebSpeech(text, lang) {
+  try {
+    console.log("[TTS Player] Using Web Speech API fallback via content script:", text.substring(0, 50) + "...", "lang:", lang);
+    
+    // Get active tab
+    const tabs = await new Promise((resolve, reject) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(tabs);
+        }
+      });
+    });
+    
+    if (!tabs || tabs.length === 0) {
+      throw new Error("No active tab found for Web Speech fallback");
+    }
+    
+    const activeTab = tabs[0];
+    
+    // Send to content script for Web Speech synthesis
+    const response = await new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(activeTab.id, {
+        action: 'speakWithWebSpeech',
+        text: text,
+        lang: lang,
+        fromTTSFallback: true
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+    
+    if (!response || !response.success) {
+      throw new Error(response?.error || "Web Speech synthesis via content script failed");
+    }
+    
+    console.log("[TTS Player] Web Speech synthesis completed via content script");
+    return { success: true, method: 'webSpeech' };
+    
+  } catch (error) {
+    console.error("[TTS Player] Web Speech API fallback failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fallback to content script for cached audio playback
+ * @param {Blob} audioBlob - Audio blob to play
+ * @returns {Promise<Object>} Result object
+ */
+async function fallbackToContentScript(audioBlob) {
+  try {
+    console.log("[TTS Player] Attempting content script fallback for cached audio");
+    
+    // Get active tab
+    const tabs = await new Promise((resolve, reject) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(tabs);
+        }
+      });
+    });
+    
+    if (!tabs || tabs.length === 0) {
+      throw new Error("No active tab found for content script fallback");
+    }
+    
+    const activeTab = tabs[0];
+    
+    // Convert blob to data URL for content script
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed to convert blob to data URL"));
+      reader.readAsDataURL(audioBlob);
+    });
+    
+    // Send to content script
+    const response = await new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(activeTab.id, {
+        action: 'playAudioFromDataUrl',
+        dataUrl: dataUrl,
+        fromTTSFallback: true
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+    
+    if (!response || !response.success) {
+      throw new Error(response?.error || "Content script audio playback failed");
+    }
+    
+    console.log("[TTS Player] Content script cached audio playback completed");
+    return { success: true };
+    
+  } catch (error) {
+    console.error("[TTS Player] Content script fallback failed:", error);
+    throw error;
   }
 }
 

@@ -158,6 +158,63 @@ export class OffscreenTTSManager {
   }
 
   /**
+   * Recreate offscreen document if needed (auto-recovery)
+   * @returns {Promise<boolean>} True if offscreen is available after recreation
+   */
+  async recreateOffscreenIfNeeded() {
+    try {
+      console.log('🔄 Checking if offscreen document needs recreation...');
+      
+      // First, test current connection
+      const isCurrentlyWorking = await this.testOffscreenConnection();
+      if (isCurrentlyWorking) {
+        console.log('✅ Offscreen document is working, no recreation needed');
+        return true;
+      }
+      
+      console.log('⚠️ Offscreen document not responding, attempting recreation...');
+      
+      // Reset state for clean recreation
+      this.offscreenCreated = false;
+      this.offscreenReady = false;
+      
+      // Close existing offscreen document if it exists
+      try {
+        const existingContexts = await this.browser.runtime.getContexts({
+          contextTypes: ['OFFSCREEN_DOCUMENT']
+        });
+        
+        if (existingContexts.length > 0) {
+          console.log('🗑️ Closing existing unresponsive offscreen document');
+          await this.browser.offscreen.closeDocument();
+          // Small delay to ensure cleanup
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (closeError) {
+        console.warn('⚠️ Failed to close existing offscreen document:', closeError);
+        // Continue with recreation anyway
+      }
+      
+      // Recreate offscreen document
+      await this.createOffscreenDocument();
+      
+      // Test the new connection
+      const isRecreatedWorking = await this.testOffscreenConnection();
+      if (isRecreatedWorking) {
+        console.log('✅ Offscreen document recreation successful');
+        return true;
+      } else {
+        console.error('❌ Offscreen document recreation failed - still not responding');
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to recreate offscreen document:', error);
+      return false;
+    }
+  }
+
+  /**
    * Speak text using offscreen document
    * @param {string} text - Text to speak
    * @param {Object} options - TTS options
@@ -175,6 +232,14 @@ export class OffscreenTTSManager {
     try {
       // Stop any current speech
       await this.stop();
+
+      // Auto-recreate offscreen if needed BEFORE attempting to speak
+      const isOffscreenReady = await this.recreateOffscreenIfNeeded();
+      if (!isOffscreenReady) {
+        console.warn('⚠️ Offscreen document not available, falling back to alternative TTS');
+        await this.fallbackToAlternativeTTS(text, options);
+        return;
+      }
 
       const ttsOptions = {
         text: text.trim(),
@@ -210,7 +275,7 @@ export class OffscreenTTSManager {
     } catch (error) {
       console.error('❌ TTS speak failed:', error);
       
-      // If offscreen fails, try to fallback to other TTS methods
+      // If offscreen fails even after recreation, try fallback methods
       console.log('🔄 Attempting TTS fallback...');
       try {
         await this.fallbackToAlternativeTTS(text, options);
@@ -240,6 +305,52 @@ export class OffscreenTTSManager {
 
     } catch (error) {
       console.error('❌ Failed to stop TTS:', error);
+    }
+  }
+
+  /**
+   * Play cached audio blob via offscreen document
+   * @param {Blob} audioBlob - Audio blob to play
+   * @returns {Promise<void>}
+   */
+  async playAudioBlob(audioBlob) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!audioBlob || !(audioBlob instanceof Blob)) {
+      throw new Error('Valid audio blob is required');
+    }
+
+    try {
+      // Ensure offscreen is ready before playing cached audio
+      const isOffscreenReady = await this.recreateOffscreenIfNeeded();
+      if (!isOffscreenReady) {
+        throw new Error('Offscreen document not available for cached audio playback');
+      }
+
+      console.log('🔊 Playing cached audio blob via offscreen:', audioBlob.size, 'bytes');
+
+      // Convert blob to ArrayBuffer for message passing
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioData = Array.from(new Uint8Array(arrayBuffer));
+
+      // Send cached audio to offscreen document
+      const response = await this.browser.runtime.sendMessage({
+        action: 'TTS_PLAY_CACHED_AUDIO',
+        target: 'offscreen',
+        data: { audioData }
+      });
+
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'Failed to play cached audio in offscreen document');
+      }
+
+      console.log('✅ Cached audio playback completed');
+
+    } catch (error) {
+      console.error('❌ Cached audio playback failed:', error);
+      throw error;
     }
   }
 

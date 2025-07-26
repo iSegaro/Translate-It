@@ -1,6 +1,6 @@
 // src/composables/useHistory.js
 // Vue composable for translation history management in sidepanel with improved API handling
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
@@ -27,16 +27,12 @@ export function useHistory() {
     return [...historyItems.value].reverse()
   })
 
-  // Load history from storage
+  // Load history from settings store
   const loadHistory = async () => {
+    isLoading.value = true
     try {
-      isLoading.value = true
-      historyError.value = ''
-
-      await settingsStore.loadSettings()
-      const settings = settingsStore.settings
-      historyItems.value = settings.translationHistory || []
-      
+      await settingsStore.loadSettings() // Ensure settings are loaded
+      historyItems.value = settingsStore.settings.translationHistory || []
       console.log(`[useHistory] Loaded ${historyItems.value.length} history items`)
     } catch (error) {
       console.error('[useHistory] Error loading history:', error)
@@ -59,15 +55,11 @@ export function useHistory() {
       }
 
       // Add to local state
-      historyItems.value.push(historyItem)
+      const newHistory = [historyItem, ...historyItems.value].slice(0, MAX_HISTORY_ITEMS)
+      historyItems.value = newHistory
 
-      // Limit history size
-      if (historyItems.value.length > MAX_HISTORY_ITEMS) {
-        historyItems.value.splice(0, historyItems.value.length - MAX_HISTORY_ITEMS)
-      }
-
-      // Save to storage
-      await browserAPI.safeStorageSet({ translationHistory: historyItems.value })
+      // Save to storage via settings store
+      await settingsStore.updateSettingAndPersist('translationHistory', newHistory)
       
       console.log('[useHistory] Added to history:', translationData.sourceText)
     } catch (error) {
@@ -80,9 +72,11 @@ export function useHistory() {
   const deleteHistoryItem = async (index) => {
     try {
       if (index >= 0 && index < historyItems.value.length) {
-        historyItems.value.splice(index, 1)
+        const newHistory = [...historyItems.value]
+        newHistory.splice(index, 1)
+        historyItems.value = newHistory
         
-        await browserAPI.safeStorageSet({ translationHistory: historyItems.value })
+        await settingsStore.updateSettingAndPersist('translationHistory', newHistory)
         
         console.log('[useHistory] Deleted history item at index:', index)
       }
@@ -103,7 +97,7 @@ export function useHistory() {
       if (userConfirmed) {
         historyItems.value = []
         
-        await browserAPI.safeStorageSet({ translationHistory: [] })
+        await settingsStore.updateSettingAndPersist('translationHistory', [])
         
         console.log('[useHistory] Cleared all history')
         return true
@@ -155,64 +149,21 @@ export function useHistory() {
     isHistoryPanelOpen.value = value
   }
 
-  // Handle storage changes from other parts of extension
-  const handleStorageChange = (changes) => {
-    if (changes.translationHistory) {
-      const newHistory = changes.translationHistory.newValue || []
-      if (JSON.stringify(newHistory) !== JSON.stringify(historyItems.value)) {
-        historyItems.value = newHistory
-        console.log('[useHistory] History updated from storage')
-      }
+  // Watch for changes in settingsStore.settings.translationHistory
+  watch(() => settingsStore.settings.translationHistory, (newHistory) => {
+    if (newHistory) {
+      historyItems.value = newHistory
+      console.log('[useHistory] History updated from settings store')
     }
-  }
-
-  // Storage change listener
-  let storageListener = null
-
-  // Setup storage listener
-  const setupStorageListener = async () => {
-    try {
-      storageListener = await browserAPI.setupStorageListener(handleStorageChange)
-      if (storageListener) {
-        console.log('[useHistory] Storage listener setup successfully')
-      } else {
-        console.warn('[useHistory] Browser storage API not available, skipping listener setup')
-      }
-    } catch (error) {
-      console.warn('[useHistory] Unable to setup storage listener:', error.message)
-    }
-  }
-
-  // Cleanup storage listener
-  const cleanupStorageListener = async () => {
-    if (storageListener) {
-      try {
-        await browserAPI.removeStorageListener(storageListener)
-        storageListener = null
-      } catch (error) {
-        console.error('[useHistory] Error cleaning up storage listener:', error)
-      }
-    }
-  }
-
-  // Initialize
-  const initialize = async () => {
-    await loadHistory()
-    await setupStorageListener()
-  }
-
-  // Cleanup
-  const cleanup = async () => {
-    await cleanupStorageListener()
-  }
+  }, { deep: true })
 
   // Lifecycle
   onMounted(() => {
-    initialize()
+    loadHistory()
   })
 
   onUnmounted(() => {
-    cleanup()
+    // No specific cleanup needed as we are watching settingsStore
   })
 
   return {
@@ -238,8 +189,6 @@ export function useHistory() {
 
     // Utilities
     formatTime,
-    createMarkdownContent,
-    initialize,
-    cleanup
+    createMarkdownContent
   }
 }

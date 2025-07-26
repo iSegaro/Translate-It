@@ -246,6 +246,98 @@ class MessageListener extends BaseListener {
   }
 
   /**
+   * Handle cached audio playback via offscreen document (with auto-recreation support)
+   */
+  async handlePlayCachedAudio(message, sendResponse) {
+    try {
+      logME("[onMessage] Cached audio playback request:", message.audioData?.length, "bytes");
+      
+      if (!message.audioData || !Array.isArray(message.audioData)) {
+        throw new Error("Invalid audio data provided");
+      }
+
+      // Convert array back to Uint8Array and create blob
+      const audioBuffer = new Uint8Array(message.audioData);
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+
+      // Try multiple approaches with auto-recreation
+      let lastError = null;
+      
+      // Attempt 1: Use TTS Manager with auto-recreation
+      try {
+        const { featureLoader } = await import('../background/feature-loader.js');
+        const ttsManager = await featureLoader.loadTTSManager();
+        
+        // Try to recreate offscreen if needed before playback
+        if (typeof ttsManager.recreateOffscreenIfNeeded === 'function') {
+          logME("[onMessage] Ensuring offscreen is ready for cached audio playback");
+          const isReady = await ttsManager.recreateOffscreenIfNeeded();
+          if (!isReady) {
+            throw new Error("Offscreen document not available and recreation failed");
+          }
+        }
+        
+        // Use TTS Manager to play via offscreen
+        if (typeof ttsManager.playAudioBlob === 'function') {
+          await ttsManager.playAudioBlob(audioBlob);
+        } else {
+          throw new Error("TTS Manager doesn't support audio blob playback");
+        }
+        
+        sendResponse({ success: true });
+        logME("[onMessage] Cached audio playback completed via TTS Manager");
+        return;
+        
+      } catch (ttsError) {
+        lastError = ttsError;
+        logME("[onMessage] TTS Manager playback failed:", ttsError.message);
+      }
+      
+      // Attempt 2: Direct offscreen message with manual recreation check
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          logME("[onMessage] Attempting direct offscreen playback");
+          
+          const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+              action: 'playOffscreenAudio',
+              audioData: message.audioData,
+              fromCachedPlayback: true
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(response);
+              }
+            });
+          });
+          
+          if (response && response.success) {
+            sendResponse({ success: true });
+            logME("[onMessage] Cached audio playback completed via direct offscreen");
+            return;
+          } else {
+            throw new Error(response?.error || "Direct offscreen playback failed");
+          }
+        } else {
+          throw new Error("Chrome runtime not available for offscreen playback");
+        }
+        
+      } catch (directError) {
+        lastError = directError;
+        logME("[onMessage] Direct offscreen playback failed:", directError.message);
+      }
+      
+      // All methods failed
+      throw lastError || new Error("All cached audio playback methods failed");
+      
+    } catch (error) {
+      logME("[onMessage] Cached audio playback failed:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Main message handler
    */
   handleMessage(message, sender, sendResponse) {
@@ -330,6 +422,11 @@ class MessageListener extends BaseListener {
           return true;
         }
         return false;
+
+      case "playCachedAudio":
+        // Handle cached audio playback via offscreen document
+        this.handlePlayCachedAudio(message, sendResponse);
+        return true;
 
       case "ping":
         logME("[onMessage] Ping received, responding with pong");

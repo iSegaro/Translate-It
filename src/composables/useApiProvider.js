@@ -1,6 +1,6 @@
 // src/composables/useApiProvider.js
 // Vue composable for API provider management in sidepanel with improved API handling
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { ProviderRegistry } from '@/providers/index.js'
@@ -20,7 +20,11 @@ export function useApiProvider() {
 
   // Computed
   const currentProviderData = computed(() => {
-    return availableProviders.value.find(p => p.id === currentProvider.value) || null
+    console.log('[useApiProvider] currentProviderData computed - currentProvider.value:', currentProvider.value);
+    console.log('[useApiProvider] currentProviderData computed - availableProviders.value:', availableProviders.value);
+    const data = availableProviders.value.find(p => p.id === currentProvider.value) || null;
+    console.log('[useApiProvider] currentProviderData computed - result data:', data);
+    return data;
   })
 
   const currentProviderIcon = computed(() => {
@@ -56,8 +60,9 @@ export function useApiProvider() {
   const loadCurrentProvider = async () => {
     try {
       await settingsStore.loadSettings()
-      const settings = settingsStore.settings
-      currentProvider.value = settings.TRANSLATION_API || 'google'
+      currentProvider.value = settingsStore.settings.TRANSLATION_API || 'google'
+      console.log('[useApiProvider] loadCurrentProvider - currentProvider.value set to:', currentProvider.value);
+
 
       // Check if current provider is available, fallback if needed
       const fallbackProvider = ProviderRegistry.getFallbackProvider(currentProvider.value)
@@ -66,7 +71,7 @@ export function useApiProvider() {
         currentProvider.value = fallbackProvider
         
         // Update settings with fallback
-        await browserAPI.safeStorageSet({ TRANSLATION_API: fallbackProvider })
+        await settingsStore.updateSettingAndPersist('TRANSLATION_API', fallbackProvider)
       }
     } catch (error) {
       console.error('[useApiProvider] Error loading current provider:', error)
@@ -77,6 +82,7 @@ export function useApiProvider() {
   // Select a new provider
   const selectProvider = async (providerId) => {
     if (!providerId || providerId === currentProvider.value) {
+      console.log('[useApiProvider] selectProvider - Provider already selected or invalid ID:', providerId);
       return false
     }
 
@@ -84,9 +90,15 @@ export function useApiProvider() {
       isLoading.value = true
       providerError.value = ''
 
-      await browserAPI.safeStorageSet({ TRANSLATION_API: providerId })
+      // Update both settingsStore and browser storage to ensure sync
+      await settingsStore.updateSettingAndPersist('TRANSLATION_API', providerId)
+      
+      // Also directly update browser storage to ensure legacy code sees the change
+      const browser = await browserAPI.ensureReady()
+      await browser.storage.local.set({ TRANSLATION_API: providerId })
       
       currentProvider.value = providerId
+      console.log('[useApiProvider] selectProvider - currentProvider.value updated to:', currentProvider.value);
       isDropdownOpen.value = false
       
       console.log(`[useApiProvider] Provider changed to: ${providerId}`)
@@ -134,56 +146,44 @@ export function useApiProvider() {
     return items
   }
 
-  // Handle provider change from other parts of extension
-  const handleStorageChange = (changes) => {
-    if (changes.TRANSLATION_API) {
-      const newProvider = changes.TRANSLATION_API.newValue
-      if (newProvider && newProvider !== currentProvider.value) {
-        currentProvider.value = newProvider
-        console.log(`[useApiProvider] Provider updated from storage: ${newProvider}`)
-      }
+  // Watch for changes in settingsStore.settings.TRANSLATION_API
+  watch(() => settingsStore.settings.TRANSLATION_API, (newProvider) => {
+    if (newProvider && newProvider !== currentProvider.value) {
+      currentProvider.value = newProvider
+      console.log(`[useApiProvider] Provider updated from settings store: ${newProvider}`)
     }
-  }
+  })
 
-  // Storage change listener
-  let storageListener = null
-
-  // Setup storage listener
+  // Listen for browser storage changes to sync with legacy code
   const setupStorageListener = async () => {
     try {
-      storageListener = await browserAPI.setupStorageListener(handleStorageChange)
-      if (storageListener) {
-        console.log('[useApiProvider] Storage listener setup successfully')
+      const browser = await browserAPI.ensureReady()
+      
+      if (browser && browser.storage && browser.storage.onChanged) {
+        browser.storage.onChanged.addListener((changes, areaName) => {
+          if (areaName === 'local' && changes.TRANSLATION_API) {
+            const newProvider = changes.TRANSLATION_API.newValue
+            if (newProvider && newProvider !== currentProvider.value) {
+              currentProvider.value = newProvider
+              settingsStore.settings.TRANSLATION_API = newProvider
+              console.log(`[useApiProvider] Provider synced from storage: ${newProvider}`)
+            }
+          }
+        })
+        console.log('[useApiProvider] Storage listener setup successful')
       } else {
-        console.warn('[useApiProvider] Browser storage API not available, skipping listener setup')
+        console.warn('[useApiProvider] Browser storage API not available')
       }
     } catch (error) {
-      console.warn('[useApiProvider] Unable to setup storage listener:', error.message)
-    }
-  }
-
-  // Cleanup storage listener
-  const cleanupStorageListener = async () => {
-    if (storageListener) {
-      try {
-        await browserAPI.removeStorageListener(storageListener)
-        storageListener = null
-      } catch (error) {
-        console.error('[useApiProvider] Error cleaning up storage listener:', error)
-      }
+      console.error('[useApiProvider] Error setting up storage listener:', error)
     }
   }
 
   // Initialize
   const initialize = async () => {
-    loadAvailableProviders()
+    await loadAvailableProviders()
     await loadCurrentProvider()
     await setupStorageListener()
-  }
-
-  // Cleanup
-  const cleanup = async () => {
-    await cleanupStorageListener()
   }
 
   // Lifecycle
@@ -192,7 +192,7 @@ export function useApiProvider() {
   })
 
   onUnmounted(() => {
-    cleanup()
+    // No specific cleanup needed as we are watching settingsStore
   })
 
   return {
@@ -205,7 +205,7 @@ export function useApiProvider() {
 
     // Computed
     currentProviderData,
-    currentProviderIcon,  
+    currentProviderIcon,
     currentProviderName,
 
     // Methods
@@ -214,10 +214,6 @@ export function useApiProvider() {
     selectProvider,
     getProviderIconUrl,
     createProviderItems,
-
-    // Utilities
-    initialize,
-    cleanup,
 
     // External state setters
     setDropdownOpen

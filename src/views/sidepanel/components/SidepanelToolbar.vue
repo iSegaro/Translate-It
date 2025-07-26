@@ -108,26 +108,23 @@ const props = defineProps({
 const emit = defineEmits(['historyToggle', 'apiDropdownToggle'])
 
 // Composables
-const { 
+const {
   showVisualFeedback,
   toggleElementSelection,
   isSelectElementModeActive
 } = useUI()
 
-const { 
+const {
   currentProviderIcon,
   currentProviderName,
   toggleDropdown: toggleApiDropdown,
   isDropdownOpen: isApiDropdownOpen
 } = useApiProvider()
 
-const { 
+const {
   toggleHistoryPanel,
-  isHistoryPanelOpen 
+  isHistoryPanelOpen
 } = useHistory()
-
-// Template refs
-const apiProviderIcon = ref(null)
 
 // Icon mapping
 const iconMap = {
@@ -149,24 +146,27 @@ const apiProviderIconSrc = computed(() => {
   if (currentProviderIcon.value) {
     // Extract filename from path like "icons/api-providers/google.svg"
     const filename = currentProviderIcon.value.split('/').pop()
+    console.log('[SidepanelToolbar] apiProviderIconSrc - extracted filename:', filename);
+    // Directly use filename as key for iconMap
     return iconMap[filename] || googleIcon
   }
+  console.log('[SidepanelToolbar] apiProviderIconSrc - currentProviderIcon.value is null/undefined, returning default googleIcon.');
   return googleIcon
-})
+});
 
 // Handle select element button click
 const handleSelectElement = async () => {
   try {
     toggleElementSelection()
-    
+
     const browser = await getBrowserAPI()
     await browser.runtime.sendMessage({
       action: 'startElementSelection'
     })
-    
+
     const button = document.getElementById('selectElementBtn')
     showVisualFeedback(button, 'success')
-    
+
     console.log('[SidepanelToolbar] Element selection mode activated')
   } catch (error) {
     console.error('[SidepanelToolbar] Error activating element selection:', error)
@@ -182,10 +182,10 @@ const handleRevertAction = async () => {
     await browser.runtime.sendMessage({
       action: 'revertLastAction'
     })
-    
+
     const button = document.getElementById('revertActionBtn')
     showVisualFeedback(button, 'success')
-    
+
     console.log('[SidepanelToolbar] Last action reverted')
   } catch (error) {
     console.error('[SidepanelToolbar] Error reverting action:', error)
@@ -202,27 +202,27 @@ const handleClearFields = () => {
     if (sourceTextArea) {
       sourceTextArea.value = ''
     }
-    
+
     // Clear translation result
     const translationResult = document.getElementById('translationResult')
     if (translationResult) {
       translationResult.textContent = ''
     }
-    
+
     // Update toolbar visibility for containers
     const sourceContainer = document.querySelector('.source-container')
     const resultContainer = document.querySelector('.result-container')
-    
+
     if (sourceContainer) {
       sourceContainer.classList.remove('has-content')
     }
     if (resultContainer) {
       resultContainer.classList.remove('has-content')
     }
-    
+
     const button = document.getElementById('clearFieldsBtn')
     showVisualFeedback(button, 'success')
-    
+
     console.log('[SidepanelToolbar] Fields cleared')
   } catch (error) {
     console.error('[SidepanelToolbar] Error clearing fields:', error)
@@ -235,10 +235,10 @@ const handleClearFields = () => {
 const handleApiProviderClick = () => {
   try {
     emit('apiDropdownToggle', !props.isApiDropdownVisible)
-    
+
     const button = document.getElementById('apiProviderBtn')
     showVisualFeedback(button, 'success', 300)
-    
+
     console.log('[SidepanelToolbar] API provider dropdown toggled:', !props.isApiDropdownVisible)
   } catch (error) {
     console.error('[SidepanelToolbar] Error toggling API provider dropdown:', error)
@@ -249,10 +249,10 @@ const handleApiProviderClick = () => {
 const handleHistoryClick = () => {
   try {
     emit('historyToggle', !props.isHistoryVisible)
-    
+
     const button = document.getElementById('historyBtn')
     showVisualFeedback(button, 'success', 300)
-    
+
     console.log('[SidepanelToolbar] History panel toggled:', !props.isHistoryVisible)
   } catch (error) {
     console.error('[SidepanelToolbar] Error toggling history panel:', error)
@@ -264,10 +264,10 @@ const handleSettingsClick = async () => {
   try {
     const browser = await getBrowserAPI()
     await browser.runtime.openOptionsPage()
-    
+
     const button = document.getElementById('settingsBtn')
     showVisualFeedback(button, 'success')
-    
+
     console.log('[SidepanelToolbar] Settings opened')
   } catch (error) {
     console.error('[SidepanelToolbar] Error opening settings:', error)
@@ -342,32 +342,16 @@ const cleanupEventListeners = () => {
   }
 }
 
-// Update API provider icon
-const updateApiProviderIcon = () => {
-  const iconElement = document.getElementById('apiProviderIcon')
-  if (iconElement && currentProviderIcon.value) {
-    iconElement.src = currentProviderIcon.value
-    iconElement.alt = currentProviderName.value || 'API Provider'
-  }
-}
-
 // Initialize component
 const initialize = () => {
   try {
-    apiProviderIcon.value = document.getElementById('apiProviderIcon')
-    updateApiProviderIcon()
     setupEventListeners()
-    
+
     console.log('[SidepanelToolbar] Component initialized')
   } catch (error) {
     console.error('[SidepanelToolbar] Initialization error:', error)
   }
 }
-
-// Watch for API provider changes
-watch(currentProviderIcon, () => {
-  updateApiProviderIcon()
-})
 
 // Watch for element selection mode changes
 watch(isSelectElementModeActive, (active) => {
@@ -391,7 +375,7 @@ watch(() => props.isHistoryVisible, (open) => {
   const button = document.getElementById('historyBtn')
   if (button) {
     button.classList.toggle('active', open)
-    console.log('[SidepanelToolbar] History panel visibility changed to:', open, '-> button active state:', button.classList.contains('active'))
+    console.log('[SidepanelToolbar] History panel toggled:', open, '-> button active state:', button.classList.contains('active'))
   }
 })
 
@@ -456,7 +440,7 @@ onUnmounted(() => {
 
   &.active {
     background-color: var(--color-primary);
-    
+
     .toolbar-icon {
       filter: invert(1);
     }

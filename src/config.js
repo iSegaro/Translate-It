@@ -326,8 +326,13 @@ export const getSettingsAsync = async () => {
 };
 
 export const initializeSettingsListener = async (Browser) => {
+  console.log('[config.js] initializeSettingsListener called, Browser.storage:', Browser.storage);
+  console.log('[config.js] Browser.storage.onChanged:', Browser.storage?.onChanged);
+  
   if (Browser.storage && Browser.storage.onChanged) {
+    console.log('[config.js] Setting up storage listener...');
     Browser.storage.onChanged.addListener((changes, areaName) => {
+      console.log(`[config.js] Storage change detected: area=${areaName}, changes=`, changes);
       if (areaName === "local" && settingsCache) {
         Object.keys(changes).forEach((key) => {
           if (
@@ -337,12 +342,14 @@ export const initializeSettingsListener = async (Browser) => {
           ) {
             const newValue = changes[key].newValue;
             if (settingsCache[key] !== newValue) {
+              console.log(`[config.js] Settings cache updated: ${key} = ${newValue} (was: ${settingsCache[key]})`);
               settingsCache[key] = newValue;
             }
           }
         });
       }
     });
+    console.log('[config.js] ✅ Storage listener successfully set up');
   } else {
     console.log(
       "Browser.storage.onChanged not available. Settings cache might become stale."
@@ -462,7 +469,9 @@ export const getPromptBASEScreenCaptureAsync = async () => {
 };
 
 export const getTranslationApiAsync = async () => {
-  return getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
+  const result = await getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
+  console.log(`[config.js] getTranslationApiAsync - Returning: ${result}`);
+  return result;
 };
 
 // WebAI Specific

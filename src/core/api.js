@@ -56,6 +56,7 @@ class ApiService {
 
     // Get translation API type
     const api = await getTranslationApiAsync();
+    console.log(`[api.js] translateText - Using API provider: ${api}`);
 
     // Skip translation if same language (except for certain modes)
     if (
