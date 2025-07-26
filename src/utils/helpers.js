@@ -113,9 +113,10 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
   return false;
 };
 
-export const isExtensionContextValid = () => {
+export const isExtensionContextValid = async () => {
   try {
-    return !!getBrowser()?.runtime?.id && !!getBrowser()?.storage?.local;
+    const browser = await getBrowserAsync();
+    return !!browser?.runtime?.id && !!browser?.storage?.local;
   } catch {
     return false;
   }
