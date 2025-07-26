@@ -1,6 +1,6 @@
 // src/managers/NotificationManager.js
 
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
@@ -96,9 +96,10 @@ export default class NotificationManager {
     }
   }
 
-  _setupLocaleListener() {
-    if (getBrowser().storage && getBrowser().storage.onChanged) {
-      getBrowser().storage.onChanged.addListener((changes, area) => {
+  async _setupLocaleListener() {
+    const browser = await getBrowserAsync();
+    if (browser.storage && browser.storage.onChanged) {
+      browser.storage.onChanged.addListener((changes, area) => {
         if (area === "local" && changes.APPLICATION_LOCALIZE) {
           // Only apply alignment if the container has already been created
           if (this.container) {
@@ -133,7 +134,7 @@ export default class NotificationManager {
   /**
    * [The `show` method now ensures the container exists before attempting to display a notification.
    */
-  show(msg, type = "info", auto = true, dur = null, onClick) {
+  async show(msg, type = "info", auto = true, dur = null, onClick) {
     // Step 1: Ensure the container is ready for in-page notifications.
     this._ensureContainerExists();
 
@@ -151,8 +152,9 @@ export default class NotificationManager {
 
     // Step 3: Fallback to a background script notification if in-page is not available or failed.
     logME(`[NotificationManager] In-page not available. Sending notification request to background for: "${msg}"`);
-    if (isExtensionContextValid()) {
-      getBrowser().runtime.sendMessage({
+    if (await isExtensionContextValid()) {
+      const browser = await getBrowserAsync();
+      browser.runtime.sendMessage({
         action: "show_os_notification",
         payload: { message: msg, title: cfg.title, type: type },
       }).catch(error => {
@@ -233,7 +235,7 @@ export default class NotificationManager {
     }
   }
 
-  isReady() {
+  async isReady() {
     // The meaning of 'ready' is now simpler: can it potentially show a notification?
     const containerExists = !!(this.container && document.body.contains(this.container));
     return {
