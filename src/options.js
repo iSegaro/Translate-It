@@ -506,18 +506,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         ?.classList.toggle("disabled", shouldDictionaryBeDisabled);
     }
 
+    // if (enableSubtitleCheckbox) {
+    //   // گزینه‌ی دیکشنری فقط باید غیرفعال شود اگر کل افزونه غیرفعال باشد
+    //   const shouldSubtitleBeDisabled = !isMasterEnabled;
+    //   enableSubtitleCheckbox.disabled = shouldSubtitleBeDisabled;
+    //   enableSubtitleCheckbox
+    //     .closest(".setting-group")
+    //     ?.classList.toggle("disabled", shouldSubtitleBeDisabled);
+    // }
     if (enableSubtitleCheckbox) {
       // گزینه‌ی دیکشنری فقط باید غیرفعال شود اگر کل افزونه غیرفعال باشد
-      const shouldSubtitleBeDisabled = !isMasterEnabled;
-      enableSubtitleCheckbox.disabled = shouldSubtitleBeDisabled;
+      const shouldSubtitleBeDisabled = true;
+      enableSubtitleCheckbox.disabled = true;
       enableSubtitleCheckbox
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldSubtitleBeDisabled);
     }
 
+    // if (showSubtitleIconCheckbox) {
+    //   const shouldSubtitleIconBeDisabled = !isMasterEnabled;
+    //   showSubtitleIconCheckbox.disabled = !isMasterEnabled;
+    //   showSubtitleIconCheckbox
+    //     .closest(".setting-group")
+    //     ?.classList.toggle("disabled", shouldSubtitleIconBeDisabled);
+    // }
     if (showSubtitleIconCheckbox) {
-      const shouldSubtitleIconBeDisabled = !isMasterEnabled;
-      showSubtitleIconCheckbox.disabled = !isMasterEnabled;
+      const shouldSubtitleIconBeDisabled = true;
+      showSubtitleIconCheckbox.disabled = true;
       showSubtitleIconCheckbox
         .closest(".setting-group")
         ?.classList.toggle("disabled", shouldSubtitleIconBeDisabled);
@@ -920,10 +935,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         CONFIG.TRANSLATE_ON_TEXT_FIELDS,
       ENABLE_DICTIONARY:
         enableDictionraryCheckbox?.checked ?? CONFIG.ENABLE_DICTIONARY,
+      // ENABLE_SUBTITLE_TRANSLATION:
+      //   enableSubtitleCheckbox?.checked ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
+      // SHOW_SUBTITLE_ICON:
+      //   showSubtitleIconCheckbox?.checked ?? CONFIG.SHOW_SUBTITLE_ICON,
       ENABLE_SUBTITLE_TRANSLATION:
-        enableSubtitleCheckbox?.checked ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
+        false,
       SHOW_SUBTITLE_ICON:
-        showSubtitleIconCheckbox?.checked ?? CONFIG.SHOW_SUBTITLE_ICON,
+        false,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS:
         enableShortcutForTextFieldsCheckbox?.checked ??
         CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS,
@@ -1039,13 +1058,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (enableDictionraryCheckbox)
         enableDictionraryCheckbox.checked =
           settings.ENABLE_DICTIONARY ?? CONFIG.ENABLE_DICTIONARY;
+      // if (enableSubtitleCheckbox)
+      //   enableSubtitleCheckbox.checked =
+      //     settings.ENABLE_SUBTITLE_TRANSLATION ??
+      //     CONFIG.ENABLE_SUBTITLE_TRANSLATION;
+      // if (showSubtitleIconCheckbox)
+      //   showSubtitleIconCheckbox.checked =
+      //     settings.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON;
       if (enableSubtitleCheckbox)
-        enableSubtitleCheckbox.checked =
-          settings.ENABLE_SUBTITLE_TRANSLATION ??
-          CONFIG.ENABLE_SUBTITLE_TRANSLATION;
+        enableSubtitleCheckbox.checked = false;
       if (showSubtitleIconCheckbox)
-        showSubtitleIconCheckbox.checked =
-          settings.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON;
+        showSubtitleIconCheckbox.checked = false;
 
       // Populate text inputs and textareas
       if (sourceLanguageInput)
