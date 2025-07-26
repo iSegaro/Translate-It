@@ -83,9 +83,9 @@
         <button
           type="submit"
           class="translate-button-main"
-          :disabled="isTranslating || !sourceText.trim()"
+          :disabled="!sourceText.trim()"
         >
-          <span>{{ isTranslating ? 'Translating...' : 'Translate' }}</span>
+          <span>{{ showSpinner ? 'Translating...' : 'Translate' }}</span>
           <img src="@/assets/icons/translate.png" alt="Translate" />
         </button>
       </div>
@@ -150,6 +150,7 @@ const translationError = ref('')
 const isTranslating = ref(false)
 const showPasteButton = ref(false)
 const showSpinner = ref(false)
+const currentAbortController = ref(null)
 
 // Computed properties for toolbar visibility
 const hasSourceContent = computed(() => {
@@ -160,7 +161,7 @@ const hasTranslationContent = computed(() => {
   return (translationResult.value || translationError.value || '').trim().length > 0
 })
 
-// Handle form submission
+// Handle form submission with request cancellation
 const handleTranslationSubmit = async () => {
   console.log('[SidepanelMainContent] Translation submit started')
   
@@ -175,6 +176,16 @@ const handleTranslationSubmit = async () => {
     return
   }
 
+  // Cancel previous request if exists
+  if (currentAbortController.value) {
+    console.log('[SidepanelMainContent] Cancelling previous translation request')
+    currentAbortController.value.abort()
+  }
+
+  // Create new abort controller for this request
+  currentAbortController.value = new AbortController()
+  const abortSignal = currentAbortController.value.signal
+
   try {
     isTranslating.value = true
     translationError.value = ''
@@ -184,18 +195,30 @@ const handleTranslationSubmit = async () => {
     console.log('[SidepanelMainContent] Ensuring background script is ready...')
     await backgroundWarmup.ensureWarmedUp()
     
+    // Check if request was cancelled during warmup
+    if (abortSignal.aborted) {
+      console.log('[SidepanelMainContent] Request aborted during warmup')
+      return
+    }
+    
     console.log('[SidepanelMainContent] Sending translation request:', {
       sourceText: sourceText.value.substring(0, 50) + '...',
       targetLanguage
     })
 
-    // Try direct message first for debugging
+    // Send translation request with abort signal
     const response = await directMessage.sendTranslation({
       promptText: sourceText.value,
       sourceLanguage: 'auto',
       targetLanguage: targetLanguage,
       translateMode: 'sidepanel'
-    })
+    }, abortSignal)
+
+    // Check if request was cancelled before processing response
+    if (abortSignal.aborted) {
+      console.log('[SidepanelMainContent] Request aborted before processing response')
+      return
+    }
 
     console.log('[SidepanelMainContent] Translation response:', response)
 
@@ -204,7 +227,6 @@ const handleTranslationSubmit = async () => {
     }
 
     if (response.success && response.data?.translatedText) {
-      showSpinner.value = false
       translationResult.value = response.data.translatedText
       console.log('[SidepanelMainContent] Translation displayed successfully')
     } else {
@@ -212,11 +234,21 @@ const handleTranslationSubmit = async () => {
     }
 
   } catch (error) {
+    // Don't show error if request was cancelled
+    if (error.name === 'AbortError' || abortSignal.aborted) {
+      console.log('[SidepanelMainContent] Translation request was cancelled')
+      return
+    }
+    
     console.error('[SidepanelMainContent] Translation failed:', error)
-    showSpinner.value = false
     translationError.value = error.message || 'Translation failed'
   } finally {
-    isTranslating.value = false
+    // Only cleanup if this is still the current request
+    if (currentAbortController.value?.signal === abortSignal) {
+      showSpinner.value = false
+      isTranslating.value = false
+      currentAbortController.value = null
+    }
   }
 }
 
@@ -424,6 +456,12 @@ onUnmounted(() => {
   // Clean up event listeners
   document.removeEventListener('focus', handleFocus, true)
   window.removeEventListener('focus', handleFocus)
+  
+  // Cancel any pending translation request
+  if (currentAbortController.value) {
+    currentAbortController.value.abort()
+    currentAbortController.value = null
+  }
 })
 </script>
 
@@ -477,6 +515,13 @@ form {
   background-position: right 10px center;
   background-size: 16px;
   padding-right: 30px;
+  filter: var(--icon-filter, none);
+}
+
+html[dir="rtl"] .language-select {
+  background-position: left 10px center;
+  padding-right: 10px;
+  padding-left: 30px;
 }
 
 .swap-button {

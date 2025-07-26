@@ -43,13 +43,45 @@ export function useDirectMessage() {
   /**
    * Send translation message with minimal wrapping
    */
-  const sendTranslation = async (payload) => {
+  const sendTranslation = async (payload, abortSignal) => {
     console.log('[useDirectMessage] Sending translation with payload:', payload)
+    
+    // Check if request was cancelled before starting
+    if (abortSignal?.aborted) {
+      throw new Error('Request was cancelled before sending')
+    }
     
     const message = {
       action: 'fetchTranslation',
       target: 'background', // Explicitly target background service worker
       payload: payload
+    }
+    
+    // If abort signal provided, race the request against cancellation
+    if (abortSignal) {
+      return new Promise((resolve, reject) => {
+        // Set up abort handler
+        const abortHandler = () => {
+          const abortError = new Error('Request cancelled')
+          abortError.name = 'AbortError'
+          reject(abortError)
+        }
+        
+        if (abortSignal.aborted) {
+          abortHandler()
+          return
+        }
+        
+        abortSignal.addEventListener('abort', abortHandler)
+        
+        // Send the actual request
+        directSendMessage(message)
+          .then(resolve)
+          .catch(reject)
+          .finally(() => {
+            abortSignal.removeEventListener('abort', abortHandler)
+          })
+      })
     }
     
     return await directSendMessage(message)
