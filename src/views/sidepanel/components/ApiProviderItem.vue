@@ -66,7 +66,14 @@ const handleClick = () => {
     }
 
     .provider-icon img {
-      filter: brightness(0) invert(1);
+      // Theme-aware filtering for better visibility on colored background
+      // Light theme: brightness(1.4) contrast(1.8) saturate(0.8) - enhances visibility while preserving colors
+      // Dark theme: brightness(0.1) invert(1) brightness(1.2) contrast(1.5) - creates white icons for dark backgrounds
+      filter: var(--provider-icon-active-filter, brightness(1.4) contrast(1.8) saturate(0.8));
+      // Theme-aware shadow for better definition
+      box-shadow: var(--provider-icon-active-shadow, 0 1px 3px rgba(0, 0, 0, 0.2));
+      border-radius: 2px;
+      transition: all 0.2s ease;
     }
   }
 }

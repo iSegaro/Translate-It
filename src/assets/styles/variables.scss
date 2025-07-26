@@ -23,6 +23,10 @@
   --link-hover-color: #0c5dc0;
   --section-title-border: #dadce0;
   --github-icon-filter: none;
+  
+  // Icon filtering for active API provider items (light theme)
+  --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
+  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 :root.theme-dark {
@@ -48,6 +52,10 @@
   --link-hover-color: #a7c8fa;
   --section-title-border: #5f6368;
   --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+  
+  // Icon filtering for active API provider items (dark theme)
+  --provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);
+  --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
 }
 
 // Map theme variables to component variables
@@ -76,6 +84,10 @@
   --color-warning: #ff9800;
   --color-error: #f44336;
   --color-info: #2196f3;
+  
+  // Default fallback values for provider icon filtering (light theme bias)
+  --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
+  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 // SCSS Variables (for Sass functions like darken, lighten)
