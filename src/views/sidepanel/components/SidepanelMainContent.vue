@@ -148,7 +148,7 @@ const sourceText = ref('')
 const translationResult = ref('')
 const translationError = ref('')
 const isTranslating = ref(false)
-const showPasteButton = ref(false)
+const showPasteButton = ref(true)
 const showSpinner = ref(false)
 const currentAbortController = ref(null)
 
@@ -294,10 +294,17 @@ const handleSourceTextInput = () => {
 // Check clipboard for paste button visibility
 const checkClipboard = async () => {
   try {
+    console.log('[SidepanelMainContent] Checking clipboard...')
     const text = await navigator.clipboard.readText()
-    showPasteButton.value = text.trim().length > 0
+    const hasContent = text.trim().length > 0
+    console.log('[SidepanelMainContent] Clipboard content exists:', hasContent, 'Length:', text.length)
+    showPasteButton.value = hasContent
+    console.log('[SidepanelMainContent] showPasteButton set to:', showPasteButton.value)
   } catch (error) {
-    showPasteButton.value = false
+    console.log('[SidepanelMainContent] Clipboard check failed:', error.message)
+    // Fallback: show button always if permission denied
+    showPasteButton.value = true
+    console.log('[SidepanelMainContent] Fallback: showPasteButton set to true')
   }
 }
 
@@ -703,11 +710,12 @@ html[dir="rtl"] .result:empty::before {
   opacity: 1;
 }
 
-.paste-icon-separate {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  display: none;
+/* Force paste button to right side with high specificity */
+.textarea-container.source-container .paste-icon-separate {
+  position: absolute !important;
+  top: 5px !important;
+  right: 8px !important;
+  left: auto !important;
   z-index: 10;
   opacity: 0.6;
   cursor: pointer;
@@ -722,9 +730,9 @@ html[dir="rtl"] .result:empty::before {
 }
 
 /* RTL support for paste button - Match OLD implementation */
-html[dir="rtl"] .paste-icon-separate {
-  left: 18px;
-  right: auto;
+html[dir="rtl"] .textarea-container.source-container .paste-icon-separate {
+  left: 18px !important;
+  right: auto !important;
 }
 
 /* Spinner styles - Match OLD implementation */
