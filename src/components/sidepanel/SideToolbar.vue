@@ -4,8 +4,12 @@
       <!-- Select Element Button -->
       <button
         class="toolbar-button"
-        :disabled="isSelectElementActivating"
-        :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP', 'Select Element')"
+        :disabled="isSelectElementActivating || isReverting"
+        :class="{ 
+          'active': isSelecting,
+          'loading': isSelectElementActivating 
+        }"
+        :title="getSelectElementTooltip()"
         @click="handleSelectElement"
       >
         <img
@@ -90,7 +94,8 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useSelectElementTranslation, useSidepanelActions } from '@/composables/useTranslationModes.js'
+import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
+import { useSidepanelActions } from '@/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useI18n } from '@/composables/useI18n.js'
@@ -120,6 +125,7 @@ const { t } = useI18n()
 
 // State
 const isSelectElementActivating = computed(() => selectElement.isActivating.value)
+const isSelecting = computed(() => selectElement.isSelecting.value)
 const isReverting = computed(() => sidepanelActions.isProcessing.value)
 
 // API provider icon
@@ -131,15 +137,23 @@ const apiProviderIcon = computed(() => {
   return '@/assets/icons/api-providers/google.svg'
 })
 
+// Tooltip text for Select Element button
+const getSelectElementTooltip = () => {
+  if (isSelecting.value) {
+    return t('SIDEPANEL_SELECT_ELEMENT_ACTIVE_TOOLTIP', 'Click to stop selecting elements')
+  }
+  return t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP', 'Select Element')
+}
+
 // Event Handlers
 const handleSelectElement = async () => {
   logME('[SideToolbar] Select element button clicked')
   
-  const success = await selectElement.activateSelectMode()
-  if (success) {
+  try {
+    await selectElement.toggleSelectElement()
     emit('select-element')
-  } else {
-    console.error('[SideToolbar] Failed to activate select element mode:', selectElement.error.value)
+  } catch (error) {
+    console.error('[SideToolbar] Failed to toggle select element mode:', error)
   }
 }
 
@@ -248,6 +262,39 @@ onUnmounted(() => {
 .toolbar-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.toolbar-button.active {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}
+
+.toolbar-button.active .toolbar-icon {
+  filter: brightness(0) invert(1);
+}
+
+.toolbar-button.loading {
+  position: relative;
+  opacity: 0.8;
+}
+
+.toolbar-button.loading::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent-primary);
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 .toolbar-icon {

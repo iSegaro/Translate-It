@@ -40,10 +40,18 @@
         </select>
       </div>
 
+      <!-- Select Element Status -->
+      <div v-if="isSelecting" class="selection-status">
+        <div class="selection-indicator">
+          <div class="selection-spinner"></div>
+          <span>{{ t('SELECT_ELEMENT_ACTIVE_MESSAGE', 'Click on any element on the webpage to translate...') }}</span>
+        </div>
+      </div>
+
       <!-- Source Text Area with Toolbar -->
       <div 
         class="textarea-container source-container" 
-        :class="{ 'has-content': hasSourceContent }"
+        :class="{ 'has-content': hasSourceContent, 'selection-mode': isSelecting }"
       >
         <div class="inline-toolbar source-toolbar">
           <img
@@ -135,13 +143,17 @@ import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useTTSSmart } from '@/composables/useTTSSmart.js'
 import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
 import { useDirectMessage } from '@/composables/useDirectMessage.js'
+import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
+import { useI18n } from '@/composables/useI18n.js'
 
-// Browser API, TTS, Background Warmup, and Direct Message
+// Browser API, TTS, Background Warmup, Direct Message, Select Element, and i18n
 const browserAPI = useBrowserAPI()
 const tts = useTTSSmart()
 const backgroundWarmup = useBackgroundWarmup()
 const directMessage = useDirectMessage()
+const selectElement = useSelectElementTranslation()
+const { t } = useI18n()
 
 // Simple state
 const sourceText = ref('')
@@ -152,7 +164,7 @@ const showPasteButton = ref(true)
 const showSpinner = ref(false)
 const currentAbortController = ref(null)
 
-// Computed properties for toolbar visibility
+// Computed properties for UI state
 const hasSourceContent = computed(() => {
   return sourceText.value.trim().length > 0
 })
@@ -160,6 +172,10 @@ const hasSourceContent = computed(() => {
 const hasTranslationContent = computed(() => {
   return (translationResult.value || translationError.value || '').trim().length > 0
 })
+
+// Select Element computed properties
+const isSelecting = computed(() => selectElement.isSelecting.value)
+const isSelectElementActivating = computed(() => selectElement.isActivating.value)
 
 // Handle form submission with request cancellation
 const handleTranslationSubmit = async () => {
@@ -449,7 +465,25 @@ const getLanguageDisplayName = (langCode) => {
   return languageMap[langCode] || langCode
 }
 
-// Lifecycle - setup event listeners for paste button
+// Select Element integration - auto-populate form
+const handleTextExtracted = (extractedText, elementData) => {
+  console.log('[SidepanelMainContent] Text extracted from element:', extractedText)
+  
+  // Populate source text
+  sourceText.value = extractedText
+  
+  // Clear previous translation and error
+  translationResult.value = ''
+  translationError.value = ''
+  
+  // Optional: Auto-trigger translation
+  // You can add a setting for this later
+  // if (settings.autoTranslateOnSelection) {
+  //   handleTranslationSubmit()
+  // }
+}
+
+// Lifecycle - setup event listeners
 onMounted(() => {
   // Initial clipboard check
   checkClipboard()
@@ -457,6 +491,11 @@ onMounted(() => {
   // Add focus listener for clipboard updates
   document.addEventListener('focus', handleFocus, true)
   window.addEventListener('focus', handleFocus)
+  
+  // Setup Select Element text extraction handler
+  selectElement.onTextExtracted.value = handleTextExtracted
+  
+  console.log('[SidepanelMainContent] Component mounted with Select Element integration')
 })
 
 onUnmounted(() => {
@@ -481,6 +520,55 @@ onUnmounted(() => {
   flex-direction: column;
   overflow-y: hidden;
   box-sizing: border-box;
+}
+
+/* Select Element Status Styling */
+.selection-status {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.selection-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.selection-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-on-accent);
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Selection Mode Styling */
+.textarea-container.selection-mode {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.textarea-container.selection-mode textarea {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 form {
