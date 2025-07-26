@@ -13,133 +13,103 @@ import { resolveLangCode } from "../langUtils.js";
 let activeTTS = null;
 
 /**
- * Chrome-specific TTS player with Direct Google TTS
+ * Chrome-specific TTS player using TTS Manager
  * 1) Chrome TTS API (preferred, if available)
- * 2) Direct Google TTS URL + Audio object (reliable fallback)
+ * 2) TTS Manager offscreen (reliable with proper readiness)
+ * 3) Direct Google TTS URL (fallback)
  */
 export async function playTTS(message) {
-  stopTTS();
+  try {
+    console.log("[TTS Chrome] playTTS called with message:", message);
+    stopTTS();
 
-  const text = message?.text?.trim();
-  if (!text) {
-    throw new Error("No text provided for TTS.");
-  }
+    const text = message?.text?.trim();
+    if (!text) {
+      throw new Error("No text provided for TTS.");
+    }
+    console.log("[TTS Chrome] Text validation passed:", text);
 
-  // Language detection
-  let rawLang = message?.lang || AUTO_DETECT_VALUE;
-  if (rawLang === AUTO_DETECT_VALUE) {
+    // Language detection
+    let rawLang = message?.lang || AUTO_DETECT_VALUE;
+    console.log("[TTS Chrome] Raw language:", rawLang);
+    
+    if (rawLang === AUTO_DETECT_VALUE) {
+      try {
+        console.log("[TTS Chrome] Starting language detection...");
+        const detectedLang = await detectTextLanguage(text);
+        rawLang = detectedLang || "en";
+        console.log("[TTS Chrome] Language detected:", rawLang);
+      } catch (err) {
+        console.log("[TTS Chrome] Language detection failed. Fallback to 'en'.", err);
+        rawLang = "en";
+      }
+    }
+
+    const lang = resolveLangCode(rawLang);
+    console.log("[TTS Chrome] Final language to play:", lang);
+
+    // Try Chrome TTS API first (fastest when available)
+    console.log("[TTS Chrome] Checking Chrome TTS API availability...");
     try {
-      const detectedLang = await detectTextLanguage(text);
-      rawLang = detectedLang || "en";
+      if (typeof chrome !== "undefined" && chrome.tts) {
+        console.log("[TTS Chrome] Chrome TTS API available, attempting...");
+        const playbackPromise = playAudioChromeTTS(text, lang);
+        
+        activeTTS = { method: "chrome" };
+        
+        await playbackPromise
+          .catch((err) => {
+            console.log("[TTS Chrome] chrome.tts error:", err);
+            throw err;
+          })
+          .finally(() => {
+            activeTTS = null;
+          });
+
+        console.log("[TTS Chrome] Chrome TTS completed successfully");
+        return { success: true };
+      } else {
+        console.log("[TTS Chrome] Chrome TTS API not available");
+      }
     } catch (err) {
-      logME("[TTS Chrome] Language detection failed. Fallback to 'en'.", err);
-      rawLang = "en";
-    }
-  }
-
-  const lang = resolveLangCode(rawLang);
-  logME("[TTS Chrome] Final language to play:", lang);
-
-  // Try Chrome TTS API first (fastest when available)
-  try {
-    if (typeof chrome !== "undefined" && chrome.tts) {
-      logME("[TTS Chrome] Attempting chrome.tts...");
-      const playbackPromise = playAudioChromeTTS(text, lang);
-      
-      activeTTS = { method: "chrome" };
-      
-      await playbackPromise
-        .catch((err) => {
-          logME("[TTS Chrome] chrome.tts error:", err);
-          throw err;
-        })
-        .finally(() => {
-          activeTTS = null;
-        });
-
-      return { success: true };
-    }
-  } catch (err) {
-    logME("[TTS Chrome] chrome.tts failed, fallback to Direct Google TTS...", err);
-  }
-
-  // Ensure offscreen document exists, then use offscreen TTS
-  logME("[TTS Chrome] Ensuring offscreen document for TTS...");
-
-  try {
-    // Ensure offscreen document is available
-    await ensureOffscreenForTTS();
-    
-    activeTTS = { method: "offscreen-tts" };
-    
-    // Send TTS request to offscreen document  
-    const response = await sendMessageToOffscreen({
-      action: 'speak',
-      text: text,
-      lang: lang,
-      rate: 1,
-      pitch: 1,
-      volume: 1,
-      fromTTSPlayer: true  // Mark as coming from cache layer
-    });
-
-    if (!response || !response.success) {
-      throw new Error(response?.error || "Offscreen TTS failed");
+      console.log("[TTS Chrome] chrome.tts failed, fallback to TTS Manager...", err);
     }
 
-    logME("[TTS Chrome] Offscreen TTS completed successfully");
-    activeTTS = null;
-    return { success: true };
-    
-  } catch (offscreenErr) {
-    activeTTS = null;
-    logME("[TTS Chrome] Offscreen TTS failed, fallback to Direct Google TTS:", offscreenErr);
-    
-    // Fallback to direct method if offscreen fails
+    // Use TTS Manager with proper readiness system
+    console.log("[TTS Chrome] Using TTS Manager for offscreen TTS...");
+
     try {
-      activeTTS = { method: "direct-google", audio: null };
+      // Load TTS Manager (speak() method handles initialization internally)
+      console.log("[TTS Chrome] Loading TTS Manager...");
+      const { featureLoader } = await import('../../background/feature-loader.js');
+      const ttsManager = await featureLoader.loadTTSManager();
+      console.log("[TTS Chrome] TTS Manager loaded, ready to speak");
       
-      // Create Google TTS URL
-      const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}&client=gtx`;
+      activeTTS = { method: "tts-manager" };
       
-      // Create and play audio
-      const audio = new Audio(googleTTSUrl);
-      audio.crossOrigin = "anonymous";
-      activeTTS.audio = audio;
-      
-      // Setup event handlers
-      const playPromise = new Promise((resolve, reject) => {
-        audio.onended = () => {
-          logME("[TTS Chrome] Direct Google TTS playback ended");
-          activeTTS = null;
-          resolve();
-        };
-        
-        audio.onerror = (error) => {
-          logME("[TTS Chrome] Direct Google TTS error:", error);
-          activeTTS = null;
-          reject(new Error("Google TTS playback failed"));
-        };
-        
-        audio.onloadstart = () => {
-          logME("[TTS Chrome] Direct Google TTS loading started");
-        };
+      // Use TTS Manager's speak method (text, options)
+      console.log("[TTS Chrome] Calling ttsManager.speak with:", { text, lang });
+      await ttsManager.speak(text, {
+        lang: lang,
+        rate: message.rate || 1,
+        pitch: message.pitch || 1,
+        volume: message.volume || 1
       });
-      
-      // Start playback
-      await audio.play();
-      logME("[TTS Chrome] Direct Google TTS playback started");
-      
-      // Wait for completion
-      await playPromise;
-      
-      return { success: true };
-      
-    } catch (directGoogleErr) {
+
+      console.log("[TTS Chrome] TTS Manager completed successfully");
       activeTTS = null;
-      logME("[TTS Chrome] Both offscreen and direct Google TTS failed:", directGoogleErr);
-      throw new Error("All TTS methods failed");
-    }
+      return { success: true };
+    
+  } catch (ttsManagerErr) {
+    activeTTS = null;
+    console.error("[TTS Chrome] TTS Manager failed:", ttsManagerErr);
+    throw new Error("TTS Manager failed: " + ttsManagerErr.message);
+  }
+  
+  } catch (mainError) {
+    console.error("[TTS Chrome] Critical error in playTTS:", mainError);
+    activeTTS = null;
+    throw mainError;
   }
 }
 
@@ -164,6 +134,19 @@ export function stopTTS() {
         }
         break;
 
+      case "tts-manager":
+        // Use TTS Manager's stop method
+        (async () => {
+          try {
+            const { featureLoader } = await import('../../background/feature-loader.js');
+            const ttsManager = await featureLoader.loadTTSManager();
+            await ttsManager.stop();
+          } catch (err) {
+            logME("[TTS Chrome] Error stopping TTS Manager:", err);
+          }
+        })();
+        break;
+
       case "webspeech":
         // Deprecated: Web Speech API removed for reliability
         if (typeof speechSynthesis !== "undefined") {
@@ -172,9 +155,8 @@ export function stopTTS() {
         break;
 
       case "offscreen-tts":
-        if (typeof chrome !== "undefined" && chrome.runtime) {
-          chrome.runtime.sendMessage({ action: 'stopTTS' }).catch(() => {});
-        }
+        // Deprecated: Direct offscreen calls removed - use TTS Manager
+        logME("[TTS Chrome] Direct offscreen method deprecated, use TTS Manager");
         break;
 
       case "offscreen":
@@ -193,66 +175,8 @@ export function stopTTS() {
   activeTTS = null;
 }
 
-/**
- * Ensure offscreen document exists for TTS
- * @returns {Promise<void>}
- */
-async function ensureOffscreenForTTS() {
-  try {
-    // Check if offscreen API is available
-    if (!chrome.offscreen) {
-      throw new Error("Offscreen API not available");
-    }
-
-    // Check if offscreen document already exists
-    const existingContexts = await chrome.runtime.getContexts({
-      contextTypes: ['OFFSCREEN_DOCUMENT']
-    });
-
-    if (existingContexts.length > 0) {
-      logME("[TTS Chrome] Offscreen document already exists");
-      return;
-    }
-
-    // Create new offscreen document
-    await chrome.offscreen.createDocument({
-      url: 'html/offscreen.html',
-      reasons: ['AUDIO_PLAYBACK'],
-      justification: 'TTS audio playback for translation extension'
-    });
-
-    logME("[TTS Chrome] Offscreen document created for TTS");
-    
-    // Small delay to ensure script loads
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-  } catch (error) {
-    logME("[TTS Chrome] Failed to ensure offscreen document:", error);
-    throw error;
-  }
-}
-
-/**
- * Send message to offscreen document
- * @param {Object} message - Message to send
- * @returns {Promise<Object>} Response from offscreen
- */
-async function sendMessageToOffscreen(message) {
-  try {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  } catch (error) {
-    logME("[TTS Chrome] Failed to send message to offscreen:", error);
-    throw error;
-  }
-}
+// Removed duplicate offscreen management functions
+// Now using TTS Manager for proper offscreen handling with readiness system
 
 /**
  * Get audio blob for caching purposes
@@ -284,7 +208,7 @@ export async function getAudioBlob(text, lang) {
 }
 
 /**
- * Play cached audio blob via offscreen document
+ * Play cached audio blob via offscreen (using direct runtime message)
  * @param {Blob} audioBlob - Cached audio blob to play
  * @returns {Promise<Object>} Result object
  */
@@ -292,8 +216,11 @@ export async function playAudioBlobViaOffscreen(audioBlob) {
   try {
     logME("[TTS Chrome] Playing cached audio blob via offscreen:", audioBlob.size, "bytes");
     
-    // Ensure offscreen document exists
-    await ensureOffscreenForTTS();
+    // Load TTS Manager to ensure offscreen readiness
+    const { featureLoader } = await import('../../background/feature-loader.js');
+    const ttsManager = await featureLoader.loadTTSManager();
+    
+    // TTS Manager is already initialized, no need to call ensureReady()
     
     // Convert blob to ArrayBuffer for message passing
     const arrayBuffer = await audioBlob.arrayBuffer();
@@ -301,11 +228,19 @@ export async function playAudioBlobViaOffscreen(audioBlob) {
     
     logME("[TTS Chrome] Sending cached audio data to offscreen:", audioData.length, "bytes");
     
-    // Send cached audio to offscreen for playback
-    const response = await sendMessageToOffscreen({
-      action: 'playCachedAudio',
-      audioData: audioData,
-      fromTTSPlayer: true
+    // Send cached audio directly to offscreen document
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: 'playCachedAudio',
+        audioData: audioData,
+        fromTTSPlayer: true
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
 
     if (!response || !response.success) {
@@ -321,27 +256,4 @@ export async function playAudioBlobViaOffscreen(audioBlob) {
   }
 }
 
-async function stopAudioViaOffscreen() {
-  try {
-    if (!chrome.offscreen?.hasDocument) return;
-    const docExists = await chrome.offscreen.hasDocument();
-    if (!docExists) return;
-
-    await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: "stopOffscreenAudio",
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-
-    await chrome.offscreen.closeDocument();
-    logME("[TTS Chrome] Offscreen stopped and closed.");
-  } catch (err) {
-    logME("[TTS Chrome] Error stopping offscreen audio:", err);
-  }
-}
+// Removed stopAudioViaOffscreen() - now handled by TTS Manager
