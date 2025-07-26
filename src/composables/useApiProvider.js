@@ -179,6 +179,17 @@ export function useApiProvider() {
     }
   }
 
+  // Convenience functions for opening/closing dropdown
+  const openDropdown = () => {
+    isDropdownOpen.value = true
+    console.log('[useApiProvider] API dropdown opened')
+  }
+
+  const closeDropdown = () => {
+    isDropdownOpen.value = false
+    console.log('[useApiProvider] API dropdown closed')
+  }
+
   // Initialize
   const initialize = async () => {
     await loadAvailableProviders()
@@ -215,7 +226,9 @@ export function useApiProvider() {
     getProviderIconUrl,
     createProviderItems,
 
-    // External state setters
+    // Dropdown Management
+    openDropdown,
+    closeDropdown,
     setDropdownOpen
   }
 }

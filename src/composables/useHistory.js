@@ -149,6 +149,17 @@ export function useHistory() {
     isHistoryPanelOpen.value = value
   }
 
+  // Convenience functions for opening/closing history panel
+  const openHistoryPanel = () => {
+    isHistoryPanelOpen.value = true
+    console.log('[useHistory] History panel opened')
+  }
+
+  const closeHistoryPanel = () => {
+    isHistoryPanelOpen.value = false
+    console.log('[useHistory] History panel closed')
+  }
+
   // Watch for changes in settingsStore.settings.translationHistory
   watch(() => settingsStore.settings.translationHistory, (newHistory) => {
     if (newHistory) {
@@ -186,6 +197,8 @@ export function useHistory() {
     
     // Panel Management
     setHistoryPanelOpen,
+    openHistoryPanel,
+    closeHistoryPanel,
 
     // Utilities
     formatTime,
