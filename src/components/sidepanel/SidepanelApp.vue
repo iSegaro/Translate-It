@@ -1,0 +1,499 @@
+<template>
+  <div class="sidepanel-container">
+    <!-- Side Toolbar -->
+    <SideToolbar
+      @select-element="handleSelectElement"
+      @revert="handleRevert"
+      @clear="handleClear"
+      @api-provider="handleApiProvider"
+      @history="handleHistory"
+      @settings="handleSettings"
+    />
+
+    <!-- Content area -->
+    <div class="content-area">
+      <!-- Main Content -->
+      <div class="main-content">
+        <TranslationForm
+          v-model:source-text="sourceText"
+          v-model:source-language="sourceLanguage"
+          v-model:target-language="targetLanguage"
+          :is-translating="isTranslating"
+          @translate="handleTranslate"
+          @swap-languages="handleSwapLanguages"
+        />
+
+        <TranslationResult
+          :result="translationResult"
+          :is-loading="isTranslating"
+          :error="translationError"
+          :target-language="targetLanguage"
+        />
+      </div>
+
+      <!-- History Panel -->
+      <div 
+        v-if="showHistoryPanel" 
+        class="history-panel show"
+      >
+        <div class="history-header">
+          <h3>{{ t('SIDEPANEL_HISTORY_TITLE', 'Translation History') }}</h3>
+          <button 
+            class="close-btn"
+            @click="showHistoryPanel = false"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="history-list">
+          <!-- History content will be handled by existing HistoryManager -->
+          <div id="historyList" ref="historyListElement"></div>
+        </div>
+        <div class="history-footer">
+          <button
+            class="clear-all-btn"
+            :title="t('SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP', 'Clear All History')"
+            @click="handleClearAllHistory"
+          >
+            <img
+              src="@/assets/icons/trash.svg"
+              alt="Clear All"
+              class="clear-all-icon"
+            />
+            <span>{{ t('SIDEPANEL_CLEAR_ALL_HISTORY', 'Clear All History') }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Provider Dropdown -->
+    <div 
+      v-if="showApiProviderDropdown"
+      class="dropdown-menu"
+      ref="apiProviderDropdownElement"
+    >
+      <!-- Dynamic provider options will be loaded here -->
+      <div id="apiProviderDropdown"></div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import SideToolbar from './SideToolbar.vue'
+import TranslationForm from './TranslationForm.vue'
+import TranslationResult from './TranslationResult.vue'
+import { useSidepanelTranslation } from '@/composables/useTranslationModes.js'
+import { useSettingsStore } from '@/store/core/settings.js'
+import { useHistory } from '@/composables/useHistory.js'
+import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
+import { useLanguages } from '@/composables/useLanguages.js'
+import { useI18n } from '@/composables/useI18n.js'
+import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { logME } from '@/utils/helpers.js'
+
+// Composables
+const sidepanelTranslation = useSidepanelTranslation()
+const settingsStore = useSettingsStore()
+const history = useHistory()
+const browserAPI = useBrowserAPI()
+const languages = useLanguages()
+const { t } = useI18n()
+
+// Refs
+const historyListElement = ref(null)
+const apiProviderDropdownElement = ref(null)
+
+// Reactive State
+const state = reactive({
+  sourceText: '',
+  sourceLanguage: 'Auto-Detect',
+  targetLanguage: 'English',
+  translationResult: null,
+  translationError: '',
+  isTranslating: false,
+  showHistoryPanel: false,
+  showApiProviderDropdown: false
+})
+
+// Computed getters for template
+const sourceText = computed(() => state.sourceText)
+const sourceLanguage = computed(() => state.sourceLanguage) 
+const targetLanguage = computed(() => state.targetLanguage)
+const translationResult = computed(() => state.translationResult)
+const translationError = computed(() => state.translationError)
+const isTranslating = computed(() => state.isTranslating)
+const showHistoryPanel = computed(() => state.showHistoryPanel)
+const showApiProviderDropdown = computed(() => state.showApiProviderDropdown)
+
+
+// Event Handlers
+const handleTranslate = async (data) => {
+  logME('[SidepanelApp] Translation requested:', data)
+  
+  state.isTranslating = true
+  state.translationError = ''
+  state.translationResult = null
+
+  try {
+    const result = await sidepanelTranslation.translateText(
+      data.text,
+      data.sourceLanguage,
+      data.targetLanguage
+    )
+
+    if (result) {
+      state.translationResult = result
+      logME('[SidepanelApp] Translation successful')
+      
+      // اضافه کردن به تاریخچه
+      if (result.success && result.data?.translatedText) {
+        const sourceLangCode = languages.getLanguagePromptName(data.sourceLanguage) || AUTO_DETECT_VALUE
+        const targetLangCode = languages.getLanguagePromptName(data.targetLanguage)
+        
+        await history.addToHistory({
+          sourceText: data.text,
+          translatedText: result.data.translatedText,
+          sourceLanguage: sourceLangCode,
+          targetLanguage: targetLangCode
+        })
+      }
+    } else {
+      state.translationError = sidepanelTranslation.error.value || 'Translation failed'
+      logME('[SidepanelApp] Translation failed:', state.translationError)
+    }
+  } catch (error) {
+    state.translationError = error.message || 'Translation error occurred'
+    logME('[SidepanelApp] Translation error:', error)
+  } finally {
+    state.isTranslating = false
+  }
+}
+
+const handleSwapLanguages = async () => {
+  logME('[SidepanelApp] Language swap requested')
+  
+  const sourceVal = state.sourceLanguage
+  const targetVal = state.targetLanguage
+  
+  // منطق swap مشابه legacy code
+  const sourceCode = languages.getLanguagePromptName(sourceVal)
+  const targetCode = languages.getLanguagePromptName(targetVal)
+  
+  let resolvedSourceCode = sourceCode
+  let resolvedTargetCode = targetCode
+  
+  // اگر زبان مبدأ Auto-Detect باشد، از تنظیمات بخوانیم
+  if (sourceCode === AUTO_DETECT_VALUE) {
+    try {
+      await settingsStore.loadSettings()
+      resolvedSourceCode = settingsStore.settings.SOURCE_LANGUAGE
+    } catch (err) {
+      logME('[SidepanelApp] Failed to load source language from settings', err)
+      resolvedSourceCode = null
+    }
+  }
+  
+  if (targetCode === AUTO_DETECT_VALUE) {
+    try {
+      await settingsStore.loadSettings()
+      resolvedTargetCode = settingsStore.settings.TARGET_LANGUAGE
+    } catch (err) {
+      logME('[SidepanelApp] Failed to load target language from settings', err)
+      resolvedTargetCode = null
+    }
+  }
+  
+  // فقط در صورت معتبر بودن هر دو زبان swap کنیم
+  if (resolvedSourceCode && 
+      resolvedTargetCode && 
+      resolvedSourceCode !== AUTO_DETECT_VALUE) {
+    
+    const newSourceDisplay = languages.getLanguageDisplayValue(resolvedTargetCode)
+    const newTargetDisplay = languages.getLanguageDisplayValue(resolvedSourceCode)
+    
+    state.sourceLanguage = newSourceDisplay || targetVal
+    state.targetLanguage = newTargetDisplay || sourceVal
+    
+    logME('[SidepanelApp] Languages swapped successfully')
+  } else {
+    logME('[SidepanelApp] Cannot swap - invalid language selection')
+  }
+}
+
+const handleSelectElement = () => {
+  logME('[SidepanelApp] Select element activated')
+  // SelectElement logic در composable handle شده
+}
+
+const handleRevert = () => {
+  logME('[SidepanelApp] Revert requested')
+  // Revert logic در composable handle شده
+}
+
+const handleClear = () => {
+  logME('[SidepanelApp] Clear requested')
+  
+  // پاک کردن فیلدها
+  state.sourceText = ''
+  state.translationResult = null
+  state.translationError = ''
+  state.sourceLanguage = 'Auto-Detect'
+  
+  // بازیابی زبان مقصد از تنظیمات
+  settingsStore.loadSettings().then(() => {
+    const targetLangDisplay = languages.getLanguageDisplayValue(settingsStore.settings.TARGET_LANGUAGE)
+    state.targetLanguage = targetLangDisplay || 'English'
+  })
+  
+  // پاک کردن lastTranslation از storage
+  browserAPI.safeSendMessage({ action: 'clearLastTranslation' })
+    .catch(error => logME('[SidepanelApp] Failed to clear last translation:', error))
+}
+
+const handleApiProvider = () => {
+  logME('[SidepanelApp] API provider dropdown toggled')
+  state.showApiProviderDropdown = !state.showApiProviderDropdown
+}
+
+const handleHistory = () => {
+  logME('[SidepanelApp] History panel toggled')
+  state.showHistoryPanel = !state.showHistoryPanel
+  
+  if (state.showHistoryPanel) {
+    // Load history content
+    nextTick(() => {
+      history.loadHistory()
+    })
+  }
+}
+
+const handleSettings = () => {
+  logME('[SidepanelApp] Settings requested')
+  // Settings button در SideToolbar handle شده
+}
+
+const handleClearAllHistory = async () => {
+  logME('[SidepanelApp] Clear all history requested')
+  
+  const success = await history.clearAllHistory()
+  if (success) {
+    logME('[SidepanelApp] All history cleared')
+  }
+}
+
+// Message listener برای selectedTextForSidePanel
+const handleMessage = (message) => {
+  if (message.action === 'selectedTextForSidePanel') {
+    state.sourceText = message.text
+    logME('[SidepanelApp] Received selected text:', message.text)
+    
+    // شروع خودکار ترجمه
+    if (state.sourceText.trim() && state.targetLanguage) {
+      handleTranslate({
+        text: state.sourceText,
+        sourceLanguage: state.sourceLanguage,
+        targetLanguage: state.targetLanguage
+      })
+    }
+  }
+}
+
+// Load last translation
+const loadLastTranslation = async () => {
+  try {
+    await settingsStore.loadSettings()
+    const settings = settingsStore.settings
+    
+    if (settings.lastTranslation) {
+      const { sourceText, translatedText, sourceLanguage, targetLanguage } = settings.lastTranslation
+      
+      if (sourceText) {
+        state.sourceText = sourceText
+      }
+      if (translatedText) {
+        state.translationResult = {
+          success: true,
+          data: { translatedText }
+        }
+      }
+      if (sourceLanguage) {
+        const sourceLangDisplay = languages.getLanguageDisplayValue(sourceLanguage)
+        if (sourceLangDisplay) {
+          state.sourceLanguage = sourceLangDisplay
+        }
+      }
+      if (targetLanguage) {
+        const targetLangDisplay = languages.getLanguageDisplayValue(targetLanguage)
+        if (targetLangDisplay) {
+          state.targetLanguage = targetLangDisplay
+        }
+      }
+    }
+  } catch (error) {
+    logME('[SidepanelApp] Error loading last translation:', error)
+  }
+}
+
+// Initialize
+onMounted(async () => {
+  logME('[SidepanelApp] Sidepanel Vue app mounted')
+  
+  try {
+    // بارگذاری تنظیمات اولیه
+    await settingsStore.loadSettings()
+    const settings = settingsStore.settings
+    
+    // تنظیم زبان‌های پیش‌فرض
+    state.sourceLanguage = 'Auto-Detect'
+    const targetLangDisplay = languages.getLanguageDisplayValue(settings.TARGET_LANGUAGE)
+    state.targetLanguage = targetLangDisplay || 'English'
+    
+    // بارگذاری آخرین ترجمه
+    await loadLastTranslation()
+    
+    // ثبت listener برای پیام‌ها
+    if (browserAPI.Browser?.runtime?.onMessage) {
+      browserAPI.Browser.runtime.onMessage.addListener(handleMessage)
+    }
+    
+    logME('[SidepanelApp] Initialization complete')
+  } catch (error) {
+    logME('[SidepanelApp] Error during initialization:', error)
+  }
+})
+
+// Cleanup
+onUnmounted(() => {
+  if (browserAPI.Browser?.runtime?.onMessage) {
+    browserAPI.Browser.runtime.onMessage.removeListener(handleMessage)
+  }
+  logME('[SidepanelApp] Sidepanel Vue app unmounted')
+})
+</script>
+
+<style scoped>
+.sidepanel-container {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-family: "Vazirmatn", "Segoe UI", sans-serif;
+  font-size: 15px;
+}
+
+.content-area {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+}
+
+.main-content {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+.history-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-color);
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  box-shadow: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.history-panel.show {
+  display: flex;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.history-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-color);
+  padding: 5px;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.history-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.clear-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-danger);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s ease;
+}
+
+.clear-all-btn:hover {
+  background: var(--bg-danger-hover);
+}
+
+.clear-all-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 200px;
+}
+</style>

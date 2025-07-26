@@ -28,10 +28,10 @@ export function useApiProvider() {
   })
 
   const currentProviderIcon = computed(() => {
-    if (currentProviderData.value) {
-      return `icons/api-providers/${currentProviderData.value.icon}`
+    if (currentProviderData.value && currentProviderData.value.icon) {
+      return `@/assets/icons/api-providers/${currentProviderData.value.icon}`
     }
-    return 'icons/api-providers/provider.svg'
+    return '@/assets/icons/api-providers/google.svg'
   })
 
   const currentProviderName = computed(() => {

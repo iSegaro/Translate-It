@@ -1,0 +1,265 @@
+<template>
+  <div class="side-toolbar">
+    <div class="toolbar-group">
+      <!-- Select Element Button -->
+      <button
+        class="toolbar-button"
+        :disabled="isSelectElementActivating"
+        :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP', 'Select Element')"
+        @click="handleSelectElement"
+      >
+        <img
+          src="@/assets/icons/select.png"
+          alt="Select Element"
+          class="toolbar-icon"
+        />
+      </button>
+
+      <!-- Revert Action Button -->
+      <button
+        class="toolbar-button"
+        :disabled="isReverting"
+        :title="t('SIDEPANEL_REVERT_TOOLTIP', 'Revert Translation')"
+        @click="handleRevert"
+      >
+        <img 
+          src="@/assets/icons/revert.png" 
+          alt="Revert" 
+          class="toolbar-icon" 
+        />
+      </button>
+
+      <!-- Clear Fields Button -->
+      <button
+        class="toolbar-button"
+        :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear Fields')"
+        @click="handleClear"
+      >
+        <img
+          src="@/assets/icons/clear.png"
+          alt="Clear Fields"
+          class="toolbar-icon"
+        />
+      </button>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- API Provider Button -->
+      <button
+        class="toolbar-button"
+        :title="t('SIDEPANEL_API_PROVIDER_TOOLTIP', 'API Provider')"
+        @click="handleApiProvider"
+      >
+        <img
+          :src="apiProviderIcon"
+          alt="API Provider"
+          class="toolbar-icon"
+        />
+      </button>
+
+      <!-- History Button -->
+      <button
+        class="toolbar-button"
+        :title="t('SIDEPANEL_HISTORY_TOOLTIP', 'Translation History')"
+        @click="handleHistory"
+      >
+        <img
+          src="@/assets/icons/history.svg"
+          alt="History"
+          class="toolbar-icon"
+        />
+      </button>
+    </div>
+
+    <div class="toolbar-group-bottom">
+      <!-- Settings Button -->
+      <button
+        class="toolbar-button"
+        :title="t('SIDEPANEL_SETTINGS_TITLE_ICON', 'Settings')"
+        @click="handleSettings"
+      >
+        <img
+          src="@/assets/icons/settings.png"
+          alt="Settings"
+          class="toolbar-icon"
+        />
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue'
+import { useSelectElementTranslation, useSidepanelActions } from '@/composables/useTranslationModes.js'
+import { useApiProvider } from '@/composables/useApiProvider.js'
+import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
+import { useI18n } from '@/composables/useI18n.js'
+import { logME } from '@/utils/helpers.js'
+
+// Props
+defineProps({
+  // اختیاری: props برای کنترل state از خارج
+})
+
+// Emits
+const emit = defineEmits([
+  'select-element',
+  'revert',
+  'clear', 
+  'api-provider',
+  'history',
+  'settings'
+])
+
+// Composables
+const selectElement = useSelectElementTranslation()
+const sidepanelActions = useSidepanelActions()
+const apiProvider = useApiProvider()
+const browserAPI = useBrowserAPI()
+const { t } = useI18n()
+
+// State
+const isSelectElementActivating = computed(() => selectElement.isActivating.value)
+const isReverting = computed(() => sidepanelActions.isProcessing.value)
+
+// API provider icon
+const apiProviderIcon = computed(() => {
+  const provider = apiProvider.currentProviderData.value
+  if (provider && provider.icon) {
+    return `@/assets/icons/api-providers/${provider.icon}`
+  }
+  return '@/assets/icons/api-providers/google.svg'
+})
+
+// Event Handlers
+const handleSelectElement = async () => {
+  logME('[SideToolbar] Select element button clicked')
+  
+  const success = await selectElement.activateSelectMode()
+  if (success) {
+    emit('select-element')
+  } else {
+    console.error('[SideToolbar] Failed to activate select element mode:', selectElement.error.value)
+  }
+}
+
+const handleRevert = async () => {
+  logME('[SideToolbar] Revert button clicked')
+  
+  const success = await sidepanelActions.revertTranslation()
+  if (success) {
+    emit('revert')
+  } else {
+    console.error('[SideToolbar] Failed to revert translation:', sidepanelActions.error.value)
+  }
+}
+
+const handleClear = () => {
+  logME('[SideToolbar] Clear button clicked')
+  emit('clear')
+}
+
+const handleApiProvider = () => {
+  logME('[SideToolbar] API provider button clicked')
+  emit('api-provider')
+}
+
+const handleHistory = () => {
+  logME('[SideToolbar] History button clicked')
+  emit('history')
+}
+
+const handleSettings = () => {
+  logME('[SideToolbar] Settings button clicked')
+  
+  // باز کردن صفحه تنظیمات
+  browserAPI.safeSendMessage({ action: 'openOptionsPage' })
+    .catch(error => {
+      console.error('[SideToolbar] Failed to open settings:', error)
+    })
+  
+  emit('settings')
+}
+
+// Global click handler برای توقف TTS
+const handleGlobalClick = () => {
+  sidepanelActions.stopTTS()
+}
+
+// Event listener برای کلیک عمومی
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', handleGlobalClick)
+}
+
+// Cleanup
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('click', handleGlobalClick)
+  }
+})
+</script>
+
+<style scoped>
+.side-toolbar {
+  width: 38px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-right: 1px solid var(--border-color);
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolbar-group-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolbar-button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.toolbar-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.toolbar-button:active:not(:disabled) {
+  background: var(--bg-active);
+}
+
+.toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.toolbar-separator {
+  width: 20px;
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+</style>

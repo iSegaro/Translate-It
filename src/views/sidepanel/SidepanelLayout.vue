@@ -34,10 +34,10 @@
 import { ref, watch } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
-import SidepanelToolbar from './components/SidepanelToolbar.vue';
-import SidepanelMainContent from './components/SidepanelMainContent.vue';
-import SidepanelHistory from './components/SidepanelHistory.vue';
-import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue';
+import SidepanelToolbar from './components/SidepanelToolbar.vue'
+import SidepanelMainContent from './components/SidepanelMainContent.vue'
+import SidepanelHistory from './components/SidepanelHistory.vue'
+import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue'
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
@@ -101,8 +101,8 @@ const handleProviderSelect = (providerId) => {
   display: flex;
   height: 100vh;
   width: 100%;
-  background-color: var(--color-background);
-  color: var(--color-text);
+  background-color: var(--bg-color);
+  color: var(--text-color);
   position: relative;
   overflow: hidden;
 }

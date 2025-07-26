@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
-import SidepanelApp from '@/views/sidepanel/SidepanelApp.vue'
+import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
 import '@/main.scss'
 import { browserAPIReady } from '@/utils/browser-polyfill.js'
 

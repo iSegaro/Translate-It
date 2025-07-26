@@ -40,7 +40,7 @@ export class ProviderHtmlGenerator {
       
       return `
         <div class="dropdown-item ${statusClass}" data-provider="${provider.id}" title="${provider.description}">
-          <img src="../icons/${provider.icon}" alt="${provider.name}" class="provider-icon">
+          <img src="@/assets/icons/${provider.icon}" alt="${provider.name}" class="provider-icon">
           <span class="provider-name">${provider.displayName}</span>
           ${statusIcon}
         </div>`.trim();
