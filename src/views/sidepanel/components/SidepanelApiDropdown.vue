@@ -190,7 +190,6 @@ const handleOutsideClick = (event) => {
       !dropdownMenu.value.contains(event.target) && 
       !apiButton.contains(event.target)) {
     emit('update:isVisible', false)
-    closeApiDropdownComposable() // Sync composable state
     console.log('[SidepanelApiDropdown] Outside click detected, emitting update:isVisible(false)')
   }
 }

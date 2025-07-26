@@ -587,21 +587,26 @@ const loadLanguageSettings = async () => {
 
 // Watch for translation result changes
 watch(translationResult, (newResult) => {
-  if (translationResultDiv.value && newResult) {
+  console.log('[SidepanelMainContent] translationResult changed:', newResult)
+  if (translationResultDiv.value) {
     translationResultDiv.value.textContent = newResult
     toggleInlineToolbarVisibility(resultContainer.value)
+    console.log('[SidepanelMainContent] translationResultDiv updated with:', newResult)
   }
 })
 
 // Watch for translation error
 watch(translationError, (error) => {
+  console.log('[SidepanelMainContent] translationError changed:', error)
   if (error && translationResultDiv.value) {
     translationResultDiv.value.innerHTML = `<span class="error-message">${error}</span>`
+    console.log('[SidepanelMainContent] translationResultDiv updated with error:', error)
   }
 })
 
 // Watch for loading state
 watch(isTranslating, (loading) => {
+  console.log('[SidepanelMainContent] isTranslating changed:', loading)
   if (translateButton.value) {
     translateButton.value.disabled = loading
     translateButton.value.classList.toggle('loading', loading)
@@ -609,6 +614,18 @@ watch(isTranslating, (loading) => {
   
   if (loading && translationResultDiv.value) {
     translationResultDiv.value.innerHTML = '<span class="loading-message">Translating...</span>'
+    console.log('[SidepanelMainContent] Displaying Translating... message')
+  } else if (!loading && translationResultDiv.value) {
+    // Clear the loading message when translation is done
+    // The translationResult watch will then populate the actual result
+    if (translationResult.value) {
+      translationResultDiv.value.textContent = translationResult.value
+      toggleInlineToolbarVisibility(resultContainer.value)
+    } else if (!translationError.value) {
+      // Only clear if there's no error and no result (e.g., initial state)
+      translationResultDiv.value.textContent = ''
+    }
+    console.log('[SidepanelMainContent] Loading state ended, clearing loading message if no result/error')
   }
 })
 
