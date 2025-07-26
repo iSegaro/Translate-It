@@ -608,6 +608,12 @@ class MessageListener extends BaseListener {
         handleAreaSelectionCancel(message, sender, sendResponse);
         return false;
 
+      case "elementSelected":
+        // Forward element selection data to sidepanel
+        logME("[onMessage] Element selected, forwarding to sidepanel");
+        // This will be handled by Vue composable listeners
+        return false;
+
       case "applyTranslationToActiveElement": {
         // ارسال مستقیم به تب جاری که درخواست داده
         if (sender.tab?.id) {

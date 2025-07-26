@@ -244,6 +244,16 @@ export function useSelectElementTranslation() {
       // مدیریت لغو selection توسط کاربر
       else if (message.action === 'elementSelectionCancelled') {
         state.isSelecting = false
+        clearSelectionTimeout()
+        if (onModeChanged.value) {
+          onModeChanged.value(false)
+        }
+      }
+      // مدیریت success پیام‌ها
+      else if (message.action === 'elementSelectionSuccess') {
+        console.log('[useSelectElementTranslation] Element selection completed successfully')
+        state.isSelecting = false
+        clearSelectionTimeout()
         if (onModeChanged.value) {
           onModeChanged.value(false)
         }

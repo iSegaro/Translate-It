@@ -7,5 +7,9 @@ import '../utils/browser-polyfill.js'
 // Import and initialize Vue bridge
 import { vueBridge } from './vue-bridge.js'
 
+// Import Select Element Manager for element selection functionality
+import { selectElementManager } from './select-element-manager.js'
+
 console.log('Content script loaded via Vue build system')
 console.log('Vue bridge initialized:', vueBridge.isInitialized)
+console.log('Select Element Manager loaded:', !!selectElementManager)
