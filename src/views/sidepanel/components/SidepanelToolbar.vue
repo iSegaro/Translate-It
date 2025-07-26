@@ -161,7 +161,7 @@ const handleSelectElement = async () => {
 
     const browser = await getBrowserAPI()
     await browser.runtime.sendMessage({
-      action: 'startElementSelection'
+      action: 'activateSelectElementMode'
     })
 
     const button = document.getElementById('selectElementBtn')

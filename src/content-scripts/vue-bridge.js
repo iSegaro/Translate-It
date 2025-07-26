@@ -124,6 +124,9 @@ class ContentScriptVueBridge {
         case 'SHOW_TEXT_REGIONS':
           this.handleShowTextRegions(data, sendResponse)
           break
+        case 'TOGGLE_SELECT_ELEMENT_MODE':
+          this.handleToggleSelectElementMode(data, sendResponse)
+          break
         default:
           sendResponse({ success: false, error: `Unknown action: ${action}` })
       }
@@ -132,6 +135,25 @@ class ContentScriptVueBridge {
     }
 
     this.Browser.runtime.onMessage.addListener(this.messageHandler)
+  }
+
+  /**
+   * Handle toggling select element mode
+   */
+  async handleToggleSelectElementMode(data, sendResponse) {
+    try {
+      console.log('[Vue Bridge] Received TOGGLE_SELECT_ELEMENT_MODE message:', data);
+      const { selectElementManager } = await import('./select-element-manager.js');
+      if (data) {
+        selectElementManager.activate();
+      } else {
+        selectElementManager.deactivate();
+      }
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('[Vue Bridge] Error toggling select element mode:', error);
+      sendResponse({ success: false, error: error.message });
+    }
   }
 
   /**

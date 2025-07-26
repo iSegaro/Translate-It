@@ -63,7 +63,7 @@ async function safeSendMessage(Browser, tabId, message) {
       msg.includes("Could not establish connection")
     ) {
       logME("[onMessage] No receiver (ignored).");
-      return {};
+      return { error: msg };
     }
     
     logME("[onMessage] Error:", msg);
@@ -341,6 +341,7 @@ class MessageListener extends BaseListener {
    * Main message handler
    */
   handleMessage(message, sender, sendResponse) {
+  console.log(`[onMessage] Raw message received:`, message);
   const action = message?.action || message?.type;
   
   // Ignore messages forwarded from offscreen to prevent loops
@@ -612,7 +613,8 @@ class MessageListener extends BaseListener {
         // Forward element selection data to sidepanel
         logME("[onMessage] Element selected, forwarding to sidepanel");
         // This will be handled by Vue composable listeners
-        return false;
+        sendResponse({ success: true }); // Send a success response back to content script
+        return true; // Keep channel open for async response
 
       case "applyTranslationToActiveElement": {
         // ارسال مستقیم به تب جاری که درخواست داده
