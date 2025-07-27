@@ -10,7 +10,7 @@ export function useSelectElementTranslation() {
   const { t } = useI18n()
   
   // Browser API reference
-  let Browser = null
+  const Browser = ref(null);
   
   // Reactive state following Plan1.md architecture
   const state = reactive({
@@ -21,6 +21,8 @@ export function useSelectElementTranslation() {
     error: null              // خطاهای احتمالی
   })
 
+  const isSelectModeActive = ref(false); // New state for overall mode status
+
   // Event emitter for parent components
   const onTextExtracted = ref(null)
   const onModeChanged = ref(null)
@@ -29,6 +31,44 @@ export function useSelectElementTranslation() {
   const selectionTimeout = ref(null)
   const SELECTION_TIMEOUT_MS = 30000 // 30 seconds
 
+  // Helper for retrying sendMessage
+  const sendMessageWithRetry = async (action, data, retries = 3, delayMs = 100) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        if (!Browser.value) {
+          Browser.value = await getBrowserAsync();
+        }
+        console.log(`[useSelectElementTranslation] Browser.value:`, Browser.value);
+        console.log(`[useSelectElementTranslation] Browser.value.runtime:`, Browser.value.runtime);
+        console.log(`[useSelectElementTranslation] Debug: Browser.value is:`, Browser.value);
+        console.log(`[useSelectElementTranslation] Debug: Browser.value.runtime is:`, Browser.value.runtime);
+        console.log(`[useSelectElementTranslation] Sending message:`, { action, data });
+        const response = await Browser.value.runtime.sendMessage({ action, data });
+        console.log(`[useSelectElementTranslation] Received response:`, response);
+        
+        if (response?.success) {
+          console.log(`[useSelectElementTranslation] Response successful:`, response);
+          return response;
+        } else {
+          console.warn(`[useSelectElementTranslation] Response failed:`, response);
+          // If response indicates failure, but not a port closed error, re-throw immediately
+          if (response?.error && !response.error.includes("message port closed") && !response.error.includes("Could not establish connection")) {
+            throw new Error(response.error);
+          }
+          // Otherwise, it's a port closed error, retry
+          throw new Error(`Retryable error: ${response?.error || 'No success response'}`);
+        }
+      } catch (error) {
+        console.warn(`[useSelectElementTranslation] Message send failed (attempt ${i + 1}/${retries}):`, error);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          throw error; // Re-throw after last retry
+        }
+      }
+    }
+  };
+
   /**
    * فعال‌سازی Select Element Mode
    * مطابق با Plan1.md و OLD implementation
@@ -36,28 +76,26 @@ export function useSelectElementTranslation() {
   const activateSelectElement = async () => {
     state.isActivating = true
     state.error = null
-    
+
     try {
       console.log('[useSelectElementTranslation] Activating select element mode')
-      
-      // اطمینان از دسترسی به Browser API
-      if (!Browser) {
-        Browser = await getBrowserAsync()
-      }
-      
-      // ارسال پیام به background script (مطابق elementModeHandler.js)
-      const response = await Browser.runtime.sendMessage({
-        action: "activateSelectElementMode",
-        data: true
-      })
+
+      const response = await sendMessageWithRetry("activateSelectElementMode", true);
 
       if (response?.success) {
         state.isSelecting = true
+        isSelectModeActive.value = true // Update the overall mode status
+        console.log(`[useSelectElementTranslation] Debug: Before setting selectElementState, Browser.value.storage:`, Browser.value?.storage);
+        if (Browser.value?.storage?.local) {
+          await Browser.value.storage.local.set({ selectElementState: true });
+        } else {
+          console.warn('[useSelectElementTranslation] Browser storage not available');
+        }
         console.log('[useSelectElementTranslation] Select element mode activated successfully')
-        
+
         // تنظیم timeout برای selection
         startSelectionTimeout()
-        
+
         // اطلاع‌رسانی به parent component
         if (onModeChanged.value) {
           onModeChanged.value(true)
@@ -65,14 +103,12 @@ export function useSelectElementTranslation() {
       } else {
         throw new Error(response?.error || 'Failed to activate select element mode')
       }
-      
+
     } catch (error) {
       console.error('[useSelectElementTranslation] Activation error:', error)
       state.error = error.message
-      
-      // نمایش پیام خطا مناسب به کاربر
       handleSelectElementError(error)
-      
+
     } finally {
       state.isActivating = false
     }
@@ -84,31 +120,30 @@ export function useSelectElementTranslation() {
   const deactivateSelectElement = async () => {
     state.isActivating = true
     state.error = null
-    
+
     try {
       console.log('[useSelectElementTranslation] Deactivating select element mode')
-      
-      // اطمینان از دسترسی به Browser API
-      if (!Browser) {
-        Browser = await getBrowserAsync()
-      }
-      
-      const response = await Browser.runtime.sendMessage({
-        action: "activateSelectElementMode",
-        data: false
-      })
+
+      const response = await sendMessageWithRetry("activateSelectElementMode", false);
 
       if (response?.success) {
         state.isSelecting = false
+        isSelectModeActive.value = false // Update the overall mode status
+        console.log(`[useSelectElementTranslation] Debug: Before setting selectElementState, Browser.value.storage:`, Browser.value?.storage);
+        if (Browser.value?.storage?.local) {
+          await Browser.value.storage.local.set({ selectElementState: false });
+        } else {
+          console.warn('[useSelectElementTranslation] Browser storage not available');
+        }
         state.selectedElement = null
         state.extractedText = ''
         state.error = null
-        
+
         // پاکسازی timeout
         clearSelectionTimeout()
-        
+
         console.log('[useSelectElementTranslation] Select element mode deactivated successfully')
-        
+
         // اطلاع‌رسانی به parent component
         if (onModeChanged.value) {
           onModeChanged.value(false)
@@ -116,11 +151,11 @@ export function useSelectElementTranslation() {
       } else {
         throw new Error(response?.error || 'Failed to deactivate select element mode')
       }
-      
+
     } catch (error) {
       console.error('[useSelectElementTranslation] Deactivation error:', error)
       state.error = error.message
-      
+
     } finally {
       state.isActivating = false
     }
@@ -130,7 +165,7 @@ export function useSelectElementTranslation() {
    * تغییر وضعیت Select Element Mode (toggle)
    */
   const toggleSelectElement = async () => {
-    if (state.isSelecting) {
+    if (isSelectModeActive.value) { // Use isSelectModeActive for toggle logic
       await deactivateSelectElement()
     } else {
       await activateSelectElement()
@@ -261,11 +296,11 @@ export function useSelectElementTranslation() {
     }
 
     // اطمینان از دسترسی به Browser API
-    if (!Browser) {
-      Browser = await getBrowserAsync()
+    if (!Browser.value) {
+      Browser.value = await getBrowserAsync()
     }
     
-    Browser.runtime.onMessage.addListener(messageListener)
+    Browser.value.runtime.onMessage.addListener(messageListener)
     return messageListener
   }
 
@@ -275,14 +310,21 @@ export function useSelectElementTranslation() {
   const loadCurrentState = async () => {
     try {
       // اطمینان از دسترسی به Browser API
-      if (!Browser) {
-        Browser = await getBrowserAsync()
+      if (!Browser.value) {
+        Browser.value = await getBrowserAsync()
       }
       
-      const result = await Browser.storage.local.get('selectElementState')
+      if (!Browser.value?.storage?.local) {
+        console.warn('[useSelectElementTranslation] Browser storage not available during loadCurrentState');
+        return;
+      }
+      
+      const result = await Browser.value.storage.local.get('selectElementState')
       if (result.selectElementState === true) {
-        state.isSelecting = true
+        isSelectModeActive.value = true // Initialize the overall mode status
         console.log('[useSelectElementTranslation] Restored active select element state')
+      } else {
+        isSelectModeActive.value = false // Ensure it's false if not active
       }
     } catch (error) {
       console.error('[useSelectElementTranslation] Error loading state:', error)
@@ -298,15 +340,24 @@ export function useSelectElementTranslation() {
     
     try {
       // اطمینان از دسترسی به Browser API
-      if (!Browser) {
-        Browser = await getBrowserAsync()
-      }
+      Browser.value = await getBrowserAsync()
       
       // تنظیم listener برای پیام‌های background
       messageListener = await setupBackgroundListener()
       
       // بارگذاری وضعیت فعلی
       await loadCurrentState()
+
+      // Listen for changes in storage to keep state in sync
+      if (Browser.value?.storage?.onChanged?.addListener) {
+        const storageChangeListener = (changes, area) => {
+          if (area === 'local' && changes.selectElementState) {
+            isSelectModeActive.value = changes.selectElementState.newValue;
+          }
+        };
+        Browser.value.storage.onChanged.addListener(storageChangeListener);
+      }
+
     } catch (error) {
       console.error('[useSelectElementTranslation] Initialization error:', error)
     }
@@ -319,8 +370,8 @@ export function useSelectElementTranslation() {
     clearSelectionTimeout()
     
     // پاکسازی listeners
-    if (messageListener && Browser) {
-      Browser.runtime.onMessage.removeListener(messageListener)
+    if (messageListener && Browser.value) {
+      Browser.value.runtime.onMessage.removeListener(messageListener)
     }
     
     // غیرفعال‌سازی mode در صورت فعال بودن
@@ -339,16 +390,17 @@ export function useSelectElementTranslation() {
     selectedElement: readonly(ref(state.selectedElement)),
     extractedText: readonly(ref(state.extractedText)),
     error: readonly(ref(state.error)),
-    
+    isSelectModeActive: readonly(isSelectModeActive), // Ensure this is readonly
+
     // Methods
     activateSelectElement,
     deactivateSelectElement,
     toggleSelectElement,
-    
+
     // Event handlers for parent components
     onTextExtracted,
     onModeChanged,
-    
+
     // Utilities
     handleElementSelected,
     loadCurrentState

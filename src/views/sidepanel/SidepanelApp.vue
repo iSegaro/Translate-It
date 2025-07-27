@@ -45,6 +45,19 @@ onMounted(async () => {
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
     console.log('✅ Loading text set')
     
+    // Step 1.5: Deactivate any active select element mode (similar to OLD implementation)
+    console.log('🔧 Deactivating select element mode if active...')
+    try {
+      await browser.runtime.sendMessage({
+        action: "activateSelectElementMode",
+        data: false,
+      });
+      console.log('✅ Select element mode deactivated')
+    } catch (error) {
+      console.warn('⚠️ Failed to deactivate select element mode:', error)
+      // Don't fail the entire initialization for this
+    }
+    
     // Step 2: Load settings store
     console.log('⚙️ Loading settings store...')
     await Promise.race([

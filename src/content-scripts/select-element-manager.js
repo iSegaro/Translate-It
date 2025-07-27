@@ -137,7 +137,7 @@ export class SelectElementManager {
     
     // Visual feedback
     this.addGlobalStyles()
-    await this.showActivationNotification()
+    // await this.showActivationNotification() // Removed: UI will handle notification
     
     // Disable page interactions
     this.disablePageInteractions()

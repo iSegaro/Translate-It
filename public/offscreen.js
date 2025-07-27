@@ -44,15 +44,25 @@ function isTTSMessage(message) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[Offscreen] Received message:", message);
 
-  // Only handle messages specifically targeted to offscreen context
+  // Only handle messages targeted to offscreen context or without specific target
   if (message.target && message.target !== "offscreen") {
     console.log("[Offscreen] Message not for offscreen, ignoring:", message.target);
     return false;
   }
+  
+  // If message has target: 'offscreen', it's definitely for us
+  // If no target specified, handle based on action type
 
   // Block direct TTS messages (should go through cache layer)
   if (message.action === 'speak' && !message.fromTTSPlayer) {
     console.log("[Offscreen] Ignoring direct speak message (should go through cache layer)");
+    return false;
+  }
+
+  // Block certain actions from being forwarded (should go directly to background)
+  const directToBackgroundActions = ['activateSelectElementMode', 'ping'];
+  if (directToBackgroundActions.includes(message.action)) {
+    console.log("[Offscreen] Ignoring action (should go directly to background):", message.action);
     return false;
   }
 

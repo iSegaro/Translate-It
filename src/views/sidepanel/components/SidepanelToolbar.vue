@@ -5,6 +5,9 @@
         id="selectElementBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
+        @click="handleSelectElement"
+        :disabled="isSelectElementDebounced"
+        :class="{ active: isSelectModeActive }"
       >
         <img
           src="@/assets/icons/select.png"
@@ -16,6 +19,7 @@
         id="revertActionBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_REVERT_TOOLTIP')"
+        @click="handleRevertAction"
       >
         <img src="@/assets/icons/revert.png" alt="Revert" class="toolbar-icon" />
       </button>
@@ -23,6 +27,7 @@
         id="clearFieldsBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON')"
+        @click="handleClearFields"
       >
         <img
           src="@/assets/icons/clear.png"
@@ -37,6 +42,8 @@
         id="apiProviderBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_API_PROVIDER_TOOLTIP')"
+        @click="handleApiProviderClick"
+        :class="{ active: isApiDropdownVisible }"
       >
         <img
           id="apiProviderIcon"
@@ -49,6 +56,8 @@
         id="historyBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_HISTORY_TOOLTIP')"
+        @click="handleHistoryClick"
+        :class="{ active: isHistoryVisible }"
       >
         <img
           src="@assets/icons/history.svg"
@@ -62,6 +71,7 @@
         id="settingsBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_SETTINGS_TITLE_ICON')"
+        @click="handleSettingsClick"
       >
         <img
           src="@assets/icons/settings.png"
@@ -78,6 +88,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useUI } from '@/composables/useUI.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useHistory } from '@/composables/useHistory.js'
+import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 // Import icons statically to ensure they're bundled
@@ -110,9 +121,15 @@ const emit = defineEmits(['historyToggle', 'apiDropdownToggle'])
 // Composables
 const {
   showVisualFeedback,
-  toggleElementSelection,
-  isSelectElementModeActive
+  // toggleElementSelection, // Removed as we will use useSelectElementTranslation's toggle
+  // isSelectElementModeActive // Removed as we will use useSelectElementTranslation's state
 } = useUI()
+
+const {
+  isSelecting: isSelectElementModeActiveFromComposable,
+  isSelectModeActive, // Use the new overall mode status
+  toggleSelectElement
+} = useSelectElementTranslation()
 
 const {
   currentProviderIcon,
@@ -154,22 +171,33 @@ const apiProviderIconSrc = computed(() => {
   return googleIcon
 });
 
-// Handle select element button click
-const handleSelectElement = async () => {
-  try {
-    toggleElementSelection()
+// Debounce logic for select element button (similar to OLD implementation)
+const isSelectElementDebounced = ref(false)
 
-    const browser = await getBrowserAPI()
-    await browser.runtime.sendMessage({
-      action: 'activateSelectElementMode'
-    })
+// Handle select element button click with debounce (similar to OLD sidepanel.js)
+const handleSelectElement = async () => {
+  if (isSelectElementDebounced.value) {
+    console.log('[SidepanelToolbar] Select element button click ignored due to debounce')
+    return
+  }
+  
+  console.log('[SidepanelToolbar] Select element button clicked, sending activation message.')
+  
+  // Set debounce flag (similar to OLD implementation with 500ms timeout)
+  isSelectElementDebounced.value = true
+  setTimeout(() => {
+    isSelectElementDebounced.value = false
+  }, 500)
+
+  try {
+    await toggleSelectElement() // Use the composable's toggle function
 
     const button = document.getElementById('selectElementBtn')
     showVisualFeedback(button, 'success')
 
-    console.log('[SidepanelToolbar] Element selection mode activated')
+    console.log('[SidepanelToolbar] Element selection mode activated/deactivated')
   } catch (error) {
-    console.error('[SidepanelToolbar] Error activating element selection:', error)
+    console.error('[SidepanelToolbar] Error toggling element selection:', error)
     const button = document.getElementById('selectElementBtn')
     showVisualFeedback(button, 'error')
   }
@@ -276,108 +304,20 @@ const handleSettingsClick = async () => {
   }
 }
 
-// Setup event listeners
-const setupEventListeners = () => {
-  const selectElementBtn = document.getElementById('selectElementBtn')
-  if (selectElementBtn) {
-    selectElementBtn.addEventListener('click', handleSelectElement)
-  }
+// Event listeners are now handled directly in template with @click directives
+// No need for manual addEventListener/removeEventListener
 
-  const revertActionBtn = document.getElementById('revertActionBtn')
-  if (revertActionBtn) {
-    revertActionBtn.addEventListener('click', handleRevertAction)
-  }
-
-  const clearFieldsBtn = document.getElementById('clearFieldsBtn')
-  if (clearFieldsBtn) {
-    clearFieldsBtn.addEventListener('click', handleClearFields)
-  }
-
-  const apiProviderBtn = document.getElementById('apiProviderBtn')
-  if (apiProviderBtn) {
-    apiProviderBtn.addEventListener('click', handleApiProviderClick)
-  }
-
-  const historyBtn = document.getElementById('historyBtn')
-  if (historyBtn) {
-    historyBtn.addEventListener('click', handleHistoryClick)
-  }
-
-  const settingsBtn = document.getElementById('settingsBtn')
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', handleSettingsClick)
-  }
-}
-
-// Cleanup event listeners
-const cleanupEventListeners = () => {
-  const selectElementBtn = document.getElementById('selectElementBtn')
-  if (selectElementBtn) {
-    selectElementBtn.removeEventListener('click', handleSelectElement)
-  }
-
-  const revertActionBtn = document.getElementById('revertActionBtn')
-  if (revertActionBtn) {
-    revertActionBtn.removeEventListener('click', handleRevertAction)
-  }
-
-  const clearFieldsBtn = document.getElementById('clearFieldsBtn')
-  if (clearFieldsBtn) {
-    clearFieldsBtn.removeEventListener('click', handleClearFields)
-  }
-
-  const apiProviderBtn = document.getElementById('apiProviderBtn')
-  if (apiProviderBtn) {
-    apiProviderBtn.removeEventListener('click', handleApiProviderClick)
-  }
-
-  const historyBtn = document.getElementById('historyBtn')
-  if (historyBtn) {
-    historyBtn.removeEventListener('click', handleHistoryClick)
-  }
-
-  const settingsBtn = document.getElementById('settingsBtn')
-  if (settingsBtn) {
-    settingsBtn.removeEventListener('click', handleSettingsClick)
-  }
-}
-
-// Initialize component
+// Initialize component (no longer needs manual event listeners)
 const initialize = () => {
   try {
-    setupEventListeners()
-
     console.log('[SidepanelToolbar] Component initialized')
   } catch (error) {
     console.error('[SidepanelToolbar] Initialization error:', error)
   }
 }
 
-// Watch for element selection mode changes
-watch(isSelectElementModeActive, (active) => {
-  const button = document.getElementById('selectElementBtn')
-  if (button) {
-    button.classList.toggle('active', active)
-  }
-})
-
-// Watch for API dropdown state changes
-watch(() => props.isApiDropdownVisible, (open) => {
-  const button = document.getElementById('apiProviderBtn')
-  if (button) {
-    button.classList.toggle('active', open)
-    console.log('[SidepanelToolbar] API dropdown visibility changed to:', open, '-> button active state:', button.classList.contains('active'))
-  }
-})
-
-// Watch for history panel state changes
-watch(() => props.isHistoryVisible, (open) => {
-  const button = document.getElementById('historyBtn')
-  if (button) {
-    button.classList.toggle('active', open)
-    console.log('[SidepanelToolbar] History panel toggled:', open, '-> button active state:', button.classList.contains('active'))
-  }
-})
+// Watches are no longer needed since we use :class bindings in template
+// Active states are handled directly in the template with :class="{ active: condition }"
 
 // Lifecycle
 onMounted(() => {
@@ -385,7 +325,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cleanupEventListeners()
+  // No cleanup needed since we use Vue's native event handling
 })
 </script>
 
@@ -443,6 +383,15 @@ onUnmounted(() => {
 
     .toolbar-icon {
       filter: invert(1);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      background-color: transparent;
     }
   }
 }

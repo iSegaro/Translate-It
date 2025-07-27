@@ -24,7 +24,7 @@ export function handleActivateSelectElementMode(
   injectionState
 ) {
   console.log("[Handler:ElementMode] >>> ENTERING handleActivateSelectElementMode");
-  logME("[Handler:ElementMode] handleActivateSelectElementMode START.");
+  logME("[Handler:ElementMode] handleActivateSelectElementMode START. Incoming message.data: " + message.data);
   
   // Return true to indicate that sendResponse will be called asynchronously
   // This is crucial for Chrome extensions to keep the message channel open
@@ -37,6 +37,7 @@ export function handleActivateSelectElementMode(
         active: true,
         currentWindow: true,
       });
+      logME(`[Handler:ElementMode] Tabs query result: ${JSON.stringify(tabs)}`);
       if (!tabs[0]?.id) {
         const err = new Error(ErrorTypes.TAB_AVAILABILITY);
         err.type = ErrorTypes.TAB_AVAILABILITY;
@@ -48,26 +49,43 @@ export function handleActivateSelectElementMode(
       logME("[Handler:ElementMode] Getting settings.");
       // 2) Determine new state
       const settings = await getSettingsAsync();
+      logME(`[Handler:ElementMode] Current settings: ${JSON.stringify(settings)}`);
       const selectElementState = settings.selectElementState || false;
-      const newState =
-        typeof message.data === "boolean" ? message.data : !selectElementState;
+      let newState;
+      if (typeof message.data === "boolean") {
+        newState = message.data;
+      } else {
+        newState = !selectElementState;
+        logME(`[Handler:ElementMode] Non-boolean message.data received. Toggling state. message.data: ${message.data}, type: ${typeof message.data}`);
+      }
 
-      logME(`[Handler:ElementMode] Setting selectElementState → ${newState}`);
+      logME(`[Handler:ElementMode] Attempting to set selectElementState in storage to: ${newState}`);
       await getBrowser().storage.local.set({ selectElementState: newState });
-      logME("[Handler:ElementMode] Storage updated.");
+      logME("[Handler:ElementMode] Storage updated. New state set to: " + newState);
 
-      logME("[Handler:ElementMode] Sending initial toggle command.");
+      logME("[Handler:ElementMode] Sending initial TOGGLE_SELECT_ELEMENT_MODE command to content script with data: " + newState);
       // 3) Send toggle command
       let response = await safeSendMessage(tabId, {
         action: "TOGGLE_SELECT_ELEMENT_MODE",
         data: newState,
       });
-      logME(`[Handler:ElementMode] Response from content script (initial):`, response);
-      logME(`[Handler:ElementMode] Type of response from content script (initial):`, typeof response);
+      logME(`[Handler:ElementMode] Response from content script (initial): ${JSON.stringify(response)}`);
+      logME(`[Handler:ElementMode] Type of response from content script (initial): ${typeof response}`);
 
-      // 4) If that fails and we’re not already injecting, inject and retry
-      if (response?.error && !injectionState.inProgress) {
-        logME("[Handler:ElementMode] Initial message failed, attempting injection.");
+      // If deactivating and content script is not reachable, consider it successful
+      if (newState === false && response?.error) {
+          logME("[Handler:ElementMode] Deactivation path: Content script not reachable, considering deactivation successful. Response error: " + response.error);
+          logME("[Handler:ElementMode] BEFORE sendResponse for deactivation success.");
+          console.log("[Handler:ElementMode] Calling sendResponse for deactivation with:", { success: true, newState });
+          sendResponse({ success: true, newState });
+          console.log("[Handler:ElementMode] Deactivation sendResponse called successfully");
+          logME("[Handler:ElementMode] AFTER final sendResponse for deactivation.");
+          return; // Exit early
+      }
+
+      // If activating and content script is not reachable, try to inject
+      if (newState === true && response?.error && !injectionState.inProgress) {
+        logME("[Handler:ElementMode] Activation path: Initial message failed, attempting injection. Error: " + response.error);
         injectionState.inProgress = true;
         try {
           logME("[Handler:ElementMode] Executing script injection.");
@@ -80,8 +98,8 @@ export function handleActivateSelectElementMode(
             action: "TOGGLE_SELECT_ELEMENT_MODE",
             data: newState,
           });
-          logME(`[Handler:ElementMode] Response from content script (retry):`, response);
-          logME(`[Handler:ElementMode] Type of response from content script (retry):`, typeof response);
+          logME(`[Handler:ElementMode] Response from content script (retry after injection): ${JSON.stringify(response)}`);
+          logME(`[Handler:ElementMode] Type of response from content script (retry after injection): ${typeof response}`);
           if (response?.error) {
             const err = new Error(response.error);
             err.type = ErrorTypes.INTEGRATION;
@@ -106,18 +124,22 @@ export function handleActivateSelectElementMode(
       }
 
       // 5) Done
-      logME("[Handler:ElementMode] Operation successful, BEFORE final sendResponse. Response to send: ", { success: true, newState });
+      logME("[Handler:ElementMode] Operation successful, BEFORE final sendResponse. Response to send: " + JSON.stringify({ success: true, newState }));
+      console.log("[Handler:ElementMode] Calling sendResponse with:", { success: true, newState });
       sendResponse({ success: true, newState });
+      console.log("[Handler:ElementMode] sendResponse called successfully");
       logME("[Handler:ElementMode] AFTER final sendResponse.");
     } catch (err) {
-      logME("[Handler:ElementMode] Error caught:", err);
+      logME("[Handler:ElementMode] Error caught in handleActivateSelectElementMode:", err);
       // Normalize and report
       await errorHandler.handle(err, {
         type: err.type || ErrorTypes.INTEGRATION,
         context: "handler-activateSelectElementMode",
       });
-      logME("[Handler:ElementMode] BEFORE sendResponse for caught error.");
+      logME("[Handler:ElementMode] BEFORE sendResponse for caught error. Error message: " + err.message);
+      console.log("[Handler:ElementMode] Calling sendResponse with error:", { success: false, error: err.message });
       sendResponse({ success: false, error: err.message });
+      console.log("[Handler:ElementMode] Error sendResponse called successfully");
       logME("[Handler:ElementMode] AFTER sendResponse for caught error.");
       if (injectionState.inProgress) {
         injectionState.inProgress = false;

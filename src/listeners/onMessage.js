@@ -47,7 +47,8 @@ const errorHandler = new ErrorHandler();
 // --- Helper Functions ---
 async function safeSendMessage(Browser, tabId, message) {
   try {
-    return await Browser.tabs.sendMessage(tabId, message);
+    const response = await Browser.tabs.sendMessage(tabId, message);
+    return { success: true, data: response };
   } catch (err) {
     const msg = err.message || "";
     const errorType = matchErrorToType(err);
@@ -55,7 +56,7 @@ async function safeSendMessage(Browser, tabId, message) {
     // Handle extension context invalidation specifically
     if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
       logME("[onMessage] Extension context invalidated - content script connection lost");
-      return { error: "Extension context invalidated" };
+      return { success: false, error: "Extension context invalidated" };
     }
     
     if (
@@ -63,11 +64,11 @@ async function safeSendMessage(Browser, tabId, message) {
       msg.includes("Could not establish connection")
     ) {
       logME("[onMessage] No receiver (ignored).");
-      return { error: msg };
+      return { success: false, error: msg };
     }
     
     logME("[onMessage] Error:", msg);
-    return { error: msg };
+    return { success: false, error: msg };
   }
 }
 
