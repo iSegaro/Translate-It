@@ -270,3 +270,20 @@ export const languageList = [
     code: "en",
   },
 ];
+
+export const getAvailableLanguages = async () => {
+  return languageList.map(lang => ({
+    code: lang.code,
+    name: lang.name,
+    voiceCode: lang.voiceCode,
+    promptName: lang.promptName
+  }))
+}
+
+export const getLanguageByName = (name) => {
+  return languageList.find(lang => lang.name === name)
+}
+
+export const getLanguageByCode = (code) => {
+  return languageList.find(lang => lang.code === code)
+}

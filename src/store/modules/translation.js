@@ -1,7 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { translationProviderFactory } from '@/providers/factory/TranslationProviderFactory.js'
 import { ErrorTypes } from '@/services/ErrorTypes.js'
+
+// Lazy load factory to avoid circular dependencies
+let translationProviderFactory = null
+const getTranslationProviderFactory = async () => {
+  if (!translationProviderFactory) {
+    const module = await import('@/providers/factory/TranslationProviderFactory.js')
+    translationProviderFactory = module.translationProviderFactory
+  }
+  return translationProviderFactory
+}
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -46,7 +55,8 @@ export const useTranslationStore = defineStore('translation', () => {
     
     try {
       // Use real provider system
-      const providerInstance = translationProviderFactory.getProvider(provider)
+      const factory = await getTranslationProviderFactory()
+      const providerInstance = factory.getProvider(provider)
       const translatedText = await providerInstance.translate(text, from, to, mode)
       
       const result = {
@@ -94,8 +104,9 @@ export const useTranslationStore = defineStore('translation', () => {
     history.value = []
   }
 
-  const setProvider = (provider) => {
-    if (translationProviderFactory.isProviderSupported(provider)) {
+  const setProvider = async (provider) => {
+    const factory = await getTranslationProviderFactory()
+    if (factory.isProviderSupported(provider)) {
       selectedProvider.value = provider
       error.value = null
     } else {
@@ -114,7 +125,8 @@ export const useTranslationStore = defineStore('translation', () => {
     error.value = null
     
     try {
-      const providerInstance = translationProviderFactory.getProvider(provider)
+      const factory = await getTranslationProviderFactory()
+      const providerInstance = factory.getProvider(provider)
       
       // Check if provider supports image translation
       if (typeof providerInstance.translateImage !== 'function') {
@@ -156,12 +168,14 @@ export const useTranslationStore = defineStore('translation', () => {
     error.value = null
   }
 
-  const resetProviders = (apiType = null) => {
-    translationProviderFactory.resetProviders(apiType)
+  const resetProviders = async (apiType = null) => {
+    const factory = await getTranslationProviderFactory()
+    factory.resetProviders(apiType)
   }
 
-  const isProviderSupported = (provider) => {
-    return translationProviderFactory.isProviderSupported(provider)
+  const isProviderSupported = async (provider) => {
+    const factory = await getTranslationProviderFactory()
+    return factory.isProviderSupported(provider)
   }
 
   return {

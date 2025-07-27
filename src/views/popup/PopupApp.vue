@@ -1,152 +1,126 @@
 <template>
-  <div class="extension-popup">
+  <div class="popup-container">
     <div v-if="isLoading" class="loading-container">
-      <LoadingSpinner />
-      <span class="loading-text">Initializing...</span>
+      <LoadingSpinner size="sm" />
+      <span class="loading-text">{{ loadingText }}</span>
+    </div>
+    
+    <div v-else-if="hasError" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <p class="error-message">{{ errorMessage }}</p>
+      <button @click="retryLoading" class="retry-button">{{ $i18n('retry_button') || 'Retry' }}</button>
     </div>
     
     <template v-else>
-      <!-- Header -->
-      <PopupHeader 
-        :extension-enabled="settingsStore.extensionEnabled"
-        @toggle-extension="handleToggleExtension"
-      />
+      <!-- Header Toolbar -->
+      <PopupHeader />
       
-      <!-- Main Translation Interface -->
-      <TranslationBox
-        mode="popup"
-        :disabled="!settingsStore.canTranslate"
-        @translate="handleTranslation"
-      />
+      <!-- Language Controls -->
+      <LanguageControls />
       
-      <!-- Quick Actions -->
-      <QuickActions
-        :can-translate="settingsStore.canTranslate"
-        @quick-translate="handleQuickTranslate"
-        @open-options="handleOpenOptions"
-        @open-sidepanel="handleOpenSidepanel"
-      />
+      <!-- Translation Form -->
+      <TranslationForm />
       
-      <!-- Provider Selector -->
-      <ProviderSelector
-        v-model="settingsStore.selectedProvider"
-        mode="compact"
-        @change="handleProviderChange"
-      />
+      <!-- Provider selector is now integrated into LanguageControls -->
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
-import PopupHeader from '@/components/layout/PopupHeader.vue'
-import TranslationBox from '@/components/feature/TranslationBox.vue'
-import QuickActions from '@/components/feature/QuickActions.vue'
-import ProviderSelector from '@/components/feature/ProviderSelector.vue'
-import { useExtensionAPI } from '@/composables/useExtensionAPI'
+import PopupHeader from '@/components/popup/PopupHeader.vue'
+import LanguageControls from '@/components/popup/LanguageControls.vue'
+import TranslationForm from '@/components/popup/TranslationForm.vue'
+import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { applyTheme } from '@/utils/theme.js'
 
 // Stores
 const settingsStore = useSettingsStore()
 
-// Composables
-const { sendMessage } = useExtensionAPI()
-
 // State
 const isLoading = ref(true)
-
-// Computed
-const canTranslate = computed(() => settingsStore.canTranslate)
-
-// Methods
-const handleToggleExtension = async (enabled) => {
-  try {
-    await settingsStore.updateSetting('extensionEnabled', enabled)
-    
-    // Notify background script
-    await sendMessage('EXTENSION_TOGGLED', { enabled })
-  } catch (error) {
-    console.error('Failed to toggle extension:', error)
-  }
-}
-
-const handleTranslation = async (result) => {
-  // Translation completed, could show notification or update UI
-  console.log('Translation completed:', result)
-}
-
-const handleQuickTranslate = async () => {
-  try {
-    // Get selected text from active tab
-    const response = await sendMessage('GET_SELECTED_TEXT')
-    if (response?.text) {
-      // Trigger translation of selected text
-      // This would be handled by TranslationBox component
-    }
-  } catch (error) {
-    console.error('Failed to get selected text:', error)
-  }
-}
-
-const handleOpenOptions = async () => {
-  try {
-    await sendMessage('OPEN_OPTIONS_PAGE')
-  } catch (error) {
-    console.error('Failed to open options:', error)
-  }
-}
-
-const handleOpenSidepanel = async () => {
-  try {
-    await sendMessage('OPEN_SIDEPANEL')
-  } catch (error) {
-    console.error('Failed to open sidepanel:', error)
-  }
-}
-
-const handleProviderChange = async (provider) => {
-  try {
-    await settingsStore.updateSetting('selectedProvider', provider)
-  } catch (error) {
-    console.error('Failed to change provider:', error)
-  }
-}
+const loadingText = ref('Initializing...')
+const hasError = ref(false)
+const errorMessage = ref('')
 
 // Lifecycle
 onMounted(async () => {
+  console.log('🚀 PopupApp mounting...')
+  
   try {
-    // Wait for settings to load
-    await settingsStore.loadSettings()
+    // Step 1: Set loading text
+    console.log('📝 Setting loading text...')
+    const browser = await getBrowserAPI()
+    loadingText.value = browser.i18n.getMessage('popup_loading') || 'Loading Popup...'
+    console.log('✅ Loading text set')
     
-    // Additional initialization if needed
-    await initializePopup()
+    // Step 2: Load settings store
+    console.log('⚙️ Loading settings store...')
+    await Promise.race([
+      settingsStore.loadSettings(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
+      )
+    ])
+    console.log('✅ Settings store loaded')
+    
+    // Step 3: Connect to background port (similar to OLD implementation)
+    console.log('🔗 Connecting to background...')
+    try {
+      const popupPort = browser.runtime.connect({ name: "popup" })
+      popupPort.postMessage({ action: "popupOpened" })
+      console.log('✅ Connected to background')
+    } catch (err) {
+      console.warn('⚠️ Failed to connect popup port:', err.message)
+      // Don't fail initialization for this
+    }
+    
+    // Step 4: Apply theme
+    console.log('🎨 Applying theme...')
+    const settings = settingsStore.settings
+    await applyTheme(settings.THEME)
+    console.log('✅ Theme applied')
+    
   } catch (error) {
-    console.error('Failed to initialize popup:', error)
+    console.error('❌ Failed to initialize popup:', error)
+    hasError.value = true
+    errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
+    console.log('✨ PopupApp initialization complete')
     isLoading.value = false
   }
 })
 
-const initializePopup = async () => {
-  // Initialize popup-specific features
-  try {
-    // Load translation features
-    const { loadTranslationFeatures } = await import('@/app/main/popup.js')
-    await loadTranslationFeatures()
-  } catch (error) {
-    console.warn('Failed to load translation features:', error)
-  }
+const retryLoading = () => {
+  console.log('🔄 Retrying popup loading...')
+  hasError.value = false
+  errorMessage.value = ''
+  isLoading.value = true
+  
+  // Reset store state
+  settingsStore.$reset && settingsStore.$reset()
+  
+  // Retry mounting logic
+  setTimeout(() => {
+    onMounted()
+  }, 100)
 }
 </script>
 
 <style scoped>
-.extension-popup {
-  width: 100%;
-  height: 100%;
+.popup-container {
+  width: 400px;
+  background: var(--bg-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-background);
+  font-family: "Vazirmatn", "Segoe UI", sans-serif;
+  font-size: 15px;
+  color: var(--text-color);
 }
 
 .loading-container {
@@ -156,10 +130,48 @@ const initializePopup = async () => {
   justify-content: center;
   padding: 2rem;
   gap: 1rem;
+  min-height: 200px;
 }
 
 .loading-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-size: 14px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+  min-height: 200px;
+}
+
+.error-icon {
+  font-size: 2rem;
+}
+
+.error-message {
+  color: var(--text-color);
+  opacity: 0.8;
+  margin: 0;
+}
+
+.retry-button {
+  padding: 0.5rem 1rem;
+  background-color: var(--toolbar-link-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: var(--toolbar-link-hover-bg-color);
 }
 </style>
