@@ -295,13 +295,25 @@ export function useSelectElementTranslation() {
       }
     }
 
-    // اطمینان از دسترسی به Browser API
-    if (!Browser.value) {
-      Browser.value = await getBrowserAsync()
+    try {
+      // اطمینان از دسترسی به Browser API
+      if (!Browser.value) {
+        Browser.value = await getBrowserAsync()
+      }
+      
+      // Use native Chrome API to avoid proxy binding issues
+      if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener(messageListener)
+      } else {
+        // Fallback to Browser API
+        Browser.value.runtime.onMessage.addListener(messageListener)
+      }
+      
+      return messageListener
+    } catch (error) {
+      console.warn('[useSelectElementTranslation] Message listener setup failed:', error)
+      return null
     }
-    
-    Browser.value.runtime.onMessage.addListener(messageListener)
-    return messageListener
   }
 
   /**
@@ -349,13 +361,26 @@ export function useSelectElementTranslation() {
       await loadCurrentState()
 
       // Listen for changes in storage to keep state in sync
-      if (Browser.value?.storage?.onChanged?.addListener) {
-        const storageChangeListener = (changes, area) => {
-          if (area === 'local' && changes.selectElementState) {
-            isSelectModeActive.value = changes.selectElementState.newValue;
+      // Use alternative approach to avoid binding issues
+      try {
+        if (Browser.value?.storage?.onChanged) {
+          const storageChangeListener = (changes, area) => {
+            if (area === 'local' && changes.selectElementState) {
+              isSelectModeActive.value = changes.selectElementState.newValue;
+            }
+          };
+          
+          // Use the original Chrome API directly if available (avoid proxy issues)
+          if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+            chrome.storage.onChanged.addListener(storageChangeListener);
+          } else {
+            // Fallback to Browser API
+            Browser.value.storage.onChanged.addListener(storageChangeListener);
           }
-        };
-        Browser.value.storage.onChanged.addListener(storageChangeListener);
+        }
+      } catch (listenerError) {
+        console.warn('[useSelectElementTranslation] Storage listener setup failed:', listenerError);
+        // Continue without storage listener - not critical for functionality
       }
 
     } catch (error) {
@@ -370,8 +395,16 @@ export function useSelectElementTranslation() {
     clearSelectionTimeout()
     
     // پاکسازی listeners
-    if (messageListener && Browser.value) {
-      Browser.value.runtime.onMessage.removeListener(messageListener)
+    if (messageListener) {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+          chrome.runtime.onMessage.removeListener(messageListener)
+        } else if (Browser.value?.runtime?.onMessage) {
+          Browser.value.runtime.onMessage.removeListener(messageListener)
+        }
+      } catch (error) {
+        console.warn('[useSelectElementTranslation] Cleanup listener removal failed:', error)
+      }
     }
     
     // غیرفعال‌سازی mode در صورت فعال بودن
