@@ -65,49 +65,50 @@ export async function handleTranslate(message, sender, sendResponse) {
     // Call the translation engine with the normalized message (ASYNC OPERATION)
     console.log('[Handler:TRANSLATE] Starting async translation...');
     
-    backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender)
-      .then(result => {
-        console.log('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
-        
-        // Ensure we have a valid response format
-        if (!result || typeof result !== 'object') {
-          throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
-        }
-        
-        if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
-          throw new Error(`Response missing 'success' property: ${JSON.stringify(result)}`);
-        }
-        
-        console.log('[Handler:TRANSLATE] Sending async response:', JSON.stringify(result, null, 2));
-        sendResponse(result);
-        console.log('[Handler:TRANSLATE] Async response sent successfully');
-      })
-      .catch(error => {
-        console.error('[Handler:TRANSLATE] Async translation error:', error);
-        console.error('[Handler:TRANSLATE] Error stack:', error.stack);
-        
-        errorHandler.handle(error, {
-          type: ErrorTypes.TRANSLATION,
-          context: "handleTranslate",
-          messageData: message
-        });
-        
-        // Use standardized error response format
-        const errorResponse = createErrorResponse(
-          error, 
-          message.context || 'unknown',
-          message.provider || message.data?.provider || 'unknown'
-        );
-        
-        console.log('[Handler:TRANSLATE] Sending async error response:', JSON.stringify(errorResponse, null, 2));
-        sendResponse(errorResponse);
+    // Use async/await instead of Promise chains to ensure proper response handling
+    try {
+      const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
+      
+      console.log('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
+      
+      // Ensure we have a valid response format
+      if (!result || typeof result !== 'object') {
+        throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
+      }
+      
+      if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
+        throw new Error(`Response missing 'success' property: ${JSON.stringify(result)}`);
+      }
+      
+      console.log('[Handler:TRANSLATE] Sending response directly from handler:', JSON.stringify(result, null, 2));
+      
+      // Return the result directly instead of using sendResponse
+      // This allows the MessageRouter to handle the response properly
+      return result;
+      
+    } catch (translationError) {
+      console.error('[Handler:TRANSLATE] Translation error:', translationError);
+      console.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
+      
+      errorHandler.handle(translationError, {
+        type: ErrorTypes.TRANSLATION,
+        context: "handleTranslate",
+        messageData: message
       });
-    
-    console.log('[Handler:TRANSLATE] Returning true for async response');
-    return true; // ASYNC response - keep channel open
+      
+      // Use standardized error response format
+      const errorResponse = createErrorResponse(
+        translationError, 
+        message.context || 'unknown',
+        message.provider || message.data?.provider || 'unknown'
+      );
+      
+      console.log('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
+      return errorResponse;
+    }
     
   } catch (error) {
-    console.error('[Handler:TRANSLATE] Error occurred:', error);
+    console.error('[Handler:TRANSLATE] Outer error occurred:', error);
     console.error('[Handler:TRANSLATE] Error stack:', error.stack);
     
     errorHandler.handle(error, {
@@ -116,15 +117,14 @@ export async function handleTranslate(message, sender, sendResponse) {
       messageData: message
     });
     
-    // Use standardized error response format
+    // Use standardized error response format for outer errors
     const errorResponse = createErrorResponse(
       error, 
       message.context || 'unknown',
       message.provider || message.data?.provider || 'unknown'
     );
     
-    console.log('[Handler:TRANSLATE] Sending error response:', JSON.stringify(errorResponse, null, 2));
-    sendResponse(errorResponse);
-    return false;
+    console.log('[Handler:TRANSLATE] Returning outer error response:', JSON.stringify(errorResponse, null, 2));
+    return errorResponse;
   }
 }

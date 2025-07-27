@@ -31,7 +31,7 @@ class MessageRouter {
    * @returns {boolean|undefined} - Returns true if sendResponse will be called asynchronously,
    *   false if handled synchronously, or undefined if no handler is found.
    */
-  async routeMessage(message, sender, sendResponse) {
+  routeMessage(message, sender, sendResponse) {
     const timestamp = Date.now();
     const messageId = `${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -71,11 +71,56 @@ class MessageRouter {
       // Handlers are expected to return true for async responses, or a direct response.
       console.log(`[MessageRouter:${messageId}] 🔄 Calling handler for action: ${action}`);
       const startTime = Date.now();
-      const result = await Promise.resolve(handler(message, sender, sendResponse));
-      const endTime = Date.now();
       
+      // Handle async handlers properly
+      const handlerResult = handler(message, sender, sendResponse);
+      
+      // If handler returns a promise, handle it asynchronously
+      if (handlerResult && typeof handlerResult.then === 'function') {
+        console.log(`[MessageRouter:${messageId}] 🔄 Async handler detected, processing...`);
+        
+        handlerResult
+          .then(result => {
+            const endTime = Date.now();
+            console.log(`[MessageRouter:${messageId}] ⏱️ Async handler execution time: ${endTime - startTime}ms`);
+            console.log(`[MessageRouter:${messageId}] 📤 Async handler returned:`, JSON.stringify(result, null, 2));
+            
+            if (result !== undefined && result !== null && typeof result === 'object') {
+              console.log(`[MessageRouter:${messageId}] 📨 Router sending async result:`, JSON.stringify(result, null, 2));
+              try {
+                sendResponse(result);
+                console.log(`[MessageRouter:${messageId}] ✅ Async response sent via router`);
+              } catch (responseError) {
+                console.error(`[MessageRouter:${messageId}] ❌ Failed to send async response:`, responseError);
+              }
+            }
+          })
+          .catch(error => {
+            console.error(`[MessageRouter:${messageId}] ❌ Async handler error:`, error);
+            this.errorHandler.handle(error, {
+              type: ErrorTypes.MESSAGE_HANDLER,
+              context: `Handler for ${action}`,
+              messageData: message
+            });
+            
+            const errorResponse = { success: false, error: error.message || `Error processing action: ${action}` };
+            try {
+              sendResponse(errorResponse);
+              console.log(`[MessageRouter:${messageId}] 📨 Error response sent:`, JSON.stringify(errorResponse, null, 2));
+            } catch (responseError) {
+              console.error(`[MessageRouter:${messageId}] ❌ Failed to send error response:`, responseError);
+            }
+          });
+        
+        // Return true to keep message channel open for async response
+        console.log(`[MessageRouter:${messageId}] 🔄 Returning true for async handler`);
+        return true;
+      }
+      
+      // Synchronous handler
+      const endTime = Date.now();
       console.log(`[MessageRouter:${messageId}] ⏱️ Handler execution time: ${endTime - startTime}ms`);
-      console.log(`[MessageRouter:${messageId}] 📤 Handler returned:`, JSON.stringify(result, null, 2));
+      console.log(`[MessageRouter:${messageId}] 📤 Handler returned:`, JSON.stringify(handlerResult, null, 2));
 
       // Handler response interpretation:
       // - true: Handler will call sendResponse asynchronously
@@ -83,16 +128,25 @@ class MessageRouter {
       // - undefined/null: Handler didn't handle the message
       // - object: Handler wants router to send this response
       
-      if (result === true) {
+      if (handlerResult === true) {
         console.log(`[MessageRouter:${messageId}] 🔄 Handler will respond asynchronously - keeping channel open`);
         return true; // Keep async channel open for handler
-      } else if (result === false) {
+      } else if (handlerResult === false) {
         console.log(`[MessageRouter:${messageId}] ✅ Handler already sent response synchronously`);
         return false; // Handler handled response, channel can close
-      } else if (result !== undefined && result !== null) {
-        console.log(`[MessageRouter:${messageId}] 📨 Router sending result from handler:`, JSON.stringify(result, null, 2));
-        sendResponse(result);
-        console.log(`[MessageRouter:${messageId}] ✅ Response sent via router`);
+      } else if (handlerResult !== undefined && handlerResult !== null) {
+        console.log(`[MessageRouter:${messageId}] 📨 Router sending result from handler:`, JSON.stringify(handlerResult, null, 2));
+        
+        // Ensure sendResponse is called synchronously within the message handler
+        try {
+          sendResponse(handlerResult);
+          console.log(`[MessageRouter:${messageId}] ✅ Response sent via router`);
+        } catch (responseError) {
+          console.error(`[MessageRouter:${messageId}] ❌ Failed to send response:`, responseError);
+          // If sendResponse fails, the port may be closed
+          return false;
+        }
+        
         return false; // Response sent synchronously by router
       } else {
         console.log(`[MessageRouter:${messageId}] ⚠️ Handler returned undefined/null, no response sent`);

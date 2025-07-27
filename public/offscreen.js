@@ -76,7 +76,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ];
   if (directToBackgroundActions.includes(message.action)) {
     console.log("[Offscreen] Ignoring action (should go directly to background):", message.action);
-    return false;
+    // Don't respond - let the message pass through to background
+    return undefined;
   }
 
   // Forward non-TTS messages to background service worker
