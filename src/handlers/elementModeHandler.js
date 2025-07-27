@@ -91,7 +91,7 @@ export function handleActivateSelectElementMode(
           logME("[Handler:ElementMode] Executing script injection.");
           await getBrowser().scripting.executeScript({
             target: { tabId },
-            files: ["browser-polyfill.js", "content.bundle.js"],
+            files: ["browser-polyfill.js", "src/content-scripts/index.js"],
           });
           logME("[Handler:ElementMode] Content script injected, retrying message.");
           response = await safeSendMessage(tabId, {

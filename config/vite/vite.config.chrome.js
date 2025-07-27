@@ -145,12 +145,7 @@ export default defineConfig({
             service_worker: 'src/background/index.js',
             type: 'module'
           };
-          manifest.content_scripts = manifest.content_scripts || [];
-          manifest.content_scripts.push({
-            matches: ["<all_urls>"],
-            js: ["src/content-scripts/index.js"],
-            run_at: "document_end"
-          });
+          // content_scripts are already defined in manifest generator, no need to add extra ones
           console.log('✅ Chrome manifest generated and validated');
           return manifest;
         },

@@ -26,6 +26,8 @@ export class SelectElementManager {
     this.currentHighlighted = null
     this.Browser = null
     this.translatedElements = new Set() // Track translated elements for revert
+    this.isProcessingClick = false // Prevent multiple rapid clicks
+    this.lastClickTime = 0 // Debounce timer
     
     // Service instances
     this.errorHandler = new ErrorHandler()
@@ -63,6 +65,51 @@ export class SelectElementManager {
         type: ErrorTypes.INTEGRATION,
         context: 'select-element-manager-init'
       })
+    }
+  }
+
+  /**
+   * Helper for retrying sendMessage with exponential backoff
+   */
+  async sendMessageWithRetry(action, data, retries = 3, delayMs = 100) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        if (!this.Browser) {
+          this.Browser = await getBrowserAsync()
+        }
+        
+        console.log(`[SelectElementManager] Sending message:`, { action, data })
+        const response = await this.Browser.runtime.sendMessage({ action, data })
+        
+        console.log(`[SelectElementManager] Raw response received:`, response)
+        
+        // Accept any truthy response or explicit success: true
+        if (response && (response.success === true || response.success !== false)) {
+          console.log(`[SelectElementManager] Message sent successfully:`, response)
+          return response
+        } else {
+          console.warn(`[SelectElementManager] Response failed:`, response)
+          // If response indicates explicit failure, re-throw immediately
+          if (response && response.success === false && response.error) {
+            throw new Error(response.error)
+          }
+          // If response is null/undefined, it's likely a connection issue - retry
+          if (!response) {
+            throw new Error(`Retryable error: No response received (null/undefined)`)
+          }
+          // Otherwise, it's a retryable error
+          throw new Error(`Retryable error: ${response?.error || 'No success response'}`)
+        }
+      } catch (error) {
+        console.warn(`[SelectElementManager] Message send failed (attempt ${i + 1}/${retries}):`, error)
+        if (i < retries - 1) {
+          // Exponential backoff: 100ms, 200ms, 400ms
+          const waitTime = delayMs * Math.pow(2, i)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        } else {
+          throw error // Re-throw after last retry
+        }
+      }
     }
   }
 
@@ -185,18 +232,9 @@ export class SelectElementManager {
     // Clear NEW select manager flag
     window.translateItNewSelectManager = false
     
-    // Send cancellation message to background/sidepanel
-    try {
-      await this.Browser.runtime.sendMessage({
-        action: 'elementSelectionCancelled',
-        data: {
-          reason: 'deactivated',
-          timestamp: Date.now()
-        }
-      })
-    } catch (error) {
-      console.warn('[SelectElementManager] Failed to send cancellation message:', error)
-    }
+    // Note: Cancellation message removed to prevent "message port closed" errors
+    // The Vue composable handles state synchronization via storage changes
+    console.log('[SelectElementManager] Select element mode deactivated - state will sync via storage')
     
     console.log('[SelectElementManager] Select element mode deactivated')
   }
@@ -251,12 +289,29 @@ export class SelectElementManager {
     
     event.preventDefault()
     event.stopPropagation()
+    event.stopImmediatePropagation() // Prevent other handlers
+    
+    // Prevent multiple rapid clicks or processing
+    if (this.isProcessingClick) {
+      console.log('[SelectElementManager] Already processing click, ignoring')
+      return
+    }
+    
+    // Add a small debounce to prevent double clicks
+    if (this.lastClickTime && (Date.now() - this.lastClickTime) < 100) {
+      console.log('[SelectElementManager] Double click detected, ignoring')
+      return
+    }
+    
+    this.isProcessingClick = true
+    this.lastClickTime = Date.now()
     
     const element = event.target
     
     if (!this.isValidTextElement(element)) {
       console.log('[SelectElementManager] Invalid element for translation')
       await this.showErrorNotification('Please select an element that contains text')
+      this.isProcessingClick = false
       return
     }
     
@@ -269,12 +324,13 @@ export class SelectElementManager {
       if (!extractedText || extractedText.trim().length === 0) {
         console.log('[SelectElementManager] No text found in selected element')
         await this.showNoTextNotification()
+        this.isProcessingClick = false
         return
       }
       
       console.log('[SelectElementManager] Text extracted:', extractedText.substring(0, 100) + '...')
       
-      // Send extracted text to background for translation
+      // Send extracted text to background for translation (once only)
       await this.processSelectedElement(element, extractedText)
       
       // Deactivate mode after successful selection
@@ -290,6 +346,8 @@ export class SelectElementManager {
       })
       
       await this.showErrorNotification(error.message)
+    } finally {
+      this.isProcessingClick = false
     }
   }
 
@@ -452,7 +510,8 @@ export class SelectElementManager {
     try {
       console.log('[SelectElementManager] Sending text to background for processing')
       
-      // Send extracted text to background for translation
+      // Send extracted text to background for translation with retry
+      // Use direct runtime.sendMessage instead of sendMessageWithRetry to avoid duplicate broadcasts
       const response = await this.Browser.runtime.sendMessage({
         action: 'elementSelected',
         data: {
@@ -474,6 +533,8 @@ export class SelectElementManager {
       
     } catch (error) {
       console.error('[SelectElementManager] Failed to send element data:', error)
+      // Don't retry on elementSelected - it causes duplicate messages
+      // Just throw the error to let the caller handle it
       throw error
     }
   }
