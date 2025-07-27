@@ -7,8 +7,8 @@ import {
   CONFIG,
   getSettingsAsync,
 } from "../config.js";
-import { ErrorHandler } from "../services/ErrorService.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorHandler } from "../error-management/ErrorService.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 import {
   separateCachedAndNewTexts,

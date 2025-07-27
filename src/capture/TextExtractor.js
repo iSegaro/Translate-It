@@ -1,7 +1,7 @@
 // src/capture/TextExtractor.js
 
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 /**
  * Text extraction interface - supports both AI and OCR methods

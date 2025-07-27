@@ -1,8 +1,8 @@
 // src/capture/ScreenSelector.js
 
 import { logME } from "../utils/helpers.js";
-import { handleUIError } from "../services/ErrorService.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { handleUIError } from "../error-management/ErrorService.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement } from "../utils/safeHtml.js";
 
 /**

@@ -39,7 +39,7 @@ export class TranslationClient {
       case TRANSLATION_CONTEXTS.SELECTION:
         return 15000 // 15 seconds for selection
       case TRANSLATION_CONTEXTS.SIDEPANEL:
-        return 20000 // 20 seconds for sidepanel (can handle longer)
+        return 45000 // 45 seconds for sidepanel (increased for async translations)
       case TRANSLATION_CONTEXTS.SUBTITLE:
         return 30000 // 30 seconds for subtitle processing
       case TRANSLATION_CONTEXTS.CAPTURE:
@@ -190,24 +190,30 @@ export class TranslationClient {
    * @returns {Promise<Object>}
    */
   async sendMessage(message) {
-    return new Promise(async (resolve, reject) => {
-      // Set timeout for the request
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Request timeout (${this.requestTimeout}ms) for context: ${this.context}`))
-      }, this.requestTimeout)
+    return new Promise((resolve, reject) => {
+      const sendMessageAsync = async () => {
+        // Set timeout for the request
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`Request timeout (${this.requestTimeout}ms) for context: ${this.context}`))
+        }, this.requestTimeout)
 
-      try {
+        try {
         // Get browser API
         const Browser = await getBrowserAPI()
         
+        console.log(`[TranslationClient:${this.context}] Sending message:`, message)
         // Send message to background
         const response = await Browser.runtime.sendMessage(message)
+        console.log(`[TranslationClient:${this.context}] Received response:`, response)
         clearTimeout(timeoutId)
         resolve(response)
       } catch (error) {
         clearTimeout(timeoutId)
-        reject(error)
+          reject(error)
+        }
       }
+      
+      sendMessageAsync()
     })
   }
 

@@ -2,7 +2,7 @@
 
 import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getEnableScreenCaptureAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from "../config.js";
 import { ProviderRegistry } from "../providers/registry/ProviderRegistry.js";
 import { captureManager } from "../capture/CaptureManager.js";

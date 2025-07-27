@@ -1,7 +1,7 @@
 // src/utils/imageProcessing.js
 
 import { logME } from "./helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 /**
  * Crop image data using canvas (content script only)

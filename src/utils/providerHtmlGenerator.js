@@ -2,6 +2,12 @@
 import { getSupportedProviders } from "../core/provider-registry.js";
 import { logME } from "./helpers.js";
 
+// Helper function to get provider by ID
+const getProviderById = (providerId) => {
+  const providers = getSupportedProviders();
+  return providers.find(provider => provider.id === providerId);
+};
+
 /**
  * Utility class for generating HTML elements for translation providers
  */

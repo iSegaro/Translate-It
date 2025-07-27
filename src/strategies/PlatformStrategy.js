@@ -1,6 +1,6 @@
 // src/strategies/PlatformStrategy.js
 
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 export default class PlatformStrategy {
   constructor(notifier = null, errorHandler = null) {

@@ -1,7 +1,7 @@
 // src/utils/simulate_events.js
 
-import { ErrorTypes } from "../services/ErrorTypes";
-import { ErrorHandler } from "../services/ErrorService.js";
+import { ErrorTypes } from "../error-management/ErrorTypes";
+import { ErrorHandler } from "../error-management/ErrorHandler.js";
 
 export const setCursorToEnd = (element) => {
   try {

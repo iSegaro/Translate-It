@@ -4,7 +4,7 @@ import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
 // import { AUTO_DETECT_VALUE } from "tts-utils";
 const AUTO_DETECT_VALUE = 'auto';
-import { ErrorTypes } from "../../services/ErrorTypes.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { TranslationMode } from "../../config.js";
 import { getBrowser } from "@/utils/browser-polyfill.js";
 

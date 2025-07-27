@@ -18,13 +18,10 @@ export class TranslationEngine {
    * Setup message listener for translation requests
    */
   async setupMessageListener() {
-    const Browser = await getBrowserAPI()
-    
-    if (Browser.runtime.onMessage.hasListener(this.handleMessage.bind(this))) {
-      return
-    }
-    
-    Browser.runtime.onMessage.addListener(this.handleMessage.bind(this))
+    // NOTE: Message handling is now managed by MessageRouter in BackgroundService
+    // This method is kept for compatibility but disabled
+    console.log('[TranslationEngine] Message listener setup skipped - handled by MessageRouter')
+    return
   }
 
   /**
@@ -49,25 +46,92 @@ export class TranslationEngine {
    * Handle translation request messages
    */
   async handleTranslateMessage(request, sender) {
-    const { context, data } = request
+    console.log('[TranslationEngine] Processing request:', JSON.stringify(request, null, 2));
+    console.log('[TranslationEngine] Sender:', sender);
+    
+    // Input validation and normalization
+    if (!request || typeof request !== 'object') {
+      throw new Error(`Invalid request: expected object, got ${typeof request}`);
+    }
+    
+    // Extract context and data with fallbacks
+    let context = request.context;
+    let data = request.data;
+    
+    // Handle different input formats
+    if (!context || !data) {
+      // Legacy format: request contains translation data directly
+      if (request.text && request.provider) {
+        console.log('[TranslationEngine] Legacy format detected, normalizing...');
+        context = request.context || 'unknown';
+        data = {
+          text: request.text,
+          provider: request.provider,
+          sourceLanguage: request.sourceLanguage || 'auto',
+          targetLanguage: request.targetLanguage || 'fa',
+          mode: request.mode || 'simple',
+          options: request.options || {}
+        };
+      } else {
+        throw new Error(`Missing required fields: context and/or data. Got: ${JSON.stringify(request)}`);
+      }
+    }
+    
+    // Validate data structure
+    if (!data || typeof data !== 'object') {
+      throw new Error(`Invalid data: expected object, got ${typeof data}`);
+    }
+    
+    if (!data.text || typeof data.text !== 'string' || data.text.trim().length === 0) {
+      throw new Error(`Invalid text: expected non-empty string, got "${data.text}"`);
+    }
+    
+    if (!data.provider || typeof data.provider !== 'string') {
+      throw new Error(`Invalid provider: expected string, got "${data.provider}"`);
+    }
+    
+    console.log('[TranslationEngine] Normalized context:', context);
+    console.log('[TranslationEngine] Normalized data:', JSON.stringify(data, null, 2));
     
     try {
+      let result;
+      
       // Context-specific optimizations
       if (context === 'popup') {
         // Fast response priority for popup
-        return await this.translateWithPriority(data)
+        console.log('[TranslationEngine] Using popup priority strategy');
+        result = await this.translateWithPriority(data);
       } else if (context === 'selection') {
         // Background processing OK for selection
-        return await this.translateWithCache(data)
+        console.log('[TranslationEngine] Using selection cache strategy');
+        result = await this.translateWithCache(data);
       } else if (context === 'sidepanel') {
         // Enhanced features for sidepanel
-        return await this.translateWithHistory(data)
+        console.log('[TranslationEngine] Using sidepanel history strategy');
+        result = await this.translateWithHistory(data);
+      } else {
+        // Default strategy
+        console.log('[TranslationEngine] Using default translation strategy');
+        result = await this.executeTranslation(data);
       }
       
-      return await this.executeTranslation(data)
+      console.log('[TranslationEngine] Translation result:', JSON.stringify(result, null, 2));
+      
+      // Validate result format
+      if (!result || typeof result !== 'object') {
+        throw new Error(`Invalid translation result: expected object, got ${typeof result}`);
+      }
+      
+      if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
+        throw new Error(`Translation result missing 'success' property: ${JSON.stringify(result)}`);
+      }
+      
+      return result;
+      
     } catch (error) {
-      console.error('[TranslationEngine] Translation error:', error)
-      return this.formatError(error, context)
+      console.error('[TranslationEngine] Translation error:', error);
+      console.error('[TranslationEngine] Error stack:', error.stack);
+      return this.formatError(error, context);
     }
   }
 

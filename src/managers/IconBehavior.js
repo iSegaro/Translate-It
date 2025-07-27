@@ -2,7 +2,7 @@
 
 import { state } from "../config.js";
 import { detectPlatform } from "../utils/platformDetector.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";

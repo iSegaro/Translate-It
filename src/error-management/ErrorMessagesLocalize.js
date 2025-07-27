@@ -1,4 +1,4 @@
-// src/services/ErrorMessagesLocalize.js
+// s../error-management/ErrorMessagesLocalize.js
 
 import { getErrorMessageByKey, matchErrorToKey } from "./ErrorMessages.js";
 

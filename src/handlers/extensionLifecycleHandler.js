@@ -1,7 +1,7 @@
 // src/handlers/extensionLifecycleHandler.js
 import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 // Note: errorHandler is passed as an argument
 

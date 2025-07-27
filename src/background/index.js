@@ -8,6 +8,8 @@ import { VueMessageHandler } from './vue-message-handler.js';
 import NotificationManager from '../managers/NotificationManager.js';
 import { initializeSettingsListener } from '../config.js';
 import { TranslationEngine } from './translation-engine.js';
+import { MessageRouter } from './message-router.js';
+import * as Handlers from './handlers/index.js';
 
 /**
  * Background Service class
@@ -21,20 +23,13 @@ class BackgroundService {
     this.listeners = [];
     this.vueMessageHandler = null;
     this.translationEngine = null;
+    this.messageRouter = new MessageRouter(); // NEW: Instantiate MessageRouter
     // Define handleCentralMessageWrapper as a class property (arrow function) here
     this.handleCentralMessageWrapper = (request, sender, sendResponse) => {
-      console.log('[BackgroundService] >>> RAW MESSAGE RECEIVED IN CENTRAL LISTENER <<<', request.action);
-      this.handleCentralMessage(request, sender)
-        .then(response => {
-          if (response !== undefined) {
-            sendResponse(response);
-          }
-        })
-        .catch(error => {
-          console.error('[BackgroundService] Error in central message handler wrapper:', error);
-          sendResponse({ success: false, error: error.message || 'Unknown error in background service' });
-        });
-      return true;
+      console.log('[BackgroundService] Forwarding message to router:', request.action);
+      // Route the message through the central router
+      // The router will handle dispatching to the correct handler and error management
+      return this.messageRouter.routeMessage(request, sender, sendResponse);
     };
   }
 
@@ -62,12 +57,17 @@ class BackgroundService {
       
       // Initialize translation engine
       await this.initializeTranslationEngine();
+
+      
       
       // Load listeners
       await this.initializeListeners();
       
       // Pre-load essential features
       await this.initializeFeatures();
+
+      // NEW: Register handlers with the MessageRouter during initialization
+      this.registerMessageHandlers();
 
       // Setup central message listener
       await this.setupCentralMessageListener();
@@ -218,6 +218,15 @@ class BackgroundService {
         }
       }
 
+      // CRITICAL: Set up MessageRouter even in minimal mode
+      try {
+        this.registerMessageHandlers();
+        await this.setupCentralMessageListener();
+        console.log('✅ MessageRouter set up in minimal mode');
+      } catch (error) {
+        console.error('❌ Failed to set up MessageRouter in minimal mode:', error);
+      }
+
       console.log('🔧 Minimal initialization completed');
       this.initialized = true;
 
@@ -225,46 +234,6 @@ class BackgroundService {
       console.error('❌ Even minimal initialization failed:', _error);
       throw _error;
     }
-  }
-
-  /**
-   * Get TTS manager
-   * @returns {Promise<Object>} TTS manager instance
-   */
-  async getTTSManager() {
-    return await featureLoader.loadTTSManager();
-  }
-
-  /**
-   * Get panel manager  
-   * @returns {Promise<Object>} Panel manager instance
-   */
-  async getPanelManager() {
-    return await featureLoader.loadPanelManager();
-  }
-
-  /**
-   * Get screen capture manager
-   * @returns {Promise<Object>} Screen capture manager instance
-   */
-  async getScreenCaptureManager() {
-    return await featureLoader.loadScreenCaptureManager();
-  }
-
-  /**
-   * Get translation engine
-   * @returns {TranslationEngine} Translation engine instance
-   */
-  getTranslationEngine() {
-    return this.translationEngine;
-  }
-
-  /**
-   * Check if service is initialized
-   * @returns {boolean}
-   */
-  isInitialized() {
-    return this.initialized;
   }
 
   /**
@@ -294,68 +263,69 @@ class BackgroundService {
     const Browser = await getBrowserAPI();
 
     // Remove any existing listener to prevent duplicates
-    if (Browser.runtime.onMessage.hasListener(this.handleCentralMessageWrapper)) {
+    if (this.handleCentralMessageWrapper) {
       Browser.runtime.onMessage.removeListener(this.handleCentralMessageWrapper);
+      console.log('🗑️ Removed existing central message listener.');
     }
 
     Browser.runtime.onMessage.addListener(this.handleCentralMessageWrapper); // Pass the function directly
     console.log('✅ Central message listener set up');
   }
 
-  /**
-   * Central message handler (actual logic)
-   * @param {Object} request - The message request
-   * @param {Object} sender - The sender of the message
-   * @returns {Promise<any>|undefined} - Response or undefined if not handled
-   */
-  async handleCentralMessage(request, sender) { // Removed sendResponse from parameters
-    console.log('[BackgroundService] Raw message received:', request); // Keep this for now
-
-    if (request.action === 'TRANSLATE') {
-      if (!this.translationEngine) {
-        console.error('[BackgroundService] Translation engine not initialized when TRANSLATE message received.');
-        return {
-          success: false,
-          error: {
-            type: 'ENGINE_NOT_READY',
-            message: 'Translation engine is not ready.',
-            context: request.context
-          }
-        };
-      }
-      try {
-        console.log('[BackgroundService] Calling translationEngine.handleTranslateMessage...');
-        const result = await this.translationEngine.handleTranslateMessage(request, sender);
-        console.log('[BackgroundService] translationEngine.handleTranslateMessage returned:', result);
-        return result;
-      } catch (error) {
-        console.error('[BackgroundService] Error handling TRANSLATE message:', error);
-        const formattedError = this.translationEngine.formatError(error, request.context);
-        console.log('[BackgroundService] Returning formatted error:', formattedError);
-        console.error('[BackgroundService] Error handling TRANSLATE message:', error);
-        // Ensure error is formatted correctly for TranslationClient
-        return this.translationEngine.formatError(error, request.context);
-      }
-    }
-
-    // Handle other message types here if needed
-    // Handle other message types here if needed
-    if (request.action === 'ping') {
-      console.log('[BackgroundService] Ping received, responding with pong');
-      return { success: true, message: 'pong' };
-    }
-
-    // For now, let VueMessageHandler handle other messages
-    if (this.vueMessageHandler) {
-      // VueMessageHandler's register method already adds a listener,
-      // so we might need to adjust how VueMessageHandler works
-      // or ensure it's the only listener for its specific messages.
-      // For now, we'll assume it's handled elsewhere or will be refactored.
-    }
-
-    // Return false or undefined if no response is sent synchronously
-    // or if the message is not handled by this central listener.
-    return undefined;
+  // NEW METHOD: Register all message handlers
+  registerMessageHandlers() {
+    console.log('[BackgroundService] Registering message handlers...');
+    
+    // Common handlers
+    this.messageRouter.registerHandler('ping', Handlers.handlePing);
+    this.messageRouter.registerHandler('open_options_page', Handlers.handleOpenOptionsPage);
+    this.messageRouter.registerHandler('open_url', Handlers.handleOpenURL);
+    this.messageRouter.registerHandler('show_os_notification', Handlers.handleShowOSNotification);
+    this.messageRouter.registerHandler('REFRESH_CONTEXT_MENUS', Handlers.handleRefreshContextMenus);
+    this.messageRouter.registerHandler('CONTENT_SCRIPT_WILL_RELOAD', Handlers.handleContentScriptWillReload);
+    
+    // Lifecycle handlers
+    this.messageRouter.registerHandler('CONTEXT_INVALID', Handlers.handleContextInvalid);
+    this.messageRouter.registerHandler('EXTENSION_RELOADED', Handlers.handleExtensionReloaded);
+    this.messageRouter.registerHandler('restart_content_script', Handlers.handleRestartContentScript);
+    this.messageRouter.registerHandler('BACKGROUND_RELOAD_EXTENSION', Handlers.handleBackgroundReloadExtension);
+    
+    // Translation handlers
+    this.messageRouter.registerHandler('TRANSLATE', Handlers.handleTranslate);
+    this.messageRouter.registerHandler('fetchTranslation', Handlers.handleFetchTranslation);
+    this.messageRouter.registerHandler('translationAdded', Handlers.handleTranslationAdded);
+    this.messageRouter.registerHandler('fetchTranslationBackground', Handlers.handleFetchTranslationBackground);
+    this.messageRouter.registerHandler('revertTranslation', Handlers.handleRevertTranslation);
+    
+    // TTS handlers
+    this.messageRouter.registerHandler('speak', Handlers.handleSpeak);
+    this.messageRouter.registerHandler('stopTTS', Handlers.handleStopTTS);
+    
+    // Element selection handlers
+    this.messageRouter.registerHandler('activateSelectElementMode', Handlers.handleActivateSelectElementMode);
+    this.messageRouter.registerHandler('UPDATE_SELECT_ELEMENT_STATE', Handlers.handleUpdateSelectElementState);
+    this.messageRouter.registerHandler('elementSelected', Handlers.handleElementSelected);
+    this.messageRouter.registerHandler('applyTranslationToActiveElement', Handlers.handleApplyTranslationToActiveElement);
+    
+    // Screen capture handlers
+    this.messageRouter.registerHandler('startAreaCapture', Handlers.handleStartAreaCapture);
+    this.messageRouter.registerHandler('startFullScreenCapture', Handlers.handleStartFullScreenCapture);
+    this.messageRouter.registerHandler('requestFullScreenCapture', Handlers.handleRequestFullScreenCapture);
+    this.messageRouter.registerHandler('processAreaCaptureImage', Handlers.handleProcessAreaCaptureImage);
+    this.messageRouter.registerHandler('previewConfirmed', Handlers.handlePreviewConfirmed);
+    this.messageRouter.registerHandler('previewCancelled', Handlers.handlePreviewCancelled);
+    this.messageRouter.registerHandler('previewRetry', Handlers.handlePreviewRetry);
+    this.messageRouter.registerHandler('resultClosed', Handlers.handleResultClosed);
+    this.messageRouter.registerHandler('captureError', Handlers.handleCaptureError);
+    this.messageRouter.registerHandler('areaSelectionCancel', Handlers.handleAreaSelectionCancel);
+    
+    // Text selection handlers
+    this.messageRouter.registerHandler('getSelectedText', Handlers.handleGetSelectedText);
+    
+    // Sidepanel handlers
+    this.messageRouter.registerHandler('OPEN_SIDE_PANEL', Handlers.handleOpenSidePanel);
+    
+    console.log('[BackgroundService] All message handlers registered successfully.');
   }
 
   /**

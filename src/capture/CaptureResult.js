@@ -1,7 +1,7 @@
 // src/capture/CaptureResult.js
 
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/safeHtml.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { getTranslationString } from "../utils/i18n.js";

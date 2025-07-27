@@ -1,7 +1,8 @@
 // src/utils/helpers.js
 import { getBrowser } from "@/utils/browser-polyfill.js";
-import { ErrorHandler } from "../services/ErrorService.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { getBrowserAPI } from '@/utils/browser-unified.js';
+import { ErrorHandler } from "../error-management/ErrorHandler.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 
 const errorHandler = new ErrorHandler();
@@ -115,7 +116,7 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
 
 export const isExtensionContextValid = async () => {
   try {
-    const browser = await getBrowserAsync();
+    const browser = await getBrowserAPI();
     return !!browser?.runtime?.id && !!browser?.storage?.local;
   } catch {
     return false;

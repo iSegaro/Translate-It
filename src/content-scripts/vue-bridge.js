@@ -522,7 +522,7 @@ class ContentScriptVueBridge {
       const instanceId = await this.createMicroApp('TextRegionSelector', {
         imageData,
         textRegions,
-        onRegionSelect: async (_region) => {
+        onRegionSelect: async (region) => {
           if (autoTranslate) {
             // Crop image to selected region and translate
             const croppedImageData = await this.cropImage(imageData, region)

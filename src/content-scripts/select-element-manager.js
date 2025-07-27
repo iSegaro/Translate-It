@@ -4,8 +4,8 @@
 
 import { getBrowserAsync } from '@/utils/browser-polyfill.js'
 import { logME } from '@/utils/helpers.js'
-import { ErrorHandler } from '@/services/ErrorService.js'
-import { ErrorTypes } from '@/services/ErrorTypes.js'
+import { ErrorHandler } from '../error-management/ErrorService.js'
+import { ErrorTypes } from '../error-management/ErrorTypes.js'
 import NotificationManager from '@/managers/NotificationManager.js'
 
 /**
@@ -172,7 +172,7 @@ export class SelectElementManager {
     console.log('[SelectElementManager] Activating select element mode')
     
     this.isActive = true
-    this.abortController = new AbortController()
+    this.abortController = new globalThis.AbortController()
     
     // Add event listeners with abort signal
     const options = { signal: this.abortController.signal, capture: true }
@@ -494,7 +494,7 @@ export class SelectElementManager {
     )
     
     let node
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
       text += node.textContent + ' '
     }
     

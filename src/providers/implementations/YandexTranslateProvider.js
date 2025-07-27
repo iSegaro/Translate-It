@@ -6,7 +6,7 @@ import { isPersianText } from "../../utils/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 const AUTO_DETECT_VALUE = 'auto';
 const getLanguageCode = (lang) => lang;
-import { ErrorTypes } from "../../services/ErrorTypes.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { TranslationMode } from "../../config.js";
 
 const TEXT_DELIMITER = "\n\n---\n\n";

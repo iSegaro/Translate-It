@@ -67,7 +67,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Block certain actions from being forwarded (should go directly to background)
-  const directToBackgroundActions = ['activateSelectElementMode', 'elementSelected', 'elementSelectionCancelled', 'elementSelectionError'];
+  const directToBackgroundActions = [
+    'activateSelectElementMode', 
+    'elementSelected', 
+    'elementSelectionCancelled', 
+    'elementSelectionError',
+    'TRANSLATE' // Block TRANSLATE messages - handled by MessageRouter
+  ];
   if (directToBackgroundActions.includes(message.action)) {
     console.log("[Offscreen] Ignoring action (should go directly to background):", message.action);
     return false;

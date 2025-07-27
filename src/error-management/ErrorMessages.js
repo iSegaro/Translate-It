@@ -1,4 +1,4 @@
-// src/services/ErrorMessages.js
+// s../error-management/ErrorMessages.js
 
 import { getTranslationString } from "../utils/i18n.js";
 import { ErrorTypes } from "./ErrorTypes.js";

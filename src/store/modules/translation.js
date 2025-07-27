@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { ErrorTypes } from '@/services/ErrorTypes.js'
+import { ErrorTypes } from '@/error-management/ErrorTypes.js'
 
 // Translation client for messaging with background service worker
 import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
@@ -21,6 +21,7 @@ export const useTranslationStore = defineStore('translation', () => {
   const selectedProvider = ref('google')
   const cache = ref(new Map())
   const error = ref(null)
+  const providers = ref([])
 
   // Getters
   const recentTranslations = computed(() => 
@@ -31,9 +32,11 @@ export const useTranslationStore = defineStore('translation', () => {
     cache.value.size > 0
   )
 
-  const supportedProviders = computed(() =>
-    translationProviderFactory.getSupportedProviders()
-  )
+  const supportedProviders = computed(() => {
+    // In Vue context, we get providers via message to background service
+    // This will be populated when the store loads provider data
+    return providers.value || []
+  })
 
   // Actions
   const translateText = async (text, options = {}) => {
@@ -110,11 +113,16 @@ export const useTranslationStore = defineStore('translation', () => {
   }
 
   const setProvider = async (provider) => {
-    const factory = await getTranslationProviderFactory()
-    if (factory.isProviderSupported(provider)) {
+    // Validate provider via background service
+    const client = getTranslationClient()
+    try {
+      await client.sendMessage({
+        action: 'VALIDATE_PROVIDER',
+        provider
+      })
       selectedProvider.value = provider
       error.value = null
-    } else {
+    } catch (error) {
       throw new Error(`Unsupported provider: ${provider}`)
     }
   }
@@ -151,13 +159,26 @@ export const useTranslationStore = defineStore('translation', () => {
   }
 
   const resetProviders = async (apiType = null) => {
-    const factory = await getTranslationProviderFactory()
-    factory.resetProviders(apiType)
+    // Reset providers via background service
+    const client = getTranslationClient()
+    await client.sendMessage({
+      action: 'RESET_PROVIDERS',
+      apiType
+    })
   }
 
   const isProviderSupported = async (provider) => {
-    const factory = await getTranslationProviderFactory()
-    return factory.isProviderSupported(provider)
+    // Check provider support via background service
+    const client = getTranslationClient()
+    try {
+      const response = await client.sendMessage({
+        action: 'IS_PROVIDER_SUPPORTED',
+        provider
+      })
+      return response.supported
+    } catch (error) {
+      return false
+    }
   }
 
   return {

@@ -22,12 +22,13 @@ export function useBackgroundWarmup() {
     warmupInProgress.value = true
     console.log('[useBackgroundWarmup] Starting background script warm-up...')
 
-    warmupPromise.value = new Promise(async (resolve) => {
-      let attempts = 0
-      const maxAttempts = 5
-      const baseDelay = 500
+    warmupPromise.value = new Promise((resolve) => {
+      const attemptWarmup = async () => {
+        let attempts = 0
+        const maxAttempts = 5
+        const baseDelay = 500
 
-      while (attempts < maxAttempts && !isWarmedUp.value) {
+        while (attempts < maxAttempts && !isWarmedUp.value) {
         attempts++
         console.log(`[useBackgroundWarmup] Warm-up attempt ${attempts}/${maxAttempts}`)
 
@@ -53,13 +54,16 @@ export function useBackgroundWarmup() {
           console.log(`[useBackgroundWarmup] Waiting ${delay}ms before next attempt...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         }
-      }
+        }
 
-      // Even if we don't get a successful ping, assume it's ready after attempts
-      console.log('[useBackgroundWarmup] Warm-up completed (assumed ready)')
-      isWarmedUp.value = true
-      warmupInProgress.value = false
-      resolve(false)
+        // Even if we don't get a successful ping, assume it's ready after attempts
+        console.log('[useBackgroundWarmup] Warm-up completed (assumed ready)')
+        isWarmedUp.value = true
+        warmupInProgress.value = false
+        resolve(false)
+      }
+      
+      attemptWarmup()
     })
 
     return warmupPromise.value

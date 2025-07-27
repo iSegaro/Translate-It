@@ -9,7 +9,7 @@ import {
 } from "../config.js";
 import { delay, isExtensionContextValid } from "../utils/helpers.js";
 import { isPersianText } from "../utils/textDetection.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { translationProviderFactory } from "../providers/index.js";
 
 const MOCK_DELAY = 500;

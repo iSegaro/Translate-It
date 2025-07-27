@@ -1,4 +1,4 @@
-// File: src/services/ErrorService.js
+// File: src/error-management/ErrorHandler.js
 
 import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";

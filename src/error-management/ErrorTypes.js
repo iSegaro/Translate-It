@@ -1,4 +1,4 @@
-// src/services/ErrorTypes.js
+// s../error-management/ErrorTypes.js
 
 export class ErrorTypes {
   // سطوح عمومی که برای لاگ و تصمیم‌گیری استفاده می‌شوند

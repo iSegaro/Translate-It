@@ -2,7 +2,7 @@
 
 import { Browser } from "@/utils/browser-polyfill.js";
 import { logME, isExtensionContextValid } from "../utils/helpers";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CONFIG, TranslationMode, getThemeAsync, getSettingsAsync } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts/tts.js";

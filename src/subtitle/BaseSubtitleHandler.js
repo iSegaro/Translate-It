@@ -1,7 +1,7 @@
 // src/subtitle/BaseSubtitleHandler.js
 
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { TranslationMode } from "../config.js";
 
 export default class BaseSubtitleHandler {

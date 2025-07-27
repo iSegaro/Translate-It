@@ -1,4 +1,4 @@
-// src/services/TranslationService.js
+// s../error-management/TranslationService.js
 import { getBrowserAPI } from "@/utils/browser-unified.js";
 import { TranslationMode } from "@/config.js";
 import { logME } from "@/utils/helpers.js";

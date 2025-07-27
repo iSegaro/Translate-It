@@ -4,7 +4,7 @@
 // src/handlers/elementModeHandler.js
 import { getBrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getSettingsAsync } from "../config.js";
 
 /**

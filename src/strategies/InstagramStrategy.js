@@ -1,5 +1,5 @@
 // src/strategies/InstagramStrategy.js
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/helpers";
 import { filterXSS } from "xss";

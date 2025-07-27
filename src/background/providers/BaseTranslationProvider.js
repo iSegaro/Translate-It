@@ -1,6 +1,6 @@
 // src/core/providers/BaseTranslationProvider.js
 import { logME } from "../../utils/helpers.js";
-import { ErrorTypes } from "../../services/ErrorTypes.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 
 /**
  * Base class for all translation providers

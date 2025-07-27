@@ -15,11 +15,12 @@ const initializeBrowserAPI = async () => {
     return globalReadyPromise.value
   }
 
-  globalReadyPromise.value = new Promise(async (resolve, reject) => {
-    try {
-      // Multiple retry attempts for sidepanel context
-      let attempts = 0
-      const maxAttempts = 10
+  globalReadyPromise.value = new Promise((resolve, reject) => {
+    const initializeAPI = async () => {
+      try {
+        // Multiple retry attempts for sidepanel context
+        let attempts = 0
+        const maxAttempts = 10
       const retryDelay = 100
 
       while (attempts < maxAttempts) {
@@ -48,12 +49,15 @@ const initializeBrowserAPI = async () => {
         }
       }
 
-      throw new Error(`Failed to initialize browser API after ${maxAttempts} attempts`)
-    } catch (error) {
-      console.error('❌ [useBrowserAPI] Browser API initialization failed:', error)
-      globalApiReady.value = false
-      reject(error)
+        throw new Error(`Failed to initialize browser API after ${maxAttempts} attempts`)
+      } catch (error) {
+        console.error('❌ [useBrowserAPI] Browser API initialization failed:', error)
+        globalApiReady.value = false
+        reject(error)
+      }
     }
+    
+    initializeAPI()
   })
 
   return globalReadyPromise.value

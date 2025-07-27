@@ -1,6 +1,6 @@
 // src/composables/useTranslationModes.js
 import { ref, reactive } from 'vue';
-import { TranslationService } from '@/services/TranslationService.js';
+import { TranslationService } from '../error-management/TranslationService.js';
 import { logME } from '@/utils/helpers.js';
 import { useLanguages } from '@/composables/useLanguages.js';
 import { AUTO_DETECT_VALUE } from '@/constants.js';

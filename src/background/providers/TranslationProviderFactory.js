@@ -1,5 +1,5 @@
 // src/providers/factory/TranslationProviderFactory.js
-import { ErrorTypes } from "../../services/ErrorTypes.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 
 /**
  * Factory class for creating translation provider instances

@@ -1,10 +1,10 @@
 // src/handlers/subtitleHandler.js
 import { Browser } from "@/utils/browser-polyfill.js";
 import { createSubtitleManager } from "../subtitle/index.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";
-import { matchErrorToType } from "../services/ErrorMatcher.js";
+import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
 
 export class SubtitleHandler {

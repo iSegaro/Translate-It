@@ -1,7 +1,7 @@
 // src/core/EventRouter.js
 import { CONFIG, state } from "../config.js";
-import { handleUIError } from "../services/ErrorService.js";
-import { ErrorTypes } from "../services/ErrorTypes.js";
+import { handleUIError } from "../error-management/ErrorService.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 export default class EventRouter {
   constructor(translationHandler, featureManager) {
