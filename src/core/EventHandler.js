@@ -617,6 +617,13 @@ export default class EventHandler {
   }
 
   handleEscape() {
+    // Check if NEW Vue select element manager is active
+    // If so, let it handle ESC key instead of OLD system
+    if (window.translateItNewSelectManager === true) {
+      console.log('[EventHandler] NEW select manager is active, skipping OLD ESC handling');
+      return;
+    }
+
     taggleLinks(false);
 
     this.cancelSelectionTranslation();

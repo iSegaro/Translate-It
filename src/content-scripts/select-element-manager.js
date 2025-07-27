@@ -129,15 +129,19 @@ export class SelectElementManager {
     
     // Add event listeners with abort signal
     const options = { signal: this.abortController.signal, capture: true }
+    // High priority for ESC key to override OLD system
     const keyOptions = { signal: this.abortController.signal, capture: true, passive: false }
     
     document.addEventListener('mouseover', this.handleMouseOver, options)
     document.addEventListener('mouseout', this.handleMouseOut, options)
     document.addEventListener('click', this.handleClick, options)
-    document.addEventListener('keydown', this.handleKeyDown, keyOptions)
     
-    // Also add keydown to window for better ESC capture
+    // Add keydown listeners with high priority to capture ESC before OLD system
+    document.addEventListener('keydown', this.handleKeyDown, keyOptions)
     window.addEventListener('keydown', this.handleKeyDown, keyOptions)
+    
+    // Mark that NEW select element manager is active (for OLD system coordination)
+    window.translateItNewSelectManager = true
     
     // Visual feedback
     this.addGlobalStyles()
@@ -177,6 +181,9 @@ export class SelectElementManager {
     
     // Re-enable page interactions
     this.enablePageInteractions()
+    
+    // Clear NEW select manager flag
+    window.translateItNewSelectManager = false
     
     // Send cancellation message to background/sidepanel
     try {

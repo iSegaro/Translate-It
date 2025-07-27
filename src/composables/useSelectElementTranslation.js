@@ -288,6 +288,7 @@ export function useSelectElementTranslation() {
       }
       // مدیریت لغو selection توسط کاربر (ESC, etc.)
       else if (message.action === 'elementSelectionCancelled') {
+        console.log('[useSelectElementTranslation] Element selection cancelled via content script:', message.data)
         state.isSelecting = false
         isSelectModeActive.value = false // همگام‌سازی toggle state
         clearSelectionTimeout()
@@ -302,6 +303,8 @@ export function useSelectElementTranslation() {
         if (onModeChanged.value) {
           onModeChanged.value(false)
         }
+        
+        console.log('[useSelectElementTranslation] Select mode state synced after cancellation')
       }
       // مدیریت success پیام‌ها
       else if (message.action === 'elementSelectionSuccess') {

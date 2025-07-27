@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
@@ -107,6 +107,37 @@ const handleSidepanelClick = async (event) => {
     }
   }
 }
+
+// Handle ESC key in sidepanel
+const handleKeyDown = async (event) => {
+  // Only handle ESC key
+  if (event.key !== 'Escape') return
+  
+  // Only deactivate if select mode is active
+  if (isSelectModeActive.value) {
+    try {
+      console.log('[SidepanelLayout] ESC pressed in sidepanel - deactivating select element mode')
+      event.preventDefault()
+      event.stopPropagation()
+      await deactivateSelectElement()
+    } catch (error) {
+      console.error('[SidepanelLayout] Failed to deactivate select element mode on ESC:', error)
+    }
+  }
+}
+
+// Lifecycle management for ESC listener
+onMounted(() => {
+  // Add global keydown listener for ESC in sidepanel
+  document.addEventListener('keydown', handleKeyDown, { capture: true })
+  console.log('[SidepanelLayout] ESC listener added to sidepanel')
+})
+
+onUnmounted(() => {
+  // Remove global keydown listener
+  document.removeEventListener('keydown', handleKeyDown, { capture: true })
+  console.log('[SidepanelLayout] ESC listener removed from sidepanel')
+})
 </script>
 
 <style lang="scss" scoped>
