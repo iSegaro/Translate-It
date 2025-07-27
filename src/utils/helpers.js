@@ -36,11 +36,11 @@ export function logMethod(target, propertyKey, descriptor) {
 }
 
 export const logME = (...args) => {
-  IsDebug().then((IsDebug) => {
-    if (IsDebug) {
+  // IsDebug().then((IsDebug) => {
+  //   if (IsDebug) {
       console.debug(...args);
-    }
-  });
+  //   }
+  // });
 };
 
 export const isEditable = (element) => {

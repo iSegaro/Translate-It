@@ -21,6 +21,21 @@ class BackgroundService {
     this.listeners = [];
     this.vueMessageHandler = null;
     this.translationEngine = null;
+    // Define handleCentralMessageWrapper as a class property (arrow function) here
+    this.handleCentralMessageWrapper = (request, sender, sendResponse) => {
+      console.log('[BackgroundService] >>> RAW MESSAGE RECEIVED IN CENTRAL LISTENER <<<', request.action);
+      this.handleCentralMessage(request, sender)
+        .then(response => {
+          if (response !== undefined) {
+            sendResponse(response);
+          }
+        })
+        .catch(error => {
+          console.error('[BackgroundService] Error in central message handler wrapper:', error);
+          sendResponse({ success: false, error: error.message || 'Unknown error in background service' });
+        });
+      return true;
+    };
   }
 
   /**
@@ -53,6 +68,9 @@ class BackgroundService {
       
       // Pre-load essential features
       await this.initializeFeatures();
+
+      // Setup central message listener
+      await this.setupCentralMessageListener();
 
       this.initialized = true;
       
@@ -265,6 +283,79 @@ class BackgroundService {
       environment: environment.getDebugInfo(),
       featureLoader: featureLoader.getDebugInfo()
     };
+  }
+
+  /**
+   * Setup central message listener to route messages to appropriate handlers
+   * @private
+   */
+  async setupCentralMessageListener() {
+    console.log('👂 Setting up central message listener...');
+    const Browser = await getBrowserAPI();
+
+    // Remove any existing listener to prevent duplicates
+    if (Browser.runtime.onMessage.hasListener(this.handleCentralMessageWrapper)) {
+      Browser.runtime.onMessage.removeListener(this.handleCentralMessageWrapper);
+    }
+
+    Browser.runtime.onMessage.addListener(this.handleCentralMessageWrapper); // Pass the function directly
+    console.log('✅ Central message listener set up');
+  }
+
+  /**
+   * Central message handler (actual logic)
+   * @param {Object} request - The message request
+   * @param {Object} sender - The sender of the message
+   * @returns {Promise<any>|undefined} - Response or undefined if not handled
+   */
+  async handleCentralMessage(request, sender) { // Removed sendResponse from parameters
+    console.log('[BackgroundService] Raw message received:', request); // Keep this for now
+
+    if (request.action === 'TRANSLATE') {
+      if (!this.translationEngine) {
+        console.error('[BackgroundService] Translation engine not initialized when TRANSLATE message received.');
+        return {
+          success: false,
+          error: {
+            type: 'ENGINE_NOT_READY',
+            message: 'Translation engine is not ready.',
+            context: request.context
+          }
+        };
+      }
+      try {
+        console.log('[BackgroundService] Calling translationEngine.handleTranslateMessage...');
+        const result = await this.translationEngine.handleTranslateMessage(request, sender);
+        console.log('[BackgroundService] translationEngine.handleTranslateMessage returned:', result);
+        return result;
+      } catch (error) {
+        console.error('[BackgroundService] Error handling TRANSLATE message:', error);
+        const formattedError = this.translationEngine.formatError(error, request.context);
+        console.log('[BackgroundService] Returning formatted error:', formattedError);
+        console.error('[BackgroundService] Error handling TRANSLATE message:', error);
+        // Ensure error is formatted correctly for TranslationClient
+        return this.translationEngine.formatError(error, request.context);
+      }
+    }
+
+    // Handle other message types here if needed
+    // Handle other message types here if needed
+    if (request.action === 'ping') {
+      console.log('[BackgroundService] Ping received, responding with pong');
+      return { success: true, message: 'pong' };
+    }
+
+    // For now, let VueMessageHandler handle other messages
+    if (this.vueMessageHandler) {
+      // VueMessageHandler's register method already adds a listener,
+      // so we might need to adjust how VueMessageHandler works
+      // or ensure it's the only listener for its specific messages.
+      // For now, we'll assume it's handled elsewhere or will be refactored.
+    }
+
+    // Return false or undefined if no response is sent synchronously
+    // or if the message is not handled by this central listener.
+    return undefined;
   }
 
   /**

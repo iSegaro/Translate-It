@@ -353,21 +353,23 @@ export class VueMessageHandler {
     const browser = await this.initializeBrowser()
     // Add listener for runtime messages
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message.source === 'vue-app') {
-        // Handle async response properly
-        this.handleMessage(message, _sender)
-          .then(response => {
-            sendResponse(response)
-          })
-          .catch(error => {
-            console.error('Vue message handler error:', error)
-            sendResponse({ success: false, error: error.message })
-          })
-        // Return true to indicate we will send response asynchronously
-        return true
+      // If the message is a TRANSLATE action, let the central handler in BackgroundService handle it.
+      // Or if it's not from a 'vue-app' source, ignore it.
+      if (message.action === 'TRANSLATE' || message.source !== 'vue-app') {
+        return false // Do not handle this message, let other listeners process it
       }
-      // Don't handle other messages
-      return false
+
+      // Handle async response properly for messages intended for Vue apps
+      this.handleMessage(message, _sender)
+        .then(response => {
+          sendResponse(response)
+        })
+        .catch(error => {
+          console.error('Vue message handler error:', error)
+          sendResponse({ success: false, error: error.message })
+        })
+      // Return true to indicate we will send response asynchronously
+      return true
     })
   }
 }

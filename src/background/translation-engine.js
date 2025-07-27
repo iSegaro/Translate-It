@@ -252,8 +252,10 @@ export class TranslationEngine {
     try {
       const Browser = await getBrowserAPI()
       const data = await Browser.storage.local.get(['translationHistory'])
-      if (data.translationHistory) {
+      if (Array.isArray(data.translationHistory)) {
         this.history = data.translationHistory
+      } else {
+        this.history = [] // Ensure it's always an array
       }
     } catch (error) {
       console.error('[TranslationEngine] Failed to load history:', error)
@@ -317,7 +319,7 @@ export class TranslationEngine {
    */
   async initialize() {
     try {
-      await this.setupMessageListener()
+      
       await this.loadHistoryFromStorage()
       console.log('[TranslationEngine] Initialized successfully')
     } catch (error) {

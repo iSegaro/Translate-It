@@ -83,6 +83,7 @@ export class BaseTranslationProvider {
 
       // Parse successful response
       const data = await response.json();
+      logME(`[${this.providerName}] _executeApiCall raw response data:`, data);
       logME(`[${this.providerName}] _executeApiCall response data:`, data);
 
       const result = extractResponse(data, response.status);

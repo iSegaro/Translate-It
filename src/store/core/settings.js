@@ -110,6 +110,12 @@ export const useSettingsStore = defineStore('settings', () => {
             } else {
               settings.value[key] = [];
             }
+          } else if (key === 'translationHistory') {
+            if (Array.isArray(stored[key])) {
+              settings.value[key] = stored[key];
+            } else {
+              settings.value[key] = []; // Default to empty array if not an array
+            }
           } else {
             settings.value[key] = stored[key]
           }
