@@ -22,6 +22,26 @@
 
 ---
 
+#### v0.9.5 – Released on July 26, 2025
+
+##### Added
+
+- Added `Microsoft Bing` as a translation provider
+- Added `Yandex Translate` as a translation provider
+- Added support for `Chrome Browser Translator` API as a translation provider (Chrome only)
+
+##### Changed
+
+- Hotfixed temporary disabling of the YouTube subtitle translation button due to visibility issue
+- Fixed translation issues in input fields
+
+##### Fixed
+
+- Improved handling of user settings
+- [#55](https://github.com/iSegaro/Translate-It/issues/55) [#53](https://github.com/iSegaro/Translate-It/issues/53) Centralized icon management and improved icon cleanup, resolving `RESULT_CODE_KILLED_BAD_MESSAGE` errors and enhancing DOM organization.
+
+---
+
 #### v0.9.0 – Released on July 22, 2025
 
 ##### Added
