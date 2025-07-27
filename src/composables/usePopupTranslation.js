@@ -43,11 +43,11 @@ export function usePopupTranslation() {
         }
       })
 
-      if (response?.success && response?.translation) {
-        translatedText.value = response.translation
+      if (response?.success && response?.translatedText) {
+        translatedText.value = response.translatedText
         lastTranslation.value = {
           source: sourceText.value,
-          target: response.translation,
+          target: response.translatedText,
           provider: settingsStore.settings.TRANSLATION_API,
           timestamp: Date.now()
         }

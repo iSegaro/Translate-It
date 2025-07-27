@@ -65,7 +65,7 @@ html, body {
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
-  overflow: hidden;
+  overflow: visible; /* Allow dropdowns to show */
   display: flex;
   flex-direction: column;
 }
@@ -442,6 +442,10 @@ html, body {
   position: absolute;
   top: 5px;
   right: 8px;
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
 
   &.hidden-by-clipboard {
     display: none !important;

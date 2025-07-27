@@ -149,9 +149,12 @@ const currentProviderName = computed(() => {
 
 // Methods
 const getProviderIcon = (iconPath) => {
-  if (!iconPath) return '@/assets/icons/api-providers/google.svg'
-  if (iconPath.startsWith('@/assets/')) return iconPath
-  return `@/assets/icons/${iconPath}`
+  // Use paths that match build output structure
+  if (!iconPath) return '/icons/api-providers/google.svg'
+  if (iconPath.startsWith('@/assets/')) {
+    return iconPath.replace('@/assets/', '/')
+  }
+  return `/icons/${iconPath}`
 }
 
 const handleTranslate = () => {
@@ -167,7 +170,10 @@ const handleTranslate = () => {
 }
 
 const toggleDropdown = () => {
+  console.log('[ProviderSelector] Toggle dropdown clicked, current state:', isDropdownOpen.value)
   isDropdownOpen.value = !isDropdownOpen.value
+  console.log('[ProviderSelector] New dropdown state:', isDropdownOpen.value)
+  console.log('[ProviderSelector] Available providers:', availableProviders.value.length)
 }
 
 const selectProvider = async (provider) => {
@@ -214,6 +220,7 @@ onUnmounted(() => {
 .split-translate-button-container {
   position: relative;
   flex-shrink: 0;
+  z-index: 100; /* Ensure dropdown is above other elements */
 }
 
 .split-translate-button {
@@ -250,6 +257,16 @@ onUnmounted(() => {
 
 .translate-main-area:hover {
   background-color: var(--toolbar-link-hover-bg-color);
+}
+
+.api-provider-icon {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  opacity: var(--icon-opacity);
+  transition: opacity 0.2s ease-in-out;
+  object-fit: contain;
 }
 
 .provider-dropdown-area {
@@ -313,12 +330,6 @@ onUnmounted(() => {
 }
 
 /* Common Styles */
-.api-provider-icon {
-  width: 16px;
-  height: 16px;
-  opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out;
-}
 
 .translate-main-area:hover .api-provider-icon {
   opacity: var(--icon-hover-opacity);
@@ -356,11 +367,13 @@ onUnmounted(() => {
   border: 1px solid var(--header-border-color);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  z-index: 1001;
   min-width: 160px;
   margin-top: 2px;
   max-height: 300px;
   overflow-y: auto;
+  display: block !important; /* Force visibility for debugging */
+  visibility: visible !important;
 }
 
 .dropdown-item {
@@ -387,9 +400,12 @@ onUnmounted(() => {
 }
 
 .dropdown-item img {
-  width: 16px;
-  height: 16px;
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
   opacity: var(--icon-opacity);
+  object-fit: contain;
 }
 
 .dropdown-item span {

@@ -57,9 +57,10 @@ defineEmits(['click'])
 // Computed
 const iconSrc = computed(() => {
   if (props.icon.startsWith('/') || props.icon.startsWith('@/')) {
-    return props.icon.replace('@/', '/src/')
+    return props.icon.replace('@/', '/')
   }
-  return `@/assets/icons/${props.icon}`
+  // Icons are copied to /icons/ directory in build output 
+  return `/icons/${props.icon}`
 })
 
 const isRevertIcon = computed(() => props.variant === 'revert')
@@ -104,6 +105,13 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
   position: absolute;
   top: 5px;
   right: 8px;
+}
+
+.voice-target-icon {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
 }
 
 .paste-icon-separate.hidden-by-clipboard {
