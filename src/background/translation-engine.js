@@ -167,7 +167,7 @@ export class TranslationEngine {
 
     try {
       // Create new provider instance
-      const provider = await this.factory.createProvider(providerId)
+      const provider = await this.factory.getProvider(providerId)
       
       if (provider) {
         this.providers.set(providerId, provider)

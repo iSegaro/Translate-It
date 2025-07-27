@@ -146,6 +146,7 @@ import { useSelectElementTranslation } from '@/composables/useSelectElementTrans
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { useI18n } from '@/composables/useI18n.js'
 import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
+import { useSettingsStore } from '@/store/core/settings.js'
 
 // Browser API, TTS, Background Warmup, Select Element, and i18n
 const browserAPI = useBrowserAPI()
@@ -153,6 +154,9 @@ const tts = useTTSSmart()
 const backgroundWarmup = useBackgroundWarmup()
 const selectElement = useSelectElementTranslation()
 const { t } = useI18n()
+
+// Settings Store
+const settingsStore = useSettingsStore()
 
 // Translation Client
 const translationClient = new TranslationClient(TRANSLATION_CONTEXTS.SIDEPANEL)
@@ -228,8 +232,12 @@ const handleTranslationSubmit = async () => {
     const sourceLanguageCode = getLanguageCode(document.getElementById('sourceLanguageInput')?.value || 'auto')
     const targetLanguageCode = getLanguageCode(targetLanguage)
 
+    // Get current provider from settings
+    const currentProvider = settingsStore.settings.TRANSLATION_API || 'google'
+    
     // Use TranslationClient for translation
     const response = await translationClient.translate(sourceText.value, {
+      provider: currentProvider,
       sourceLanguage: sourceLanguageCode === 'en' && document.getElementById('sourceLanguageInput')?.value === 'auto' ? 'auto' : sourceLanguageCode,
       targetLanguage: targetLanguageCode,
       mode: 'sidepanel'
