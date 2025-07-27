@@ -322,6 +322,10 @@ class BackgroundService {
     // Text selection handlers
     this.messageRouter.registerHandler('getSelectedText', Handlers.handleGetSelectedText);
     
+    // Page exclusion handlers
+    this.messageRouter.registerHandler('isCurrentPageExcluded', Handlers.handleIsCurrentPageExcluded);
+    this.messageRouter.registerHandler('setExcludeCurrentPage', Handlers.handleSetExcludeCurrentPage);
+    
     // Sidepanel handlers
     this.messageRouter.registerHandler('OPEN_SIDE_PANEL', Handlers.handleOpenSidePanel);
     

@@ -47,5 +47,9 @@ export * from './screen-capture/handleAreaSelectionCancel.js';
 // Text selection handlers
 export * from './text-selection/handleGetSelectedText.js';
 
+// Page exclusion handlers
+export * from './page-exclusion/handleIsCurrentPageExcluded.js';
+export * from './page-exclusion/handleSetExcludeCurrentPage.js';
+
 // Sidepanel handlers
 export * from './sidepanel/handleOpenSidePanel.js';

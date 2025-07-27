@@ -79,36 +79,55 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
-import { renderMarkdown } from '@/utils/simpleMarkdown.js'
-import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Stores
 const settingsStore = useSettingsStore()
 
-// Translation Client
-const translationClient = new TranslationClient(TRANSLATION_CONTEXTS.POPUP)
+// Composables (lightweight popup version)
+const translation = usePopupTranslation()
 
 // Refs
 const sourceTextarea = ref(null)
 const translationResult = ref(null)
 
-// State
-const sourceText = ref('')
-const translatedText = ref('')
-const isTranslating = ref(false)
+// State from composables
+const {
+  sourceText,
+  translatedText,
+  isTranslating,
+  translationError,
+  hasTranslation,
+  canTranslate,
+  triggerTranslation,
+  clearTranslation,
+  loadLastTranslation
+} = translation
+
+// Local state
 const canPaste = ref(true)
 const lastTranslation = ref(null)
 
 // Computed
 const formattedTranslatedText = computed(() => {
+  if (translationError.value) {
+    return `<div class="error-text">⚠️ ${translationError.value}</div>`
+  }
+  
+  if (isTranslating.value) {
+    return '<div class="loading-text">در حال ترجمه...</div>'
+  }
+  
   if (!translatedText.value) {
     const placeholder = 'نتیجه ترجمه اینجا نمایش داده می‌شود...'
     return `<div class="placeholder-text">${placeholder}</div>`
   }
-  return renderMarkdown(translatedText.value)
+  
+  // Simple text formatting for popup (no markdown)
+  return translatedText.value.replace(/\n/g, '<br>')
 })
 
 // Methods
@@ -129,10 +148,7 @@ const handleKeydown = (event) => {
 }
 
 const handleTranslate = async () => {
-  if (!sourceText.value.trim() || isTranslating.value) return
-  
-  isTranslating.value = true
-  translatedText.value = ''
+  if (!canTranslate.value) return
   
   try {
     // Store last translation for revert functionality
@@ -143,17 +159,10 @@ const handleTranslate = async () => {
       targetLanguage: settingsStore.settings.TARGET_LANGUAGE
     }
     
-    // Use TranslationClient for translation
-    const response = await translationClient.translate(sourceText.value, {
-      provider: settingsStore.settings.TRANSLATION_API,
-      sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-      targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
-      mode: 'popup'
-    })
+    // Use composable translation function
+    const success = await triggerTranslation(translationResult.value)
     
-    if (response?.translatedText) {
-      translatedText.value = response.translatedText
-      
+    if (success) {
       // Add fade-in animation
       await nextTick()
       if (translationResult.value) {
@@ -162,15 +171,10 @@ const handleTranslate = async () => {
           translationResult.value?.classList.remove('fade-in')
         }, 400)
       }
-    } else {
-      throw new Error('No translation result received')
     }
     
   } catch (error) {
     console.error('[PopupTranslationForm] Translation error:', error)
-    translatedText.value = `خطا در ترجمه: ${error.message}`
-  } finally {
-    isTranslating.value = false
   }
 }
 
@@ -179,7 +183,6 @@ const copySourceText = async () => {
   
   try {
     await navigator.clipboard.writeText(sourceText.value)
-    // Could show a toast notification here
   } catch (error) {
     console.error('Failed to copy source text:', error)
   }
@@ -189,10 +192,9 @@ const copyTargetText = async () => {
   if (!translatedText.value) return
   
   try {
-    // Strip HTML tags for clipboard
-    const textOnly = translatedText.value.replace(/<[^>]*>/g, '')
-    await navigator.clipboard.writeText(textOnly)
-    // Could show a toast notification here
+    // Get original markdown content if available
+    const textToCopy = translationResult.value?.dataset?.originalMarkdown || translatedText.value
+    await navigator.clipboard.writeText(textToCopy)
   } catch (error) {
     console.error('Failed to copy target text:', error)
   }
@@ -201,8 +203,16 @@ const copyTargetText = async () => {
 const pasteText = async () => {
   try {
     const text = await navigator.clipboard.readText()
-    sourceText.value = text
-    handleSourceInput()
+    if (text) {
+      sourceText.value = text
+      handleSourceInput()
+      
+      // Auto-translate if setting enabled
+      await nextTick()
+      if (settingsStore.settings.AUTO_TRANSLATE_ON_PASTE || false) {
+        await handleTranslate()
+      }
+    }
   } catch (error) {
     console.error('Failed to paste text:', error)
   }
@@ -214,10 +224,13 @@ const playSourceTTS = async () => {
   try {
     const browser = await getBrowserAPI()
     await browser.runtime.sendMessage({
-      action: 'playTTS',
+      action: 'speak',
       data: {
         text: sourceText.value,
-        language: settingsStore.settings.SOURCE_LANGUAGE
+        lang: settingsStore.settings.SOURCE_LANGUAGE,
+        rate: settingsStore.settings.TTS_RATE || 1,
+        pitch: settingsStore.settings.TTS_PITCH || 1,
+        volume: settingsStore.settings.TTS_VOLUME || 1
       }
     })
   } catch (error) {
@@ -233,10 +246,13 @@ const playTargetTTS = async () => {
     // Strip HTML tags for TTS
     const textOnly = translatedText.value.replace(/<[^>]*>/g, '')
     await browser.runtime.sendMessage({
-      action: 'playTTS',
+      action: 'speak',
       data: {
         text: textOnly,
-        language: settingsStore.settings.TARGET_LANGUAGE
+        lang: settingsStore.settings.TARGET_LANGUAGE,
+        rate: settingsStore.settings.TTS_RATE || 1,
+        pitch: settingsStore.settings.TTS_PITCH || 1,
+        volume: settingsStore.settings.TTS_VOLUME || 1
       }
     })
   } catch (error) {
@@ -245,8 +261,7 @@ const playTargetTTS = async () => {
 }
 
 const clearStorage = () => {
-  sourceText.value = ''
-  translatedText.value = ''
+  clearTranslation()
   lastTranslation.value = null
 }
 
@@ -267,7 +282,7 @@ const revertTranslation = () => {
 }
 
 // Event listeners
-onMounted(() => {
+onMounted(async () => {
   // Listen for global events from header component
   document.addEventListener('clear-storage', clearStorage)
   document.addEventListener('revert-translation', revertTranslation)
@@ -286,17 +301,22 @@ onMounted(() => {
     }
   })
   
+  // Initialize translation data
+  await loadLastTranslation()
+  
   // Check clipboard permissions
-  checkClipboardPermissions()
+  await checkClipboardPermissions()
+  
+  // Set up clipboard monitoring
+  setInterval(checkClipboardPermissions, 2000)
 })
 
 const checkClipboardPermissions = async () => {
   try {
-    const result = await navigator.permissions.query({ name: 'clipboard-read' })
-    canPaste.value = result.state === 'granted' || result.state === 'prompt'
+    const text = await navigator.clipboard.readText()
+    canPaste.value = text && text.trim().length > 0
   } catch (error) {
-    // Fallback to true if permissions API not available
-    canPaste.value = true
+    canPaste.value = false
   }
 }
 </script>
@@ -349,6 +369,29 @@ const checkClipboardPermissions = async () => {
   color: #6c757d;
   font-style: italic;
   opacity: 0.7;
+}
+
+.error-text {
+  color: #dc3545;
+  font-style: italic;
+  padding: 8px;
+  border-left: 3px solid #dc3545;
+  background-color: rgba(220, 53, 69, 0.1);
+  border-radius: 3px;
+}
+
+.loading-text {
+  color: #007bff;
+  font-style: italic;
+  opacity: 0.8;
+  text-align: center;
+  padding: 16px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.4; }
 }
 
 /* Inline Toolbar */

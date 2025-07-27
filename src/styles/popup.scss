@@ -40,18 +40,28 @@
   --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
 }
 
-// Base styles
-body {
+// Base styles for extension popup
+html, body {
   margin: 0;
+  padding: 0;
+  width: 400px;
+  height: 350px;
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
   font-size: 15px;
+  overflow: hidden;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
 }
 
 // Popup container
 .popup-container {
-  width: 400px;
+  width: 100%;
+  height: 100%;
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;

@@ -66,15 +66,17 @@ onMounted(async () => {
     ])
     console.log('✅ Settings store loaded')
     
-    // Step 3: Connect to background port (similar to OLD implementation)
-    console.log('🔗 Connecting to background...')
+    // Step 3: Test background connection with simple ping
+    console.log('🔗 Testing background connection...')
     try {
-      const popupPort = browser.runtime.connect({ name: "popup" })
-      popupPort.postMessage({ action: "popupOpened" })
-      console.log('✅ Connected to background')
+      const response = await browser.runtime.sendMessage({
+        action: 'ping',
+        data: { from: 'popup' }
+      })
+      console.log('✅ Background connection test success:', response)
     } catch (err) {
-      console.warn('⚠️ Failed to connect popup port:', err.message)
-      // Don't fail initialization for this
+      console.warn('⚠️ Background connection test failed:', err.message)
+      // Don't fail initialization for this - background might be starting
     }
     
     // Step 4: Apply theme
@@ -111,7 +113,8 @@ const retryLoading = () => {
 
 <style scoped>
 .popup-container {
-  width: 400px;
+  width: 100%;
+  height: 100%;
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;

@@ -182,12 +182,15 @@ export function useTranslation() {
 
     try {
       const response = await browserAPI.safeSendMessage({
-        action: 'fetchTranslation',
-        payload: {
-          promptText: textToTranslate,
+        action: 'TRANSLATE',
+        context: 'popup',
+        data: {
+          text: textToTranslate,
+          provider: settingsStore.settings.TRANSLATION_API,
           sourceLanguage: sourceLangCheck,
           targetLanguage: targetLangCodeCheck,
-          translateMode
+          mode: 'popup',
+          options: {}
         }
       })
 
