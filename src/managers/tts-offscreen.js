@@ -132,7 +132,7 @@ export class OffscreenTTSManager {
       // First check if we received readiness signal
       if (this.offscreenReady) {
         console.log('✅ Offscreen document already signaled readiness');
-        return true;
+        // Still test actual connection even if ready signal received
       }
       
       console.log('🔍 Testing offscreen document connection...');
@@ -140,15 +140,21 @@ export class OffscreenTTSManager {
       const response = await Promise.race([
         this.browser.runtime.sendMessage({
           action: 'TTS_TEST',
-          target: 'offscreen'
+          target: 'offscreen',
+          timestamp: Date.now() // Add timestamp for request tracking
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Connection test timeout')), 800)
+          setTimeout(() => reject(new Error('Connection test timeout')), 1000) // Increased timeout
         )
       ]);
       
-      console.log('✅ Offscreen document is ready and responsive');
-      return true;
+      if (response && response.success) {
+        console.log('✅ Offscreen document is ready and responsive');
+        this.offscreenReady = true; // Update ready state
+        return true;
+      } else {
+        throw new Error('Invalid response from offscreen document');
+      }
       
     } catch (error) {
       console.warn('⚠️ Offscreen document connection test failed:', error.message);
@@ -229,60 +235,95 @@ export class OffscreenTTSManager {
       throw new Error('Text to speak cannot be empty');
     }
 
-    try {
-      // Stop any current speech
-      await this.stop();
+    // Retry mechanism with exponential backoff
+    const maxRetries = 2;
+    let lastError = null;
 
-      // Auto-recreate offscreen if needed BEFORE attempting to speak
-      const isOffscreenReady = await this.recreateOffscreenIfNeeded();
-      if (!isOffscreenReady) {
-        console.warn('⚠️ Offscreen document not available, falling back to alternative TTS');
-        await this.fallbackToAlternativeTTS(text, options);
-        return;
-      }
-
-      const ttsOptions = {
-        text: text.trim(),
-        voice: options.voice || null,
-        rate: options.rate || 1,
-        pitch: options.pitch || 1,
-        volume: options.volume || 1,
-        lang: options.lang || 'en-US'
-      };
-
-      console.log('🔊 Speaking text via offscreen document:', text.substring(0, 50));
-
-      // Send message to offscreen document with explicit target
-      const response = await this.browser.runtime.sendMessage({
-        action: 'TTS_SPEAK',
-        target: 'offscreen', // Explicitly target offscreen context
-        data: ttsOptions
-      });
-
-      if (!response || !response.success) {
-        throw new Error(response?.error || 'Failed to start TTS in offscreen document');
-      }
-
-      // Store current speech info
-      this.currentSpeech = {
-        text: text,
-        options: ttsOptions,
-        startTime: Date.now()
-      };
-
-      console.log('✅ TTS started successfully');
-
-    } catch (error) {
-      console.error('❌ TTS speak failed:', error);
-      
-      // If offscreen fails even after recreation, try fallback methods
-      console.log('🔄 Attempting TTS fallback...');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await this.fallbackToAlternativeTTS(text, options);
-      } catch (fallbackError) {
-        console.error('❌ TTS fallback also failed:', fallbackError);
-        throw new Error(`TTS failed: ${error.message}. Fallback: ${fallbackError.message}`);
+        console.log(`🔊 TTS speak attempt ${attempt}/${maxRetries} for:`, text.substring(0, 50));
+
+        // Stop any current speech
+        await this.stop();
+
+        // Auto-recreate offscreen if needed BEFORE attempting to speak
+        const isOffscreenReady = await this.recreateOffscreenIfNeeded();
+        if (!isOffscreenReady) {
+          console.warn('⚠️ Offscreen document not available, falling back to alternative TTS');
+          await this.fallbackToAlternativeTTS(text, options);
+          return;
+        }
+
+        const ttsOptions = {
+          text: text.trim(),
+          voice: options.voice || null,
+          rate: options.rate || 1,
+          pitch: options.pitch || 1,
+          volume: options.volume || 1,
+          lang: options.lang || 'en-US'
+        };
+
+        console.log(`🔊 Speaking text via offscreen document (attempt ${attempt}):`, text.substring(0, 50));
+
+        // Send message to offscreen document with explicit target and timeout
+        const response = await Promise.race([
+          this.browser.runtime.sendMessage({
+            action: 'TTS_SPEAK',
+            target: 'offscreen', // Explicitly target offscreen context
+            data: ttsOptions,
+            timestamp: Date.now()
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('TTS request timeout')), 2000)
+          )
+        ]);
+
+        if (!response || !response.success) {
+          throw new Error(response?.error || 'Failed to start TTS in offscreen document');
+        }
+
+        // Store current speech info
+        this.currentSpeech = {
+          text: text,
+          options: ttsOptions,
+          startTime: Date.now()
+        };
+
+        console.log(`✅ TTS started successfully on attempt ${attempt}`);
+        return; // Success, exit retry loop
+
+      } catch (error) {
+        lastError = error;
+        console.error(`❌ TTS speak failed on attempt ${attempt}:`, error);
+        
+        // If this is a message port error and we have retries left, try again
+        if (attempt < maxRetries && 
+            (error.message.includes('message port closed') || 
+             error.message.includes('Could not establish connection') ||
+             error.message.includes('timeout'))) {
+          console.log(`🔄 Retrying TTS in ${attempt * 500}ms... (${maxRetries - attempt} attempts left)`);
+          
+          // Reset offscreen state for retry
+          this.offscreenReady = false;
+          this.offscreenCreated = false;
+          
+          // Wait before retry with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, attempt * 500));
+          continue;
+        }
+        
+        // If it's the last attempt or non-retryable error, break
+        break;
       }
+    }
+
+    // If all retries failed, try fallback methods
+    console.log('🔄 All TTS attempts failed, trying fallback...');
+    try {
+      await this.fallbackToAlternativeTTS(text, options);
+    } catch (fallbackError) {
+      console.error('❌ TTS fallback also failed:', fallbackError);
+      throw new Error(`TTS failed: ${lastError.message}. Fallback: ${fallbackError.message}`);
     }
   }
 
@@ -294,17 +335,25 @@ export class OffscreenTTSManager {
     if (!this.initialized) return;
 
     try {
-      // Stop speech in offscreen document
-      await this.browser.runtime.sendMessage({
-        action: 'TTS_STOP',
-        target: 'offscreen'
-      });
+      // Stop speech in offscreen document with timeout
+      await Promise.race([
+        this.browser.runtime.sendMessage({
+          action: 'TTS_STOP',
+          target: 'offscreen',
+          timestamp: Date.now()
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Stop request timeout')), 1000)
+        )
+      ]);
 
       this.currentSpeech = null;
       console.log('🛑 TTS stopped');
 
     } catch (error) {
-      console.error('❌ Failed to stop TTS:', error);
+      // Don't throw on stop errors, just log them
+      console.warn('⚠️ Failed to stop TTS (non-critical):', error);
+      this.currentSpeech = null; // Clear state anyway
     }
   }
 
@@ -487,32 +536,79 @@ export class OffscreenTTSManager {
    * @private
    */
   async fallbackToAlternativeTTS(text, options) {
-    console.log('🔄 Using content script TTS fallback');
+    console.log('🔄 Using alternative TTS methods');
     
+    // Try direct Google TTS URL as a more reliable fallback
     try {
-      // Get active tab to inject TTS
-      const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
-      if (!tab) {
-        throw new Error('No active tab found for TTS fallback');
-      }
+      console.log('🔄 Trying direct Google TTS fallback');
       
-      // Send TTS message to content script
-      await this.browser.tabs.sendMessage(tab.id, {
-        action: 'TTS_SPEAK_CONTENT',
-        data: {
-          text: text,
-          lang: options.lang || 'en-US',
-          rate: options.rate || 1,
-          pitch: options.pitch || 1,
-          volume: options.volume || 1
-        }
+      const lang = options.lang || 'en';
+      const langCode = lang.includes('-') ? lang.split('-')[0] : lang;
+      
+      // Create direct Google TTS URL
+      const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx`;
+      
+      // Create and play audio element directly
+      const audio = new Audio(googleTTSUrl);
+      audio.crossOrigin = 'anonymous';
+      
+      return new Promise((resolve, reject) => {
+        audio.onloadeddata = () => {
+          console.log('✅ Direct Google TTS audio loaded successfully');
+          audio.play()
+            .then(() => {
+              console.log('✅ Direct Google TTS playback started');
+              resolve();
+            })
+            .catch(reject);
+        };
+        
+        audio.onerror = (error) => {
+          console.error('❌ Direct Google TTS failed:', error);
+          reject(new Error('Direct Google TTS playback failed'));
+        };
+        
+        audio.onended = () => {
+          console.log('✅ Direct Google TTS playback ended');
+        };
       });
       
-      console.log('✅ Content script TTS fallback successful');
+    } catch (directError) {
+      console.error('❌ Direct Google TTS failed:', directError);
       
-    } catch (error) {
-      console.error('❌ Content script TTS fallback failed:', error);
-      throw error;
+      // Fallback to content script TTS
+      console.log('🔄 Trying content script TTS fallback');
+      
+      try {
+        // Get active tab to inject TTS
+        const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
+        if (!tab) {
+          throw new Error('No active tab found for TTS fallback');
+        }
+        
+        // Send TTS message to content script with timeout
+        await Promise.race([
+          this.browser.tabs.sendMessage(tab.id, {
+            action: 'TTS_SPEAK_CONTENT',
+            data: {
+              text: text,
+              lang: options.lang || 'en-US',
+              rate: options.rate || 1,
+              pitch: options.pitch || 1,
+              volume: options.volume || 1
+            }
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Content script TTS timeout')), 3000)
+          )
+        ]);
+        
+        console.log('✅ Content script TTS fallback successful');
+        
+      } catch (contentScriptError) {
+        console.error('❌ Content script TTS fallback failed:', contentScriptError);
+        throw new Error(`All TTS fallback methods failed. Direct: ${directError.message}, Content: ${contentScriptError.message}`);
+      }
     }
   }
 }

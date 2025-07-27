@@ -59,8 +59,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // Handle ping requests directly in offscreen
+  if (message.action === 'ping') {
+    console.log("[Offscreen] Ping received, responding with success");
+    sendResponse({ success: true, message: "Offscreen document is responsive" });
+    return false; // synchronous response
+  }
+
   // Block certain actions from being forwarded (should go directly to background)
-  const directToBackgroundActions = ['activateSelectElementMode', 'ping'];
+  const directToBackgroundActions = ['activateSelectElementMode'];
   if (directToBackgroundActions.includes(message.action)) {
     console.log("[Offscreen] Ignoring action (should go directly to background):", message.action);
     return false;

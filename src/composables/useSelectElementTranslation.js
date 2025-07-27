@@ -276,6 +276,19 @@ export function useSelectElementTranslation() {
    */
   const setupBackgroundListener = async () => {
     const messageListener = (message, sender) => {
+      // Only handle select element related messages
+      const selectElementActions = [
+        'elementSelected',
+        'elementSelectionError', 
+        'elementSelectionCancelled',
+        'elementSelectionSuccess'
+      ];
+      
+      if (!selectElementActions.includes(message.action)) {
+        // Ignore TTS and other unrelated messages
+        return;
+      }
+      
       console.log('[useSelectElementTranslation] Background message received:', message)
       
       // مدیریت پیام انتخاب element
