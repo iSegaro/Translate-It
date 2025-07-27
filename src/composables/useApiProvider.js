@@ -3,8 +3,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
-import { ProviderRegistry } from '@/providers/index.js'
-import { ProviderHtmlGenerator } from '@/utils/providerHtmlGenerator.js'
+import { getProvidersForDropdown, getProviderById } from '@/core/provider-registry.js'
 
 export function useApiProvider() {
   // State
@@ -42,10 +41,13 @@ export function useApiProvider() {
   const loadAvailableProviders = () => {
     try {
       console.log('[useApiProvider] Starting to load providers...')
-      console.log('[useApiProvider] ProviderHtmlGenerator:', ProviderHtmlGenerator)
-      console.log('[useApiProvider] ProviderRegistry:', ProviderRegistry)
       
-      availableProviders.value = ProviderHtmlGenerator.generateProviderArray()
+      const providersFromRegistry = getProvidersForDropdown()
+      availableProviders.value = providersFromRegistry.map(provider => ({
+        id: provider.value,
+        name: provider.label,
+        icon: provider.icon
+      }))
       
       console.log(`[useApiProvider] Loaded ${availableProviders.value.length} available providers`)
       console.log('[useApiProvider] Providers:', availableProviders.value)
@@ -65,13 +67,13 @@ export function useApiProvider() {
 
 
       // Check if current provider is available, fallback if needed
-      const fallbackProvider = ProviderRegistry.getFallbackProvider(currentProvider.value)
-      if (fallbackProvider !== currentProvider.value) {
-        console.log(`[useApiProvider] Provider ${currentProvider.value} not available, using fallback: ${fallbackProvider}`)
-        currentProvider.value = fallbackProvider
+      const providerExists = getProviderById(currentProvider.value)
+      if (!providerExists) {
+        console.log(`[useApiProvider] Provider ${currentProvider.value} not available, using fallback: google`)
+        currentProvider.value = 'google'
         
         // Update settings with fallback
-        await settingsStore.updateSettingAndPersist('TRANSLATION_API', fallbackProvider)
+        await settingsStore.updateSettingAndPersist('TRANSLATION_API', 'google')
       }
     } catch (error) {
       console.error('[useApiProvider] Error loading current provider:', error)

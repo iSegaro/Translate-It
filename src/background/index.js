@@ -7,6 +7,7 @@ import { featureLoader } from './feature-loader.js';
 import { VueMessageHandler } from './vue-message-handler.js';
 import NotificationManager from '../managers/NotificationManager.js';
 import { initializeSettingsListener } from '../config.js';
+import { TranslationEngine } from './translation-engine.js';
 
 /**
  * Background Service class
@@ -19,6 +20,7 @@ class BackgroundService {
     this.features = {};
     this.listeners = [];
     this.vueMessageHandler = null;
+    this.translationEngine = null;
   }
 
   /**
@@ -42,6 +44,9 @@ class BackgroundService {
       
       // Load Vue message handler
       await this.initializeVueMessageHandler();
+      
+      // Initialize translation engine
+      await this.initializeTranslationEngine();
       
       // Load listeners
       await this.initializeListeners();
@@ -110,6 +115,24 @@ class BackgroundService {
   }
 
   /**
+   * Initialize translation engine
+   * @private
+   */
+  async initializeTranslationEngine() {
+    console.log('🔄 Initializing translation engine...');
+    
+    try {
+      this.translationEngine = new TranslationEngine();
+      await this.translationEngine.initialize();
+      
+      console.log('✅ Translation engine initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize translation engine:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Initialize event listeners
    * @private
    */
@@ -167,6 +190,16 @@ class BackgroundService {
         }
       }
 
+      // Try to initialize translation engine
+      if (!this.translationEngine) {
+        try {
+          this.translationEngine = new TranslationEngine();
+          await this.translationEngine.initialize();
+        } catch (error) {
+          console.error('Translation engine unavailable in minimal mode');
+        }
+      }
+
       console.log('🔧 Minimal initialization completed');
       this.initialized = true;
 
@@ -201,6 +234,14 @@ class BackgroundService {
   }
 
   /**
+   * Get translation engine
+   * @returns {TranslationEngine} Translation engine instance
+   */
+  getTranslationEngine() {
+    return this.translationEngine;
+  }
+
+  /**
    * Check if service is initialized
    * @returns {boolean}
    */
@@ -219,6 +260,8 @@ class BackgroundService {
       features: Object.keys(this.features),
       listeners: this.listeners.length,
       hasVueHandler: !!this.vueMessageHandler,
+      hasTranslationEngine: !!this.translationEngine,
+      translationStats: this.translationEngine ? this.translationEngine.getCacheStats() : null,
       environment: environment.getDebugInfo(),
       featureLoader: featureLoader.getDebugInfo()
     };
@@ -238,6 +281,7 @@ class BackgroundService {
     this.features = {};
     this.listeners = [];
     this.vueMessageHandler = null;
+    this.translationEngine = null;
     
     console.log('🛑 Background service shutdown complete');
   }

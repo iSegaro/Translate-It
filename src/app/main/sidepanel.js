@@ -100,11 +100,9 @@ export const loadAdvancedFeatures = async () => {
 }
 
 export const loadProviderFeatures = async () => {
-  const [aiProviders, freeProviders] = await Promise.all([
-    import('@/providers/implementations/OpenAIProvider.js'),
-    import('@/providers/implementations/GoogleTranslateProvider.js')
-  ])
-  return { aiProviders, freeProviders }
+  // Providers are now handled by the background service worker
+  // UI contexts use TranslationClient for messaging
+  return { aiProviders: null, freeProviders: null }
 }
 
 // Progressive loading after initial render

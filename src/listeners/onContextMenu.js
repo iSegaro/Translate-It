@@ -4,7 +4,7 @@ import { getBrowserAsync } from "@/utils/browser-polyfill.js";
 import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
-import { ProviderRegistry } from "../providers/index.js";
+import { getSupportedProviders } from "../core/provider-registry.js";
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
@@ -17,11 +17,11 @@ const COMMAND_NAME = "toggle-select-element";
 
 // --- Get API Providers from Registry ---
 function getApiProviders() {
-  const availableProviders = ProviderRegistry.getAvailableProviders();
+  const availableProviders = getSupportedProviders();
   return availableProviders.map(provider => ({
     id: provider.id,
     i18nKey: `api_provider_${provider.id}`,
-    defaultTitle: provider.displayName
+    defaultTitle: provider.name
   }));
 }
 

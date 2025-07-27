@@ -2,14 +2,15 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ErrorTypes } from '@/services/ErrorTypes.js'
 
-// Lazy load factory to avoid circular dependencies
-let translationProviderFactory = null
-const getTranslationProviderFactory = async () => {
-  if (!translationProviderFactory) {
-    const module = await import('@/providers/factory/TranslationProviderFactory.js')
-    translationProviderFactory = module.translationProviderFactory
+// Translation client for messaging with background service worker
+import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
+
+let translationClient = null
+const getTranslationClient = () => {
+  if (!translationClient) {
+    translationClient = new TranslationClient(TRANSLATION_CONTEXTS.POPUP)
   }
-  return translationProviderFactory
+  return translationClient
 }
 
 export const useTranslationStore = defineStore('translation', () => {
@@ -54,13 +55,17 @@ export const useTranslationStore = defineStore('translation', () => {
     error.value = null
     
     try {
-      // Use real provider system
-      const factory = await getTranslationProviderFactory()
-      const providerInstance = factory.getProvider(provider)
-      const translatedText = await providerInstance.translate(text, from, to, mode)
+      // Use translation client for messaging with background service worker
+      const client = getTranslationClient()
+      const response = await client.translate(text, {
+        provider,
+        sourceLanguage: from,
+        targetLanguage: to,
+        mode
+      })
       
       const result = {
-        text: translatedText,
+        text: response.translatedText,
         sourceText: text,
         fromLanguage: from,
         toLanguage: to,
@@ -125,32 +130,9 @@ export const useTranslationStore = defineStore('translation', () => {
     error.value = null
     
     try {
-      const factory = await getTranslationProviderFactory()
-      const providerInstance = factory.getProvider(provider)
-      
-      // Check if provider supports image translation
-      if (typeof providerInstance.translateImage !== 'function') {
-        throw new Error(`Provider ${provider} does not support image translation`)
-      }
-      
-      const translatedText = await providerInstance.translateImage(imageData, from, to, mode)
-      
-      const result = {
-        text: translatedText,
-        sourceText: '[Image]',
-        fromLanguage: from,
-        toLanguage: to,
-        provider: provider,
-        mode: mode,
-        timestamp: Date.now(),
-        confidence: 0.85, // Lower confidence for OCR+translation
-        isImageTranslation: true
-      }
-      
-      currentTranslation.value = result
-      addToHistory(result)
-      
-      return result
+      // Image translation not yet implemented in the new messaging architecture
+      // This will be added in a future update
+      throw new Error('Image translation is not available in the new architecture yet')
     } catch (err) {
       error.value = err.message || 'Image translation failed'
       console.error('Image translation error:', err)

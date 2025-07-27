@@ -26,52 +26,52 @@ export class TranslationProviderFactory {
     
     switch (apiType.toLowerCase()) {
       case "google": {
-        const module = await import("../implementations/GoogleTranslateProvider.js");
+        const module = await import("./GoogleTranslateProvider.js");
         ProviderClass = module.GoogleTranslateProvider;
         break;
       }
       case "bing": {
-        const module = await import("../implementations/BingTranslateProvider.js");
+        const module = await import("./BingTranslateProvider.js");
         ProviderClass = module.BingTranslateProvider;
         break;
       }
       case "yandex": {
-        const module = await import("../implementations/YandexTranslateProvider.js");
+        const module = await import("./YandexTranslateProvider.js");
         ProviderClass = module.YandexTranslateProvider;
         break;
       }
       case "gemini": {
-        const module = await import("../implementations/GeminiProvider.js");
+        const module = await import("./GeminiProvider.js");
         ProviderClass = module.GeminiProvider;
         break;
       }
       case "openai": {
-        const module = await import("../implementations/OpenAIProvider.js");
+        const module = await import("./OpenAIProvider.js");
         ProviderClass = module.OpenAIProvider;
         break;
       }
       case "openrouter": {
-        const module = await import("../implementations/OpenRouterProvider.js");
+        const module = await import("./OpenRouterProvider.js");
         ProviderClass = module.OpenRouterProvider;
         break;
       }
       case "deepseek": {
-        const module = await import("../implementations/DeepSeekProvider.js");
+        const module = await import("./DeepSeekProvider.js");
         ProviderClass = module.DeepSeekProvider;
         break;
       }
       case "webai": {
-        const module = await import("../implementations/WebAIProvider.js");
+        const module = await import("./WebAIProvider.js");
         ProviderClass = module.WebAIProvider;
         break;
       }
       case "custom": {
-        const module = await import("../implementations/CustomProvider.js");
+        const module = await import("./CustomProvider.js");
         ProviderClass = module.CustomProvider;
         break;
       }
       case "browserapi": {
-        const module = await import("../implementations/BrowserTranslateProvider.js");
+        const module = await import("./BrowserTranslateProvider.js");
         ProviderClass = module.BrowserTranslateProvider;
         break;
       }

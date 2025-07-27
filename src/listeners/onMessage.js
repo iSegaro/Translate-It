@@ -11,7 +11,7 @@ import {
   logME,
   openOptionsPage_from_Background,
 } from "../utils/helpers.js";
-import { translateText } from "../core/api.js";
+// Legacy translation API no longer used - TranslationEngine handles this directly
 
 // --- Import Handlers ---
 import { handleExtensionLifecycle } from "../handlers/extensionLifecycleHandler.js";
@@ -475,7 +475,7 @@ class MessageListener extends BaseListener {
           message,
           sender,
           safeSendResponse,
-          translateText,
+          null, // No longer using direct translateText function - handled in background engine
           errorHandler
         ).catch(error => {
           logME("[onMessage] handleFetchTranslation promise rejected:", error);
@@ -514,7 +514,7 @@ class MessageListener extends BaseListener {
           message,
           sender,
           sendResponse,
-          translateText,
+          null, // No longer using direct translateText function - handled in background engine
           errorHandler
         );
         return true;

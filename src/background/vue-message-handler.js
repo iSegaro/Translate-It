@@ -2,7 +2,7 @@
 // Handles messages from Vue applications (popup, sidepanel, options)
 
 import { getBrowserAsync } from '../utils/browser-polyfill.js'
-import { translationProviderFactory } from '../providers/factory/TranslationProviderFactory.js'
+// Translation is now handled by the TranslationEngine, not directly by message handlers
 import { ErrorTypes } from '../services/ErrorTypes.js'
 
 export class VueMessageHandler {
@@ -68,34 +68,15 @@ export class VueMessageHandler {
     }
   }
 
-  // Translation handlers
+  // Translation handlers - DEPRECATED: Translation is now handled by TranslationEngine
   async handleTranslation(data) {
-    const { text, from = 'auto', to = 'en', provider = 'google', mode = 'simple' } = data
-    
-    if (!text?.trim()) {
-      throw new Error('Text to translate cannot be empty')
-    }
-
-    try {
-      const providerInstance = translationProviderFactory.getProvider(provider)
-      const translatedText = await providerInstance.translate(text, from, to, mode)
-      
-      return {
-        text: translatedText,
-        sourceText: text,
-        fromLanguage: from,
-        toLanguage: to,
-        provider: provider,
-        mode: mode,
-        timestamp: Date.now()
-      }
-    } catch (error) {
-      console.error('Translation error:', error)
-      throw new Error(`Translation failed: ${error.message}`)
-    }
+    // Translation is now handled by the TranslationEngine through the universal messaging protocol
+    throw new Error('Translation through VueMessageHandler is deprecated. Use TranslationClient instead.')
   }
 
   async handleImageTranslation(data) {
+    // Image translation is not yet implemented in the new messaging architecture
+    throw new Error('Image translation is not available in the new architecture yet')
     const { imageData, from = 'auto', to = 'en', provider = 'gemini', mode = 'simple' } = data
     
     if (!imageData) {
@@ -129,6 +110,8 @@ export class VueMessageHandler {
 
   // Provider management handlers
   async handleProviderStatus(data) {
+    // Provider status is now handled by the TranslationEngine
+    throw new Error('Provider status through VueMessageHandler is deprecated')
     const { provider } = data
     
     try {
@@ -170,6 +153,8 @@ export class VueMessageHandler {
   }
 
   async handleTestProvider(data) {
+    // Provider testing is now handled by the TranslationEngine
+    throw new Error('Provider testing through VueMessageHandler is deprecated')
     const { provider, config } = data
     
     try {

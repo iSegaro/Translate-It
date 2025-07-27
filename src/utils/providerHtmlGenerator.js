@@ -1,5 +1,5 @@
 // src/utils/providerHtmlGenerator.js
-import { ProviderRegistry } from "../providers/index.js";
+import { getSupportedProviders } from "../core/provider-registry.js";
 import { logME } from "./helpers.js";
 
 /**
@@ -13,13 +13,15 @@ export class ProviderHtmlGenerator {
    * @returns {string} HTML string for option elements
    */
   static generateOptionsHtml(providers = null) {
-    const availableProviders = providers || ProviderRegistry.getAvailableProviders();
+    const availableProviders = providers || getSupportedProviders();
     logME(`[ProviderHtmlGenerator] Generating options HTML for ${availableProviders.length} providers`);
     
     return availableProviders.map(provider => {
-      const title = provider.requirements.browsers.length < 4 
-        ? `${provider.displayName} (${provider.requirements.browsers.join(', ')})`
-        : provider.displayName;
+      const title = provider.requirements ? 
+        (provider.requirements.browsers.length < 4 
+          ? `${provider.name} (${provider.requirements.browsers.join(', ')})`
+          : provider.name)
+        : provider.name;
       
       return `<option value="${provider.id}" title="${provider.description}">${title}</option>`;
     }).join('\n                  ');
@@ -31,7 +33,7 @@ export class ProviderHtmlGenerator {
    * @returns {string} HTML string for dropdown items
    */
   static generateDropdownHtml(providers = null) {
-    const availableProviders = providers || ProviderRegistry.getAvailableProviders();
+    const availableProviders = providers || getSupportedProviders();
     logME(`[ProviderHtmlGenerator] Generating dropdown HTML for ${availableProviders.length} providers`);
     
     return availableProviders.map(provider => {
@@ -41,7 +43,7 @@ export class ProviderHtmlGenerator {
       return `
         <div class="dropdown-item ${statusClass}" data-provider="${provider.id}" title="${provider.description}">
           <img src="@/assets/icons/${provider.icon}" alt="${provider.name}" class="provider-icon">
-          <span class="provider-name">${provider.displayName}</span>
+          <span class="provider-name">${provider.name}</span>
           ${statusIcon}
         </div>`.trim();
     }).join('\n        ');
@@ -53,15 +55,14 @@ export class ProviderHtmlGenerator {
    * @returns {Array} Provider objects for JavaScript use
    */
   static generateProviderArray(providers = null) {
-    const availableProviders = providers || ProviderRegistry.getAvailableProviders();
+    const availableProviders = providers || getSupportedProviders();
     
     return availableProviders.map(provider => ({
       id: provider.id,
-      name: provider.displayName,
+      name: provider.name,
       icon: provider.icon,
       description: provider.description,
       needsApiKey: provider.needsApiKey,
-      needsUrl: provider.needsUrl,
       category: provider.category
     }));
   }
@@ -72,7 +73,7 @@ export class ProviderHtmlGenerator {
    * @returns {string} HTML string for provider settings section
    */
   static generateProviderSettingsHtml(providerId) {
-    const provider = ProviderRegistry.getProvider(providerId);
+    const provider = getProviderById(providerId);
     if (!provider) {
       return '';
     }
@@ -110,10 +111,12 @@ export class ProviderHtmlGenerator {
    * @returns {string} CSS class name
    */
   static _getProviderStatusClass(provider) {
-    if (provider.requirements.features.length > 0) {
-      // Check if Chrome-specific features are available
-      const hasFeatures = ProviderRegistry._checkBrowserFeatures(provider.requirements.features);
-      return hasFeatures ? 'provider-available' : 'provider-limited';
+    if (provider.features && provider.features.length > 0) {
+      // For browser provider, check if available
+      if (provider.id === 'browser') {
+        return 'provider-limited'; // Simplified check
+      }
+      return 'provider-available';
     }
     return 'provider-available';
   }
@@ -125,11 +128,9 @@ export class ProviderHtmlGenerator {
    * @returns {string} HTML for status icon
    */
   static _getProviderStatusIcon(provider) {
-    if (provider.id === 'browserapi') {
-      const isAvailable = ProviderRegistry.isProviderAvailable(provider.id);
-      if (!isAvailable) {
-        return '<span class="provider-status" title="Requires Chrome 138+">⚠️</span>';
-      }
+    if (provider.id === 'browser') {
+      // Simplified availability check for browser provider
+      return '<span class="provider-status" title="Requires Chrome 138+">⚠️</span>';
     }
     
     if (provider.category === 'free') {
@@ -249,7 +250,8 @@ export class ProviderHtmlGenerator {
    * @returns {Object} Validation configuration
    */
   static generateProviderValidation(providerId) {
-    return ProviderRegistry.getProviderValidation(providerId);
+    const provider = getProviderById(providerId);
+    return provider ? { required: provider.needsApiKey } : null;
   }
 
   /**
@@ -258,20 +260,16 @@ export class ProviderHtmlGenerator {
    * @returns {string} Warning message or empty string
    */
   static generateCompatibilityWarning(providerId) {
-    const provider = ProviderRegistry.getProvider(providerId);
+    const provider = getProviderById(providerId);
     if (!provider) {
       return '';
     }
 
-    const isAvailable = ProviderRegistry.isProviderAvailable(providerId);
-    if (!isAvailable) {
-      if (provider.id === 'browserapi') {
-        return `⚠️ ${provider.displayName} is not available. Requires Chrome ${provider.requirements.minVersion}+ with translation features enabled.`;
-      }
-      
-      return `⚠️ ${provider.displayName} is not available in your current browser.`;
+    // Simplified compatibility check
+    if (provider.id === 'browser') {
+      return `⚠️ ${provider.name} is not available. Requires Chrome 138+ with translation features enabled.`;
     }
-
+    
     return '';
   }
 
@@ -280,15 +278,15 @@ export class ProviderHtmlGenerator {
    * @returns {Object} Categorized provider data
    */
   static generateProviderComparison() {
-    const allProviders = ProviderRegistry.getAllProviders();
+    const allProviders = getSupportedProviders();
     
     return {
       free: allProviders.filter(p => p.category === 'free'),
       ai: allProviders.filter(p => p.category === 'ai'), 
       local: allProviders.filter(p => p.category === 'local'),
       custom: allProviders.filter(p => p.category === 'custom'),
-      available: ProviderRegistry.getAvailableProviders(),
-      unavailable: allProviders.filter(p => !ProviderRegistry.isProviderAvailable(p.id))
+      available: allProviders,
+      unavailable: [] // Simplified - all supported providers are available
     };
   }
 }

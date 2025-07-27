@@ -75,17 +75,33 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'vendor/vendor'
             }
             
-            // Provider chunks
-            if (id.includes('src/providers/implementations')) {
-              const providerMatch = id.match(/implementations\/(.+?)Provider/)
+            // Background provider chunks (only in background bundle)
+            if (id.includes('src/background/providers/')) {
+              const providerMatch = id.match(/providers\/(.+?)Provider/)
               if (providerMatch) {
-                return `providers/provider-${providerMatch[1].toLowerCase()}`
+                return `background/provider-${providerMatch[1].toLowerCase()}`
               }
-              return 'providers/providers'
+              return 'background/providers'
+            }
+            
+            // UI provider registry (lightweight)
+            if (id.includes('src/core/provider-registry')) {
+              return 'core/provider-registry'
+            }
+            
+            // Translation client and protocol (lightweight)
+            if (id.includes('src/core/translation-client') || id.includes('src/core/translation-protocol')) {
+              return 'core/translation-client'
+            }
+            
+            // Legacy providers (should not be used in UI contexts)
+            if (id.includes('src/providers/implementations')) {
+              console.warn('🚨 Warning: Legacy provider implementation loaded in UI context:', id)
+              return 'legacy/providers'
             }
             
             if (id.includes('src/providers')) {
-              return 'providers/providers-core'
+              return 'legacy/providers-core'
             }
             
             // Component chunks
@@ -203,7 +219,9 @@ export const createBaseConfig = (browser, options = {}) => {
         '@vueuse/core'
       ],
       exclude: [
-        // Exclude provider implementations for lazy loading
+        // Exclude background providers (not used in UI contexts)
+        'src/background/providers',
+        // Exclude legacy providers
         'src/providers/implementations',
         // Exclude large features for code splitting
         'src/capture',

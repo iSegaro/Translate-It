@@ -111,6 +111,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
 
 // Props
@@ -191,58 +192,13 @@ const closeDropdown = (event) => {
 
 // Initialize providers
 onMounted(() => {
-  availableProviders.value = [
-    {
-      id: 'google',
-      name: 'Google Translate',
-      icon: 'api-providers/google.svg'
-    },
-    {
-      id: 'gemini',
-      name: 'Google Gemini',
-      icon: 'api-providers/gemini.svg'
-    },
-    {
-      id: 'bing',
-      name: 'Microsoft Bing',
-      icon: 'api-providers/bing.svg'
-    },
-    {
-      id: 'yandex',
-      name: 'Yandex Translate',
-      icon: 'api-providers/yandex.svg'
-    },
-    {
-      id: 'browser',
-      name: 'Browser Translation',
-      icon: 'api-providers/chrome-translate.svg'
-    },
-    {
-      id: 'webai',
-      name: 'WebAI to API',
-      icon: 'api-providers/webai.svg'
-    },
-    {
-      id: 'openrouter',
-      name: 'OpenRouter',
-      icon: 'api-providers/openrouter.svg'
-    },
-    {
-      id: 'openai',
-      name: 'OpenAI',
-      icon: 'api-providers/openai.svg'
-    },
-    {
-      id: 'deepseek',
-      name: 'DeepSeek',
-      icon: 'api-providers/deepseek.svg'
-    },
-    {
-      id: 'custom',
-      name: 'Custom',
-      icon: 'api-providers/custom.svg'
-    }
-  ]
+  // Use provider registry for consistent provider information
+  const providersFromRegistry = getProvidersForDropdown()
+  availableProviders.value = providersFromRegistry.map(provider => ({
+    id: provider.value,
+    name: provider.label,
+    icon: `api-providers/${provider.icon}`
+  }))
   
   // Add click listener to close dropdown
   document.addEventListener('click', closeDropdown)

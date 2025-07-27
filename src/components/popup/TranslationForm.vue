@@ -82,10 +82,14 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
 import { renderMarkdown } from '@/utils/simpleMarkdown.js'
+import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Stores
 const settingsStore = useSettingsStore()
+
+// Translation Client
+const translationClient = new TranslationClient(TRANSLATION_CONTEXTS.POPUP)
 
 // Refs
 const sourceTextarea = ref(null)
@@ -131,8 +135,6 @@ const handleTranslate = async () => {
   translatedText.value = ''
   
   try {
-    const browser = await getBrowserAPI()
-    
     // Store last translation for revert functionality
     lastTranslation.value = {
       source: sourceText.value,
@@ -141,19 +143,16 @@ const handleTranslate = async () => {
       targetLanguage: settingsStore.settings.TARGET_LANGUAGE
     }
     
-    const response = await browser.runtime.sendMessage({
-      action: 'translate',
-      data: {
-        text: sourceText.value,
-        sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-        targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
-        provider: settingsStore.settings.TRANSLATION_API,
-        mode: 'popup'
-      }
+    // Use TranslationClient for translation
+    const response = await translationClient.translate(sourceText.value, {
+      provider: settingsStore.settings.TRANSLATION_API,
+      sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
+      targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
+      mode: 'popup'
     })
     
-    if (response?.success) {
-      translatedText.value = response.translatedText || ''
+    if (response?.translatedText) {
+      translatedText.value = response.translatedText
       
       // Add fade-in animation
       await nextTick()
@@ -164,11 +163,11 @@ const handleTranslate = async () => {
         }, 400)
       }
     } else {
-      throw new Error(response?.error || 'Translation failed')
+      throw new Error('No translation result received')
     }
     
   } catch (error) {
-    console.error('Translation error:', error)
+    console.error('[PopupTranslationForm] Translation error:', error)
     translatedText.value = `خطا در ترجمه: ${error.message}`
   } finally {
     isTranslating.value = false

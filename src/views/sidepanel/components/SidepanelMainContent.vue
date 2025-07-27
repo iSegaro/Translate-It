@@ -142,18 +142,20 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useTTSSmart } from '@/composables/useTTSSmart.js'
 import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
-import { useDirectMessage } from '@/composables/useDirectMessage.js'
 import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { useI18n } from '@/composables/useI18n.js'
+import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
 
-// Browser API, TTS, Background Warmup, Direct Message, Select Element, and i18n
+// Browser API, TTS, Background Warmup, Select Element, and i18n
 const browserAPI = useBrowserAPI()
 const tts = useTTSSmart()
 const backgroundWarmup = useBackgroundWarmup()
-const directMessage = useDirectMessage()
 const selectElement = useSelectElementTranslation()
 const { t } = useI18n()
+
+// Translation Client
+const translationClient = new TranslationClient(TRANSLATION_CONTEXTS.SIDEPANEL)
 
 // Simple state
 const sourceText = ref('')
@@ -222,13 +224,16 @@ const handleTranslationSubmit = async () => {
       targetLanguage
     })
 
-    // Send translation request with abort signal
-    const response = await directMessage.sendTranslation({
-      promptText: sourceText.value,
-      sourceLanguage: 'auto',
-      targetLanguage: targetLanguage,
-      translateMode: 'sidepanel'
-    }, abortSignal)
+    // Convert language names to codes
+    const sourceLanguageCode = getLanguageCode(document.getElementById('sourceLanguageInput')?.value || 'auto')
+    const targetLanguageCode = getLanguageCode(targetLanguage)
+
+    // Use TranslationClient for translation
+    const response = await translationClient.translate(sourceText.value, {
+      sourceLanguage: sourceLanguageCode === 'en' && document.getElementById('sourceLanguageInput')?.value === 'auto' ? 'auto' : sourceLanguageCode,
+      targetLanguage: targetLanguageCode,
+      mode: 'sidepanel'
+    })
 
     // Check if request was cancelled before processing response
     if (abortSignal.aborted) {
@@ -238,15 +243,11 @@ const handleTranslationSubmit = async () => {
 
     console.log('[SidepanelMainContent] Translation response:', response)
 
-    if (response._isConnectionError) {
-      throw new Error('Translation service temporarily unavailable')
-    }
-
-    if (response.success && response.data?.translatedText) {
-      translationResult.value = response.data.translatedText
+    if (response && response.translatedText) {
+      translationResult.value = response.translatedText
       console.log('[SidepanelMainContent] Translation displayed successfully')
     } else {
-      throw new Error(response.error || 'Translation failed')
+      throw new Error('No translation result received')
     }
 
   } catch (error) {

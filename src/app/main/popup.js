@@ -8,13 +8,23 @@ import { browserAPIReady } from '@/utils/browser-polyfill.js'
 async function initializeApp() {
   try {
     // Wait for browser API to be ready
-    await browserAPIReady
+    const browserAPI = await browserAPIReady
+    
+    // Ensure browser API is globally available for i18n plugin
+    if (typeof window !== 'undefined') {
+      window.browser = browserAPI;
+      window.chrome = browserAPI; // Some plugins expect chrome object
+    }
+
+    // Import i18n plugin after browser API is ready and globally available
+    const { default: i18n } = await import('vue-plugin-webextension-i18n')
     
     // Create Vue app
     const app = createApp(PopupApp)
 
-    // Use Pinia for state management
+    // Use plugins (order matters: Pinia first, then i18n)
     app.use(pinia)
+    app.use(i18n)
 
     // Global properties for extension context
     app.config.globalProperties.$isExtension = true
@@ -58,7 +68,7 @@ if (appElement && !appElement.__vue_app__) {
   initializeApp()
 }
 
-// Lazy loading functions for heavy features
+// Lazy loading functions for heavy features (only load when needed)
 export const loadTranslationFeatures = async () => {
   const [translation, providers] = await Promise.all([
     import('@/store/modules/translation.js'),
@@ -76,11 +86,5 @@ export const loadAdvancedFeatures = async () => {
   return { capture, tts, history }
 }
 
-// Preload essential features after initial render
-setTimeout(async () => {
-  try {
-    await loadTranslationFeatures()
-  } catch (error) {
-    console.error('Failed to preload translation features:', error)
-  }
-}, 100)
+// Note: Removed preloading to reduce popup bundle size
+// Features will be loaded on-demand when actually needed
