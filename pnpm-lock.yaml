@@ -8,12 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@iconify/vue':
-        specifier: ^5.0.0
-        version: 5.0.0(vue@3.5.20(typescript@5.9.2))
-      '@vueuse/core':
-        specifier: ^13.5.0
-        version: 13.8.0(vue@3.5.20(typescript@5.9.2))
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -1371,6 +1365,10 @@ packages:
 
   '@eslint/js@9.34.0':
     resolution: {integrity: sha512-EoyvqQnBNsV1CWaEJ559rxXL4c8V92gxirbawSmVUOWXlsRxxQXl6LmCpdUblgxgSkDIqKnhzba2SjRTI/A5Rw==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@eslint/js@9.32.0':
+    resolution: {integrity: sha512-BBpRFZK3eX6uMLKz8WxFOBIFFcGFJ/g8XuwjTHCqHROSIsopI+ddn/d5Cfh36+7+e5edVS8dbSHnBNhrLEX0zg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@eslint/object-schema@2.1.6':
@@ -8195,7 +8193,7 @@ snapshots:
 
   '@eslint/js@8.57.1': {}
 
-  '@eslint/js@9.34.0': {}
+  '@eslint/js@9.22.0': {}
 
   '@eslint/object-schema@2.1.6': {}
 
