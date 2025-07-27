@@ -129,11 +129,15 @@ export class SelectElementManager {
     
     // Add event listeners with abort signal
     const options = { signal: this.abortController.signal, capture: true }
+    const keyOptions = { signal: this.abortController.signal, capture: true, passive: false }
     
     document.addEventListener('mouseover', this.handleMouseOver, options)
     document.addEventListener('mouseout', this.handleMouseOut, options)
     document.addEventListener('click', this.handleClick, options)
-    document.addEventListener('keydown', this.handleKeyDown, options)
+    document.addEventListener('keydown', this.handleKeyDown, keyOptions)
+    
+    // Also add keydown to window for better ESC capture
+    window.addEventListener('keydown', this.handleKeyDown, keyOptions)
     
     // Visual feedback
     this.addGlobalStyles()
@@ -288,9 +292,17 @@ export class SelectElementManager {
   async handleKeyDown(event) {
     if (!this.isActive) return
     
-    if (event.key === 'Escape') {
+    console.log('[SelectElementManager] KeyDown event received:', {
+      key: event.key,
+      code: event.code,
+      target: event.target?.tagName,
+      isActive: this.isActive
+    })
+    
+    if (event.key === 'Escape' || event.code === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
+      event.stopImmediatePropagation()
       
       console.log('[SelectElementManager] ESC pressed - cancelling selection')
       
@@ -301,6 +313,7 @@ export class SelectElementManager {
       }
       
       await this.deactivate()
+      return false
     }
   }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="sidepanel-container">
+  <div class="sidepanel-container" @click="handleSidepanelClick">
     <!-- Side Toolbar -->
     <SidepanelToolbar 
       @history-toggle="handleHistoryToggle"
@@ -34,6 +34,7 @@
 import { ref, watch } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
+import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import SidepanelToolbar from './components/SidepanelToolbar.vue'
 import SidepanelMainContent from './components/SidepanelMainContent.vue'
 import SidepanelHistory from './components/SidepanelHistory.vue'
@@ -42,6 +43,7 @@ import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue'
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const { closeDropdown: closeApiDropdown, setDropdownOpen } = useApiProvider()
+const { isSelectModeActive, deactivateSelectElement } = useSelectElementTranslation()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
@@ -91,6 +93,19 @@ const handleHistoryItemSelect = (item) => {
 const handleProviderSelect = (providerId) => {
   console.log('[SidepanelLayout] Provider selected:', providerId)
   isApiDropdownVisible.value = false
+}
+
+// Handle sidepanel click to deactivate select element mode
+const handleSidepanelClick = async (event) => {
+  // Only deactivate if select mode is active
+  if (isSelectModeActive.value) {
+    try {
+      console.log('[SidepanelLayout] Sidepanel clicked - deactivating select element mode')
+      await deactivateSelectElement()
+    } catch (error) {
+      console.error('[SidepanelLayout] Failed to deactivate select element mode:', error)
+    }
+  }
 }
 </script>
 
