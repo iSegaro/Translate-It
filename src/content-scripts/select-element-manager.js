@@ -174,6 +174,19 @@ export class SelectElementManager {
     // Re-enable page interactions
     this.enablePageInteractions()
     
+    // Send cancellation message to background/sidepanel
+    try {
+      await this.Browser.runtime.sendMessage({
+        action: 'elementSelectionCancelled',
+        data: {
+          reason: 'deactivated',
+          timestamp: Date.now()
+        }
+      })
+    } catch (error) {
+      console.warn('[SelectElementManager] Failed to send cancellation message:', error)
+    }
+    
     console.log('[SelectElementManager] Select element mode deactivated')
   }
 

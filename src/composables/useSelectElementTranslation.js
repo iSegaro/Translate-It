@@ -199,7 +199,7 @@ export function useSelectElementTranslation() {
    * مدیریت انتخاب element از content script
    * مطابق با Plan1.md flow
    */
-  const handleElementSelected = (elementData) => {
+  const handleElementSelected = async (elementData) => {
     console.log('[useSelectElementTranslation] Element selected:', elementData)
     
     // پاکسازی timeout
@@ -208,7 +208,17 @@ export function useSelectElementTranslation() {
     state.selectedElement = elementData
     state.extractedText = elementData.text || ''
     state.isSelecting = false
+    isSelectModeActive.value = false // همگام‌سازی toggle state
     state.error = null // پاکسازی خطاهای قبلی
+    
+    // همگام‌سازی با storage
+    if (Browser.value?.storage?.local) {
+      try {
+        await Browser.value.storage.local.set({ selectElementState: false });
+      } catch (error) {
+        console.warn('[useSelectElementTranslation] Failed to update storage:', error);
+      }
+    }
     
     // اطلاع‌رسانی به parent component برای populate کردن form
     if (onTextExtracted.value && state.extractedText) {
@@ -276,10 +286,19 @@ export function useSelectElementTranslation() {
       else if (message.action === 'elementSelectionError') {
         handleSelectElementError(new Error(message.data?.error || 'Element selection failed'))
       }
-      // مدیریت لغو selection توسط کاربر
+      // مدیریت لغو selection توسط کاربر (ESC, etc.)
       else if (message.action === 'elementSelectionCancelled') {
         state.isSelecting = false
+        isSelectModeActive.value = false // همگام‌سازی toggle state
         clearSelectionTimeout()
+        
+        // همگام‌سازی با storage
+        if (Browser.value?.storage?.local) {
+          Browser.value.storage.local.set({ selectElementState: false }).catch(error => {
+            console.warn('[useSelectElementTranslation] Failed to update storage on cancellation:', error);
+          });
+        }
+        
         if (onModeChanged.value) {
           onModeChanged.value(false)
         }
@@ -288,7 +307,16 @@ export function useSelectElementTranslation() {
       else if (message.action === 'elementSelectionSuccess') {
         console.log('[useSelectElementTranslation] Element selection completed successfully')
         state.isSelecting = false
+        isSelectModeActive.value = false // همگام‌سازی toggle state
         clearSelectionTimeout()
+        
+        // همگام‌سازی با storage
+        if (Browser.value?.storage?.local) {
+          Browser.value.storage.local.set({ selectElementState: false }).catch(error => {
+            console.warn('[useSelectElementTranslation] Failed to update storage on success:', error);
+          });
+        }
+        
         if (onModeChanged.value) {
           onModeChanged.value(false)
         }
