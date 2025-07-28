@@ -1,81 +1,37 @@
 <template>
   <form @submit.prevent="handleSubmit" class="translation-form">
     <!-- Language Controls -->
-    <div class="language-controls">
-      <select
-        v-model="sourceLanguage"
-        class="language-select"
-        :title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'Source Language')"
-      >
-        <option value="Auto-Detect">Auto-Detect</option>
-        <option
-          v-for="language in availableLanguages"
-          :key="language.code"
-          :value="language.name"
-        >
-          {{ language.name }}
-        </option>
-      </select>
+    <LanguageSelector
+      v-model:source-language="sourceLanguage"
+      v-model:target-language="targetLanguage"
+      :disabled="isTranslating"
+      :auto-detect-label="'Auto-Detect'"
+      :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'Source Language')"
+      :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'Target Language')"
+      :swap-title="t('SIDEPANEL_SWAP_LANGUAGES_TITLE', 'Swap Languages')"
+      :swap-alt="'Swap'"
+      @swap-languages="handleSwapLanguages"
+    />
 
-      <button
-        type="button"
-        class="swap-button"
-        :title="t('SIDEPANEL_SWAP_LANGUAGES_TITLE', 'Swap Languages')"
-        :disabled="!canSwapLanguages"
-        @click="handleSwapLanguages"
-      >
-        <img src="@/assets/icons/swap.png" alt="Swap" />
-      </button>
-
-      <select
-        v-model="targetLanguage"
-        class="language-select"
-        :title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'Target Language')"
-      >
-        <option
-          v-for="language in targetLanguages"
-          :key="language.code"
-          :value="language.name"
-        >
-          {{ language.name }}
-        </option>
-      </select>
-    </div>
-
-    <!-- Source Text Area with Toolbar -->
-    <div class="textarea-container source-container">
-      <div class="inline-toolbar source-toolbar" :class="{ 'visible': hasSourceText }">
-        <img
-          src="@/assets/icons/copy.png"
-          class="inline-icon"
-          :title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy Source Text')"
-          @click="handleCopySource"
-        />
-        <img
-          src="@/assets/icons/speaker.png"
-          class="inline-icon"
-          :title="t('SIDEPANEL_VOICE_SOURCE_TITLE_ICON', 'Play Source Text')"
-          @click="handleVoiceSource"
-        />
-      </div>
-      
-      <img
-        src="@/assets/icons/paste.png"
-        class="inline-icon paste-icon-separate"
-        :title="t('SIDEPANEL_PASTE_SOURCE_TITLE_ICON', 'Paste from Clipboard')"
-        @click="handlePasteSource"
-      />
-      
-      <textarea
-        ref="sourceTextarea"
-        v-model="sourceText"
-        rows="6"
-        :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate')"
-        class="source-textarea"
-        @input="handleSourceTextInput"
-        @keydown="handleKeydown"
-      ></textarea>
-    </div>
+    <!-- Source Input Field -->
+    <TranslationInputField
+      v-model="sourceText"
+      ref="sourceInputRef"
+      :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate')"
+      :language="sourceLanguage"
+      :rows="6"
+      :tabindex="1"
+      :copy-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy Source Text')"
+      :copy-alt="'Copy'"
+      :tts-title="t('SIDEPANEL_VOICE_SOURCE_TITLE_ICON', 'Play Source Text')"
+      :tts-alt="'Play'"
+      :paste-title="t('SIDEPANEL_PASTE_SOURCE_TITLE_ICON', 'Paste from Clipboard')"
+      :paste-alt="'Paste'"
+      :auto-translate-on-paste="false"
+      @translate="handleSubmit"
+      @input="handleSourceTextInput"
+      @keydown="handleKeydown"
+    />
 
     <!-- Action Bar -->
     <div class="action-bar">
@@ -98,15 +54,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { useLanguages } from '@/composables/useLanguages.js'
-import { useClipboard } from '@/composables/useClipboard.js'
-import { useTTSSimple } from '@/composables/useTTSSimple.js'
-import { useSettingsStore } from '@/store/core/settings.js'
+import { ref, computed } from 'vue'
 import { useI18n } from '@/composables/useI18n.js'
-import { correctTextDirection } from '@/utils/textDetection.js'
-import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { logME } from '@/utils/helpers.js'
+import { AUTO_DETECT_VALUE } from '@/constants.js'
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 
 // Props
 const props = defineProps({
@@ -138,13 +91,9 @@ const emit = defineEmits([
 ])
 
 // Refs
-const sourceTextarea = ref(null)
+const sourceInputRef = ref(null)
 
 // Composables
-const languages = useLanguages()
-const clipboard = useClipboard()
-const tts = useTTSSimple()
-const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 // Local reactive values
@@ -164,15 +113,6 @@ const targetLanguage = computed({
 })
 
 // Computed
-const availableLanguages = computed(() => languages.allLanguages.value || [])
-
-const targetLanguages = computed(() => {
-  // فیلتر کردن Auto-Detect از لیست زبان‌های مقصد
-  return (languages.allLanguages.value || []).filter(lang => 
-    lang.code !== AUTO_DETECT_VALUE && lang.code !== 'auto'
-  )
-})
-
 const hasSourceText = computed(() => sourceText.value.trim().length > 0)
 
 const canTranslate = computed(() => {
@@ -193,13 +133,6 @@ const canTranslate = computed(() => {
   return hasText && hasTarget && notAutoDetect && notTranslating
 })
 
-const canSwapLanguages = computed(() => {
-  return sourceLanguage.value !== 'Auto-Detect' && 
-         sourceLanguage.value !== AUTO_DETECT_VALUE && 
-         targetLanguage.value !== 'Auto-Detect' && 
-         targetLanguage.value !== AUTO_DETECT_VALUE
-})
-
 // Event Handlers
 const handleSubmit = () => {
   if (canTranslate.value) {
@@ -213,78 +146,17 @@ const handleSubmit = () => {
 }
 
 const handleSwapLanguages = () => {
-  if (canSwapLanguages.value) {
-    logME('[TranslationForm] Swapping languages')
-    emit('swap-languages')
-  }
+  logME('[TranslationForm] Swapping languages')
+  emit('swap-languages')
 }
 
 const handleSourceTextInput = () => {
-  // اصلاح جهت متن در صورت نیاز
-  nextTick(() => {
-    if (sourceTextarea.value) {
-      correctTextDirection(sourceTextarea.value, sourceText.value)
-    }
-  })
+  // Handled by TranslationInputField component
 }
 
 const handleKeydown = (event) => {
-  const isModifierPressed = event.ctrlKey || event.metaKey
-  const isEnterKey = event.key === 'Enter'
-  const isSlashKey = event.key === '/'
-  
-  if (isModifierPressed && (isEnterKey || isSlashKey)) {
-    event.preventDefault()
-    handleSubmit()
-  }
+  // Handled by TranslationInputField component
 }
-
-const handleCopySource = async () => {
-  if (hasSourceText.value) {
-    const success = await clipboard.copyToClipboard(sourceText.value)
-    if (success) {
-      logME('[TranslationForm] Source text copied to clipboard')
-    }
-  }
-}
-
-const handleVoiceSource = () => {
-  if (hasSourceText.value) {
-    logME('[TranslationForm] Playing source text with TTS')
-    tts.speak(sourceText.value, sourceLanguage.value)
-  }
-}
-
-const handlePasteSource = async () => {
-  const pastedText = await clipboard.pasteFromClipboard()
-  if (pastedText) {
-    sourceText.value = pastedText
-    handleSourceTextInput()
-    logME('[TranslationForm] Text pasted from clipboard')
-  }
-}
-
-// Initialize languages
-onMounted(async () => {
-  await languages.loadLanguages()
-  
-  // تنظیم زبان پیش‌فرض از settings
-  try {
-    await settingsStore.loadSettings()
-    const settings = settingsStore.settings
-    
-    if (!props.sourceLanguage) {
-      sourceLanguage.value = AUTO_DETECT_VALUE
-    }
-    
-    if (!props.targetLanguage) {
-      const targetLangDisplay = languages.getLanguageDisplayValue(settings.TARGET_LANGUAGE)
-      targetLanguage.value = targetLangDisplay || 'English'
-    }
-  } catch (error) {
-    console.error('[TranslationForm] Failed to load language settings:', error)
-  }
-})
 </script>
 
 <style scoped>
@@ -295,120 +167,14 @@ onMounted(async () => {
   padding: 16px;
 }
 
-.language-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+/* Sidepanel-specific adjustments */
+.translation-form :deep(.textarea-container) {
+  margin: 0; /* No margin for sidepanel */
 }
 
-.language-select {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.language-select:focus {
-  outline: none;
-  border-color: var(--accent-color);
-}
-
-.swap-button {
-  padding: 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s ease;
-}
-
-.swap-button:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.swap-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.swap-button img {
-  width: 16px;
-  height: 16px;
-}
-
-.textarea-container {
-  position: relative;
-}
-
-.inline-toolbar {
-  position: absolute;
-  top: 5px;
-  left: 18px;
-  display: none;
-  align-items: center;
-  gap: 12px;
-  z-index: 10;
-}
-
-.inline-toolbar.visible {
-  display: flex;
-}
-
-.inline-icon {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s ease, filter 0.2s ease;
-  filter: var(--icon-filter);
-}
-
-.inline-icon:hover {
-  opacity: 1;
-}
-
-.paste-icon-separate {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  display: none;
-  z-index: 10;
-}
-
-.source-textarea {
-  width: 100%;
+.translation-form :deep(.translation-textarea) {
   height: 140px;
   resize: none;
-  box-sizing: border-box;
-  padding-top: 32px;
-  padding-bottom: 12px;
-  padding-inline-start: 14px;
-  padding-inline-end: 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  background-color: var(--bg-secondary);
-  color: var(--text-color);
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1.7;
-  direction: ltr;
-  text-align: left;
-  min-width: 0;
-}
-
-.source-textarea:focus {
-  outline: none;
-  border-color: var(--accent-color);
-}
-
-.source-textarea::placeholder {
-  color: var(--text-secondary);
 }
 
 .action-bar {

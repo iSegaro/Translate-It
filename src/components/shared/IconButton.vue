@@ -105,6 +105,9 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
   position: absolute;
   top: 5px;
   right: 8px;
+  direction: ltr; /* Force LTR to maintain consistent positioning */
+  width: 16px;
+  height: 16px;
 }
 
 .voice-target-icon {

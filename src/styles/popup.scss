@@ -391,66 +391,8 @@ html, body {
   opacity: 0.7;
 }
 
-// Inline toolbar
-.inline-toolbar {
-  position: absolute;
-  top: 5px;
-  display: none;
-  align-items: center;
-  background: transparent;
-  z-index: 10;
-  padding: 2px;
-
-  &.source-toolbar {
-    left: 8px;
-    right: auto;
-    width: auto;
-    justify-content: space-between;
-
-    .toolbar-left-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-  }
-
-  &.target-toolbar {
-    left: 8px;
-    right: auto;
-    gap: 10px;
-  }
-}
-
-.textarea-container.has-content .inline-toolbar {
-  display: flex;
-}
-
-.inline-icon {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  opacity: var(--icon-opacity, 0.6);
-  transition: opacity 0.2s ease, filter 0.2s ease-in-out;
-  filter: var(--icon-filter);
-
-  &:hover {
-    opacity: var(--icon-hover-opacity, 1);
-  }
-}
-
-.paste-icon-separate {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  width: 16px !important;
-  height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
-
-  &.hidden-by-clipboard {
-    display: none !important;
-  }
-}
+// Inline toolbar styles are now handled by shared components
+// Remove conflicting styles to avoid positioning issues
 
 // Toggle switch
 .switch {

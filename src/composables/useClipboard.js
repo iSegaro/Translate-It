@@ -128,6 +128,10 @@ export function useClipboard() {
     handleCopyTarget,
     handlePasteSource,
     setupClipboardMonitoring,
-    cleanupClipboardMonitoring
+    cleanupClipboardMonitoring,
+    
+    // Aliases for shared component compatibility
+    copyToClipboard: copyText,
+    pasteFromClipboard: pasteText
   }
 }

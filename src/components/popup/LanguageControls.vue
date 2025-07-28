@@ -1,29 +1,15 @@
 <template>
   <div class="language-controls">
+    <!-- Unified Language Selector with swap functionality -->
     <LanguageSelector
-      v-model="targetLanguage"
-      @update:modelValue="handleTargetLanguageChange"
-      :title="$i18n('popup_target_language_title') || 'زبان مقصد'"
-    />
-    
-    <button
-      @click="handleSwapLanguages"
-      class="swap-button"
-      :title="$i18n('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
-      :disabled="!canSwap"
-    >
-      <IconButton
-        icon="swap.png"
-        :alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
-        type="inline"
-      />
-    </button>
-
-    <LanguageSelector
-      v-model="sourceLanguage"
-      @update:modelValue="handleSourceLanguageChange"
-      :title="$i18n('popup_source_language_title') || 'زبان مبدا'"
-      :show-auto-detect="true"
+      v-model:source-language="sourceLanguage"
+      v-model:target-language="targetLanguage"
+      :source-title="$i18n('popup_source_language_title') || 'زبان مبدا'"
+      :target-title="$i18n('popup_target_language_title') || 'زبان مقصد'"
+      :swap-title="$i18n('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
+      :swap-alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
+      :auto-detect-label="'Auto-Detect'"
+      @swap-languages="handleSwapLanguages"
     />
     
     <ProviderSelector 
@@ -35,65 +21,51 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
-import IconButton from '@/components/shared/IconButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
 // Stores
 const settingsStore = useSettingsStore()
 
-// State
-const sourceLanguage = ref('auto')
-const targetLanguage = ref('English')
-
-// Computed
-const canSwap = computed(() => {
-  return sourceLanguage.value !== 'auto' && 
-         sourceLanguage.value !== targetLanguage.value
+// State - using computed to sync with settings store
+const sourceLanguage = computed({
+  get: () => settingsStore.settings.SOURCE_LANGUAGE || 'Auto-Detect',
+  set: async (value) => {
+    try {
+      await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
+    } catch (error) {
+      console.error('Error updating source language:', error)
+    }
+  }
 })
 
-// Watch for settings changes
-watch(() => settingsStore.settings.SOURCE_LANGUAGE, (newValue) => {
-  sourceLanguage.value = newValue || 'auto'
-}, { immediate: true })
-
-watch(() => settingsStore.settings.TARGET_LANGUAGE, (newValue) => {
-  targetLanguage.value = newValue || 'English'
-}, { immediate: true })
+const targetLanguage = computed({
+  get: () => settingsStore.settings.TARGET_LANGUAGE || 'English',
+  set: async (value) => {
+    try {
+      await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', value)
+    } catch (error) {
+      console.error('Error updating target language:', error)
+    }
+  }
+})
 
 // Methods
-const handleSourceLanguageChange = async () => {
-  try {
-    await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', sourceLanguage.value)
-  } catch (error) {
-    console.error('Error updating source language:', error)
-  }
-}
-
-const handleTargetLanguageChange = async () => {
-  try {
-    await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', targetLanguage.value)
-  } catch (error) {
-    console.error('Error updating target language:', error)
-  }
-}
 
 const handleSwapLanguages = async () => {
-  if (!canSwap.value) return
-  
   try {
     const tempSource = sourceLanguage.value
     const tempTarget = targetLanguage.value
     
+    // Check if swap is possible (source is not auto-detect and languages are different)
+    if (tempSource === 'Auto-Detect' || tempSource === tempTarget) {
+      return
+    }
+    
     sourceLanguage.value = tempTarget
     targetLanguage.value = tempSource
-    
-    await Promise.all([
-      settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', sourceLanguage.value),
-      settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', targetLanguage.value)
-    ])
     
     // Emit event to notify other components
     const event = new CustomEvent('languages-swapped', {
@@ -105,9 +77,6 @@ const handleSwapLanguages = async () => {
     document.dispatchEvent(event)
   } catch (error) {
     console.error('Error swapping languages:', error)
-    // Revert on error
-    sourceLanguage.value = settingsStore.settings.SOURCE_LANGUAGE
-    targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE
   }
 }
 
@@ -134,63 +103,5 @@ const handleProviderChange = (provider) => {
   gap: 6px;
   background: var(--language-controls-bg-color);
   border-bottom: 1px solid var(--language-controls-border-color);
-}
-
-.language-select {
-  flex: 1;
-  min-width: 100px;
-  padding: 7px 8px;
-  font-size: 14px;
-  border: 1px solid var(--language-select-border-color);
-  border-radius: 4px;
-  background-color: var(--language-select-bg-color);
-  color: var(--language-select-text-color);
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5" viewBox="0 0 10 5"><path fill="%236c757d" d="M0 0l5 5 5-5z"/></svg>');
-  background-repeat: no-repeat;
-  background-position: left 8px center;
-  background-size: 10px 5px;
-  padding-left: 25px;
-  filter: var(--icon-filter);
-}
-
-.swap-button {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s ease, filter 0.2s ease-in-out;
-  flex-shrink: 0;
-}
-
-.swap-button:hover {
-  background-color: var(--toolbar-link-hover-bg-color);
-}
-
-.swap-button img {
-  width: 16px;
-  height: 16px;
-  opacity: var(--icon-opacity);
-  filter: var(--icon-filter);
-  transition: opacity 0.2s ease-in-out;
-}
-
-.swap-button:hover img {
-  opacity: var(--icon-hover-opacity);
-}
-
-.swap-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.swap-button:disabled:hover {
-  background-color: transparent;
 }
 </style>
