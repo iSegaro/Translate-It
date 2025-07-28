@@ -1,5 +1,5 @@
 // src/background/handlers/lifecycle/handleRestartContentScript.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
   console.log('[Handler:restart_content_script] Processing content script restart:', message);
   
   try {
-    const Browser = await getBrowserAPI();
     const tabId = message.tabId || sender.tab?.id;
     
     if (!tabId) {
@@ -27,13 +26,13 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
     console.log(`🔄 [restart_content_script] Restarting content script for tab ${tabId}`);
     
     // Execute content script reinjection
-    await Browser.scripting.executeScript({
+    await browser.scripting.executeScript({
       target: { tabId },
       files: ['/content-scripts/main.js'] // Main content script entry point
     });
     
     // Reinject CSS if needed
-    await Browser.scripting.insertCSS({
+    await browser.scripting.insertCSS({
       target: { tabId },
       files: ['/styles/content.css']
     });

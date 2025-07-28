@@ -1,5 +1,5 @@
 // src/utils/select_element.js
-import { Browser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
 import { isExtensionContextValid, logME } from "./helpers.js";
@@ -13,7 +13,7 @@ export async function Active_SelectElement(
   force = false
 ) {
   try {
-    const tabs = await Browser.tabs.query({
+    const tabs = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
@@ -32,9 +32,9 @@ export async function Active_SelectElement(
 
     // فقط وقتی تغییر می‌کنه یا force=true است
     if (force || active !== currentState) {
-      await Browser.storage.local.set({ selectElementState: active });
+      await browser.storage.local.set({ selectElementState: active });
 
-      const response = await Browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         action: "activateSelectElementMode",
         data: active,
       });

@@ -5,11 +5,9 @@ import { logME } from '../../../utils/helpers.js';
  * Handles the 'ping' message action.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - False for synchronous response.
+ * @returns {Promise<Object>} - A Promise that resolves with the response object.
  */
-export function handlePing(message, sender, sendResponse) {
+export async function handlePing(message, sender) {
   logME("[Handler:Common] Ping received, responding with pong");
-  sendResponse({ success: true, message: "pong" });
-  return false; // Synchronous response
+  return { success: true, message: "pong" };
 }

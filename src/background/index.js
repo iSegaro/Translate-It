@@ -1,14 +1,13 @@
 // Background script entry point for Vue build
 // Cross-browser service worker for Manifest V3
 
-import { environment } from '../utils/environment.js';
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { featureLoader } from './feature-loader.js';
 import { VueMessageHandler } from './vue-message-handler.js';
 import NotificationManager from '../managers/NotificationManager.js';
 import { initializeSettingsListener } from '../config.js';
 import { TranslationEngine } from './translation-engine.js';
-import { MessageRouter } from './message-router.js';
+import { coreMessageRouter } from '../core/CoreMessageRouter.js';
 import * as Handlers from './handlers/index.js';
 
 /**
@@ -23,14 +22,7 @@ class BackgroundService {
     this.listeners = [];
     this.vueMessageHandler = null;
     this.translationEngine = null;
-    this.messageRouter = new MessageRouter(); // NEW: Instantiate MessageRouter
-    // Define handleCentralMessageWrapper as a class property (arrow function) here
-    this.handleCentralMessageWrapper = (request, sender, sendResponse) => {
-      console.log('[BackgroundService] Forwarding message to router:', request.action);
-      // Route the message through the central router
-      // The router will handle dispatching to the correct handler and error management
-      return this.messageRouter.routeMessage(request, sender, sendResponse);
-    };
+    this.coreRouter = coreMessageRouter;
   }
 
   /**
@@ -46,7 +38,7 @@ class BackgroundService {
       console.log('🚀 Initializing cross-browser background service...');
 
       // Initialize environment and browser API
-      await this.initializeBrowserAPI();
+      await this.initializebrowserAPI();
       
       // Initialize NotificationManager
       this.notificationManager = new NotificationManager();
@@ -58,7 +50,8 @@ class BackgroundService {
       // Initialize translation engine
       await this.initializeTranslationEngine();
 
-      
+      // Initialize core message router
+      await this.coreRouter.initialize();
       
       // Load listeners
       await this.initializeListeners();
@@ -66,14 +59,11 @@ class BackgroundService {
       // Pre-load essential features
       await this.initializeFeatures();
 
-      // NEW: Register handlers with the MessageRouter during initialization
+      // Register all message handlers with core router
       this.registerMessageHandlers();
       
       // Initialize error handlers for specific modules
       await this.initializeErrorHandlers();
-
-      // Setup central message listener
-      await this.setupCentralMessageListener();
 
       this.initialized = true;
       
@@ -94,26 +84,24 @@ class BackgroundService {
    * Initialize browser API
    * @private
    */
-  async initializeBrowserAPI() {
+  async initializebrowserAPI() {
     console.log('🌐 Initializing browser API...');
     
-    this.browser = await getBrowserAPI();
+    this.browser = browser;
     
     // Make globally available for legacy code
-    globalThis.Browser = this.browser;
-    globalThis.browser = this.browser;
+    globalThis.browser = browser;
+    globalThis.browser = browser;
     
     if (typeof self !== 'undefined') {
-      self.Browser = this.browser;
-      self.browser = this.browser;
+      self.browser = browser;
+      self.browser = browser;
     }
 
-    const browserName = environment.getBrowser();
+    console.log(`✅ browser API initialized with webextension-polyfill`);
 
-    console.log(`✅ Browser API initialized for ${browserName}`);
-
-    // Initialize settings listener with the fully initialized Browser object
-    await initializeSettingsListener(this.browser);
+    // Initialize settings listener with the browser object
+    await initializeSettingsListener(browser);
   }
 
   /**
@@ -161,7 +149,7 @@ class BackgroundService {
     console.log('🎧 Initializing event listeners...');
     
     try {
-      this.listeners = await featureLoader.loadAllListeners();
+      this.listeners = await featureLoader.loadAllListeners(this.browser);
       console.log(`✅ Loaded ${this.listeners.length} listeners`);
     } catch (error) {
       console.error('❌ Failed to load some listeners:', error);
@@ -239,8 +227,8 @@ class BackgroundService {
     try {
       // At minimum, try to get browser API
       if (!this.browser) {
-        this.browser = await getBrowserAPI();
-        globalThis.Browser = this.browser;
+        this.browser = browser;
+        globalThis.browser = this.browser;
         globalThis.browser = this.browser;
       }
 
@@ -290,101 +278,113 @@ class BackgroundService {
   getDebugInfo() {
     return {
       initialized: this.initialized,
-      browser: environment.getBrowser(),
+      browser: browser,
       features: Object.keys(this.features),
       listeners: this.listeners.length,
       hasVueHandler: !!this.vueMessageHandler,
       hasTranslationEngine: !!this.translationEngine,
       translationStats: this.translationEngine ? this.translationEngine.getCacheStats() : null,
-      environment: environment.getDebugInfo(),
       featureLoader: featureLoader.getDebugInfo()
     };
   }
 
   /**
-   * Setup central message listener to route messages to appropriate handlers
+   * Setup port listener to route messages from connected ports
    * @private
    */
-  async setupCentralMessageListener() {
-    console.log('👂 Setting up central message listener...');
-    const Browser = await getBrowserAPI();
 
-    // Remove any existing listener to prevent duplicates
-    if (this.handleCentralMessageWrapper) {
-      Browser.runtime.onMessage.removeListener(this.handleCentralMessageWrapper);
-      console.log('🗑️ Removed existing central message listener.');
-    }
-
-    Browser.runtime.onMessage.addListener(this.handleCentralMessageWrapper); // Pass the function directly
-    console.log('✅ Central message listener set up');
-  }
-
-  // NEW METHOD: Register all message handlers
+  // Register all message handlers with CoreMessageRouter
   registerMessageHandlers() {
-    console.log('[BackgroundService] Registering message handlers...');
+    console.log('[BackgroundService] Registering message handlers with CoreMessageRouter...');
     
     // Common handlers
-    this.messageRouter.registerHandler('ping', Handlers.handlePing);
-    this.messageRouter.registerHandler('open_options_page', Handlers.handleOpenOptionsPage);
-    this.messageRouter.registerHandler('open_url', Handlers.handleOpenURL);
-    this.messageRouter.registerHandler('show_os_notification', Handlers.handleShowOSNotification);
-    this.messageRouter.registerHandler('REFRESH_CONTEXT_MENUS', Handlers.handleRefreshContextMenus);
-    this.messageRouter.registerHandler('CONTENT_SCRIPT_WILL_RELOAD', Handlers.handleContentScriptWillReload);
+    this.coreRouter.registerHandler('ping', Handlers.handlePing);
+    this.coreRouter.registerHandler('open_options_page', Handlers.handleOpenOptionsPage);
+    this.coreRouter.registerHandler('open_url', Handlers.handleOpenURL);
+    this.coreRouter.registerHandler('show_os_notification', Handlers.handleShowOSNotification);
+    this.coreRouter.registerHandler('REFRESH_CONTEXT_MENUS', Handlers.handleRefreshContextMenus);
+    this.coreRouter.registerHandler('CONTENT_SCRIPT_WILL_RELOAD', Handlers.handleContentScriptWillReload);
     
     // Lifecycle handlers
-    this.messageRouter.registerHandler('CONTEXT_INVALID', Handlers.handleContextInvalid);
-    this.messageRouter.registerHandler('EXTENSION_RELOADED', Handlers.handleExtensionReloaded);
-    this.messageRouter.registerHandler('restart_content_script', Handlers.handleRestartContentScript);
-    this.messageRouter.registerHandler('BACKGROUND_RELOAD_EXTENSION', Handlers.handleBackgroundReloadExtension);
+    this.coreRouter.registerHandler('CONTEXT_INVALID', Handlers.handleContextInvalid);
+    this.coreRouter.registerHandler('EXTENSION_RELOADED', Handlers.handleExtensionReloaded);
+    this.coreRouter.registerHandler('restart_content_script', Handlers.handleRestartContentScript);
+    this.coreRouter.registerHandler('BACKGROUND_RELOAD_EXTENSION', Handlers.handleBackgroundReloadExtension);
     
-    // Translation handlers
-    this.messageRouter.registerHandler('TRANSLATE', Handlers.handleTranslate);
-    this.messageRouter.registerHandler('fetchTranslation', Handlers.handleFetchTranslation);
-    this.messageRouter.registerHandler('translationAdded', Handlers.handleTranslationAdded);
-    this.messageRouter.registerHandler('fetchTranslationBackground', Handlers.handleFetchTranslationBackground);
-    this.messageRouter.registerHandler('revertTranslation', Handlers.handleRevertTranslation);
+    // Translation handlers (require port for better reliability)
+    this.coreRouter.registerHandler('TRANSLATE', Handlers.handleTranslate, { 
+      requiresPort: true, 
+      contexts: ['popup', 'sidepanel', 'content'],
+      timeout: 60000 
+    });
+    this.coreRouter.registerHandler('fetchTranslation', Handlers.handleFetchTranslation);
+    this.coreRouter.registerHandler('translationAdded', Handlers.handleTranslationAdded);
+    this.coreRouter.registerHandler('fetchTranslationBackground', Handlers.handleFetchTranslationBackground);
+    this.coreRouter.registerHandler('revertTranslation', Handlers.handleRevertTranslation);
+    
+    // Provider and settings handlers
+    this.coreRouter.registerHandler('GET_PROVIDERS', this.handleGetProviders.bind(this));
+    this.coreRouter.registerHandler('GET_HISTORY', this.handleGetHistory.bind(this));
+    this.coreRouter.registerHandler('CLEAR_HISTORY', this.handleClearHistory.bind(this));
     
     // TTS handlers
-    this.messageRouter.registerHandler('speak', Handlers.handleSpeak);
-    this.messageRouter.registerHandler('stopTTS', Handlers.handleStopTTS);
-    this.messageRouter.registerHandler('TTS_SPEAK_CONTENT', Handlers.handleTTSSpeakContent);
-    this.messageRouter.registerHandler('OFFSCREEN_READY', Handlers.handleOffscreenReady);
-    this.messageRouter.registerHandler('TTS_SPEAK', Handlers.handleTTSOffscreen);
-    this.messageRouter.registerHandler('TTS_STOP', Handlers.handleTTSOffscreen);
-    this.messageRouter.registerHandler('TTS_TEST', Handlers.handleTTSOffscreen);
-    this.messageRouter.registerHandler('playOffscreenAudio', Handlers.handleTTSOffscreen);
-    this.messageRouter.registerHandler('stopOffscreenAudio', Handlers.handleTTSOffscreen);
-    this.messageRouter.registerHandler('playCachedAudio', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('speak', Handlers.handleSpeak);
+    this.coreRouter.registerHandler('stopTTS', Handlers.handleStopTTS);
+    this.coreRouter.registerHandler('TTS_SPEAK_CONTENT', Handlers.handleTTSSpeakContent);
+    this.coreRouter.registerHandler('TTS_SPEAK', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('TTS_STOP', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('TTS_TEST', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('OFFSCREEN_READY', Handlers.handleOffscreenReady);
+    this.coreRouter.registerHandler('playOffscreenAudio', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('stopOffscreenAudio', Handlers.handleTTSOffscreen);
+    this.coreRouter.registerHandler('playCachedAudio', Handlers.handleTTSOffscreen);
     
     // Element selection handlers
-    this.messageRouter.registerHandler('activateSelectElementMode', Handlers.handleActivateSelectElementMode);
-    this.messageRouter.registerHandler('UPDATE_SELECT_ELEMENT_STATE', Handlers.handleUpdateSelectElementState);
-    this.messageRouter.registerHandler('elementSelected', Handlers.handleElementSelected);
-    this.messageRouter.registerHandler('applyTranslationToActiveElement', Handlers.handleApplyTranslationToActiveElement);
+    this.coreRouter.registerHandler('activateSelectElementMode', Handlers.handleActivateSelectElementMode);
+    this.coreRouter.registerHandler('UPDATE_SELECT_ELEMENT_STATE', Handlers.handleUpdateSelectElementState);
+    this.coreRouter.registerHandler('elementSelected', Handlers.handleElementSelected);
+    this.coreRouter.registerHandler('applyTranslationToActiveElement', Handlers.handleApplyTranslationToActiveElement);
     
     // Screen capture handlers
-    this.messageRouter.registerHandler('startAreaCapture', Handlers.handleStartAreaCapture);
-    this.messageRouter.registerHandler('startFullScreenCapture', Handlers.handleStartFullScreenCapture);
-    this.messageRouter.registerHandler('requestFullScreenCapture', Handlers.handleRequestFullScreenCapture);
-    this.messageRouter.registerHandler('processAreaCaptureImage', Handlers.handleProcessAreaCaptureImage);
-    this.messageRouter.registerHandler('previewConfirmed', Handlers.handlePreviewConfirmed);
-    this.messageRouter.registerHandler('previewCancelled', Handlers.handlePreviewCancelled);
-    this.messageRouter.registerHandler('previewRetry', Handlers.handlePreviewRetry);
-    this.messageRouter.registerHandler('resultClosed', Handlers.handleResultClosed);
-    this.messageRouter.registerHandler('captureError', Handlers.handleCaptureError);
-    this.messageRouter.registerHandler('areaSelectionCancel', Handlers.handleAreaSelectionCancel);
+    this.coreRouter.registerHandler('startAreaCapture', Handlers.handleStartAreaCapture);
+    this.coreRouter.registerHandler('startFullScreenCapture', Handlers.handleStartFullScreenCapture);
+    this.coreRouter.registerHandler('requestFullScreenCapture', Handlers.handleRequestFullScreenCapture);
+    this.coreRouter.registerHandler('processAreaCaptureImage', Handlers.handleProcessAreaCaptureImage);
+    this.coreRouter.registerHandler('previewConfirmed', Handlers.handlePreviewConfirmed);
+    this.coreRouter.registerHandler('previewCancelled', Handlers.handlePreviewCancelled);
+    this.coreRouter.registerHandler('previewRetry', Handlers.handlePreviewRetry);
+    this.coreRouter.registerHandler('resultClosed', Handlers.handleResultClosed);
+    this.coreRouter.registerHandler('captureError', Handlers.handleCaptureError);
+    this.coreRouter.registerHandler('areaSelectionCancel', Handlers.handleAreaSelectionCancel);
     
     // Text selection handlers
-    this.messageRouter.registerHandler('getSelectedText', Handlers.handleGetSelectedText);
+    this.coreRouter.registerHandler('getSelectedText', Handlers.handleGetSelectedText);
     
     // Page exclusion handlers
-    this.messageRouter.registerHandler('isCurrentPageExcluded', Handlers.handleIsCurrentPageExcluded);
-    this.messageRouter.registerHandler('setExcludeCurrentPage', Handlers.handleSetExcludeCurrentPage);
+    this.coreRouter.registerHandler('isCurrentPageExcluded', Handlers.handleIsCurrentPageExcluded);
+    this.coreRouter.registerHandler('setExcludeCurrentPage', Handlers.handleSetExcludeCurrentPage);
     
     // Sidepanel handlers
-    this.messageRouter.registerHandler('OPEN_SIDE_PANEL', Handlers.handleOpenSidePanel);
+    this.coreRouter.registerHandler('OPEN_SIDE_PANEL', Handlers.handleOpenSidePanel);
     
-    console.log('[BackgroundService] All message handlers registered successfully.');
+    console.log('[BackgroundService] All message handlers registered with CoreMessageRouter successfully.');
+  }
+
+  // Helper handlers for new client methods
+  async handleGetProviders(message, sender) {
+    const { getAvailableProviders } = await import('../providers/index.js');
+    return { providers: getAvailableProviders() };
+  }
+
+  async handleGetHistory(message, sender) {
+    const { getTranslationHistory } = await import('../config.js');
+    return { history: await getTranslationHistory() };
+  }
+
+  async handleClearHistory(message, sender) {
+    const { clearTranslationHistory } = await import('../config.js');
+    await clearTranslationHistory();
+    return { success: true };
   }
 
   /**

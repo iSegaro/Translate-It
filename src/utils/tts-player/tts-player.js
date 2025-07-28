@@ -1,5 +1,5 @@
 // src/managers/tts-player.js
-// Browser-agnostic TTS player that delegates to appropriate implementation
+// browser-agnostic TTS player that delegates to appropriate implementation
 
 import * as chromePlayer from "./tts-player-chrome.js";
 import * as firefoxPlayer from "./tts-player-firefox.js";
@@ -199,7 +199,7 @@ async function playAudioBlob(audioBlob, text = null, lang = null) {
     }
     
     // Fallback: Try direct Audio object (may not work in service worker context)
-    console.warn("[TTS Player] Browser-specific cached playback not available, trying direct Audio");
+    console.warn("[TTS Player] browser-specific cached playback not available, trying direct Audio");
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     

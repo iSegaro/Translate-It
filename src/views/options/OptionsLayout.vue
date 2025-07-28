@@ -14,14 +14,14 @@
 import { computed } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 // RTL detection using i18n plugin
 const isRTL = computed(() => {
   try {
     // Access browser API safely
-    if (typeof window !== 'undefined' && window.browser && window.browser.i18n) {
-      return window.browser.i18n.getMessage('IsRTL') === 'true'
+    if (typeof browser !== 'undefined' && browser.i18n) {
+      return browser.i18n.getMessage('IsRTL') === 'true'
     }
     return false
   } catch (e) {

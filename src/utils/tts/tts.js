@@ -1,5 +1,5 @@
 // src/utils/tts.js
-import { getBrowserAPI } from "../browser-unified.js";
+import browser from 'webextension-polyfill';
 import { logME } from "../helpers.js";
 import { languageList } from "../languages.js";
 
@@ -99,11 +99,11 @@ export function playAudioWebSpeechAPI(text, langCode) {
 
 export function playAudioChromeTTS(text, lang) {
   return new Promise((resolve, reject) => {
-    if (!chrome?.tts) {
-      return reject(new Error("chrome.tts not available"));
+    if (!browser?.tts) {
+      return reject(new Error("browser.tts not available"));
     }
 
-    chrome.tts.speak(text, {
+    browser.tts.speak(text, {
       lang,
       onEvent: (event) => {
         if (event.type === "end") {

@@ -1,7 +1,6 @@
 // src/composables/useHistory.js
 // Vue composable for translation history management in sidepanel with improved API handling
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useBrowserAPI } from './useBrowserAPI.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
 import { correctTextDirection } from '@/utils/textDetection.js'
@@ -17,7 +16,7 @@ export function useHistory() {
   const isHistoryPanelOpen = ref(false)
 
   // Composables
-  const browserAPI = useBrowserAPI()
+  
   const settingsStore = useSettingsStore()
 
   // Computed

@@ -1,5 +1,5 @@
 // src/background/handlers/screen-capture/handleStartFullScreenCapture.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleStartFullScreenCapture(message, sender, sendResponse
   console.log('[Handler:startFullScreenCapture] Processing full screen capture:', message.data);
   
   try {
-    const Browser = await getBrowserAPI();
     const backgroundService = globalThis.backgroundService;
     
     if (!backgroundService) {

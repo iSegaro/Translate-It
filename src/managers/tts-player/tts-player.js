@@ -1,5 +1,5 @@
 // src/managers/tts-player.js
-// Browser-agnostic TTS player that delegates to appropriate implementation
+// browser-agnostic TTS player that delegates to appropriate implementation
 
 import * as chromePlayer from "./tts-player-chrome.js";
 import * as firefoxPlayer from "./tts-player-firefox.js";

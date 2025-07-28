@@ -2,7 +2,7 @@
 // Vue-compatible Select Element Manager
 // Integrated with existing services and error handling
 
-import { getBrowserAsync } from '@/utils/browser-polyfill.js'
+import browser from 'webextension-polyfill'
 import { logME } from '@/utils/helpers.js'
 import { ErrorHandler } from '../error-management/ErrorService.js'
 import { ErrorTypes } from '../error-management/ErrorTypes.js'
@@ -24,7 +24,7 @@ export class SelectElementManager {
     this.overlayElements = new Set()
     this.originalTexts = new Map()
     this.currentHighlighted = null
-    this.Browser = null
+    this.browser = null
     this.translatedElements = new Set() // Track translated elements for revert
     this.isProcessingClick = false // Prevent multiple rapid clicks
     this.lastClickTime = 0 // Debounce timer
@@ -52,13 +52,13 @@ export class SelectElementManager {
    */
   async initialize() {
     try {
-      this.Browser = await getBrowserAsync()
+      this.browser = browser;
       this.setupMessageListener()
       
       // Initialize services
       this.notificationManager.initialize()
       
-      console.log('[SelectElementManager] Browser API initialized')
+      console.log('[SelectElementManager] browser API initialized')
     } catch (error) {
       console.error('[SelectElementManager] Initialization failed:', error)
       await this.errorHandler.handle(error, {
@@ -74,12 +74,9 @@ export class SelectElementManager {
   async sendMessageWithRetry(action, data, retries = 3, delayMs = 100) {
     for (let i = 0; i < retries; i++) {
       try {
-        if (!this.Browser) {
-          this.Browser = await getBrowserAsync()
-        }
         
         console.log(`[SelectElementManager] Sending message:`, { action, data })
-        const response = await this.Browser.runtime.sendMessage({ action, data })
+        const response = await this.browser.runtime.sendMessage({ action, data })
         
         console.log(`[SelectElementManager] Raw response received:`, response)
         
@@ -117,10 +114,10 @@ export class SelectElementManager {
    * Setup message listener for background communication
    */
   setupMessageListener() {
-    if (!this.Browser || this.messageListener) return
+    if (!this.browser || this.messageListener) return
     
     this.messageListener = this.handleMessage
-    this.Browser.runtime.onMessage.addListener(this.messageListener)
+    this.browser.runtime.onMessage.addListener(this.messageListener)
     console.log('[SelectElementManager] Message listener registered')
   }
 
@@ -505,14 +502,14 @@ export class SelectElementManager {
    * Process selected element - send to background for translation
    */
   async processSelectedElement(element, text) {
-    if (!this.Browser) return
+    if (!this.browser) return
     
     try {
       console.log('[SelectElementManager] Sending text to background for processing')
       
       // Send extracted text to background for translation with retry
       // Use direct runtime.sendMessage instead of sendMessageWithRetry to avoid duplicate broadcasts
-      const response = await this.Browser.runtime.sendMessage({
+      const response = await this.browser.runtime.sendMessage({
         action: 'elementSelected',
         data: {
           text: text,
@@ -774,8 +771,8 @@ export class SelectElementManager {
     await this.deactivate()
     
     // Remove message listener
-    if (this.Browser && this.messageListener) {
-      this.Browser.runtime.onMessage.removeListener(this.messageListener)
+    if (this.browser && this.messageListener) {
+      this.browser.runtime.onMessage.removeListener(this.messageListener)
       this.messageListener = null
     }
     

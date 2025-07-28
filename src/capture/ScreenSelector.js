@@ -165,14 +165,14 @@ export class ScreenSelector {
 
   /**
    * Convert viewport coordinates to capture coordinates
-   * Browser capture API captures visible viewport, so we need viewport-relative coordinates
+   * browser capture API captures visible viewport, so we need viewport-relative coordinates
    * @param {MouseEvent} event - Mouse event with clientX/clientY
    * @returns {Object} Capture coordinates {x, y}
    * @private
    */
   _getCaptureCoordinates(event) {
     // For screen capture, we need viewport-relative coordinates
-    // Browser.tabs.captureVisibleTab() captures what's currently visible in viewport
+    // browser.tabs.captureVisibleTab() captures what's currently visible in viewport
     return {
       x: Math.round(event.clientX),
       y: Math.round(event.clientY)

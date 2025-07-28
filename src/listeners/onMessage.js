@@ -1,8 +1,8 @@
 // src/listeners/onMessage.js
 // Cross-browser message listener with base listener architecture
 
+import browser from 'webextension-polyfill';
 import { BaseListener } from "./base-listener.js";
-import { getBrowserAPI } from "../utils/browser-unified.js";
 import { logME } from "../utils/helpers.js";
 
 /**
@@ -32,18 +32,16 @@ class MessageListener extends BaseListener {
     }
 
     try {
-      const Browser = await getBrowserAPI(); // Use getBrowserAPI here
-      if (!Browser) {
-        throw new Error(`Browser API not available`);
+      if (!browser) {
+        throw new Error(`browser API not available`);
       }
 
-      const eventObject = Browser.runtime.onMessage; // Direct access to onMessage
+      const eventObject = browser.runtime.onMessage;
       if (!eventObject) {
         throw new Error(`Event onMessage not available on runtime`);
       }
 
-      // For message listeners, we need to handle the return value properly
-      // Chrome extension message listeners need to return true to keep the response channel open
+      // webextension-polyfill handles cross-browser compatibility automatically
       eventObject.addListener((message, sender, sendResponse) => {
         console.debug(
           `📨 ${this.listenerName} event received, forwarding to central router.`
@@ -54,6 +52,7 @@ class MessageListener extends BaseListener {
           typeof globalThis.backgroundService.handleCentralMessageWrapper ===
             "function"
         ) {
+          // Let webextension-polyfill handle the cross-browser differences
           return globalThis.backgroundService.handleCentralMessageWrapper(
             message,
             sender,

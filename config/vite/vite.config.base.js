@@ -24,7 +24,7 @@ export const createBaseConfig = (browser, options = {}) => {
       ...(options.extraPlugins || [])
     ],
 
-    // Browser-specific definitions  
+    // browser-specific definitions  
     define: {
       __BROWSER__: JSON.stringify(browser),
       __IS_PRODUCTION__: isProduction,

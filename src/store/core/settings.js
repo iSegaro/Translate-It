@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/utils/secureStorage.js'
 
@@ -92,9 +92,6 @@ export const useSettingsStore = defineStore('settings', () => {
     
     isLoading.value = true
     try {
-      // Get browser API
-      const browser = await getBrowserAPI()
-      
       // Get all settings from storage
       const stored = await browser.storage.local.get(null)
       
@@ -136,7 +133,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const saveAllSettings = async () => {
     isSaving.value = true
     try {
-      const browser = await getBrowserAPI()
       await browser.storage.local.set(settings.value)
       return true
     } catch (error) {
@@ -157,7 +153,6 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       console.log(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
       settings.value[key] = value // Update local state
-      const browser = await getBrowserAPI()
       await browser.storage.local.set({ [key]: value }) // Persist immediately
       console.log(`[settingsStore] Successfully saved ${key} to browser storage`)
       return true
@@ -173,7 +168,6 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.assign(settings.value, updates)
       
       // Get browser API and save to storage
-      const browser = await getBrowserAPI()
       await browser.storage.local.set(settings.value)
       
       return true
@@ -186,7 +180,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const resetSettings = async () => {
     try {
       // Get browser API and clear all storage
-      const browser = await getBrowserAPI()
       await browser.storage.local.clear()
       
       // Reset to CONFIG defaults
@@ -355,7 +348,6 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const markMigrationComplete = async (fromVersion = 'legacy') => {
     try {
-      const browser = await getBrowserAPI()
       const manifest = browser.runtime.getManifest()
       
       const migrationData = {
@@ -397,7 +389,6 @@ export const useSettingsStore = defineStore('settings', () => {
   // Setup storage listener
   const setupStorageListener = async () => {
     try {
-      const browser = await getBrowserAPI()
       if (browser.storage && browser.storage.onChanged) {
         storageListener = handleStorageChange
         browser.storage.onChanged.addListener(storageListener)
@@ -414,7 +405,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const cleanupStorageListener = async () => {
     if (storageListener) {
       try {
-        const browser = await getBrowserAPI()
         if (browser.storage && browser.storage.onChanged) {
           browser.storage.onChanged.removeListener(storageListener)
           storageListener = null

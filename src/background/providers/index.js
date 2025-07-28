@@ -5,7 +5,7 @@
 
 export { BaseTranslationProvider } from './BaseTranslationProvider.js'
 export { BingTranslateProvider } from './BingTranslateProvider.js'
-export { BrowserTranslateProvider } from './BrowserTranslateProvider.js'
+export { browserTranslateProvider } from './browserTranslateProvider.js'
 export { CustomProvider } from './CustomProvider.js'
 export { DeepSeekProvider } from './DeepSeekProvider.js'
 export { GeminiProvider } from './GeminiProvider.js'

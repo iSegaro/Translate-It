@@ -34,7 +34,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
           const devicePixelRatio = window.devicePixelRatio || 1;
           
           // Calculate actual coordinates on the captured image
-          // Browser capture may be at device pixel ratio
+          // browser capture may be at device pixel ratio
           const actualX = selectionData.x * devicePixelRatio;
           const actualY = selectionData.y * devicePixelRatio;
           const actualWidth = selectionData.width * devicePixelRatio;

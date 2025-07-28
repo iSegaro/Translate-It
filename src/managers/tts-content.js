@@ -1,7 +1,7 @@
 // src/managers/tts-content.js
 // Content script TTS implementation (fallback)
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Content Script TTS Manager
@@ -22,7 +22,7 @@ export class ContentScriptTTSManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
       console.log('🔊 Initializing content script TTS manager');
 
@@ -64,7 +64,7 @@ export class ContentScriptTTSManager {
       }
     };
 
-    this.browser.runtime.onMessage.addListener(this.messageListener);
+    browser.runtime.onMessage.addListener(this.messageListener);
   }
 
   /**
@@ -266,7 +266,7 @@ export class ContentScriptTTSManager {
 
     // Remove message listener
     if (this.messageListener && this.browser?.runtime?.onMessage) {
-      this.browser.runtime.onMessage.removeListener(this.messageListener);
+      browser.runtime.onMessage.removeListener(this.messageListener);
       this.messageListener = null;
     }
 

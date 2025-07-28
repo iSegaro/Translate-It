@@ -5,7 +5,7 @@ export function useExtensionAPI() {
   const messageListeners = ref([])
 
   // Get browser API (webextension-polyfill or native)
-  const getBrowserAPI = () => {
+  const getbrowserAPI = () => {
     if (typeof browser !== 'undefined') {
       return browser
     }
@@ -17,7 +17,7 @@ export function useExtensionAPI() {
 
   const sendMessage = async (action, data = {}) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       const response = await api.runtime.sendMessage({ 
         action, 
         data,
@@ -39,7 +39,7 @@ export function useExtensionAPI() {
 
   const sendToTab = async (tabId, action, data = {}) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       const response = await api.tabs.sendMessage(tabId, { 
         action, 
         data,
@@ -55,7 +55,7 @@ export function useExtensionAPI() {
 
   const sendToContentScript = async (action, data = {}) => {
     try {
-      const [tab] = await getBrowserAPI().tabs.query({ active: true, currentWindow: true })
+      const [tab] = await getbrowserAPI().tabs.query({ active: true, currentWindow: true })
       if (!tab) {
         throw new Error('No active tab found')
       }
@@ -67,7 +67,7 @@ export function useExtensionAPI() {
   }
 
   const onMessage = (callback) => {
-    const api = getBrowserAPI()
+    const api = getbrowserAPI()
     const listener = (message, sender, sendResponse) => {
       callback(message, sender, sendResponse)
     }
@@ -86,7 +86,7 @@ export function useExtensionAPI() {
 
   const getStorageData = async (keys) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       return await api.storage.local.get(keys)
     } catch (error) {
       console.error('Failed to get storage data:', error)
@@ -96,7 +96,7 @@ export function useExtensionAPI() {
 
   const setStorageData = async (data) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       return await api.storage.local.set(data)
     } catch (error) {
       console.error('Failed to set storage data:', error)
@@ -106,7 +106,7 @@ export function useExtensionAPI() {
 
   const getCurrentTab = async () => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       const [tab] = await api.tabs.query({ active: true, currentWindow: true })
       return tab
     } catch (error) {
@@ -117,7 +117,7 @@ export function useExtensionAPI() {
 
   const openOptionsPage = async () => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       await api.runtime.openOptionsPage()
     } catch (error) {
       console.error('Failed to open options page:', error)
@@ -127,7 +127,7 @@ export function useExtensionAPI() {
 
   const openSidepanel = async () => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       // Chrome-specific sidepanel API
       if (api.sidePanel) {
         await api.sidePanel.open({ windowId: window.id })
@@ -143,7 +143,7 @@ export function useExtensionAPI() {
 
   const createNotification = async (options) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       return await api.notifications.create(options)
     } catch (error) {
       console.error('Failed to create notification:', error)
@@ -153,7 +153,7 @@ export function useExtensionAPI() {
 
   const captureVisibleTab = async (options = {}) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       return await api.tabs.captureVisibleTab(options)
     } catch (error) {
       console.error('Failed to capture visible tab:', error)
@@ -163,7 +163,7 @@ export function useExtensionAPI() {
 
   const executeScript = async (tabId, details) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       return await api.tabs.executeScript(tabId, details)
     } catch (error) {
       console.error('Failed to execute script:', error)
@@ -209,7 +209,7 @@ export function useExtensionAPI() {
   // Content script integration
   const injectContentScript = async (tabId, scriptPath) => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       await api.tabs.executeScript(tabId, { file: scriptPath })
     } catch (error) {
       console.error('Failed to inject content script:', error)
@@ -241,7 +241,7 @@ export function useExtensionAPI() {
   // Cleanup on component unmount
   onUnmounted(() => {
     try {
-      const api = getBrowserAPI()
+      const api = getbrowserAPI()
       messageListeners.value.forEach(listener => {
         api.runtime.onMessage.removeListener(listener)
       })
@@ -298,6 +298,6 @@ export function useExtensionAPI() {
     updateContextMenu,
     
     // Utility
-    getBrowserAPI
+    getbrowserAPI
   }
 }

@@ -1,7 +1,7 @@
 // src/managers/sidebar-firefox.js
 // Firefox sidebar manager (and fallback for other browsers)
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Firefox Sidebar Manager
@@ -20,7 +20,7 @@ export class FirefoxSidebarManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
       console.log('📋 Initializing Firefox sidebar manager');
       this.initialized = true;
@@ -45,11 +45,11 @@ export class FirefoxSidebarManager {
     try {
       // Firefox sidebar opens automatically based on manifest sidebar_action
       // For manual opening, we can use tabs.create as fallback
-      const sidebarUrl = this.browser.runtime.getURL('sidepanel.html');
+      const sidebarUrl = browser.runtime.getURL('sidepanel.html');
       
       // Try to open as popup window (better than tab for sidebar-like experience)
-      if (this.browser.windows) {
-        await this.browser.windows.create({
+      if (browser.windows) {
+        await browser.windows.create({
           url: sidebarUrl,
           type: 'popup',
           width: 400,
@@ -60,7 +60,7 @@ export class FirefoxSidebarManager {
         console.log('📋 Firefox sidebar opened as popup window');
       } else {
         // Fallback: open in new tab
-        await this.browser.tabs.create({
+        await browser.tabs.create({
           url: sidebarUrl,
           active: true
         });

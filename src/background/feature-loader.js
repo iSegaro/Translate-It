@@ -1,8 +1,7 @@
 // src/background/feature-loader.js
 // Dynamic feature loading based on browser capabilities
 
-import { environment } from "../utils/environment.js";
-import { getBrowserAPI } from "../utils/browser-unified.js";
+import browser from 'webextension-polyfill';
 
 // Static map of listener modules for principled dynamic import
 const listenerModules = {
@@ -57,10 +56,8 @@ export class FeatureLoader {
    * @private
    */
   async _loadTTSManagerImpl() {
-    await environment.initialize();
-
-    const capabilities = environment.getDetectedFeatures();
-    const ttsMethod = environment.getTTSMethod();
+    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { offscreen: true } : { offscreen: false }; // Simplified capability detection
+    const ttsMethod = capabilities.offscreen ? "offscreen-document" : "background-page"; // Simplified TTS method selection
 
     console.log(`🔊 Loading TTS manager with method: ${ttsMethod}`);
 
@@ -160,10 +157,8 @@ export class FeatureLoader {
    * @private
    */
   async _loadPanelManagerImpl() {
-    await environment.initialize();
-
-    const capabilities = environment.getDetectedFeatures();
-    const panelSystem = environment.getPanelSystem();
+    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { sidePanel: true } : { sidePanel: false }; // Simplified capability detection
+    const panelSystem = capabilities.sidePanel ? "side_panel" : "sidebar_action"; // Simplified panel system selection
 
     console.log(`📋 Loading panel manager with system: ${panelSystem}`);
 
@@ -225,12 +220,10 @@ export class FeatureLoader {
    * @private
    */
   async _loadScreenCaptureManagerImpl() {
-    await environment.initialize();
+    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { offscreen: true } : { offscreen: false }; // Simplified capability detection
+    const browserName = browser.runtime.getURL('').startsWith('chrome') ? "chrome" : "firefox"; // Simplified browser detection
 
-    const capabilities = environment.getDetectedFeatures();
-    const browser = environment.getBrowser();
-
-    console.log(`📸 Loading screen capture manager for ${browser}`);
+    console.log(`📸 Loading screen capture manager for ${browserName}`);
 
     try {
       if (capabilities.offscreen && browser === "chrome") {
@@ -323,7 +316,7 @@ export class FeatureLoader {
    * @param {string} listenerName - Name of the listener to load
    * @returns {Promise<Object>} Listener module
    */
-  async loadListener(listenerName, Browser) {
+  async loadListener(listenerName, browser) {
     const cacheKey = `listener-${listenerName}`;
 
     if (this.loadedFeatures.has(cacheKey)) {
@@ -351,7 +344,7 @@ export class FeatureLoader {
       }
       const module = await moduleLoader();
       if (typeof module.initialize === "function") {
-        await module.initialize(Browser);
+        await module.initialize(browser);
       }
       this.loadedFeatures.set(cacheKey, module);
       console.log(`✅ Loaded listener: ${listenerName}`);
@@ -377,11 +370,10 @@ export class FeatureLoader {
 
     console.log("🎧 Loading all listeners...");
 
-    // Get the Browser API once for all listeners
-    const Browser = await getBrowserAPI();
+    // Get the browser API once for all listeners
 
     const results = await Promise.allSettled(
-      listenerNames.map((name) => this.loadListener(name, Browser))
+      listenerNames.map((name) => this.loadListener(name, browser))
     );
 
     const loadedListeners = [];
@@ -409,7 +401,7 @@ export class FeatureLoader {
       loadedFeatures: Array.from(this.loadedFeatures.keys()),
       loadingPromises: Array.from(this.loadingPromises.keys()),
       featureCount: this.loadedFeatures.size,
-      environment: environment.getDebugInfo(),
+      environment: {},
     };
   }
 

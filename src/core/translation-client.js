@@ -3,7 +3,7 @@
  * Handles communication with background translation engine
  */
 
-import { getBrowserAPI } from '../utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { 
   createTranslationRequest,
   createProviderListRequest,
@@ -25,6 +25,91 @@ export class TranslationClient {
     
     this.context = context
     this.requestTimeout = this.getTimeoutForContext(context)
+    this.port = null
+    this.messageCallbacks = new Map() // To store callbacks for pending messages
+    this.messageIdCounter = 0
+    this.readyPromise = new Promise(resolve => { this.resolveReady = resolve }) // NEW: Ready Promise
+    this.connect()
+  }
+
+  /**
+   * Establishes a long-lived connection to the background script.
+   */
+  connect() {
+    if (this.port && this.port.connected) {
+      this.resolveReady() // Resolve if already connected
+      return
+    }
+
+    console.log(`[TranslationClient:${this.context}] Connecting to background script...`)
+    this.port = browser.runtime.connect({ name: `translation-port-${this.context}` })
+
+    this.port.onMessage.addListener(this.handleMessage.bind(this))
+    this.port.onDisconnect.addListener(this.handleDisconnect.bind(this))
+
+    // Send a handshake message and wait for acknowledgment
+    const handshakeTimeout = setTimeout(() => {
+      console.error(`[TranslationClient:${this.context}] Handshake timeout. Disconnecting.`);
+      this.port.disconnect();
+    }, 5000); // 5 seconds for handshake
+
+    this.port.postMessage({ action: 'CONNECTION_READY', context: this.context });
+
+    // Only resolve readyPromise when CONNECTION_ACK is received
+    this.readyPromise = new Promise((resolve, reject) => {
+      const ackListener = (msg) => {
+        if (msg.action === 'CONNECTION_ACK' && msg.context === this.context) {
+          console.log(`[TranslationClient:${this.context}] Received CONNECTION_ACK. Connection established.`);
+          clearTimeout(handshakeTimeout);
+          this.port.onMessage.removeListener(ackListener); // Remove this specific listener
+          resolve();
+        }
+      };
+      this.port.onMessage.addListener(ackListener);
+    });
+
+    console.log(`[TranslationClient:${this.context}] Connected to background script. Waiting for ACK.`) 
+  }
+
+  /**
+   * Handles incoming messages from the background script.
+   * @param {Object} response - The response message.
+   */
+  handleMessage(response) {
+    console.log(`[TranslationClient:${this.context}] Received message from background:`, response)
+    const { messageId, ...data } = response
+    if (this.messageCallbacks.has(messageId)) {
+      const { resolve, reject, timeoutId } = this.messageCallbacks.get(messageId)
+      clearTimeout(timeoutId)
+      this.messageCallbacks.delete(messageId)
+      if (data.success) {
+        resolve(data)
+      } else {
+        const error = new Error(data.error.message || 'Background error')
+        error.type = data.error.type
+        error.code = data.error.code
+        reject(error)
+      }
+    } else {
+      console.warn(`[TranslationClient:${this.context}] Received message with unknown messageId: ${messageId}`, response)
+    }
+  }
+
+  /**
+   * Handles port disconnection.
+   */
+  handleDisconnect() {
+    console.warn(`[TranslationClient:${this.context}] Disconnected from background script. Attempting to reconnect...`)
+    this.port = null
+    // Reset ready promise
+    this.readyPromise = new Promise(resolve => { this.resolveReady = resolve })
+    // Clear all pending messages as they won't be responded to
+    this.messageCallbacks.forEach(({ reject }) => {
+      reject(new Error('Disconnected from background script.'))
+    })
+    this.messageCallbacks.clear()
+    // Attempt to reconnect after a short delay
+    setTimeout(() => this.connect(), 1000)
   }
 
   /**
@@ -127,8 +212,8 @@ export class TranslationClient {
       { id: 'deepseek', name: 'DeepSeek', category: 'ai', needsApiKey: true },
       { id: 'openrouter', name: 'OpenRouter', category: 'ai', needsApiKey: true },
       { id: 'webai', name: 'WebAI to API', category: 'local', needsApiKey: false },
-      { id: 'browser', name: 'Browser Translation', category: 'browser', needsApiKey: false },
-      { id: 'custom', name: 'Custom API', category: 'custom', needsApiKey: true }
+      { id: 'browser', name: 'browser Translation', category: 'browser', needsApiKey: false },
+      { id: 'custom', name: 'Custom API', category: 'ai', needsApiKey: true }
     ]
   }
 
@@ -190,30 +275,26 @@ export class TranslationClient {
    * @returns {Promise<Object>}
    */
   async sendMessage(message) {
-    return new Promise((resolve, reject) => {
-      const sendMessageAsync = async () => {
-        // Set timeout for the request
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`Request timeout (${this.requestTimeout}ms) for context: ${this.context}`))
-        }, this.requestTimeout)
+    // NEW: Await the ready promise before sending
+    await this.readyPromise
 
-        try {
-        // Get browser API
-        const Browser = await getBrowserAPI()
-        
-        console.log(`[TranslationClient:${this.context}] Sending message:`, message)
-        // Send message to background
-        const response = await Browser.runtime.sendMessage(message)
-        console.log(`[TranslationClient:${this.context}] Received response:`, response)
-        clearTimeout(timeoutId)
-        resolve(response)
-      } catch (error) {
-        clearTimeout(timeoutId)
-          reject(error)
-        }
-      }
-      
-      sendMessageAsync()
+    if (!this.port || !this.port.connected) {
+      // This case should ideally not be hit if readyPromise is awaited correctly
+      throw new Error('Port not connected after readyPromise resolved.')
+    }
+
+    const messageId = this.messageIdCounter++
+    const messageWithId = { ...message, messageId }
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.messageCallbacks.delete(messageId)
+        reject(new Error(`Request timeout (${this.requestTimeout}ms) for messageId: ${messageId} in context: ${this.context}`))
+      }, this.requestTimeout)
+
+      this.messageCallbacks.set(messageId, { resolve, reject, timeoutId })
+      console.log(`[TranslationClient:${this.context}] Sending message (via port.postMessage):`, messageWithId)
+      this.port.postMessage(messageWithId)
     })
   }
 

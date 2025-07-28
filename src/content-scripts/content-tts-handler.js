@@ -1,7 +1,7 @@
 // src/content-scripts/content-tts-handler.js
 // Content script TTS handler for fallback TTS functionality
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Content Script TTS Handler
@@ -22,7 +22,7 @@ class ContentTTSHandler {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       this.initialized = true;
       console.log('[ContentTTS] Content script TTS handler initialized');
     } catch (error) {

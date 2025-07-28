@@ -1,6 +1,6 @@
 // src/utils/localization.js
 
-import { Browser } from "@/utils/browser-polyfill.js";
+import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 import { logME } from "./helpers.js";
@@ -29,7 +29,7 @@ function initLocalizationUI() {
     // 2. ایجاد تگ <img> برای نمایش پرچم
     const img = document.createElement("img");
     img.className = "language-flag-image"; // استفاده از کلاسی که در CSS تعریف کردیم
-    img.src = Browser.runtime.getURL(`icons/flags/${lang.flagCode}.svg`);
+        img.src = browser.runtime.getURL(`icons/flags/${lang.flagCode}.svg`);
     img.alt = `${lang.name} flag`; // برای دسترسی‌پذیری بهتر
 
     li.appendChild(img); // ابتدا تصویر پرچم اضافه می‌شود
@@ -45,7 +45,7 @@ function initLocalizationUI() {
       li.classList.add("selected");
       // Persist selection
       // ذخیره زبان انتخاب‌شده برای لوکالایز
-      await Browser.storage.local.set({ APPLICATION_LOCALIZE: lang.locale });
+      await browser.storage.local.set({ APPLICATION_LOCALIZE: lang.locale });
     });
 
     ul.appendChild(li);
@@ -67,7 +67,7 @@ async function setLanguage(locale) {
 
     // --- Send a message to the background script to refresh context menus ---
     logME("[localization] Sending message to refresh context menus for locale:", locale);
-    Browser.runtime.sendMessage({ action: "REFRESH_CONTEXT_MENUS" })
+    browser.runtime.sendMessage({ action: "REFRESH_CONTEXT_MENUS" })
       .catch(err => logME("Error sending REFRESH_CONTEXT_MENUS message:", err.message));
 
   } catch (err) {
@@ -87,7 +87,7 @@ if (typeof document !== "undefined") {
 }
 
 // Listen for storage changes to reapply localization if changed from another context
-Browser.storage.onChanged.addListener((changes, area) => {
+browser.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.APPLICATION_LOCALIZE) {
     const newLocale = changes.APPLICATION_LOCALIZE.newValue;
     // We call app_localize directly here instead of setLanguage to avoid a message loop

@@ -18,7 +18,6 @@ import {
 } from "../config.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import { getTranslationString } from "../utils/i18n.js";
-import { Browser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isComplexEditor } from "../utils/framework-compat/index.js";
@@ -171,7 +170,7 @@ export async function translateFieldViaSmartHandler({
         );
 
         try {
-          const res = await Browser.runtime.sendMessage({
+          const res = await browser.runtime.sendMessage({
             action: "applyTranslationToActiveElement",
             payload: { translatedText: translated, copyOnly: false },
           });

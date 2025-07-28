@@ -82,7 +82,7 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
   
-  // Browser Translation API specific errors
+  // browser Translation API specific errors
   if (msg.includes("translation not available") ||
       msg.includes("language pair not supported") ||
       msg.includes("language not supported"))

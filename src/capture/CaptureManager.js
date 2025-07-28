@@ -1,6 +1,6 @@
 // src/capture/CaptureManager.js
 
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import { getbrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
@@ -169,7 +169,7 @@ export class CaptureManager {
       logME("[CaptureManager] Requesting preview display in content script");
 
       // Get active tab to send preview message
-      const [activeTab] = await getBrowser().tabs.query({ 
+      const [activeTab] = await getbrowser().tabs.query({ 
         active: true, 
         currentWindow: true 
       });
@@ -182,7 +182,7 @@ export class CaptureManager {
       }
 
       // Send preview data to content script
-      await getBrowser().tabs.sendMessage(activeTab.id, {
+      await getbrowser().tabs.sendMessage(activeTab.id, {
         action: "SHOW_CAPTURE_PREVIEW",
         data: {
           captureData,
@@ -241,7 +241,7 @@ export class CaptureManager {
         logME("[CaptureManager] Restarting area capture selection");
         
         // Get active tab to send area selection restart message
-        const [activeTab] = await getBrowser().tabs.query({ 
+        const [activeTab] = await getbrowser().tabs.query({ 
         active: true, 
         currentWindow: true 
       });
@@ -254,7 +254,7 @@ export class CaptureManager {
         }
         
         // Send area selection start message to content script
-        await getBrowser().tabs.sendMessage(activeTab.id, {
+        await getbrowser().tabs.sendMessage(activeTab.id, {
           action: "START_SCREEN_AREA_SELECTION",
           data: this.captureOptions
         });
@@ -340,7 +340,7 @@ export class CaptureManager {
       if (!targetTabId) {
         logME("[CaptureManager] No tab ID found in capture data, trying active tab fallback");
         // Fallback to active tab query
-        const [activeTab] = await getBrowser().tabs.query({ 
+        const [activeTab] = await getbrowser().tabs.query({ 
           active: true, 
           currentWindow: true 
         });
@@ -356,7 +356,7 @@ export class CaptureManager {
       logME("[CaptureManager] Using tab ID for result display:", targetTabId);
 
       // Send result data to content script
-      await getBrowser().tabs.sendMessage(targetTabId, {
+      await getbrowser().tabs.sendMessage(targetTabId, {
         action: "SHOW_CAPTURE_RESULT",
         data: {
           originalCapture: captureData,
@@ -390,7 +390,7 @@ export class CaptureManager {
       logME("[CaptureManager] Capturing screen");
 
       // Get active tab
-      const [activeTab] = await getBrowser().tabs.query({ 
+      const [activeTab] = await getbrowser().tabs.query({ 
         active: true, 
         currentWindow: true 
       });
@@ -403,7 +403,7 @@ export class CaptureManager {
       }
 
       // Capture visible tab
-      const dataUrl = await getBrowser().tabs.captureVisibleTab(activeTab.windowId, {
+      const dataUrl = await getbrowser().tabs.captureVisibleTab(activeTab.windowId, {
         format: "png",
         quality: 100
       });

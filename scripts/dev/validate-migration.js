@@ -15,7 +15,7 @@ const validateMigration = async () => {
     () => validateComponentIntegrity(),
     () => validateStoreIntegration(),
     () => validateExtensionAPIs(),
-    () => validateCrossBrowserCompatibility(),
+    () => validateCrossbrowserCompatibility(),
     () => validateTestCoverage(),
     () => validateBuildSystem()
   ]
@@ -165,7 +165,7 @@ function validateExtensionAPIs() {
   console.log('     Extension APIs validated')
 }
 
-function validateCrossBrowserCompatibility() {
+function validateCrossbrowserCompatibility() {
   console.log('   🌐 Validating cross-browser compatibility...')
   
   // Check manifest files exist (created by webpack build)

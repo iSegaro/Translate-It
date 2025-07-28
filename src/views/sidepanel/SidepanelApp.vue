@@ -23,7 +23,7 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -41,22 +41,8 @@ onMounted(async () => {
   try {
     // Step 1: Set loading text
     console.log('📝 Setting loading text...')
-    const browser = await getBrowserAPI()
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
     console.log('✅ Loading text set')
-    
-    // Step 1.5: Deactivate any active select element mode (similar to OLD implementation)
-    console.log('🔧 Deactivating select element mode if active...')
-    try {
-      await browser.runtime.sendMessage({
-        action: "activateSelectElementMode",
-        data: false,
-      });
-      console.log('✅ Select element mode deactivated')
-    } catch (error) {
-      console.warn('⚠️ Failed to deactivate select element mode:', error)
-      // Don't fail the entire initialization for this
-    }
     
     // Step 2: Load settings store
     console.log('⚙️ Loading settings store...')

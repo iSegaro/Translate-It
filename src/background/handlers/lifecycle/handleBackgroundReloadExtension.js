@@ -1,5 +1,5 @@
 // src/background/handlers/lifecycle/handleBackgroundReloadExtension.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleBackgroundReloadExtension(message, sender, sendRespo
   console.log('[Handler:BACKGROUND_RELOAD_EXTENSION] Processing extension reload request:', message);
   
   try {
-    const Browser = await getBrowserAPI();
     
     console.warn('🔄 [BACKGROUND_RELOAD_EXTENSION] Triggering complete extension reload');
     
@@ -32,7 +31,7 @@ export async function handleBackgroundReloadExtension(message, sender, sendRespo
     setTimeout(async () => {
       try {
         // Reload the extension runtime
-        await Browser.runtime.reload();
+        await browser.runtime.reload();
       } catch (reloadError) {
         console.error('❌ [BACKGROUND_RELOAD_EXTENSION] Reload failed:', reloadError);
         errorHandler.handle(reloadError, {

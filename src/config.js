@@ -1,5 +1,5 @@
 // src/config.js
-import { getBrowserAsync } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -91,8 +91,8 @@ export const CONFIG = {
   CUSTOM_API_KEY: "",
   CUSTOM_API_MODEL: "",
 
-  // --- Browser Translation API Settings (Chrome 138+) ---
-  BROWSER_TRANSLATE_ENABLED: true, // Enable/disable Browser Translation API
+  // --- browser Translation API Settings (Chrome 138+) ---
+  BROWSER_TRANSLATE_ENABLED: true, // Enable/disable browser Translation API
   BROWSER_TRANSLATE_AUTO_DOWNLOAD: true, // Automatically download language packs when needed
 
   // --- Translation Activation Settings ---
@@ -309,8 +309,7 @@ export const getSettingsAsync = async () => {
     return settingsCache;
   }
   // Otherwise, fetch from storage
-  const Browser = await getBrowserAsync();
-  return Browser.storage.local
+  return browser.storage.local
     .get(null)
     .then((items) => {
       // Combine fetched items with defaults to ensure all keys exist
@@ -325,13 +324,13 @@ export const getSettingsAsync = async () => {
     });
 };
 
-export const initializeSettingsListener = async (Browser) => {
-  console.log('[config.js] initializeSettingsListener called, Browser.storage:', Browser.storage);
-  console.log('[config.js] Browser.storage.onChanged:', Browser.storage?.onChanged);
+export const initializeSettingsListener = async (browser) => {
+  console.log('[config.js] initializeSettingsListener called, browser.storage:', browser.storage);
+  console.log('[config.js] browser.storage.onChanged:', browser.storage?.onChanged);
   
-  if (Browser.storage && Browser.storage.onChanged) {
+  if (browser.storage && browser.storage.onChanged) {
     console.log('[config.js] Setting up storage listener...');
-    Browser.storage.onChanged.addListener((changes, areaName) => {
+    browser.storage.onChanged.addListener((changes, areaName) => {
       console.log(`[config.js] Storage change detected: area=${areaName}, changes=`, changes);
       if (areaName === "local" && settingsCache) {
         Object.keys(changes).forEach((key) => {
@@ -352,7 +351,7 @@ export const initializeSettingsListener = async (Browser) => {
     console.log('[config.js] ✅ Storage listener successfully set up');
   } else {
     console.log(
-      "Browser.storage.onChanged not available. Settings cache might become stale."
+      "browser.storage.onChanged not available. Settings cache might become stale."
     );
   }
 };
@@ -582,15 +581,15 @@ export const getREPLACE_SPECIAL_SITESAsync = async () => {
   );
 };
 
-// --- Browser Translation API Getters ---
-export const getBrowserTranslateEnabledAsync = async () => {
+// --- browser Translation API Getters ---
+export const getbrowserTranslateEnabledAsync = async () => {
   return getSettingValueAsync(
     "BROWSER_TRANSLATE_ENABLED", 
     CONFIG.BROWSER_TRANSLATE_ENABLED
   );
 };
 
-export const getBrowserTranslateAutoDownloadAsync = async () => {
+export const getbrowserTranslateAutoDownloadAsync = async () => {
   return getSettingValueAsync(
     "BROWSER_TRANSLATE_AUTO_DOWNLOAD", 
     CONFIG.BROWSER_TRANSLATE_AUTO_DOWNLOAD

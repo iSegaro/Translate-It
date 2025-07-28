@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 
 // Mock browser extension APIs
-const mockBrowser = {
+const mockbrowser = {
   runtime: {
     sendMessage: vi.fn().mockResolvedValue({ success: true }),
     onMessage: {
@@ -36,8 +36,8 @@ const mockBrowser = {
 }
 
 // Make browser available globally
-global.browser = mockBrowser
-global.chrome = mockBrowser
+global.browser = mockbrowser
+global.chrome = mockbrowser
 
 // Mock Web APIs
 global.ResizeObserver = vi.fn(() => ({

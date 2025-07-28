@@ -69,8 +69,8 @@ export class ProviderRegistry {
     },
     {
       id: "browserapi",
-      name: "Browser API",
-      displayName: "Browser Translation",
+      name: "browser API",
+      displayName: "browser Translation",
       icon: "chrome-translate.svg",
       description:
         "Built-in Chrome translation API. Requires Chrome 138+ and works offline.",
@@ -179,11 +179,11 @@ export class ProviderRegistry {
 
   /**
    * Get providers available for current browser
-   * @param {string} [browserName] - Browser name (auto-detected if not provided)
+   * @param {string} [browserName] - browser name (auto-detected if not provided)
    * @returns {Array} Available providers for the browser
    */
   static getAvailableProviders(browserName = null) {
-    const browser = browserName || this._detectBrowser();
+    const browser = browserName || this._detectbrowser();
     logME(
       `[ProviderRegistry] Detecting available providers for browser: ${browser}`
     );
@@ -212,7 +212,7 @@ export class ProviderRegistry {
 
       // Check required features (for Chrome Translation API)
       if (provider.requirements.features.length > 0) {
-        const hasFeatures = this._checkBrowserFeatures(
+        const hasFeatures = this._checkbrowserFeatures(
           provider.requirements.features
         );
         if (!hasFeatures) {
@@ -270,9 +270,9 @@ export class ProviderRegistry {
   /**
    * Detect current browser
    * @private
-   * @returns {string} Browser name
+   * @returns {string} browser name
    */
-  static _detectBrowser() {
+  static _detectbrowser() {
     if (typeof navigator === "undefined") {
       return "chrome"; // Default for extension environment
     }
@@ -318,7 +318,7 @@ export class ProviderRegistry {
    * @param {Array<string>} features - Required features
    * @returns {boolean} True if all features are available
    */
-  static _checkBrowserFeatures(features) {
+  static _checkbrowserFeatures(features) {
     if (typeof globalThis === "undefined") {
       return false;
     }

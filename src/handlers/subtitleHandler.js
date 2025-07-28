@@ -1,5 +1,4 @@
 // src/handlers/subtitleHandler.js
-import { Browser } from "@/utils/browser-polyfill.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { logME } from "../utils/helpers.js";
@@ -215,7 +214,7 @@ export class SubtitleHandler {
       button.title = "Toggle Translate-It Subtitles";
 
       const icon = document.createElement("img");
-      icon.src = Browser.runtime.getURL("icons/extension_icon_48.png");
+      icon.src = browser.runtime.getURL("icons/extension_icon_48.png");
       icon.className = "translate-it-yt-icon";
       button.appendChild(icon);
 
@@ -247,7 +246,7 @@ export class SubtitleHandler {
       const key = "ENABLE_SUBTITLE_TRANSLATION";
       const settings = await getSettingsAsync();
       const currentVal = settings[key] ?? true;
-      await Browser.storage.local.set({ [key]: !currentVal });
+      await browser.storage.local.set({ [key]: !currentVal });
       // The storage listener will trigger the update, but we call this directly for immediate feedback.
       if (this.site === "youtube") {
         this.updateYouTubeButtonState(!currentVal);
@@ -321,7 +320,7 @@ export class SubtitleHandler {
       const subtitleTranslationProvider = {
         translate: async (text, mode) => {
           try {
-            const response = await Browser.runtime.sendMessage({
+            const response = await browser.runtime.sendMessage({
               action: "fetchTranslation",
               payload: { promptText: text, translationMode: mode },
             });

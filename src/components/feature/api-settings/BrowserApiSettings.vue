@@ -1,6 +1,6 @@
 <template>
   <div class="api-info">
-    <h3>{{ $i18n('browser_api_settings_title') || 'Browser Translation' }}</h3>
+    <h3>{{ $i18n('browser_api_settings_title') || 'browser Translation' }}</h3>
     <p class="setting-description">
       {{ $i18n('browser_api_description') || 'Built-in Chrome translation API. Requires Chrome 138+ and works offline.' }}
     </p>
@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-// No specific script logic needed for Browser API as it has no configurable settings
+// No specific script logic needed for browser API as it has no configurable settings
 </script>
 
 <style lang="scss" scoped>

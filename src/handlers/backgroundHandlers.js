@@ -1,6 +1,6 @@
 // src/handlers/backgroundHandlers.js
 
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
@@ -10,7 +10,7 @@ import { getTranslationString } from "../utils/i18n.js";
 
 export async function handleRevertBackground() {
   try {
-    const [tab] = await getBrowser().tabs.query({
+    const [tab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
@@ -19,7 +19,7 @@ export async function handleRevertBackground() {
       return;
     }
     try {
-      await getBrowser().tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: "revertAllAndEscape",
         source: "background",
       });
@@ -79,7 +79,7 @@ export async function handleFetchTranslation(
 
     // ذخیرهٔ آخرین ترجمه در حالت دیکنشری
     if (translateMode === TranslationMode.Dictionary_Translation) {
-      await getBrowser().storage.local.set({
+      await browser.storage.local.set({
         lastTranslation: {
           sourceText: promptText,
           translatedText: translation,
@@ -148,7 +148,7 @@ export async function handleFetchTranslationBackground(
     // if (translationMode !== TranslationMode.SelectElement) {
     // ذخیرهٔ آخرین ترجمه دیکشنری
     if (translationMode === TranslationMode.Dictionary_Translation) {
-      await getBrowser().storage.local.set({
+      await browser.storage.local.set({
         lastTranslation: {
           sourceText: promptText,
           translatedText: translation,

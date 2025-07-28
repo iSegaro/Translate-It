@@ -1,5 +1,5 @@
 // src/background/handlers/common/handleShowOSNotification.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleShowOSNotification(message, sender, sendResponse) {
   console.log('[Handler:show_os_notification] Processing notification request:', message);
   
   try {
-    const Browser = await getBrowserAPI();
     const { title, message: notificationMessage, type = 'basic', iconUrl, buttons } = message.data || {};
     
     if (!title || !notificationMessage) {
@@ -38,7 +37,7 @@ export async function handleShowOSNotification(message, sender, sendResponse) {
     }
     
     // Create the notification
-    const notificationId = await Browser.notifications.create(notificationOptions);
+    const notificationId = await browser.notifications.create(notificationOptions);
     
     console.log(`✅ [show_os_notification] Notification created with ID: ${notificationId}`);
     

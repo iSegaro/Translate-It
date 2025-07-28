@@ -66,7 +66,7 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
 import { languageList } from '@/utils/languages.js'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 // Helper function
 const getLanguageNameByCode = (code) => {

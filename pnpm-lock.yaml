@@ -44,6 +44,9 @@ importers:
       vue-router:
         specifier: ^4.5.1
         version: 4.5.1(vue@3.5.18)
+      webextension-polyfill:
+        specifier: ^0.12.0
+        version: 0.12.0
       xss:
         specifier: ^1.0.15
         version: 1.0.15
@@ -4406,6 +4409,9 @@ packages:
 
   webextension-polyfill@0.10.0:
     resolution: {integrity: sha512-c5s35LgVa5tFaHhrZDnr3FpQpjj1BB+RXhLTYUxGqBVN460HkbM8TBtEqdXWbpTKfzwCcjAZVF7zXCYSKtcp9g==}
+
+  webextension-polyfill@0.12.0:
+    resolution: {integrity: sha512-97TBmpoWJEE+3nFBQ4VocyCdLKfw54rFaJ6EVQYLBCXqCIpLSZkwGgASpv4oPt9gdKCJ80RJlcmNzNn008Ag6Q==}
 
   webidl-conversions@7.0.0:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
@@ -9109,6 +9115,8 @@ snapshots:
       - supports-color
 
   webextension-polyfill@0.10.0: {}
+
+  webextension-polyfill@0.12.0: {}
 
   webidl-conversions@7.0.0: {}
 

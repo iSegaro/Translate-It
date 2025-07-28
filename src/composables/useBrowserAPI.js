@@ -2,62 +2,45 @@
 // Vue composable for reliable browser API access with Vue lifecycle integration
 
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill';
 
 // Global state for API readiness
 const globalApiReady = ref(false)
-const globalBrowserAPI = ref(null)
+const globalbrowserAPI = ref(null)
 const globalReadyPromise = ref(null)
 
 // Singleton initialization
-const initializeBrowserAPI = async () => {
+const initializebrowserAPI = () => {
   if (globalReadyPromise.value) {
     return globalReadyPromise.value
   }
 
   globalReadyPromise.value = new Promise((resolve, reject) => {
-    const initializeAPI = async () => {
+    const init = async () => {
       try {
-        // Multiple retry attempts for sidepanel context
-        let attempts = 0
-        const maxAttempts = 10
-      const retryDelay = 100
+        // With webextension-polyfill, browser is available synchronously.
+        if (browser && browser.storage && browser.runtime) {
+          // Test storage access to ensure API is responsive
+          await browser.storage.local.get(['test'])
 
-      while (attempts < maxAttempts) {
-        try {
-          const browser = await getBrowserAPI()
-          
-          // Verify essential APIs are available
-          if (browser && browser.storage && browser.runtime) {
-            // Test storage access
-            await browser.storage.local.get(['test'])
-            
-            globalBrowserAPI.value = browser
-            globalApiReady.value = true
-            
-            console.log('✅ [useBrowserAPI] Browser API initialized successfully')
-            resolve(browser)
-            return
-          }
-        } catch (error) {
-          console.warn(`[useBrowserAPI] Attempt ${attempts + 1} failed:`, error.message)
+          globalbrowserAPI.value = browser
+          globalApiReady.value = true
+          console.log(
+            '✅ [useBrowserAPI] browser API initialized and verified via webextension-polyfill'
+          )
+          resolve(browser)
+        } else {
+          throw new Error(
+            'browser API from webextension-polyfill is not available or incomplete.'
+          )
         }
-
-        attempts++
-        if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, retryDelay))
-        }
-      }
-
-        throw new Error(`Failed to initialize browser API after ${maxAttempts} attempts`)
       } catch (error) {
-        console.error('❌ [useBrowserAPI] Browser API initialization failed:', error)
+        console.error('❌ [useBrowserAPI] browser API initialization failed:', error)
         globalApiReady.value = false
         reject(error)
       }
     }
-    
-    initializeAPI()
+    init()
   })
 
   return globalReadyPromise.value
@@ -66,14 +49,14 @@ const initializeBrowserAPI = async () => {
 export function useBrowserAPI() {
   // Local state
   const isReady = ref(globalApiReady.value)
-  const api = ref(globalBrowserAPI.value)
+  const api = ref(globalbrowserAPI.value)
   const error = ref('')
   const isLoading = ref(!globalApiReady.value)
 
   // Reactive updates
   const updateState = () => {
     isReady.value = globalApiReady.value
-    api.value = globalBrowserAPI.value
+    api.value = globalbrowserAPI.value
     isLoading.value = !globalApiReady.value
   }
 
@@ -81,7 +64,7 @@ export function useBrowserAPI() {
   onMounted(async () => {
     try {
       if (!globalApiReady.value) {
-        await initializeBrowserAPI()
+        await initializebrowserAPI()
       }
       updateState()
     } catch (err) {
@@ -94,11 +77,11 @@ export function useBrowserAPI() {
   // Ensure browser API is ready before operations
   const ensureReady = async () => {
     if (globalApiReady.value) {
-      return globalBrowserAPI.value
+      return globalbrowserAPI.value
     }
 
     try {
-      return await initializeBrowserAPI()
+      return await initializebrowserAPI()
     } catch (err) {
       error.value = err.message
       throw err
@@ -136,7 +119,7 @@ export function useBrowserAPI() {
         const browser = await ensureReady()
         
         console.log(`[useBrowserAPI] Sending message (attempt ${attempt}/${maxRetries}):`, message.action)
-        console.log(`[useBrowserAPI] Browser API state:`, { initialized: globalApiReady.value, api: !!globalBrowserAPI.value })
+        console.log(`[useBrowserAPI] browser API state:`, { initialized: globalApiReady.value, api: !!globalbrowserAPI.value })
         
         // Use the unified browser API which handles promisification correctly
         // Increase timeout for translation operations which can take longer
@@ -257,4 +240,4 @@ export function useBrowserAPI() {
 }
 
 // Export singleton initialization for direct use
-export { initializeBrowserAPI }
+export { initializebrowserAPI }

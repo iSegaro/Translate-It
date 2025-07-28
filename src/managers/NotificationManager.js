@@ -1,6 +1,6 @@
 // src/managers/NotificationManager.js
 
-import { getBrowserAsync } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
 
@@ -97,7 +97,6 @@ export default class NotificationManager {
   }
 
   async _setupLocaleListener() {
-    const browser = await getBrowserAsync();
     if (browser.storage && browser.storage.onChanged) {
       browser.storage.onChanged.addListener((changes, area) => {
         if (area === "local" && changes.APPLICATION_LOCALIZE) {
@@ -153,7 +152,6 @@ export default class NotificationManager {
     // Step 3: Fallback to a background script notification if in-page is not available or failed.
     logME(`[NotificationManager] In-page not available. Sending notification request to background for: "${msg}"`);
     if (await isExtensionContextValid()) {
-      const browser = await getBrowserAsync();
       browser.runtime.sendMessage({
         action: "show_os_notification",
         payload: { message: msg, title: cfg.title, type: type },

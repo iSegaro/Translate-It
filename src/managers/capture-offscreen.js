@@ -1,7 +1,7 @@
 // src/managers/capture-offscreen.js
 // Chrome offscreen document screen capture manager
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Offscreen Screen Capture Manager for Chrome
@@ -21,9 +21,9 @@ export class OffscreenCaptureManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
-      if (!this.browser.offscreen) {
+      if (!browser.offscreen) {
         throw new Error('Offscreen API not available');
       }
 
@@ -48,7 +48,7 @@ export class OffscreenCaptureManager {
   async createOffscreenDocument() {
     try {
       // Check if offscreen document already exists
-      const existingContexts = await this.browser.runtime.getContexts({
+      const existingContexts = await browser.runtime.getContexts({
         contextTypes: ['OFFSCREEN_DOCUMENT']
       });
 
@@ -59,7 +59,7 @@ export class OffscreenCaptureManager {
       }
 
       // Create new offscreen document for screen capture
-      await this.browser.offscreen.createDocument({
+      await browser.offscreen.createDocument({
         url: 'offscreen.html',
         reasons: ['DOM_SCRAPING', 'BLOBS'],
         justification: 'Screen capture processing and OCR for translation extension'
@@ -93,11 +93,11 @@ export class OffscreenCaptureManager {
       console.log('📸 Capturing visible tab with offscreen processing');
 
       // Capture visible tab
-      const imageData = await this.browser.tabs.captureVisibleTab(captureOptions);
+      const imageData = await browser.tabs.captureVisibleTab(captureOptions);
 
       // Process in offscreen document if needed
       if (options.processInOffscreen) {
-        const response = await this.browser.runtime.sendMessage({
+        const response = await browser.runtime.sendMessage({
           target: 'offscreen',
           action: 'PROCESS_CAPTURE',
           data: {
@@ -137,7 +137,7 @@ export class OffscreenCaptureManager {
       const fullImage = await this.captureVisibleTab(options);
 
       // Process cropping in offscreen document
-      const response = await this.browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         target: 'offscreen',
         action: 'CROP_IMAGE',
         data: {
@@ -174,7 +174,7 @@ export class OffscreenCaptureManager {
     try {
       console.log('🔍 Processing image for OCR in offscreen document');
 
-      const response = await this.browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         target: 'offscreen',
         action: 'OCR_PROCESS',
         data: {
@@ -230,7 +230,7 @@ export class OffscreenCaptureManager {
     try {
       // Close offscreen document if we created it
       if (this.offscreenCreated && this.browser?.offscreen?.closeDocument) {
-        await this.browser.offscreen.closeDocument();
+        await browser.offscreen.closeDocument();
         this.offscreenCreated = false;
       }
 

@@ -62,7 +62,7 @@ export const PROVIDER_REGISTRY = [
   },
   {
     id: 'browser',
-    name: 'Browser Translation',
+    name: 'browser Translation',
     description: 'Built-in browser translation API (Chrome 138+)',
     icon: 'chrome-translate.svg',
     category: PROVIDER_CATEGORIES.BROWSER,

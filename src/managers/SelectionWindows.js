@@ -1,6 +1,5 @@
 // src/managers/SelectionWindows.js
 
-import { Browser } from "@/utils/browser-polyfill.js";
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CONFIG, TranslationMode, getThemeAsync, getSettingsAsync } from "../config.js";
@@ -132,12 +131,12 @@ export default class SelectionWindows {
   _addThemeChangeListener() {
     if (
       !this.themeChangeListener &&
-      Browser.storage &&
-      Browser.storage.onChanged
+      browser.storage &&
+      browser.storage.onChanged
     ) {
       // Store the bound function so it can be correctly removed
       this.boundHandleThemeChange = this._handleThemeChange.bind(this);
-      Browser.storage.onChanged.addListener(this.boundHandleThemeChange);
+      browser.storage.onChanged.addListener(this.boundHandleThemeChange);
       // logME("[SelectionWindows] Theme change listener added.");
     }
   }
@@ -145,10 +144,10 @@ export default class SelectionWindows {
   _removeThemeChangeListener() {
     if (
       this.boundHandleThemeChange &&
-      Browser.storage &&
-      Browser.storage.onChanged
+      browser.storage &&
+      browser.storage.onChanged
     ) {
-      Browser.storage.onChanged.removeListener(this.boundHandleThemeChange);
+      browser.storage.onChanged.removeListener(this.boundHandleThemeChange);
       this.boundHandleThemeChange = null; // Clear the stored listener
       // logME("[SelectionWindows] Theme change listener removed.");
     }
@@ -200,7 +199,7 @@ export default class SelectionWindows {
     this.icon = document.createElement("div");
     this.icon.id = "translate-it-icon";
 
-    const iconUrl = Browser.runtime.getURL("icons/extension_icon_32.png");
+    const iconUrl = browser.runtime.getURL("icons/extension_icon_32.png");
 
     // Calculate position for iframe escape
     const iconPosition = this._calculateCoordsForTopWindow({
@@ -377,7 +376,7 @@ export default class SelectionWindows {
       }
     });
 
-    Browser.runtime
+    browser.runtime
       .sendMessage({
         action: "fetchTranslationBackground",
         payload: { promptText: selectedText, translationMode },
@@ -500,7 +499,7 @@ export default class SelectionWindows {
 
   stoptts_playing() {
     if (isExtensionContextValid()) {
-      Browser.runtime.sendMessage({ action: "stopTTS" });
+      browser.runtime.sendMessage({ action: "stopTTS" });
     }
   }
 
@@ -905,14 +904,14 @@ export default class SelectionWindows {
 
   createTTSIcon(textToSpeak, title = "Speak") {
     const icon = document.createElement("img");
-    icon.src = Browser.runtime.getURL("icons/speaker.png");
+    icon.src = browser.runtime.getURL("icons/speaker.png");
     icon.alt = title;
     icon.title = title;
     icon.classList.add("tts-icon");
     icon.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isExtensionContextValid()) {
-        Browser.runtime.sendMessage({
+        browser.runtime.sendMessage({
           action: "speak",
           text: textToSpeak,
           lang: AUTO_DETECT_VALUE,
@@ -924,7 +923,7 @@ export default class SelectionWindows {
 
   createCopyIcon(textToCopy, title = "Copy") {
     const icon = document.createElement("img");
-    icon.src = Browser.runtime.getURL("icons/copy.png");
+    icon.src = browser.runtime.getURL("icons/copy.png");
     icon.alt = title;
     icon.title = title;
     icon.classList.add("tts-icon"); // Reuse same styling as TTS icon

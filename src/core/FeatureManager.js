@@ -1,5 +1,5 @@
 // src/core/FeatureManager.js
-import { Browser } from "@/utils/browser-polyfill.js";
+import { browser } from "@/utils/browser-polyfill.js";
 import { CONFIG } from "../config.js";
 import { logME } from "../utils/helpers.js";
 
@@ -45,7 +45,7 @@ export default class FeatureManager {
     this._subscribers = {};
 
     // بارگذاری مقادیر فعلی از storage
-    Browser.storage.local
+    browser.storage.local
       .get(Object.keys(this.keyMap))
       .then((stored) => {
         Object.entries(stored).forEach(([storageKey, newValue]) => {
@@ -62,7 +62,7 @@ export default class FeatureManager {
       });
 
     // افزودن listener برای تغییرات آینده
-    Browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
+    browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
   }
 
   /** @param {FeatureKey} flag */

@@ -1,5 +1,5 @@
 // s../error-management/TranslationService.js
-import { getBrowserAPI } from "@/utils/browser-unified.js";
+import browser from 'webextension-polyfill';
 import { TranslationMode } from "@/config.js";
 import { logME } from "@/utils/helpers.js";
 
@@ -18,8 +18,7 @@ export class TranslationService {
     try {
       logME(`[TranslationService] Sending translation request for mode: ${mode}`);
       
-      const Browser = await getBrowserAPI();
-      const response = await Browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         action: "fetchTranslation",
         payload: {
           ...payload,
@@ -27,8 +26,8 @@ export class TranslationService {
         }
       });
 
-      if (Browser.runtime.lastError) {
-        throw new Error(Browser.runtime.lastError.message);
+      if (browser.runtime.lastError) {
+        throw new Error(browser.runtime.lastError.message);
       }
 
       return response;
@@ -62,8 +61,7 @@ export class TranslationService {
     try {
       logME(`[TranslationService] ${active ? 'Activating' : 'Deactivating'} select element mode`);
       
-      const Browser = await getBrowserAPI();
-      await Browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: "activateSelectElementMode",
         data: active
       });
@@ -81,8 +79,7 @@ export class TranslationService {
     try {
       logME("[TranslationService] Sending revert translation request");
       
-      const Browser = await getBrowserAPI();
-      await Browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: "revertTranslation"
       });
     } catch (error) {
@@ -97,8 +94,7 @@ export class TranslationService {
    */
   static async stopTTS() {
     try {
-      const Browser = await getBrowserAPI();
-      await Browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: "stopTTS"
       });
     } catch (error) {

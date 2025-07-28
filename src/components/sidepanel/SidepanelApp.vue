@@ -353,8 +353,8 @@ onMounted(async () => {
     await loadLastTranslation()
     
     // ثبت listener برای پیام‌ها
-    if (browserAPI.Browser?.runtime?.onMessage) {
-      browserAPI.Browser.runtime.onMessage.addListener(handleMessage)
+    if (browserAPI.browser?.runtime?.onMessage) {
+      browserAPI.browser.runtime.onMessage.addListener(handleMessage)
     }
     
     logME('[SidepanelApp] Initialization complete')
@@ -365,8 +365,8 @@ onMounted(async () => {
 
 // Cleanup
 onUnmounted(() => {
-  if (browserAPI.Browser?.runtime?.onMessage) {
-    browserAPI.Browser.runtime.onMessage.removeListener(handleMessage)
+  if (browserAPI.browser?.runtime?.onMessage) {
+    browserAPI.browser.runtime.onMessage.removeListener(handleMessage)
   }
   logME('[SidepanelApp] Sidepanel Vue app unmounted')
 })

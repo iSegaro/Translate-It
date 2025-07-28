@@ -1,5 +1,4 @@
 // src/handlers/ttsHandler.js
-import { Browser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import {
   detectTextLanguage,
@@ -43,13 +42,13 @@ export async function handlePlayGoogleTTS(
     }
 
     const requiredOrigin = "https://translate.google.com/*";
-    const hasPermission = await Browser.permissions.contains({
+    const hasPermission = await browser.permissions.contains({
       origins: [requiredOrigin],
     });
 
     if (!hasPermission) {
       const granted = await new Promise((resolve) => {
-        Browser.permissions.request({ origins: [requiredOrigin] }, resolve);
+        browser.permissions.request({ origins: [requiredOrigin] }, resolve);
       });
       if (!granted) {
         throw new Error("Permission for Google Translate was denied.");

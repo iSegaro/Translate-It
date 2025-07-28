@@ -73,7 +73,7 @@ async function validateChromeExtension() {
     console.log(`├─ ✅ Extension Version: ${manifest.version}`);
     console.log(`└─ ✅ Manifest validation completed\n`);
 
-    // Step 3: Cross-Browser Validation
+    // Step 3: Cross-browser Validation
     console.log('┌─ WEB-EXT CROSS-BROWSER VALIDATION');
     console.log('├─ Running cross-browser compatibility check...');
     

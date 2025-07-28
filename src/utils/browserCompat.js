@@ -1,13 +1,13 @@
 // src/utils/browserCompat.js
-// Browser compatibility utilities
+// browser compatibility utilities
 
 /**
  * Detect if we're running in Firefox
  */
 export async function isFirefox() {
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getBrowserInfo) {
-      const browserInfo = await chrome.runtime.getBrowserInfo();
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getbrowserInfo) {
+      const browserInfo = await chrome.runtime.getbrowserInfo();
       return browserInfo.name.toLowerCase() === 'firefox';
     }
     // Fallback detection for content scripts/UI contexts
@@ -46,7 +46,7 @@ export async function getTTSPlayer() {
       return module;
     }
   } catch (error) {
-    console.error('[BrowserCompat] Error loading TTS player:', error);
+    console.error('[browserCompat] Error loading TTS player:', error);
     // Fallback to chrome implementation
     const module = await import(/* webpackChunkName: "tts-chrome-fallback" */ '../managers/tts-player/tts-player-chrome.js');
     return module;
@@ -66,7 +66,7 @@ export async function getTTSUtils() {
       return module;
     }
   } catch (error) {
-    console.error('[BrowserCompat] Error loading TTS utils:', error);
+    console.error('[browserCompat] Error loading TTS utils:', error);
     // Fallback to chrome implementation
     const module = await import(/* webpackChunkName: "tts-utils-chrome-fallback" */ './tts/tts-chrome.js');
     return module;

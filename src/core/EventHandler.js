@@ -1,5 +1,5 @@
 // src/core/EventHandler.js
-import { Browser } from "@/utils/browser-polyfill.js";
+import { browser } from "@/utils/browser-polyfill.js";
 import {
   getRequireCtrlForTextSelectionAsync,
   state,
@@ -495,7 +495,7 @@ export default class EventHandler {
       }
 
       /* 4) درخواستِ ترجمه به پس‌زمینه */
-      const response = await Browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         action: "fetchTranslationBackground",
         payload: {
           promptText: jsonPayload,

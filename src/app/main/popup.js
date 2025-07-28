@@ -2,18 +2,17 @@ import { createApp } from 'vue'
 import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
-import { browserAPIReady } from '@/utils/browser-polyfill.js'
+import browser from 'webextension-polyfill'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
     // Wait for browser API to be ready
-    const browserAPI = await browserAPIReady
     
     // Ensure browser API is globally available for i18n plugin
     if (typeof window !== 'undefined') {
-      window.browser = browserAPI;
-      window.chrome = browserAPI; // Some plugins expect chrome object
+      window.browser = browser;
+      window.chrome = browser; // Some plugins expect chrome object
     }
 
     // Import i18n plugin after browser API is ready and globally available

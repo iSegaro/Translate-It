@@ -1,4 +1,3 @@
-import '../../public/browser-polyfill.js'
 import { createApp } from 'vue'
 import { pinia } from './store'
 import App from './views/sidepanel/SidepanelApp.vue'

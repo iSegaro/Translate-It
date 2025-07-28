@@ -166,7 +166,7 @@ async function setupProject() {
     console.log('\n📋 Project Information:');
     console.log('   Name: Translate-It Extension');
     console.log('   Type: Cross-browser web extension');
-    console.log('   Browsers: Chrome & Firefox');
+    console.log('   browsers: Chrome & Firefox');
     
     console.log('\n🚀 Available Commands:');
     console.log('   Development:');

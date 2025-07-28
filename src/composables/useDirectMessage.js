@@ -2,7 +2,7 @@
 // Direct message sending without complex wrappers for debugging
 
 import { ref } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 export function useDirectMessage() {
   const isReady = ref(false)
@@ -12,12 +12,10 @@ export function useDirectMessage() {
    */
   const directSendMessage = async (message) => {
     try {
-      console.log('[useDirectMessage] Getting browser API...')
-      const browser = await getBrowserAPI()
-      console.log('[useDirectMessage] Browser API obtained:', !!browser)
+      
       
       if (!browser || !browser.runtime) {
-        throw new Error('Browser API not available')
+        throw new Error('browser API not available')
       }
 
       console.log('[useDirectMessage] Sending direct message:', message)

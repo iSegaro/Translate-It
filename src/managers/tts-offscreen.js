@@ -1,7 +1,7 @@
 // src/managers/tts-offscreen.js
 // Chrome offscreen document TTS implementation
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Offscreen TTS Manager for Chrome
@@ -24,10 +24,10 @@ export class OffscreenTTSManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
       // Check if offscreen API is available
-      if (!this.browser.offscreen) {
+      if (!browser.offscreen) {
         throw new Error('Offscreen API not available');
       }
 
@@ -87,7 +87,7 @@ export class OffscreenTTSManager {
   async createOffscreenDocument() {
     try {
       // Check if offscreen document already exists
-      const existingContexts = await this.browser.runtime.getContexts({
+      const existingContexts = await browser.runtime.getContexts({
         contextTypes: ['OFFSCREEN_DOCUMENT']
       });
 
@@ -98,7 +98,7 @@ export class OffscreenTTSManager {
       }
 
       // Create new offscreen document with absolute path
-      await this.browser.offscreen.createDocument({
+      await browser.offscreen.createDocument({
         url: 'html/offscreen.html',
         reasons: ['AUDIO_PLAYBACK'],
         justification: 'TTS audio playback for translation extension'
@@ -118,7 +118,7 @@ export class OffscreenTTSManager {
       
       // Try alternative approach
       try {
-        await this.browser.offscreen.createDocument({
+        await browser.offscreen.createDocument({
           url: chrome.runtime.getURL('html/offscreen.html'),
           reasons: ['AUDIO_PLAYBACK'], 
           justification: 'TTS audio playback for translation extension'
@@ -153,7 +153,7 @@ export class OffscreenTTSManager {
       console.log('🔍 Testing offscreen document connection...');
       
       const response = await Promise.race([
-        this.browser.runtime.sendMessage({
+        browser.runtime.sendMessage({
           action: 'TTS_TEST',
           target: 'offscreen',
           timestamp: Date.now() // Add timestamp for request tracking
@@ -201,13 +201,13 @@ export class OffscreenTTSManager {
       
       // Close existing offscreen document if it exists
       try {
-        const existingContexts = await this.browser.runtime.getContexts({
+        const existingContexts = await browser.runtime.getContexts({
           contextTypes: ['OFFSCREEN_DOCUMENT']
         });
         
         if (existingContexts.length > 0) {
           console.log('🗑️ Closing existing unresponsive offscreen document');
-          await this.browser.offscreen.closeDocument();
+          await browser.offscreen.closeDocument();
           // Small delay to ensure cleanup
           await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -282,7 +282,7 @@ export class OffscreenTTSManager {
 
         // Send message to offscreen document with explicit target and timeout
         const response = await Promise.race([
-          this.browser.runtime.sendMessage({
+          browser.runtime.sendMessage({
             action: 'TTS_SPEAK',
             target: 'offscreen', // Explicitly target offscreen context
             data: ttsOptions,
@@ -352,7 +352,7 @@ export class OffscreenTTSManager {
     try {
       // Stop speech in offscreen document with timeout
       await Promise.race([
-        this.browser.runtime.sendMessage({
+        browser.runtime.sendMessage({
           action: 'TTS_STOP',
           target: 'offscreen',
           timestamp: Date.now()
@@ -400,7 +400,7 @@ export class OffscreenTTSManager {
       const audioData = Array.from(new Uint8Array(arrayBuffer));
 
       // Send cached audio to offscreen document
-      const response = await this.browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         action: 'TTS_PLAY_CACHED_AUDIO',
         target: 'offscreen',
         data: { audioData }
@@ -426,7 +426,7 @@ export class OffscreenTTSManager {
     if (!this.initialized || !this.currentSpeech) return;
 
     try {
-      await this.browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         target: 'offscreen',
         action: 'TTS_PAUSE'
       });
@@ -446,7 +446,7 @@ export class OffscreenTTSManager {
     if (!this.initialized) return;
 
     try {
-      await this.browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         target: 'offscreen',
         action: 'TTS_RESUME'
       });
@@ -468,7 +468,7 @@ export class OffscreenTTSManager {
     }
 
     try {
-      const response = await this.browser.runtime.sendMessage({
+      const response = await browser.runtime.sendMessage({
         target: 'offscreen',
         action: 'TTS_GET_VOICES'
       });
@@ -534,7 +534,7 @@ export class OffscreenTTSManager {
       
       // Close offscreen document if we created it
       if (this.offscreenCreated && this.browser?.offscreen?.closeDocument) {
-        await this.browser.offscreen.closeDocument();
+        await browser.offscreen.closeDocument();
         this.offscreenCreated = false;
       }
 
@@ -559,7 +559,7 @@ export class OffscreenTTSManager {
       
       // Send TTS request through MessageRouter to content script handler
       const response = await Promise.race([
-        this.browser.runtime.sendMessage({
+        browser.runtime.sendMessage({
           action: 'TTS_SPEAK_CONTENT',
           data: {
             text: text,
@@ -595,7 +595,7 @@ export class OffscreenTTSManager {
         const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx&ttsspeed=${options.rate || 1}`;
         
         // Send URL to offscreen for audio playback
-        const response = await this.browser.runtime.sendMessage({
+        const response = await browser.runtime.sendMessage({
           action: 'playOffscreenAudio',
           target: 'offscreen',
           url: googleTTSUrl

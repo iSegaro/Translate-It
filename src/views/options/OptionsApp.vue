@@ -23,7 +23,7 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { loadSettingsModules } from '@/utils/settings-modules.js'
 
 // Stores
@@ -42,7 +42,6 @@ onMounted(async () => {
   try {
     // Step 1: Set loading text
     console.log('📝 Setting loading text...')
-    const browser = await getBrowserAPI()
     loadingText.value = browser.i18n.getMessage('options_loading') || 'Loading Settings...'
     console.log('✅ Loading text set')
     

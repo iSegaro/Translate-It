@@ -174,7 +174,7 @@ export function useApiProvider() {
         })
         console.log('[useApiProvider] Storage listener setup successful')
       } else {
-        console.warn('[useApiProvider] Browser storage API not available')
+        console.warn('[useApiProvider] browser storage API not available')
       }
     } catch (error) {
       console.error('[useApiProvider] Error setting up storage listener:', error)

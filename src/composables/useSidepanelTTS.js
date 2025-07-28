@@ -1,7 +1,7 @@
 // src/composables/useSidepanelTTS.js
 // Simple TTS composable for sidepanel (matches original functionality)
 import { ref } from 'vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 
 export function useSidepanelTTS() {
@@ -19,7 +19,7 @@ export function useSidepanelTTS() {
       isSpeaking.value = true
       ttsError.value = ''
       
-      const browser = await getBrowserAPI()
+      const browser = browser
       await browser.runtime.sendMessage({ 
         action: 'speak', 
         text: text.trim(), 
@@ -42,7 +42,7 @@ export function useSidepanelTTS() {
   // Stop current TTS playback
   const stopTTS = async () => {
     try {
-      const browser = await getBrowserAPI()
+      const browser = browser
       await browser.runtime.sendMessage({ action: 'stopTTS' })
       isSpeaking.value = false
       return true

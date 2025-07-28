@@ -33,7 +33,7 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageControls from '@/components/popup/LanguageControls.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/theme.js'
 
 // Stores
@@ -52,7 +52,6 @@ onMounted(async () => {
   try {
     // Step 1: Set loading text
     console.log('📝 Setting loading text...')
-    const browser = await getBrowserAPI()
     loadingText.value = browser.i18n.getMessage('popup_loading') || 'Loading Popup...'
     console.log('✅ Loading text set')
     

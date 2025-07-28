@@ -5,7 +5,7 @@
 // Note: safeSendMessage is passed as an argument
 
 // src/handlers/getSelectedTextHandler.js
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
@@ -17,7 +17,7 @@ export async function handleGetSelectedText(
 ) {
   logME("[Handler:GetSelectedText] Handling request.");
   try {
-    const tabs = await getBrowser().tabs.query({
+    const tabs = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });

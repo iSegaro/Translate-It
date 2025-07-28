@@ -170,7 +170,7 @@ const providerDetails = {
   },
   webai: {
     name: 'Web AI',
-    description: 'Browser-based AI translation using local models.',
+    description: 'browser-based AI translation using local models.',
     requiresKey: false,
     requiresUrl: false,
     requiresModel: false

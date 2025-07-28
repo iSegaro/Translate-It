@@ -1,4 +1,4 @@
-// src/core/providers/BrowserTranslateProvider.js
+// src/core/providers/browserTranslateProvider.js
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
@@ -6,11 +6,11 @@ import { isPersianText } from "../../utils/textDetection.js";
 const AUTO_DETECT_VALUE = 'auto';
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { TranslationMode } from "../../config.js";
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
-// Language code mapping for Browser Translation API (BCP 47 format)
+// Language code mapping for browser Translation API (BCP 47 format)
 const langNameToCodeMap = {
   afrikaans: "af",
   albanian: "sq", 
@@ -61,16 +61,16 @@ const langNameToCodeMap = {
   vietnamese: "vi",
 };
 
-export class BrowserTranslateProvider extends BaseTranslationProvider {
+export class browserTranslateProvider extends BaseTranslationProvider {
   static detector = null;
   static translators = {};
 
   constructor() {
-    super("BrowserTranslate");
+    super("browserTranslate");
   }
 
   /**
-   * Check if Browser Translation APIs are available
+   * Check if browser Translation APIs are available
    * @returns {boolean} - True if APIs are available
    */
   _isAPIAvailable() {
@@ -130,32 +130,32 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     // Try Chrome's built-in LanguageDetector first
     if (typeof globalThis.LanguageDetector !== 'undefined') {
       try {
-        if (!BrowserTranslateProvider.detector) {
-          BrowserTranslateProvider.detector = await globalThis.LanguageDetector.create();
+        if (!browserTranslateProvider.detector) {
+          browserTranslateProvider.detector = await globalThis.LanguageDetector.create();
         }
-        const results = await BrowserTranslateProvider.detector.detect(text);
+        const results = await browserTranslateProvider.detector.detect(text);
         
         if (results && results.length > 0 && results[0].confidence > 0.5) {
           detectedLangCode = results[0].detectedLanguage;
         }
       } catch (detectorError) {
-        logME(`[${this.providerName}] LanguageDetector failed for swapping, trying Browser.i18n fallback:`, detectorError);
+        logME(`[${this.providerName}] LanguageDetector failed for swapping, trying browser.i18n fallback:`, detectorError);
       }
     }
     
-    // Fallback to Browser.i18n.detectLanguage if LanguageDetector failed
+    // Fallback to browser.i18n.detectLanguage if LanguageDetector failed
     if (!detectedLangCode) {
       try {
-        logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage for swapping...`);
-        const detectionResult = await getBrowser().i18n.detectLanguage(text);
-        logME(`[${this.providerName}] Browser.i18n.detectLanguage swapping result:`, detectionResult);
+        logME(`[${this.providerName}] Trying browser.i18n.detectLanguage for swapping...`);
+        const detectionResult = await browser.i18n.detectLanguage(text);
+        logME(`[${this.providerName}] browser.i18n.detectLanguage swapping result:`, detectionResult);
         if (detectionResult?.languages && detectionResult.languages.length > 0) {
           detectedLangCode = detectionResult.languages[0].language.split("-")[0];
           const percentage = detectionResult.languages[0].percentage || 0;
           logME(`[${this.providerName}] Detected language for swapping: ${detectedLangCode} (${percentage}% confidence, reliable: ${detectionResult.isReliable})`);
         }
       } catch (i18nError) {
-        logME(`[${this.providerName}] Browser.i18n.detectLanguage failed for swapping:`, i18nError);
+        logME(`[${this.providerName}] browser.i18n.detectLanguage failed for swapping:`, i18nError);
       }
     }
     
@@ -203,7 +203,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
   }
 
   /**
-   * Detect language using Browser Language Detector API
+   * Detect language using browser Language Detector API
    * @param {string} text - Text to detect language for
    * @param {string} sourceLang - Original source language
    * @returns {Promise<string>} - Detected language code
@@ -217,11 +217,11 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     try {
       if (typeof globalThis.LanguageDetector !== 'undefined') {
         // Create detector if not exists
-        if (!BrowserTranslateProvider.detector) {
-          BrowserTranslateProvider.detector = await globalThis.LanguageDetector.create();
+        if (!browserTranslateProvider.detector) {
+          browserTranslateProvider.detector = await globalThis.LanguageDetector.create();
         }
 
-        const results = await BrowserTranslateProvider.detector.detect(text);
+        const results = await browserTranslateProvider.detector.detect(text);
         
         if (results && results.length > 0 && results[0].confidence > 0.5) {
           logME(`[${this.providerName}] Language detected using LanguageDetector: ${results[0].detectedLanguage}`);
@@ -229,25 +229,25 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
         }
       }
     } catch (error) {
-      logME(`[${this.providerName}] LanguageDetector failed (${error.message}), falling back to Browser.i18n.detectLanguage`);
+      logME(`[${this.providerName}] LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage`);
     }
 
-    // Fallback to Browser.i18n.detectLanguage (available in all Chrome versions)
+    // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
     try {
-      logME(`[${this.providerName}] Trying Browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
-      const detectionResult = await getBrowser().i18n.detectLanguage(text);
-      logME(`[${this.providerName}] Browser.i18n.detectLanguage result:`, detectionResult);
+      logME(`[${this.providerName}] Trying browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
+      const detectionResult = await browser.i18n.detectLanguage(text);
+      logME(`[${this.providerName}] browser.i18n.detectLanguage result:`, detectionResult);
       
       if (detectionResult?.languages && detectionResult.languages.length > 0) {
         const detectedLang = detectionResult.languages[0].language.split("-")[0];
         const percentage = detectionResult.languages[0].percentage || 0;
-        logME(`[${this.providerName}] Language detected using Browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})`);
+        logME(`[${this.providerName}] Language detected using browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})`);
         return detectedLang;
       } else {
-        logME(`[${this.providerName}] Browser.i18n.detectLanguage result empty`);
+        logME(`[${this.providerName}] browser.i18n.detectLanguage result empty`);
       }
     } catch (error) {
-      logME(`[${this.providerName}] Browser.i18n.detectLanguage failed:`, error);
+      logME(`[${this.providerName}] browser.i18n.detectLanguage failed:`, error);
     }
 
     // Final fallback to regex detection
@@ -267,8 +267,8 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
   async _getTranslator(sourceLang, targetLang) {
     const translatorKey = `${sourceLang}-${targetLang}`;
     
-    if (BrowserTranslateProvider.translators[translatorKey]) {
-      return BrowserTranslateProvider.translators[translatorKey];
+    if (browserTranslateProvider.translators[translatorKey]) {
+      return browserTranslateProvider.translators[translatorKey];
     }
 
     // Check availability first
@@ -298,7 +298,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     });
 
     // Cache the translator
-    BrowserTranslateProvider.translators[translatorKey] = translator;
+    browserTranslateProvider.translators[translatorKey] = translator;
     return translator;
   }
 
@@ -327,8 +327,8 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
     }
 
     // --- Language Code Conversion ---
-    // For BrowserTranslateProvider, we need to handle AUTO_DETECT_VALUE differently
-    // than GoogleTranslateProvider because Browser API works with specific language codes
+    // For browserTranslateProvider, we need to handle AUTO_DETECT_VALUE differently
+    // than GoogleTranslateProvider because browser API works with specific language codes
     let sourceLanguageCode, targetLanguageCode;
     
     if (sourceLang === AUTO_DETECT_VALUE) {
@@ -444,7 +444,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
       try {
         this.detector.destroy();
       } catch (error) {
-        logME("[BrowserTranslate] Error destroying detector:", error);
+        logME("[browserTranslate] Error destroying detector:", error);
       }
       this.detector = null;
     }
@@ -455,7 +455,7 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
         try {
           this.translators[key].destroy();
         } catch (error) {
-          logME(`[BrowserTranslate] Error destroying translator ${key}:`, error);
+          logME(`[browserTranslate] Error destroying translator ${key}:`, error);
         }
         delete this.translators[key];
       }
@@ -466,6 +466,6 @@ export class BrowserTranslateProvider extends BaseTranslationProvider {
    * Reset session context (override parent method)
    */
   resetSessionContext() {
-    BrowserTranslateProvider.cleanup();
+    browserTranslateProvider.cleanup();
   }
 }

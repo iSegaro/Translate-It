@@ -81,7 +81,7 @@ export function generateManifest(browser = 'chrome') {
     }
   };
 
-  // Browser-specific configurations
+  // browser-specific configurations
   if (browser === 'firefox') {
     return generateFirefoxManifest(baseManifest);
   } else {
@@ -231,9 +231,9 @@ function generateFirefoxManifest(baseManifest) {
 /**
  * Get browser-specific manifest fields
  * @param {string} browser - Target browser
- * @returns {Object} Browser-specific fields
+ * @returns {Object} browser-specific fields
  */
-export function getBrowserSpecificFields(browser) {
+export function getbrowserSpecificFields(browser) {
   if (browser === 'firefox') {
     return {
       panelKey: 'sidebar_action',
@@ -278,7 +278,7 @@ export function validateManifest(manifest, browser) {
     errors.push(`Expected manifest_version 3, got ${manifest.manifest_version}`);
   }
 
-  // Browser-specific validations
+  // browser-specific validations
   if (browser === 'firefox') {
     if (!manifest.browser_specific_settings?.gecko?.id) {
       errors.push('Firefox manifest missing browser_specific_settings.gecko.id');

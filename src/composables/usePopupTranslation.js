@@ -1,8 +1,8 @@
 // Lightweight translation composable specifically for popup
 // Simplified version without heavy dependencies
 import { ref, computed } from 'vue'
+import browser from 'webextension-polyfill'
 import { useSettingsStore } from '@/store/core/settings.js'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
 
 export function usePopupTranslation() {
   // State
@@ -27,8 +27,6 @@ export function usePopupTranslation() {
     translationError.value = ''
 
     try {
-      const browser = await getBrowserAPI()
-      
       // Send translation request to background
       const response = await browser.runtime.sendMessage({
         action: 'TRANSLATE',

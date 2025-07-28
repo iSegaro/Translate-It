@@ -89,7 +89,7 @@ import { useUI } from '@/composables/useUI.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useHistory } from '@/composables/useHistory.js'
 import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 // Import icons statically to ensure they're bundled
 import googleIcon from '@/assets/icons/api-providers/google.svg'
@@ -206,7 +206,6 @@ const handleSelectElement = async () => {
 // Handle revert action button click
 const handleRevertAction = async () => {
   try {
-    const browser = await getBrowserAPI()
     await browser.runtime.sendMessage({
       action: 'revertLastAction'
     })
@@ -290,7 +289,6 @@ const handleHistoryClick = () => {
 // Handle settings button click
 const handleSettingsClick = async () => {
   try {
-    const browser = await getBrowserAPI()
     await browser.runtime.openOptionsPage()
 
     const button = document.getElementById('settingsBtn')

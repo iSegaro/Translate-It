@@ -1,7 +1,7 @@
 // src/background/handlers/tts/handleTTSOffscreen.js
 // Handler for offscreen document TTS operations
 
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -22,7 +22,6 @@ export const handleTTSOffscreen = async (request, sender) => {
     console.log('[TTSOffscreenHandler] 🎯 Processing offscreen TTS request:', request.action);
     console.log('[TTSOffscreenHandler] 📨 Request data:', request.data ? 'Present' : 'Missing');
 
-    const browser = await getBrowserAPI();
     
     // Forward message to offscreen document with explicit target
     const forwardedMessage = {

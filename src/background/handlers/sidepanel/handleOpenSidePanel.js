@@ -1,5 +1,5 @@
 // src/background/handlers/sidepanel/handleOpenSidePanel.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,28 +17,27 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
   console.log('[Handler:OPEN_SIDE_PANEL] Processing side panel open request:', message.data);
   
   try {
-    const Browser = await getBrowserAPI();
     const { tabId, windowId } = message.data || {};
     const targetTabId = tabId || sender.tab?.id;
     const targetWindowId = windowId || sender.tab?.windowId;
     
     // Check if sidePanel API is available (Chrome)
-    if (Browser.sidePanel) {
+    if (browser.sidePanel) {
       // Use Chrome's native side panel
       if (targetTabId) {
-        await Browser.sidePanel.open({ tabId: targetTabId });
+        await browser.sidePanel.open({ tabId: targetTabId });
       } else if (targetWindowId) {
-        await Browser.sidePanel.open({ windowId: targetWindowId });
+        await browser.sidePanel.open({ windowId: targetWindowId });
       } else {
-        await Browser.sidePanel.open({});
+        await browser.sidePanel.open({});
       }
-    } else if (Browser.sidebarAction) {
+    } else if (browser.sidebarAction) {
       // Use Firefox's sidebar action
-      await Browser.sidebarAction.open();
+      await browser.sidebarAction.open();
     } else {
       // Fallback: open options page in new tab
-      await Browser.tabs.create({
-        url: Browser.runtime.getURL('/pages/sidepanel.html'),
+      await browser.tabs.create({
+        url: browser.runtime.getURL('/pages/sidepanel.html'),
         active: true
       });
     }

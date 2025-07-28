@@ -64,7 +64,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Stores
@@ -76,7 +76,6 @@ const excludeCurrentPage = ref(false)
 // Methods
 const handleTranslatePage = async () => {
   try {
-    const browser = await getBrowserAPI()
     const [activeTab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
@@ -94,7 +93,6 @@ const handleTranslatePage = async () => {
 
 const handleOpenSidePanel = async () => {
   try {
-    const browser = await getBrowserAPI()
     
     // For Chrome, find the current tab and open its side panel
     if (browser.sidePanel) {
@@ -120,7 +118,6 @@ const handleOpenSidePanel = async () => {
 
 const handleSelectElement = async () => {
   try {
-    const browser = await getBrowserAPI()
     await browser.runtime.sendMessage({
       action: "activateSelectElementMode",
       data: true,
@@ -147,7 +144,6 @@ const handleRevert = () => {
 
 const handleOpenSettings = async () => {
   try {
-    const browser = await getBrowserAPI()
     await browser.runtime.openOptionsPage()
     window.close()
   } catch (error) {
@@ -157,7 +153,6 @@ const handleOpenSettings = async () => {
 
 const handleExcludeToggle = async () => {
   try {
-    const browser = await getBrowserAPI()
     const [activeTab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
@@ -180,7 +175,6 @@ const handleExcludeToggle = async () => {
 // Initialize exclude status
 onMounted(async () => {
   try {
-    const browser = await getBrowserAPI()
     const [activeTab] = await browser.tabs.query({
       active: true,
       currentWindow: true,

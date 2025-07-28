@@ -1,6 +1,6 @@
 // src/listeners/onContextMenu.js
 
-import { getBrowserAsync } from "@/utils/browser-polyfill.js";
+import browser from "webextension-polyfill";
 import { logME, focusOrCreateTab } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { getTranslationApiAsync } from "../config.js";
@@ -18,16 +18,16 @@ const COMMAND_NAME = "toggle-select-element";
 // --- Get API Providers from Registry ---
 function getApiProviders() {
   const availableProviders = getSupportedProviders();
-  return availableProviders.map(provider => ({
+  return availableProviders.map((provider) => ({
     id: provider.id,
     i18nKey: `api_provider_${provider.id}`,
-    defaultTitle: provider.name
+    defaultTitle: provider.name,
   }));
 }
 
-export async function setupContextMenus(Browser) {
+export async function setupContextMenus(browser) {
   // Clear all previous context menus to prevent duplicate errors
-  await Browser.contextMenus.removeAll();
+  await browser.contextMenus.removeAll();
   logME("[ContextMenuSetup] All previous context menus removed.");
 
   // Get the currently active API to set the 'checked' state
@@ -38,12 +38,12 @@ export async function setupContextMenus(Browser) {
     let pageMenuTitle =
       (await getTranslationString("context_menu_translate_with_selection")) ||
       "Translate Element";
-    const commands = await Browser.commands.getAll();
+    const commands = await browser.commands.getAll();
     const command = commands.find((c) => c.name === COMMAND_NAME);
     if (command && command.shortcut) {
       pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
     }
-    Browser.contextMenus.create({
+    browser.contextMenus.create({
       id: PAGE_CONTEXT_MENU_ID,
       title: pageMenuTitle,
       contexts: ["page", "selection", "link", "image", "video", "audio"],
@@ -55,17 +55,17 @@ export async function setupContextMenus(Browser) {
     logME("Error creating page context menu:", e);
   }
 
-  // --- 2. Create Action (Browser Action) Context Menus ---
+  // --- 2. Create Action (browser Action) Context Menus ---
   try {
     // --- Options Menu ---
-    Browser.contextMenus.create({
+    browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_OPTIONS_ID,
       title: (await getTranslationString("context_menu_options")) || "Options",
       contexts: ["action"],
     });
 
     // --- API Provider Parent Menu ---
-    Browser.contextMenus.create({
+    browser.contextMenus.create({
       id: API_PROVIDER_PARENT_ID,
       title:
         (await getTranslationString("context_menu_api_provider")) ||
@@ -76,7 +76,7 @@ export async function setupContextMenus(Browser) {
     // --- API Provider Sub-Menus (Radio Buttons) ---
     const apiProviders = getApiProviders();
     for (const provider of apiProviders) {
-      Browser.contextMenus.create({
+      browser.contextMenus.create({
         id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
         parentId: API_PROVIDER_PARENT_ID,
         title:
@@ -92,7 +92,7 @@ export async function setupContextMenus(Browser) {
     );
 
     // --- Other Action Menus ---
-    Browser.contextMenus.create({
+    browser.contextMenus.create({
       id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
       title:
         (await getTranslationString("context_menu_shortcuts")) ||
@@ -100,7 +100,7 @@ export async function setupContextMenus(Browser) {
       contexts: ["action"],
     });
 
-    Browser.contextMenus.create({
+    browser.contextMenus.create({
       id: HELP_MENU_ID,
       title:
         (await getTranslationString("context_menu_help")) || "Help & Support",
@@ -112,14 +112,14 @@ export async function setupContextMenus(Browser) {
   }
 }
 
-async function deactivateSelectElementModeInAllTabs(Browser) {
+async function deactivateSelectElementModeInAllTabs(browser) {
   try {
-    const tabs = await Browser.tabs.query({});
+    const tabs = await browser.tabs.query({});
     for (const tab of tabs) {
       if (tab.id) {
         // We send the message but don't wait for a response.
         // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
-        Browser.tabs
+        browser.tabs
           .sendMessage(tab.id, {
             action: "TOGGLE_SELECT_ELEMENT_MODE",
             data: false, // `false` signals deactivation
@@ -137,9 +137,9 @@ async function deactivateSelectElementModeInAllTabs(Browser) {
   }
 }
 
-export async function initialize(Browser) {
+export async function initialize(browser) {
   // Listener for when a context menu item is clicked.
-  Browser.contextMenus.onClicked.addListener(async (info, tab) => {
+  browser.contextMenus.onClicked.addListener(async (info, tab) => {
     logME(`[ContextMenu] Clicked menu item: ${info.menuItemId}`);
 
     // --- شناسایی و مدیریت کلیک روی منوی آیکون افزونه (Action Context) ---
@@ -154,84 +154,88 @@ export async function initialize(Browser) {
 
     // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
     if (isApiProviderClick || isStaticActionClick) {
-      await deactivateSelectElementModeInAllTabs(Browser);
+      await deactivateSelectElementModeInAllTabs(browser);
     }
 
     // --- Handler for API Provider selection ---
     if (isApiProviderClick) {
       const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
-      if (Browser.storage && Browser.storage.local) {
+      if (browser.storage && browser.storage.local) {
         try {
-          await Browser.storage.local.set({ TRANSLATION_API: newApiId });
+          await browser.storage.local.set({ TRANSLATION_API: newApiId });
           logME(`[ContextMenu] API Provider changed to: ${newApiId}`);
         } catch (e) {
           logME(`[ContextMenu] Error setting new API provider:`, e);
         }
       } else {
-        logME(`[ContextMenu] Browser.storage.local is not available. Cannot set API provider.`);
-      }
-      return; // Stop further processing
-    }
-
-    // --- Handler for other menu items ---
-    switch (info.menuItemId) {
-      case PAGE_CONTEXT_MENU_ID:
-        if (tab && tab.id) {
-          // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
-          Browser.tabs
-            .sendMessage(tab.id, {
-              action: "TOGGLE_SELECT_ELEMENT_MODE",
-              data: true,
-            })
-            .catch((err) => {
-              logME(
-                `[ContextMenu] Could not send message to tab ${tab.id}:`,
-                err.message
-              );
-            });
-        }
-        break;
-      case ACTION_CONTEXT_MENU_OPTIONS_ID:
-        focusOrCreateTab(Browser.runtime.getURL("html/options.html"));
-        break;
-      case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
-        try {
-          const browserInfo = await Browser.runtime.getBrowserInfo();
-          const url =
-            browserInfo.name === "Firefox" ?
-              "html/options.html#help=shortcut"
-            : "chrome://extensions/shortcuts";
-          Browser.tabs.create({ url });
-        } catch (e) {
-          logME(
-            "Could not determine browser type, opening for Chrome as default.",
-            e
-          );
-          Browser.tabs.create({ url: "chrome://extensions/shortcuts" });
-        }
-        break;
-      case HELP_MENU_ID:
-        focusOrCreateTab(Browser.runtime.getURL("html/options.html#help"));
-        break;
-    }
-  });
-
-  /**
-   * Listener to keep the context menu synchronized with storage changes.
-   * This runs if the user changes the API from the options page.
-   */
-  if (Browser.storage && Browser.storage.onChanged) {
-    Browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === "local" && changes.TRANSLATION_API) {
         logME(
-          "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+          `[ContextMenu] browser.storage.local is not available. Cannot set API provider.`
         );
-        setupContextMenus(Browser);
+        return; // Stop further processing
       }
-    });
-  } else {
-    logME(`[ContextMenu] Browser.storage.onChanged is not available. Cannot synchronize context menus.`);
-  }
 
-  logME("[ContextMenu] Listeners are active.");
+      // --- Handler for other menu items ---
+      switch (info.menuItemId) {
+        case PAGE_CONTEXT_MENU_ID:
+          if (tab && tab.id) {
+            // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
+            browser.tabs
+              .sendMessage(tab.id, {
+                action: "TOGGLE_SELECT_ELEMENT_MODE",
+                data: true,
+              })
+              .catch((err) => {
+                logME(
+                  `[ContextMenu] Could not send message to tab ${tab.id}:`,
+                  err.message
+                );
+              });
+          }
+          break;
+        case ACTION_CONTEXT_MENU_OPTIONS_ID:
+          focusOrCreateTab(browser.runtime.getURL("html/options.html"));
+          break;
+        case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
+          try {
+            const platformInfo = await browser.runtime.getPlatformInfo();
+            const url =
+              platformInfo.os === "mac" ?
+                "html/options.html#help=shortcut"
+              : "chrome://extensions/shortcuts";
+            browser.tabs.create({ url });
+          } catch (e) {
+            logME(
+              "Could not determine browser type, opening for Chrome as default.",
+              e
+            );
+            browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+          }
+          break;
+        case HELP_MENU_ID:
+          focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
+          break;
+      }
+    }
+
+    /**
+     * Listener to keep the context menu synchronized with storage changes.
+     * This runs if the user changes the API from the options page.
+     */
+    if (browser.storage && browser.storage.onChanged) {
+      browser.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === "local" && changes.TRANSLATION_API) {
+          logME(
+            "[ContextMenu] TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+          );
+          setupContextMenus(browser);
+        }
+      });
+    } else {
+      logME(
+        `[ContextMenu] browser.storage.onChanged is not available. Cannot synchronize context menus.`
+      );
+    }
+
+    logME("[ContextMenu] Listeners are active.");
+  });
 }

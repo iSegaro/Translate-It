@@ -56,7 +56,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import ThemeSelector from './components/ThemeSelector.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
-import { getBrowserAPI } from '@/utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 import { useLanguages } from '@/composables/useLanguages.js' // Import useLanguages
 
 const settingsStore = useSettingsStore()
@@ -86,7 +86,6 @@ const selectedLanguage = computed({
 // Get manifest version
 onMounted(async () => {
   try {
-    const browser = await getBrowserAPI()
     const manifest = browser.runtime.getManifest()
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {

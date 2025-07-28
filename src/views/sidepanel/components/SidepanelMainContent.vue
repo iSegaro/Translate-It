@@ -145,10 +145,10 @@ import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
 import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { useI18n } from '@/composables/useI18n.js'
-import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
+import { UnifiedTranslationClient } from '@/core/UnifiedTranslationClient.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 
-// Browser API, TTS, Background Warmup, Select Element, and i18n
+// browser API, TTS, Background Warmup, Select Element, and i18n
 const browserAPI = useBrowserAPI()
 const tts = useTTSSmart()
 const backgroundWarmup = useBackgroundWarmup()
@@ -159,7 +159,7 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
 // Translation Client
-const translationClient = new TranslationClient(TRANSLATION_CONTEXTS.SIDEPANEL)
+const translationClient = new UnifiedTranslationClient('sidepanel')
 
 // Simple state
 const sourceText = ref('')

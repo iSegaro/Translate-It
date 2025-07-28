@@ -1,8 +1,7 @@
 // src/managers/tts-background.js
 // Background page TTS implementation for Firefox and fallback
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
-import { environment } from '../utils/environment.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Background TTS Manager for Firefox and fallback scenarios
@@ -25,8 +24,7 @@ export class BackgroundTTSManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
-      await environment.initialize();
+      this.browser = browser;
 
       console.log('🔊 Initializing background TTS manager');
 
@@ -53,10 +51,10 @@ export class BackgroundTTSManager {
   async detectAvailableMethods() {
     this.availableMethods = [];
 
-    // Method 1: Browser TTS API (Chrome/Firefox native)
-    if (this.browser.tts && typeof this.browser.tts.speak === 'function') {
+    // Method 1: browser TTS API (Chrome/Firefox native)
+    if (browser.tts && typeof browser.tts.speak === 'function') {
       this.availableMethods.push('browser-tts');
-      console.log('✅ Browser TTS API available');
+      console.log('✅ browser TTS API available');
     }
 
     // Method 2: Speech Synthesis API (if available in background context)
@@ -128,7 +126,7 @@ export class BackgroundTTSManager {
   async speakWithMethod(method, options) {
     switch (method) {
       case 'browser-tts':
-        return this.speakWithBrowserTTS(options);
+        return this.speakWithbrowserTTS(options);
       
       case 'speech-synthesis':
         return this.speakWithSpeechSynthesis(options);
@@ -148,7 +146,7 @@ export class BackgroundTTSManager {
    * Speak using browser TTS API
    * @private
    */
-  async speakWithBrowserTTS(options) {
+  async speakWithbrowserTTS(options) {
     return new Promise((resolve, reject) => {
       const ttsOptions = {
         lang: options.lang,
@@ -161,9 +159,9 @@ export class BackgroundTTSManager {
         ttsOptions.voiceName = options.voice;
       }
 
-      this.browser.tts.speak(options.text, ttsOptions, () => {
-        if (this.browser.runtime.lastError) {
-          reject(new Error(this.browser.runtime.lastError.message));
+      browser.tts.speak(options.text, ttsOptions, () => {
+        if (browser.runtime.lastError) {
+          reject(new Error(browser.runtime.lastError.message));
         } else {
           resolve();
         }
@@ -260,13 +258,13 @@ export class BackgroundTTSManager {
   async speakWithContentScript(options) {
     try {
       // Get active tab
-      const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab) {
         throw new Error('No active tab found');
       }
 
       // Send message to content script
-      const response = await this.browser.tabs.sendMessage(tab.id, {
+      const response = await browser.tabs.sendMessage(tab.id, {
         action: 'TTS_SPEAK',
         source: 'background',
         data: options
@@ -289,8 +287,8 @@ export class BackgroundTTSManager {
   async stop() {
     try {
       // Stop browser TTS
-      if (this.browser.tts && this.browser.tts.stop) {
-        this.browser.tts.stop();
+      if (browser.tts && browser.tts.stop) {
+        browser.tts.stop();
       }
 
       // Stop speech synthesis
@@ -320,9 +318,9 @@ export class BackgroundTTSManager {
 
     try {
       // Get browser TTS voices
-      if (this.browser.tts && this.browser.tts.getVoices) {
+      if (browser.tts && browser.tts.getVoices) {
         const browserVoices = await new Promise((resolve) => {
-          this.browser.tts.getVoices(resolve);
+          browser.tts.getVoices(resolve);
         });
         voices.push(...browserVoices.map(v => ({
           ...v,

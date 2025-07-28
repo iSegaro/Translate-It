@@ -1,7 +1,7 @@
 // src/background/handlers/tts/handleTTSSpeakContent.js
 // Handler for content script TTS fallback requests
 
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -25,7 +25,6 @@ export const handleTTSSpeakContent = async (request, sender) => {
       throw new Error('Text to speak is required for content script TTS');
     }
 
-    const browser = await getBrowserAPI();
     
     // Get active tab for content script injection
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });

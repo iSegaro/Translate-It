@@ -1,8 +1,7 @@
 // src/listeners/base-listener.js
 // Base class for cross-browser event listeners
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
-import { environment } from '../utils/environment.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Base Event Listener class
@@ -26,8 +25,7 @@ export class BaseListener {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
-      await environment.initialize();
+      this.browser = browser;
 
       this.initialized = true;
       console.log(`🎧 Initialized ${this.listenerName} listener`);
@@ -87,7 +85,7 @@ export class BaseListener {
     try {
       const eventTarget = this.browser[this.eventType];
       if (!eventTarget) {
-        throw new Error(`Browser API ${this.eventType} not available`);
+        throw new Error(`browser API ${this.eventType} not available`);
       }
 
       const eventObject = eventTarget[this.eventName];
@@ -268,7 +266,7 @@ export class BaseListener {
   getDebugInfo() {
     return {
       ...this.getStats(),
-      browser: environment.getBrowser(),
+      browser: this.browser,
       browserAPI: !!this.browser,
       eventAvailable: this.isAvailable()
     };
@@ -299,7 +297,7 @@ export class BaseListener {
 
 /**
  * Create a specialized listener class
- * @param {string} eventType - Browser API type (runtime, tabs, etc.)
+ * @param {string} eventType - browser API type (runtime, tabs, etc.)
  * @param {string} eventName - Event name (onMessage, onInstalled, etc.)
  * @param {string} listenerName - Human-readable name
  * @returns {Class} Specialized listener class

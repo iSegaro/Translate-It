@@ -4,7 +4,7 @@
 // Translation is now handled by the TranslationEngine, not directly by message handlers
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import { getBrowserAPI } from "../utils/browser-unified.js";
+import browser from 'webextension-polyfill';
 
 export class VueMessageHandler {
   constructor() {
@@ -251,7 +251,6 @@ export class VueMessageHandler {
   async handleStartScreenCapture(data, sender) {
     try {
       // Get active tab
-      const browser = await getBrowserAPI();
       const [tab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
@@ -284,7 +283,6 @@ export class VueMessageHandler {
 
     try {
       // Capture visible tab
-      const browser = await getBrowserAPI();
       const imageData = await browser.tabs.captureVisibleTab({
         format: "png",
       });
@@ -311,7 +309,6 @@ export class VueMessageHandler {
 
     try {
       // Remove existing context menu items
-      const browser = await getBrowserAPI();
       await browser.contextMenus.removeAll();
 
       // Add new menu items
@@ -336,7 +333,6 @@ export class VueMessageHandler {
 
   async handleGetExtensionInfo() {
     try {
-      const browser = await getBrowserAPI();
       const manifest = browser.runtime.getManifest();
 
       return {
@@ -387,13 +383,11 @@ export class VueMessageHandler {
 
   // Helper methods for storage
   async storeProviderConfig(provider, config) {
-    const browser = await getBrowserAPI();
     const key = `provider_config_${provider}`;
     await browser.storage.local.set({ [key]: config });
   }
 
   async getStoredProviderConfig(provider) {
-    const browser = await getBrowserAPI();
     const key = `provider_config_${provider}`;
     const result = await browser.storage.local.get(key);
     return result[key] || null;

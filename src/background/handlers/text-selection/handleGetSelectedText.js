@@ -1,5 +1,5 @@
 // src/background/handlers/text-selection/handleGetSelectedText.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
   console.log('[Handler:getSelectedText] Processing text selection request:', message.data);
   
   try {
-    const Browser = await getBrowserAPI();
     const { tabId } = message.data || {};
     const targetTabId = tabId || sender.tab?.id;
     
@@ -26,7 +25,7 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
     }
     
     // Send message to content script to get selected text
-    const response = await Browser.tabs.sendMessage(targetTabId, {
+    const response = await browser.tabs.sendMessage(targetTabId, {
       action: 'GET_SELECTED_TEXT',
       data: {
         timestamp: Date.now()

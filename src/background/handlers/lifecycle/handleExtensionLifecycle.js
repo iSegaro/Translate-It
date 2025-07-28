@@ -1,5 +1,5 @@
 // src/background/handlers/lifecycle/handleExtensionLifecycle.js
-import { getBrowserAPI } from "../../utils/browser-unified.js"; // Changed from browser-polyfill.js
+import browser from 'webextension-polyfill';
 import { logME } from "../../utils/helpers.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js"; // Changed from services
 
@@ -15,8 +15,7 @@ export async function handleExtensionLifecycle(
   logME(`[Handler:Lifecycle] Handling action: ${action}`);
   try {
     logME(`[Handler:Lifecycle] Reloading extension due to action: ${action}`);
-    const Browser = await getBrowserAPI(); // Get Browser API
-    Browser.runtime.reload();
+    browser.runtime.reload();
     // sendResponse might not be reached
   } catch (error) {
     logME(
@@ -24,8 +23,7 @@ export async function handleExtensionLifecycle(
       error
     );
     if (sender.tab?.id) {
-      const Browser = await getBrowserAPI(); // Get Browser API
-      Browser.scripting
+      browser.scripting
         .executeScript({
           target: { tabId: sender.tab.id },
           files: ["content.bundle.js"],

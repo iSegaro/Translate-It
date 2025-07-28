@@ -2,7 +2,7 @@
 // It toggles the mode on or off based on the message received from the popup.
 
 // src/handlers/elementModeHandler.js
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getSettingsAsync } from "../config.js";
@@ -33,7 +33,7 @@ export function handleActivateSelectElementMode(
     try {
       logME("[Handler:ElementMode] Querying active tab.");
       // 1) Find active tab
-      const tabs = await getBrowser().tabs.query({
+      const tabs = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
@@ -60,7 +60,7 @@ export function handleActivateSelectElementMode(
       }
 
       logME(`[Handler:ElementMode] Attempting to set selectElementState in storage to: ${newState}`);
-      await getBrowser().storage.local.set({ selectElementState: newState });
+      await browser.storage.local.set({ selectElementState: newState });
       logME("[Handler:ElementMode] Storage updated. New state set to: " + newState);
 
       logME("[Handler:ElementMode] Sending initial TOGGLE_SELECT_ELEMENT_MODE command to content script with data: " + newState);
@@ -89,7 +89,7 @@ export function handleActivateSelectElementMode(
         injectionState.inProgress = true;
         try {
           logME("[Handler:ElementMode] Executing script injection.");
-          await getBrowser().scripting.executeScript({
+          await browser.scripting.executeScript({
             target: { tabId },
             files: ["browser-polyfill.js", "src/content-scripts/index.js"],
           });

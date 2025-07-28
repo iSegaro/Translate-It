@@ -1,5 +1,5 @@
 // src/background/handlers/element-selection/handleApplyTranslationToActiveElement.js
-import { getBrowserAPI } from '../../../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -17,7 +17,6 @@ export async function handleApplyTranslationToActiveElement(message, sender, sen
   console.log('[Handler:applyTranslationToActiveElement] Processing translation application:', message.data);
   
   try {
-    const Browser = await getBrowserAPI();
     const { translatedText, elementId, tabId } = message.data || {};
     const targetTabId = tabId || sender.tab?.id;
     
@@ -30,7 +29,7 @@ export async function handleApplyTranslationToActiveElement(message, sender, sen
     }
     
     // Send message to content script to apply translation
-    const response = await Browser.tabs.sendMessage(targetTabId, {
+    const response = await browser.tabs.sendMessage(targetTabId, {
       action: 'APPLY_TRANSLATION_TO_ELEMENT',
       data: {
         translatedText,

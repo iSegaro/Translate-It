@@ -1,6 +1,6 @@
 // src/utils/cleanupSelectionWindows.js
 
-import { Browser } from "@/utils/browser-polyfill.js";
+import { browser } from "@/utils/browser-polyfill.js";
 import { logME } from "./helpers";
 
 /**
@@ -20,14 +20,14 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
       });
     };
 
-    if (Browser.scripting && Browser.scripting.executeScript) {
-      await Browser.scripting.executeScript({
+    if (browser.scripting && browser.scripting.executeScript) {
+      await browser.scripting.executeScript({
         target: { tabId },
         func: cleanupFn,
       });
     } else {
       // Fallback for MV2 or older browsers
-      await Browser.tabs.executeScript(tabId, {
+      await browser.tabs.executeScript(tabId, {
         func: cleanupFn,
       });
     }
@@ -41,7 +41,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
  */
 export async function dismissAllSelectionWindows() {
   try {
-    const tabs = await Browser.tabs.query({ url: "<all_urls>" });
+    const tabs = await browser.tabs.query({ url: "<all_urls>" });
     for (const tab of tabs) {
       if (!tab.id) continue;
       await dismissAllSelectionWindowsInTab(tab.id);

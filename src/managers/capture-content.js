@@ -1,7 +1,7 @@
 // src/managers/capture-content.js
 // Content script-based screen capture manager (fallback)
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Content Script Screen Capture Manager
@@ -20,7 +20,7 @@ export class ContentScriptCaptureManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
       console.log('📸 Initializing content script capture manager');
       this.initialized = true;
@@ -51,7 +51,7 @@ export class ContentScriptCaptureManager {
       console.log('📸 Capturing visible tab via content script method');
 
       // Use basic tab capture API
-      const imageData = await this.browser.tabs.captureVisibleTab(captureOptions);
+      const imageData = await browser.tabs.captureVisibleTab(captureOptions);
 
       return imageData;
 
@@ -74,7 +74,7 @@ export class ContentScriptCaptureManager {
 
     try {
       // Get active tab
-      const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab) {
         throw new Error('No active tab found');
       }
@@ -82,7 +82,7 @@ export class ContentScriptCaptureManager {
       console.log('📸 Starting area capture via content script');
 
       // Inject capture UI into content script
-      await this.browser.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: 'START_AREA_CAPTURE',
         source: 'background',
         data: { area, options }
@@ -142,7 +142,7 @@ export class ContentScriptCaptureManager {
 
     try {
       // Get active tab for content script injection
-      const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab) {
         throw new Error('No active tab found for OCR processing');
       }
@@ -150,7 +150,7 @@ export class ContentScriptCaptureManager {
       console.log('🔍 Processing image for OCR via content script');
 
       // Send image to content script for OCR processing
-      const response = await this.browser.tabs.sendMessage(tab.id, {
+      const response = await browser.tabs.sendMessage(tab.id, {
         action: 'OCR_PROCESS',
         source: 'background',
         data: {

@@ -92,7 +92,7 @@ export class ProviderHtmlGenerator {
       case 'yandex':
         return this._generateYandexSettingsHtml(provider);
       case 'browserapi':
-        return this._generateBrowserApiSettingsHtml(provider);
+        return this._generatebrowserApiSettingsHtml(provider);
       case 'gemini':
         return this._generateGeminiSettingsHtml(provider);
       case 'openai':
@@ -197,13 +197,13 @@ export class ProviderHtmlGenerator {
   }
 
   /**
-   * Generate Browser API settings HTML
+   * Generate browser API settings HTML
    * @private
    */
-  static _generateBrowserApiSettingsHtml(provider) {
+  static _generatebrowserApiSettingsHtml(provider) {
     return `
       <div id="browserApiSettingsInfo" style="display: none">
-        <h3 data-i18n="browser_api_settings_title">Browser Translation API</h3>
+        <h3 data-i18n="browser_api_settings_title">browser Translation API</h3>
         <div class="setting-group api-key-info">
           <span class="setting-description" data-i18n="browser_api_description">
             ${provider.description}

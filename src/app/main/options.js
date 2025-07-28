@@ -3,7 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
 import OptionsApp from '@/views/options/OptionsApp.vue'
 import '@/main.scss'
-import { browserAPIReady } from '@/utils/browser-polyfill.js'
+import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
 
 // Import route components (lazy loaded)
@@ -23,18 +23,18 @@ async function initializeApp() {
     
     // Wait for browser API to be ready
     console.log('⏳ Waiting for browser API to be ready...')
-    const browserAPI = await browserAPIReady
-    console.log('✅ Browser API is ready')
+    
+    console.log('✅ browser API is ready')
 
     // Ensure browser API is globally available for i18n plugin
     if (typeof window !== 'undefined') {
-      window.browser = browserAPI;
-      window.chrome = browserAPI; // Some plugins expect chrome object
+      window.browser = browser;
+      window.chrome = browser; // Some plugins expect chrome object
       
       // Debug: Check if i18n is available
       console.log('🔍 Checking i18n availability:', {
-        'browserAPI.i18n': !!browserAPI.i18n,
-        'browserAPI.i18n.getMessage': !!browserAPI.i18n?.getMessage,
+        'browserAPI.i18n': !!browser.i18n,
+        'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
         'window.browser.i18n': !!window.browser.i18n,
         'chrome.i18n (native)': !!chrome?.i18n
       });
@@ -154,7 +154,7 @@ setTimeout(() => {
     console.log('⚠️ App failed to initialize, checking potential issues...')
     
     // Check if required APIs are available
-    console.log('🔍 Browser API check:')
+    console.log('🔍 browser API check:')
     console.log('- typeof chrome:', typeof chrome)
     console.log('- typeof browser:', typeof browser)
     console.log('- chrome.runtime:', chrome?.runtime)
@@ -171,7 +171,7 @@ setTimeout(() => {
         <h2 style="color: #e74c3c; margin-top: 0;">Extension Loading Issue</h2>
         <p>The Vue.js application failed to initialize. This might be due to:</p>
         <ul style="text-align: left;">
-          <li>Browser extension API not ready</li>
+          <li>browser extension API not ready</li>
           <li>Content Security Policy restrictions</li>
           <li>Missing dependencies or imports</li>
           <li>Timing issues with async initialization</li>
@@ -179,7 +179,7 @@ setTimeout(() => {
         <p><strong>Check the browser console for detailed error messages.</strong></p>
         <div style="margin-top: 20px;">
           <button onclick="location.reload()" style="padding: 10px 20px; margin-right: 10px; border: none; background: #3498db; color: white; border-radius: 4px; cursor: pointer;">Reload Page</button>
-          <button onclick="chrome.runtime.openOptionsPage()" style="padding: 10px 20px; border: none; background: #95a5a6; color: white; border-radius: 4px; cursor: pointer;">Open New Options Tab</button>
+          <button onclick="browser.runtime.openOptionsPage()" style="padding: 10px 20px; border: none; background: #95a5a6; color: white; border-radius: 4px; cursor: pointer;">Open New Options Tab</button>
         </div>
       </div>
     `)

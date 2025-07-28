@@ -14,10 +14,9 @@ const errorHandler = new ErrorHandler();
  * This processes translation requests through the background translation engine.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - A Promise that resolves with the translation result or rejects with an error.
  */
-export async function handleTranslate(message, sender, sendResponse) {
+export async function handleTranslate(message, sender) {
   console.log('[Handler:TRANSLATE] Raw message received:', JSON.stringify(message, null, 2));
   console.log('[Handler:TRANSLATE] Sender info:', sender);
   
@@ -66,65 +65,42 @@ export async function handleTranslate(message, sender, sendResponse) {
     console.log('[Handler:TRANSLATE] Starting async translation...');
     
     // Use async/await instead of Promise chains to ensure proper response handling
-    try {
-      const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
-      
-      console.log('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
-      
-      // Ensure we have a valid response format
-      if (!result || typeof result !== 'object') {
-        throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
-      }
-      
-      if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
-        throw new Error(`Response missing 'success' property: ${JSON.stringify(result)}`);
-      }
-      
-      console.log('[Handler:TRANSLATE] Sending response directly from handler:', JSON.stringify(result, null, 2));
-      
-      // Return the result directly instead of using sendResponse
-      // This allows the MessageRouter to handle the response properly
-      return result;
-      
-    } catch (translationError) {
-      console.error('[Handler:TRANSLATE] Translation error:', translationError);
-      console.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
-      
-      errorHandler.handle(translationError, {
-        type: ErrorTypes.TRANSLATION,
-        context: "handleTranslate",
-        messageData: message
-      });
-      
-      // Use standardized error response format
-      const errorResponse = createErrorResponse(
-        translationError, 
-        message.context || 'unknown',
-        message.provider || message.data?.provider || 'unknown'
-      );
-      
-      console.log('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
-      return errorResponse;
+    const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
+    
+    console.log('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
+    
+    // Ensure we have a valid response format
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
     }
     
-  } catch (error) {
-    console.error('[Handler:TRANSLATE] Outer error occurred:', error);
-    console.error('[Handler:TRANSLATE] Error stack:', error.stack);
+    if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
+      throw new Error(`Response missing 'success' property: ${JSON.stringify(result)}`);
+    }
     
-    errorHandler.handle(error, {
+    console.log('[Handler:TRANSLATE] Translation successful:', JSON.stringify(result, null, 2));
+    
+    // Return result for consistent handling
+    return result;
+    
+  } catch (translationError) {
+    console.error('[Handler:TRANSLATE] Translation error:', translationError);
+    console.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
+    
+    errorHandler.handle(translationError, {
       type: ErrorTypes.TRANSLATION,
       context: "handleTranslate",
       messageData: message
     });
     
-    // Use standardized error response format for outer errors
+    // Use standardized error response format
     const errorResponse = createErrorResponse(
-      error, 
+      translationError, 
       message.context || 'unknown',
       message.provider || message.data?.provider || 'unknown'
     );
     
-    console.log('[Handler:TRANSLATE] Returning outer error response:', JSON.stringify(errorResponse, null, 2));
+    console.log('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
     return errorResponse;
   }
 }

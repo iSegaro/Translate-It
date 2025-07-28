@@ -1,5 +1,5 @@
 // src/providers/implementations/YandexTranslateProvider.js
-import { getBrowser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
 import { logME } from "../../utils/helpers.js";
 import { isPersianText } from "../../utils/textDetection.js";
@@ -222,7 +222,7 @@ export class YandexTranslateProvider extends BaseTranslationProvider {
   }
 
   /**
-   * Apply language swapping logic similar to Google Translate and Browser Translate
+   * Apply language swapping logic similar to Google Translate and browser Translate
    * @param {string} text - Text for detection
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
@@ -230,8 +230,8 @@ export class YandexTranslateProvider extends BaseTranslationProvider {
    */
   async _applyLanguageSwapping(text, sourceLang, targetLang) {
     try {
-      // Use Browser.i18n.detectLanguage for detection (similar to other providers)
-      const detectionResult = await getBrowser().i18n.detectLanguage(text);
+      // Use browser.i18n.detectLanguage for detection (similar to other providers)
+      const detectionResult = await browser.i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
@@ -272,7 +272,7 @@ export class YandexTranslateProvider extends BaseTranslationProvider {
   async translate(text, sourceLang, targetLang, translateMode = null) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // Language Detection and Swapping (similar to Google Translate and Browser Translate)
+    // Language Detection and Swapping (similar to Google Translate and browser Translate)
     [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang);
 
     // Set auto-detect for Field and Subtitle modes after language detection

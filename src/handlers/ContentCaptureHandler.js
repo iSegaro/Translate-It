@@ -6,7 +6,7 @@ import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { cropImageData } from "../utils/imageProcessing.js";
-import { Browser } from "@/utils/browser-polyfill.js";
+import browser from 'webextension-polyfill';
 
 /**
  * Content Script handler for Screen Capture functionality
@@ -76,7 +76,7 @@ export class ContentCaptureHandler {
       logME("[ContentCaptureHandler] Area selection completed:", selectionData);
 
       // First request full screen capture from background
-      const fullCaptureResponse = await Browser.runtime.sendMessage({
+      const fullCaptureResponse = await browser.runtime.sendMessage({
         action: "requestFullScreenCapture",
         data: {}
       });
@@ -94,7 +94,7 @@ export class ContentCaptureHandler {
       );
 
       // Send cropped image to background for processing
-      await Browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: "processAreaCaptureImage",
         data: {
           imageData: croppedImageData,
@@ -217,7 +217,7 @@ export class ContentCaptureHandler {
       }
 
       // Send confirmation to background for translation
-      await Browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: "previewConfirmed",
         data: {
           captureData,
@@ -245,7 +245,7 @@ export class ContentCaptureHandler {
       }
 
       // Notify background
-      Browser.runtime.sendMessage({
+      browser.runtime.sendMessage({
         action: "previewCancelled",
         data: {}
       }).catch(error => {
@@ -272,7 +272,7 @@ export class ContentCaptureHandler {
       }
 
       // Send retry request to background
-      Browser.runtime.sendMessage({
+      browser.runtime.sendMessage({
         action: "previewRetry",
         data: { captureType }
       }).catch(error => {
@@ -298,7 +298,7 @@ export class ContentCaptureHandler {
       }
 
       // Notify background if needed
-      Browser.runtime.sendMessage({
+      browser.runtime.sendMessage({
         action: "resultClosed",
         data: {}
       }).catch(error => {
@@ -335,7 +335,7 @@ export class ContentCaptureHandler {
     }
 
     // Send error to background
-    Browser.runtime.sendMessage({
+    browser.runtime.sendMessage({
       action: "captureError",
       data: {
         error: error.message,
@@ -383,7 +383,7 @@ export class ContentCaptureHandler {
    */
   _showErrorNotification(message, error) {
     // Send error notification request to background
-    Browser.runtime.sendMessage({
+    browser.runtime.sendMessage({
       action: "SHOW_ERROR_NOTIFICATION",
       data: {
         message,

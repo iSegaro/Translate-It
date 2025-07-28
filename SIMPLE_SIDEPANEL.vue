@@ -73,7 +73,7 @@
 import { ref } from 'vue'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 
-// Browser API
+// browser API
 const browserAPI = useBrowserAPI()
 
 // Simple state

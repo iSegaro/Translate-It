@@ -4,7 +4,7 @@
  */
 
 import { TranslationProviderFactory } from './providers/TranslationProviderFactory.js'
-import { getBrowserAPI } from '../utils/browser-unified.js'
+import browser from 'webextension-polyfill'
 
 export class TranslationEngine {
   constructor() {
@@ -300,8 +300,7 @@ export class TranslationEngine {
    */
   async saveHistoryToStorage() {
     try {
-      const Browser = await getBrowserAPI()
-      await Browser.storage.local.set({
+      await browser.storage.local.set({
         translationHistory: this.history
       })
     } catch (error) {
@@ -314,8 +313,7 @@ export class TranslationEngine {
    */
   async loadHistoryFromStorage() {
     try {
-      const Browser = await getBrowserAPI()
-      const data = await Browser.storage.local.get(['translationHistory'])
+      const data = await browser.storage.local.get(['translationHistory'])
       if (Array.isArray(data.translationHistory)) {
         this.history = data.translationHistory
       } else {

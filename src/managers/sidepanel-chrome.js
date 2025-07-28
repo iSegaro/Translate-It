@@ -1,7 +1,7 @@
 // src/managers/sidepanel-chrome.js
 // Chrome side panel manager
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Chrome Side Panel Manager
@@ -20,9 +20,9 @@ export class ChromeSidePanelManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
+      this.browser = browser;
       
-      if (!this.browser.sidePanel) {
+      if (!browser.sidePanel) {
         throw new Error('Chrome sidePanel API not available');
       }
 
@@ -47,7 +47,7 @@ export class ChromeSidePanelManager {
     }
 
     try {
-      await this.browser.sidePanel.open({ tabId });
+      await browser.sidePanel.open({ tabId });
       console.log('📋 Chrome side panel opened');
     } catch (error) {
       console.error('❌ Failed to open Chrome side panel:', error);
@@ -66,7 +66,7 @@ export class ChromeSidePanelManager {
     }
 
     try {
-      await this.browser.sidePanel.setPanelBehavior({
+      await browser.sidePanel.setPanelBehavior({
         tabId,
         openPanelOnActionClick: behavior === 'enabled'
       });

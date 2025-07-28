@@ -1,8 +1,7 @@
 // src/managers/context-menu.js
 // Context menu manager for cross-browser compatibility
 
-import { getBrowserAPI } from '../utils/browser-unified.js';
-import { environment } from '../utils/environment.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Context Menu Manager
@@ -22,8 +21,7 @@ export class ContextMenuManager {
     if (this.initialized) return;
 
     try {
-      this.browser = await getBrowserAPI();
-      await environment.initialize();
+      this.browser = browser;
       
       console.log('📋 Initializing context menu manager');
       
@@ -113,7 +111,7 @@ export class ContextMenuManager {
     }
 
     try {
-      const menuId = await this.browser.contextMenus.create(menuConfig);
+      const menuId = await browser.contextMenus.create(menuConfig);
       this.createdMenus.add(menuConfig.id || menuId);
       
       console.log(`📋 Created context menu: ${menuConfig.title || menuConfig.id}`);
@@ -136,7 +134,7 @@ export class ContextMenuManager {
     }
 
     try {
-      await this.browser.contextMenus.update(menuId, updateInfo);
+      await browser.contextMenus.update(menuId, updateInfo);
       console.log(`📋 Updated context menu: ${menuId}`);
 
     } catch (error) {
@@ -155,7 +153,7 @@ export class ContextMenuManager {
     }
 
     try {
-      await this.browser.contextMenus.remove(menuId);
+      await browser.contextMenus.remove(menuId);
       this.createdMenus.delete(menuId);
       
       console.log(`📋 Removed context menu: ${menuId}`);
@@ -175,7 +173,7 @@ export class ContextMenuManager {
     }
 
     try {
-      await this.browser.contextMenus.removeAll();
+      await browser.contextMenus.removeAll();
       this.createdMenus.clear();
       
       console.log('📋 Cleared all context menus');
@@ -234,7 +232,7 @@ export class ContextMenuManager {
 
     try {
       // Send message to content script to handle translation
-      await this.browser.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: 'TRANSLATE_SELECTION',
         source: 'context-menu',
         data: {
@@ -254,7 +252,7 @@ export class ContextMenuManager {
    */
   async handleTranslatePage(info, tab) {
     try {
-      await this.browser.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: 'TRANSLATE_PAGE',
         source: 'context-menu',
         data: {
@@ -273,7 +271,7 @@ export class ContextMenuManager {
    */
   async handleSelectElementMode(info, tab) {
     try {
-      await this.browser.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: 'ACTIVATE_SELECT_ELEMENT_MODE',
         source: 'context-menu',
         data: {
@@ -292,7 +290,7 @@ export class ContextMenuManager {
    */
   async handleCaptureScreen(info, tab) {
     try {
-      await this.browser.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         action: 'START_SCREEN_CAPTURE',
         source: 'context-menu',
         data: {
@@ -311,8 +309,8 @@ export class ContextMenuManager {
    */
   async handleOpenOptions(info, tab) {
     try {
-      const optionsUrl = this.browser.runtime.getURL('options.html');
-      await this.browser.tabs.create({ url: optionsUrl });
+      const optionsUrl = browser.runtime.getURL('options.html');
+      await browser.tabs.create({ url: optionsUrl });
 
     } catch (error) {
       console.error('❌ Failed to handle open options:', error);
@@ -323,8 +321,8 @@ export class ContextMenuManager {
    * Register context menu click listener
    */
   registerClickListener() {
-    if (this.browser?.contextMenus?.onClicked) {
-      this.browser.contextMenus.onClicked.addListener(
+    if (browser?.contextMenus?.onClicked) {
+      browser.contextMenus.onClicked.addListener(
         this.handleMenuClick.bind(this)
       );
       console.log('📋 Context menu click listener registered');
