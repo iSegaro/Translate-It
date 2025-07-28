@@ -210,6 +210,18 @@ class BackgroundService {
         console.log('✅ TTS handleStopTTS error handler initialized');
       }
       
+      const contentModule = await import('./handlers/tts/handleTTSSpeakContent.js');
+      if (contentModule.initializeTTSContentHandler) {
+        contentModule.initializeTTSContentHandler(errorHandler);
+        console.log('✅ TTS handleTTSSpeakContent error handler initialized');
+      }
+      
+      const offscreenModule = await import('./handlers/tts/handleTTSOffscreen.js');
+      if (offscreenModule.initializeTTSOffscreenHandler) {
+        offscreenModule.initializeTTSOffscreenHandler(errorHandler);
+        console.log('✅ TTS handleTTSOffscreen error handler initialized');
+      }
+      
       console.log('✅ Error handlers initialization completed');
     } catch (error) {
       console.error('❌ Failed to initialize error handlers:', error);
@@ -335,6 +347,14 @@ class BackgroundService {
     // TTS handlers
     this.messageRouter.registerHandler('speak', Handlers.handleSpeak);
     this.messageRouter.registerHandler('stopTTS', Handlers.handleStopTTS);
+    this.messageRouter.registerHandler('TTS_SPEAK_CONTENT', Handlers.handleTTSSpeakContent);
+    this.messageRouter.registerHandler('OFFSCREEN_READY', Handlers.handleOffscreenReady);
+    this.messageRouter.registerHandler('TTS_SPEAK', Handlers.handleTTSOffscreen);
+    this.messageRouter.registerHandler('TTS_STOP', Handlers.handleTTSOffscreen);
+    this.messageRouter.registerHandler('TTS_TEST', Handlers.handleTTSOffscreen);
+    this.messageRouter.registerHandler('playOffscreenAudio', Handlers.handleTTSOffscreen);
+    this.messageRouter.registerHandler('stopOffscreenAudio', Handlers.handleTTSOffscreen);
+    this.messageRouter.registerHandler('playCachedAudio', Handlers.handleTTSOffscreen);
     
     // Element selection handlers
     this.messageRouter.registerHandler('activateSelectElementMode', Handlers.handleActivateSelectElementMode);

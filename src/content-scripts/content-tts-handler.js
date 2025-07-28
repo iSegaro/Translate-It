@@ -33,20 +33,22 @@ class ContentTTSHandler {
 
   /**
    * Setup message listener for TTS requests
+   * Now integrated with central message routing
    */
   setupMessageListener() {
     // Use chrome.runtime directly since this is a content script
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
       chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Only handle TTS_SPEAK_CONTENT messages that are explicitly targeted for content script
         if (message.action === 'TTS_SPEAK_CONTENT') {
           console.log('[ContentTTS] Received TTS speak request:', message);
           this.handleTTSSpeak(message.data, sendResponse);
           return true; // Keep async channel open
         }
-        return false;
+        return false; // Let other handlers process other messages
       });
       
-      console.log('[ContentTTS] Message listener setup complete');
+      console.log('[ContentTTS] Message listener setup complete (integrated with central routing)');
     } else {
       console.warn('[ContentTTS] Chrome runtime not available, TTS fallback disabled');
     }

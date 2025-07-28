@@ -25,6 +25,9 @@ export * from './translation/handleRevertTranslation.js';
 // TTS handlers
 export * from './tts/handleSpeak.js';
 export * from './tts/handleStopTTS.js';
+export * from './tts/handleTTSSpeakContent.js';
+export * from './tts/handleOffscreenReady.js';
+export * from './tts/handleTTSOffscreen.js';
 
 // Element selection handlers
 export * from './element-selection/handleActivateSelectElementMode.js';

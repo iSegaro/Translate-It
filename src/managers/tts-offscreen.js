@@ -50,19 +50,34 @@ export class OffscreenTTSManager {
 
   /**
    * Setup listener for offscreen readiness signal
+   * Now handled through central MessageRouter
    * @private
    */
   setupReadinessListener() {
     if (this.readinessListenerAdded) return;
 
-    this.browser.runtime.onMessage.addListener((message) => {
-      if (message.action === 'OFFSCREEN_READY') {
-        console.log('⚡ Offscreen document signaled readiness');
-        this.offscreenReady = true;
-      }
+    // Register a global callback for offscreen readiness
+    // This will be called by the central handleOffscreenReady handler
+    if (!globalThis.offscreenReadyCallbacks) {
+      globalThis.offscreenReadyCallbacks = [];
+    }
+    
+    globalThis.offscreenReadyCallbacks.push(() => {
+      console.log('⚡ Offscreen document signaled readiness via MessageRouter');
+      this.offscreenReady = true;
     });
 
     this.readinessListenerAdded = true;
+    console.log('✅ Offscreen readiness callback registered with MessageRouter');
+  }
+
+  /**
+   * Handle offscreen readiness signal (called by MessageRouter handler)
+   * @public
+   */
+  handleOffscreenReady() {
+    console.log('⚡ TTS Manager: Offscreen document is ready');
+    this.offscreenReady = true;
   }
 
   /**
@@ -538,45 +553,36 @@ export class OffscreenTTSManager {
   async fallbackToAlternativeTTS(text, options) {
     console.log('🔄 Using alternative TTS methods');
     
-    // First try: Content script TTS (more reliable than direct Audio)
+    // First try: Content script TTS through MessageRouter
     try {
-      console.log('🔄 Trying content script TTS fallback');
+      console.log('🔄 Trying content script TTS fallback via MessageRouter');
       
-      // Get active tab to inject TTS
-      const tabs = await this.browser.tabs.query({ active: true, currentWindow: true });
+      // Send TTS request through MessageRouter to content script handler
+      const response = await Promise.race([
+        this.browser.runtime.sendMessage({
+          action: 'TTS_SPEAK_CONTENT',
+          data: {
+            text: text,
+            lang: options.lang || 'en-US',
+            rate: options.rate || 1,
+            pitch: options.pitch || 1,
+            volume: options.volume || 1
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Content script TTS timeout')), 5000)
+        )
+      ]);
       
-      if (tabs && tabs.length > 0) {
-        const tab = tabs[0];
-        
-        // Send TTS message to content script with timeout
-        const response = await Promise.race([
-          this.browser.tabs.sendMessage(tab.id, {
-            action: 'TTS_SPEAK_CONTENT',
-            data: {
-              text: text,
-              lang: options.lang || 'en-US',
-              rate: options.rate || 1,
-              pitch: options.pitch || 1,
-              volume: options.volume || 1
-            }
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Content script TTS timeout')), 3000)
-          )
-        ]);
-        
-        if (response && response.success) {
-          console.log('✅ Content script TTS fallback successful');
-          return; // Success
-        } else {
-          throw new Error(response?.error || 'Content script TTS failed');
-        }
+      if (response && response.success) {
+        console.log('✅ Content script TTS fallback successful via MessageRouter');
+        return; // Success
       } else {
-        throw new Error('No active tab found for TTS fallback');
+        throw new Error(response?.error || 'Content script TTS failed');
       }
       
     } catch (contentScriptError) {
-      console.error('❌ Content script TTS fallback failed:', contentScriptError);
+      console.error('❌ Content script TTS fallback failed via MessageRouter:', contentScriptError);
       
       // Second try: Offscreen Google TTS (send to offscreen for Audio API)
       try {

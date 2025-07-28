@@ -44,118 +44,51 @@ function isTTSMessage(message) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[Offscreen] Received message:", message);
 
-  // Only handle messages targeted to offscreen context or without specific target
-  if (message.target && message.target !== "offscreen") {
-    console.log("[Offscreen] Message not for offscreen, ignoring:", message.target);
+  // Only handle messages explicitly targeted to offscreen context
+  if (!message.target || message.target !== "offscreen") {
+    console.log("[Offscreen] Message not targeted for offscreen, ignoring:", message.target);
     return false;
   }
   
-  // If message has target: 'offscreen', it's definitely for us
-  // If no target specified, handle based on action type
+  // Remove forwardedFromBackground flag if present (clean up)
+  const cleanMessage = { ...message };
+  delete cleanMessage.forwardedFromBackground;
+  delete cleanMessage.target;
 
-  // Allow direct TTS messages from popup and other sources
-  // (Removed blocking as popup sends direct speak messages)
+  console.log("[Offscreen] Processing message targeted for offscreen:", cleanMessage.action);
 
-  // Handle ping requests directly in offscreen
-  if (message.action === 'ping') {
-    console.log("[Offscreen] Ping received, responding with success");
-    sendResponse({ success: true, message: "Offscreen document is responsive" });
-    return false; // synchronous response
-  }
-
-  // Block certain actions from being forwarded (should go directly to background)
-  const directToBackgroundActions = [
-    'activateSelectElementMode', 
-    'elementSelected', 
-    'elementSelectionCancelled', 
-    'elementSelectionError',
-    'TRANSLATE' // Block TRANSLATE messages - handled by MessageRouter
-  ];
-  if (directToBackgroundActions.includes(message.action)) {
-    console.log("[Offscreen] Ignoring action (should go directly to background):", message.action);
-    // Don't respond - let the message pass through to background
-    return undefined;
-  }
-
-  // Handle specific TTS messages in offscreen, forward others to background
-  if (!isTTSMessage(message)) {
-    console.log("[Offscreen] Forwarding non-TTS message to background:", message.action);
-    chrome.runtime
-      .sendMessage({
-        ...message,
-        forwardedFromOffscreen: true,
-      })
-      .then((response) => {
-        if (sendResponse) sendResponse(response);
-      })
-      .catch((error) => {
-        console.error("[Offscreen] Failed to forward message:", error);
-        if (sendResponse)
-          sendResponse({ success: false, error: error.message });
-      });
-    return true; // Keep async channel open
-  }
-
-  // Forward 'speak' messages to background handler (don't handle in offscreen)
-  if (message.action === "speak") {
-    console.log("[Offscreen] Forwarding speak message to background handler");
-    chrome.runtime
-      .sendMessage({
-        ...message,
-        forwardedFromOffscreen: true,
-      })
-      .then((response) => {
-        if (sendResponse) sendResponse(response);
-      })
-      .catch((error) => {
-        console.error("[Offscreen] Failed to forward speak message:", error);
-        if (sendResponse)
-          sendResponse({ success: false, error: error.message });
-      });
-    return true; // Keep async channel open
-  }
-
-  // Handle TTS speak requests (new format)
-  if (message.action === "TTS_SPEAK" && message.data) {
-    handleTTSSpeak(message.data, sendResponse);
+  // Handle different TTS and audio actions
+  const action = cleanMessage.action;
+  
+  if (action === "TTS_SPEAK" && cleanMessage.data) {
+    handleTTSSpeak(cleanMessage.data, sendResponse);
     return true; // keep async channel open
   }
-
-  // Handle TTS requests (removed - now handled by background)
-
-  // Handle TTS stop requests
-  else if (message.action === "TTS_STOP") {
+  else if (action === "TTS_STOP") {
     handleTTSStop(sendResponse);
     return true;
   }
-
-  // Handle TTS test requests
-  else if (message.action === "TTS_TEST") {
+  else if (action === "TTS_TEST") {
     sendResponse({ success: true, message: "Offscreen TTS ready" });
     return false; // synchronous response
   }
-
-  // Legacy audio playback support
-  else if (message.action === "playOffscreenAudio" && message.url) {
-    handleAudioPlayback(message.url, sendResponse);
+  else if (action === "playOffscreenAudio" && cleanMessage.url) {
+    handleAudioPlayback(cleanMessage.url, sendResponse);
     return true;
   }
-
-  // Legacy audio stop support
-  else if (message.action === "stopOffscreenAudio") {
+  else if (action === "stopOffscreenAudio") {
     handleAudioStop(sendResponse);
     return true;
   }
-
-  // Handle cached audio blob playback
-  else if (message.action === "playCachedAudio" && message.audioData) {
-    handleCachedAudioPlayback(message.audioData, sendResponse);
+  else if (action === "playCachedAudio" && cleanMessage.audioData) {
+    handleCachedAudioPlayback(cleanMessage.audioData, sendResponse);
     return true;
   }
-
-  console.warn("[Offscreen] Unknown offscreen message action:", message.action);
-  sendResponse({ success: false, error: "Unknown action" });
-  return false;
+  else {
+    console.warn("[Offscreen] Unknown offscreen action:", action);
+    sendResponse({ success: false, error: `Unknown offscreen action: ${action}` });
+    return false;
+  }
 });
 
 /**
