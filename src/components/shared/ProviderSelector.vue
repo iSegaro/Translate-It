@@ -32,7 +32,7 @@
     
     <!-- Provider Dropdown -->
     <div 
-      v-if="isDropdownOpen"
+      v-show="isDropdownOpen"
       class="dropdown-menu"
       @click.stop
     >
@@ -73,7 +73,7 @@
     
     <!-- Provider Dropdown -->
     <div 
-      v-if="isDropdownOpen"
+      v-show="isDropdownOpen"
       class="dropdown-menu"
       @click.stop
     >
@@ -170,10 +170,7 @@ const handleTranslate = () => {
 }
 
 const toggleDropdown = () => {
-  console.log('[ProviderSelector] Toggle dropdown clicked, current state:', isDropdownOpen.value)
   isDropdownOpen.value = !isDropdownOpen.value
-  console.log('[ProviderSelector] New dropdown state:', isDropdownOpen.value)
-  console.log('[ProviderSelector] Available providers:', availableProviders.value.length)
 }
 
 const selectProvider = async (provider) => {
@@ -372,8 +369,7 @@ onUnmounted(() => {
   margin-top: 2px;
   max-height: 300px;
   overflow-y: auto;
-  display: block !important; /* Force visibility for debugging */
-  visibility: visible !important;
+  display: block;
 }
 
 .dropdown-item {
