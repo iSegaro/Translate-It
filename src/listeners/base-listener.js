@@ -160,6 +160,13 @@ export class BaseListener {
       console.debug(`✅ ${this.listenerName} completed successfully`);
     }
 
+    // For runtime.onMessage, return the actual result from the first successful handler
+    // instead of metadata, as browser expects the actual response value
+    if (this.eventName === 'onMessage' && results.length > 0 && results[0].result !== undefined) {
+      return results[0].result;
+    }
+
+    // For other events, return metadata as usual
     return {
       results,
       errors,

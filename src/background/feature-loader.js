@@ -3,14 +3,8 @@
 
 import browser from 'webextension-polyfill';
 
-// Static map of listener modules for principled dynamic import
-const listenerModules = {
-  onInstalled: () => import("../listeners/onInstalled.js"),
-  onCommand: () => import("../listeners/onCommand.js"),
-  onContextMenu: () => import("../listeners/onContextMenu.js"),
-  onMessage: () => import("../listeners/onMessage.js"),
-  onNotificationClicked: () => import("../listeners/onNotificationClicked.js"),
-};
+// Legacy listeners removed - now managed by UnifiedListenerManager
+const listenerModules = {};
 
 /**
  * Feature loader class
@@ -316,80 +310,24 @@ export class FeatureLoader {
    * @param {string} listenerName - Name of the listener to load
    * @returns {Promise<Object>} Listener module
    */
+  /**
+   * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
+   */
   async loadListener(listenerName, browser) {
-    const cacheKey = `listener-${listenerName}`;
-
-    if (this.loadedFeatures.has(cacheKey)) {
-      return this.loadedFeatures.get(cacheKey);
-    }
-
-    const allowedListeners = [
-      "onInstalled",
-      "onCommand",
-      "onContextMenu",
-      "onMessage",
-      "onNotificationClicked",
-    ];
-
-    if (!allowedListeners.includes(listenerName)) {
-      throw new Error(
-        `Attempted to load an unallowed listener: ${listenerName}`
-      );
-    }
-
-    try {
-      const moduleLoader = listenerModules[listenerName];
-      if (!moduleLoader) {
-        throw new Error(`Listener module not found for: ${listenerName}`);
-      }
-      const module = await moduleLoader();
-      if (typeof module.initialize === "function") {
-        await module.initialize(browser);
-      }
-      this.loadedFeatures.set(cacheKey, module);
-      console.log(`✅ Loaded listener: ${listenerName}`);
-      return module;
-    } catch (error) {
-      console.error(`❌ Failed to load listener ${listenerName}:`, error);
-      throw error;
-    }
+    console.warn(`[FeatureLoader] loadListener(${listenerName}) is deprecated - listeners are now managed by UnifiedListenerManager`);
+    return null;
   }
 
   /**
    * Load all listeners
    * @returns {Promise<Array>} Array of loaded listener modules
    */
+  /**
+   * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
+   */
   async loadAllListeners() {
-    const listenerNames = [
-      "onInstalled",
-      "onCommand",
-      "onContextMenu",
-      "onMessage",
-      "onNotificationClicked",
-    ];
-
-    console.log("🎧 Loading all listeners...");
-
-    // Get the browser API once for all listeners
-
-    const results = await Promise.allSettled(
-      listenerNames.map((name) => this.loadListener(name, browser))
-    );
-
-    const loadedListeners = [];
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        loadedListeners.push(result.value);
-        console.log(`✅ Listener ${listenerNames[index]} loaded`);
-      } else {
-        console.error(
-          `❌ Failed to load listener ${listenerNames[index]}:`,
-          result.reason
-        );
-      }
-    });
-
-    return loadedListeners;
+    console.warn('[FeatureLoader] loadAllListeners is deprecated - listeners are now managed by UnifiedListenerManager');
+    return [];
   }
 
   /**

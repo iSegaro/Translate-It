@@ -34,25 +34,21 @@ function isPageExcluded(url) {
  * Handles the 'isCurrentPageExcluded' message action.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - False for synchronous response.
+ * @returns {Object} - Response object for CoreMessageRouter.
  */
-export function handleIsCurrentPageExcluded(message, sender, sendResponse) {
+export function handleIsCurrentPageExcluded(message, sender) {
   try {
     const { url } = message.data || {}
     
     if (!url) {
-      sendResponse({ success: false, error: 'URL is required' })
-      return false
+      return { success: false, error: 'URL is required' }
     }
 
     const excluded = isPageExcluded(url)
     
-    sendResponse({ success: true, excluded })
-    return false
+    return { success: true, excluded }
   } catch (error) {
     console.error('[handleIsCurrentPageExcluded] Error:', error)
-    sendResponse({ success: false, error: 'Failed to check page exclusion status' })
-    return false
+    return { success: false, error: 'Failed to check page exclusion status' }
   }
 }

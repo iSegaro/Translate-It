@@ -1,8 +1,8 @@
 // Lightweight translation composable specifically for popup
 // Simplified version without heavy dependencies
 import { ref, computed } from 'vue'
-import browser from 'webextension-polyfill'
 import { useSettingsStore } from '@/store/core/settings.js'
+import { UnifiedTranslationClient } from '@/core/UnifiedTranslationClient.js'
 
 export function usePopupTranslation() {
   // State
@@ -14,6 +14,9 @@ export function usePopupTranslation() {
 
   // Store
   const settingsStore = useSettingsStore()
+  
+  // Translation client
+  const translationClient = new UnifiedTranslationClient('popup')
 
   // Computed
   const hasTranslation = computed(() => Boolean(translatedText.value?.trim()))
@@ -27,27 +30,21 @@ export function usePopupTranslation() {
     translationError.value = ''
 
     try {
-      // Send translation request to background
-      const response = await browser.runtime.sendMessage({
-        action: 'TRANSLATE',
-        context: 'popup',
-        data: {
-          text: sourceText.value,
-          provider: settingsStore.settings.TRANSLATION_API,
-          sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-          targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
-          mode: 'popup',
-          options: {}
-        }
+      // Use UnifiedTranslationClient for translation request
+      const response = await translationClient.translate(sourceText.value, {
+        provider: settingsStore.settings.TRANSLATION_API,
+        sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
+        targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
+        mode: 'popup'
       })
 
-      if (response?.success && response?.translatedText) {
+      if (response?.translatedText) {
         translatedText.value = response.translatedText
         lastTranslation.value = {
           source: sourceText.value,
           target: response.translatedText,
-          provider: settingsStore.settings.TRANSLATION_API,
-          timestamp: Date.now()
+          provider: response.provider || settingsStore.settings.TRANSLATION_API,
+          timestamp: response.timestamp || Date.now()
         }
       } else {
         throw new Error(response?.error || 'Translation failed')
