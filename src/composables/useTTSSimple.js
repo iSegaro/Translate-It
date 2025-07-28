@@ -3,6 +3,7 @@
 
 import { ref } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
+import { getLanguageCodeForTTS } from '@/utils/languages.js'
 
 export function useTTSSimple() {
   const browserAPI = useBrowserAPI()
@@ -23,11 +24,16 @@ export function useTTSSimple() {
       isPlaying.value = true
       console.log('[useTTSSimple] Speaking:', text.substring(0, 50) + '...')
       
-      // Simple message like OLD version
+      // Unified message format for consistency with popup
       await browserAPI.safeSendMessage({
         action: 'speak',
-        text: text.trim(),
-        lang: lang
+        data: {
+          text: text.trim(),
+          lang: getLanguageCodeForTTS(lang) || 'en',
+          rate: 1,
+          pitch: 1,
+          volume: 1
+        }
       })
       
       console.log('[useTTSSimple] TTS message sent successfully')

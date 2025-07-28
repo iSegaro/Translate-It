@@ -6,6 +6,24 @@
 
 */
 
+/**
+ * Convert language name to language code for TTS
+ * @param {string} languageName - Language name like "English", "Farsi"
+ * @returns {string} Language code like "en", "fa"
+ */
+export function getLanguageCodeForTTS(languageName) {
+  if (!languageName) return 'en';
+  
+  // If it's already a code (like "en", "fa"), return as is
+  if (languageName.length <= 3) {
+    return languageName;
+  }
+  
+  // Find the language in the list
+  const language = languageList.find(lang => lang.name === languageName);
+  return language ? language.code : 'en'; // Default to English
+}
+
 export const languageList = [
   {
     name: "English",

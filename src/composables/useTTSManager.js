@@ -3,6 +3,7 @@
 
 import { ref, onUnmounted } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
+import { getLanguageCodeForTTS } from '@/utils/languages.js'
 
 export function useTTSManager() {
   // State
@@ -31,15 +32,17 @@ export function useTTSManager() {
 
       console.log('[useTTSManager] Starting TTS playback:', text.substring(0, 50) + '...')
 
-      // Send TTS request to background with dynamic loading
+      // Send TTS request to background with unified format
       const response = await browserAPI.safeSendMessage({
         action: 'speak',
-        text: text,
-        voice: options.voice,
-        rate: options.rate || 1.0,
-        pitch: options.pitch || 1.0,
-        volume: options.volume || 1.0,
-        lang: options.lang
+        data: {
+          text: text,
+          lang: getLanguageCodeForTTS(options.lang) || 'en',
+          rate: options.rate || 1.0,
+          pitch: options.pitch || 1.0,
+          volume: options.volume || 1.0,
+          voice: options.voice
+        }
       })
 
       if (response._isConnectionError) {

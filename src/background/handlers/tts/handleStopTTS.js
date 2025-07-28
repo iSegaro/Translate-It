@@ -15,10 +15,20 @@ export const handleStopTTS = async (request, sender) => {
     return { success: true };
   } catch (error) {
     console.error('[TTSHandler] Error handling stopTTS message:', error);
-    return errorHandlerInstance.handle(error, {
-      type: ErrorTypes.TTS_ERROR,
-      message: error.message || 'Failed to stop TTS',
-      context: 'stopTTS',
-    });
+    
+    // Handle case when errorHandlerInstance is not initialized
+    if (errorHandlerInstance) {
+      return errorHandlerInstance.handle(error, {
+        type: ErrorTypes.TTS_ERROR,
+        message: error.message || 'Failed to stop TTS',
+        context: 'stopTTS',
+      });
+    } else {
+      // Fallback error response when error handler not available
+      return {
+        success: false,
+        error: error.message || 'Failed to stop TTS'
+      };
+    }
   }
 };

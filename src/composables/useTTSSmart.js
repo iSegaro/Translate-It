@@ -4,6 +4,7 @@
 
 import { ref } from 'vue'
 import { useBrowserAPI } from './useBrowserAPI.js'
+import { getLanguageCodeForTTS } from '@/utils/languages.js'
 
 /**
  * Smart TTS composable that intelligently detects browser
@@ -36,12 +37,17 @@ export function useTTSSmart() {
         options
       })
       
-      // Send message to background with simple pattern (like OLD version)
+      // Send message to background with unified format
       const response = await browserAPI.safeSendMessage({
         action: 'speak',
-        text: text.trim(),
-        lang: lang,
-        ...options // Include voice, rate, pitch, volume options
+        data: {
+          text: text.trim(),
+          lang: getLanguageCodeForTTS(lang) || 'en',
+          rate: options.rate || 1,
+          pitch: options.pitch || 1,
+          volume: options.volume || 1,
+          voice: options.voice
+        }
       })
       
       if (response && !response._isConnectionError) {

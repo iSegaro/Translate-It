@@ -55,6 +55,7 @@ import { useTTSSimple } from '@/composables/useTTSSimple.js'
 import { useI18n } from '@/composables/useI18n.js'
 import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
 import { correctTextDirection } from '@/utils/textDetection.js'
+import { getLanguageCodeForTTS } from '@/utils/languages.js'
 import { logME } from '@/utils/helpers.js'
 
 // Props
@@ -132,7 +133,7 @@ const handleVoiceResult = () => {
   if (!hasResult.value) return
   
   logME('[TranslationResult] Playing result with TTS')
-  tts.speak(translatedText.value, props.targetLanguage)
+  tts.speak(translatedText.value, getLanguageCodeForTTS(props.targetLanguage))
 }
 
 // Watchers

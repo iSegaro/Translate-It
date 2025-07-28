@@ -538,56 +538,18 @@ export class OffscreenTTSManager {
   async fallbackToAlternativeTTS(text, options) {
     console.log('🔄 Using alternative TTS methods');
     
-    // Try direct Google TTS URL as a more reliable fallback
+    // First try: Content script TTS (more reliable than direct Audio)
     try {
-      console.log('🔄 Trying direct Google TTS fallback');
-      
-      const lang = options.lang || 'en';
-      const langCode = lang.includes('-') ? lang.split('-')[0] : lang;
-      
-      // Create direct Google TTS URL
-      const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx`;
-      
-      // Create and play audio element directly
-      const audio = new Audio(googleTTSUrl);
-      audio.crossOrigin = 'anonymous';
-      
-      return new Promise((resolve, reject) => {
-        audio.onloadeddata = () => {
-          console.log('✅ Direct Google TTS audio loaded successfully');
-          audio.play()
-            .then(() => {
-              console.log('✅ Direct Google TTS playback started');
-              resolve();
-            })
-            .catch(reject);
-        };
-        
-        audio.onerror = (error) => {
-          console.error('❌ Direct Google TTS failed:', error);
-          reject(new Error('Direct Google TTS playback failed'));
-        };
-        
-        audio.onended = () => {
-          console.log('✅ Direct Google TTS playback ended');
-        };
-      });
-      
-    } catch (directError) {
-      console.error('❌ Direct Google TTS failed:', directError);
-      
-      // Fallback to content script TTS
       console.log('🔄 Trying content script TTS fallback');
       
-      try {
-        // Get active tab to inject TTS
-        const [tab] = await this.browser.tabs.query({ active: true, currentWindow: true });
-        if (!tab) {
-          throw new Error('No active tab found for TTS fallback');
-        }
+      // Get active tab to inject TTS
+      const tabs = await this.browser.tabs.query({ active: true, currentWindow: true });
+      
+      if (tabs && tabs.length > 0) {
+        const tab = tabs[0];
         
         // Send TTS message to content script with timeout
-        await Promise.race([
+        const response = await Promise.race([
           this.browser.tabs.sendMessage(tab.id, {
             action: 'TTS_SPEAK_CONTENT',
             data: {
@@ -603,11 +565,48 @@ export class OffscreenTTSManager {
           )
         ]);
         
-        console.log('✅ Content script TTS fallback successful');
+        if (response && response.success) {
+          console.log('✅ Content script TTS fallback successful');
+          return; // Success
+        } else {
+          throw new Error(response?.error || 'Content script TTS failed');
+        }
+      } else {
+        throw new Error('No active tab found for TTS fallback');
+      }
+      
+    } catch (contentScriptError) {
+      console.error('❌ Content script TTS fallback failed:', contentScriptError);
+      
+      // Second try: Offscreen Google TTS (send to offscreen for Audio API)
+      try {
+        console.log('🔄 Trying offscreen Google TTS fallback');
         
-      } catch (contentScriptError) {
-        console.error('❌ Content script TTS fallback failed:', contentScriptError);
-        throw new Error(`All TTS fallback methods failed. Direct: ${directError.message}, Content: ${contentScriptError.message}`);
+        const lang = options.lang || 'en';
+        const langCode = lang.includes('-') ? lang.split('-')[0] : lang;
+        
+        // Create Google TTS URL
+        const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx&ttsspeed=${options.rate || 1}`;
+        
+        // Send URL to offscreen for audio playback
+        const response = await this.browser.runtime.sendMessage({
+          action: 'playOffscreenAudio',
+          target: 'offscreen',
+          url: googleTTSUrl
+        });
+        
+        if (response && response.success) {
+          console.log('✅ Offscreen Google TTS fallback successful');
+          return; // Success
+        } else {
+          throw new Error(response?.error || 'Offscreen Google TTS failed');
+        }
+        
+      } catch (offscreenError) {
+        console.error('❌ Offscreen Google TTS fallback failed:', offscreenError);
+        
+        // Final fallback: Simple error notification
+        throw new Error(`All TTS methods failed. Content script: ${contentScriptError.message}, Offscreen Google TTS: ${offscreenError.message}`);
       }
     }
   }

@@ -82,6 +82,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { getBrowserAPI } from '@/utils/browser-unified.js'
+import { getLanguageCodeForTTS } from '@/utils/languages.js'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Stores
@@ -227,7 +228,7 @@ const playSourceTTS = async () => {
       action: 'speak',
       data: {
         text: sourceText.value,
-        lang: settingsStore.settings.SOURCE_LANGUAGE,
+        lang: getLanguageCodeForTTS(settingsStore.settings.SOURCE_LANGUAGE),
         rate: settingsStore.settings.TTS_RATE || 1,
         pitch: settingsStore.settings.TTS_PITCH || 1,
         volume: settingsStore.settings.TTS_VOLUME || 1
@@ -249,7 +250,7 @@ const playTargetTTS = async () => {
       action: 'speak',
       data: {
         text: textOnly,
-        lang: settingsStore.settings.TARGET_LANGUAGE,
+        lang: getLanguageCodeForTTS(settingsStore.settings.TARGET_LANGUAGE),
         rate: settingsStore.settings.TTS_RATE || 1,
         pitch: settingsStore.settings.TTS_PITCH || 1,
         volume: settingsStore.settings.TTS_VOLUME || 1

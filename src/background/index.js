@@ -68,6 +68,9 @@ class BackgroundService {
 
       // NEW: Register handlers with the MessageRouter during initialization
       this.registerMessageHandlers();
+      
+      // Initialize error handlers for specific modules
+      await this.initializeErrorHandlers();
 
       // Setup central message listener
       await this.setupCentralMessageListener();
@@ -179,6 +182,38 @@ class BackgroundService {
     } catch (error) {
       console.error('❌ Failed to load some features:', error);
       // Continue with available features
+    }
+  }
+
+  /**
+   * Initialize error handlers for specific modules
+   * @private
+   */
+  async initializeErrorHandlers() {
+    console.log('🛡️ Initializing error handlers...');
+    
+    try {
+      // Initialize TTS error handlers with proper ErrorHandler
+      const { ErrorHandler } = await import('../error-management/ErrorHandler.js');
+      const errorHandler = new ErrorHandler();
+      
+      // Import TTS handler initializers
+      const speakModule = await import('./handlers/tts/handleSpeak.js');
+      if (speakModule.initializeTTSHandler) {
+        speakModule.initializeTTSHandler(errorHandler);
+        console.log('✅ TTS handleSpeak error handler initialized');
+      }
+      
+      const stopModule = await import('./handlers/tts/handleStopTTS.js');
+      if (stopModule.initializeTTSHandler) {
+        stopModule.initializeTTSHandler(errorHandler);
+        console.log('✅ TTS handleStopTTS error handler initialized');
+      }
+      
+      console.log('✅ Error handlers initialization completed');
+    } catch (error) {
+      console.error('❌ Failed to initialize error handlers:', error);
+      // Continue without error handlers
     }
   }
 
