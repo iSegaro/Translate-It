@@ -148,7 +148,7 @@
 
       <!-- Result Area with Toolbar -->
       <TranslationOutputField
-        :content="translationResult"
+        :content="translatedText"
         :language="targetLanguageValue"
         :is-loading="isTranslating"
         :error="translationError"
@@ -174,6 +174,7 @@ import { useI18n } from "@/composables/useI18n.js";
 import { UnifiedTranslationClient } from "@/core/UnifiedTranslationClient.js";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { useHistory } from "@/composables/useHistory.js";
+import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
 
@@ -187,16 +188,24 @@ const { t } = useI18n();
 // Settings Store
 const settingsStore = useSettingsStore();
 
-// Translation Client
-const translationClient = new UnifiedTranslationClient("sidepanel");
+// Translation Composable - SAME AS POPUP
+const translation = useSidepanelTranslation();
 
-// Simple state
-const sourceText = ref("");
-const translationResult = ref("");
-const translationError = ref("");
-const isTranslating = ref(false);
+// Extract states from composable - SAME AS POPUP
+const {
+  sourceText,
+  translatedText,
+  isTranslating,
+  translationError,
+  hasTranslation,
+  canTranslate,
+  triggerTranslation,
+  clearTranslation,
+  loadLastTranslation
+} = translation;
+
+// Local UI state (not related to translation)
 const showPasteButton = ref(true);
-const showSpinner = ref(false);
 const currentAbortController = ref(null);
 const targetLanguageInputRef = ref(null);
 const sourceLanguageInputRef = ref(null);
@@ -244,14 +253,14 @@ watch(
         sourceText.value,
       );
       console.log(
-        "[SidepanelMainContent] Current translationResult.value:",
-        translationResult.value,
+        "[SidepanelMainContent] Current translatedText.value:",
+        translatedText.value,
       );
 
       // If the last history item matches the current source text, update the result
       if (
         lastItem.sourceText.trim() === sourceText.value.trim() &&
-        (translationResult.value === "" || translationResult.value === null)
+        (translatedText.value === "" || translatedText.value === null)
       ) {
         console.log(
           "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
@@ -259,24 +268,20 @@ watch(
         console.log("  lastItem.sourceText:", lastItem.sourceText);
         console.log("  sourceText.value:", sourceText.value);
         console.log(
-          "  translationResult.value (before update):",
-          translationResult.value,
+          "  translatedText.value (before update):",
+          translatedText.value,
         );
-        translationResult.value = lastItem.translatedText;
+        
+        translatedText.value = lastItem.translatedText;
         translationError.value = ""; // Clear any potential Firefox bug error message
-        showSpinner.value = false;
         isTranslating.value = false;
         console.log(
-          "  [History Watcher] translationResult.value (after update):",
-          translationResult.value,
+          "  [History Watcher] translatedText.value (after update):",
+          translatedText.value,
         );
         console.log(
           "  [History Watcher] translationError.value (after update):",
           translationError.value,
-        );
-        console.log(
-          "  [History Watcher] showSpinner.value (after update):",
-          showSpinner.value,
         );
         console.log(
           "  [History Watcher] isTranslating.value (after update):",
@@ -290,10 +295,10 @@ watch(
           "  lastItem.sourceText === sourceText.value:",
           lastItem.sourceText === sourceText.value,
         );
-        console.log("  translationResult.value:", translationResult.value);
+        console.log("  translatedText.value:", translatedText.value);
         console.log(
-          "  (translationResult.value === '' || translationResult.value === null):",
-          translationResult.value === "" || translationResult.value === null,
+          "  (translatedText.value === '' || translatedText.value === null):",
+          translatedText.value === "" || translatedText.value === null,
         );
       }
     }
@@ -301,108 +306,34 @@ watch(
   { deep: true },
 );
 
-// Handle form submission with request cancellation
+// Handle form submission using composable - SAME AS POPUP
 const handleTranslationSubmit = async () => {
   console.log("[SidepanelMainContent] Translation submit started");
 
-  if (!sourceText.value.trim()) {
-    console.warn("[SidepanelMainContent] No source text provided");
+  if (!canTranslate.value) {
+    console.warn("[SidepanelMainContent] Cannot translate - conditions not met");
     return;
   }
-
-  const targetLanguage = targetLanguageValue.value;
-  if (!targetLanguage) {
-    console.warn("[SidepanelMainContent] No target language selected");
-    return;
-  }
-
-  // Cancel previous request if exists
-  if (currentAbortController.value) {
-    console.log(
-      "[SidepanelMainContent] Cancelling previous translation request",
-    );
-    currentAbortController.value.abort();
-  }
-
-  // Create new abort controller for this request
-  currentAbortController.value = new AbortController();
-  const abortSignal = currentAbortController.value.signal;
 
   try {
-    isTranslating.value = true;
-    translationError.value = "";
-    translationResult.value = "";
+    // Cancel previous request if exists
+    if (currentAbortController.value) {
+      console.log("[SidepanelMainContent] Cancelling previous translation request");
+      currentAbortController.value.abort();
+    }
 
-    console.log(
-      "[SidepanelMainContent] Ensuring background script is ready...",
-    );
+    // Ensure background is ready
+    console.log("[SidepanelMainContent] Ensuring background script is ready...");
     await backgroundWarmup.ensureWarmedUp();
 
-    // Check if request was cancelled during warmup
-    if (abortSignal.aborted) {
-      console.log("[SidepanelMainContent] Request aborted during warmup");
-      return;
-    }
-
-    console.log("[SidepanelMainContent] Sending translation request:", {
-      sourceText: sourceText.value.substring(0, 50) + "...",
-      targetLanguage,
-    });
-
-    // Convert language names to codes
-    const sourceLanguageCode = getLanguageCode(sourceLanguageValue.value);
-    const targetLanguageCode = getLanguageCode(targetLanguage);
-
-    // Get current provider from settings
-    const currentProvider = settingsStore.settings.TRANSLATION_API || "google";
-
-    // Use TranslationClient for translation
-    const response = await translationClient.translate(sourceText.value, {
-      provider: currentProvider,
-      sourceLanguage:
-        sourceLanguageCode === "en" && sourceLanguageValue.value === "auto"
-          ? "auto"
-          : sourceLanguageCode,
-      targetLanguage: targetLanguageCode,
-      mode: "sidepanel",
-    });
-
-    // Check if request was cancelled before processing response
-    if (abortSignal.aborted) {
-      console.log(
-        "[SidepanelMainContent] Request aborted before processing response",
-      );
-      return;
-    }
-
-    console.log("[SidepanelMainContent] Translation response:", response);
-
-    // For Firefox MV3, the actual translation result will come via a separate message
-    // The initial response from UnifiedMessenger will be a generic success message
-    // We will rely on the message listener to update translationResult.value
-    if (response && response.success) {
-      console.log(
-        "[SidepanelMainContent] Translation request sent successfully. Waiting for result update...",
-      );
-      // No direct update here, the listener will handle it
-    } else {
-      throw new Error(response.error || "No translation result received");
-    }
+    // Use composable translation function - EXACTLY LIKE POPUP
+    console.log("[SidepanelMainContent] Triggering translation via composable");
+    const success = await triggerTranslation();
+    
+    console.log("[SidepanelMainContent] Translation completed:", success);
+    
   } catch (error) {
-    // Don't show error if request was cancelled
-    if (error.name === "AbortError" || abortSignal.aborted) {
-      console.log("[SidepanelMainContent] Translation request was cancelled");
-      return;
-    }
-
-    console.error("[SidepanelMainContent] Translation failed:", error);
-    translationError.value = error.message || "Translation failed";
-  } finally {
-    // Only cleanup if this is still the current request
-    if (currentAbortController.value?.signal === abortSignal) {
-      isTranslating.value = false;
-      currentAbortController.value = null;
-    }
+    console.error("[SidepanelMainContent] Translation error:", error);
   }
 };
 
@@ -645,8 +576,8 @@ const handleTextExtracted = (extractedText, _elementData) => {
   // Populate source text
   sourceText.value = extractedText;
 
-  // Clear previous translation and error
-  translationResult.value = "";
+  // Clear previous translation and error - use composable state
+  translatedText.value = "";
   translationError.value = "";
 
   // Optional: Auto-trigger translation
@@ -657,7 +588,7 @@ const handleTextExtracted = (extractedText, _elementData) => {
 };
 
 // Lifecycle - setup event listeners
-onMounted(() => {
+onMounted(async () => {
   // Suppress no-unused-vars warnings for template-used variables/functions
   // These are used in the template but not directly in the script setup block
   console.log(historyComposable); // Explicitly use historyComposable to satisfy linter
@@ -676,23 +607,10 @@ onMounted(() => {
   // Setup Select Element text extraction handler
   selectElement.onTextExtracted.value = handleTextExtracted;
 
-  // Listen for translation result updates from background script
-  browserAPI.onMessage.addListener((message) => {
-    if (
-      message.action === "TRANSLATION_RESULT_UPDATE" &&
-      message.context === "sidepanel"
-    ) {
-      console.log(
-        "[SidepanelMainContent] Received TRANSLATION_RESULT_UPDATE:",
-        message,
-      );
-      translationResult.value = message.translatedText;
-      translationError.value = ""; // Clear any previous error
-      showSpinner.value = false;
-      isTranslating.value = false;
-      console.log("[SidepanelMainContent] Translation displayed successfully");
-    }
-  });
+  // Message listener is now handled by useSidepanelTranslation composable - SAME AS POPUP
+
+  // Initialize translation data - SAME AS POPUP
+  await loadLastTranslation();
 
   console.log(
     "[SidepanelMainContent] Component mounted with Select Element integration",

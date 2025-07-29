@@ -18,19 +18,18 @@
       />
     </div>
     
-    <!-- Loading Spinner -->
+    <!-- Loading Spinner (overlaid when loading) -->
     <div v-if="isLoading" class="spinner-overlay">
       <div class="spinner-center">
         <div class="spinner"></div>
       </div>
     </div>
     
-    <!-- Result Content -->
+    <!-- Result Content (always present) -->
     <div 
-      v-else
       ref="resultRef"
       class="result-content"
-      :class="{ 'has-error': hasError, 'fade-in': showFadeIn }"
+      :class="{ 'has-error': hasError, 'fade-in': showFadeIn, 'loading-fade': isLoading }"
       v-html="renderedContent"
     ></div>
   </div>
@@ -167,8 +166,9 @@ const handleTTS = async () => {
 }
 
 // Watchers
-watch(() => props.content, (newContent) => {
-  if (newContent && props.showFadeInAnimation) {
+watch(() => props.content, (newContent, oldContent) => {
+  // Only trigger fade-in if content actually changed and we're not loading
+  if (newContent && newContent !== oldContent && props.showFadeInAnimation && !props.isLoading) {
     showFadeIn.value = true
     setTimeout(() => {
       showFadeIn.value = false
@@ -225,6 +225,11 @@ watch(() => props.error, (newError) => {
 .result-content.has-error {
   border-color: var(--error-color, #dc3545);
   background-color: var(--bg-error-subtle, rgba(220, 53, 69, 0.1));
+}
+
+.result-content.loading-fade {
+  opacity: 0.3;
+  transition: opacity 0.3s ease-out;
 }
 
 /* Content Styling */
@@ -336,9 +341,14 @@ watch(() => props.error, (newError) => {
 
 /* Loading Spinner */
 .spinner-overlay {
-  position: relative;
-  width: 100%;
-  min-height: 60px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-result-color-rgb, 255, 255, 255), 0.8);
+  border-radius: 4px;
+  z-index: 10;
 }
 
 .spinner-center {
