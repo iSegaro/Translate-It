@@ -3,14 +3,12 @@
 import browser from 'webextension-polyfill';
 import { logME } from "../../../utils/helpers.js";
 
-export async function handleOpenOptionsPage(message, sender, sendResponse) {
+export async function handleOpenOptionsPage(message, sender) {
   try {
     browser.runtime.openOptionsPage();
-    sendResponse({ success: true });
-    return false; // No async response needed
+    return { success: true };
   } catch (error) {
     logME("[handleOpenOptionsPage] Failed to open options page:", error);
-    sendResponse({ success: false, error: error.message });
-    return false;
+    return { success: false, error: error.message };
   }
 }

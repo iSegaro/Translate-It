@@ -3,18 +3,16 @@
 import browser from 'webextension-polyfill';
 import { logME } from "../../../utils/helpers.js";
 
-export async function handleOpenURL(message, sender, sendResponse) {
+export async function handleOpenURL(message, sender) {
   try {
     const anchor = message.data?.anchor;
     const optionsUrl = browser.runtime.getURL(
       `html/options.html${anchor ? `#${anchor}` : ""}`
     );
     browser.tabs.create({ url: optionsUrl });
-    sendResponse({ success: true });
-    return true; // Indicates async response
+    return { success: true };
   } catch (error) {
     logME("[handleOpenURL] Failed to open URL:", error);
-    sendResponse({ success: false, error: error.message });
-    return false;
+    return { success: false, error: error.message };
   }
 }

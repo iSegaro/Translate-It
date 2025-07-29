@@ -4,13 +4,11 @@
 
 import { ref, reactive, onMounted, onUnmounted, readonly } from "vue";
 import { useI18n } from "./useI18n.js";
-import browser from "webextension-polyfill";
+import { useBrowserAPI } from "./useBrowserAPI.js";
 
 export function useSelectElementTranslation() {
   const { t } = useI18n();
-
-  // browser API reference
-  const browser = ref(null);
+  const browserAPI = useBrowserAPI();
 
   // Reactive state following Plan1.md architecture
   const state = reactive({
@@ -40,19 +38,11 @@ export function useSelectElementTranslation() {
   ) => {
     for (let i = 0; i < retries; i++) {
       try {
-        console.log(
-          `[useSelectElementTranslation] Debug: browser is:`,
-          browser,
-        );
-        console.log(
-          `[useSelectElementTranslation] Debug: browser.runtime is:`,
-          browser.runtime,
-        );
         console.log(`[useSelectElementTranslation] Sending message:`, {
           action,
           data,
         });
-        const response = await browser.runtime.sendMessage({ action, data });
+        const response = await browserAPI.safeSendMessage({ action, data });
         console.log(
           `[useSelectElementTranslation] Received response:`,
           response,
@@ -118,14 +108,15 @@ export function useSelectElementTranslation() {
         state.isSelecting = true;
         isSelectModeActive.value = true; // Update the overall mode status
         console.log(
-          `[useSelectElementTranslation] Debug: Before setting selectElementState, browser.storage:`,
-          browser.storage,
+          `[useSelectElementTranslation] Debug: Before setting selectElementState, browserAPI:`,
+          browserAPI,
         );
-        if (browser.storage?.local) {
-          await browser.storage.local.set({ selectElementState: true });
-        } else {
+        try {
+          await browserAPI.safeStorageSet({ selectElementState: true });
+        } catch (error) {
           console.warn(
-            "[useSelectElementTranslation] browser storage not available",
+            "[useSelectElementTranslation] Failed to set selectElementState:",
+            error,
           );
         }
         console.log(
@@ -174,14 +165,15 @@ export function useSelectElementTranslation() {
         state.isSelecting = false;
         isSelectModeActive.value = false; // Update the overall mode status
         console.log(
-          `[useSelectElementTranslation] Debug: Before setting selectElementState, browser.storage:`,
-          browser.storage,
+          `[useSelectElementTranslation] Debug: Before setting selectElementState, browserAPI:`,
+          browserAPI,
         );
-        if (browser.storage?.local) {
-          await browser.storage.local.set({ selectElementState: false });
-        } else {
+        try {
+          await browserAPI.safeStorageSet({ selectElementState: false });
+        } catch (error) {
           console.warn(
-            "[useSelectElementTranslation] browser storage not available",
+            "[useSelectElementTranslation] Failed to set selectElementState:",
+            error,
           );
         }
         state.selectedElement = null;
@@ -264,15 +256,13 @@ export function useSelectElementTranslation() {
     state.error = null; // پاکسازی خطاهای قبلی
 
     // همگام‌سازی با storage
-    if (browser.storage?.local) {
-      try {
-        await browser.storage.local.set({ selectElementState: false });
-      } catch (error) {
-        console.warn(
-          "[useSelectElementTranslation] Failed to update storage:",
-          error,
-        );
-      }
+    try {
+      await browserAPI.safeStorageSet({ selectElementState: false });
+    } catch (error) {
+      console.warn(
+        "[useSelectElementTranslation] Failed to update storage:",
+        error,
+      );
     }
 
     // اطلاع‌رسانی به parent component برای populate کردن form
@@ -391,16 +381,13 @@ export function useSelectElementTranslation() {
         clearSelectionTimeout();
 
         // همگام‌سازی با storage
-        if (browser.storage?.local) {
-          browser.storage.local
-            .set({ selectElementState: false })
-            .catch((error) => {
-              console.warn(
-                "[useSelectElementTranslation] Failed to update storage on cancellation:",
-                error,
-              );
-            });
-        }
+        browserAPI.safeStorageSet({ selectElementState: false })
+          .catch((error) => {
+            console.warn(
+              "[useSelectElementTranslation] Failed to update storage on cancellation:",
+              error,
+            );
+          });
 
         if (onModeChanged.value) {
           onModeChanged.value(false);
@@ -420,16 +407,13 @@ export function useSelectElementTranslation() {
         clearSelectionTimeout();
 
         // همگام‌سازی با storage
-        if (browser.storage?.local) {
-          browser.storage.local
-            .set({ selectElementState: false })
-            .catch((error) => {
-              console.warn(
-                "[useSelectElementTranslation] Failed to update storage on success:",
-                error,
-              );
-            });
-        }
+        browserAPI.safeStorageSet({ selectElementState: false })
+          .catch((error) => {
+            console.warn(
+              "[useSelectElementTranslation] Failed to update storage on success:",
+              error,
+            );
+          });
 
         if (onModeChanged.value) {
           onModeChanged.value(false);
@@ -437,36 +421,14 @@ export function useSelectElementTranslation() {
       }
     };
 
-    // اطمینان از دسترسی به browser API
-
-    // Use native Chrome API to avoid proxy binding issues
-    if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-      try {
-        chrome.runtime.onMessage.addListener.call(
-          chrome.runtime.onMessage,
-          messageListener,
-        );
-        browser.runtime.onMessage.addListener.call(
-          browser.runtime.onMessage,
-          messageListener,
-        );
-        chrome.storage.onChanged.addListener.call(
-          chrome.storage.onChanged,
-          storageChangeListener,
-        );
-        browser.storage.onChanged.addListener.call(
-          browser.storage.onChanged,
-          storageChangeListener,
-        );
-      } catch (listenerError) {
-        console.warn(
-          "[useSelectElementTranslation] Storage listener setup failed:",
-          listenerError,
-        );
-        // Continue without storage listener - not critical for functionality
-      }
-    }
+    // Setup message listener using browserAPI (standard pattern)
+    browserAPI.onMessage.addListener(messageListener);
   };
+
+  // Setup message listener on mount
+  onMounted(() => {
+    setupBackgroundListener();
+  });
 
   onUnmounted(() => {
     console.log(
@@ -476,21 +438,7 @@ export function useSelectElementTranslation() {
     // پاکسازی timeout
     clearSelectionTimeout();
 
-    // پاکسازی listeners
-    if (messageListener) {
-      try {
-        if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-          chrome.runtime.onMessage.removeListener(messageListener);
-        } else if (browser.runtime?.onMessage) {
-          browser.runtime.onMessage.removeListener(messageListener);
-        }
-      } catch (error) {
-        console.warn(
-          "[useSelectElementTranslation] Cleanup listener removal failed:",
-          error,
-        );
-      }
-    }
+    // Cleanup is handled automatically by browserAPI
 
     // غیرفعال‌سازی mode در صورت فعال بودن
     if (state.isSelecting) {
@@ -525,24 +473,18 @@ export function useSelectElementTranslation() {
     // Utilities
     handleElementSelected,
     loadCurrentState: async () => {
-      if (browser.storage?.local) {
-        try {
-          const result = await browser.storage.local.get("selectElementState");
-          isSelectModeActive.value = !!result.selectElementState;
-          state.isSelecting = !!result.selectElementState;
-          console.log(
-            "[useSelectElementTranslation] Loaded selectElementState from storage:",
-            isSelectModeActive.value,
-          );
-        } catch (error) {
-          console.warn(
-            "[useSelectElementTranslation] Failed to load selectElementState from storage:",
-            error,
-          );
-        }
-      } else {
+      try {
+        const result = await browserAPI.safeStorageGet(["selectElementState"]);
+        isSelectModeActive.value = !!result.selectElementState;
+        state.isSelecting = !!result.selectElementState;
+        console.log(
+          "[useSelectElementTranslation] Loaded selectElementState from storage:",
+          isSelectModeActive.value,
+        );
+      } catch (error) {
         console.warn(
-          "[useSelectElementTranslation] browser storage not available during loadCurrentState",
+          "[useSelectElementTranslation] Failed to load selectElementState from storage:",
+          error,
         );
       }
     },

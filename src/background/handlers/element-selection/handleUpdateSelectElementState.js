@@ -9,10 +9,9 @@ const errorHandler = new ErrorHandler();
  * This updates the state of element selection mode.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleUpdateSelectElementState(message, sender, sendResponse) {
+export async function handleUpdateSelectElementState(message, sender) {
   console.log('[Handler:UPDATE_SELECT_ELEMENT_STATE] Processing element selection state update:', message.data);
   
   try {
@@ -34,20 +33,18 @@ export async function handleUpdateSelectElementState(message, sender, sendRespon
     
     console.log(`✅ [UPDATE_SELECT_ELEMENT_STATE] Element selection state updated for tab ${targetTabId}`);
     
-    sendResponse({ 
+    return { 
       success: true, 
       message: 'Element selection state updated',
       tabId: targetTabId,
       isActive
-    });
-    return true;
+    };
   } catch (error) {
     errorHandler.handle(error, {
       type: ErrorTypes.ELEMENT_SELECTION,
       context: "handleUpdateSelectElementState",
       messageData: message
     });
-    sendResponse({ success: false, error: error.message || 'Element selection state update failed' });
-    return false;
+    return { success: false, error: error.message || 'Element selection state update failed' };
   }
 }

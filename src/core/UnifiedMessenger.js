@@ -76,12 +76,24 @@ export class UnifiedMessenger {
                     });
                     return;
                   }
-                  // For other messages, resolve with success flag
-                  resolve({
-                    success: true,
-                    message:
-                      "Response received but undefined due to Firefox MV3 bug",
-                  });
+                  // For element selection messages, we need to handle the actual response from background
+                  if (messageToSend.action === "activateSelectElementMode") {
+                    // Check if we can determine success/failure from background logs or other indicators
+                    // Since we can't get the real response, assume success for now
+                    // The actual feedback will come from content script or storage updates
+                    resolve({
+                      success: true,
+                      message: "Element selection mode toggled (Firefox MV3 workaround)",
+                      firefoxBug: true,
+                    });
+                  } else {
+                    // For other messages, resolve with success flag
+                    resolve({
+                      success: true,
+                      message:
+                        "Response received but undefined due to Firefox MV3 bug",
+                    });
+                  }
                 } else {
                   resolve(response);
                 }

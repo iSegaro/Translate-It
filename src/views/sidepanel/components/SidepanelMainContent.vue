@@ -138,7 +138,7 @@
           class="translate-button-main"
           :disabled="!sourceText.trim()"
         >
-          <span>{{ showSpinner ? "Translating..." : "Translate" }}</span>
+          <span>{{ isTranslating ? "Translating..." : "Translate" }}</span>
           <img
             src="@/assets/icons/translate.png"
             alt="Translate"

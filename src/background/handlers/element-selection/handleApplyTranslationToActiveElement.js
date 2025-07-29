@@ -10,10 +10,9 @@ const errorHandler = new ErrorHandler();
  * This applies a translation to the currently active element.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleApplyTranslationToActiveElement(message, sender, sendResponse) {
+export async function handleApplyTranslationToActiveElement(message, sender) {
   console.log('[Handler:applyTranslationToActiveElement] Processing translation application:', message.data);
   
   try {
@@ -40,21 +39,19 @@ export async function handleApplyTranslationToActiveElement(message, sender, sen
     
     console.log(`✅ [applyTranslationToActiveElement] Translation applied to element in tab ${targetTabId}`);
     
-    sendResponse({ 
+    return { 
       success: true, 
       message: 'Translation applied to active element',
       tabId: targetTabId,
       elementId,
       response
-    });
-    return true;
+    };
   } catch (error) {
     errorHandler.handle(error, {
       type: ErrorTypes.ELEMENT_SELECTION,
       context: "handleApplyTranslationToActiveElement",
       messageData: message
     });
-    sendResponse({ success: false, error: error.message || 'Translation application failed' });
-    return false;
+    return { success: false, error: error.message || 'Translation application failed' };
   }
 }

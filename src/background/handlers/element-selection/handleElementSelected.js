@@ -9,10 +9,9 @@ const errorHandler = new ErrorHandler();
  * This processes an element that has been selected for translation.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleElementSelected(message, sender, sendResponse) {
+export async function handleElementSelected(message, sender) {
   console.log('[Handler:elementSelected] Processing element selection:', message.data);
   
   try {
@@ -39,20 +38,18 @@ export async function handleElementSelected(message, sender, sendResponse) {
     
     console.log(`✅ [elementSelected] Element processed successfully for tab ${targetTabId}`);
     
-    sendResponse({ 
+    return { 
       success: true, 
       message: 'Element selected and processed',
       data: result,
       tabId: targetTabId
-    });
-    return true;
+    };
   } catch (error) {
     errorHandler.handle(error, {
       type: ErrorTypes.ELEMENT_SELECTION,
       context: "handleElementSelected",
       messageData: message
     });
-    sendResponse({ success: false, error: error.message || 'Element selection processing failed' });
-    return false;
+    return { success: false, error: error.message || 'Element selection processing failed' };
   }
 }

@@ -146,8 +146,22 @@ export class SelectElementManager {
    * Handle messages from background script
    */
   async handleMessage(message, sender, sendResponse) {
-    if (message.action === "TOGGLE_SELECT_ELEMENT_MODE") {
-      const shouldActivate = message.data;
+    console.log(`[SelectElementManager] Received message:`, message);
+    
+    if (message.action === "TOGGLE_SELECT_ELEMENT_MODE" || 
+        message.action === "ACTIVATE_ELEMENT_SELECTION" ||
+        message.action === "DEACTIVATE_ELEMENT_SELECTION") {
+      
+      // Determine activation state
+      let shouldActivate;
+      if (message.action === "ACTIVATE_ELEMENT_SELECTION") {
+        shouldActivate = true;
+      } else if (message.action === "DEACTIVATE_ELEMENT_SELECTION") {
+        shouldActivate = false;
+      } else {
+        // Legacy TOGGLE_SELECT_ELEMENT_MODE
+        shouldActivate = message.data;
+      }
 
       try {
         if (shouldActivate) {
@@ -157,10 +171,17 @@ export class SelectElementManager {
         }
 
         // Send success response to background
-        sendResponse({ success: true, isActive: this.isActive });
+        const response = { success: true, isActive: this.isActive };
         console.log(
           `[SelectElementManager] Mode ${shouldActivate ? "activated" : "deactivated"} successfully`,
+          response
         );
+        
+        if (sendResponse) {
+          sendResponse(response);
+        }
+        
+        return response;
       } catch (error) {
         console.error("[SelectElementManager] Toggle error:", error);
 
@@ -170,10 +191,12 @@ export class SelectElementManager {
           context: "select-element-toggle",
         });
 
-        sendResponse({ success: false, error: error.message });
+        const errorResponse = { success: false, error: error.message };
+        if (sendResponse) {
+          sendResponse(errorResponse);
+        }
+        return errorResponse;
       }
-
-      return true; // Keep response channel open
     }
 
     return false; // Let other handlers process the message

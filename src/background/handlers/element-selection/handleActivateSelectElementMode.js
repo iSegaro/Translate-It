@@ -10,45 +10,60 @@ const errorHandler = new ErrorHandler();
  * This activates element selection mode in a specific tab.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleActivateSelectElementMode(message, sender, sendResponse) {
+export async function handleActivateSelectElementMode(message, sender) {
   console.log('[Handler:activateSelectElementMode] Processing element selection activation:', message.data);
   
   try {
     const { tabId } = message.data || {};
-    const targetTabId = tabId || sender.tab?.id;
+    let targetTabId = tabId || sender.tab?.id;
     
+    // If no tabId available (e.g., from sidepanel), get current active tab
     if (!targetTabId) {
-      throw new Error('Tab ID is required for element selection mode');
+      console.log('[Handler:activateSelectElementMode] No tab ID from sender, finding active tab...');
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tabs.length > 0) {
+        targetTabId = tabs[0].id;
+        console.log(`[Handler:activateSelectElementMode] Found active tab: ${targetTabId}`);
+      }
     }
     
-    // Send message to content script to activate selection mode
+    if (!targetTabId) {
+      throw new Error('Could not determine target tab for element selection');
+    }
+    
+    // Send message to content script to activate/deactivate selection mode
+    const isActivating = message.data === true || message.data?.activate === true;
+    const action = isActivating ? 'ACTIVATE_ELEMENT_SELECTION' : 'DEACTIVATE_ELEMENT_SELECTION';
+    
+    console.log(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId}`);
+    
     const response = await browser.tabs.sendMessage(targetTabId, {
-      action: 'ACTIVATE_ELEMENT_SELECTION',
+      action: action,
       data: {
-        mode: 'select',
+        mode: isActivating ? 'select' : 'normal',
+        activate: isActivating,
         timestamp: Date.now()
       }
     });
     
-    console.log(`✅ [activateSelectElementMode] Element selection mode activated in tab ${targetTabId}`);
+    const statusText = isActivating ? 'activated' : 'deactivated';
+    console.log(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
     
-    sendResponse({ 
+    return { 
       success: true, 
-      message: 'Element selection mode activated',
+      message: `Element selection mode ${statusText}`,
       tabId: targetTabId,
+      activated: isActivating,
       response
-    });
-    return true;
+    };
   } catch (error) {
     errorHandler.handle(error, {
       type: ErrorTypes.ELEMENT_SELECTION,
       context: "handleActivateSelectElementMode",
       messageData: message
     });
-    sendResponse({ success: false, error: error.message || 'Element selection activation failed' });
-    return false;
+    return { success: false, error: error.message || 'Element selection activation failed' };
   }
 }
