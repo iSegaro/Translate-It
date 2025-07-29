@@ -21,10 +21,8 @@ export class CoreMessageRouter {
     if (this.initialized) return;
 
     // Setup runtime.onMessage listener for direct messages
-    browser.runtime.onMessage.addListener(this.handleRuntimeMessage.bind(this));
-    
-    // Setup runtime.onConnect listener for port connections
-    browser.runtime.onConnect.addListener(this.handlePortConnection.bind(this));
+    browser.runtime.onMessage.addListener.call(browser.runtime.onMessage, this.handleRuntimeMessage.bind(this));
+browser.runtime.onConnect.addListener.call(browser.runtime.onConnect, this.handlePortConnection.bind(this));
 
     this.initialized = true;
     console.log('✅ CoreMessageRouter initialized');

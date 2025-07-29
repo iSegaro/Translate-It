@@ -4,7 +4,7 @@
 // Translation is now handled by the TranslationEngine, not directly by message handlers
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 export class VueMessageHandler {
   constructor() {
@@ -17,46 +17,46 @@ export class VueMessageHandler {
     // Translation handlers (TRANSLATE action is now handled by MessageRouter)
     // Keep only image translation which has special handling
     this.handlers.set(
-      "TRANSLATE_IMAGE", 
-      this.handleImageTranslation.bind(this)
+      "TRANSLATE_IMAGE",
+      this.handleImageTranslation.bind(this),
     );
 
     // Provider management handlers
     this.handlers.set(
       "GET_PROVIDER_STATUS",
-      this.handleProviderStatus.bind(this)
+      this.handleProviderStatus.bind(this),
     );
     this.handlers.set(
       "TEST_PROVIDER_CONNECTION",
-      this.handleTestProvider.bind(this)
+      this.handleTestProvider.bind(this),
     );
     this.handlers.set(
       "SAVE_PROVIDER_CONFIG",
-      this.handleSaveProviderConfig.bind(this)
+      this.handleSaveProviderConfig.bind(this),
     );
     this.handlers.set(
       "GET_PROVIDER_CONFIG",
-      this.handleGetProviderConfig.bind(this)
+      this.handleGetProviderConfig.bind(this),
     );
 
     // Screen capture handlers
     this.handlers.set(
       "START_SCREEN_CAPTURE",
-      this.handleStartScreenCapture.bind(this)
+      this.handleStartScreenCapture.bind(this),
     );
     this.handlers.set(
       "CAPTURE_SCREEN_AREA",
-      this.handleCaptureScreenArea.bind(this)
+      this.handleCaptureScreenArea.bind(this),
     );
 
     // Extension feature handlers
     this.handlers.set(
       "UPDATE_CONTEXT_MENU",
-      this.handleUpdateContextMenu.bind(this)
+      this.handleUpdateContextMenu.bind(this),
     );
     this.handlers.set(
       "GET_EXTENSION_INFO",
-      this.handleGetExtensionInfo.bind(this)
+      this.handleGetExtensionInfo.bind(this),
     );
 
     // Logging handlers
@@ -110,7 +110,7 @@ export class VueMessageHandler {
       const backgroundService = globalThis.backgroundService; // Access the global background service
       if (!backgroundService || !backgroundService.translationEngine) {
         throw new Error(
-          "Background service or translation engine not initialized."
+          "Background service or translation engine not initialized.",
         );
       }
 
@@ -120,7 +120,7 @@ export class VueMessageHandler {
           from,
           to,
           provider,
-          mode
+          mode,
         );
 
       return {
@@ -151,7 +151,7 @@ export class VueMessageHandler {
       const backgroundService = globalThis.backgroundService; // Access the global background service
       if (!backgroundService || !backgroundService.translationEngine) {
         throw new Error(
-          "Background service or translation engine not initialized."
+          "Background service or translation engine not initialized.",
         );
       }
 
@@ -173,13 +173,13 @@ export class VueMessageHandler {
       const backgroundService = globalThis.backgroundService; // Access the global background service
       if (!backgroundService || !backgroundService.translationEngine) {
         throw new Error(
-          "Background service or translation engine not initialized."
+          "Background service or translation engine not initialized.",
         );
       }
 
       const testResult = await backgroundService.translationEngine.testProvider(
         provider,
-        config
+        config,
       );
 
       return {
@@ -397,7 +397,7 @@ export class VueMessageHandler {
   async register() {
     // Registration is now handled by the MessageRouter in BackgroundService
     console.log(
-      "[VueMessageHandler] Register method called, but actual registration is handled by MessageRouter."
+      "[VueMessageHandler] Register method called, but actual registration is handled by MessageRouter.",
     );
   }
 }

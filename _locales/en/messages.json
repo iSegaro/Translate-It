@@ -12,6 +12,8 @@
   "context_menu_options": { "message": "Options" },
   "context_menu_shortcuts": { "message": "Keyboard Shortcut" },
   "context_menu_help": { "message": "Useful Help" },
+  "context_menu_translate_screen": { "message": "Translate Screen (Capture)" },
+  "context_menu_reload_extension": { "message": "Reload Extension (Debug)" },
   "context_menu_translate_with_selection": { "message": "Translate Element" },
   "context_menu_api_provider": { "message": "API Provider" },
   "api_provider_google": { "message": "Google Translate" },

@@ -30,7 +30,7 @@ export async function handleFetchTranslationBackground(
   sender,
   sendResponse,
   translateText,
-  errorHandler
+  errorHandler,
 ) {
   try {
     const { promptText, translationMode, sourceLang, targetLang } =
@@ -48,7 +48,7 @@ export async function handleFetchTranslationBackground(
       promptText,
       translationMode,
       sourceLang,
-      targetLang
+      targetLang,
     );
 
     // Check result
@@ -93,16 +93,16 @@ export default class TranslationHandler {
     this.strategies = {
       [Platform.WhatsApp]: new WhatsAppStrategy(
         this.notifier,
-        this.errorHandler
+        this.errorHandler,
       ),
       [Platform.Instagram]: new InstagramStrategy(
         this.notifier,
-        this.errorHandler
+        this.errorHandler,
       ),
       [Platform.Medium]: new MediumStrategy(this.notifier, this.errorHandler),
       [Platform.Telegram]: new TelegramStrategy(
         this.notifier,
-        this.errorHandler
+        this.errorHandler,
       ),
       [Platform.Twitter]: new TwitterStrategy(this.notifier, this.errorHandler),
       [Platform.ChatGPT]: new ChatGPTStrategy(this.notifier, this.errorHandler),
@@ -218,12 +218,11 @@ export default class TranslationHandler {
       statusNotification = this.notifier.show(
         (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
           "(translating...)",
-        "status"
+        "status",
       );
 
-      state.translateMode =
-        params.selectionRange ?
-          TranslationMode.SelectElement
+      state.translateMode = params.selectionRange
+        ? TranslationMode.SelectElement
         : TranslationMode.Field;
 
       //ارسال دقیق target برای جلوگیری از undefined
@@ -273,7 +272,7 @@ export default class TranslationHandler {
       Object.entries(this.strategies).forEach(([name, strategy]) => {
         if (typeof strategy.extractText !== "function") {
           throw new Error(
-            `استراتژی ${name} متد extractText را پیاده‌سازی نکرده است`
+            `استراتژی ${name} متد extractText را پیاده‌سازی نکرده است`,
           );
         }
       });
@@ -296,7 +295,7 @@ export default class TranslationHandler {
         ) {
           return await this.strategies[platform].updateElement(
             target,
-            translated
+            translated,
           );
         }
       }
@@ -327,7 +326,7 @@ export default class TranslationHandler {
         {
           type: ErrorTypes.SERVICE,
           context: `TranslationHandler-extractFromActiveElement-${platform}`,
-        }
+        },
       );
       return "";
     }

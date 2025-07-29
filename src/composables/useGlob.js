@@ -1,5 +1,4 @@
-
-import { glob } from 'glob';
+import { glob } from "glob";
 
 export const useGlob = () => {
   const findFiles = async (pattern) => {

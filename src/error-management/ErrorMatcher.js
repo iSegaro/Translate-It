@@ -81,11 +81,13 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("translation not found"))
     return ErrorTypes.TRANSLATION_NOT_FOUND;
   if (msg.includes("translation failed")) return ErrorTypes.TRANSLATION_FAILED;
-  
+
   // browser Translation API specific errors
-  if (msg.includes("translation not available") ||
-      msg.includes("language pair not supported") ||
-      msg.includes("language not supported"))
+  if (
+    msg.includes("translation not available") ||
+    msg.includes("language pair not supported") ||
+    msg.includes("language not supported")
+  )
     return ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
 
   // Import/Export password issues
@@ -118,11 +120,13 @@ export function matchErrorToType(rawOrError = "") {
     return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing"))
     return ErrorTypes.API_KEY_MISSING;
-  
+
   // Google Translate
-  if (msg.includes("http 400 error") ||
-      msg.includes("http 400") ||
-      msg.includes("400 error"))
+  if (
+    msg.includes("http 400 error") ||
+    msg.includes("http 400") ||
+    msg.includes("400 error")
+  )
     return ErrorTypes.INVALID_REQUEST;
 
   // API URL or model errors
@@ -154,7 +158,7 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("location is not supported")
   ) {
     logME(
-      "[ErrorMatcher] Quota exceeded with region, indicating Gemini-specific quota."
+      "[ErrorMatcher] Quota exceeded with region, indicating Gemini-specific quota.",
     );
     return ErrorTypes.GEMINI_QUOTA_REGION;
   }

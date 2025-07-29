@@ -38,27 +38,27 @@ export class TextExtractor {
   async extractText(imageData, options = {}) {
     try {
       const method = options.method || this.defaultMethod;
-      
+
       logME(`[TextExtractor] Extracting text using method: ${method}`, {
         method,
         hasImage: !!imageData,
-        options: { ...options, imageData: '[base64-data]' }
+        options: { ...options, imageData: "[base64-data]" },
       });
 
       const extractorFunction = this.extractionMethods.get(method);
       if (!extractorFunction) {
         throw this._createError(
           ErrorTypes.INTEGRATION,
-          `Text extraction method '${method}' not available`
+          `Text extraction method '${method}' not available`,
         );
       }
 
       const result = await extractorFunction(imageData, options);
-      
+
       logME(`[TextExtractor] Text extraction completed:`, {
         method,
         success: !!result,
-        textLength: result?.extractedText?.length || 0
+        textLength: result?.extractedText?.length || 0,
       });
 
       return {
@@ -66,9 +66,8 @@ export class TextExtractor {
         extractedText: result.extractedText || "",
         confidence: result.confidence || 1.0,
         metadata: result.metadata || {},
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-
     } catch (error) {
       logME(`[TextExtractor] Text extraction failed:`, error);
       throw this._normalizeError(error, "extractText");
@@ -92,23 +91,22 @@ export class TextExtractor {
 
       // For OCR method, extract first then translate
       const extractionResult = await this.extractText(imageData, options);
-      
+
       if (!extractionResult.extractedText) {
         throw this._createError(
           ErrorTypes.TEXT_EMPTY,
-          "No text extracted from image"
+          "No text extracted from image",
         );
       }
 
       // TODO: Add text translation step for OCR results
       // This would involve calling translation providers with extracted text
-      
+
       return {
         ...extractionResult,
         translatedText: extractionResult.extractedText, // Placeholder for now
-        translationMethod: "pending-ocr-implementation"
+        translationMethod: "pending-ocr-implementation",
       };
-
     } catch (error) {
       logME(`[TextExtractor] Extract and translate failed:`, error);
       throw this._normalizeError(error, "extractAndTranslate");
@@ -124,15 +122,17 @@ export class TextExtractor {
    */
   async _aiExtractAndTranslate(imageData, options) {
     const { provider, sourceLang, targetLang, mode } = options;
-    
+
     // Import here to avoid circular dependencies
-    const { translationProviderFactory } = await import("../providers/factory/index.js");
-    
+    const { translationProviderFactory } = await import(
+      "../providers/factory/index.js"
+    );
+
     const providerInstance = translationProviderFactory.getProvider(provider);
     if (!providerInstance || !providerInstance.translateImage) {
       throw this._createError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
-        `Provider ${provider} does not support image translation`
+        `Provider ${provider} does not support image translation`,
       );
     }
 
@@ -140,7 +140,7 @@ export class TextExtractor {
       imageData,
       sourceLang,
       targetLang,
-      mode
+      mode,
     );
 
     return {
@@ -148,7 +148,7 @@ export class TextExtractor {
       extractedText: "[AI-extracted]", // AI combines extraction and translation
       translatedText,
       confidence: 1.0,
-      metadata: { provider, aiCombined: true }
+      metadata: { provider, aiCombined: true },
     };
   }
 
@@ -180,7 +180,7 @@ export class TextExtractor {
     } else {
       throw this._createError(
         ErrorTypes.INTEGRATION,
-        `Cannot set default method to unavailable method: ${method}`
+        `Cannot set default method to unavailable method: ${method}`,
       );
     }
   }
@@ -212,10 +212,13 @@ export class TextExtractor {
     }
 
     let errorType = ErrorTypes.INTEGRATION;
-    
+
     if (error.message?.includes("not supported")) {
       errorType = ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED;
-    } else if (error.message?.includes("empty") || error.message?.includes("no text")) {
+    } else if (
+      error.message?.includes("empty") ||
+      error.message?.includes("no text")
+    ) {
       errorType = ErrorTypes.TEXT_EMPTY;
     } else if (error.message?.includes("extraction")) {
       errorType = ErrorTypes.IMAGE_PROCESSING_FAILED;
@@ -224,7 +227,7 @@ export class TextExtractor {
     const normalizedError = new Error(error.message || "Text extraction error");
     normalizedError.type = errorType;
     normalizedError.context = `text-extractor-${context}`;
-    
+
     return normalizedError;
   }
 
@@ -235,7 +238,7 @@ export class TextExtractor {
    */
   static createWithDefaults() {
     const extractor = new TextExtractor();
-    
+
     // Register AI method (current implementation)
     extractor.registerMethod("ai", async (_imageData, _options) => {
       // This is handled by _aiExtractAndTranslate

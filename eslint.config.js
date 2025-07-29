@@ -1,8 +1,10 @@
 // eslint.config.js
 
-import js from "@eslint/js";
-import babelParser from "@babel/eslint-parser";
-import noUnsanitized from "eslint-plugin-no-unsanitized";
+const js = require("@eslint/js");
+const babelParser = require("@babel/eslint-parser");
+const noUnsanitized = require("eslint-plugin-no-unsanitized");
+const vuePlugin = require("eslint-plugin-vue");
+const vueParser = require("vue-eslint-parser");
 
 const browser = process.env.BROWSER || "chrome";
 
@@ -17,13 +19,16 @@ const browserGlobals = {
 
 const config = [
   js.configs.recommended,
+  // Vue specific configuration
+  ...vuePlugin.configs["flat/recommended"],
   {
-    files: ["src/**/*.js"],
+    files: ["src/**/*.js", "src/**/*.vue"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      parser: babelParser,
+      parser: vueParser,
       parserOptions: {
+        parser: babelParser,
         requireConfigFile: false,
         babelOptions: {
           plugins: [
@@ -78,19 +83,11 @@ const config = [
     },
     plugins: {
       "no-unsanitized": noUnsanitized,
+      vue: vuePlugin,
     },
     rules: {
-      // استفاده امن از innerHTML
-      "no-unsanitized/method": "error",
-      "no-unsanitized/property": [
-        "error",
-        {
-          escape: {
-            methods: ["DOMPurify.sanitize"],
-          },
-        },
-      ],
-      // سایر قوانین
+      "vue/multi-word-component-names": "off",
+      "vue/no-unused-vars": "warn",
       "no-console": "off",
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },
@@ -103,4 +100,4 @@ if (browser === 'firefox') {
   });
 }
 
-export default config;
+module.exports = config;

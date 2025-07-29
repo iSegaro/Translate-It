@@ -15,23 +15,23 @@ export class CaptureResult {
     this.originalCapture = options.originalCapture;
     this.translationText = options.translationText;
     this.position = options.position || { x: 100, y: 100 };
-    
+
     this.onClose = options.onClose || (() => {});
-    
+
     this.isVisible = false;
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
-    
+
     // DOM elements
     this.resultOverlay = null;
     this.dragHandle = null;
     this.contentContainer = null;
     this.closeButton = null;
-    
+
     // Auto-fade timer
     this.autoFadeTimer = null;
     this.autoFadeDelay = 10000; // 10 seconds
-    
+
     // Bound event handlers
     this._boundMouseDown = this._handleMouseDown.bind(this);
     this._boundMouseMove = this._handleMouseMove.bind(this);
@@ -54,15 +54,15 @@ export class CaptureResult {
       await this._createResultOverlay();
       this._addEventListeners();
       this._startAutoFadeTimer();
-      
+
       this.isVisible = true;
-      
+
       logME("[CaptureResult] Result shown successfully");
     } catch (error) {
       logME("[CaptureResult] Error showing result:", error);
       throw this._createError(
         ErrorTypes.UI,
-        `Failed to show capture result: ${error.message}`
+        `Failed to show capture result: ${error.message}`,
       );
     }
   }
@@ -77,11 +77,11 @@ export class CaptureResult {
 
     this._clearAutoFadeTimer();
     this._removeEventListeners();
-    
+
     if (this.resultOverlay && this.resultOverlay.parentNode) {
       this.resultOverlay.parentNode.removeChild(this.resultOverlay);
     }
-    
+
     this.isVisible = false;
   }
 
@@ -108,7 +108,7 @@ export class CaptureResult {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           opacity: 0.95;
           transition: opacity 0.3s ease;
-        `
+        `,
       });
 
       // Create drag handle header
@@ -125,14 +125,17 @@ export class CaptureResult {
           justify-content: space-between;
           font-size: 12px;
           font-weight: 600;
-        `
+        `,
       });
 
       // Create title
       const title = createSafeElement("span", "", {});
       safeSetText(
-        title, 
-        await getTranslationString("CAPTURE_RESULT_TITLE", "Translation Result")
+        title,
+        await getTranslationString(
+          "CAPTURE_RESULT_TITLE",
+          "Translation Result",
+        ),
       );
 
       // Create close button
@@ -147,7 +150,7 @@ export class CaptureResult {
           font-size: 16px;
           line-height: 1;
           transition: background-color 0.2s ease;
-        `
+        `,
       });
       safeSetText(this.closeButton, "×");
 
@@ -155,12 +158,15 @@ export class CaptureResult {
       this.closeButton.addEventListener("mouseenter", () => {
         this.closeButton.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
       });
-      
+
       this.closeButton.addEventListener("mouseleave", () => {
         this.closeButton.style.backgroundColor = "transparent";
       });
 
-      this.closeButton.addEventListener("click", this._handleCloseClick.bind(this));
+      this.closeButton.addEventListener(
+        "click",
+        this._handleCloseClick.bind(this),
+      );
 
       this.dragHandle.appendChild(title);
       this.dragHandle.appendChild(this.closeButton);
@@ -174,34 +180,43 @@ export class CaptureResult {
           line-height: 1.5;
           font-size: 14px;
           color: #333;
-        `
+        `,
       });
 
       // Extract actual translation text (handle both string and object cases)
       let actualTranslationText = "";
       if (typeof this.translationText === "string") {
         actualTranslationText = this.translationText;
-      } else if (this.translationText && typeof this.translationText === "object") {
+      } else if (
+        this.translationText &&
+        typeof this.translationText === "object"
+      ) {
         // If it's an object, try to extract translatedText property
-        actualTranslationText = this.translationText.translatedText || 
-                               this.translationText.text || 
-                               JSON.stringify(this.translationText);
+        actualTranslationText =
+          this.translationText.translatedText ||
+          this.translationText.text ||
+          JSON.stringify(this.translationText);
       }
-      
+
       logME("[CaptureResult] Processing translation text:", {
         originalType: typeof this.translationText,
         extractedText: actualTranslationText,
-        original: this.translationText
+        original: this.translationText,
       });
 
       // Render translation content with markdown support
-      const translationContent = SimpleMarkdown.render(actualTranslationText || "");
-      
+      const translationContent = SimpleMarkdown.render(
+        actualTranslationText || "",
+      );
+
       // Clear existing content
       this.contentContainer.innerHTML = "";
-      
+
       // SimpleMarkdown.render() returns a DOM element, so append it directly
-      if (translationContent && translationContent.nodeType === Node.ELEMENT_NODE) {
+      if (
+        translationContent &&
+        translationContent.nodeType === Node.ELEMENT_NODE
+      ) {
         this.contentContainer.appendChild(translationContent);
       } else {
         // Fallback: if it's not a DOM element, set as text
@@ -218,12 +233,12 @@ export class CaptureResult {
           font-size: 11px;
           color: #666;
           text-align: center;
-        `
+        `,
       });
 
       const footerText = await getTranslationString(
-        "CAPTURE_RESULT_FOOTER", 
-        "Drag to move • Auto-fade in 10s • Click × to close"
+        "CAPTURE_RESULT_FOOTER",
+        "Drag to move • Auto-fade in 10s • Click × to close",
       );
       safeSetText(footer, footerText);
 
@@ -250,7 +265,7 @@ export class CaptureResult {
     if (this.dragHandle) {
       this.dragHandle.addEventListener("mousedown", this._boundMouseDown);
     }
-    
+
     document.addEventListener("mousemove", this._boundMouseMove);
     document.addEventListener("mouseup", this._boundMouseUp);
     document.addEventListener("keydown", this._boundKeyDown);
@@ -264,7 +279,7 @@ export class CaptureResult {
     if (this.dragHandle) {
       this.dragHandle.removeEventListener("mousedown", this._boundMouseDown);
     }
-    
+
     document.removeEventListener("mousemove", this._boundMouseMove);
     document.removeEventListener("mouseup", this._boundMouseUp);
     document.removeEventListener("keydown", this._boundKeyDown);
@@ -281,12 +296,12 @@ export class CaptureResult {
     logME("[CaptureResult] Starting drag");
 
     this.isDragging = true;
-    
+
     // Calculate drag offset
     const rect = this.resultOverlay.getBoundingClientRect();
     this.dragOffset = {
       x: event.clientX - rect.left,
-      y: event.clientY - rect.top
+      y: event.clientY - rect.top,
     };
 
     // Clear auto-fade while dragging
@@ -316,8 +331,14 @@ export class CaptureResult {
     const viewportHeight = window.innerHeight;
     const rect = this.resultOverlay.getBoundingClientRect();
 
-    const constrainedX = Math.max(0, Math.min(newX, viewportWidth - rect.width));
-    const constrainedY = Math.max(0, Math.min(newY, viewportHeight - rect.height));
+    const constrainedX = Math.max(
+      0,
+      Math.min(newX, viewportWidth - rect.width),
+    );
+    const constrainedY = Math.max(
+      0,
+      Math.min(newY, viewportHeight - rect.height),
+    );
 
     // Update position
     this.resultOverlay.style.left = constrainedX + "px";
@@ -338,7 +359,7 @@ export class CaptureResult {
     logME("[CaptureResult] Ending drag");
 
     this.isDragging = false;
-    
+
     // Reset cursor
     this.dragHandle.style.cursor = "move";
 
@@ -382,12 +403,12 @@ export class CaptureResult {
    */
   _startAutoFadeTimer() {
     this._clearAutoFadeTimer();
-    
+
     this.autoFadeTimer = setTimeout(() => {
       if (this.isVisible && !this.isDragging) {
         logME("[CaptureResult] Auto-fading result");
         this.resultOverlay.style.opacity = "0.3";
-        
+
         // Complete auto-close after fade
         setTimeout(() => {
           if (this.isVisible) {
@@ -407,7 +428,7 @@ export class CaptureResult {
       clearTimeout(this.autoFadeTimer);
       this.autoFadeTimer = null;
     }
-    
+
     // Reset opacity if overlay exists
     if (this.resultOverlay) {
       this.resultOverlay.style.opacity = "0.95";
@@ -436,7 +457,7 @@ export class CaptureResult {
 
     this._clearAutoFadeTimer();
     this.hide();
-    
+
     // Reset references
     this.resultOverlay = null;
     this.dragHandle = null;
@@ -458,25 +479,29 @@ export class CaptureResult {
    */
   updateTranslation(newText) {
     this.translationText = newText;
-    
+
     if (this.contentContainer) {
       // Extract actual translation text (handle both string and object cases)
       let actualTranslationText = "";
       if (typeof newText === "string") {
         actualTranslationText = newText;
       } else if (newText && typeof newText === "object") {
-        actualTranslationText = newText.translatedText || 
-                               newText.text || 
-                               JSON.stringify(newText);
+        actualTranslationText =
+          newText.translatedText || newText.text || JSON.stringify(newText);
       }
-      
-      const translationContent = SimpleMarkdown.render(actualTranslationText || "");
-      
+
+      const translationContent = SimpleMarkdown.render(
+        actualTranslationText || "",
+      );
+
       // Clear existing content
       this.contentContainer.innerHTML = "";
-      
+
       // SimpleMarkdown.render() returns a DOM element, so append it directly
-      if (translationContent && translationContent.nodeType === Node.ELEMENT_NODE) {
+      if (
+        translationContent &&
+        translationContent.nodeType === Node.ELEMENT_NODE
+      ) {
         this.contentContainer.appendChild(translationContent);
       } else {
         // Fallback: if it's not a DOM element, set as text
@@ -491,7 +516,7 @@ export class CaptureResult {
    */
   setPosition(newPosition) {
     this.position = newPosition;
-    
+
     if (this.resultOverlay) {
       this.resultOverlay.style.left = newPosition.x + "px";
       this.resultOverlay.style.top = newPosition.y + "px";

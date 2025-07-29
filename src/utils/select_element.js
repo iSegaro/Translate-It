@@ -1,5 +1,5 @@
 // src/utils/select_element.js
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 import { getEventRouterInstance } from "../core/InstanceManager.js";
 import { isExtensionContextValid, logME } from "./helpers.js";
@@ -10,7 +10,7 @@ getEventRouterInstance();
 export async function Active_SelectElement(
   active = null,
   closePopup = false,
-  force = false
+  force = false,
 ) {
   try {
     const tabs = await browser.tabs.query({

@@ -18,7 +18,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     return {
       container: ".player-timedtext, .ltr-1xbip9h",
       text: ".player-timedtext-text-container span, .player-timedtext p, .ltr-1xbip9h span",
-      player: "video"
+      player: "video",
     };
   }
 
@@ -27,11 +27,11 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
       // Netflix اغلب از چندین span استفاده می‌کند
       if (element.children.length > 0) {
         return Array.from(element.children)
-          .map(child => child.textContent)
+          .map((child) => child.textContent)
           .join("")
           .trim();
       }
-      
+
       return element.textContent?.trim() || "";
     } catch {
       return element.textContent?.trim() || "";
@@ -58,13 +58,17 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     return new Promise((resolve) => {
       const check = () => {
         try {
-          const videoPlayer = window?.netflix?.appContext?.state?.playerApp?.getAPI()?.videoPlayer;
+          const videoPlayer =
+            window?.netflix?.appContext?.state?.playerApp?.getAPI()
+              ?.videoPlayer;
           if (videoPlayer) {
             this.netflixPlayer = videoPlayer;
             logME("[NetflixSubtitleHandler] Netflix player API found");
             resolve(true);
           } else if (elapsed >= maxWait) {
-            logME("[NetflixSubtitleHandler] Netflix player API not found, using fallback");
+            logME(
+              "[NetflixSubtitleHandler] Netflix player API not found, using fallback",
+            );
             resolve(false);
           } else {
             elapsed += checkInterval;
@@ -86,7 +90,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   // Override start method برای تنظیمات خاص Netflix
   async start() {
     this.currentMovieId = this.getCurrentMovieId();
-    
+
     if (!this.currentMovieId) {
       logME("[NetflixSubtitleHandler] No movie ID found");
       return false;
@@ -96,11 +100,11 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     await this.waitForNetflixPlayer();
 
     const result = await super.start();
-    
+
     if (result) {
       this.setupNetflixSpecific();
     }
-    
+
     return result;
   }
 
@@ -130,15 +134,23 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     }
 
     // Event delegation برای hover events
-    document.addEventListener("mouseenter", this.handleSubtitleHover.bind(this), true);
-    document.addEventListener("mouseleave", this.handleSubtitleLeave.bind(this), true);
+    document.addEventListener(
+      "mouseenter",
+      this.handleSubtitleHover.bind(this),
+      true,
+    );
+    document.addEventListener(
+      "mouseleave",
+      this.handleSubtitleLeave.bind(this),
+      true,
+    );
   }
 
   handleSubtitleHover(event) {
-    if (!event.target || typeof event.target.closest !== 'function') {
+    if (!event.target || typeof event.target.closest !== "function") {
       return;
     }
-    
+
     const selectors = this.getSelectors();
     if (event.target.closest(selectors.container)) {
       this.pauseVideo();
@@ -146,10 +158,10 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   }
 
   handleSubtitleLeave(event) {
-    if (!event.target || typeof event.target.closest !== 'function') {
+    if (!event.target || typeof event.target.closest !== "function") {
       return;
     }
-    
+
     const selectors = this.getSelectors();
     if (event.target.closest(selectors.container)) {
       this.resumeVideo();
@@ -163,13 +175,14 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
         const playerSessionIds = this.netflixPlayer.getAllPlayerSessionIds();
         const sessionId = playerSessionIds?.[0];
         if (sessionId) {
-          const player = this.netflixPlayer.getVideoPlayerBySessionId(sessionId);
+          const player =
+            this.netflixPlayer.getVideoPlayerBySessionId(sessionId);
           player?.pause?.();
           this.wasPlayingBeforePause = true;
           return;
         }
       }
-      
+
       // Fallback به HTML5 video
       const video = document.querySelector(this.getSelectors().player);
       if (video && !video.paused) {
@@ -188,13 +201,14 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
         const playerSessionIds = this.netflixPlayer.getAllPlayerSessionIds();
         const sessionId = playerSessionIds?.[0];
         if (sessionId) {
-          const player = this.netflixPlayer.getVideoPlayerBySessionId(sessionId);
+          const player =
+            this.netflixPlayer.getVideoPlayerBySessionId(sessionId);
           player?.play?.();
           this.wasPlayingBeforePause = false;
           return;
         }
       }
-      
+
       // Fallback به HTML5 video
       const video = document.querySelector(this.getSelectors().player);
       if (video && this.wasPlayingBeforePause) {
@@ -210,9 +224,10 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   updateSubtitleElement(element, originalText, translatedText) {
     try {
       // پیدا کردن parent container
-      const parentContainer = element.closest(".player-timedtext-text-container") || 
-                            element.closest(".ltr-1xbip9h") ||
-                            element.parentElement;
+      const parentContainer =
+        element.closest(".player-timedtext-text-container") ||
+        element.closest(".ltr-1xbip9h") ||
+        element.parentElement;
 
       if (!parentContainer) {
         super.updateSubtitleElement(element, originalText, translatedText);
@@ -264,7 +279,9 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
       parentContainer.dataset.translated = "true";
       parentContainer.dataset.originalText = originalText;
 
-      logME(`[NetflixSubtitleHandler] Updated subtitle: "${originalText}" -> "${translatedText}"`);
+      logME(
+        `[NetflixSubtitleHandler] Updated subtitle: "${originalText}" -> "${translatedText}"`,
+      );
     } catch {
       // Fallback to parent method
       super.updateSubtitleElement(element, originalText, translatedText);
@@ -281,7 +298,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   // مدیریت تغییر URL
   handleUrlChange() {
     const newMovieId = this.getCurrentMovieId();
-    
+
     if (newMovieId !== this.currentMovieId) {
       this.currentMovieId = newMovieId;
       logME(`[NetflixSubtitleHandler] Movie changed to: ${newMovieId}`);
@@ -294,16 +311,16 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     // Remove event listeners
     document.removeEventListener("mouseenter", this.handleSubtitleHover, true);
     document.removeEventListener("mouseleave", this.handleSubtitleLeave, true);
-    
+
     // Remove styles
     const style = document.querySelector("#netflix-subtitle-style");
     if (style) {
       style.remove();
     }
-    
+
     this.netflixPlayer = null;
     this.currentMovieId = null;
-    
+
     super.destroy();
   }
 }

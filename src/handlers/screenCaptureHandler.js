@@ -1,9 +1,14 @@
 // src/handlers/screenCaptureHandler.js
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { getEnableScreenCaptureAsync, getSourceLanguageAsync, getTargetLanguageAsync, getTranslationApiAsync } from "../config.js";
+import {
+  getEnableScreenCaptureAsync,
+  getSourceLanguageAsync,
+  getTargetLanguageAsync,
+  getTranslationApiAsync,
+} from "../config.js";
 import { ProviderRegistry } from "../providers/registry/ProviderRegistry.js";
 import { captureManager } from "../capture/CaptureManager.js";
 
@@ -27,7 +32,7 @@ export async function handleStartAreaCapture(
   sendResponse,
   safeSendMessage,
   errorHandler,
-  injectionState
+  injectionState,
 ) {
   logME("[Handler:ScreenCapture] Starting area capture request");
 
@@ -37,7 +42,7 @@ export async function handleStartAreaCapture(
     if (!screenCaptureEnabled) {
       throw createScreenCaptureError(
         ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED,
-        "Screen capture feature is disabled"
+        "Screen capture feature is disabled",
       );
     }
 
@@ -45,7 +50,7 @@ export async function handleStartAreaCapture(
     const [sourceLanguage, targetLanguage, provider] = await Promise.all([
       getSourceLanguageAsync(),
       getTargetLanguageAsync(),
-      getTranslationApiAsync()
+      getTranslationApiAsync(),
     ]);
 
     // 3. Validate provider supports image translation
@@ -53,7 +58,7 @@ export async function handleStartAreaCapture(
     if (!providerInfo || providerInfo.category !== "ai") {
       throw createScreenCaptureError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
-        "Current provider does not support image translation. Please select an AI provider."
+        "Current provider does not support image translation. Please select an AI provider.",
       );
     }
 
@@ -62,11 +67,11 @@ export async function handleStartAreaCapture(
       active: true,
       currentWindow: true,
     });
-    
+
     if (!tabs[0]?.id) {
       throw createScreenCaptureError(
         ErrorTypes.TAB_AVAILABILITY,
-        "No active tab found"
+        "No active tab found",
       );
     }
 
@@ -79,21 +84,23 @@ export async function handleStartAreaCapture(
         sourceLanguage,
         targetLanguage,
         provider,
-        captureType: "area"
-      }
+        captureType: "area",
+      },
     });
 
     // 6. Handle content script injection if needed
     if (response?.error && !injectionState.inProgress) {
-      logME("[Handler:ScreenCapture] Content script not available, injecting...");
-      
+      logME(
+        "[Handler:ScreenCapture] Content script not available, injecting...",
+      );
+
       injectionState.inProgress = true;
       try {
         await browser.scripting.executeScript({
           target: { tabId },
           files: ["browser-polyfill.js", "content.bundle.js"],
         });
-        
+
         // Retry after injection
         response = await safeSendMessage(tabId, {
           action: "START_SCREEN_AREA_SELECTION",
@@ -101,21 +108,21 @@ export async function handleStartAreaCapture(
             sourceLanguage,
             targetLanguage,
             provider,
-            captureType: "area"
-          }
+            captureType: "area",
+          },
         });
-        
+
         if (response?.error) {
           throw createScreenCaptureError(
             ErrorTypes.INTEGRATION,
-            `Content script communication failed: ${response.error}`
+            `Content script communication failed: ${response.error}`,
           );
         }
       } catch (injectionErr) {
         logME("[Handler:ScreenCapture] Script injection failed:", injectionErr);
         throw createScreenCaptureError(
           ErrorTypes.INTEGRATION,
-          "Could not inject content script for screen capture"
+          "Could not inject content script for screen capture",
         );
       } finally {
         injectionState.inProgress = false;
@@ -124,16 +131,15 @@ export async function handleStartAreaCapture(
 
     logME("[Handler:ScreenCapture] Area capture initiated successfully");
     sendResponse({ success: true, message: "Area selection started" });
-
   } catch (error) {
     logME("[Handler:ScreenCapture] Error in area capture:", error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-area",
     });
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to start area capture" 
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to start area capture",
     });
     if (injectionState.inProgress) injectionState.inProgress = false;
   }
@@ -154,7 +160,7 @@ export async function handleStartFullScreenCapture(
   sendResponse,
   safeSendMessage,
   errorHandler,
-  _injectionState
+  _injectionState,
 ) {
   logME("[Handler:ScreenCapture] Starting full screen capture request");
 
@@ -164,7 +170,7 @@ export async function handleStartFullScreenCapture(
     if (!screenCaptureEnabled) {
       throw createScreenCaptureError(
         ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED,
-        "Screen capture feature is disabled"
+        "Screen capture feature is disabled",
       );
     }
 
@@ -172,7 +178,7 @@ export async function handleStartFullScreenCapture(
     const [sourceLanguage, targetLanguage, provider] = await Promise.all([
       getSourceLanguageAsync(),
       getTargetLanguageAsync(),
-      getTranslationApiAsync()
+      getTranslationApiAsync(),
     ]);
 
     // 3. Validate provider supports image translation
@@ -180,7 +186,7 @@ export async function handleStartFullScreenCapture(
     if (!providerInfo || providerInfo.category !== "ai") {
       throw createScreenCaptureError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
-        "Current provider does not support image translation. Please select an AI provider."
+        "Current provider does not support image translation. Please select an AI provider.",
       );
     }
 
@@ -188,21 +194,20 @@ export async function handleStartFullScreenCapture(
     await captureManager.startFullScreenCapture({
       sourceLanguage,
       targetLanguage,
-      provider
+      provider,
     });
 
     logME("[Handler:ScreenCapture] Full screen capture completed successfully");
     sendResponse({ success: true, message: "Full screen capture completed" });
-
   } catch (error) {
     logME("[Handler:ScreenCapture] Error in full screen capture:", error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-fullscreen",
     });
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to complete full screen capture" 
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to complete full screen capture",
     });
   }
 }
@@ -218,7 +223,7 @@ export async function handleRequestFullScreenCapture(
   message,
   sender,
   sendResponse,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:ScreenCapture] Request for full screen capture received");
 
@@ -228,11 +233,11 @@ export async function handleRequestFullScreenCapture(
       active: true,
       currentWindow: true,
     });
-    
+
     if (!tabs[0]?.id) {
       throw createScreenCaptureError(
         ErrorTypes.TAB_AVAILABILITY,
-        "No active tab found for capture"
+        "No active tab found for capture",
       );
     }
 
@@ -241,38 +246,37 @@ export async function handleRequestFullScreenCapture(
     // Capture visible tab
     const dataUrl = await browser.tabs.captureVisibleTab(activeTab.windowId, {
       format: "png",
-      quality: 100
+      quality: 100,
     });
 
     const captureData = {
       imageData: dataUrl,
       timestamp: Date.now(),
       tabId: activeTab.id,
-      url: activeTab.url
+      url: activeTab.url,
     };
 
     logME("[Handler:ScreenCapture] Full screen capture completed for cropping");
-    sendResponse({ 
-      success: true, 
-      ...captureData
+    sendResponse({
+      success: true,
+      ...captureData,
     });
-
   } catch (error) {
     logME("[Handler:ScreenCapture] Error capturing full screen:", error);
-    
+
     let errorType = ErrorTypes.SCREEN_CAPTURE_FAILED;
     if (error.message?.includes("permission")) {
       errorType = ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED;
     }
-    
+
     await errorHandler.handle(error, {
       type: errorType,
       context: "handler-screenCapture-fullRequest",
     });
-    
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to capture screen" 
+
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to capture screen",
     });
   }
 }
@@ -288,17 +292,18 @@ export async function handleProcessAreaCaptureImage(
   message,
   sender,
   sendResponse,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:ScreenCapture] Processing cropped area capture image");
 
   try {
-    const { imageData, selectionData, captureOptions, originalCapture } = message.data;
+    const { imageData, selectionData, captureOptions, originalCapture } =
+      message.data;
 
     if (!imageData || !selectionData || !captureOptions) {
       throw createScreenCaptureError(
         ErrorTypes.INTEGRATION,
-        "Invalid area capture image data received"
+        "Invalid area capture image data received",
       );
     }
 
@@ -311,8 +316,8 @@ export async function handleProcessAreaCaptureImage(
       position: { x: selectionData.x, y: selectionData.y },
       dimensions: {
         width: selectionData.width,
-        height: selectionData.height
-      }
+        height: selectionData.height,
+      },
     };
 
     // Process with CaptureManager (preview and translation)
@@ -320,16 +325,18 @@ export async function handleProcessAreaCaptureImage(
 
     logME("[Handler:ScreenCapture] Area capture image processed successfully");
     sendResponse({ success: true, message: "Area capture completed" });
-
   } catch (error) {
-    logME("[Handler:ScreenCapture] Error processing area capture image:", error);
+    logME(
+      "[Handler:ScreenCapture] Error processing area capture image:",
+      error,
+    );
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-processImage",
     });
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to process area capture image" 
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to process area capture image",
     });
   }
 }
@@ -345,7 +352,7 @@ export async function handlePreviewConfirmed(
   message,
   sender,
   sendResponse,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:ScreenCapture] Preview confirmed, starting translation");
 
@@ -355,25 +362,29 @@ export async function handlePreviewConfirmed(
     if (!captureData || !translationOptions) {
       throw createScreenCaptureError(
         ErrorTypes.INTEGRATION,
-        "Invalid preview confirmation data received"
+        "Invalid preview confirmation data received",
       );
     }
 
     // Process with CaptureManager
     await captureManager.handlePreviewConfirm(captureData);
 
-    logME("[Handler:ScreenCapture] Preview confirmation processed successfully");
+    logME(
+      "[Handler:ScreenCapture] Preview confirmation processed successfully",
+    );
     sendResponse({ success: true, message: "Translation started" });
-
   } catch (error) {
-    logME("[Handler:ScreenCapture] Error processing preview confirmation:", error);
+    logME(
+      "[Handler:ScreenCapture] Error processing preview confirmation:",
+      error,
+    );
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-previewConfirm",
     });
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to process preview confirmation" 
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to process preview confirmation",
     });
   }
 }
@@ -386,10 +397,10 @@ export async function handlePreviewConfirmed(
  */
 export function handlePreviewCancelled(message, sender, sendResponse) {
   logME("[Handler:ScreenCapture] Preview cancelled by user");
-  
+
   // Clean up capture operations
   captureManager.handlePreviewCancel();
-  
+
   sendResponse({ success: true, message: "Preview cancelled" });
 }
 
@@ -404,13 +415,13 @@ export async function handlePreviewRetry(
   message,
   sender,
   sendResponse,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:ScreenCapture] Preview retry requested");
   logME("[Handler:ScreenCapture] Preview retry message data:", {
     messageData: message.data,
     hasData: !!message.data,
-    captureType: message.data?.captureType
+    captureType: message.data?.captureType,
   });
 
   try {
@@ -419,7 +430,7 @@ export async function handlePreviewRetry(
     if (!captureType) {
       throw createScreenCaptureError(
         ErrorTypes.INTEGRATION,
-        "Invalid preview retry data received"
+        "Invalid preview retry data received",
       );
     }
 
@@ -428,16 +439,15 @@ export async function handlePreviewRetry(
 
     logME("[Handler:ScreenCapture] Preview retry processed successfully");
     sendResponse({ success: true, message: "Retry initiated" });
-
   } catch (error) {
     logME("[Handler:ScreenCapture] Error processing preview retry:", error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-previewRetry",
     });
-    sendResponse({ 
-      success: false, 
-      error: error.message || "Failed to process preview retry" 
+    sendResponse({
+      success: false,
+      error: error.message || "Failed to process preview retry",
     });
   }
 }
@@ -450,10 +460,10 @@ export async function handlePreviewRetry(
  */
 export function handleResultClosed(message, sender, sendResponse) {
   logME("[Handler:ScreenCapture] Result closed by user");
-  
+
   // Clean up capture operations
   captureManager.handleResultClose();
-  
+
   sendResponse({ success: true, message: "Result closed" });
 }
 
@@ -464,11 +474,14 @@ export function handleResultClosed(message, sender, sendResponse) {
  * @param {Function} sendResponse - Response callback
  */
 export function handleCaptureError(message, sender, sendResponse) {
-  logME("[Handler:ScreenCapture] Capture error reported from content script:", message.data);
-  
+  logME(
+    "[Handler:ScreenCapture] Capture error reported from content script:",
+    message.data,
+  );
+
   // Clean up capture operations
   captureManager.cleanup();
-  
+
   sendResponse({ success: true, message: "Error handled" });
 }
 
@@ -480,10 +493,10 @@ export function handleCaptureError(message, sender, sendResponse) {
  */
 export function handleAreaSelectionCancel(message, sender, sendResponse) {
   logME("[Handler:ScreenCapture] Area selection cancelled by user");
-  
+
   // Clean up any pending capture operations
   captureManager.cleanup();
-  
+
   sendResponse({ success: true, message: "Area selection cancelled" });
 }
 

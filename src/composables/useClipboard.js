@@ -1,125 +1,129 @@
 // src/composables/useClipboard.js
 // Vue composable for clipboard functionality in sidepanel
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from "vue";
 
 export function useClipboard() {
   // State
-  const hasClipboardContent = ref(false)
-  const clipboardError = ref('')
+  const hasClipboardContent = ref(false);
+  const clipboardError = ref("");
 
   // Copy text to clipboard
   const copyText = async (text, feedbackCallback = null) => {
-    if (!text) return false
-    
+    if (!text) return false;
+
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(text);
       if (feedbackCallback) {
-        feedbackCallback('success')
+        feedbackCallback("success");
       }
-      return true
+      return true;
     } catch (err) {
-      console.error('Failed to copy text:', err)
-      clipboardError.value = 'Failed to copy text'
+      console.error("Failed to copy text:", err);
+      clipboardError.value = "Failed to copy text";
       if (feedbackCallback) {
-        feedbackCallback('error')
+        feedbackCallback("error");
       }
-      return false
+      return false;
     }
-  }
+  };
 
   // Paste text from clipboard
   const pasteText = async () => {
     try {
-      const text = await navigator.clipboard.readText()
-      return text || ''
+      const text = await navigator.clipboard.readText();
+      return text || "";
     } catch (err) {
-      console.error('Failed to paste text:', err)
-      clipboardError.value = 'Failed to read clipboard'
-      return ''
+      console.error("Failed to paste text:", err);
+      clipboardError.value = "Failed to read clipboard";
+      return "";
     }
-  }
+  };
 
   // Check if clipboard has content
   const checkClipboardContent = async () => {
     try {
-      const text = await navigator.clipboard.readText()
-      hasClipboardContent.value = text.trim().length > 0
-      return hasClipboardContent.value
+      const text = await navigator.clipboard.readText();
+      hasClipboardContent.value = text.trim().length > 0;
+      return hasClipboardContent.value;
     } catch {
-      hasClipboardContent.value = false
-      return false
+      hasClipboardContent.value = false;
+      return false;
     }
-  }
+  };
 
   // Handle clipboard-related operations for source text
   const handleCopySource = async (sourceText, feedbackCallback) => {
-    return await copyText(sourceText, feedbackCallback)
-  }
+    return await copyText(sourceText, feedbackCallback);
+  };
 
   // Handle clipboard-related operations for translated text
   const handleCopyTarget = async (translationResult, feedbackCallback) => {
     // Get the original markdown text if available, otherwise fall back to textContent
-    const originalMarkdown = translationResult?.dataset?.originalMarkdown
-    const text = originalMarkdown || translationResult?.textContent || ''
-    return await copyText(text, feedbackCallback)
-  }
+    const originalMarkdown = translationResult?.dataset?.originalMarkdown;
+    const text = originalMarkdown || translationResult?.textContent || "";
+    return await copyText(text, feedbackCallback);
+  };
 
   // Handle paste to source text
-  const handlePasteSource = async (sourceTextRef, updateCallback, feedbackCallback) => {
+  const handlePasteSource = async (
+    sourceTextRef,
+    updateCallback,
+    feedbackCallback,
+  ) => {
     try {
-      const text = await pasteText()
+      const text = await pasteText();
       if (text) {
         if (sourceTextRef) {
-          sourceTextRef.value = text
+          sourceTextRef.value = text;
         }
         if (updateCallback) {
-          updateCallback(text)
+          updateCallback(text);
         }
-        return text
+        return text;
       }
-      return ''
+      return "";
     } catch (err) {
-      console.error('Failed to paste text:', err)
+      console.error("Failed to paste text:", err);
       if (feedbackCallback) {
-        feedbackCallback('error')
+        feedbackCallback("error");
       }
-      return ''
+      return "";
     }
-  }
+  };
 
   // Focus handling for clipboard updates
-  let focusListener = null
-  
+  let focusListener = null;
+
   const setupClipboardMonitoring = () => {
     focusListener = () => {
-      checkClipboardContent()
-    }
-    document.addEventListener('focus', focusListener, true)
+      checkClipboardContent();
+    };
+    document.addEventListener("focus", focusListener, true);
     // Initial check
-    checkClipboardContent()
-  }
+    checkClipboardContent();
+  };
 
   const cleanupClipboardMonitoring = () => {
     if (focusListener) {
-      document.removeEventListener('focus', focusListener, true)
-      focusListener = null
+      document.removeEventListener("focus", focusListener, true);
+      focusListener = null;
     }
-  }
+  };
 
   // Lifecycle
   onMounted(() => {
-    setupClipboardMonitoring()
-  })
+    setupClipboardMonitoring();
+  });
 
   onUnmounted(() => {
-    cleanupClipboardMonitoring()
-  })
+    cleanupClipboardMonitoring();
+  });
 
   return {
     // State
     hasClipboardContent,
     clipboardError,
-    
+
     // Methods
     copyText,
     pasteText,
@@ -129,9 +133,9 @@ export function useClipboard() {
     handlePasteSource,
     setupClipboardMonitoring,
     cleanupClipboardMonitoring,
-    
+
     // Aliases for shared component compatibility
     copyToClipboard: copyText,
-    pasteFromClipboard: pasteText
-  }
+    pasteFromClipboard: pasteText,
+  };
 }

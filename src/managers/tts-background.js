@@ -1,7 +1,7 @@
 // src/managers/tts-background.js
 // Background page TTS implementation for Firefox and fallback
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Background TTS Manager for Firefox and fallback scenarios
@@ -26,20 +26,22 @@ export class BackgroundTTSManager {
     try {
       this.browser = browser;
 
-      console.log('🔊 Initializing background TTS manager');
+      console.log("🔊 Initializing background TTS manager");
 
       // Detect available TTS methods
       await this.detectAvailableMethods();
 
       if (this.availableMethods.length === 0) {
-        throw new Error('No TTS methods available in background context');
+        throw new Error("No TTS methods available in background context");
       }
 
       this.initialized = true;
-      console.log('✅ Background TTS manager initialized with methods:', this.availableMethods);
-
+      console.log(
+        "✅ Background TTS manager initialized with methods:",
+        this.availableMethods,
+      );
     } catch (error) {
-      console.error('❌ Failed to initialize background TTS manager:', error);
+      console.error("❌ Failed to initialize background TTS manager:", error);
       throw error;
     }
   }
@@ -52,27 +54,29 @@ export class BackgroundTTSManager {
     this.availableMethods = [];
 
     // Method 1: browser TTS API (Chrome/Firefox native)
-    if (browser.tts && typeof browser.tts.speak === 'function') {
-      this.availableMethods.push('browser-tts');
-      console.log('✅ browser TTS API available');
+    if (browser.tts && typeof browser.tts.speak === "function") {
+      this.availableMethods.push("browser-tts");
+      console.log("✅ browser TTS API available");
     }
 
     // Method 2: Speech Synthesis API (if available in background context)
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      this.availableMethods.push('speech-synthesis');
-      console.log('✅ Speech Synthesis API available');
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      this.availableMethods.push("speech-synthesis");
+      console.log("✅ Speech Synthesis API available");
     }
 
     // Method 3: Web Audio API for generated speech
-    if (typeof window !== 'undefined' && 
-        (window.AudioContext || window.webkitAudioContext)) {
-      this.availableMethods.push('web-audio');
-      console.log('✅ Web Audio API available');
+    if (
+      typeof window !== "undefined" &&
+      (window.AudioContext || window.webkitAudioContext)
+    ) {
+      this.availableMethods.push("web-audio");
+      console.log("✅ Web Audio API available");
     }
 
     // Method 4: Content script delegation
-    this.availableMethods.push('content-script');
-    console.log('✅ Content script delegation available (fallback)');
+    this.availableMethods.push("content-script");
+    console.log("✅ Content script delegation available (fallback)");
   }
 
   /**
@@ -87,7 +91,7 @@ export class BackgroundTTSManager {
     }
 
     if (!text || !text.trim()) {
-      throw new Error('Text to speak cannot be empty');
+      throw new Error("Text to speak cannot be empty");
     }
 
     // Stop any current speech
@@ -99,10 +103,10 @@ export class BackgroundTTSManager {
       rate: options.rate || 1,
       pitch: options.pitch || 1,
       volume: options.volume || 1,
-      lang: options.lang || 'en-US'
+      lang: options.lang || "en-US",
     };
 
-    console.log('🔊 Speaking text via background:', text.substring(0, 50));
+    console.log("🔊 Speaking text via background:", text.substring(0, 50));
 
     // Try methods in order of preference
     for (const method of this.availableMethods) {
@@ -116,7 +120,7 @@ export class BackgroundTTSManager {
       }
     }
 
-    throw new Error('All TTS methods failed');
+    throw new Error("All TTS methods failed");
   }
 
   /**
@@ -125,18 +129,18 @@ export class BackgroundTTSManager {
    */
   async speakWithMethod(method, options) {
     switch (method) {
-      case 'browser-tts':
+      case "browser-tts":
         return this.speakWithbrowserTTS(options);
-      
-      case 'speech-synthesis':
+
+      case "speech-synthesis":
         return this.speakWithSpeechSynthesis(options);
-      
-      case 'web-audio':
+
+      case "web-audio":
         return this.speakWithWebAudio(options);
-      
-      case 'content-script':
+
+      case "content-script":
         return this.speakWithContentScript(options);
-      
+
       default:
         throw new Error(`Unknown TTS method: ${method}`);
     }
@@ -152,7 +156,7 @@ export class BackgroundTTSManager {
         lang: options.lang,
         rate: options.rate,
         pitch: options.pitch,
-        volume: options.volume
+        volume: options.volume,
       };
 
       if (options.voice) {
@@ -176,7 +180,7 @@ export class BackgroundTTSManager {
   async speakWithSpeechSynthesis(options) {
     return new Promise((resolve, reject) => {
       if (!window.speechSynthesis) {
-        throw new Error('Speech Synthesis API not available');
+        throw new Error("Speech Synthesis API not available");
       }
 
       const utterance = new SpeechSynthesisUtterance(options.text);
@@ -187,7 +191,9 @@ export class BackgroundTTSManager {
 
       if (options.voice) {
         const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.name === options.voice || v.lang === options.lang);
+        const voice = voices.find(
+          (v) => v.name === options.voice || v.lang === options.lang,
+        );
         if (voice) {
           utterance.voice = voice;
         }
@@ -215,7 +221,7 @@ export class BackgroundTTSManager {
   async speakWithWebAudio(options) {
     // This is a basic implementation that generates audio tones
     // In a real implementation, you'd use a TTS service or pre-recorded audio
-    
+
     if (!this.audioContext) {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioContext();
@@ -233,8 +239,14 @@ export class BackgroundTTSManager {
         oscillator.connect(gainNode);
         gainNode.connect(this.audioContext.destination);
 
-        oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(options.volume * 0.1, this.audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(
+          frequency,
+          this.audioContext.currentTime,
+        );
+        gainNode.gain.setValueAtTime(
+          options.volume * 0.1,
+          this.audioContext.currentTime,
+        );
 
         oscillator.start(this.audioContext.currentTime);
         oscillator.stop(this.audioContext.currentTime + duration);
@@ -243,8 +255,9 @@ export class BackgroundTTSManager {
           resolve();
         };
 
-        console.log(`🎵 Generated audio tone for ${duration}s (Web Audio fallback)`);
-
+        console.log(
+          `🎵 Generated audio tone for ${duration}s (Web Audio fallback)`,
+        );
       } catch (error) {
         reject(new Error(`Web Audio TTS failed: ${error.message}`));
       }
@@ -258,24 +271,26 @@ export class BackgroundTTSManager {
   async speakWithContentScript(options) {
     try {
       // Get active tab
-      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (!tab) {
-        throw new Error('No active tab found');
+        throw new Error("No active tab found");
       }
 
       // Send message to content script
       const response = await browser.tabs.sendMessage(tab.id, {
-        action: 'TTS_SPEAK',
-        source: 'background',
-        data: options
+        action: "TTS_SPEAK",
+        source: "background",
+        data: options,
       });
 
       if (!response || !response.success) {
-        throw new Error(response?.error || 'Content script TTS failed');
+        throw new Error(response?.error || "Content script TTS failed");
       }
 
-      console.log('🔗 TTS delegated to content script');
-
+      console.log("🔗 TTS delegated to content script");
     } catch (error) {
       throw new Error(`Content script TTS failed: ${error.message}`);
     }
@@ -302,10 +317,9 @@ export class BackgroundTTSManager {
         await this.audioContext.suspend();
       }
 
-      console.log('🛑 Background TTS stopped');
-
+      console.log("🛑 Background TTS stopped");
     } catch (error) {
-      console.error('❌ Failed to stop background TTS:', error);
+      console.error("❌ Failed to stop background TTS:", error);
     }
   }
 
@@ -322,26 +336,29 @@ export class BackgroundTTSManager {
         const browserVoices = await new Promise((resolve) => {
           browser.tts.getVoices(resolve);
         });
-        voices.push(...browserVoices.map(v => ({
-          ...v,
-          source: 'browser-tts'
-        })));
+        voices.push(
+          ...browserVoices.map((v) => ({
+            ...v,
+            source: "browser-tts",
+          })),
+        );
       }
 
       // Get speech synthesis voices
       if (window.speechSynthesis) {
         const synthVoices = window.speechSynthesis.getVoices();
-        voices.push(...synthVoices.map(v => ({
-          name: v.name,
-          lang: v.lang,
-          localService: v.localService,
-          default: v.default,
-          source: 'speech-synthesis'
-        })));
+        voices.push(
+          ...synthVoices.map((v) => ({
+            name: v.name,
+            lang: v.lang,
+            localService: v.localService,
+            default: v.default,
+            source: "speech-synthesis",
+          })),
+        );
       }
-
     } catch (error) {
-      console.error('❌ Failed to get voices:', error);
+      console.error("❌ Failed to get voices:", error);
     }
 
     return voices;
@@ -361,13 +378,14 @@ export class BackgroundTTSManager {
    */
   getDebugInfo() {
     return {
-      type: 'background',
+      type: "background",
       initialized: this.initialized,
       availableMethods: this.availableMethods,
       hasAudioContext: !!this.audioContext,
       currentUtterance: !!this.currentUtterance,
       browserTTS: !!this.browser?.tts,
-      speechSynthesis: typeof window !== 'undefined' && !!window.speechSynthesis
+      speechSynthesis:
+        typeof window !== "undefined" && !!window.speechSynthesis,
     };
   }
 
@@ -375,8 +393,8 @@ export class BackgroundTTSManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log('🧹 Cleaning up background TTS manager');
-    
+    console.log("🧹 Cleaning up background TTS manager");
+
     await this.stop();
 
     if (this.audioContext) {

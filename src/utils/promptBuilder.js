@@ -26,7 +26,7 @@ function isSpecificTextJsonFormat(obj) {
       (item) =>
         typeof item === "object" &&
         item !== null &&
-        typeof item.text === "string"
+        typeof item.text === "string",
     )
   );
 }
@@ -44,7 +44,7 @@ export async function buildPrompt(
   text,
   sourceLang,
   targetLang,
-  translateMode = TranslationMode.Field
+  translateMode = TranslationMode.Field,
 ) {
   // دریافت پرامت تنظیم‌شده توسط کاربر
   const promptTemplate = await getPromptAsync();
@@ -69,7 +69,10 @@ export async function buildPrompt(
   } else {
     if (translateMode === TranslationMode.Subtitle) {
       promptBase = await getPromptBASESubtitleAsync();
-    } else if (translateMode === TranslationMode.Popup_Translate || translateMode === TranslationMode.Sidepanel_Translate) {
+    } else if (
+      translateMode === TranslationMode.Popup_Translate ||
+      translateMode === TranslationMode.Sidepanel_Translate
+    ) {
       promptBase = await getPromptPopupTranslateAsync();
     } else if ((await getEnableDictionaryAsync()) === true) {
       if (translateMode === TranslationMode.Dictionary_Translation) {
@@ -99,10 +102,7 @@ export async function buildPrompt(
       .replace(/\$_{SOURCE}/g, sourceLang)
       .replace(/\$_{TARGET}/g, targetLang);
 
-    finalPromptWithUserRules = baseClean.replace(
-      /\$_{USER_RULES}/g,
-      userRules
-    );
+    finalPromptWithUserRules = baseClean.replace(/\$_{USER_RULES}/g, userRules);
   }
 
   logME("Prompt template: ", finalPromptWithUserRules);
@@ -111,16 +111,16 @@ export async function buildPrompt(
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
   let finalPrompt;
-    if (finalPromptWithUserRules.includes("$_{TEXT}")) {
+  if (finalPromptWithUserRules.includes("$_{TEXT}")) {
     // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
     finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
-      textForTranslation
+      textForTranslation,
     );
     // جایگزینی مستقیم بدون کد markdown برای جلوگیری از سوءتفاهم AI
     finalPrompt = finalPromptWithUserRules.replace(
       /\$_{TEXT}/g,
-      textForTranslation
+      textForTranslation,
     );
     logME("Final prompt with TEXT replacement: ", finalPrompt);
   } else {

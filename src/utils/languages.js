@@ -12,16 +12,16 @@
  * @returns {string} Language code like "en", "fa"
  */
 export function getLanguageCodeForTTS(languageName) {
-  if (!languageName) return 'en';
-  
+  if (!languageName) return "en";
+
   // If it's already a code (like "en", "fa"), return as is
   if (languageName.length <= 3) {
     return languageName;
   }
-  
+
   // Find the language in the list
-  const language = languageList.find(lang => lang.name === languageName);
-  return language ? language.code : 'en'; // Default to English
+  const language = languageList.find((lang) => lang.name === languageName);
+  return language ? language.code : "en"; // Default to English
 }
 
 export const languageList = [
@@ -290,18 +290,18 @@ export const languageList = [
 ];
 
 export const getAvailableLanguages = async () => {
-  return languageList.map(lang => ({
+  return languageList.map((lang) => ({
     code: lang.code,
     name: lang.name,
     voiceCode: lang.voiceCode,
-    promptName: lang.promptName
-  }))
-}
+    promptName: lang.promptName,
+  }));
+};
 
 export const getLanguageByName = (name) => {
-  return languageList.find(lang => lang.name === name)
-}
+  return languageList.find((lang) => lang.name === name);
+};
 
 export const getLanguageByCode = (code) => {
-  return languageList.find(lang => lang.code === code)
-}
+  return languageList.find((lang) => lang.code === code);
+};

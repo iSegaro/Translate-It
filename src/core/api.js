@@ -20,8 +20,6 @@ class ApiService {
     // Remove sessionContext as it's now handled by individual providers
   }
 
-
-
   /**
    * Reset session context for a specific provider or all providers
    * @param {string} [apiType] - Specific provider to reset session, or all if not specified
@@ -35,8 +33,8 @@ class ApiService {
     if (await getUseMockAsync()) {
       await delay(MOCK_DELAY);
       const sample = text.substring(0, 50);
-      return isPersianText(sample) ?
-          CONFIG.DEBUG_TRANSLATED_ENGLISH
+      return isPersianText(sample)
+        ? CONFIG.DEBUG_TRANSLATED_ENGLISH
         : CONFIG.DEBUG_TRANSLATED_PERSIAN;
     }
 
@@ -70,13 +68,13 @@ class ApiService {
     try {
       // Get provider instance from factory
       const provider = translationProviderFactory.getProvider(api);
-      
+
       // Use provider's translate method
       return await provider.translate(
         text,
         sourceLanguage,
         targetLanguage,
-        translateMode
+        translateMode,
       );
     } catch (error) {
       // Add context to error if not already present

@@ -7,8 +7,7 @@ import { VueMessageHandler } from "./vue-message-handler.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { initializeSettingsListener } from "../config.js";
 import { TranslationEngine } from "./translation-engine.js";
-import { coreMessageRouter } from "../core/CoreMessageRouter.js";
-import { UnifiedListenerManager } from "../core/UnifiedListenerManager.js";
+import { simpleMessageHandler } from "../core/SimpleMessageHandler.js";
 import * as Handlers from "./handlers/index.js";
 import { triggerTestInstallation } from "../handlers/installation-handler.js";
 
@@ -24,8 +23,12 @@ class BackgroundService {
     this.listeners = [];
     this.vueMessageHandler = null;
     this.translationEngine = null;
-    this.coreRouter = coreMessageRouter;
-    this.listenerManager = new UnifiedListenerManager(coreMessageRouter);
+    this.messageHandler = simpleMessageHandler;
+    // Ensure SimpleMessageHandler is initialized
+    if (!this.messageHandler.initialized) {
+      console.log("🎧 Initializing SimpleMessageHandler...");
+      this.messageHandler.initialize();
+    }
   }
 
   /**
@@ -47,22 +50,10 @@ class BackgroundService {
       this.notificationManager = new NotificationManager();
       this.notificationManager.initialize();
 
-      // Load Vue message handler
-      await this.initializeVueMessageHandler();
-
       // Initialize translation engine
       await this.initializeTranslationEngine();
 
-      // Initialize core message router
-      await this.coreRouter.initialize();
-
-      // Initialize unified listener manager
-      await this.listenerManager.initialize();
-
-      // Pre-load essential features
-      await this.initializeFeatures();
-
-      // Register all message handlers with core router
+      // Register all message handlers with simple handler
       this.registerMessageHandlers();
 
       // Initialize error handlers for specific modules
@@ -74,26 +65,34 @@ class BackgroundService {
       this.initialized = true;
 
       // Add context menu click listener
-      browser.contextMenus.onClicked.addListener(async (info, tab) => {
-        console.log('[BackgroundService] Context menu item clicked:', info.menuItemId);
-        switch (info.menuItemId) {
-          case 'translate-selection':
-            // Handle translate selection
-            break;
-          case 'open-options':
-            browser.runtime.openOptionsPage();
-            break;
-          case 'translate-screen':
-            // Handle translate screen
-            break;
-          case 'open-help':
-            browser.tabs.create({ url: 'https://github.com/iSegaro/Translate-It/wiki' });
-            break;
-          case 'reload-extension':
-            browser.runtime.reload();
-            break;
-        }
-      });
+      browser.contextMenus.onClicked.addListener.call(
+        browser.contextMenus.onClicked,
+        async (info, tab) => {
+          console.log(
+            "[BackgroundService] Context menu item clicked:",
+            info.menuItemId,
+          );
+          switch (info.menuItemId) {
+            case "translate-selection":
+              // Handle translate selection
+              break;
+            case "open-options":
+              browser.runtime.openOptionsPage();
+              break;
+            case "translate-screen":
+              // Handle translate screen
+              break;
+            case "open-help":
+              browser.tabs.create({
+                url: "https://github.com/iSegaro/Translate-It/wiki",
+              });
+              break;
+            case "reload-extension":
+              browser.runtime.reload();
+              break;
+          }
+        },
+      );
 
       console.log("✅ Background service initialized successfully");
       console.log("📊 Service info:", this.getDebugInfo());
@@ -129,24 +128,6 @@ class BackgroundService {
 
     // Initialize settings listener with the browser object
     await initializeSettingsListener(browser);
-  }
-
-  /**
-   * Initialize Vue message handler
-   * @private
-   */
-  async initializeVueMessageHandler() {
-    console.log("📡 Initializing Vue message handler...");
-
-    try {
-      this.vueMessageHandler = new VueMessageHandler();
-      await this.vueMessageHandler.register();
-
-      console.log("✅ Vue message handler registered");
-    } catch (error) {
-      console.error("❌ Failed to initialize Vue message handler:", error);
-      throw error;
-    }
   }
 
   /**
@@ -272,12 +253,11 @@ class BackgroundService {
       // CRITICAL: Set up MessageRouter even in minimal mode
       try {
         this.registerMessageHandlers();
-        await this.setupCentralMessageListener();
         console.log("✅ MessageRouter set up in minimal mode");
       } catch (error) {
         console.error(
           "❌ Failed to set up MessageRouter in minimal mode:",
-          error
+          error,
         );
       }
 
@@ -301,8 +281,9 @@ class BackgroundService {
       listeners: this.listeners.length,
       hasVueHandler: !!this.vueMessageHandler,
       hasTranslationEngine: !!this.translationEngine,
-      translationStats:
-        this.translationEngine ? this.translationEngine.getCacheStats() : null,
+      translationStats: this.translationEngine
+        ? this.translationEngine.getCacheStats()
+        : null,
       featureLoader: featureLoader.getDebugInfo(),
     };
   }
@@ -312,217 +293,188 @@ class BackgroundService {
    * @private
    */
 
-  // Register all message handlers with CoreMessageRouter
+  // Register all message handlers with SimpleMessageHandler
   registerMessageHandlers() {
     console.log(
-      "[BackgroundService] Registering message handlers with CoreMessageRouter..."
+      "[BackgroundService] Registering message handlers with SimpleMessageHandler...",
     );
 
-    // Common handlers
-    this.coreRouter.registerHandler("ping", Handlers.handlePing);
-    this.coreRouter.registerHandler(
+    // Register custom handlers for legacy actions
+    this.messageHandler.registerHandler("ping", Handlers.handlePing);
+    this.messageHandler.registerHandler(
       "open_options_page",
-      Handlers.handleOpenOptionsPage
+      Handlers.handleOpenOptionsPage,
     );
-    this.coreRouter.registerHandler("open_url", Handlers.handleOpenURL);
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler("open_url", Handlers.handleOpenURL);
+    this.messageHandler.registerHandler(
       "show_os_notification",
-      Handlers.handleShowOSNotification
+      Handlers.handleShowOSNotification,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "REFRESH_CONTEXT_MENUS",
-      Handlers.handleRefreshContextMenus
+      Handlers.handleRefreshContextMenus,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "CONTENT_SCRIPT_WILL_RELOAD",
-      Handlers.handleContentScriptWillReload
+      Handlers.handleContentScriptWillReload,
     );
 
     // Lifecycle handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "CONTEXT_INVALID",
-      Handlers.handleContextInvalid
+      Handlers.handleContextInvalid,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "EXTENSION_RELOADED",
-      Handlers.handleExtensionReloaded
+      Handlers.handleExtensionReloaded,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "restart_content_script",
-      Handlers.handleRestartContentScript
+      Handlers.handleRestartContentScript,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "BACKGROUND_RELOAD_EXTENSION",
-      Handlers.handleBackgroundReloadExtension
+      Handlers.handleBackgroundReloadExtension,
     );
 
-    // Translation handlers (require port for better reliability)
-    this.coreRouter.registerHandler("TRANSLATE", Handlers.handleTranslate, {
-      requiresPort: true,
-      contexts: ["popup", "sidepanel", "content"],
-      timeout: 60000,
-    });
-    this.coreRouter.registerHandler(
+    // Core translation handler
+    this.messageHandler.registerHandler("TRANSLATE", Handlers.handleTranslate);
+
+    // Legacy translation handlers (to maintain compatibility)
+    this.messageHandler.registerHandler(
       "fetchTranslation",
-      Handlers.handleFetchTranslation
+      Handlers.handleFetchTranslation,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "translationAdded",
-      Handlers.handleTranslationAdded
+      Handlers.handleTranslationAdded,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "fetchTranslationBackground",
-      Handlers.handleFetchTranslationBackground
+      Handlers.handleFetchTranslationBackground,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "revertTranslation",
-      Handlers.handleRevertTranslation
+      Handlers.handleRevertTranslation,
     );
 
-    // Provider and settings handlers
-    this.coreRouter.registerHandler(
-      "GET_PROVIDERS",
-      this.handleGetProviders.bind(this)
-    );
-    this.coreRouter.registerHandler(
-      "GET_HISTORY",
-      this.handleGetHistory.bind(this)
-    );
-    this.coreRouter.registerHandler(
-      "CLEAR_HISTORY",
-      this.handleClearHistory.bind(this)
-    );
-
-    // TTS handlers
-    this.coreRouter.registerHandler("speak", Handlers.handleSpeak);
-    this.coreRouter.registerHandler("stopTTS", Handlers.handleStopTTS);
-    this.coreRouter.registerHandler(
+    // Legacy TTS handlers (to maintain compatibility)
+    this.messageHandler.registerHandler("speak", Handlers.handleSpeak);
+    this.messageHandler.registerHandler("stopTTS", Handlers.handleStopTTS);
+    this.messageHandler.registerHandler(
       "TTS_SPEAK_CONTENT",
-      Handlers.handleTTSSpeakContent
+      Handlers.handleTTSSpeakContent,
     );
-    this.coreRouter.registerHandler("TTS_SPEAK", Handlers.handleTTSOffscreen);
-    this.coreRouter.registerHandler("TTS_STOP", Handlers.handleTTSOffscreen);
-    this.coreRouter.registerHandler("TTS_TEST", Handlers.handleTTSOffscreen);
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
+      "TTS_TEST",
+      Handlers.handleTTSOffscreen,
+    );
+    this.messageHandler.registerHandler(
       "OFFSCREEN_READY",
-      Handlers.handleOffscreenReady
+      Handlers.handleOffscreenReady,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "playOffscreenAudio",
-      Handlers.handleTTSOffscreen
+      Handlers.handleTTSOffscreen,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "stopOffscreenAudio",
-      Handlers.handleTTSOffscreen
+      Handlers.handleTTSOffscreen,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "playCachedAudio",
-      Handlers.handleTTSOffscreen
+      Handlers.handleTTSOffscreen,
     );
 
     // Element selection handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "activateSelectElementMode",
-      Handlers.handleActivateSelectElementMode
+      Handlers.handleActivateSelectElementMode,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "UPDATE_SELECT_ELEMENT_STATE",
-      Handlers.handleUpdateSelectElementState
+      Handlers.handleUpdateSelectElementState,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "elementSelected",
-      Handlers.handleElementSelected
+      Handlers.handleElementSelected,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "applyTranslationToActiveElement",
-      Handlers.handleApplyTranslationToActiveElement
+      Handlers.handleApplyTranslationToActiveElement,
     );
 
     // Screen capture handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "startAreaCapture",
-      Handlers.handleStartAreaCapture
+      Handlers.handleStartAreaCapture,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "startFullScreenCapture",
-      Handlers.handleStartFullScreenCapture
+      Handlers.handleStartFullScreenCapture,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "requestFullScreenCapture",
-      Handlers.handleRequestFullScreenCapture
+      Handlers.handleRequestFullScreenCapture,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "processAreaCaptureImage",
-      Handlers.handleProcessAreaCaptureImage
+      Handlers.handleProcessAreaCaptureImage,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "previewConfirmed",
-      Handlers.handlePreviewConfirmed
+      Handlers.handlePreviewConfirmed,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "previewCancelled",
-      Handlers.handlePreviewCancelled
+      Handlers.handlePreviewCancelled,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "previewRetry",
-      Handlers.handlePreviewRetry
+      Handlers.handlePreviewRetry,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "resultClosed",
-      Handlers.handleResultClosed
+      Handlers.handleResultClosed,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "captureError",
-      Handlers.handleCaptureError
+      Handlers.handleCaptureError,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "areaSelectionCancel",
-      Handlers.handleAreaSelectionCancel
+      Handlers.handleAreaSelectionCancel,
     );
 
     // Text selection handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "getSelectedText",
-      Handlers.handleGetSelectedText
+      Handlers.handleGetSelectedText,
     );
 
     // Page exclusion handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "isCurrentPageExcluded",
-      Handlers.handleIsCurrentPageExcluded
+      Handlers.handleIsCurrentPageExcluded,
     );
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "setExcludeCurrentPage",
-      Handlers.handleSetExcludeCurrentPage
+      Handlers.handleSetExcludeCurrentPage,
     );
 
     // Sidepanel handlers
-    this.coreRouter.registerHandler(
+    this.messageHandler.registerHandler(
       "OPEN_SIDE_PANEL",
-      Handlers.handleOpenSidePanel
+      Handlers.handleOpenSidePanel,
     );
 
     console.log(
-      "[BackgroundService] All message handlers registered with CoreMessageRouter successfully."
+      "[BackgroundService] All message handlers registered with SimpleMessageHandler successfully.",
     );
   }
 
-  // Helper handlers for new client methods
-  async handleGetProviders(message, sender) {
-    const { getAvailableProviders } = await import("../providers/index.js");
-    return { providers: getAvailableProviders() };
-  }
-
-  async handleGetHistory(message, sender) {
-    const { getTranslationHistory } = await import("../config.js");
-    return { history: await getTranslationHistory() };
-  }
-
-  async handleClearHistory(message, sender) {
-    const { clearTranslationHistory } = await import("../config.js");
-    await clearTranslationHistory();
-    return { success: true };
-  }
+  // Note: Helper handlers for GET_PROVIDERS, GET_HISTORY, CLEAR_HISTORY
+  // are now built into SimpleMessageHandler
 
   /**
    * Refresh all context menus
@@ -647,28 +599,14 @@ backgroundService
   .initialize()
   .then(() => {
     console.log(
-      "🎯 Background service initialization completed, setting up test functions..."
+      "🎯 Background service initialization completed, setting up test functions...",
     );
     exposeGlobalTestFunctions();
-
-    // Add onInstalled listener
-    browser.runtime.onInstalled.addListener(async (details) => {
-      console.log('[BackgroundService] runtime.onInstalled event triggered:', details.reason);
-      const { handleInstallationEvent } = await import('../handlers/installation-handler.js');
-      await handleInstallationEvent(details);
-    });
-
-    // Add notifications.onClicked listener
-    browser.notifications.onClicked.addListener(async (notificationId) => {
-      console.log('[BackgroundService] notifications.onClicked event triggered:', notificationId);
-      const { handleNotificationEvent } = await import('../handlers/notification-handler.js');
-      await handleNotificationEvent(notificationId);
-    });
   })
   .catch((_error) => {
     console.error(
       "💥 Critical: Background service initialization failed:",
-      _error
+      _error,
     );
 
     // Report error to extension pages if possible
@@ -712,7 +650,7 @@ if (typeof self !== "undefined" && "serviceWorker" in self) {
   self.addEventListener("unhandledrejection", (event) => {
     console.error(
       "🚨 Unhandled promise rejection in service worker:",
-      event.reason
+      event.reason,
     );
   });
 }

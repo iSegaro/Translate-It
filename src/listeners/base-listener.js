@@ -1,7 +1,7 @@
 // src/listeners/base-listener.js
 // Base class for cross-browser event listeners
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Base Event Listener class
@@ -29,9 +29,11 @@ export class BaseListener {
 
       this.initialized = true;
       console.log(`🎧 Initialized ${this.listenerName} listener`);
-
     } catch (error) {
-      console.error(`❌ Failed to initialize ${this.listenerName} listener:`, error);
+      console.error(
+        `❌ Failed to initialize ${this.listenerName} listener:`,
+        error,
+      );
       throw error;
     }
   }
@@ -41,15 +43,15 @@ export class BaseListener {
    * @param {Function} handler - Handler function
    * @param {string} name - Handler name for debugging
    */
-  addHandler(handler, name = 'unnamed') {
-    if (typeof handler !== 'function') {
-      throw new Error('Handler must be a function');
+  addHandler(handler, name = "unnamed") {
+    if (typeof handler !== "function") {
+      throw new Error("Handler must be a function");
     }
 
     this.handlers.push({
       fn: handler,
       name: name,
-      addedAt: Date.now()
+      addedAt: Date.now(),
     });
 
     console.log(`➕ Added handler "${name}" to ${this.listenerName}`);
@@ -60,7 +62,7 @@ export class BaseListener {
    * @param {string} name - Handler name to remove
    */
   removeHandler(name) {
-    const index = this.handlers.findIndex(h => h.name === name);
+    const index = this.handlers.findIndex((h) => h.name === name);
     if (index !== -1) {
       this.handlers.splice(index, 1);
       console.log(`➖ Removed handler "${name}" from ${this.listenerName}`);
@@ -90,7 +92,9 @@ export class BaseListener {
 
       const eventObject = eventTarget[this.eventName];
       if (!eventObject) {
-        throw new Error(`Event ${this.eventName} not available on ${this.eventType}`);
+        throw new Error(
+          `Event ${this.eventName} not available on ${this.eventType}`,
+        );
       }
 
       // Add the main event listener
@@ -98,9 +102,11 @@ export class BaseListener {
       this.isRegistered = true;
 
       console.log(`✅ Registered ${this.listenerName} listener`);
-
     } catch (error) {
-      console.error(`❌ Failed to register ${this.listenerName} listener:`, error);
+      console.error(
+        `❌ Failed to register ${this.listenerName} listener:`,
+        error,
+      );
       throw error;
     }
   }
@@ -115,7 +121,9 @@ export class BaseListener {
       return;
     }
 
-    console.debug(`📨 ${this.listenerName} event received, calling ${this.handlers.length} handlers`);
+    console.debug(
+      `📨 ${this.listenerName} event received, calling ${this.handlers.length} handlers`,
+    );
 
     const results = [];
     const errors = [];
@@ -123,27 +131,28 @@ export class BaseListener {
     for (const handler of this.handlers) {
       try {
         const startTime = performance.now();
-        
+
         // Call handler with proper error isolation
         const result = await this.callHandlerSafely(handler, args);
-        
+
         const duration = performance.now() - startTime;
-        
+
         results.push({
           handler: handler.name,
           result: result,
           duration: duration,
-          success: true
+          success: true,
         });
 
-        console.debug(`✅ Handler "${handler.name}" completed in ${duration.toFixed(2)}ms`);
-
+        console.debug(
+          `✅ Handler "${handler.name}" completed in ${duration.toFixed(2)}ms`,
+        );
       } catch (error) {
         const errorInfo = {
           handler: handler.name,
           error: error.message,
           stack: error.stack,
-          success: false
+          success: false,
         };
 
         errors.push(errorInfo);
@@ -155,14 +164,20 @@ export class BaseListener {
 
     // Log summary
     if (errors.length > 0) {
-      console.warn(`⚠️ ${this.listenerName} completed with ${errors.length}/${this.handlers.length} errors`);
+      console.warn(
+        `⚠️ ${this.listenerName} completed with ${errors.length}/${this.handlers.length} errors`,
+      );
     } else {
       console.debug(`✅ ${this.listenerName} completed successfully`);
     }
 
     // For runtime.onMessage, return the actual result from the first successful handler
     // instead of metadata, as browser expects the actual response value
-    if (this.eventName === 'onMessage' && results.length > 0 && results[0].result !== undefined) {
+    if (
+      this.eventName === "onMessage" &&
+      results.length > 0 &&
+      results[0].result !== undefined
+    ) {
       return results[0].result;
     }
 
@@ -172,7 +187,7 @@ export class BaseListener {
       errors,
       totalHandlers: this.handlers.length,
       successCount: results.length,
-      errorCount: errors.length
+      errorCount: errors.length,
     };
   }
 
@@ -184,23 +199,24 @@ export class BaseListener {
     try {
       // Detect if handler returns a promise
       const result = handler.fn(...args);
-      
-      if (result && typeof result.then === 'function') {
+
+      if (result && typeof result.then === "function") {
         // Handler is async or returns a promise
         return await Promise.race([
           result,
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Handler timeout')), 10000)
-          )
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Handler timeout")), 10000),
+          ),
         ]);
       } else {
         // Handler is synchronous
         return result;
       }
-
     } catch (error) {
       // Wrap and re-throw with additional context
-      const wrappedError = new Error(`Handler "${handler.name}" failed: ${error.message}`);
+      const wrappedError = new Error(
+        `Handler "${handler.name}" failed: ${error.message}`,
+      );
       wrappedError.originalError = error;
       wrappedError.handlerName = handler.name;
       throw wrappedError;
@@ -218,16 +234,18 @@ export class BaseListener {
     try {
       const eventTarget = this.browser[this.eventType];
       const eventObject = eventTarget?.[this.eventName];
-      
+
       if (eventObject && eventObject.removeListener) {
         eventObject.removeListener(this.handleEvent.bind(this));
       }
 
       this.isRegistered = false;
       console.log(`🚫 Unregistered ${this.listenerName} listener`);
-
     } catch (error) {
-      console.error(`❌ Failed to unregister ${this.listenerName} listener:`, error);
+      console.error(
+        `❌ Failed to unregister ${this.listenerName} listener:`,
+        error,
+      );
     }
   }
 
@@ -237,10 +255,12 @@ export class BaseListener {
    */
   isAvailable() {
     try {
-      return this.initialized && 
-             this.browser && 
-             this.browser[this.eventType] && 
-             this.browser[this.eventType][this.eventName];
+      return (
+        this.initialized &&
+        this.browser &&
+        this.browser[this.eventType] &&
+        this.browser[this.eventType][this.eventName]
+      );
     } catch {
       return false;
     }
@@ -258,11 +278,11 @@ export class BaseListener {
       initialized: this.initialized,
       isRegistered: this.isRegistered,
       handlerCount: this.handlers.length,
-      handlers: this.handlers.map(h => ({
+      handlers: this.handlers.map((h) => ({
         name: h.name,
-        addedAt: h.addedAt
+        addedAt: h.addedAt,
       })),
-      isAvailable: this.isAvailable()
+      isAvailable: this.isAvailable(),
     };
   }
 
@@ -275,7 +295,7 @@ export class BaseListener {
       ...this.getStats(),
       browser: this.browser,
       browserAPI: !!this.browser,
-      eventAvailable: this.isAvailable()
+      eventAvailable: this.isAvailable(),
     };
   }
 
@@ -293,10 +313,10 @@ export class BaseListener {
    */
   async cleanup() {
     console.log(`🧹 Cleaning up ${this.listenerName} listener`);
-    
+
     await this.unregister();
     this.clearHandlers();
-    
+
     this.initialized = false;
     this.browser = null;
   }
@@ -333,41 +353,45 @@ export async function createAndRegisterListeners(listenerConfigs) {
       const ListenerClass = createListener(
         config.eventType,
         config.eventName,
-        config.listenerName
+        config.listenerName,
       );
-      
+
       const listener = new ListenerClass();
-      
+
       // Add handlers if provided
       if (config.handlers) {
-        config.handlers.forEach(handler => {
+        config.handlers.forEach((handler) => {
           listener.addHandler(handler.fn, handler.name);
         });
       }
-      
+
       // Register the listener
       await listener.register();
       listeners.push(listener);
-      
-      console.log(`✅ Created and registered ${config.listenerName}`);
 
+      console.log(`✅ Created and registered ${config.listenerName}`);
     } catch (error) {
-      console.error(`❌ Failed to create listener ${config.listenerName}:`, error);
+      console.error(
+        `❌ Failed to create listener ${config.listenerName}:`,
+        error,
+      );
       errors.push({
         config: config,
-        error: error
+        error: error,
       });
     }
   }
 
   if (errors.length > 0) {
-    console.warn(`⚠️ ${errors.length}/${listenerConfigs.length} listeners failed to initialize`);
+    console.warn(
+      `⚠️ ${errors.length}/${listenerConfigs.length} listeners failed to initialize`,
+    );
   }
 
   return {
     listeners,
     errors,
     successCount: listeners.length,
-    errorCount: errors.length
+    errorCount: errors.length,
   };
 }

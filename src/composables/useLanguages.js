@@ -1,17 +1,17 @@
 // src/composables/useLanguages.js
 // Composable for language management
 
-import { ref, computed } from 'vue'
-import { languageList } from '@/utils/languages.js'
-import { logME } from '@/utils/helpers.js'
+import { ref, computed } from "vue";
+import { languageList } from "@/utils/languages.js";
+import { logME } from "@/utils/helpers.js";
 
 /**
  * Composable for managing different types of languages in the extension
  */
 export function useLanguages() {
   // State
-  const isLoaded = ref(false)
-  const languages = ref([])
+  const isLoaded = ref(false);
+  const languages = ref([]);
 
   /**
    * Load languages list
@@ -21,31 +21,34 @@ export function useLanguages() {
     try {
       if (!isLoaded.value) {
         // زبان‌ها از فایل استاتیک بارگذاری می‌شوند
-        languages.value = languageList || []
-        isLoaded.value = true
-        logME('[useLanguages] Languages loaded successfully:', languages.value.length)
+        languages.value = languageList || [];
+        isLoaded.value = true;
+        logME(
+          "[useLanguages] Languages loaded successfully:",
+          languages.value.length,
+        );
       }
     } catch (error) {
-      logME('[useLanguages] Failed to load languages:', error)
+      logME("[useLanguages] Failed to load languages:", error);
       // در صورت خطا، از لیست خالی استفاده می‌کنیم
-      languages.value = []
-      isLoaded.value = true
+      languages.value = [];
+      isLoaded.value = true;
     }
-  }
+  };
 
   /**
    * Get all available translation languages
    * @returns {Array} Array of translation languages with code and name
    */
   const getTranslationLanguages = () => {
-    return (languages.value || languageList || []).map(lang => ({
+    return (languages.value || languageList || []).map((lang) => ({
       code: lang.code,
       name: lang.name,
       promptName: lang.promptName,
       voiceCode: lang.voiceCode,
-      flagCode: lang.flagCode
-    }))
-  }
+      flagCode: lang.flagCode,
+    }));
+  };
 
   /**
    * Get source languages (includes auto-detect)
@@ -53,18 +56,18 @@ export function useLanguages() {
    */
   const getSourceLanguages = () => {
     return [
-      { code: 'auto', name: 'Auto Detect', promptName: 'Auto Detect' },
-      ...getTranslationLanguages()
-    ]
-  }
+      { code: "auto", name: "Auto Detect", promptName: "Auto Detect" },
+      ...getTranslationLanguages(),
+    ];
+  };
 
   /**
    * Get target languages (excludes auto-detect)
    * @returns {Array} Array of target languages
    */
   const getTargetLanguages = () => {
-    return getTranslationLanguages()
-  }
+    return getTranslationLanguages();
+  };
 
   /**
    * Get interface languages (only available UI locales)
@@ -72,10 +75,10 @@ export function useLanguages() {
    */
   const getInterfaceLanguages = () => {
     return [
-      { code: 'en', name: 'English' },
-      { code: 'fa', name: 'فارسی' }
-    ]
-  }
+      { code: "en", name: "English" },
+      { code: "fa", name: "فارسی" },
+    ];
+  };
 
   /**
    * Find language by code
@@ -83,12 +86,12 @@ export function useLanguages() {
    * @returns {Object|null} Language object or null if not found
    */
   const findLanguageByCode = (code) => {
-    if (code === 'auto') {
-      return { code: 'auto', name: 'Auto Detect', promptName: 'Auto Detect' }
+    if (code === "auto") {
+      return { code: "auto", name: "Auto Detect", promptName: "Auto Detect" };
     }
-    const langList = languages.value || languageList || []
-    return langList.find(lang => lang.code === code) || null
-  }
+    const langList = languages.value || languageList || [];
+    return langList.find((lang) => lang.code === code) || null;
+  };
 
   /**
    * Get language name by code
@@ -96,9 +99,9 @@ export function useLanguages() {
    * @returns {string} Language name or code if not found
    */
   const getLanguageName = (code) => {
-    const language = findLanguageByCode(code)
-    return language ? language.name : code
-  }
+    const language = findLanguageByCode(code);
+    return language ? language.name : code;
+  };
 
   /**
    * Get language prompt name by display name or code
@@ -106,29 +109,29 @@ export function useLanguages() {
    * @returns {string} Language prompt name or identifier if not found
    */
   const getLanguagePromptName = (identifier) => {
-    if (!identifier) return null
-    
+    if (!identifier) return null;
+
     // Check if it's auto-detect
-    if (identifier === 'Auto-Detect' || identifier === 'auto') {
-      return 'auto'
+    if (identifier === "Auto-Detect" || identifier === "auto") {
+      return "auto";
     }
-    
-    const langList = languages.value || languageList || []
-    
+
+    const langList = languages.value || languageList || [];
+
     // Find by name (display value)
-    const langByName = langList.find(lang => lang.name === identifier)
+    const langByName = langList.find((lang) => lang.name === identifier);
     if (langByName) {
-      return langByName.promptName || langByName.code
+      return langByName.promptName || langByName.code;
     }
-    
+
     // Find by code
-    const langByCode = langList.find(lang => lang.code === identifier)
+    const langByCode = langList.find((lang) => lang.code === identifier);
     if (langByCode) {
-      return langByCode.promptName || langByCode.code
+      return langByCode.promptName || langByCode.code;
     }
-    
-    return identifier
-  }
+
+    return identifier;
+  };
 
   /**
    * Get language display value by code
@@ -136,41 +139,41 @@ export function useLanguages() {
    * @returns {string} Language display name or code if not found
    */
   const getLanguageDisplayValue = (code) => {
-    if (!code) return null
-    
-    if (code === 'auto') {
-      return 'Auto-Detect'
+    if (!code) return null;
+
+    if (code === "auto") {
+      return "Auto-Detect";
     }
-    
-    const langList = languages.value || languageList || []
-    const language = langList.find(lang => lang.code === code)
-    return language ? language.name : code
-  }
+
+    const langList = languages.value || languageList || [];
+    const language = langList.find((lang) => lang.code === code);
+    return language ? language.name : code;
+  };
 
   // Computed reactive references
   const allLanguages = computed(() => {
     if (!isLoaded.value) {
       // اگر هنوز load نشده، از languageList استاتیک استفاده کنیم
-      return languageList || []
+      return languageList || [];
     }
-    return languages.value || []
-  })
+    return languages.value || [];
+  });
 
-  const translationLanguages = computed(() => getTranslationLanguages())
-  const sourceLanguages = computed(() => getSourceLanguages())
-  const targetLanguages = computed(() => getTargetLanguages())
-  const interfaceLanguages = computed(() => getInterfaceLanguages())
+  const translationLanguages = computed(() => getTranslationLanguages());
+  const sourceLanguages = computed(() => getSourceLanguages());
+  const targetLanguages = computed(() => getTargetLanguages());
+  const interfaceLanguages = computed(() => getInterfaceLanguages());
 
   // Auto-load در صورت دسترسی به languageList
   if (languageList && languageList.length > 0 && !isLoaded.value) {
-    loadLanguages()
+    loadLanguages();
   }
 
   return {
     // State
     isLoaded,
     allLanguages,
-    
+
     // Functions
     loadLanguages,
     getTranslationLanguages,
@@ -181,11 +184,11 @@ export function useLanguages() {
     getLanguageName,
     getLanguagePromptName,
     getLanguageDisplayValue,
-    
+
     // Computed refs
     translationLanguages,
     sourceLanguages,
     targetLanguages,
-    interfaceLanguages
-  }
+    interfaceLanguages,
+  };
 }

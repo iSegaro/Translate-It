@@ -5,7 +5,7 @@
 // Note: safeSendMessage is passed as an argument
 
 // src/handlers/getSelectedTextHandler.js
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
@@ -13,7 +13,7 @@ export async function handleGetSelectedText(
   message,
   sender,
   sendResponse,
-  safeSendMessage
+  safeSendMessage,
 ) {
   logME("[Handler:GetSelectedText] Handling request.");
   try {

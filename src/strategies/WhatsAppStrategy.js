@@ -171,7 +171,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       new InputEvent("input", {
         bubbles: true,
         composed: true,
-      })
+      }),
     );
   }
 }

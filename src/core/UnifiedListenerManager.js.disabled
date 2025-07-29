@@ -187,29 +187,110 @@ export class UnifiedListenerManager {
   /**
    * Handle runtime.onMessage events - route to CoreMessageRouter
    */
-  async handleMessage(message, sender, sendResponse) {
-    console.debug('[UnifiedListenerManager] Message received, routing to CoreMessageRouter');
+  handleMessage(message, sender, sendResponse) {
+    console.log('[UnifiedListenerManager] Message received, routing to CoreMessageRouter');
+    console.log('[UnifiedListenerManager] sendResponse available:', typeof sendResponse, sendResponse ? 'YES' : 'NO');
     
     const startTime = performance.now();
     this.updateEventMetrics('runtime.onMessage');
 
-    try {
-      // CoreMessageRouter handles the message automatically
-      // We just need to return what it returns
-      const result = await this.coreRouter.handleRuntimeMessage(message, sender, sendResponse);
-      
-      const duration = performance.now() - startTime;
-      this.updatePerformanceMetrics('runtime.onMessage', duration);
-      
-      return result;
-      
-    } catch (error) {
-      console.error('[UnifiedListenerManager] Message routing error:', error);
-      this.updateErrorMetrics('runtime.onMessage');
-      
-      // Return error response for consistency
-      return { success: false, error: error.message };
-    }
+    // Handle async processing with sendResponse for Firefox compatibility
+    (async () => {
+      try {
+        console.log('[UnifiedListenerManager] Starting async processing...');
+        
+        // CoreMessageRouter handles the message automatically
+        const result = await this.coreRouter.handleRuntimeMessage(message, sender, sendResponse);
+        
+        console.log('[UnifiedListenerManager] Got result from CoreMessageRouter:', result);
+        
+        const duration = performance.now() - startTime;
+        this.updatePerformanceMetrics('runtime.onMessage', duration);
+        
+        // Send response back via sendResponse for Firefox
+        if (sendResponse && typeof sendResponse === 'function') {
+          console.log('[UnifiedListenerManager] Calling sendResponse with:', result);
+          sendResponse(result);
+          console.log('[UnifiedListenerManager] sendResponse called successfully');
+        } else {
+          console.warn('[UnifiedListenerManager] sendResponse not available or not a function');
+        }
+        
+        // Also broadcast response for Firefox compatibility if client expects it
+        if (message.expectResponse && message.messageId) {
+          console.log('[UnifiedListenerManager] Broadcasting response for Firefox compatibility');
+          try {
+            browser.tabs.sendMessage(sender.tab?.id, {
+              type: 'RESPONSE',
+              originalMessageId: message.messageId,
+              success: true,
+              data: result
+            }).catch(() => {
+              // Ignore errors - tab might not exist or not have content script
+              console.log('[UnifiedListenerManager] Could not broadcast to tab, trying runtime');
+              // Try broadcasting via runtime for extension pages
+              browser.runtime.sendMessage({
+                type: 'RESPONSE',
+                originalMessageId: message.messageId,
+                success: true,
+                data: result
+              }).catch(() => {
+                console.log('[UnifiedListenerManager] Broadcast failed');
+              });
+            });
+          } catch (error) {
+            console.warn('[UnifiedListenerManager] Broadcast error:', error);
+          }
+        }
+        
+      } catch (error) {
+        console.error('[UnifiedListenerManager] Error handling message:', error);
+        
+        const duration = performance.now() - startTime;
+        this.updatePerformanceMetrics('runtime.onMessage', duration);
+        
+        const errorResponse = { 
+          success: false, 
+          error: { 
+            message: error.message, 
+            type: error.constructor.name 
+          } 
+        };
+        
+        if (sendResponse && typeof sendResponse === 'function') {
+          console.log('[UnifiedListenerManager] Calling sendResponse with error:', errorResponse);
+          sendResponse(errorResponse);
+        }
+        
+        // Also broadcast error response for Firefox compatibility
+        if (message.expectResponse && message.messageId) {
+          console.log('[UnifiedListenerManager] Broadcasting error response for Firefox compatibility');
+          try {
+            browser.tabs.sendMessage(sender.tab?.id, {
+              type: 'RESPONSE',
+              originalMessageId: message.messageId,
+              success: false,
+              error: errorResponse.error
+            }).catch(() => {
+              browser.runtime.sendMessage({
+                type: 'RESPONSE',
+                originalMessageId: message.messageId,
+                success: false,
+                error: errorResponse.error
+              }).catch(() => {
+                console.log('[UnifiedListenerManager] Error broadcast failed');
+              });
+            });
+          } catch (broadcastError) {
+            console.warn('[UnifiedListenerManager] Error broadcast failed:', broadcastError);
+          }
+        }
+      }
+    })();
+    
+    // Return true to indicate async response for Firefox
+    console.log('[UnifiedListenerManager] Returning true for async handling');
+    return true;
   }
 
   /**

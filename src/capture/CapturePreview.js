@@ -14,20 +14,20 @@ export class CapturePreview {
     this.captureData = options.captureData;
     this.captureType = options.captureType || "area";
     this.selectionData = options.selectionData;
-    
+
     this.onConfirm = options.onConfirm || (() => {});
     this.onCancel = options.onCancel || (() => {});
     this.onRetry = options.onRetry || (() => {});
-    
+
     this.isVisible = false;
-    
+
     // DOM elements
     this.modal = null;
     this.previewImage = null;
     this.confirmButton = null;
     this.cancelButton = null;
     this.retryButton = null;
-    
+
     // Bound event handlers
     this._boundKeyDown = this._handleKeyDown.bind(this);
     this._boundClickOutside = this._handleClickOutside.bind(this);
@@ -47,15 +47,15 @@ export class CapturePreview {
 
       await this._createModal();
       this._addEventListeners();
-      
+
       this.isVisible = true;
-      
+
       logME("[CapturePreview] Preview shown successfully");
     } catch (error) {
       logME("[CapturePreview] Error showing preview:", error);
       throw this._createError(
         ErrorTypes.UI,
-        `Failed to show capture preview: ${error.message}`
+        `Failed to show capture preview: ${error.message}`,
       );
     }
   }
@@ -69,11 +69,11 @@ export class CapturePreview {
     logME("[CapturePreview] Hiding preview");
 
     this._removeEventListeners();
-    
+
     if (this.modal && this.modal.parentNode) {
       this.modal.parentNode.removeChild(this.modal);
     }
-    
+
     this.isVisible = false;
   }
 
@@ -98,7 +98,7 @@ export class CapturePreview {
           justify-content: center;
           z-index: 2147483647;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        `
+        `,
       });
 
       // Create modal content
@@ -114,7 +114,7 @@ export class CapturePreview {
           flex-direction: column;
           align-items: center;
           position: relative;
-        `
+        `,
       });
 
       // Create header
@@ -122,7 +122,7 @@ export class CapturePreview {
         style: `
           text-align: center;
           margin-bottom: 20px;
-        `
+        `,
       });
 
       const title = createSafeElement("h3", "", {
@@ -131,12 +131,12 @@ export class CapturePreview {
           font-size: 18px;
           font-weight: 600;
           color: #333;
-        `
+        `,
       });
-      
+
       safeSetText(
-        title, 
-        await getTranslationString("CAPTURE_PREVIEW_TITLE", "Capture Preview")
+        title,
+        await getTranslationString("CAPTURE_PREVIEW_TITLE", "Capture Preview"),
       );
 
       const subtitle = createSafeElement("p", "", {
@@ -144,15 +144,15 @@ export class CapturePreview {
           margin: 0;
           font-size: 14px;
           color: #666;
-        `
+        `,
       });
-      
+
       safeSetText(
         subtitle,
         await getTranslationString(
-          "CAPTURE_PREVIEW_SUBTITLE", 
-          "Review your capture and confirm to translate"
-        )
+          "CAPTURE_PREVIEW_SUBTITLE",
+          "Review your capture and confirm to translate",
+        ),
       );
 
       header.appendChild(title);
@@ -171,7 +171,7 @@ export class CapturePreview {
           display: flex;
           align-items: center;
           justify-content: center;
-        `
+        `,
       });
 
       // Create preview image
@@ -183,7 +183,7 @@ export class CapturePreview {
           object-fit: contain;
         `,
         src: this.captureData.imageData,
-        alt: "Capture Preview"
+        alt: "Capture Preview",
       });
 
       previewContainer.appendChild(this.previewImage);
@@ -195,19 +195,23 @@ export class CapturePreview {
           margin-bottom: 20px;
           font-size: 12px;
           color: #666;
-        `
+        `,
       });
 
-      const captureTypeText = this.captureType === "area" ? 
-        await getTranslationString("CAPTURE_TYPE_AREA", "Selected Area") :
-        await getTranslationString("CAPTURE_TYPE_FULLSCREEN", "Full Screen");
-      
+      const captureTypeText =
+        this.captureType === "area"
+          ? await getTranslationString("CAPTURE_TYPE_AREA", "Selected Area")
+          : await getTranslationString(
+              "CAPTURE_TYPE_FULLSCREEN",
+              "Full Screen",
+            );
+
       let infoText = `${captureTypeText}`;
-      
+
       if (this.selectionData) {
         infoText += ` • ${this.selectionData.width} × ${this.selectionData.height}`;
       }
-      
+
       safeSetText(captureInfo, infoText);
 
       // Create button container
@@ -216,26 +220,26 @@ export class CapturePreview {
           display: flex;
           gap: 12px;
           align-items: center;
-        `
+        `,
       });
 
       // Create buttons
       this.cancelButton = this._createButton(
         await getTranslationString("BUTTON_CANCEL", "Cancel"),
         "secondary",
-        this._handleCancelClick.bind(this)
+        this._handleCancelClick.bind(this),
       );
 
       this.retryButton = this._createButton(
         await getTranslationString("BUTTON_RETRY", "Retry"),
-        "secondary", 
-        this._handleRetryClick.bind(this)
+        "secondary",
+        this._handleRetryClick.bind(this),
       );
 
       this.confirmButton = this._createButton(
         await getTranslationString("BUTTON_TRANSLATE", "Translate"),
         "primary",
-        this._handleConfirmClick.bind(this)
+        this._handleConfirmClick.bind(this),
       );
 
       // Assemble buttons
@@ -273,7 +277,7 @@ export class CapturePreview {
    */
   _createButton(text, type, onClick) {
     const isPrimary = type === "primary";
-    
+
     const button = createSafeElement("button", "", {
       style: `
         padding: 10px 20px;
@@ -284,14 +288,18 @@ export class CapturePreview {
         cursor: pointer;
         transition: all 0.2s ease;
         min-width: 80px;
-        ${isPrimary ? `
+        ${
+          isPrimary
+            ? `
           background: #007acc;
           color: white;
-        ` : `
+        `
+            : `
           background: #f0f0f0;
           color: #333;
-        `}
-      `
+        `
+        }
+      `,
     });
 
     safeSetText(button, text);
@@ -430,7 +438,7 @@ export class CapturePreview {
     logME("[CapturePreview] Cleaning up");
 
     this.hide();
-    
+
     // Reset references
     this.modal = null;
     this.previewImage = null;

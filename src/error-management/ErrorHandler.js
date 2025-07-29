@@ -7,7 +7,10 @@ import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 
-const SILENT = new Set([ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]);
+const SILENT = new Set([
+  ErrorTypes.CONTEXT,
+  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+]);
 const SUPPRESS_CONSOLE = new Set([
   ErrorTypes.CONTEXT,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
@@ -68,7 +71,9 @@ export class ErrorHandler {
       }
       if (SILENT.has(type)) return err;
 
-      const action = OPEN_SETTINGS.has(type) ? () => openOptionsPage("api") : undefined;
+      const action = OPEN_SETTINGS.has(type)
+        ? () => openOptionsPage("api")
+        : undefined;
 
       this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
       return err;
@@ -79,7 +84,7 @@ export class ErrorHandler {
 
   _logError(error, meta) {
     console.error(
-      `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`
+      `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
     );
   }
 

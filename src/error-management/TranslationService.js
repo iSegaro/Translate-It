@@ -1,5 +1,5 @@
 // s../error-management/TranslationService.js
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { TranslationMode } from "@/config.js";
 import { logME } from "@/utils/helpers.js";
 
@@ -16,14 +16,16 @@ export class TranslationService {
    */
   static async translate(mode, payload) {
     try {
-      logME(`[TranslationService] Sending translation request for mode: ${mode}`);
-      
+      logME(
+        `[TranslationService] Sending translation request for mode: ${mode}`,
+      );
+
       const response = await browser.runtime.sendMessage({
         action: "fetchTranslation",
         payload: {
           ...payload,
-          translateMode: mode
-        }
+          translateMode: mode,
+        },
       });
 
       if (browser.runtime.lastError) {
@@ -48,7 +50,7 @@ export class TranslationService {
     return this.translate(TranslationMode.Sidepanel_Translate, {
       promptText: text,
       sourceLanguage: sourceLang,
-      targetLanguage: targetLang
+      targetLanguage: targetLang,
     });
   }
 
@@ -59,11 +61,13 @@ export class TranslationService {
    */
   static async activateSelectElementMode(active = true) {
     try {
-      logME(`[TranslationService] ${active ? 'Activating' : 'Deactivating'} select element mode`);
-      
+      logME(
+        `[TranslationService] ${active ? "Activating" : "Deactivating"} select element mode`,
+      );
+
       await browser.runtime.sendMessage({
         action: "activateSelectElementMode",
-        data: active
+        data: active,
       });
     } catch (error) {
       logME("[TranslationService] Error toggling select element mode:", error);
@@ -78,9 +82,9 @@ export class TranslationService {
   static async revertTranslation() {
     try {
       logME("[TranslationService] Sending revert translation request");
-      
+
       await browser.runtime.sendMessage({
-        action: "revertTranslation"
+        action: "revertTranslation",
       });
     } catch (error) {
       logME("[TranslationService] Error reverting translation:", error);
@@ -95,16 +99,19 @@ export class TranslationService {
   static async stopTTS() {
     try {
       await browser.runtime.sendMessage({
-        action: "stopTTS"
+        action: "stopTTS",
       });
     } catch (error) {
       // خطا را نادیده می‌گیریم چون ممکن است TTS فعال نباشد
-      logME("[TranslationService] TTS stop request failed (might not be active):", error);
+      logME(
+        "[TranslationService] TTS stop request failed (might not be active):",
+        error,
+      );
     }
   }
 
   // آینده: Methods برای Translation Modes دیگر
-  
+
   /**
    * ترجمه در فیلدهای متنی
    * @param {string} text - متن برای ترجمه
@@ -116,7 +123,7 @@ export class TranslationService {
     return this.translate(TranslationMode.Field, {
       promptText: text,
       sourceLanguage: sourceLang,
-      targetLanguage: targetLang
+      targetLanguage: targetLang,
     });
   }
 
@@ -131,7 +138,7 @@ export class TranslationService {
     return this.translate(TranslationMode.Selection, {
       promptText: text,
       sourceLanguage: sourceLang,
-      targetLanguage: targetLang
+      targetLanguage: targetLang,
     });
   }
 
@@ -142,7 +149,7 @@ export class TranslationService {
    */
   static async selectElementTranslate(jsonData) {
     return this.translate(TranslationMode.SelectElement, {
-      promptText: jsonData
+      promptText: jsonData,
     });
   }
 }

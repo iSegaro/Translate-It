@@ -28,7 +28,7 @@ export function resolveLangCode(inputLang) {
 export async function getEffectiveLanguage(
   text,
   selectedLang,
-  label = AUTO_DETECT_VALUE
+  label = AUTO_DETECT_VALUE,
 ) {
   if (selectedLang && selectedLang !== AUTO_DETECT_VALUE) {
     logME(`[Lang Resolver]: Using selected ${label} language: ${selectedLang}`);
@@ -40,12 +40,12 @@ export async function getEffectiveLanguage(
     const detectedLang = await detectTextLanguage(text);
     if (detectedLang) {
       logME(
-        `[Lang Resolver]: Auto-detected ${label} language: ${detectedLang}`
+        `[Lang Resolver]: Auto-detected ${label} language: ${detectedLang}`,
       );
       return detectedLang;
     } else {
       logME(
-        `[Lang Resolver]: Failed to detect ${label} language. Fallback to 'en'.`
+        `[Lang Resolver]: Failed to detect ${label} language. Fallback to 'en'.`,
       );
       return "en"; // fallback
     }

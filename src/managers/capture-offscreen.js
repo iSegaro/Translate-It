@@ -1,7 +1,7 @@
 // src/managers/capture-offscreen.js
 // Chrome offscreen document screen capture manager
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Offscreen Screen Capture Manager for Chrome
@@ -22,21 +22,23 @@ export class OffscreenCaptureManager {
 
     try {
       this.browser = browser;
-      
+
       if (!browser.offscreen) {
-        throw new Error('Offscreen API not available');
+        throw new Error("Offscreen API not available");
       }
 
-      console.log('📸 Initializing Chrome offscreen capture manager');
-      
+      console.log("📸 Initializing Chrome offscreen capture manager");
+
       // Create offscreen document for advanced capture functionality
       await this.createOffscreenDocument();
-      
-      this.initialized = true;
-      console.log('✅ Offscreen capture manager initialized');
 
+      this.initialized = true;
+      console.log("✅ Offscreen capture manager initialized");
     } catch (error) {
-      console.error('❌ Failed to initialize offscreen capture manager:', error);
+      console.error(
+        "❌ Failed to initialize offscreen capture manager:",
+        error,
+      );
       throw error;
     }
   }
@@ -49,27 +51,30 @@ export class OffscreenCaptureManager {
     try {
       // Check if offscreen document already exists
       const existingContexts = await browser.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT']
+        contextTypes: ["OFFSCREEN_DOCUMENT"],
       });
 
       if (existingContexts.length > 0) {
-        console.log('📄 Offscreen document already exists for capture');
+        console.log("📄 Offscreen document already exists for capture");
         this.offscreenCreated = true;
         return;
       }
 
       // Create new offscreen document for screen capture
       await browser.offscreen.createDocument({
-        url: 'offscreen.html',
-        reasons: ['DOM_SCRAPING', 'BLOBS'],
-        justification: 'Screen capture processing and OCR for translation extension'
+        url: "offscreen.html",
+        reasons: ["DOM_SCRAPING", "BLOBS"],
+        justification:
+          "Screen capture processing and OCR for translation extension",
       });
 
       this.offscreenCreated = true;
-      console.log('📄 Offscreen document created for screen capture');
-
+      console.log("📄 Offscreen document created for screen capture");
     } catch (error) {
-      console.error('❌ Failed to create offscreen document for capture:', error);
+      console.error(
+        "❌ Failed to create offscreen document for capture:",
+        error,
+      );
       throw error;
     }
   }
@@ -86,11 +91,11 @@ export class OffscreenCaptureManager {
 
     try {
       const captureOptions = {
-        format: options.format || 'png',
-        quality: options.quality || 90
+        format: options.format || "png",
+        quality: options.quality || 90,
       };
 
-      console.log('📸 Capturing visible tab with offscreen processing');
+      console.log("📸 Capturing visible tab with offscreen processing");
 
       // Capture visible tab
       const imageData = await browser.tabs.captureVisibleTab(captureOptions);
@@ -98,25 +103,27 @@ export class OffscreenCaptureManager {
       // Process in offscreen document if needed
       if (options.processInOffscreen) {
         const response = await browser.runtime.sendMessage({
-          target: 'offscreen',
-          action: 'PROCESS_CAPTURE',
+          target: "offscreen",
+          action: "PROCESS_CAPTURE",
           data: {
             imageData,
-            options
-          }
+            options,
+          },
         });
 
         if (!response || !response.success) {
-          throw new Error(response?.error || 'Failed to process capture in offscreen document');
+          throw new Error(
+            response?.error ||
+              "Failed to process capture in offscreen document",
+          );
         }
 
         return response.processedData;
       }
 
       return imageData;
-
     } catch (error) {
-      console.error('❌ Screen capture failed:', error);
+      console.error("❌ Screen capture failed:", error);
       throw new Error(`Screen capture failed: ${error.message}`);
     }
   }
@@ -138,24 +145,25 @@ export class OffscreenCaptureManager {
 
       // Process cropping in offscreen document
       const response = await browser.runtime.sendMessage({
-        target: 'offscreen',
-        action: 'CROP_IMAGE',
+        target: "offscreen",
+        action: "CROP_IMAGE",
         data: {
           imageData: fullImage,
           area: area,
-          options
-        }
+          options,
+        },
       });
 
       if (!response || !response.success) {
-        throw new Error(response?.error || 'Failed to crop image in offscreen document');
+        throw new Error(
+          response?.error || "Failed to crop image in offscreen document",
+        );
       }
 
-      console.log('📸 Screen area captured and cropped');
+      console.log("📸 Screen area captured and cropped");
       return response.croppedData;
-
     } catch (error) {
-      console.error('❌ Screen area capture failed:', error);
+      console.error("❌ Screen area capture failed:", error);
       throw new Error(`Screen area capture failed: ${error.message}`);
     }
   }
@@ -172,30 +180,29 @@ export class OffscreenCaptureManager {
     }
 
     try {
-      console.log('🔍 Processing image for OCR in offscreen document');
+      console.log("🔍 Processing image for OCR in offscreen document");
 
       const response = await browser.runtime.sendMessage({
-        target: 'offscreen',
-        action: 'OCR_PROCESS',
+        target: "offscreen",
+        action: "OCR_PROCESS",
         data: {
           imageData,
           options: {
-            language: options.language || 'eng',
+            language: options.language || "eng",
             psm: options.psm || 6,
-            ...options
-          }
-        }
+            ...options,
+          },
+        },
       });
 
       if (!response || !response.success) {
-        throw new Error(response?.error || 'OCR processing failed');
+        throw new Error(response?.error || "OCR processing failed");
       }
 
-      console.log('✅ OCR processing completed');
+      console.log("✅ OCR processing completed");
       return response.extractedText;
-
     } catch (error) {
-      console.error('❌ OCR processing failed:', error);
+      console.error("❌ OCR processing failed:", error);
       throw new Error(`OCR processing failed: ${error.message}`);
     }
   }
@@ -214,10 +221,10 @@ export class OffscreenCaptureManager {
    */
   getDebugInfo() {
     return {
-      type: 'offscreen-capture',
+      type: "offscreen-capture",
       initialized: this.initialized,
       offscreenCreated: this.offscreenCreated,
-      hasOffscreenAPI: !!this.browser?.offscreen
+      hasOffscreenAPI: !!this.browser?.offscreen,
     };
   }
 
@@ -225,17 +232,16 @@ export class OffscreenCaptureManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log('🧹 Cleaning up offscreen capture manager');
-    
+    console.log("🧹 Cleaning up offscreen capture manager");
+
     try {
       // Close offscreen document if we created it
       if (this.offscreenCreated && this.browser?.offscreen?.closeDocument) {
         await browser.offscreen.closeDocument();
         this.offscreenCreated = false;
       }
-
     } catch (error) {
-      console.error('❌ Error during capture manager cleanup:', error);
+      console.error("❌ Error during capture manager cleanup:", error);
     }
 
     this.initialized = false;

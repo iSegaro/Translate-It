@@ -1,153 +1,160 @@
 // src/composables/useUI.js
 // Vue composable for UI state management in sidepanel
-import { ref, nextTick } from 'vue'
+import { ref, nextTick } from "vue";
 
 export function useUI() {
   // State
-  const isHistoryPanelOpen = ref(false)
-  const isApiDropdownOpen = ref(false)
-  const isSelectElementModeActive = ref(false)
-  const feedbackStates = ref({})
+  const isHistoryPanelOpen = ref(false);
+  const isApiDropdownOpen = ref(false);
+  const isSelectElementModeActive = ref(false);
+  const feedbackStates = ref({});
 
   // Toggle history panel
   const toggleHistoryPanel = () => {
-    isHistoryPanelOpen.value = !isHistoryPanelOpen.value
-  }
+    isHistoryPanelOpen.value = !isHistoryPanelOpen.value;
+  };
 
   // Open history panel
   const openHistoryPanel = () => {
-    isHistoryPanelOpen.value = true
-  }
+    isHistoryPanelOpen.value = true;
+  };
 
   // Close history panel
   const closeHistoryPanel = () => {
-    isHistoryPanelOpen.value = false
-  }
+    isHistoryPanelOpen.value = false;
+  };
 
   // Toggle API dropdown
   const toggleApiDropdown = () => {
-    isApiDropdownOpen.value = !isApiDropdownOpen.value
-  }
+    isApiDropdownOpen.value = !isApiDropdownOpen.value;
+  };
 
   // Open API dropdown
   const openApiDropdown = () => {
-    isApiDropdownOpen.value = true
-  }
+    isApiDropdownOpen.value = true;
+  };
 
   // Close API dropdown
   const closeApiDropdown = () => {
-    isApiDropdownOpen.value = false
-  }
+    isApiDropdownOpen.value = false;
+  };
 
   // Toggle inline toolbar visibility based on content (matches uiManager.js)
   const toggleInlineToolbarVisibility = (container) => {
-    if (!container) return
+    if (!container) return;
 
-    const textElement = container.querySelector('textarea, .result')
-    if (!textElement) return
+    const textElement = container.querySelector("textarea, .result");
+    if (!textElement) return;
 
-    const text = (textElement.value || textElement.textContent || '').trim()
-    container.classList.toggle('has-content', !!text)
-  }
+    const text = (textElement.value || textElement.textContent || "").trim();
+    container.classList.toggle("has-content", !!text);
+  };
 
   // Show visual feedback on an element (matches uiManager.js)
-  const showVisualFeedback = (element, feedbackType = 'success', duration = 800) => {
-    if (!element) return
+  const showVisualFeedback = (
+    element,
+    feedbackType = "success",
+    duration = 800,
+  ) => {
+    if (!element) return;
 
-    const feedbackClass = `feedback-${feedbackType}`
-    element.classList.add(feedbackClass)
-    
+    const feedbackClass = `feedback-${feedbackType}`;
+    element.classList.add(feedbackClass);
+
     // Track feedback state
-    const elementId = element.id || element.className || 'unknown'
-    feedbackStates.value[elementId] = feedbackType
+    const elementId = element.id || element.className || "unknown";
+    feedbackStates.value[elementId] = feedbackType;
 
     setTimeout(() => {
-      element.classList.remove(feedbackClass)
-      delete feedbackStates.value[elementId]
-    }, duration)
-  }
+      element.classList.remove(feedbackClass);
+      delete feedbackStates.value[elementId];
+    }, duration);
+  };
 
   // Update toolbar visibility for multiple containers
   const updateToolbarVisibilities = (containers) => {
-    containers.forEach(container => {
+    containers.forEach((container) => {
       if (container) {
-        toggleInlineToolbarVisibility(container)
+        toggleInlineToolbarVisibility(container);
       }
-    })
-  }
+    });
+  };
 
   // Handle element selection mode toggle
   const toggleElementSelection = () => {
-    isSelectElementModeActive.value = !isSelectElementModeActive.value
-  }
+    isSelectElementModeActive.value = !isSelectElementModeActive.value;
+  };
 
   // Activate element selection mode
   const activateElementSelection = () => {
-    isSelectElementModeActive.value = true
-  }
+    isSelectElementModeActive.value = true;
+  };
 
   // Deactivate element selection mode
   const deactivateElementSelection = () => {
-    isSelectElementModeActive.value = false
-  }
+    isSelectElementModeActive.value = false;
+  };
 
   // Close all dropdowns and panels
   const closeAllOverlays = () => {
-    isApiDropdownOpen.value = false
+    isApiDropdownOpen.value = false;
     // Note: History panel usually stays open when clicked elsewhere
-  }
+  };
 
   // Handle global click outside
   const handleGlobalClick = (event) => {
     // Close API dropdown if clicking outside
     if (isApiDropdownOpen.value) {
-      const apiDropdown = document.querySelector('.api-dropdown')
-      const apiButton = document.querySelector('#apiProviderBtn')
-      
-      if (apiDropdown && apiButton && 
-          !apiDropdown.contains(event.target) && 
-          !apiButton.contains(event.target)) {
-        closeApiDropdown()
+      const apiDropdown = document.querySelector(".api-dropdown");
+      const apiButton = document.querySelector("#apiProviderBtn");
+
+      if (
+        apiDropdown &&
+        apiButton &&
+        !apiDropdown.contains(event.target) &&
+        !apiButton.contains(event.target)
+      ) {
+        closeApiDropdown();
       }
     }
-  }
+  };
 
   // Setup global event listeners
   const setupGlobalListeners = () => {
-    document.addEventListener('click', handleGlobalClick)
-  }
+    document.addEventListener("click", handleGlobalClick);
+  };
 
   // Cleanup global event listeners
   const cleanupGlobalListeners = () => {
-    document.removeEventListener('click', handleGlobalClick)
-  }
+    document.removeEventListener("click", handleGlobalClick);
+  };
 
   // Focus management
   const focusElement = async (element) => {
-    if (!element) return false
+    if (!element) return false;
 
-    await nextTick()
+    await nextTick();
     try {
-      element.focus()
-      return true
+      element.focus();
+      return true;
     } catch (error) {
-      console.warn('Could not focus element:', error)
-      return false
+      console.warn("Could not focus element:", error);
+      return false;
     }
-  }
+  };
 
   // Scroll to element
-  const scrollToElement = (element, behavior = 'smooth') => {
-    if (!element) return false
+  const scrollToElement = (element, behavior = "smooth") => {
+    if (!element) return false;
 
     try {
-      element.scrollIntoView({ behavior, block: 'nearest' })
-      return true
+      element.scrollIntoView({ behavior, block: "nearest" });
+      return true;
     } catch (error) {
-      console.warn('Could not scroll to element:', error)
-      return false
+      console.warn("Could not scroll to element:", error);
+      return false;
     }
-  }
+  };
 
   return {
     // State
@@ -183,6 +190,6 @@ export function useUI() {
 
     // Focus & Scroll
     focusElement,
-    scrollToElement
-  }
+    scrollToElement,
+  };
 }

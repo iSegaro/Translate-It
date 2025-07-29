@@ -330,7 +330,7 @@ export const initializeSettingsListener = async (browser) => {
   
   if (browser.storage && browser.storage.onChanged) {
     console.log('[config.js] Setting up storage listener...');
-    browser.storage.onChanged.addListener((changes, areaName) => {
+    browser.storage.onChanged.addListener.call(browser.storage.onChanged, (changes, areaName) => {
       console.log(`[config.js] Storage change detected: area=${areaName}, changes=`, changes);
       if (areaName === "local" && settingsCache) {
         Object.keys(changes).forEach((key) => {

@@ -13,7 +13,7 @@ export async function handlePlayGoogleTTS(
   sender,
   sendResponse,
   playAudioViaOffscreen,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:TTS] Handling playGoogleTTS request", message);
   try {
@@ -29,11 +29,11 @@ export async function handlePlayGoogleTTS(
         if (languageInfo?.voiceCode) {
           voiceLangCode = languageInfo.voiceCode;
           logME(
-            `[Handler:TTS] Detected language: ${detectedLang}, using voice code: ${voiceLangCode}`
+            `[Handler:TTS] Detected language: ${detectedLang}, using voice code: ${voiceLangCode}`,
           );
         } else {
           logME(
-            `[Handler:TTS] No voice code for: ${detectedLang}. Falling back to 'en'.`
+            `[Handler:TTS] No voice code for: ${detectedLang}. Falling back to 'en'.`,
           );
         }
       }
@@ -56,7 +56,7 @@ export async function handlePlayGoogleTTS(
     }
 
     const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(
-      text
+      text,
     )}&tl=${voiceLangCode}`;
 
     const offscreenResult = await playAudioViaOffscreen(ttsUrl);
@@ -71,9 +71,8 @@ export async function handlePlayGoogleTTS(
   } catch (error) {
     logME("[Handler:TTS] Error processing playGoogleTTS:", error);
     const handledError = errorHandler.handle(error, {
-      type:
-        error.message.includes("Permission") ?
-          ErrorTypes.PERMISSION
+      type: error.message.includes("Permission")
+        ? ErrorTypes.PERMISSION
         : ErrorTypes.API,
       context: "handler-playGoogleTTS",
       metadata: { textSnippet: message?.text?.substring(0, 50) || "N/A" },

@@ -32,19 +32,19 @@ export default class InstagramStrategy extends PlatformStrategy {
       } else if (element.isContentEditable) {
         const trustedHTML = filterXSS(translatedText, {
           whiteList: {
-            br: []
+            br: [],
           },
           stripIgnoreTag: true,
-          stripIgnoreTagBody: ['script', 'style'],
+          stripIgnoreTagBody: ["script", "style"],
           onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
             // Block javascript: and data: URLs
-            if (name === 'href' || name === 'src') {
+            if (name === "href" || name === "src") {
               if (value.match(/^(javascript|data|vbscript):/i)) {
-                return '';
+                return "";
               }
             }
             return false;
-          }
+          },
         });
 
         const parser = new DOMParser();
@@ -187,7 +187,7 @@ export default class InstagramStrategy extends PlatformStrategy {
       new InputEvent("input", {
         bubbles: true,
         composed: true,
-      })
+      }),
     );
   }
 }

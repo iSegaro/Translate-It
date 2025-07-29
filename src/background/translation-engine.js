@@ -3,15 +3,15 @@
  * Handles all translation requests from UI contexts via messaging
  */
 
-import { TranslationProviderFactory } from './providers/TranslationProviderFactory.js'
-import browser from 'webextension-polyfill'
+import { TranslationProviderFactory } from "../providers/factory/TranslationProviderFactory.js";
+import browser from "webextension-polyfill";
 
 export class TranslationEngine {
   constructor() {
-    this.providers = new Map()
-    this.cache = new Map()
-    this.history = []
-    this.factory = new TranslationProviderFactory()
+    this.providers = new Map();
+    this.cache = new Map();
+    this.history = [];
+    this.factory = new TranslationProviderFactory();
   }
 
   /**
@@ -20,117 +20,145 @@ export class TranslationEngine {
   async setupMessageListener() {
     // NOTE: Message handling is now managed by MessageRouter in BackgroundService
     // This method is kept for compatibility but disabled
-    console.log('[TranslationEngine] Message listener setup skipped - handled by MessageRouter')
-    return
+    console.log(
+      "[TranslationEngine] Message listener setup skipped - handled by MessageRouter",
+    );
+    return;
   }
 
   /**
    * Handle incoming messages from UI contexts
    */
   async handleMessage(request, sender, sendResponse) {
-    if (request.action === 'TRANSLATE') {
+    if (request.action === "TRANSLATE") {
       try {
-        const result = await this.handleTranslateMessage(request, sender)
-        return result
+        const result = await this.handleTranslateMessage(request, sender);
+        return result;
       } catch (error) {
-        console.error('[TranslationEngine] Error handling message:', error)
-        return this.formatError(error, request.context)
+        console.error("[TranslationEngine] Error handling message:", error);
+        return this.formatError(error, request.context);
       }
     }
-    
+
     // Let other message handlers process non-translation messages
-    return undefined
+    return undefined;
   }
 
   /**
    * Handle translation request messages
    */
   async handleTranslateMessage(request, sender) {
-    console.log('[TranslationEngine] Processing request:', JSON.stringify(request, null, 2));
-    console.log('[TranslationEngine] Sender:', sender);
-    
+    console.log(
+      "[TranslationEngine] Processing request:",
+      JSON.stringify(request, null, 2),
+    );
+    console.log("[TranslationEngine] Sender:", sender);
+
     // Input validation and normalization
-    if (!request || typeof request !== 'object') {
-      throw new Error(`Invalid request: expected object, got ${typeof request}`);
+    if (!request || typeof request !== "object") {
+      throw new Error(
+        `Invalid request: expected object, got ${typeof request}`,
+      );
     }
-    
+
     // Extract context and data with fallbacks
     let context = request.context;
     let data = request.data;
-    
+
     // Handle different input formats
     if (!context || !data) {
       // Legacy format: request contains translation data directly
       if (request.text && request.provider) {
-        console.log('[TranslationEngine] Legacy format detected, normalizing...');
-        context = request.context || 'unknown';
+        console.log(
+          "[TranslationEngine] Legacy format detected, normalizing...",
+        );
+        context = request.context || "unknown";
         data = {
           text: request.text,
           provider: request.provider,
-          sourceLanguage: request.sourceLanguage || 'auto',
-          targetLanguage: request.targetLanguage || 'fa',
-          mode: request.mode || 'simple',
-          options: request.options || {}
+          sourceLanguage: request.sourceLanguage || "auto",
+          targetLanguage: request.targetLanguage || "fa",
+          mode: request.mode || "simple",
+          options: request.options || {},
         };
       } else {
-        throw new Error(`Missing required fields: context and/or data. Got: ${JSON.stringify(request)}`);
+        throw new Error(
+          `Missing required fields: context and/or data. Got: ${JSON.stringify(request)}`,
+        );
       }
     }
-    
+
     // Validate data structure
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== "object") {
       throw new Error(`Invalid data: expected object, got ${typeof data}`);
     }
-    
-    if (!data.text || typeof data.text !== 'string' || data.text.trim().length === 0) {
-      throw new Error(`Invalid text: expected non-empty string, got "${data.text}"`);
+
+    if (
+      !data.text ||
+      typeof data.text !== "string" ||
+      data.text.trim().length === 0
+    ) {
+      throw new Error(
+        `Invalid text: expected non-empty string, got "${data.text}"`,
+      );
     }
-    
-    if (!data.provider || typeof data.provider !== 'string') {
-      throw new Error(`Invalid provider: expected string, got "${data.provider}"`);
+
+    if (!data.provider || typeof data.provider !== "string") {
+      throw new Error(
+        `Invalid provider: expected string, got "${data.provider}"`,
+      );
     }
-    
-    console.log('[TranslationEngine] Normalized context:', context);
-    console.log('[TranslationEngine] Normalized data:', JSON.stringify(data, null, 2));
-    
+
+    console.log("[TranslationEngine] Normalized context:", context);
+    console.log(
+      "[TranslationEngine] Normalized data:",
+      JSON.stringify(data, null, 2),
+    );
+
     try {
       let result;
-      
+
       // Context-specific optimizations
-      if (context === 'popup') {
+      if (context === "popup") {
         // Fast response priority for popup
-        console.log('[TranslationEngine] Using popup priority strategy');
+        console.log("[TranslationEngine] Using popup priority strategy");
         result = await this.translateWithPriority(data);
-      } else if (context === 'selection') {
+      } else if (context === "selection") {
         // Background processing OK for selection
-        console.log('[TranslationEngine] Using selection cache strategy');
+        console.log("[TranslationEngine] Using selection cache strategy");
         result = await this.translateWithCache(data);
-      } else if (context === 'sidepanel') {
+      } else if (context === "sidepanel") {
         // Enhanced features for sidepanel
-        console.log('[TranslationEngine] Using sidepanel history strategy');
+        console.log("[TranslationEngine] Using sidepanel history strategy");
         result = await this.translateWithHistory(data);
       } else {
         // Default strategy
-        console.log('[TranslationEngine] Using default translation strategy');
+        console.log("[TranslationEngine] Using default translation strategy");
         result = await this.executeTranslation(data);
       }
-      
-      console.log('[TranslationEngine] Translation result:', JSON.stringify(result, null, 2));
-      
+
+      console.log(
+        "[TranslationEngine] Translation result:",
+        JSON.stringify(result, null, 2),
+      );
+
       // Validate result format
-      if (!result || typeof result !== 'object') {
-        throw new Error(`Invalid translation result: expected object, got ${typeof result}`);
+      if (!result || typeof result !== "object") {
+        throw new Error(
+          `Invalid translation result: expected object, got ${typeof result}`,
+        );
       }
-      
-      if (!Object.prototype.hasOwnProperty.call(result, 'success')) {
-        throw new Error(`Translation result missing 'success' property: ${JSON.stringify(result)}`);
+
+      if (!Object.prototype.hasOwnProperty.call(result, "success")) {
+        throw new Error(
+          `Translation result missing 'success' property: ${JSON.stringify(result)}`,
+        );
       }
-      
+
       return result;
-      
     } catch (error) {
-      console.error('[TranslationEngine] Translation error:', error);
-      console.error('[TranslationEngine] Error stack:', error.stack);
+      console.error("[TranslationEngine] Translation error:", error);
+      console.error("[TranslationEngine] Error stack:", error.stack);
       return this.formatError(error, context);
     }
   }
@@ -140,72 +168,79 @@ export class TranslationEngine {
    */
   async translateWithPriority(data) {
     // Check cache first for instant response
-    const cacheKey = this.generateCacheKey(data)
+    const cacheKey = this.generateCacheKey(data);
     if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey)
+      const cached = this.cache.get(cacheKey);
       return {
         ...cached,
-        fromCache: true
-      }
+        fromCache: true,
+      };
     }
 
-    return await this.executeTranslation(data)
+    return await this.executeTranslation(data);
   }
 
   /**
    * Execute translation with cache checking (for selection)
    */
   async translateWithCache(data) {
-    const cacheKey = this.generateCacheKey(data)
-    
+    const cacheKey = this.generateCacheKey(data);
+
     // Return cached result if available
     if (this.cache.has(cacheKey)) {
       return {
         ...this.cache.get(cacheKey),
-        fromCache: true
-      }
+        fromCache: true,
+      };
     }
 
-    const result = await this.executeTranslation(data)
-    
+    const result = await this.executeTranslation(data);
+
     // Cache the result
-    this.cacheResult(cacheKey, result)
-    
-    return result
+    this.cacheResult(cacheKey, result);
+
+    return result;
   }
 
   /**
    * Execute translation with history tracking (for sidepanel)
    */
   async translateWithHistory(data) {
-    const result = await this.executeTranslation(data)
-    
+    const result = await this.executeTranslation(data);
+
     // Add to history for sidepanel
-    this.addToHistory(data, result)
-    
-    return result
+    this.addToHistory(data, result);
+
+    return result;
   }
 
   /**
    * Core translation execution logic
    */
   async executeTranslation(data) {
-    const { text, provider, sourceLanguage, targetLanguage, mode } = data
-    
+    const { text, provider, sourceLanguage, targetLanguage, mode } = data;
+
     if (!text || text.trim().length === 0) {
-      throw new Error('Text to translate is required')
+      throw new Error("Text to translate is required");
     }
 
     // Get or create provider instance
-    const providerInstance = await this.getProvider(provider)
-    
+    const providerInstance = await this.getProvider(provider);
+
     if (!providerInstance) {
-      throw new Error(`Provider '${provider}' not found or failed to initialize`)
+      throw new Error(
+        `Provider '${provider}' not found or failed to initialize`,
+      );
     }
 
     // Execute translation
-    const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, mode)
-    
+    const result = await providerInstance.translate(
+      text,
+      sourceLanguage,
+      targetLanguage,
+      mode,
+    );
+
     const response = {
       success: true,
       translatedText: result,
@@ -214,10 +249,10 @@ export class TranslationEngine {
       targetLanguage,
       originalText: text,
       timestamp: Date.now(),
-      mode: mode || 'simple'
-    }
+      mode: mode || "simple",
+    };
 
-    return response
+    return response;
   }
 
   /**
@@ -226,30 +261,33 @@ export class TranslationEngine {
   async getProvider(providerId) {
     // Return cached provider if available
     if (this.providers.has(providerId)) {
-      return this.providers.get(providerId)
+      return this.providers.get(providerId);
     }
 
     try {
       // Create new provider instance
-      const provider = await this.factory.getProvider(providerId)
-      
+      const provider = await this.factory.getProvider(providerId);
+
       if (provider) {
-        this.providers.set(providerId, provider)
-        return provider
+        this.providers.set(providerId, provider);
+        return provider;
       }
     } catch (error) {
-      console.error(`[TranslationEngine] Failed to create provider '${providerId}':`, error)
+      console.error(
+        `[TranslationEngine] Failed to create provider '${providerId}':`,
+        error,
+      );
     }
 
-    return null
+    return null;
   }
 
   /**
    * Generate cache key for translation request
    */
   generateCacheKey(data) {
-    const { text, provider, sourceLanguage, targetLanguage, mode } = data
-    return `${provider}:${sourceLanguage}:${targetLanguage}:${mode}:${text.slice(0, 100)}`
+    const { text, provider, sourceLanguage, targetLanguage, mode } = data;
+    return `${provider}:${sourceLanguage}:${targetLanguage}:${mode}:${text.slice(0, 100)}`;
   }
 
   /**
@@ -259,14 +297,14 @@ export class TranslationEngine {
     // Limit cache size to prevent memory issues
     if (this.cache.size >= 100) {
       // Remove oldest entries
-      const firstKey = this.cache.keys().next().value
-      this.cache.delete(firstKey)
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
     }
 
     this.cache.set(cacheKey, {
       ...result,
-      cachedAt: Date.now()
-    })
+      cachedAt: Date.now(),
+    });
   }
 
   /**
@@ -281,18 +319,18 @@ export class TranslationEngine {
       sourceLanguage: data.sourceLanguage,
       targetLanguage: data.targetLanguage,
       timestamp: Date.now(),
-      mode: data.mode
-    }
+      mode: data.mode,
+    };
 
-    this.history.unshift(historyItem)
+    this.history.unshift(historyItem);
 
     // Limit history size
     if (this.history.length > 50) {
-      this.history = this.history.slice(0, 50)
+      this.history = this.history.slice(0, 50);
     }
 
     // Optionally save to storage
-    this.saveHistoryToStorage()
+    this.saveHistoryToStorage();
   }
 
   /**
@@ -301,10 +339,10 @@ export class TranslationEngine {
   async saveHistoryToStorage() {
     try {
       await browser.storage.local.set({
-        translationHistory: this.history
-      })
+        translationHistory: this.history,
+      });
     } catch (error) {
-      console.error('[TranslationEngine] Failed to save history:', error)
+      console.error("[TranslationEngine] Failed to save history:", error);
     }
   }
 
@@ -313,14 +351,14 @@ export class TranslationEngine {
    */
   async loadHistoryFromStorage() {
     try {
-      const data = await browser.storage.local.get(['translationHistory'])
+      const data = await browser.storage.local.get(["translationHistory"]);
       if (Array.isArray(data.translationHistory)) {
-        this.history = data.translationHistory
+        this.history = data.translationHistory;
       } else {
-        this.history = [] // Ensure it's always an array
+        this.history = []; // Ensure it's always an array
       }
     } catch (error) {
-      console.error('[TranslationEngine] Failed to load history:', error)
+      console.error("[TranslationEngine] Failed to load history:", error);
     }
   }
 
@@ -331,12 +369,12 @@ export class TranslationEngine {
     return {
       success: false,
       error: {
-        type: 'TRANSLATION_ERROR',
-        message: error.message || 'Translation failed',
-        context: context || 'unknown',
-        timestamp: Date.now()
-      }
-    }
+        type: "TRANSLATION_ERROR",
+        message: error.message || "Translation failed",
+        context: context || "unknown",
+        timestamp: Date.now(),
+      },
+    };
   }
 
   /**
@@ -344,10 +382,10 @@ export class TranslationEngine {
    */
   async getAvailableProviders() {
     try {
-      return await this.factory.getAvailableProviders()
+      return await this.factory.getAvailableProviders();
     } catch (error) {
-      console.error('[TranslationEngine] Failed to get providers:', error)
-      return []
+      console.error("[TranslationEngine] Failed to get providers:", error);
+      return [];
     }
   }
 
@@ -355,15 +393,15 @@ export class TranslationEngine {
    * Clear cache
    */
   clearCache() {
-    this.cache.clear()
+    this.cache.clear();
   }
 
   /**
    * Clear history
    */
   clearHistory() {
-    this.history = []
-    this.saveHistoryToStorage()
+    this.history = [];
+    this.saveHistoryToStorage();
   }
 
   /**
@@ -372,8 +410,8 @@ export class TranslationEngine {
   getCacheStats() {
     return {
       size: this.cache.size,
-      providers: this.providers.size
-    }
+      providers: this.providers.size,
+    };
   }
 
   /**
@@ -381,11 +419,10 @@ export class TranslationEngine {
    */
   async initialize() {
     try {
-      
-      await this.loadHistoryFromStorage()
-      console.log('[TranslationEngine] Initialized successfully')
+      await this.loadHistoryFromStorage();
+      console.log("[TranslationEngine] Initialized successfully");
     } catch (error) {
-      console.error('[TranslationEngine] Initialization failed:', error)
+      console.error("[TranslationEngine] Initialization failed:", error);
     }
   }
 }

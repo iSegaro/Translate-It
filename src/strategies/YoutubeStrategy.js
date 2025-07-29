@@ -3,7 +3,10 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { logME } from "../utils/helpers.js";
 import { filterXSS } from "xss";
-import { smartTextReplacement, smartDelay } from "../utils/framework-compat/index.js";
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "../utils/framework-compat/index.js";
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -76,44 +79,41 @@ export default class YoutubeStrategy extends PlatformStrategy {
       if (translatedText !== undefined && translatedText !== null) {
         // استفاده از smart replacement برای سازگاری بهتر با فریم‌ورک‌ها
         const success = await smartTextReplacement(element, translatedText);
-        
+
         if (success) {
           this.applyVisualFeedback(element);
           this.applyTextDirection(element, translatedText);
-          
+
           // تاخیر هوشمند برای اطمینان از پردازش کامل
           await smartDelay(200);
-          
+
           logME("[YoutubeStrategy] Smart replacement completed successfully");
         } else {
           // fallback به روش قدیمی
           logME("[YoutubeStrategy] Falling back to legacy replacement method");
-          
+
           if (element.isContentEditable) {
             // برای عناصر contentEditable از <br> استفاده کنید
             const htmlText = translatedText.replace(/\n/g, "<br>");
             const trustedHTML = filterXSS(htmlText, {
               whiteList: {
-                br: []
+                br: [],
               },
               stripIgnoreTag: true,
-              stripIgnoreTagBody: ['script', 'style'],
+              stripIgnoreTagBody: ["script", "style"],
               onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
                 // Block javascript: and data: URLs
-                if (name === 'href' || name === 'src') {
+                if (name === "href" || name === "src") {
                   if (value.match(/^(javascript|data|vbscript):/i)) {
-                    return '';
+                    return "";
                   }
                 }
                 return false;
-              }
+              },
             });
 
             const parser = new DOMParser();
-            const doc = parser.parseFromString(
-              trustedHTML,
-              "text/html"
-            );
+            const doc = parser.parseFromString(trustedHTML, "text/html");
 
             element.textContent = "";
             Array.from(doc.body.childNodes).forEach((node) => {

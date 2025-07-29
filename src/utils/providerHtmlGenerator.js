@@ -5,14 +5,13 @@ import { logME } from "./helpers.js";
 // Helper function to get provider by ID
 const getProviderById = (providerId) => {
   const providers = getSupportedProviders();
-  return providers.find(provider => provider.id === providerId);
+  return providers.find((provider) => provider.id === providerId);
 };
 
 /**
  * Utility class for generating HTML elements for translation providers
  */
 export class ProviderHtmlGenerator {
-  
   /**
    * Generate options HTML for settings page
    * @param {Array} [providers] - Provider list (defaults to available providers)
@@ -20,17 +19,21 @@ export class ProviderHtmlGenerator {
    */
   static generateOptionsHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-    logME(`[ProviderHtmlGenerator] Generating options HTML for ${availableProviders.length} providers`);
-    
-    return availableProviders.map(provider => {
-      const title = provider.requirements ? 
-        (provider.requirements.browsers.length < 4 
-          ? `${provider.name} (${provider.requirements.browsers.join(', ')})`
-          : provider.name)
-        : provider.name;
-      
-      return `<option value="${provider.id}" title="${provider.description}">${title}</option>`;
-    }).join('\n                  ');
+    logME(
+      `[ProviderHtmlGenerator] Generating options HTML for ${availableProviders.length} providers`,
+    );
+
+    return availableProviders
+      .map((provider) => {
+        const title = provider.requirements
+          ? provider.requirements.browsers.length < 4
+            ? `${provider.name} (${provider.requirements.browsers.join(", ")})`
+            : provider.name
+          : provider.name;
+
+        return `<option value="${provider.id}" title="${provider.description}">${title}</option>`;
+      })
+      .join("\n                  ");
   }
 
   /**
@@ -40,19 +43,23 @@ export class ProviderHtmlGenerator {
    */
   static generateDropdownHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-    logME(`[ProviderHtmlGenerator] Generating dropdown HTML for ${availableProviders.length} providers`);
-    
-    return availableProviders.map(provider => {
-      const statusClass = this._getProviderStatusClass(provider);
-      const statusIcon = this._getProviderStatusIcon(provider);
-      
-      return `
+    logME(
+      `[ProviderHtmlGenerator] Generating dropdown HTML for ${availableProviders.length} providers`,
+    );
+
+    return availableProviders
+      .map((provider) => {
+        const statusClass = this._getProviderStatusClass(provider);
+        const statusIcon = this._getProviderStatusIcon(provider);
+
+        return `
         <div class="dropdown-item ${statusClass}" data-provider="${provider.id}" title="${provider.description}">
           <img src="@/assets/icons/${provider.icon}" alt="${provider.name}" class="provider-icon">
           <span class="provider-name">${provider.name}</span>
           ${statusIcon}
         </div>`.trim();
-    }).join('\n        ');
+      })
+      .join("\n        ");
   }
 
   /**
@@ -62,14 +69,14 @@ export class ProviderHtmlGenerator {
    */
   static generateProviderArray(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-    
-    return availableProviders.map(provider => ({
+
+    return availableProviders.map((provider) => ({
       id: provider.id,
       name: provider.name,
       icon: provider.icon,
       description: provider.description,
       needsApiKey: provider.needsApiKey,
-      category: provider.category
+      category: provider.category,
     }));
   }
 
@@ -81,32 +88,32 @@ export class ProviderHtmlGenerator {
   static generateProviderSettingsHtml(providerId) {
     const provider = getProviderById(providerId);
     if (!provider) {
-      return '';
+      return "";
     }
 
     switch (providerId) {
-      case 'google':
+      case "google":
         return this._generateGoogleSettingsHtml(provider);
-      case 'bing':
+      case "bing":
         return this._generateBingSettingsHtml(provider);
-      case 'yandex':
+      case "yandex":
         return this._generateYandexSettingsHtml(provider);
-      case 'browserapi':
+      case "browserapi":
         return this._generatebrowserApiSettingsHtml(provider);
-      case 'gemini':
+      case "gemini":
         return this._generateGeminiSettingsHtml(provider);
-      case 'openai':
+      case "openai":
         return this._generateOpenAISettingsHtml(provider);
-      case 'openrouter':
+      case "openrouter":
         return this._generateOpenRouterSettingsHtml(provider);
-      case 'deepseek':
+      case "deepseek":
         return this._generateDeepSeekSettingsHtml(provider);
-      case 'webai':
+      case "webai":
         return this._generateWebAISettingsHtml(provider);
-      case 'custom':
+      case "custom":
         return this._generateCustomSettingsHtml(provider);
       default:
-        return '';
+        return "";
     }
   }
 
@@ -119,33 +126,33 @@ export class ProviderHtmlGenerator {
   static _getProviderStatusClass(provider) {
     if (provider.features && provider.features.length > 0) {
       // For browser provider, check if available
-      if (provider.id === 'browser') {
-        return 'provider-limited'; // Simplified check
+      if (provider.id === "browser") {
+        return "provider-limited"; // Simplified check
       }
-      return 'provider-available';
+      return "provider-available";
     }
-    return 'provider-available';
+    return "provider-available";
   }
 
   /**
    * Get provider status icon
-   * @private  
+   * @private
    * @param {Object} provider - Provider object
    * @returns {string} HTML for status icon
    */
   static _getProviderStatusIcon(provider) {
-    if (provider.id === 'browser') {
+    if (provider.id === "browser") {
       // Simplified availability check for browser provider
       return '<span class="provider-status" title="Requires Chrome 138+">⚠️</span>';
     }
-    
-    if (provider.category === 'free') {
+
+    if (provider.category === "free") {
       return '<span class="provider-status" title="Free service">🆓</span>';
     } else if (provider.needsApiKey) {
       return '<span class="provider-status" title="Requires API key">🔑</span>';
     }
-    
-    return '';
+
+    return "";
   }
 
   /**
@@ -268,15 +275,15 @@ export class ProviderHtmlGenerator {
   static generateCompatibilityWarning(providerId) {
     const provider = getProviderById(providerId);
     if (!provider) {
-      return '';
+      return "";
     }
 
     // Simplified compatibility check
-    if (provider.id === 'browser') {
+    if (provider.id === "browser") {
       return `⚠️ ${provider.name} is not available. Requires Chrome 138+ with translation features enabled.`;
     }
-    
-    return '';
+
+    return "";
   }
 
   /**
@@ -285,14 +292,14 @@ export class ProviderHtmlGenerator {
    */
   static generateProviderComparison() {
     const allProviders = getSupportedProviders();
-    
+
     return {
-      free: allProviders.filter(p => p.category === 'free'),
-      ai: allProviders.filter(p => p.category === 'ai'), 
-      local: allProviders.filter(p => p.category === 'local'),
-      custom: allProviders.filter(p => p.category === 'custom'),
+      free: allProviders.filter((p) => p.category === "free"),
+      ai: allProviders.filter((p) => p.category === "ai"),
+      local: allProviders.filter((p) => p.category === "local"),
+      custom: allProviders.filter((p) => p.category === "custom"),
       available: allProviders,
-      unavailable: [] // Simplified - all supported providers are available
+      unavailable: [], // Simplified - all supported providers are available
     };
   }
 }

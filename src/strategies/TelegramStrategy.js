@@ -32,7 +32,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       if (!field) {
         const editableFields = document.querySelectorAll(
-          '[contenteditable="true"]'
+          '[contenteditable="true"]',
         );
         field = editableFields.length === 1 ? editableFields[0] : null;
       }
@@ -182,7 +182,7 @@ export default class TelegramStrategy extends PlatformStrategy {
         telegramField.value = translatedText;
         telegramField.setAttribute(
           "dir",
-          CONFIG.RTL_REGEX.test(translatedText) ? "rtl" : "ltr"
+          CONFIG.RTL_REGEX.test(translatedText) ? "rtl" : "ltr",
         );
         telegramField.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
@@ -245,7 +245,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
   validateField(element) {
     const hasNestedEditable = element?.querySelector(
-      '[contenteditable="true"]'
+      '[contenteditable="true"]',
     );
     return (
       element &&
@@ -329,7 +329,7 @@ export default class TelegramStrategy extends PlatformStrategy {
       new InputEvent("input", {
         bubbles: true,
         composed: true,
-      })
+      }),
     );
   }
 }

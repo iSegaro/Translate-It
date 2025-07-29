@@ -14,32 +14,32 @@ export async function cropImageData(imageDataUrl, selectionData) {
     try {
       logME("[ImageProcessing] Starting image crop:", {
         selection: selectionData,
-        hasImage: !!imageDataUrl
+        hasImage: !!imageDataUrl,
       });
 
       // Create canvas for cropping
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      
+
       // Set canvas size to selected area
       canvas.width = selectionData.width;
       canvas.height = selectionData.height;
 
       // Load full screen image
       const img = new window.Image();
-      
+
       img.onload = () => {
         try {
           // Get device pixel ratio for high-DPI displays
           const devicePixelRatio = window.devicePixelRatio || 1;
-          
+
           // Calculate actual coordinates on the captured image
           // browser capture may be at device pixel ratio
           const actualX = selectionData.x * devicePixelRatio;
           const actualY = selectionData.y * devicePixelRatio;
           const actualWidth = selectionData.width * devicePixelRatio;
           const actualHeight = selectionData.height * devicePixelRatio;
-          
+
           // Ensure coordinates are within image bounds
           const maxX = Math.min(actualX, img.naturalWidth - actualWidth);
           const maxY = Math.min(actualY, img.naturalHeight - actualHeight);
@@ -49,36 +49,46 @@ export async function cropImageData(imageDataUrl, selectionData) {
           const safeHeight = Math.min(actualHeight, img.naturalHeight - safeY);
 
           logME("[ImageProcessing] Coordinate calculation:", {
-            original: { x: selectionData.x, y: selectionData.y, width: selectionData.width, height: selectionData.height },
+            original: {
+              x: selectionData.x,
+              y: selectionData.y,
+              width: selectionData.width,
+              height: selectionData.height,
+            },
             devicePixelRatio: devicePixelRatio,
-            calculated: { x: actualX, y: actualY, width: actualWidth, height: actualHeight },
+            calculated: {
+              x: actualX,
+              y: actualY,
+              width: actualWidth,
+              height: actualHeight,
+            },
             safe: { x: safeX, y: safeY, width: safeWidth, height: safeHeight },
             imageSize: { width: img.naturalWidth, height: img.naturalHeight },
             coordinateSystem: "viewport-relative (matches browser capture)",
-            debug: selectionData.debug || {}
+            debug: selectionData.debug || {},
           });
 
           // Draw cropped area to canvas
           ctx.drawImage(
             img,
             safeX, // source x
-            safeY, // source y  
+            safeY, // source y
             safeWidth, // source width
             safeHeight, // source height
             0, // dest x
             0, // dest y
             selectionData.width, // dest width (original size for display)
-            selectionData.height // dest height (original size for display)
+            selectionData.height, // dest height (original size for display)
           );
 
           // Convert to data URL
           const croppedDataUrl = canvas.toDataURL("image/png", 1.0);
-          
+
           logME("[ImageProcessing] Image cropped successfully", {
             originalSize: `${img.naturalWidth}x${img.naturalHeight}`,
             croppedSize: `${selectionData.width}x${selectionData.height}`,
             actualCroppedSize: `${safeWidth}x${safeHeight}`,
-            croppedDataLength: croppedDataUrl.length
+            croppedDataLength: croppedDataUrl.length,
           });
 
           resolve(croppedDataUrl);
@@ -99,10 +109,11 @@ export async function cropImageData(imageDataUrl, selectionData) {
 
       // Start loading image
       img.src = imageDataUrl;
-
     } catch (error) {
       logME("[ImageProcessing] Error setting up image crop:", error);
-      const setupError = new Error(`Failed to setup image cropping: ${error.message}`);
+      const setupError = new Error(
+        `Failed to setup image cropping: ${error.message}`,
+      );
       setupError.type = ErrorTypes.IMAGE_PROCESSING_FAILED;
       reject(setupError);
     }
@@ -115,12 +126,14 @@ export async function cropImageData(imageDataUrl, selectionData) {
  * @returns {boolean} True if valid
  */
 export function isValidImageDataUrl(imageDataUrl) {
-  if (!imageDataUrl || typeof imageDataUrl !== 'string') {
+  if (!imageDataUrl || typeof imageDataUrl !== "string") {
     return false;
   }
-  
+
   // Check for data URL format
-  return imageDataUrl.startsWith('data:image/') && imageDataUrl.includes('base64,');
+  return (
+    imageDataUrl.startsWith("data:image/") && imageDataUrl.includes("base64,")
+  );
 }
 
 /**
@@ -131,18 +144,18 @@ export function isValidImageDataUrl(imageDataUrl) {
 export async function getImageDimensions(imageDataUrl) {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
-    
+
     img.onload = () => {
       resolve({
         width: img.naturalWidth,
-        height: img.naturalHeight
+        height: img.naturalHeight,
       });
     };
-    
+
     img.onerror = () => {
       reject(new Error("Failed to load image for dimension calculation"));
     };
-    
+
     img.src = imageDataUrl;
   });
 }

@@ -37,9 +37,12 @@ export default class FeatureManager {
       TEXT_SELECTION:
         initialFlags.TEXT_SELECTION ?? CONFIG.TRANSLATE_ON_TEXT_SELECTION,
       DICTIONARY: initialFlags.DICTIONARY ?? CONFIG.ENABLE_DICTIONARY,
-      SUBTITLE_TRANSLATION: initialFlags.SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
-      SHOW_SUBTITLE_ICON: initialFlags.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON,
-      SCREEN_CAPTURE: initialFlags.SCREEN_CAPTURE ?? CONFIG.ENABLE_SCREEN_CAPTURE,
+      SUBTITLE_TRANSLATION:
+        initialFlags.SUBTITLE_TRANSLATION ?? CONFIG.ENABLE_SUBTITLE_TRANSLATION,
+      SHOW_SUBTITLE_ICON:
+        initialFlags.SHOW_SUBTITLE_ICON ?? CONFIG.SHOW_SUBTITLE_ICON,
+      SCREEN_CAPTURE:
+        initialFlags.SCREEN_CAPTURE ?? CONFIG.ENABLE_SCREEN_CAPTURE,
     };
 
     this._subscribers = {};
@@ -62,7 +65,10 @@ export default class FeatureManager {
       });
 
     // افزودن listener برای تغییرات آینده
-    browser.storage.onChanged.addListener(this._onStorageChanged.bind(this));
+    browser.storage.onChanged.addListener.call(
+      browser.storage.onChanged,
+      this._onStorageChanged.bind(this),
+    );
   }
 
   /** @param {FeatureKey} flag */

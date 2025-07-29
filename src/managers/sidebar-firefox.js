@@ -1,7 +1,7 @@
 // src/managers/sidebar-firefox.js
 // Firefox sidebar manager (and fallback for other browsers)
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Firefox Sidebar Manager
@@ -21,13 +21,12 @@ export class FirefoxSidebarManager {
 
     try {
       this.browser = browser;
-      
-      console.log('📋 Initializing Firefox sidebar manager');
-      this.initialized = true;
-      console.log('✅ Firefox sidebar manager initialized');
 
+      console.log("📋 Initializing Firefox sidebar manager");
+      this.initialized = true;
+      console.log("✅ Firefox sidebar manager initialized");
     } catch (error) {
-      console.error('❌ Failed to initialize Firefox sidebar manager:', error);
+      console.error("❌ Failed to initialize Firefox sidebar manager:", error);
       throw error;
     }
   }
@@ -45,30 +44,29 @@ export class FirefoxSidebarManager {
     try {
       // Firefox sidebar opens automatically based on manifest sidebar_action
       // For manual opening, we can use tabs.create as fallback
-      const sidebarUrl = browser.runtime.getURL('sidepanel.html');
-      
+      const sidebarUrl = browser.runtime.getURL("sidepanel.html");
+
       // Try to open as popup window (better than tab for sidebar-like experience)
       if (browser.windows) {
         await browser.windows.create({
           url: sidebarUrl,
-          type: 'popup',
+          type: "popup",
           width: 400,
           height: 600,
           left: window.screen.width - 420,
-          top: 100
+          top: 100,
         });
-        console.log('📋 Firefox sidebar opened as popup window');
+        console.log("📋 Firefox sidebar opened as popup window");
       } else {
         // Fallback: open in new tab
         await browser.tabs.create({
           url: sidebarUrl,
-          active: true
+          active: true,
         });
-        console.log('📋 Firefox sidebar opened in new tab');
+        console.log("📋 Firefox sidebar opened in new tab");
       }
-
     } catch (error) {
-      console.error('❌ Failed to open Firefox sidebar:', error);
+      console.error("❌ Failed to open Firefox sidebar:", error);
       throw error;
     }
   }
@@ -78,7 +76,7 @@ export class FirefoxSidebarManager {
    * @param {number} tabId - Tab ID
    * @param {string} behavior - Panel behavior
    */
-  async setPanelBehavior(tabId, behavior = 'enabled') {
+  async setPanelBehavior(tabId, behavior = "enabled") {
     // Firefox sidebar behavior is controlled by manifest
     // This is a no-op but we'll log for consistency
     console.log(`📋 Firefox sidebar behavior is always enabled (no-op)`);
@@ -98,10 +96,10 @@ export class FirefoxSidebarManager {
    */
   getDebugInfo() {
     return {
-      type: 'firefox-sidebar',
+      type: "firefox-sidebar",
       initialized: this.initialized,
       hasWindowsAPI: !!this.browser?.windows,
-      hasTabsAPI: !!this.browser?.tabs
+      hasTabsAPI: !!this.browser?.tabs,
     };
   }
 }

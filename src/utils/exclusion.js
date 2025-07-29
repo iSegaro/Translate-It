@@ -39,7 +39,7 @@ export function isUrlExcluded_TEXT_FIELDS_ICON(url) {
 
   // ۱. بررسی در لیست پیش‌فرض
   const isDefaultExcluded = DEFAULT_EXCLUDED_TEXT_FIELDS_ICON.some((site) =>
-    url.includes(site)
+    url.includes(site),
   );
   if (isDefaultExcluded) {
     return true;
@@ -59,7 +59,7 @@ export function isUrlExcluded(url, userExcludedSites = []) {
 
   // ۱. بررسی در لیست پیش‌فرض
   const isDefaultExcluded = DEFAULT_EXCLUDED_SITES.some((site) =>
-    url.includes(site)
+    url.includes(site),
   );
   if (isDefaultExcluded) {
     return true;

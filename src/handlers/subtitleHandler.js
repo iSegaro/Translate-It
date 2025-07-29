@@ -65,17 +65,21 @@ export class SubtitleHandler {
 
     // Wait for FeatureManager to load from storage before initial check
     await this.waitForFeatureManagerReady();
-    
+
     // Check if extension is globally enabled first
     if (!this.featureManager.isOn("EXTENSION_ENABLED")) {
-      logME("[SubtitleHandler] Extension globally disabled, skipping initialization");
+      logME(
+        "[SubtitleHandler] Extension globally disabled, skipping initialization",
+      );
       return;
     }
 
     // Check if current site is excluded
     const isExcluded = await this.checkSiteExclusion();
     if (isExcluded) {
-      logME("[SubtitleHandler] Current site is excluded, skipping initialization");
+      logME(
+        "[SubtitleHandler] Current site is excluded, skipping initialization",
+      );
       return;
     }
 
@@ -83,7 +87,7 @@ export class SubtitleHandler {
     if (this.site === "youtube") {
       this.initializeYouTubeUI();
     }
-    
+
     // Perform initial check to start or stop the integration
     this.handleSubtitleFeatureToggle();
 
@@ -117,17 +121,26 @@ export class SubtitleHandler {
       const actualExtensionValue = settings.EXTENSION_ENABLED ?? true;
       const actualSubtitleValue = settings.ENABLE_SUBTITLE_TRANSLATION ?? true;
       const actualIconValue = settings.SHOW_SUBTITLE_ICON ?? true;
-      
+
       // If FeatureManager hasn't loaded the values yet, wait a bit
-      if (this.featureManager.isOn("EXTENSION_ENABLED") !== actualExtensionValue ||
-          this.featureManager.isOn("SUBTITLE_TRANSLATION") !== actualSubtitleValue ||
-          this.featureManager.isOn("SHOW_SUBTITLE_ICON") !== actualIconValue) {
-        logME("[SubtitleHandler] Waiting for FeatureManager to sync with storage...");
+      if (
+        this.featureManager.isOn("EXTENSION_ENABLED") !==
+          actualExtensionValue ||
+        this.featureManager.isOn("SUBTITLE_TRANSLATION") !==
+          actualSubtitleValue ||
+        this.featureManager.isOn("SHOW_SUBTITLE_ICON") !== actualIconValue
+      ) {
+        logME(
+          "[SubtitleHandler] Waiting for FeatureManager to sync with storage...",
+        );
         // Give FeatureManager time to load from storage
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logME("[SubtitleHandler] Error checking storage, proceeding with current state:", error);
+      logME(
+        "[SubtitleHandler] Error checking storage, proceeding with current state:",
+        error,
+      );
     }
   }
 
@@ -137,14 +150,16 @@ export class SubtitleHandler {
   initializeYouTubeUI() {
     // Only initialize UI if SHOW_SUBTITLE_ICON is enabled
     if (!this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
-      logME("[SubtitleHandler] SHOW_SUBTITLE_ICON is disabled, skipping YouTube UI initialization");
+      logME(
+        "[SubtitleHandler] SHOW_SUBTITLE_ICON is disabled, skipping YouTube UI initialization",
+      );
       return;
     }
 
     this.injectYouTubeButtonStyles();
     this.youtubeButtonInterval = setInterval(
       () => this.createYouTubeButton(),
-      1000
+      1000,
     );
   }
 
@@ -193,8 +208,10 @@ export class SubtitleHandler {
   createYouTubeButton() {
     try {
       // Check if we should create the button at all
-      if (!this.featureManager.isOn("EXTENSION_ENABLED") || 
-          !this.featureManager.isOn("SHOW_SUBTITLE_ICON")) {
+      if (
+        !this.featureManager.isOn("EXTENSION_ENABLED") ||
+        !this.featureManager.isOn("SHOW_SUBTITLE_ICON")
+      ) {
         return;
       }
 
@@ -226,13 +243,15 @@ export class SubtitleHandler {
       this.updateYouTubeButtonState();
     } catch (error) {
       const errorType = matchErrorToType(error);
-      
+
       // Handle extension context invalidation
       if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-        logME("[SubtitleHandler] Extension context invalidated, cannot create YouTube button");
+        logME(
+          "[SubtitleHandler] Extension context invalidated, cannot create YouTube button",
+        );
         return;
       }
-      
+
       // Log other errors but don't crash
       logME("[SubtitleHandler] Error creating YouTube button:", error);
     }
@@ -253,10 +272,12 @@ export class SubtitleHandler {
       }
     } catch (error) {
       const errorType = matchErrorToType(error);
-      
+
       // Handle extension context invalidation
       if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-        logME("[SubtitleHandler] Extension context invalidated, cannot toggle subtitle setting");
+        logME(
+          "[SubtitleHandler] Extension context invalidated, cannot toggle subtitle setting",
+        );
         // Optionally disable the button to prevent further clicks
         const button = document.querySelector(".translate-it-yt-button");
         if (button) {
@@ -266,7 +287,7 @@ export class SubtitleHandler {
         }
         return;
       }
-      
+
       // Handle other errors through the error service
       this.translationHandler.errorHandler.handle(error, {
         type: errorType,
@@ -290,10 +311,12 @@ export class SubtitleHandler {
         enabled = settings.ENABLE_SUBTITLE_TRANSLATION ?? true;
       } catch (error) {
         const errorType = matchErrorToType(error);
-        
+
         // Handle extension context invalidation
         if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-          logME("[SubtitleHandler] Extension context invalidated, cannot update button state");
+          logME(
+            "[SubtitleHandler] Extension context invalidated, cannot update button state",
+          );
           // Default to disabled state and mark button as non-functional
           enabled = false;
           button.disabled = true;
@@ -301,9 +324,12 @@ export class SubtitleHandler {
           button.title = "Extension reloaded, please refresh page";
           return;
         }
-        
+
         // For other errors, default to true
-        logME("[SubtitleHandler] Error getting button state, defaulting to enabled:", error);
+        logME(
+          "[SubtitleHandler] Error getting button state, defaulting to enabled:",
+          error,
+        );
         enabled = true;
       }
     }
@@ -360,34 +386,39 @@ export class SubtitleHandler {
             } else {
               logME(
                 "[SubtitleHandler] Could not extract translated text from response:",
-                response
+                response,
               );
               return text; // Return original text on failure
             }
           } catch (error) {
             const errorType = matchErrorToType(error);
-            
+
             // Handle extension context invalidation specifically
             if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-              logME("[SubtitleHandler] Extension context invalidated, disabling subtitle translation");
+              logME(
+                "[SubtitleHandler] Extension context invalidated, disabling subtitle translation",
+              );
               // Stop subtitle translation to prevent further errors
               if (this.subtitleIntegration) {
                 try {
                   this.subtitleIntegration.destroy();
                   this.subtitleIntegration = null;
                 } catch (destroyError) {
-                  logME("[SubtitleHandler] Error stopping subtitle integration:", destroyError);
+                  logME(
+                    "[SubtitleHandler] Error stopping subtitle integration:",
+                    destroyError,
+                  );
                 }
               }
               return text; // Return original text
             }
-            
+
             // Use the error service to handle other errors properly
             this.translationHandler.errorHandler.handle(error, {
               type: errorType,
               context: "subtitle-translation-provider",
             });
-            
+
             return text; // Return original text on error
           }
         },
@@ -401,7 +432,7 @@ export class SubtitleHandler {
       this.subtitleIntegration = createSubtitleManager(
         subtitleTranslationProvider,
         this.translationHandler.errorHandler,
-        this.translationHandler.notifier
+        this.translationHandler.notifier,
       );
       await this.subtitleIntegration.start();
       logME("[SubtitleHandler] Subtitle integration started successfully.");
@@ -424,7 +455,7 @@ export class SubtitleHandler {
       this.subtitleIntegration = null;
     }
     const container = document.querySelector(
-      "#translate-it-subtitle-container"
+      "#translate-it-subtitle-container",
     );
     if (container) container.remove();
     const style = document.querySelector("#youtube-subtitle-style");
@@ -443,7 +474,9 @@ export class SubtitleHandler {
 
     // Check if extension is globally enabled first
     if (!this.featureManager.isOn("EXTENSION_ENABLED")) {
-      logME("[SubtitleHandler] Extension globally disabled, stopping subtitle integration");
+      logME(
+        "[SubtitleHandler] Extension globally disabled, stopping subtitle integration",
+      );
       this.stopSubtitleIntegration();
       return;
     }
@@ -451,7 +484,9 @@ export class SubtitleHandler {
     // Check site exclusion
     const isExcluded = await this.checkSiteExclusion();
     if (isExcluded) {
-      logME("[SubtitleHandler] Site is excluded, stopping subtitle integration");
+      logME(
+        "[SubtitleHandler] Site is excluded, stopping subtitle integration",
+      );
       this.stopSubtitleIntegration();
       return;
     }
@@ -502,7 +537,7 @@ export class SubtitleHandler {
     } else {
       // Remove the YouTube UI completely
       this.cleanupYouTubeUI();
-      
+
       // Extra cleanup: make sure no button exists after cleanup
       setTimeout(() => {
         const button = document.getElementById("translate-it-yt-btn");
@@ -548,20 +583,20 @@ export class SubtitleHandler {
    */
   cleanupYouTubeUI() {
     logME("[SubtitleHandler] Cleaning up YouTube UI.");
-    
+
     // Stop the button creation interval first
     if (this.youtubeButtonInterval) {
       clearInterval(this.youtubeButtonInterval);
       this.youtubeButtonInterval = null;
     }
-    
+
     // Remove the button element
     const button = document.getElementById("translate-it-yt-btn");
     if (button) {
       button.remove();
       logME("[SubtitleHandler] YouTube button removed.");
     }
-    
+
     // Remove the style element
     const style = document.getElementById("translate-it-yt-button-style");
     if (style) {

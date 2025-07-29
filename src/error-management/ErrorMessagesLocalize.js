@@ -17,10 +17,13 @@ export async function translateErrorMessage(error) {
   }
 
   const raw =
-    typeof error === "string" ? error
-    : error instanceof Error ? error.message
-    : typeof error?.message === "string" ? error.message
-    : "(Unknown Error)";
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : typeof error?.message === "string"
+          ? error.message
+          : "(Unknown Error)";
 
   const key = matchErrorToKey(raw);
   if (key) {

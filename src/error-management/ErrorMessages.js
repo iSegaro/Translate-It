@@ -10,7 +10,8 @@ export const errorMessages = {
   [ErrorTypes.TEXT_TOO_LONG]: "Text is too long",
   [ErrorTypes.TRANSLATION_NOT_FOUND]: "Translation not found",
   [ErrorTypes.TRANSLATION_FAILED]: "Translation failed",
-  [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "Language pair not supported by the selected translation service",
+  [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]:
+    "Language pair not supported by the selected translation service",
 
   // API settings errors
   [ErrorTypes.API]: "API error",
@@ -32,23 +33,30 @@ export const errorMessages = {
   [ErrorTypes.SERVER_ERROR]:
     "The service provider's server encountered an error. Please try again later.", // برای 500, 502, 503
 
-
   // Import/Export password errors
-  [ErrorTypes.IMPORT_PASSWORD_REQUIRED]: "Password is required to import encrypted settings",
-  [ErrorTypes.IMPORT_PASSWORD_INCORRECT]: "Incorrect password or corrupted data",
+  [ErrorTypes.IMPORT_PASSWORD_REQUIRED]:
+    "Password is required to import encrypted settings",
+  [ErrorTypes.IMPORT_PASSWORD_INCORRECT]:
+    "Incorrect password or corrupted data",
 
   // Screen Capture errors
-  [ErrorTypes.SCREEN_CAPTURE_FAILED]: "Failed to capture screen. Please try again.",
-  [ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED]: "Screen capture permission denied. Please enable permissions and try again.",
-  [ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED]: "Screen capture is not supported in this browser or context.",
-  [ErrorTypes.IMAGE_PROCESSING_FAILED]: "Failed to process captured image. Please try again.",
-  [ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED]: "Current translation provider does not support image translation. Please select an AI provider.",
+  [ErrorTypes.SCREEN_CAPTURE_FAILED]:
+    "Failed to capture screen. Please try again.",
+  [ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED]:
+    "Screen capture permission denied. Please enable permissions and try again.",
+  [ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED]:
+    "Screen capture is not supported in this browser or context.",
+  [ErrorTypes.IMAGE_PROCESSING_FAILED]:
+    "Failed to process captured image. Please try again.",
+  [ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED]:
+    "Current translation provider does not support image translation. Please select an AI provider.",
 
   // General errors
   [ErrorTypes.NETWORK_ERROR]: "Connection to server failed",
   [ErrorTypes.HTTP_ERROR]: "HTTP error",
   [ErrorTypes.CONTEXT]: "Extension context lost",
-  [ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]: "Extension reloaded, please refresh page",
+  [ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]:
+    "Extension reloaded, please refresh page",
   [ErrorTypes.UNKNOWN]: "An unknown error occurred",
   [ErrorTypes.TAB_AVAILABILITY]: "Tab not available",
   [ErrorTypes.UI]: "User Interface error",

@@ -3,8 +3,11 @@
 // Registry exports
 export { ProviderRegistry } from "./registry/index.js";
 
-// Factory exports  
-export { TranslationProviderFactory, translationProviderFactory } from "./factory/index.js";
+// Factory exports
+export {
+  TranslationProviderFactory,
+  translationProviderFactory,
+} from "./factory/index.js";
 
 // Individual provider implementations (no barrel export to avoid circular dependencies)
 export { GoogleTranslateProvider } from "./implementations/GoogleTranslateProvider.js";

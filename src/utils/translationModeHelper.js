@@ -54,7 +54,7 @@ export function isDictionaryTranslation(text) {
  * @returns {string} یا همان defaultMode یا TranslationMode.Dictionary_Translation
  */
 export function determineTranslationMode(text, defaultMode) {
-  return isDictionaryTranslation(text) ?
-      TranslationMode.Dictionary_Translation
+  return isDictionaryTranslation(text)
+    ? TranslationMode.Dictionary_Translation
     : defaultMode;
 }

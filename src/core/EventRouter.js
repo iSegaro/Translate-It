@@ -77,7 +77,7 @@ export default class EventRouter {
 
     // بررسی تغییرات EXTENSION_ENABLED
     this.featureManager.on("EXTENSION_ENABLED", () =>
-      this.initEventListeners()
+      this.initEventListeners(),
     );
 
     // بررسی تغییرات بقیه ویژگی‌ها
@@ -113,7 +113,7 @@ export default class EventRouter {
           target.removeEventListener(type, listener, options);
           this._attached.delete(key);
         }
-      }
+      },
     );
   }
 
@@ -125,7 +125,7 @@ export default class EventRouter {
           target.removeEventListener(type, listener, options);
           this._attached.delete(key);
         }
-      }
+      },
     );
   }
 
@@ -175,7 +175,7 @@ export default class EventRouter {
 
   async dispose() {
     Object.keys(this.featureEventMap).forEach((flag) =>
-      this.removeListeners(flag)
+      this.removeListeners(flag),
     );
   }
 }

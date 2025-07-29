@@ -9,7 +9,7 @@
 
 class SecureStorage {
   constructor() {
-    this.algorithm = 'AES-GCM';
+    this.algorithm = "AES-GCM";
     this.keyLength = 256;
     this.ivLength = 12; // 96 bits for GCM
     this.saltLength = 16; // 128 bits
@@ -41,24 +41,24 @@ class SecureStorage {
   async deriveKey(password, salt) {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       encoder.encode(password),
-      { name: 'PBKDF2' },
+      { name: "PBKDF2" },
       false,
-      ['deriveKey']
+      ["deriveKey"],
     );
 
     return crypto.subtle.deriveKey(
       {
-        name: 'PBKDF2',
+        name: "PBKDF2",
         salt: salt,
         iterations: this.iterations,
-        hash: 'SHA-256'
+        hash: "SHA-256",
       },
       keyMaterial,
       { name: this.algorithm, length: this.keyLength },
       false,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"],
     );
   }
 
@@ -69,7 +69,7 @@ class SecureStorage {
    */
   arrayBufferToBase64(buffer) {
     const bytes = new Uint8Array(buffer);
-    let binary = '';
+    let binary = "";
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
@@ -97,8 +97,8 @@ class SecureStorage {
    * @returns {Promise<object>} Encrypted data package
    */
   async encryptData(data, password) {
-    if (!password || password.trim() === '') {
-      throw new Error('Password is required for encryption');
+    if (!password || password.trim() === "") {
+      throw new Error("Password is required for encryption");
     }
 
     const salt = this.generateSalt();
@@ -112,10 +112,10 @@ class SecureStorage {
     const encryptedData = await crypto.subtle.encrypt(
       {
         name: this.algorithm,
-        iv: iv
+        iv: iv,
       },
       key,
-      dataBuffer
+      dataBuffer,
     );
 
     return {
@@ -124,7 +124,7 @@ class SecureStorage {
       salt: this.arrayBufferToBase64(salt),
       iv: this.arrayBufferToBase64(iv),
       data: this.arrayBufferToBase64(encryptedData),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -135,15 +135,17 @@ class SecureStorage {
    * @returns {Promise<object>} Decrypted data
    */
   async decryptData(encryptedPackage, password) {
-    if (!password || password.trim() === '') {
-      throw new Error('Password is required for decryption');
+    if (!password || password.trim() === "") {
+      throw new Error("Password is required for decryption");
     }
 
     if (!encryptedPackage.encrypted) {
-      throw new Error('Data is not encrypted');
+      throw new Error("Data is not encrypted");
     }
 
-    const salt = new Uint8Array(this.base64ToArrayBuffer(encryptedPackage.salt));
+    const salt = new Uint8Array(
+      this.base64ToArrayBuffer(encryptedPackage.salt),
+    );
     const iv = new Uint8Array(this.base64ToArrayBuffer(encryptedPackage.iv));
     const encryptedData = this.base64ToArrayBuffer(encryptedPackage.data);
 
@@ -153,17 +155,17 @@ class SecureStorage {
       const decryptedBuffer = await crypto.subtle.decrypt(
         {
           name: this.algorithm,
-          iv: iv
+          iv: iv,
         },
         key,
-        encryptedData
+        encryptedData,
       );
 
       const decoder = new TextDecoder();
       const decryptedString = decoder.decode(decryptedBuffer);
       return JSON.parse(decryptedString);
     } catch {
-      throw new Error('Incorrect password or corrupted data');
+      throw new Error("Incorrect password or corrupted data");
     }
   }
 
@@ -175,14 +177,14 @@ class SecureStorage {
   extractApiKeys(settings) {
     const apiKeys = {};
     const keyFields = [
-      'API_KEY',
-      'OPENAI_API_KEY',
-      'OPENROUTER_API_KEY',
-      'DEEPSEEK_API_KEY',
-      'CUSTOM_API_KEY'
+      "API_KEY",
+      "OPENAI_API_KEY",
+      "OPENROUTER_API_KEY",
+      "DEEPSEEK_API_KEY",
+      "CUSTOM_API_KEY",
     ];
 
-    keyFields.forEach(field => {
+    keyFields.forEach((field) => {
       if (settings[field]) {
         apiKeys[field] = settings[field];
       }
@@ -199,14 +201,14 @@ class SecureStorage {
   removeApiKeys(settings) {
     const cleanSettings = { ...settings };
     const keyFields = [
-      'API_KEY',
-      'OPENAI_API_KEY',
-      'OPENROUTER_API_KEY',
-      'DEEPSEEK_API_KEY',
-      'CUSTOM_API_KEY'
+      "API_KEY",
+      "OPENAI_API_KEY",
+      "OPENROUTER_API_KEY",
+      "DEEPSEEK_API_KEY",
+      "CUSTOM_API_KEY",
     ];
 
-    keyFields.forEach(field => {
+    keyFields.forEach((field) => {
       delete cleanSettings[field];
     });
 
@@ -223,20 +225,20 @@ class SecureStorage {
     const apiKeys = this.extractApiKeys(settings);
     const cleanSettings = this.removeApiKeys(settings);
 
-    if (password && password.trim() !== '') {
+    if (password && password.trim() !== "") {
       // Encrypt API keys
       const encryptedKeys = await this.encryptData(apiKeys, password);
       return {
         ...cleanSettings,
         _secureKeys: encryptedKeys,
-        _hasEncryptedKeys: true
+        _hasEncryptedKeys: true,
       };
     } else {
       // No encryption - include keys as plain text (backward compatibility)
       return {
         ...cleanSettings,
         ...apiKeys,
-        _hasEncryptedKeys: false
+        _hasEncryptedKeys: false,
       };
     }
   }
@@ -256,13 +258,16 @@ class SecureStorage {
       return cleanSettings;
     }
 
-    if (!password || password.trim() === '') {
-      throw new Error('Password is required to import encrypted settings');
+    if (!password || password.trim() === "") {
+      throw new Error("Password is required to import encrypted settings");
     }
 
     // Decrypt API keys
-    const decryptedKeys = await this.decryptData(importedSettings._secureKeys, password);
-    
+    const decryptedKeys = await this.decryptData(
+      importedSettings._secureKeys,
+      password,
+    );
+
     // Combine with other settings
     const cleanSettings = { ...importedSettings };
     delete cleanSettings._hasEncryptedKeys;
@@ -270,7 +275,7 @@ class SecureStorage {
 
     return {
       ...cleanSettings,
-      ...decryptedKeys
+      ...decryptedKeys,
     };
   }
 }

@@ -3,7 +3,7 @@ import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 import { logME } from "./helpers.js";
-import { correctTextDirection} from "./textDetection.js";
+import { correctTextDirection } from "./textDetection.js";
 import { getTranslationString } from "./i18n.js";
 
 const translationCache = new Map();
@@ -64,7 +64,7 @@ export function collectTextNodes(targetElement) {
     targetElement,
     NodeFilter.SHOW_TEXT,
     null,
-    false
+    false,
   );
 
   const textNodes = [];
@@ -171,17 +171,19 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
             textNode,
             containerSpan,
             parentElement,
-          }
+          },
         );
         // اگر خطایی رخ داد، اطلاعات ذخیره شده برای این uniqueId را حذف کنید
-        if(context.state.originalTexts.has(uniqueId)){
-            context.state.originalTexts.delete(uniqueId);
+        if (context.state.originalTexts.has(uniqueId)) {
+          context.state.originalTexts.delete(uniqueId);
         }
-
 
         const processedError = ErrorHandler.processError(error);
         // اطمینان از اینکه context.errorHandler موجود است
-        if (context.errorHandler && typeof context.errorHandler.handle === 'function') {
+        if (
+          context.errorHandler &&
+          typeof context.errorHandler.handle === "function"
+        ) {
           context.errorHandler.handle(processedError, {
             type: ErrorTypes.UI,
             context: "textExtraction-apply-translations-replace",
@@ -243,13 +245,13 @@ export async function revertTranslations(context) {
   if (successfulReverts > 0) {
     context.notifier.show(
       `${successfulReverts} ${(await getTranslationString("STATUS_Revert_Number")) || "(مورد بازگردانی شد)"}`,
-      "revert"
+      "revert",
     );
   } else if (await IsDebug()) {
     context.notifier.show(
       (await getTranslationString("STATUS_REVERT_NOT_FOUND")) ||
         "(هیچ متنی برای بازگردانی یافت نشد)",
-      "warning"
+      "warning",
     );
   }
 
@@ -261,7 +263,7 @@ export async function revertTranslations(context) {
 
 export function parseAndCleanTranslationResponse(
   translatedJsonString,
-  context
+  context,
 ) {
   let cleanJsonString = translatedJsonString.trim();
 
@@ -269,7 +271,7 @@ export function parseAndCleanTranslationResponse(
   // این Regex کمی بهبود یافته تا فضای خالی قبل/بعد براکت‌ها را هم در نظر بگیرد
   // و اولویت را به آرایه ([...]) بدهد اگر هر دو ممکن باشند (گرچه بعید است)
   const jsonMatch = cleanJsonString.match(
-    /(\[(?:.|\n|\r)*\]|\{(?:.|\n|\r)*\})/s
+    /(\[(?:.|\n|\r)*\]|\{(?:.|\n|\r)*\})/s,
   );
 
   if (!jsonMatch || !jsonMatch[1]) {
@@ -291,7 +293,7 @@ export function parseAndCleanTranslationResponse(
   } catch (initialError) {
     logME(
       "Initial JSON.parse failed. Attempting repair by removing the last element.",
-      initialError.message // لاگ کردن پیام خطا اولیه
+      initialError.message, // لاگ کردن پیام خطا اولیه
     );
 
     // 3. تلاش برای تعمیر فقط اگر شبیه آرایه باشد
@@ -304,7 +306,7 @@ export function parseAndCleanTranslationResponse(
       // جستجو را از یکی مانده به آخر شروع می‌کنیم تا از براکت انتهایی احتمالی صرف نظر شود
       const lastCommaIndex = potentialJsonString.lastIndexOf(
         ",",
-        potentialJsonString.length - 2 // نادیده گرفتن کاراکتر آخر
+        potentialJsonString.length - 2, // نادیده گرفتن کاراکتر آخر
       );
 
       // اگر ویرگولی پیدا شد (یعنی حداقل دو آیتم وجود داشته یا یک آیتم و یک ویرگول اضافی)
@@ -312,7 +314,7 @@ export function parseAndCleanTranslationResponse(
         // رشته را تا قبل از آخرین ویرگول جدا کن
         let repairedJsonString = potentialJsonString.substring(
           0,
-          lastCommaIndex
+          lastCommaIndex,
         );
 
         // اطمینان از اینکه رشته با براکت بسته ] تمام می‌شود
@@ -326,7 +328,7 @@ export function parseAndCleanTranslationResponse(
           const parsedResult = JSON.parse(repairedJsonString);
           logME(
             "Successfully parsed JSON after removing the potentially corrupted last element.",
-            "warning"
+            "warning",
           );
           // می‌توانید در اینجا یک نوع هشدار خاص برای handler ارسال کنید که تعمیر موفق بود
           // context.errorHandler.handle(new Error("JSON repaired successfully"), { type: ..., level: 'warning' });
@@ -335,7 +337,7 @@ export function parseAndCleanTranslationResponse(
           // اگر تعمیر هم ناموفق بود
           logME(
             "Repair attempt also failed.",
-            repairError.message // لاگ کردن پیام خطای دوم
+            repairError.message, // لاگ کردن پیام خطای دوم
           );
           // خطای اولیه را به handler ارسال کن چون ریشه مشکل همان بود
           const processedError = ErrorHandler.processError(initialError);
@@ -349,7 +351,7 @@ export function parseAndCleanTranslationResponse(
       } else {
         // اگر ویرگولی پیدا نشد (مثلاً فقط یک آیتم خراب بود مثل "[{"text":"a"" )
         logME(
-          "Could not repair JSON: No comma found to separate the last element."
+          "Could not repair JSON: No comma found to separate the last element.",
         );
         const processedError = ErrorHandler.processError(initialError);
         context.errorHandler.handle(processedError, {
@@ -362,7 +364,7 @@ export function parseAndCleanTranslationResponse(
     } else {
       // اگر خطای اولیه SyntaxError نبود یا رشته با '[' شروع نشده بود
       logME(
-        "Initial parse failed, and repair condition not met (not array or not SyntaxError)."
+        "Initial parse failed, and repair condition not met (not array or not SyntaxError).",
       );
       const processedError = ErrorHandler.processError(initialError);
       context.errorHandler.handle(processedError, {
@@ -408,7 +410,7 @@ export function handleTranslationLengthMismatch(translatedData, expandedTexts) {
       `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
       `طول دریافت شده: ${translatedData.length}`,
       "علت احتمالی: تقسیم/ادغام متفاوت متن توسط API یا افزودن/حذف آیتم‌ها.",
-      "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد..."
+      "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد...",
     );
 
     if (
@@ -461,14 +463,14 @@ export function reassembleTranslations(
   expandedTexts,
   originMapping,
   textsToTranslate,
-  cachedTranslations
+  cachedTranslations,
 ) {
   const newTranslations = new Map();
   const translatedSegmentsMap = new Map();
 
   const numItemsToProcess = Math.min(
     expandedTexts.length,
-    translatedData.length
+    translatedData.length,
   );
 
   for (let i = 0; i < numItemsToProcess; i++) {
@@ -491,7 +493,7 @@ export function reassembleTranslations(
         "آیتم دریافتی:",
         translatedItem,
         "اطلاعات نگاشت:",
-        mappingInfo
+        mappingInfo,
       );
       if (mappingInfo) {
         const { originalIndex } = mappingInfo;

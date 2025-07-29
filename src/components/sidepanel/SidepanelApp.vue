@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import SideToolbar from './SideToolbar.vue'
 import TranslationForm from './TranslationForm.vue'
 import TranslationResult from './TranslationResult.vue'
@@ -142,25 +142,22 @@ const handleTranslate = async (data) => {
       data.targetLanguage
     )
 
-    if (result) {
+    if (result && result.success) {
       state.translationResult = result
       logME('[SidepanelApp] Translation successful')
       
-      // اضافه کردن به تاریخچه
-      if (result.success && result.data?.translatedText) {
-        const sourceLangCode = languages.getLanguagePromptName(data.sourceLanguage) || AUTO_DETECT_VALUE
-        const targetLangCode = languages.getLanguagePromptName(data.targetLanguage)
-        
-        await history.addToHistory({
-          sourceText: data.text,
-          translatedText: result.data.translatedText,
-          sourceLanguage: sourceLangCode,
-          targetLanguage: targetLangCode
-        })
-      }
+      // The history is now managed by the translation engine
+      // No need to add it here manually
+      
     } else {
-      state.translationError = sidepanelTranslation.error.value || 'Translation failed'
-      logME('[SidepanelApp] Translation failed:', state.translationError)
+      // Handle Firefox MV3 bug where response is undefined
+      if (result?.firefoxBug) {
+        logME('[SidepanelApp] Firefox MV3 bug detected. Waiting for history update.')
+        // The watcher on history.sortedHistoryItems will handle this
+      } else {
+        state.translationError = sidepanelTranslation.error.value || 'Translation failed'
+        logME('[SidepanelApp] Translation failed:', state.translationError)
+      }
     }
   } catch (error) {
     state.translationError = error.message || 'Translation error occurred'
@@ -169,6 +166,26 @@ const handleTranslate = async (data) => {
     state.isTranslating = false
   }
 }
+
+// Watch for history changes to handle Firefox MV3 bug
+watch(() => history.sortedHistoryItems, (newHistory) => {
+  if (newHistory && newHistory.length > 0) {
+    const lastItem = newHistory[0]
+    
+    // If the last history item matches the current source text, update the result
+    if (lastItem.sourceText === state.sourceText && !state.translationResult) {
+      logME('[SidepanelApp] Updating translation from history due to watcher trigger.')
+      state.translationResult = {
+        success: true,
+        data: {
+          translatedText: lastItem.translatedText,
+          detectedSourceLang: lastItem.sourceLanguage
+        }
+      }
+      state.translationError = '' // Clear any potential Firefox bug error message
+    }
+  }
+}, { deep: true })
 
 const handleSwapLanguages = async () => {
   logME('[SidepanelApp] Language swap requested')
@@ -354,7 +371,7 @@ onMounted(async () => {
     
     // ثبت listener برای پیام‌ها
     if (browserAPI.browser?.runtime?.onMessage) {
-      browserAPI.browser.runtime.onMessage.addListener(handleMessage)
+      browserAPI.browser.runtime.onMessage.addListener.call(browserAPI.browser.runtime.onMessage, handleMessage)
     }
     
     logME('[SidepanelApp] Initialization complete')

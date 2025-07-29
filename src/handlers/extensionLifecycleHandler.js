@@ -1,5 +1,5 @@
 // src/handlers/extensionLifecycleHandler.js
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
@@ -9,7 +9,7 @@ export function handleExtensionLifecycle(
   message,
   sender,
   sendResponse,
-  errorHandler
+  errorHandler,
 ) {
   const action = message.action || message.type;
   logME(`[Handler:Lifecycle] Handling action: ${action}`);
@@ -20,7 +20,7 @@ export function handleExtensionLifecycle(
   } catch (error) {
     logME(
       `[Handler:Lifecycle] Reload failed, attempting content script injection:`,
-      error
+      error,
     );
     if (sender.tab?.id) {
       browser.scripting
@@ -31,7 +31,7 @@ export function handleExtensionLifecycle(
         .catch((injectionError) => {
           logME(
             "[Handler:Lifecycle] Content script injection fallback failed:",
-            injectionError
+            injectionError,
           );
           errorHandler.handle(injectionError, {
             type: ErrorTypes.INTEGRATION,

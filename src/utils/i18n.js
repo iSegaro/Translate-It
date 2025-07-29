@@ -1,6 +1,6 @@
 // src/utils/i18n.js
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { applyElementDirection } from "./textDetection.js";
 import { getApplication_LocalizeAsync } from "../config.js";
 import { languageList } from "./languages.js";
@@ -60,7 +60,7 @@ export async function getTranslationString(key, lang) {
 
     const foundLang = languageList.find(
       (language) =>
-        language.name === App_Language || language.locale === App_Language
+        language.name === App_Language || language.locale === App_Language,
     );
 
     // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم.
@@ -115,7 +115,7 @@ export async function app_localize(lang_code) {
         applyElementDirection(promptTemplate, false);
       }
     },
-    250
+    250,
   );
 
   // لوکالایز کردن المان‌های موجود در head (مثلاً <title>)
@@ -139,8 +139,9 @@ function localizeContainer(container, translations) {
   const textItems = container.querySelectorAll("[data-i18n]");
   textItems.forEach((item) => {
     const key = item.getAttribute("data-i18n");
-    const translation = translations?.[key]?.message || browser.i18n.getMessage(key);
-    
+    const translation =
+      translations?.[key]?.message || browser.i18n.getMessage(key);
+
     if (item.matches("input, textarea")) {
       item.value = translation;
     } else if (item.matches("img")) {
@@ -149,20 +150,25 @@ function localizeContainer(container, translations) {
       item.textContent = translation;
     }
   });
-  
+
   // --- Part 2: Handle titles (data-i18n-title) ---
   const titleItems = container.querySelectorAll("[data-i18n-title]");
   titleItems.forEach((item) => {
     const titleKey = item.getAttribute("data-i18n-title");
-    const titleTranslation = translations?.[titleKey]?.message || getbrowser().i18n.getMessage(titleKey);
+    const titleTranslation =
+      translations?.[titleKey]?.message ||
+      getbrowser().i18n.getMessage(titleKey);
     item.setAttribute("title", titleTranslation);
   });
-  
+
   // --- Part 3: Handle placeholders (data-i18n-placeholder) ---
-  const placeholderItems = container.querySelectorAll("[data-i18n-placeholder]");
+  const placeholderItems = container.querySelectorAll(
+    "[data-i18n-placeholder]",
+  );
   placeholderItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-placeholder");
-    const translation = translations?.[key]?.message || browser.i18n.getMessage(key);
+    const translation =
+      translations?.[key]?.message || browser.i18n.getMessage(key);
     if (translation) {
       item.placeholder = translation;
     }
@@ -172,7 +178,8 @@ function localizeContainer(container, translations) {
   const markdownItems = container.querySelectorAll("[data-i18n-markdown]");
   markdownItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-markdown");
-    const markdownString = translations?.[key]?.message || getbrowser().i18n.getMessage(key);
+    const markdownString =
+      translations?.[key]?.message || getbrowser().i18n.getMessage(key);
 
     if (markdownString) {
       // Use our custom markdown parser
@@ -182,7 +189,6 @@ function localizeContainer(container, translations) {
     }
   });
 }
-
 
 // متد ترجمه برای پنجره Popup
 export async function app_localize_popup(lang_code) {

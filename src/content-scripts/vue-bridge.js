@@ -1,40 +1,40 @@
 // Content Script Vue Bridge
 // Enables Vue components to be dynamically injected into web pages
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import browser from 'webextension-polyfill'
-import DOMPurify from 'dompurify'
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import browser from "webextension-polyfill";
+import DOMPurify from "dompurify";
 
 class ContentScriptVueBridge {
   constructor() {
-    this.vueInstances = new Map()
-    this.pinia = createPinia()
-    this.isInitialized = false
-    this.componentRegistry = new Map()
-    this.messageHandler = null
-    this.browser = null // Initialize browser property
+    this.vueInstances = new Map();
+    this.pinia = createPinia();
+    this.isInitialized = false;
+    this.componentRegistry = new Map();
+    this.messageHandler = null;
+    this.browser = null; // Initialize browser property
   }
 
   /**
    * Initialize the Vue bridge
    */
   async initialize() {
-    if (this.isInitialized) return
+    if (this.isInitialized) return;
 
     try {
       this.browser = browser; // Assign browser here
 
       // Register available components
-      await this.registerComponents()
-      
+      await this.registerComponents();
+
       // Setup message listener for commands from extension
-      this.setupMessageListener()
-      
-      this.isInitialized = true
-      console.log('[Vue Bridge] Initialized successfully')
+      this.setupMessageListener();
+
+      this.isInitialized = true;
+      console.log("[Vue Bridge] Initialized successfully");
     } catch (error) {
-      console.error('[Vue Bridge] Failed to initialize:', error)
+      console.error("[Vue Bridge] Failed to initialize:", error);
     }
   }
 
@@ -43,23 +43,29 @@ class ContentScriptVueBridge {
    */
   async registerComponents() {
     // Dynamic imports for components
-    this.componentRegistry.set('TranslationTooltip', async () => {
-      const { default: component } = await import('../components/content/TranslationTooltip.vue')
-      return component
-    })
-    
-    this.componentRegistry.set('ScreenSelector', async () => {
-      const { default: component } = await import('../components/content/ScreenSelector.vue')
-      return component
-    })
-    
-    this.componentRegistry.set('CapturePreview', async () => {
-      const { default: component } = await import('../components/content/CapturePreview.vue')
-      return component
-    })
-    
+    this.componentRegistry.set("TranslationTooltip", async () => {
+      const { default: component } = await import(
+        "../components/content/TranslationTooltip.vue"
+      );
+      return component;
+    });
+
+    this.componentRegistry.set("ScreenSelector", async () => {
+      const { default: component } = await import(
+        "../components/content/ScreenSelector.vue"
+      );
+      return component;
+    });
+
+    this.componentRegistry.set("CapturePreview", async () => {
+      const { default: component } = await import(
+        "../components/content/CapturePreview.vue"
+      );
+      return component;
+    });
+
     // Register screen capture overlay component
-    this.componentRegistry.set('ScreenCaptureOverlay', async () => {
+    this.componentRegistry.set("ScreenCaptureOverlay", async () => {
       const component = {
         template: `
           <div class="screen-capture-overlay">
@@ -71,23 +77,23 @@ class ContentScriptVueBridge {
           </div>
         `,
         components: {
-          ScreenSelector: await this.getComponent('ScreenSelector')
+          ScreenSelector: await this.getComponent("ScreenSelector"),
         },
-        props: ['onSelect', 'onCancel', 'onError'],
+        props: ["onSelect", "onCancel", "onError"],
         methods: {
           handleSelection(result) {
-            this.onSelect?.(result)
+            this.onSelect?.(result);
           },
           handleCancel() {
-            this.onCancel?.()
+            this.onCancel?.();
           },
           handleError(error) {
-            this.onError?.(error)
-          }
-        }
-      }
-      return component
-    })
+            this.onError?.(error);
+          },
+        },
+      };
+      return component;
+    });
   }
 
   /**
@@ -95,46 +101,49 @@ class ContentScriptVueBridge {
    */
   async setupMessageListener() {
     this.messageHandler = (message, sender, sendResponse) => {
-      if (message.source !== 'vue-app') return
+      if (message.source !== "vue-app") return;
 
-      const { action, data } = message
+      const { action, data } = message;
 
       switch (action) {
-        case 'CREATE_VUE_MICRO_APP':
-          this.handleCreateMicroApp(data, sendResponse)
-          break
-        case 'DESTROY_VUE_MICRO_APP':
-          this.handleDestroyMicroApp(data, sendResponse)
-          break
-        case 'SHOW_TRANSLATION_TOOLTIP':
-          this.handleShowTooltip(data, sendResponse)
-          break
-        case 'HIDE_TRANSLATION_TOOLTIP':
-          this.handleHideTooltip(data, sendResponse)
-          break
-        case 'START_SCREEN_CAPTURE':
-          this.handleStartScreenCapture(data, sendResponse)
-          break
-        case 'ADVANCED_SCREEN_CAPTURE':
-          this.handleAdvancedScreenCapture(data, sendResponse)
-          break
-        case 'SHOW_CAPTURE_PREVIEW':
-          this.handleShowCapturePreview(data, sendResponse)
-          break
-        case 'SHOW_TEXT_REGIONS':
-          this.handleShowTextRegions(data, sendResponse)
-          break
-        case 'TOGGLE_SELECT_ELEMENT_MODE':
-          this.handleToggleSelectElementMode(data, sendResponse)
-          break
+        case "CREATE_VUE_MICRO_APP":
+          this.handleCreateMicroApp(data, sendResponse);
+          break;
+        case "DESTROY_VUE_MICRO_APP":
+          this.handleDestroyMicroApp(data, sendResponse);
+          break;
+        case "SHOW_TRANSLATION_TOOLTIP":
+          this.handleShowTooltip(data, sendResponse);
+          break;
+        case "HIDE_TRANSLATION_TOOLTIP":
+          this.handleHideTooltip(data, sendResponse);
+          break;
+        case "START_SCREEN_CAPTURE":
+          this.handleStartScreenCapture(data, sendResponse);
+          break;
+        case "ADVANCED_SCREEN_CAPTURE":
+          this.handleAdvancedScreenCapture(data, sendResponse);
+          break;
+        case "SHOW_CAPTURE_PREVIEW":
+          this.handleShowCapturePreview(data, sendResponse);
+          break;
+        case "SHOW_TEXT_REGIONS":
+          this.handleShowTextRegions(data, sendResponse);
+          break;
+        case "TOGGLE_SELECT_ELEMENT_MODE":
+          this.handleToggleSelectElementMode(data, sendResponse);
+          break;
         default:
-          sendResponse({ success: false, error: `Unknown action: ${action}` })
+          sendResponse({ success: false, error: `Unknown action: ${action}` });
       }
 
-      return true // Keep channel open for async response
-    }
+      return true; // Keep channel open for async response
+    };
 
-    this.browser.runtime.onMessage.addListener(this.messageHandler)
+    this.browser.runtime.onMessage.addListener.call(
+      this.browser.runtime.onMessage,
+      this.messageHandler,
+    );
   }
 
   /**
@@ -142,8 +151,13 @@ class ContentScriptVueBridge {
    */
   async handleToggleSelectElementMode(data, sendResponse) {
     try {
-      console.log('[Vue Bridge] Received TOGGLE_SELECT_ELEMENT_MODE message:', data);
-      const { selectElementManager } = await import('./select-element-manager.js');
+      console.log(
+        "[Vue Bridge] Received TOGGLE_SELECT_ELEMENT_MODE message:",
+        data,
+      );
+      const { selectElementManager } = await import(
+        "./select-element-manager.js"
+      );
       if (data) {
         selectElementManager.activate();
       } else {
@@ -151,7 +165,7 @@ class ContentScriptVueBridge {
       }
       sendResponse({ success: true });
     } catch (error) {
-      console.error('[Vue Bridge] Error toggling select element mode:', error);
+      console.error("[Vue Bridge] Error toggling select element mode:", error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -161,35 +175,37 @@ class ContentScriptVueBridge {
    */
   async createMicroApp(componentName, props = {}, target = null) {
     try {
-      const componentLoader = this.componentRegistry.get(componentName)
+      const componentLoader = this.componentRegistry.get(componentName);
       if (!componentLoader) {
-        throw new Error(`Component ${componentName} not found`)
+        throw new Error(`Component ${componentName} not found`);
       }
 
-      const component = await componentLoader()
-      const container = target || this.createContainer()
-      
-      const app = createApp(component, props)
-      app.use(this.pinia)
-      
+      const component = await componentLoader();
+      const container = target || this.createContainer();
+
+      const app = createApp(component, props);
+      app.use(this.pinia);
+
       // Add global properties if needed
-      app.config.globalProperties.$bridge = this
-      
-      app.mount(container)
-      
-      const instanceId = `vue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      this.vueInstances.set(instanceId, { 
-        app, 
-        container, 
+      app.config.globalProperties.$bridge = this;
+
+      app.mount(container);
+
+      const instanceId = `vue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      this.vueInstances.set(instanceId, {
+        app,
+        container,
         componentName,
-        props 
-      })
-      
-      console.log(`[Vue Bridge] Created micro app: ${componentName} (${instanceId})`)
-      return instanceId
+        props,
+      });
+
+      console.log(
+        `[Vue Bridge] Created micro app: ${componentName} (${instanceId})`,
+      );
+      return instanceId;
     } catch (error) {
-      console.error(`[Vue Bridge] Failed to create micro app:`, error)
-      throw error
+      console.error(`[Vue Bridge] Failed to create micro app:`, error);
+      throw error;
     }
   }
 
@@ -197,22 +213,22 @@ class ContentScriptVueBridge {
    * Destroy a micro Vue app
    */
   destroyMicroApp(instanceId) {
-    const instance = this.vueInstances.get(instanceId)
+    const instance = this.vueInstances.get(instanceId);
     if (!instance) {
-      console.warn(`[Vue Bridge] Instance ${instanceId} not found`)
-      return false
+      console.warn(`[Vue Bridge] Instance ${instanceId} not found`);
+      return false;
     }
 
     try {
-      instance.app.unmount()
-      instance.container.remove()
-      this.vueInstances.delete(instanceId)
-      
-      console.log(`[Vue Bridge] Destroyed micro app: ${instanceId}`)
-      return true
+      instance.app.unmount();
+      instance.container.remove();
+      this.vueInstances.delete(instanceId);
+
+      console.log(`[Vue Bridge] Destroyed micro app: ${instanceId}`);
+      return true;
     } catch (error) {
-      console.error(`[Vue Bridge] Failed to destroy micro app:`, error)
-      return false
+      console.error(`[Vue Bridge] Failed to destroy micro app:`, error);
+      return false;
     }
   }
 
@@ -220,8 +236,8 @@ class ContentScriptVueBridge {
    * Create a container element for Vue components
    */
   createContainer() {
-    const container = document.createElement('div')
-    container.className = 'translate-it-vue-container'
+    const container = document.createElement("div");
+    container.className = "translate-it-vue-container";
     container.style.cssText = `
       position: fixed;
       z-index: 2147483647;
@@ -231,23 +247,23 @@ class ContentScriptVueBridge {
       line-height: 1.4;
       color: #333;
       background: transparent;
-    `
-    
-    document.body.appendChild(container)
-    return container
+    `;
+
+    document.body.appendChild(container);
+    return container;
   }
 
   /**
    * Create a tooltip container with specific positioning
    */
   createTooltipContainer(position) {
-    const container = this.createContainer()
+    const container = this.createContainer();
     container.style.cssText += `
       top: ${position.y}px;
       left: ${position.x}px;
       pointer-events: auto;
-    `
-    return container
+    `;
+    return container;
   }
 
   /**
@@ -255,106 +271,114 @@ class ContentScriptVueBridge {
    */
   async handleCreateMicroApp(data, sendResponse) {
     try {
-      const { componentName, props, position } = data
-      const target = position ? this.createTooltipContainer(position) : null
-      const instanceId = await this.createMicroApp(componentName, props, target)
-      sendResponse({ success: true, instanceId })
+      const { componentName, props, position } = data;
+      const target = position ? this.createTooltipContainer(position) : null;
+      const instanceId = await this.createMicroApp(
+        componentName,
+        props,
+        target,
+      );
+      sendResponse({ success: true, instanceId });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
   handleDestroyMicroApp(data, sendResponse) {
     try {
-      const { instanceId } = data
-      const success = this.destroyMicroApp(instanceId)
-      sendResponse({ success })
+      const { instanceId } = data;
+      const success = this.destroyMicroApp(instanceId);
+      sendResponse({ success });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
   async handleShowTooltip(data, sendResponse) {
     try {
-      const { text, position } = data
-      
+      const { text, position } = data;
+
       // Hide any existing tooltip first
-      this.hideAllTooltips()
-      
-      const instanceId = await this.createMicroApp('TranslationTooltip', {
-        text,
-        position,
-        onClose: () => this.destroyMicroApp(instanceId)
-      }, this.createTooltipContainer(position))
-      
-      sendResponse({ success: true, instanceId })
+      this.hideAllTooltips();
+
+      const instanceId = await this.createMicroApp(
+        "TranslationTooltip",
+        {
+          text,
+          position,
+          onClose: () => this.destroyMicroApp(instanceId),
+        },
+        this.createTooltipContainer(position),
+      );
+
+      sendResponse({ success: true, instanceId });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
   handleHideTooltip(data, sendResponse) {
     try {
-      this.hideAllTooltips()
-      sendResponse({ success: true })
+      this.hideAllTooltips();
+      sendResponse({ success: true });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
   async handleStartScreenCapture(data, sendResponse) {
     try {
       // Hide any existing overlays
-      this.hideAllOverlays()
-      
-      const instanceId = await this.createMicroApp('ScreenSelector', {
+      this.hideAllOverlays();
+
+      const instanceId = await this.createMicroApp("ScreenSelector", {
         onSelect: async (result) => {
           try {
             // Send selection result to background script
             const response = await this.browser.runtime.sendMessage({
-              action: 'PROCESS_SCREEN_CAPTURE',
-              data: { 
+              action: "PROCESS_SCREEN_CAPTURE",
+              data: {
                 coordinates: result.coordinates,
-                imageData: result.imageData 
+                imageData: result.imageData,
               },
-              source: 'content-script'
-            })
-            
+              source: "content-script",
+            });
+
             if (response.success) {
               // Show capture preview if enabled
               if (data.showPreview !== false) {
-                await this.showCapturePreview(result, instanceId)
+                await this.showCapturePreview(result, instanceId);
               } else {
-                this.destroyMicroApp(instanceId)
+                this.destroyMicroApp(instanceId);
               }
             } else {
-              throw new Error(response.error || 'Failed to process capture')
+              throw new Error(response.error || "Failed to process capture");
             }
           } catch (error) {
-            console.error('Screen capture processing failed:', error)
-            this.showCaptureError(error.message, instanceId)
+            console.error("Screen capture processing failed:", error);
+            this.showCaptureError(error.message, instanceId);
           }
         },
         onCancel: () => {
-          this.destroyMicroApp(instanceId)
-          
+          this.destroyMicroApp(instanceId);
+
           // Notify background script of cancellation
           this.browser.runtime.sendMessage({
-            action: 'SCREEN_CAPTURE_CANCELLED',
-            source: 'content-script'
-          })
+            action: "SCREEN_CAPTURE_CANCELLED",
+            source: "content-script",
+          });
         },
         onError: (error) => {
-          console.error('Screen capture error:', error)
-          this.showCaptureError(error.message, instanceId)
+          console.error("Screen capture error:", error);
+          this.showCaptureError(error.message, instanceId);
         },
         showInstructions: data.showInstructions !== false,
-        allowFullScreen: data.allowFullScreen !== false
-      })
-      
-      sendResponse({ success: true, instanceId })
+        allowFullScreen: data.allowFullScreen !== false,
+      });
+
+      sendResponse({ success: true, instanceId });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -364,42 +388,42 @@ class ContentScriptVueBridge {
   async showCapturePreview(captureResult, selectorInstanceId) {
     try {
       // Destroy the selector first
-      this.destroyMicroApp(selectorInstanceId)
-      
+      this.destroyMicroApp(selectorInstanceId);
+
       // Create preview modal
-      const previewInstanceId = await this.createMicroApp('CapturePreview', {
+      const previewInstanceId = await this.createMicroApp("CapturePreview", {
         imageData: captureResult.imageData,
         coordinates: captureResult.coordinates,
         onClose: () => {
-          this.destroyMicroApp(previewInstanceId)
+          this.destroyMicroApp(previewInstanceId);
         },
         onRetake: () => {
-          this.destroyMicroApp(previewInstanceId)
+          this.destroyMicroApp(previewInstanceId);
           // Restart capture process
-          this.handleStartScreenCapture({ showPreview: true }, () => {})
+          this.handleStartScreenCapture({ showPreview: true }, () => {});
         },
         onTranslate: (result) => {
           // Handle translation result
           this.browser.runtime.sendMessage({
-            action: 'TRANSLATION_COMPLETED',
+            action: "TRANSLATION_COMPLETED",
             data: result,
-            source: 'content-script'
-          })
+            source: "content-script",
+          });
         },
         onSave: (result) => {
           // Handle save to history
           this.browser.runtime.sendMessage({
-            action: 'SAVE_TRANSLATION',
+            action: "SAVE_TRANSLATION",
             data: result,
-            source: 'content-script'
-          })
-        }
-      })
-      
-      return previewInstanceId
+            source: "content-script",
+          });
+        },
+      });
+
+      return previewInstanceId;
     } catch (error) {
-      console.error('Failed to show capture preview:', error)
-      this.showCaptureError(error.message)
+      console.error("Failed to show capture preview:", error);
+      this.showCaptureError(error.message);
     }
   }
 
@@ -408,11 +432,11 @@ class ContentScriptVueBridge {
    */
   showCaptureError(message, instanceId = null) {
     if (instanceId) {
-      this.destroyMicroApp(instanceId)
+      this.destroyMicroApp(instanceId);
     }
-    
+
     // Create error notification
-    const errorContainer = this.createContainer()
+    const errorContainer = this.createContainer();
     errorContainer.innerHTML = DOMPurify.sanitize(`
       <div style="
         position: fixed;
@@ -439,14 +463,14 @@ class ContentScriptVueBridge {
           font-size: 16px;
         ">×</button>
       </div>
-    `)
-    
+    `);
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
       if (errorContainer.parentNode) {
-        errorContainer.remove()
+        errorContainer.remove();
       }
-    }, 5000)
+    }, 5000);
   }
 
   /**
@@ -454,17 +478,21 @@ class ContentScriptVueBridge {
    */
   async handleAdvancedScreenCapture(data, sendResponse) {
     try {
-      const { mode = 'manual', detectText = false, autoTranslate = false } = data
-      
-      if (mode === 'auto') {
+      const {
+        mode = "manual",
+        detectText = false,
+        autoTranslate = false,
+      } = data;
+
+      if (mode === "auto") {
         // Automatic text region detection
-        await this.performAutoCapture(detectText, autoTranslate, sendResponse)
+        await this.performAutoCapture(detectText, autoTranslate, sendResponse);
       } else {
         // Manual selection mode
-        await this.handleStartScreenCapture(data, sendResponse)
+        await this.handleStartScreenCapture(data, sendResponse);
       }
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -475,42 +503,55 @@ class ContentScriptVueBridge {
     try {
       // Send request to background for full screen capture
       const captureResponse = await this.browser.runtime.sendMessage({
-        action: 'CAPTURE_FULL_SCREEN',
-        source: 'content-script'
-      })
-      
+        action: "CAPTURE_FULL_SCREEN",
+        source: "content-script",
+      });
+
       if (!captureResponse.success) {
-        throw new Error(captureResponse.error || 'Failed to capture screen')
+        throw new Error(captureResponse.error || "Failed to capture screen");
       }
-      
+
       if (detectText) {
         // Analyze image for text regions
         const analysisResponse = await this.browser.runtime.sendMessage({
-          action: 'ANALYZE_IMAGE_TEXT',
+          action: "ANALYZE_IMAGE_TEXT",
           data: { imageData: captureResponse.data.imageData },
-          source: 'content-script'
-        })
-        
-        if (analysisResponse.success && analysisResponse.data.textRegions?.length > 0) {
+          source: "content-script",
+        });
+
+        if (
+          analysisResponse.success &&
+          analysisResponse.data.textRegions?.length > 0
+        ) {
           // Show detected regions for user selection
-          await this.showTextRegionSelector(captureResponse.data.imageData, analysisResponse.data.textRegions, autoTranslate)
-          sendResponse({ success: true, mode: 'text-regions' })
+          await this.showTextRegionSelector(
+            captureResponse.data.imageData,
+            analysisResponse.data.textRegions,
+            autoTranslate,
+          );
+          sendResponse({ success: true, mode: "text-regions" });
         } else {
           // Fallback to manual selection
-          await this.handleStartScreenCapture({ showPreview: true }, sendResponse)
+          await this.handleStartScreenCapture(
+            { showPreview: true },
+            sendResponse,
+          );
         }
       } else {
         // Direct translation of full screen
         if (autoTranslate) {
-          await this.performDirectTranslation(captureResponse.data.imageData, sendResponse)
+          await this.performDirectTranslation(
+            captureResponse.data.imageData,
+            sendResponse,
+          );
         } else {
-          await this.showCapturePreview(captureResponse.data, null)
-          sendResponse({ success: true, mode: 'preview' })
+          await this.showCapturePreview(captureResponse.data, null);
+          sendResponse({ success: true, mode: "preview" });
         }
       }
     } catch (error) {
-      console.error('Auto capture failed:', error)
-      sendResponse({ success: false, error: error.message })
+      console.error("Auto capture failed:", error);
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -519,29 +560,32 @@ class ContentScriptVueBridge {
    */
   async showTextRegionSelector(imageData, textRegions, autoTranslate) {
     try {
-      const instanceId = await this.createMicroApp('TextRegionSelector', {
+      const instanceId = await this.createMicroApp("TextRegionSelector", {
         imageData,
         textRegions,
         onRegionSelect: async (region) => {
           if (autoTranslate) {
             // Crop image to selected region and translate
-            const croppedImageData = await this.cropImage(imageData, region)
-            await this.performDirectTranslation(croppedImageData)
+            const croppedImageData = await this.cropImage(imageData, region);
+            await this.performDirectTranslation(croppedImageData);
           } else {
             // Show preview for selected region
-            const croppedImageData = await this.cropImage(imageData, region)
-            await this.showCapturePreview({ imageData: croppedImageData, coordinates: region }, instanceId)
+            const croppedImageData = await this.cropImage(imageData, region);
+            await this.showCapturePreview(
+              { imageData: croppedImageData, coordinates: region },
+              instanceId,
+            );
           }
         },
         onCancel: () => {
-          this.destroyMicroApp(instanceId)
-        }
-      })
-      
-      return instanceId
+          this.destroyMicroApp(instanceId);
+        },
+      });
+
+      return instanceId;
     } catch (error) {
-      console.error('Failed to show text region selector:', error)
-      throw error
+      console.error("Failed to show text region selector:", error);
+      throw error;
     }
   }
 
@@ -551,22 +595,25 @@ class ContentScriptVueBridge {
   async performDirectTranslation(imageData, sendResponse = null) {
     try {
       const translationResponse = await this.browser.runtime.sendMessage({
-        action: 'TRANSLATE_IMAGE_DIRECT',
+        action: "TRANSLATE_IMAGE_DIRECT",
         data: { imageData },
-        source: 'content-script'
-      })
-      
+        source: "content-script",
+      });
+
       if (translationResponse.success) {
         // Show translation result as tooltip
-        await this.showTranslationResult(translationResponse.data)
-        sendResponse?.({ success: true, translation: translationResponse.data })
+        await this.showTranslationResult(translationResponse.data);
+        sendResponse?.({
+          success: true,
+          translation: translationResponse.data,
+        });
       } else {
-        throw new Error(translationResponse.error || 'Translation failed')
+        throw new Error(translationResponse.error || "Translation failed");
       }
     } catch (error) {
-      console.error('Direct translation failed:', error)
-      sendResponse?.({ success: false, error: error.message })
-      throw error
+      console.error("Direct translation failed:", error);
+      sendResponse?.({ success: false, error: error.message });
+      throw error;
     }
   }
 
@@ -577,25 +624,29 @@ class ContentScriptVueBridge {
     try {
       const position = {
         x: window.innerWidth / 2 - 150,
-        y: 50
-      }
-      
-      const instanceId = await this.createMicroApp('TranslationTooltip', {
-        text: translationData.text,
-        sourceText: translationData.sourceText || '[Image]',
-        fromLanguage: translationData.fromLanguage,
-        toLanguage: translationData.toLanguage,
-        provider: translationData.provider,
-        position,
-        onClose: () => {
-          this.destroyMicroApp(instanceId)
-        }
-      }, this.createTooltipContainer(position))
-      
-      return instanceId
+        y: 50,
+      };
+
+      const instanceId = await this.createMicroApp(
+        "TranslationTooltip",
+        {
+          text: translationData.text,
+          sourceText: translationData.sourceText || "[Image]",
+          fromLanguage: translationData.fromLanguage,
+          toLanguage: translationData.toLanguage,
+          provider: translationData.provider,
+          position,
+          onClose: () => {
+            this.destroyMicroApp(instanceId);
+          },
+        },
+        this.createTooltipContainer(position),
+      );
+
+      return instanceId;
     } catch (error) {
-      console.error('Failed to show translation result:', error)
-      throw error
+      console.error("Failed to show translation result:", error);
+      throw error;
     }
   }
 
@@ -604,11 +655,14 @@ class ContentScriptVueBridge {
    */
   async handleShowCapturePreview(data, sendResponse) {
     try {
-      const { imageData, coordinates } = data
-      const instanceId = await this.showCapturePreview({ imageData, coordinates }, null)
-      sendResponse({ success: true, instanceId })
+      const { imageData, coordinates } = data;
+      const instanceId = await this.showCapturePreview(
+        { imageData, coordinates },
+        null,
+      );
+      sendResponse({ success: true, instanceId });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -617,11 +671,15 @@ class ContentScriptVueBridge {
    */
   async handleShowTextRegions(data, sendResponse) {
     try {
-      const { imageData, textRegions, autoTranslate = false } = data
-      const instanceId = await this.showTextRegionSelector(imageData, textRegions, autoTranslate)
-      sendResponse({ success: true, instanceId })
+      const { imageData, textRegions, autoTranslate = false } = data;
+      const instanceId = await this.showTextRegionSelector(
+        imageData,
+        textRegions,
+        autoTranslate,
+      );
+      sendResponse({ success: true, instanceId });
     } catch (error) {
-      sendResponse({ success: false, error: error.message })
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -632,7 +690,7 @@ class ContentScriptVueBridge {
     // This would need actual image processing
     // For now, return the original image
     // In a real implementation, this would use Canvas API to crop
-    return imageData
+    return imageData;
   }
 
   /**
@@ -640,16 +698,18 @@ class ContentScriptVueBridge {
    */
   hideAllTooltips() {
     for (const [instanceId, instance] of this.vueInstances) {
-      if (instance.componentName === 'TranslationTooltip') {
-        this.destroyMicroApp(instanceId)
+      if (instance.componentName === "TranslationTooltip") {
+        this.destroyMicroApp(instanceId);
       }
     }
   }
 
   hideAllOverlays() {
     for (const [instanceId, instance] of this.vueInstances) {
-      if (['ScreenSelector', 'CapturePreview'].includes(instance.componentName)) {
-        this.destroyMicroApp(instanceId)
+      if (
+        ["ScreenSelector", "CapturePreview"].includes(instance.componentName)
+      ) {
+        this.destroyMicroApp(instanceId);
       }
     }
   }
@@ -658,7 +718,7 @@ class ContentScriptVueBridge {
    * Get instance information
    */
   getInstanceInfo(instanceId) {
-    return this.vueInstances.get(instanceId) || null
+    return this.vueInstances.get(instanceId) || null;
   }
 
   /**
@@ -668,26 +728,26 @@ class ContentScriptVueBridge {
     return Array.from(this.vueInstances.entries()).map(([id, instance]) => ({
       id,
       componentName: instance.componentName,
-      props: instance.props
-    }))
+      props: instance.props,
+    }));
   }
 
   /**
    * Cleanup all instances
    */
   async cleanup() {
-    console.log('[Vue Bridge] Cleaning up all instances...')
-    
+    console.log("[Vue Bridge] Cleaning up all instances...");
+
     for (const instanceId of this.vueInstances.keys()) {
-      this.destroyMicroApp(instanceId)
+      this.destroyMicroApp(instanceId);
     }
-    
+
     if (this.messageHandler) {
-      this.browser.runtime.onMessage.removeListener(this.messageHandler)
-      this.messageHandler = null
+      this.browser.runtime.onMessage.removeListener(this.messageHandler);
+      this.messageHandler = null;
     }
-    
-    this.isInitialized = false
+
+    this.isInitialized = false;
   }
 
   /**
@@ -695,30 +755,30 @@ class ContentScriptVueBridge {
    */
   isPageSuitable() {
     // Skip certain pages/domains
-    const unsuitableHosts = ['chrome:', 'moz-extension:', 'chrome-extension:']
-    const currentHost = window.location.protocol
-    
-    return !unsuitableHosts.some(host => currentHost.startsWith(host))
+    const unsuitableHosts = ["chrome:", "moz-extension:", "chrome-extension:"];
+    const currentHost = window.location.protocol;
+
+    return !unsuitableHosts.some((host) => currentHost.startsWith(host));
   }
 }
 
 // Create and export the bridge instance
-export const vueBridge = new ContentScriptVueBridge()
+export const vueBridge = new ContentScriptVueBridge();
 
 // Auto-initialize if page is suitable
 if (vueBridge.isPageSuitable()) {
   // Initialize after DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => vueBridge.initialize())
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => vueBridge.initialize());
   } else {
-    vueBridge.initialize()
+    vueBridge.initialize();
   }
 }
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => vueBridge.cleanup())
+window.addEventListener("beforeunload", () => vueBridge.cleanup());
 
 // Make bridge available globally for debugging
-if (typeof window !== 'undefined') {
-  window.__translateItVueBridge = vueBridge
+if (typeof window !== "undefined") {
+  window.__translateItVueBridge = vueBridge;
 }

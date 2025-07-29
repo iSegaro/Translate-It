@@ -7,164 +7,164 @@
  * Provider categories
  */
 export const PROVIDER_CATEGORIES = {
-  FREE: 'free',
-  AI: 'ai',
-  BROWSER: 'browser',
-  LOCAL: 'local',
-  CUSTOM: 'custom'
-}
+  FREE: "free",
+  AI: "ai",
+  BROWSER: "browser",
+  LOCAL: "local",
+  CUSTOM: "custom",
+};
 
 /**
  * Complete provider registry with metadata for UI
  */
 export const PROVIDER_REGISTRY = [
   {
-    id: 'google',
-    name: 'Google Translate',
-    description: 'Free translation service by Google',
-    icon: 'google.svg',
+    id: "google",
+    name: "Google Translate",
+    description: "Free translation service by Google",
+    icon: "google.svg",
     category: PROVIDER_CATEGORIES.FREE,
     needsApiKey: false,
     supported: true,
-    features: ['text', 'autoDetect', 'bulk'],
+    features: ["text", "autoDetect", "bulk"],
     languages: 100,
-    rateLimit: 'None',
-    quality: 'High',
-    speed: 'Fast'
+    rateLimit: "None",
+    quality: "High",
+    speed: "Fast",
   },
   {
-    id: 'bing',
-    name: 'Bing Translate',
-    description: 'Free translation service by Microsoft',
-    icon: 'bing.svg',
+    id: "bing",
+    name: "Bing Translate",
+    description: "Free translation service by Microsoft",
+    icon: "bing.svg",
     category: PROVIDER_CATEGORIES.FREE,
     needsApiKey: false,
     supported: true,
-    features: ['text', 'autoDetect'],
+    features: ["text", "autoDetect"],
     languages: 70,
-    rateLimit: 'None',
-    quality: 'High',
-    speed: 'Fast'
+    rateLimit: "None",
+    quality: "High",
+    speed: "Fast",
   },
   {
-    id: 'yandex',
-    name: 'Yandex Translate',
-    description: 'Free translation service by Yandex',
-    icon: 'yandex.svg',
+    id: "yandex",
+    name: "Yandex Translate",
+    description: "Free translation service by Yandex",
+    icon: "yandex.svg",
     category: PROVIDER_CATEGORIES.FREE,
     needsApiKey: false,
     supported: true,
-    features: ['text', 'autoDetect'],
+    features: ["text", "autoDetect"],
     languages: 90,
-    rateLimit: 'None',
-    quality: 'High',
-    speed: 'Fast'
+    rateLimit: "None",
+    quality: "High",
+    speed: "Fast",
   },
   {
-    id: 'browser',
-    name: 'browser Translation',
-    description: 'Built-in browser translation API (Chrome 138+)',
-    icon: 'chrome-translate.svg',
+    id: "browser",
+    name: "browser Translation",
+    description: "Built-in browser translation API (Chrome 138+)",
+    icon: "chrome-translate.svg",
     category: PROVIDER_CATEGORIES.BROWSER,
     needsApiKey: false,
     supported: true,
-    features: ['text', 'autoDetect', 'offline'],
+    features: ["text", "autoDetect", "offline"],
     languages: 50,
-    rateLimit: 'None',
-    quality: 'High',
-    speed: 'Very Fast',
-    requirements: 'Chrome 138+ or compatible browser'
+    rateLimit: "None",
+    quality: "High",
+    speed: "Very Fast",
+    requirements: "Chrome 138+ or compatible browser",
   },
   {
-    id: 'gemini',
-    name: 'Google Gemini',
-    description: 'AI-powered translation with context understanding',
-    icon: 'gemini.svg',
+    id: "gemini",
+    name: "Google Gemini",
+    description: "AI-powered translation with context understanding",
+    icon: "gemini.svg",
     category: PROVIDER_CATEGORIES.AI,
     needsApiKey: true,
     supported: true,
-    features: ['text', 'context', 'smart', 'bulk'],
+    features: ["text", "context", "smart", "bulk"],
     languages: 100,
-    rateLimit: 'API dependent',
-    quality: 'Very High',
-    speed: 'Medium',
-    models: ['gemini-pro', 'gemini-flash']
+    rateLimit: "API dependent",
+    quality: "Very High",
+    speed: "Medium",
+    models: ["gemini-pro", "gemini-flash"],
   },
   {
-    id: 'openai',
-    name: 'OpenAI GPT',
-    description: 'AI translation using GPT models',
-    icon: 'openai.svg',
+    id: "openai",
+    name: "OpenAI GPT",
+    description: "AI translation using GPT models",
+    icon: "openai.svg",
     category: PROVIDER_CATEGORIES.AI,
     needsApiKey: true,
     supported: true,
-    features: ['text', 'context', 'smart', 'creative'],
+    features: ["text", "context", "smart", "creative"],
     languages: 100,
-    rateLimit: 'API dependent',
-    quality: 'Very High',
-    speed: 'Medium',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo']
+    rateLimit: "API dependent",
+    quality: "Very High",
+    speed: "Medium",
+    models: ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
   },
   {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    description: 'Advanced AI translation with reasoning capabilities',
-    icon: 'deepseek.svg',
+    id: "deepseek",
+    name: "DeepSeek",
+    description: "Advanced AI translation with reasoning capabilities",
+    icon: "deepseek.svg",
     category: PROVIDER_CATEGORIES.AI,
     needsApiKey: true,
     supported: true,
-    features: ['text', 'context', 'reasoning', 'technical'],
+    features: ["text", "context", "reasoning", "technical"],
     languages: 100,
-    rateLimit: 'API dependent',
-    quality: 'Very High',
-    speed: 'Medium',
-    models: ['deepseek-chat', 'deepseek-reasoner']
+    rateLimit: "API dependent",
+    quality: "Very High",
+    speed: "Medium",
+    models: ["deepseek-chat", "deepseek-reasoner"],
   },
   {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    description: 'Access to multiple AI models through OpenRouter',
-    icon: 'openrouter.svg',
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "Access to multiple AI models through OpenRouter",
+    icon: "openrouter.svg",
     category: PROVIDER_CATEGORIES.AI,
     needsApiKey: true,
     supported: true,
-    features: ['text', 'context', 'multiModel'],
+    features: ["text", "context", "multiModel"],
     languages: 100,
-    rateLimit: 'API dependent',
-    quality: 'Variable',
-    speed: 'Variable',
-    models: ['Multiple available']
+    rateLimit: "API dependent",
+    quality: "Variable",
+    speed: "Variable",
+    models: ["Multiple available"],
   },
   {
-    id: 'webai',
-    name: 'WebAI to API',
-    description: 'Local AI server integration',
-    icon: 'webai.svg',
+    id: "webai",
+    name: "WebAI to API",
+    description: "Local AI server integration",
+    icon: "webai.svg",
     category: PROVIDER_CATEGORIES.LOCAL,
     needsApiKey: false,
     supported: true,
-    features: ['text', 'local', 'privacy'],
+    features: ["text", "local", "privacy"],
     languages: 50,
-    rateLimit: 'None',
-    quality: 'Variable',
-    speed: 'Fast',
-    requirements: 'Local WebAI server running'
+    rateLimit: "None",
+    quality: "Variable",
+    speed: "Fast",
+    requirements: "Local WebAI server running",
   },
   {
-    id: 'custom',
-    name: 'Custom API',
-    description: 'Connect to custom OpenAI-compatible API',
-    icon: 'custom.svg',
+    id: "custom",
+    name: "Custom API",
+    description: "Connect to custom OpenAI-compatible API",
+    icon: "custom.svg",
     category: PROVIDER_CATEGORIES.CUSTOM,
     needsApiKey: true,
     supported: true,
-    features: ['text', 'configurable'],
-    languages: 'Variable',
-    rateLimit: 'API dependent',
-    quality: 'Variable',
-    speed: 'Variable'
-  }
-]
+    features: ["text", "configurable"],
+    languages: "Variable",
+    rateLimit: "API dependent",
+    quality: "Variable",
+    speed: "Variable",
+  },
+];
 
 /**
  * Get provider by ID
@@ -172,7 +172,7 @@ export const PROVIDER_REGISTRY = [
  * @returns {Object|null}
  */
 export function getProviderById(id) {
-  return PROVIDER_REGISTRY.find(provider => provider.id === id) || null
+  return PROVIDER_REGISTRY.find((provider) => provider.id === id) || null;
 }
 
 /**
@@ -181,7 +181,7 @@ export function getProviderById(id) {
  * @returns {Array}
  */
 export function getProvidersByCategory(category) {
-  return PROVIDER_REGISTRY.filter(provider => provider.category === category)
+  return PROVIDER_REGISTRY.filter((provider) => provider.category === category);
 }
 
 /**
@@ -189,7 +189,7 @@ export function getProvidersByCategory(category) {
  * @returns {Array}
  */
 export function getFreeProviders() {
-  return PROVIDER_REGISTRY.filter(provider => !provider.needsApiKey)
+  return PROVIDER_REGISTRY.filter((provider) => !provider.needsApiKey);
 }
 
 /**
@@ -197,7 +197,7 @@ export function getFreeProviders() {
  * @returns {Array}
  */
 export function getApiKeyProviders() {
-  return PROVIDER_REGISTRY.filter(provider => provider.needsApiKey)
+  return PROVIDER_REGISTRY.filter((provider) => provider.needsApiKey);
 }
 
 /**
@@ -205,7 +205,7 @@ export function getApiKeyProviders() {
  * @returns {Array}
  */
 export function getSupportedProviders() {
-  return PROVIDER_REGISTRY.filter(provider => provider.supported)
+  return PROVIDER_REGISTRY.filter((provider) => provider.supported);
 }
 
 /**
@@ -214,29 +214,29 @@ export function getSupportedProviders() {
  * @returns {Array}
  */
 export function getProvidersByFeature(feature) {
-  return PROVIDER_REGISTRY.filter(provider => 
-    provider.features && provider.features.includes(feature)
-  )
+  return PROVIDER_REGISTRY.filter(
+    (provider) => provider.features && provider.features.includes(feature),
+  );
 }
 
 /**
  * Provider feature definitions
  */
 export const PROVIDER_FEATURES = {
-  TEXT: 'text',
-  AUTO_DETECT: 'autoDetect',
-  CONTEXT: 'context',
-  SMART: 'smart',
-  CREATIVE: 'creative',
-  TECHNICAL: 'technical',
-  REASONING: 'reasoning',
-  BULK: 'bulk',
-  OFFLINE: 'offline',
-  LOCAL: 'local',
-  PRIVACY: 'privacy',
-  MULTI_MODEL: 'multiModel',
-  CONFIGURABLE: 'configurable'
-}
+  TEXT: "text",
+  AUTO_DETECT: "autoDetect",
+  CONTEXT: "context",
+  SMART: "smart",
+  CREATIVE: "creative",
+  TECHNICAL: "technical",
+  REASONING: "reasoning",
+  BULK: "bulk",
+  OFFLINE: "offline",
+  LOCAL: "local",
+  PRIVACY: "privacy",
+  MULTI_MODEL: "multiModel",
+  CONFIGURABLE: "configurable",
+};
 
 /**
  * Get provider display name
@@ -244,8 +244,8 @@ export const PROVIDER_FEATURES = {
  * @returns {string}
  */
 export function getProviderName(id) {
-  const provider = getProviderById(id)
-  return provider ? provider.name : id
+  const provider = getProviderById(id);
+  return provider ? provider.name : id;
 }
 
 /**
@@ -254,8 +254,8 @@ export function getProviderName(id) {
  * @returns {string}
  */
 export function getProviderIcon(id) {
-  const provider = getProviderById(id)
-  return provider ? provider.icon : 'provider.svg'
+  const provider = getProviderById(id);
+  return provider ? provider.icon : "provider.svg";
 }
 
 /**
@@ -264,8 +264,8 @@ export function getProviderIcon(id) {
  * @returns {boolean}
  */
 export function providerNeedsApiKey(id) {
-  const provider = getProviderById(id)
-  return provider ? provider.needsApiKey : false
+  const provider = getProviderById(id);
+  return provider ? provider.needsApiKey : false;
 }
 
 /**
@@ -274,8 +274,8 @@ export function providerNeedsApiKey(id) {
  * @returns {string}
  */
 export function getProviderCategory(id) {
-  const provider = getProviderById(id)
-  return provider ? provider.category : PROVIDER_CATEGORIES.CUSTOM
+  const provider = getProviderById(id);
+  return provider ? provider.category : PROVIDER_CATEGORIES.CUSTOM;
 }
 
 /**
@@ -284,8 +284,8 @@ export function getProviderCategory(id) {
  * @returns {boolean}
  */
 export function isProviderSupported(id) {
-  const provider = getProviderById(id)
-  return provider ? provider.supported : false
+  const provider = getProviderById(id);
+  return provider ? provider.supported : false;
 }
 
 /**
@@ -293,13 +293,13 @@ export function isProviderSupported(id) {
  * @returns {Array}
  */
 export function getProvidersForDropdown() {
-  return getSupportedProviders().map(provider => ({
+  return getSupportedProviders().map((provider) => ({
     value: provider.id,
     label: provider.name,
     icon: provider.icon,
     category: provider.category,
-    needsApiKey: provider.needsApiKey
-  }))
+    needsApiKey: provider.needsApiKey,
+  }));
 }
 
 /**
@@ -307,25 +307,25 @@ export function getProvidersForDropdown() {
  * @returns {Object}
  */
 export function getProvidersGroupedByCategory() {
-  const grouped = {}
-  
-  Object.values(PROVIDER_CATEGORIES).forEach(category => {
-    grouped[category] = getProvidersByCategory(category)
-  })
-  
-  return grouped
+  const grouped = {};
+
+  Object.values(PROVIDER_CATEGORIES).forEach((category) => {
+    grouped[category] = getProvidersByCategory(category);
+  });
+
+  return grouped;
 }
 
 /**
  * Default provider recommendations
  */
 export const DEFAULT_PROVIDERS = {
-  QUICK: 'google',      // For quick translations
-  ACCURATE: 'gemini',   // For high-quality translations
-  FREE: 'google',       // Free option
-  AI: 'gemini',         // AI-powered
-  OFFLINE: 'browser'    // Offline capable
-}
+  QUICK: "google", // For quick translations
+  ACCURATE: "gemini", // For high-quality translations
+  FREE: "google", // Free option
+  AI: "gemini", // AI-powered
+  OFFLINE: "browser", // Offline capable
+};
 
 /**
  * Get recommended provider for use case
@@ -333,5 +333,5 @@ export const DEFAULT_PROVIDERS = {
  * @returns {string}
  */
 export function getRecommendedProvider(useCase) {
-  return DEFAULT_PROVIDERS[useCase.toUpperCase()] || DEFAULT_PROVIDERS.QUICK
+  return DEFAULT_PROVIDERS[useCase.toUpperCase()] || DEFAULT_PROVIDERS.QUICK;
 }

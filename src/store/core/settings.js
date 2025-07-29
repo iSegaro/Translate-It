@@ -391,7 +391,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       if (browser.storage && browser.storage.onChanged) {
         storageListener = handleStorageChange
-        browser.storage.onChanged.addListener(storageListener)
+        browser.storage.onChanged.addListener.call(browser.storage.onChanged, storageListener)
         console.log('[SettingsStore] Storage listener setup successfully')
       } else {
         console.log('[SettingsStore] browser.storage.onChanged is not available. Settings cache might become stale.')

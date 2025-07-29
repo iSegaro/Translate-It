@@ -1,3 +1,4 @@
+import browser from "webextension-polyfill";
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { 
@@ -80,8 +81,27 @@ export async function handleTranslate(message, sender) {
     
     console.log('[Handler:TRANSLATE] Translation successful:', JSON.stringify(result, null, 2));
     
-    // Return result for consistent handling
-    return result;
+    // Send the actual translation result back to the sidepanel via a separate message
+    // This is a workaround for Firefox MV3's unreliable sendMessage response
+    if (result.success && result.translatedText) {
+      browser.runtime.sendMessage({
+        action: 'TRANSLATION_RESULT_UPDATE',
+        context: message.context, // Should be 'sidepanel'
+        translatedText: result.translatedText,
+        originalText: result.originalText,
+        provider: result.provider,
+        sourceLanguage: result.sourceLanguage,
+        targetLanguage: result.targetLanguage,
+        timestamp: result.timestamp,
+        mode: result.mode
+      }).catch(error => {
+        console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message:', error);
+      });
+    }
+
+    // Return a generic success message for the initial sendMessage call
+    // The frontend will rely on the TRANSLATION_RESULT_UPDATE message for the actual text
+    return { success: true, message: "Translation request processed in background." };
     
   } catch (translationError) {
     console.error('[Handler:TRANSLATE] Translation error:', translationError);

@@ -32,8 +32,15 @@ function hasActiveElementTextSelection() {
 
     if (activeElement.isContentEditable) {
       const selection = window.getSelection();
-      return selection && !selection.isCollapsed && selection.toString().trim().length > 0;
-    } else if (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA") {
+      return (
+        selection &&
+        !selection.isCollapsed &&
+        selection.toString().trim().length > 0
+      );
+    } else if (
+      activeElement.tagName === "INPUT" ||
+      activeElement.tagName === "TEXTAREA"
+    ) {
       return activeElement.selectionStart !== activeElement.selectionEnd;
     }
 
@@ -52,8 +59,9 @@ export async function translateFieldViaSmartHandler({
 }) {
   if (!text || !translationHandler) return;
 
-  const mode =
-    selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
+  const mode = selectionRange
+    ? TranslationMode.SelectElement
+    : TranslationMode.Field;
   const platform =
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
@@ -93,42 +101,56 @@ export async function translateFieldViaSmartHandler({
 
     // تعیین حالت عملیات: جایگزینی یا کپی
     let isReplaceMode = false;
-    
+
     const hasTextSelection = hasActiveElementTextSelection();
-    
+
     if (mode === TranslationMode.Field) {
       // بررسی تنظیمات کلی
       const is_copy = await getCOPY_REPLACEAsync();
-      
+
       if (platform === Platform.Default) {
         // فقط برای platform پیش‌فرض، بررسی ویرایشگر پیچیده
         const activeElement = document.activeElement;
-        const isComplexEditorDetected = activeElement ? isComplexEditor(activeElement) : false;
-        
+        const isComplexEditorDetected = activeElement
+          ? isComplexEditor(activeElement)
+          : false;
+
         if (isComplexEditorDetected) {
           // اگر کاربر صریحاً replace mode انتخاب کرده، به آن احترام بگذاریم
           // سیستم universalTextInsertion جدید ما می‌تواند با complex editors کار کند
           if (is_copy === "replace") {
-            logME("[SmartTranslationHandler] Complex editor detected but user chose replace mode - attempting advanced insertion");
+            logME(
+              "[SmartTranslationHandler] Complex editor detected but user chose replace mode - attempting advanced insertion",
+            );
             isReplaceMode = true;
           } else {
-            logME("[SmartTranslationHandler] Complex editor detected with copy mode - forcing copy mode");
+            logME(
+              "[SmartTranslationHandler] Complex editor detected with copy mode - forcing copy mode",
+            );
             isReplaceMode = false;
           }
         } else if (is_copy === "replace") {
           isReplaceMode = true;
-          logME(`[SmartTranslationHandler] replace on default (hasSelection: ${hasTextSelection})`);
+          logME(
+            `[SmartTranslationHandler] replace on default (hasSelection: ${hasTextSelection})`,
+          );
         } else {
-          logME(`[SmartTranslationHandler] copy on default (hasSelection: ${hasTextSelection})`);
+          logME(
+            `[SmartTranslationHandler] copy on default (hasSelection: ${hasTextSelection})`,
+          );
         }
       } else {
         // برای platform‌های خاص، از استراتژی موجود استفاده کن
         if (is_copy === "replace") {
           isReplaceMode = true;
-          logME(`[SmartTranslationHandler] replace on platform (hasSelection: ${hasTextSelection})`);
+          logME(
+            `[SmartTranslationHandler] replace on platform (hasSelection: ${hasTextSelection})`,
+          );
         } else {
           const is_special_replace = await getREPLACE_SPECIAL_SITESAsync();
-          logME(`REPLACE_SPECIAL_SITES ${is_special_replace} (hasSelection: ${hasTextSelection})`);
+          logME(
+            `REPLACE_SPECIAL_SITES ${is_special_replace} (hasSelection: ${hasTextSelection})`,
+          );
           if (is_special_replace === true) {
             isReplaceMode = true;
           }
@@ -159,14 +181,14 @@ export async function translateFieldViaSmartHandler({
         // این متد در service worker به DOM دسترسی ندارد اما برای سناریوهای خاص شاید پیاده‌سازی شده باشد
         wasAppliedSuccessfully = await translationHandler.updateTargetElement(
           target,
-          translated
+          translated,
         );
       }
 
       // اگر استراتژی مستقیم موفق نبود، از طریق ارسال پیام به Content Script تلاش می‌کنیم
       if (!wasAppliedSuccessfully) {
         logME(
-          "[SmartTranslateHandler] Direct strategy failed or skipped. Fallback to message passing."
+          "[SmartTranslateHandler] Direct strategy failed or skipped. Fallback to message passing.",
         );
 
         try {
@@ -182,17 +204,17 @@ export async function translateFieldViaSmartHandler({
           if (!wasAppliedSuccessfully) {
             logME(
               "[SmartTranslateHandler] ❗ Fallback via sendMessage also failed.",
-              res?.error || ""
+              res?.error || "",
             );
           } else {
             logME(
-              "[SmartTranslateHandler] Fallback via sendMessage applied successfully."
+              "[SmartTranslateHandler] Fallback via sendMessage applied successfully.",
             );
           }
         } catch (err) {
           logME(
             "[SmartTranslateHandler] ❗ Error during sendMessage for applyTranslation.",
-            err
+            err,
           );
           wasAppliedSuccessfully = false;
         }
@@ -203,13 +225,15 @@ export async function translateFieldViaSmartHandler({
       // اگر هیچ‌کدام از روش‌های جایگزینی موفق نبود، متن را در کلیپ‌بورد کپی می‌کنیم
       if (!wasAppliedSuccessfully) {
         logME(
-          "[SmartTranslateHandler] All replace attempts failed. Final fallback: Copying to clipboard."
+          "[SmartTranslateHandler] All replace attempts failed. Final fallback: Copying to clipboard.",
         );
         await copyToClipboard(translated, translationHandler);
       }
     } else {
       // --- حالت کپی فعال است ---
-      logME("[SmartTranslateHandler] Executing Copy Mode - no field modifications.");
+      logME(
+        "[SmartTranslateHandler] Executing Copy Mode - no field modifications.",
+      );
       await copyToClipboard(translated, translationHandler);
     }
   } catch (err) {
@@ -229,7 +253,7 @@ async function copyToClipboard(text, translationHandler) {
         "ترجمه در حافظه کپی شد. (Ctrl+V)",
       "success",
       true,
-      3000
+      3000,
     );
   } catch (error) {
     await translationHandler.errorHandler.handle(error, {

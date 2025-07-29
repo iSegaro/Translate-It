@@ -5,9 +5,11 @@ import { logME } from '../../../utils/helpers.js';
  * Handles the 'ping' message action.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @returns {Promise<Object>} - A Promise that resolves with the response object.
+ * @returns {Promise<Object>} - Returns a promise for webextension-polyfill compatibility.
  */
 export async function handlePing(message, sender) {
   logME("[Handler:Common] Ping received, responding with pong");
-  return { success: true, message: "pong" };
+  const response = { success: true, message: "pong" };
+  logME("[Handler:Common] Returning pong response:", response);
+  return response;
 }

@@ -8,18 +8,18 @@ import { filterXSS } from "xss";
  * Based on CLAUDE.md documentation
  */
 const XSS_CONFIG = {
-  whiteList: { br: [] },           // Only <br> tags allowed
-  stripIgnoreTag: true,            // Remove unknown tags
-  stripIgnoreTagBody: ['script', 'style'], // Block dangerous content
+  whiteList: { br: [] }, // Only <br> tags allowed
+  stripIgnoreTag: true, // Remove unknown tags
+  stripIgnoreTagBody: ["script", "style"], // Block dangerous content
   onIgnoreTagAttr: function (tag, name, value) {
     // Block javascript:, data:, vbscript: URLs
-    if (name === 'href' || name === 'src') {
+    if (name === "href" || name === "src") {
       if (value.match(/^(javascript|data|vbscript):/i)) {
-        return '';
+        return "";
       }
     }
     return false;
-  }
+  },
 };
 
 /**
@@ -35,22 +35,22 @@ export function safeSetHTML(element, htmlContent) {
   try {
     // Sanitize HTML content using filterXSS with project configuration
     const sanitizedHtml = filterXSS(htmlContent, XSS_CONFIG);
-    
+
     // Use DOMParser for safe HTML insertion (Firefox compatible)
     const parser = new DOMParser();
-    const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-    
+    const doc = parser.parseFromString(sanitizedHtml, "text/html");
+
     // Clear existing content
-    element.textContent = '';
-    
+    element.textContent = "";
+
     // Append sanitized content
-    Array.from(doc.body.childNodes).forEach(node => {
+    Array.from(doc.body.childNodes).forEach((node) => {
       element.appendChild(node.cloneNode(true));
     });
   } catch (error) {
     // Fallback to safe text content on error
-    console.warn('safeSetHTML failed, falling back to textContent:', error);
-    element.textContent = htmlContent.replace(/<[^>]*>/g, ''); // Strip HTML tags
+    console.warn("safeSetHTML failed, falling back to textContent:", error);
+    element.textContent = htmlContent.replace(/<[^>]*>/g, ""); // Strip HTML tags
   }
 }
 
@@ -63,8 +63,8 @@ export function safeSetText(element, textContent) {
   if (!element) {
     return;
   }
-  
-  element.textContent = textContent || '';
+
+  element.textContent = textContent || "";
 }
 
 /**
@@ -74,18 +74,18 @@ export function safeSetText(element, textContent) {
  * @param {Object} attributes - Element attributes (optional)
  * @returns {Element} Created element with safe content
  */
-export function createSafeElement(tagName, htmlContent = '', attributes = {}) {
+export function createSafeElement(tagName, htmlContent = "", attributes = {}) {
   const element = document.createElement(tagName);
-  
+
   // Set attributes
   Object.entries(attributes).forEach(([key, value]) => {
     element.setAttribute(key, value);
   });
-  
+
   // Set content safely
   if (htmlContent) {
     safeSetHTML(element, htmlContent);
   }
-  
+
   return element;
 }

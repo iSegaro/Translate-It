@@ -14,19 +14,19 @@ export class ScreenSelector {
     this.mode = options.mode || "area"; // "area" or "fullscreen"
     this.onSelectionComplete = options.onSelectionComplete || (() => {});
     this.onCancel = options.onCancel || (() => {});
-    
+
     this.isActive = false;
     this.isSelecting = false;
-    
+
     // Selection state
     this.startPoint = null;
     this.currentSelection = null;
-    
+
     // DOM elements
     this.overlay = null;
     this.selectionBox = null;
     this.instructions = null;
-    
+
     // Bound event handlers
     this._boundMouseDown = this._handleMouseDown.bind(this);
     this._boundMouseMove = this._handleMouseMove.bind(this);
@@ -47,20 +47,20 @@ export class ScreenSelector {
       }
 
       this.isActive = true;
-      
+
       // Create and inject overlay
       await this._createOverlay();
-      
+
       // Add event listeners
       this._addEventListeners();
-      
+
       logME("[ScreenSelector] Area selection started successfully");
     } catch (error) {
       logME("[ScreenSelector] Error starting selection:", error);
       this.cleanup();
       throw this._createError(
         ErrorTypes.SCREEN_CAPTURE,
-        `Failed to start screen selection: ${error.message}`
+        `Failed to start screen selection: ${error.message}`,
       );
     }
   }
@@ -85,7 +85,7 @@ export class ScreenSelector {
           z-index: 2147483647;
           user-select: none;
           pointer-events: all;
-        `
+        `,
       });
 
       // Create selection box
@@ -97,7 +97,7 @@ export class ScreenSelector {
           background: rgba(0, 122, 204, 0.1);
           pointer-events: none;
           display: none;
-        `
+        `,
       });
 
       // Create instructions
@@ -117,15 +117,16 @@ export class ScreenSelector {
           z-index: 2147483648;
           pointer-events: none;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        `
+        `,
       });
-      
-      this.instructions.textContent = "Drag to select area • Press Escape to cancel";
+
+      this.instructions.textContent =
+        "Drag to select area • Press Escape to cancel";
 
       // Assemble overlay
       this.overlay.appendChild(this.selectionBox);
       this.overlay.appendChild(this.instructions);
-      
+
       // Inject into page
       document.body.appendChild(this.overlay);
 
@@ -157,7 +158,7 @@ export class ScreenSelector {
     if (this.overlay) {
       this.overlay.removeEventListener("mousedown", this._boundMouseDown);
     }
-    
+
     document.removeEventListener("mousemove", this._boundMouseMove);
     document.removeEventListener("mouseup", this._boundMouseUp);
     document.removeEventListener("keydown", this._boundKeyDown);
@@ -175,7 +176,7 @@ export class ScreenSelector {
     // browser.tabs.captureVisibleTab() captures what's currently visible in viewport
     return {
       x: Math.round(event.clientX),
-      y: Math.round(event.clientY)
+      y: Math.round(event.clientY),
     };
   }
 
@@ -190,12 +191,12 @@ export class ScreenSelector {
     logME("[ScreenSelector] Mouse down, starting selection");
 
     this.isSelecting = true;
-    
+
     // Use viewport coordinates for capture (since browser captures viewport)
     const captureCoords = this._getCaptureCoordinates(event);
     this.startPoint = {
       x: captureCoords.x,
-      y: captureCoords.y
+      y: captureCoords.y,
     };
 
     // Show selection box using same coordinates
@@ -235,11 +236,11 @@ export class ScreenSelector {
     this.selectionBox.style.height = height + "px";
 
     // Store current selection using capture coordinates
-    this.currentSelection = { 
-      left: left, 
-      top: top, 
-      width: width, 
-      height: height 
+    this.currentSelection = {
+      left: left,
+      top: top,
+      width: width,
+      height: height,
     };
   }
 
@@ -256,9 +257,11 @@ export class ScreenSelector {
     this.isSelecting = false;
 
     // Validate selection
-    if (!this.currentSelection || 
-        this.currentSelection.width < 10 || 
-        this.currentSelection.height < 10) {
+    if (
+      !this.currentSelection ||
+      this.currentSelection.width < 10 ||
+      this.currentSelection.height < 10
+    ) {
       logME("[ScreenSelector] Selection too small, ignoring");
       this._resetSelection();
       return;
@@ -295,21 +298,21 @@ export class ScreenSelector {
     // Debug logging for coordinate analysis
     const debugInfo = {
       selection: this.currentSelection,
-      coordinateSystem: "viewport-relative", 
+      coordinateSystem: "viewport-relative",
       devicePixelRatio: window.devicePixelRatio || 1,
       scrollOffset: {
         x: window.pageXOffset || document.documentElement.scrollLeft || 0,
-        y: window.pageYOffset || document.documentElement.scrollTop || 0
+        y: window.pageYOffset || document.documentElement.scrollTop || 0,
       },
       viewport: {
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
       },
       documentSize: {
         width: document.documentElement.scrollWidth,
-        height: document.documentElement.scrollHeight
+        height: document.documentElement.scrollHeight,
       },
-      note: "Using viewport coordinates because browser capture API captures visible viewport only"
+      note: "Using viewport coordinates because browser capture API captures visible viewport only",
     };
 
     logME("[ScreenSelector] Completing selection with debug info:", debugInfo);
@@ -321,7 +324,7 @@ export class ScreenSelector {
       height: this.currentSelection.height,
       timestamp: Date.now(),
       // Add debug info for troubleshooting
-      debug: debugInfo
+      debug: debugInfo,
     };
 
     // Clean up before callback
@@ -332,10 +335,12 @@ export class ScreenSelector {
       this.onSelectionComplete(selectionData);
     } catch (error) {
       logME("[ScreenSelector] Error in selection completion callback:", error);
-      handleUIError(this._createError(
-        ErrorTypes.SCREEN_CAPTURE,
-        `Selection completion failed: ${error.message}`
-      ));
+      handleUIError(
+        this._createError(
+          ErrorTypes.SCREEN_CAPTURE,
+          `Selection completion failed: ${error.message}`,
+        ),
+      );
     }
   }
 
@@ -365,7 +370,7 @@ export class ScreenSelector {
     this.startPoint = null;
     this.currentSelection = null;
     this.isSelecting = false;
-    
+
     if (this.selectionBox) {
       this.selectionBox.style.display = "none";
     }
@@ -393,15 +398,15 @@ export class ScreenSelector {
 
     this.isActive = false;
     this.isSelecting = false;
-    
+
     // Remove event listeners
     this._removeEventListeners();
-    
+
     // Remove DOM elements
     if (this.overlay && this.overlay.parentNode) {
       this.overlay.parentNode.removeChild(this.overlay);
     }
-    
+
     // Reset state
     this.overlay = null;
     this.selectionBox = null;

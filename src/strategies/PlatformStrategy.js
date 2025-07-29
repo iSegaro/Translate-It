@@ -43,7 +43,7 @@ export default class PlatformStrategy {
     );
   }
 
-    async applyVisualFeedback(element) {
+  async applyVisualFeedback(element) {
     if (!element || !element.style) return; // بررسی بیشتر برای اطمینان
 
     const originalBackgroundColor = element.style.backgroundColor;
@@ -54,13 +54,12 @@ export default class PlatformStrategy {
       element.style.backgroundColor = "#d4f8d4"; // رنگ سبز برای نشان دادن پردازش/موفقیت
 
       // منتظر میمونه تا رنگ سبز قابل مشاهده باشد و سپس به حالت اولیه بازمیگردد
-      await new Promise(resolve => setTimeout(resolve, 300)); // مدت زمان نمایش رنگ سبز
+      await new Promise((resolve) => setTimeout(resolve, 300)); // مدت زمان نمایش رنگ سبز
 
       element.style.backgroundColor = originalBackgroundColor;
 
       // منتظر میمونه تا انیمیشن بازگشت به پایان برسد
-      await new Promise(resolve => setTimeout(resolve, 300)); // باید با زمان transition هماهنگ باشد
-
+      await new Promise((resolve) => setTimeout(resolve, 300)); // باید با زمان transition هماهنگ باشد
     } catch (error) {
       // در صورت بروز خطا، سعی میکنه استایل‌ها را فوراً به حالت اولیه بازگردند
       element.style.backgroundColor = originalBackgroundColor;

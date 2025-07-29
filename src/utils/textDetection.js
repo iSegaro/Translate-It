@@ -1,5 +1,5 @@
 // src/utils/textDetection.js
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { languageList } from "./languages.js";
 // import { logME } from "./helpers.js";
@@ -55,7 +55,7 @@ export const correctTextDirection = (element, text) => {
     // این حالت ممکن است برای spanها کمتر رایج باشد اما برای استحکام کد خوب است
     element.setAttribute(
       "style",
-      `direction: ${direction}; text-align: ${textAlign};`
+      `direction: ${direction}; text-align: ${textAlign};`,
     );
   }
   // بسیار مهم: ویژگی 'dir' را برای مدیریت صحیح bidi توسط مرورگر تنظیم می شود

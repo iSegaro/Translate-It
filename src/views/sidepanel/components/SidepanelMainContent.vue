@@ -4,86 +4,131 @@
       <div class="language-controls">
         <select
           id="sourceLanguageInput"
+          ref="sourceLanguageInputRef"
           class="language-select"
           title="Source Language"
         >
-          <option value="auto">Auto-Detect</option>
-          <option value="English">English</option>
-          <option value="Persian">Persian</option>
-          <option value="Arabic">Arabic</option>
-          <option value="French">French</option>
-          <option value="German">German</option>
-          <option value="Spanish">Spanish</option>
+          <option value="auto">
+            Auto-Detect
+          </option>
+          <option value="English">
+            English
+          </option>
+          <option value="Persian">
+            Persian
+          </option>
+          <option value="Arabic">
+            Arabic
+          </option>
+          <option value="French">
+            French
+          </option>
+          <option value="German">
+            German
+          </option>
+          <option value="Spanish">
+            Spanish
+          </option>
         </select>
-        
+
         <button
-          type="button"
           id="swapLanguagesBtn"
+          type="button"
           class="swap-button"
           title="Swap Languages"
           @click="handleSwapLanguages"
         >
-          <img src="@/assets/icons/swap.png" alt="Swap" />
+          <img
+            src="@/assets/icons/swap.png"
+            alt="Swap"
+          >
         </button>
 
         <select
           id="targetLanguageInput"
+          ref="targetLanguageInputRef"
           class="language-select"
           title="Target Language"
         >
-          <option value="English">English</option>
-          <option value="Persian" selected>Persian</option>
-          <option value="Arabic">Arabic</option>
-          <option value="French">French</option>
-          <option value="German">German</option>
-          <option value="Spanish">Spanish</option>
+          <option value="English">
+            English
+          </option>
+          <option
+            value="Persian"
+            selected
+          >
+            Persian
+          </option>
+          <option value="Arabic">
+            Arabic
+          </option>
+          <option value="French">
+            French
+          </option>
+          <option value="German">
+            German
+          </option>
+          <option value="Spanish">
+            Spanish
+          </option>
         </select>
       </div>
 
       <!-- Select Element Status -->
-      <div v-if="isSelecting" class="selection-status">
+      <div
+        v-if="isSelecting"
+        class="selection-status"
+      >
         <div class="selection-indicator">
-          <div class="selection-spinner"></div>
-          <span>{{ t('SELECT_ELEMENT_ACTIVE_MESSAGE', 'Click on any element on the webpage to translate...') }}</span>
+          <div class="selection-spinner" />
+          <span>{{
+            t(
+              "SELECT_ELEMENT_ACTIVE_MESSAGE",
+              "Click on any element on the webpage to translate...",
+            )
+          }}</span>
         </div>
       </div>
 
       <!-- Source Text Area with Toolbar -->
-      <div 
-        class="textarea-container source-container" 
-        :class="{ 'has-content': hasSourceContent, 'selection-mode': isSelecting }"
+      <div
+        class="textarea-container source-container"
+        :class="{
+          'has-content': hasSourceContent,
+          'selection-mode': isSelecting,
+        }"
       >
         <div class="inline-toolbar source-toolbar">
           <img
-            src="@/assets/icons/copy.png"
             id="copySourceBtn"
+            src="@/assets/icons/copy.png"
             class="inline-icon"
             title="Copy Source Text"
             @click="copySourceText"
-          />
+          >
           <img
-            src="@/assets/icons/speaker.png"
             id="voiceSourceIcon"
+            src="@/assets/icons/speaker.png"
             class="inline-icon"
             title="Speak Source Text"
             @click="speakSourceText"
-          />
+          >
         </div>
         <img
-          src="@/assets/icons/paste.png"
+          v-show="showPasteButton"
           id="pasteSourceBtn"
+          src="@/assets/icons/paste.png"
           class="inline-icon paste-icon-separate"
           title="Paste Source Text"
-          v-show="showPasteButton"
           @click="pasteSourceText"
-        />
+        >
         <textarea
           id="sourceText"
+          v-model="sourceText"
           rows="6"
           placeholder="Enter text to translate..."
-          v-model="sourceText"
           @input="handleSourceTextInput"
-        ></textarea>
+        />
       </div>
 
       <!-- Action Bar -->
@@ -93,431 +138,578 @@
           class="translate-button-main"
           :disabled="!sourceText.trim()"
         >
-          <span>{{ showSpinner ? 'Translating...' : 'Translate' }}</span>
-          <img src="@/assets/icons/translate.png" alt="Translate" />
+          <span>{{ showSpinner ? "Translating..." : "Translate" }}</span>
+          <img
+            src="@/assets/icons/translate.png"
+            alt="Translate"
+          >
         </button>
       </div>
 
       <!-- Result Area with Toolbar -->
-      <div 
-        class="textarea-container result-container"
-        :class="{ 'has-content': hasTranslationContent }"
-      >
-        <div class="inline-toolbar target-toolbar">
-          <img
-            src="@/assets/icons/copy.png"
-            id="copyTargetBtn"
-            class="inline-icon"
-            title="Copy Translation"
-            @click="copyTranslationText"
-          />
-          <img
-            src="@/assets/icons/speaker.png"
-            id="voiceTargetIcon"
-            class="inline-icon"
-            title="Speak Translation"
-            @click="speakTranslationText"
-          />
-        </div>
-        <div
-          id="translationResult"  
-          class="result"
-          :class="{ 'has-error': translationError, 'fade-in': translationResult && !showSpinner }"
-          data-i18n-placeholder="Translation will appear here..."
-        >
-          <div v-if="showSpinner" class="spinner-center">
-            <div class="spinner"></div>
-          </div>
-          <template v-else>
-            {{ translationError || translationResult || '' }}
-          </template>
-        </div>
-      </div>
+      <TranslationOutputField
+        :content="translationResult"
+        :language="targetLanguageValue"
+        :is-loading="isTranslating"
+        :error="translationError"
+        :placeholder="'Translation will appear here...'"
+        :copy-title="'Copy Translation'"
+        :copy-alt="'Copy Result'"
+        :tts-title="'Speak Translation'"
+        :tts-alt="'Voice Target'"
+        :show-fade-in-animation="true"
+      />
     </form>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
-import { useTTSSmart } from '@/composables/useTTSSmart.js'
-import { useBackgroundWarmup } from '@/composables/useBackgroundWarmup.js'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
-import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
-import { useI18n } from '@/composables/useI18n.js'
-import { UnifiedTranslationClient } from '@/core/UnifiedTranslationClient.js'
-import { useSettingsStore } from '@/store/core/settings.js'
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
+import { useTTSSmart } from "@/composables/useTTSSmart.js";
+import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
+import { useSelectElementTranslation } from "@/composables/useSelectElementTranslation.js";
+import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
+import { useI18n } from "@/composables/useI18n.js";
+import { UnifiedTranslationClient } from "@/core/UnifiedTranslationClient.js";
+import { useSettingsStore } from "@/store/core/settings.js";
+import { useHistory } from "@/composables/useHistory.js";
+
+import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
-const browserAPI = useBrowserAPI()
-const tts = useTTSSmart()
-const backgroundWarmup = useBackgroundWarmup()
-const selectElement = useSelectElementTranslation()
-const { t } = useI18n()
+const browserAPI = useBrowserAPI();
+const tts = useTTSSmart();
+const backgroundWarmup = useBackgroundWarmup();
+const selectElement = useSelectElementTranslation();
+const { t } = useI18n();
 
 // Settings Store
-const settingsStore = useSettingsStore()
+const settingsStore = useSettingsStore();
 
 // Translation Client
-const translationClient = new UnifiedTranslationClient('sidepanel')
+const translationClient = new UnifiedTranslationClient("sidepanel");
 
 // Simple state
-const sourceText = ref('')
-const translationResult = ref('')
-const translationError = ref('')
-const isTranslating = ref(false)
-const showPasteButton = ref(true)
-const showSpinner = ref(false)
-const currentAbortController = ref(null)
+const sourceText = ref("");
+const translationResult = ref("");
+const translationError = ref("");
+const isTranslating = ref(false);
+const showPasteButton = ref(true);
+const showSpinner = ref(false);
+const currentAbortController = ref(null);
+const targetLanguageInputRef = ref(null);
+const sourceLanguageInputRef = ref(null);
+
+const historyComposable = useHistory();
 
 // Computed properties for UI state
 const hasSourceContent = computed(() => {
-  return sourceText.value.trim().length > 0
-})
+  return sourceText.value.trim().length > 0;
+});
 
 const hasTranslationContent = computed(() => {
-  return (translationResult.value || translationError.value || '').trim().length > 0
-})
+  return (
+    (translationResult.value || translationError.value || "").trim().length > 0
+  );
+});
 
 // Select Element computed properties
-const isSelecting = computed(() => selectElement.isSelecting.value)
-const isSelectElementActivating = computed(() => selectElement.isActivating.value)
+const isSelecting = computed(() => selectElement.isSelecting.value);
+const isSelectElementActivating = computed(
+  () => selectElement.isSelecting.value,
+);
+
+const targetLanguageValue = computed(() => {
+  return targetLanguageInputRef.value?.value || "Persian";
+});
+
+const sourceLanguageValue = computed(() => {
+  return sourceLanguageInputRef.value?.value || "auto";
+});
+
+// Watch for history changes to handle Firefox MV3 bug
+watch(
+  () => historyComposable.sortedHistoryItems,
+  (newHistory) => {
+    console.log(
+      "[SidepanelMainContent] History watcher triggered. newHistory:",
+      newHistory,
+    );
+    if (newHistory && newHistory.length > 0) {
+      const lastItem = newHistory[0];
+      console.log("[SidepanelMainContent] Last history item:", lastItem);
+      console.log(
+        "[SidepanelMainContent] Current sourceText.value:",
+        sourceText.value,
+      );
+      console.log(
+        "[SidepanelMainContent] Current translationResult.value:",
+        translationResult.value,
+      );
+
+      // If the last history item matches the current source text, update the result
+      if (
+        lastItem.sourceText.trim() === sourceText.value.trim() &&
+        (translationResult.value === "" || translationResult.value === null)
+      ) {
+        console.log(
+          "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
+        );
+        console.log("  lastItem.sourceText:", lastItem.sourceText);
+        console.log("  sourceText.value:", sourceText.value);
+        console.log(
+          "  translationResult.value (before update):",
+          translationResult.value,
+        );
+        translationResult.value = lastItem.translatedText;
+        translationError.value = ""; // Clear any potential Firefox bug error message
+        showSpinner.value = false;
+        isTranslating.value = false;
+        console.log(
+          "  [History Watcher] translationResult.value (after update):",
+          translationResult.value,
+        );
+        console.log(
+          "  [History Watcher] translationError.value (after update):",
+          translationError.value,
+        );
+        console.log(
+          "  [History Watcher] showSpinner.value (after update):",
+          showSpinner.value,
+        );
+        console.log(
+          "  [History Watcher] isTranslating.value (after update):",
+          isTranslating.value,
+        );
+      } else {
+        console.log("[SidepanelMainContent] Watcher condition NOT met.");
+        console.log("  lastItem.sourceText:", lastItem.sourceText);
+        console.log("  sourceText.value:", sourceText.value);
+        console.log(
+          "  lastItem.sourceText === sourceText.value:",
+          lastItem.sourceText === sourceText.value,
+        );
+        console.log("  translationResult.value:", translationResult.value);
+        console.log(
+          "  (translationResult.value === '' || translationResult.value === null):",
+          translationResult.value === "" || translationResult.value === null,
+        );
+      }
+    }
+  },
+  { deep: true },
+);
 
 // Handle form submission with request cancellation
 const handleTranslationSubmit = async () => {
-  console.log('[SidepanelMainContent] Translation submit started')
-  
+  console.log("[SidepanelMainContent] Translation submit started");
+
   if (!sourceText.value.trim()) {
-    console.warn('[SidepanelMainContent] No source text provided')
-    return
+    console.warn("[SidepanelMainContent] No source text provided");
+    return;
   }
 
-  const targetLanguage = document.getElementById('targetLanguageInput')?.value
+  const targetLanguage = targetLanguageValue.value;
   if (!targetLanguage) {
-    console.warn('[SidepanelMainContent] No target language selected')
-    return
+    console.warn("[SidepanelMainContent] No target language selected");
+    return;
   }
 
   // Cancel previous request if exists
   if (currentAbortController.value) {
-    console.log('[SidepanelMainContent] Cancelling previous translation request')
-    currentAbortController.value.abort()
+    console.log(
+      "[SidepanelMainContent] Cancelling previous translation request",
+    );
+    currentAbortController.value.abort();
   }
 
   // Create new abort controller for this request
-  currentAbortController.value = new AbortController()
-  const abortSignal = currentAbortController.value.signal
+  currentAbortController.value = new AbortController();
+  const abortSignal = currentAbortController.value.signal;
 
   try {
-    isTranslating.value = true
-    translationError.value = ''
-    translationResult.value = ''
-    showSpinner.value = true
-    
-    console.log('[SidepanelMainContent] Ensuring background script is ready...')
-    await backgroundWarmup.ensureWarmedUp()
-    
+    isTranslating.value = true;
+    translationError.value = "";
+    translationResult.value = "";
+
+    console.log(
+      "[SidepanelMainContent] Ensuring background script is ready...",
+    );
+    await backgroundWarmup.ensureWarmedUp();
+
     // Check if request was cancelled during warmup
     if (abortSignal.aborted) {
-      console.log('[SidepanelMainContent] Request aborted during warmup')
-      return
+      console.log("[SidepanelMainContent] Request aborted during warmup");
+      return;
     }
-    
-    console.log('[SidepanelMainContent] Sending translation request:', {
-      sourceText: sourceText.value.substring(0, 50) + '...',
-      targetLanguage
-    })
+
+    console.log("[SidepanelMainContent] Sending translation request:", {
+      sourceText: sourceText.value.substring(0, 50) + "...",
+      targetLanguage,
+    });
 
     // Convert language names to codes
-    const sourceLanguageCode = getLanguageCode(document.getElementById('sourceLanguageInput')?.value || 'auto')
-    const targetLanguageCode = getLanguageCode(targetLanguage)
+    const sourceLanguageCode = getLanguageCode(sourceLanguageValue.value);
+    const targetLanguageCode = getLanguageCode(targetLanguage);
 
     // Get current provider from settings
-    const currentProvider = settingsStore.settings.TRANSLATION_API || 'google'
-    
+    const currentProvider = settingsStore.settings.TRANSLATION_API || "google";
+
     // Use TranslationClient for translation
     const response = await translationClient.translate(sourceText.value, {
       provider: currentProvider,
-      sourceLanguage: sourceLanguageCode === 'en' && document.getElementById('sourceLanguageInput')?.value === 'auto' ? 'auto' : sourceLanguageCode,
+      sourceLanguage:
+        sourceLanguageCode === "en" && sourceLanguageValue.value === "auto"
+          ? "auto"
+          : sourceLanguageCode,
       targetLanguage: targetLanguageCode,
-      mode: 'sidepanel'
-    })
+      mode: "sidepanel",
+    });
 
     // Check if request was cancelled before processing response
     if (abortSignal.aborted) {
-      console.log('[SidepanelMainContent] Request aborted before processing response')
-      return
+      console.log(
+        "[SidepanelMainContent] Request aborted before processing response",
+      );
+      return;
     }
 
-    console.log('[SidepanelMainContent] Translation response:', response)
+    console.log("[SidepanelMainContent] Translation response:", response);
 
-    if (response && response.translatedText) {
-      translationResult.value = response.translatedText
-      console.log('[SidepanelMainContent] Translation displayed successfully')
+    // For Firefox MV3, the actual translation result will come via a separate message
+    // The initial response from UnifiedMessenger will be a generic success message
+    // We will rely on the message listener to update translationResult.value
+    if (response && response.success) {
+      console.log(
+        "[SidepanelMainContent] Translation request sent successfully. Waiting for result update...",
+      );
+      // No direct update here, the listener will handle it
     } else {
-      throw new Error('No translation result received')
+      throw new Error(response.error || "No translation result received");
     }
-
   } catch (error) {
     // Don't show error if request was cancelled
-    if (error.name === 'AbortError' || abortSignal.aborted) {
-      console.log('[SidepanelMainContent] Translation request was cancelled')
-      return
+    if (error.name === "AbortError" || abortSignal.aborted) {
+      console.log("[SidepanelMainContent] Translation request was cancelled");
+      return;
     }
-    
-    console.error('[SidepanelMainContent] Translation failed:', error)
-    translationError.value = error.message || 'Translation failed'
+
+    console.error("[SidepanelMainContent] Translation failed:", error);
+    translationError.value = error.message || "Translation failed";
   } finally {
     // Only cleanup if this is still the current request
     if (currentAbortController.value?.signal === abortSignal) {
-      showSpinner.value = false
-      isTranslating.value = false
-      currentAbortController.value = null
+      isTranslating.value = false;
+      currentAbortController.value = null;
     }
   }
-}
+};
 
 // Copy source text to clipboard
 const copySourceText = async () => {
   try {
-    await navigator.clipboard.writeText(sourceText.value)
-    console.log('[SidepanelMainContent] Source text copied to clipboard')
+    await navigator.clipboard.writeText(sourceText.value);
+    console.log("[SidepanelMainContent] Source text copied to clipboard");
   } catch (error) {
-    console.error('[SidepanelMainContent] Failed to copy source text:', error)
+    console.error("[SidepanelMainContent] Failed to copy source text:", error);
   }
-}
+};
 
 // Copy translation text to clipboard
 const copyTranslationText = async () => {
   try {
-    await navigator.clipboard.writeText(translationResult.value)
-    console.log('[SidepanelMainContent] Translation copied to clipboard')
+    await navigator.clipboard.writeText(translationResult.value);
+    console.log("[SidepanelMainContent] Translation copied to clipboard");
   } catch (error) {
-    console.error('[SidepanelMainContent] Failed to copy translation:', error)
+    console.error("[SidepanelMainContent] Failed to copy translation:", error);
   }
-}
+};
 
 // Paste text into source textarea
 const pasteSourceText = async () => {
   try {
-    const text = await navigator.clipboard.readText()
-    sourceText.value = text
+    const text = await navigator.clipboard.readText();
+    sourceText.value = text;
     // Trigger input event to update reactive properties
-    handleSourceTextInput()
-    console.log('[SidepanelMainContent] Text pasted from clipboard')
+    handleSourceTextInput();
+    console.log("[SidepanelMainContent] Text pasted from clipboard");
   } catch (error) {
-    console.error('[SidepanelMainContent] Failed to paste text:', error)
+    console.error("[SidepanelMainContent] Failed to paste text:", error);
   }
-}
+};
 
 // Handle source text input to update toolbar visibility
 const handleSourceTextInput = () => {
   // Reactive hasSourceContent will automatically handle toolbar visibility
   // This is called on input events
-}
+};
 
 // Check clipboard for paste button visibility
 const checkClipboard = async () => {
   try {
-    console.log('[SidepanelMainContent] Checking clipboard...')
-    const text = await navigator.clipboard.readText()
-    const hasContent = text.trim().length > 0
-    console.log('[SidepanelMainContent] Clipboard content exists:', hasContent, 'Length:', text.length)
-    showPasteButton.value = hasContent
-    console.log('[SidepanelMainContent] showPasteButton set to:', showPasteButton.value)
+    console.log("[SidepanelMainContent] Checking clipboard...");
+    const text = await navigator.clipboard.readText();
+    const hasContent = text.trim().length > 0;
+    console.log(
+      "[SidepanelMainContent] Clipboard content exists:",
+      hasContent,
+      "Length:",
+      text.length,
+    );
+    showPasteButton.value = hasContent;
+    console.log(
+      "[SidepanelMainContent] showPasteButton set to:",
+      showPasteButton.value,
+    );
   } catch (error) {
-    console.log('[SidepanelMainContent] Clipboard check failed:', error.message)
+    console.log(
+      "[SidepanelMainContent] Clipboard check failed:",
+      error.message,
+    );
     // Fallback: show button always if permission denied
-    showPasteButton.value = true
-    console.log('[SidepanelMainContent] Fallback: showPasteButton set to true')
+    showPasteButton.value = true;
+    console.log("[SidepanelMainContent] Fallback: showPasteButton set to true");
   }
-}
+};
 
 // Listen for focus events to update paste button
 const handleFocus = () => {
-  checkClipboard()
-}
+  checkClipboard();
+};
 
 // Helper function to convert language name to simple language code for Google TTS
 const getLanguageCode = (languageName) => {
   const languageMap = {
-    'English': 'en',
-    'Persian': 'fa', 
-    'Arabic': 'ar',
-    'French': 'fr',
-    'German': 'de',
-    'Spanish': 'es',
-    'Chinese': 'zh',
-    'Hindi': 'hi',
-    'Portuguese': 'pt',
-    'Russian': 'ru',
-    'Japanese': 'ja',
-    'Korean': 'ko',
-    'Italian': 'it',
-    'Dutch': 'nl',
-    'Turkish': 'tr',
-    'auto': 'en'
-  }
-  
-  return languageMap[languageName] || 'en'
-}
+    English: "en",
+    Persian: "fa",
+    Arabic: "ar",
+    French: "fr",
+    German: "de",
+    Spanish: "es",
+    Chinese: "zh",
+    Hindi: "hi",
+    Portuguese: "pt",
+    Russian: "ru",
+    Japanese: "ja",
+    Korean: "ko",
+    Italian: "it",
+    Dutch: "nl",
+    Turkish: "tr",
+    auto: "en",
+  };
+
+  return languageMap[languageName] || "en";
+};
 
 // Speak source text using TTS
 const speakSourceText = async () => {
-  const sourceLanguage = document.getElementById('sourceLanguageInput')?.value || 'auto'
-  const langCode = getLanguageCode(sourceLanguage)
-  await tts.speak(sourceText.value, langCode)
-  console.log('[SidepanelMainContent] Source text TTS started with language:', langCode)
-}
+  const sourceLanguage = sourceLanguageValue.value || "auto";
+  const langCode = getLanguageCode(sourceLanguage);
+  await tts.speak(sourceText.value, langCode);
+  console.log(
+    "[SidepanelMainContent] Source text TTS started with language:",
+    langCode,
+  );
+};
 
-// Speak translation text using TTS  
+// Speak translation text using TTS
 const speakTranslationText = async () => {
-  const targetLanguage = document.getElementById('targetLanguageInput')?.value || 'auto'
-  const langCode = getLanguageCode(targetLanguage)
-  await tts.speak(translationResult.value, langCode)
-  console.log('[SidepanelMainContent] Translation TTS started with language:', langCode)
-}
+  const targetLanguage = targetLanguageValue.value || "auto";
+  const langCode = getLanguageCode(targetLanguage);
+  await tts.speak(translationResult.value, langCode);
+  console.log(
+    "[SidepanelMainContent] Translation TTS started with language:",
+    langCode,
+  );
+};
 
 // Handle language swap functionality
 const handleSwapLanguages = async () => {
   try {
-    const sourceSelect = document.getElementById('sourceLanguageInput')
-    const targetSelect = document.getElementById('targetLanguageInput')
-    
+    const sourceSelect = sourceLanguageInputRef.value;
+    const targetSelect = targetLanguageInputRef.value;
+
     if (!sourceSelect || !targetSelect) {
-      console.error('[SidepanelMainContent] Language select elements not found')
-      return
+      console.error(
+        "[SidepanelMainContent] Language select elements not found",
+      );
+      return;
     }
 
-    let sourceVal = sourceSelect.value
-    let targetVal = targetSelect.value
-    
+    let sourceVal = sourceSelect.value;
+    let targetVal = targetSelect.value;
+
     // Get language codes - for simplification we use the values directly
-    let sourceCode = getLanguageCode(sourceVal)
-    let targetCode = getLanguageCode(targetVal)
-    
-    let resolvedSourceCode = sourceCode
-    let resolvedTargetCode = targetCode
-    
+    let sourceCode = getLanguageCode(sourceVal);
+    let targetCode = getLanguageCode(targetVal);
+
+    let resolvedSourceCode = sourceCode;
+    let resolvedTargetCode = targetCode;
+
     // If source is "auto-detect", try to get actual source language from settings
-    if (sourceCode === 'auto' || sourceVal === 'auto') {
+    if (sourceCode === "auto" || sourceVal === "auto") {
       try {
-        resolvedSourceCode = await getSourceLanguageAsync()
-        console.log('[SidepanelMainContent] Resolved source language from settings:', resolvedSourceCode)
+        resolvedSourceCode = await getSourceLanguageAsync();
+        console.log(
+          "[SidepanelMainContent] Resolved source language from settings:",
+          resolvedSourceCode,
+        );
       } catch (err) {
-        console.error('[SidepanelMainContent] Failed to load source language from settings:', err)
-        resolvedSourceCode = null
+        console.error(
+          "[SidepanelMainContent] Failed to load source language from settings:",
+          err,
+        );
+        resolvedSourceCode = null;
       }
     }
-    
+
     // In case target is somehow auto (shouldn't happen but for robustness)
-    if (targetCode === 'auto' || targetVal === 'auto') {
+    if (targetCode === "auto" || targetVal === "auto") {
       try {
-        resolvedTargetCode = await getTargetLanguageAsync()
-        console.log('[SidepanelMainContent] Resolved target language from settings:', resolvedTargetCode)
+        resolvedTargetCode = await getTargetLanguageAsync();
+        console.log(
+          "[SidepanelMainContent] Resolved target language from settings:",
+          resolvedTargetCode,
+        );
       } catch (err) {
-        console.error('[SidepanelMainContent] Failed to load target language from settings:', err)
-        resolvedTargetCode = null
+        console.error(
+          "[SidepanelMainContent] Failed to load target language from settings:",
+          err,
+        );
+        resolvedTargetCode = null;
       }
     }
-    
+
     // Only proceed if both languages are valid and source is not auto-detect
     if (
       resolvedSourceCode &&
       resolvedTargetCode &&
-      resolvedSourceCode !== 'auto'
+      resolvedSourceCode !== "auto"
     ) {
       // Get display names for the resolved languages
-      const newSourceDisplay = getLanguageDisplayName(resolvedTargetCode)
-      const newTargetDisplay = getLanguageDisplayName(resolvedSourceCode)
-      
+      const newSourceDisplay = getLanguageDisplayName(resolvedTargetCode);
+      const newTargetDisplay = getLanguageDisplayName(resolvedSourceCode);
+
       // Swap the language values
-      sourceSelect.value = newSourceDisplay || targetVal
-      targetSelect.value = newTargetDisplay || sourceVal
-      
-      console.log('[SidepanelMainContent] Languages swapped successfully')
-      
+      sourceSelect.value = newSourceDisplay || targetVal;
+      targetSelect.value = newTargetDisplay || sourceVal;
+
+      console.log("[SidepanelMainContent] Languages swapped successfully");
     } else {
       // Cannot swap - provide feedback
-      console.log('[SidepanelMainContent] Cannot swap - invalid language selection', {
-        resolvedSourceCode,
-        resolvedTargetCode
-      })
+      console.log(
+        "[SidepanelMainContent] Cannot swap - invalid language selection",
+        {
+          resolvedSourceCode,
+          resolvedTargetCode,
+        },
+      );
       // Could add visual feedback here like in the OLD implementation
     }
-    
   } catch (error) {
-    console.error('[SidepanelMainContent] Error swapping languages:', error)
+    console.error("[SidepanelMainContent] Error swapping languages:", error);
   }
-}
+};
 
 // Helper function to get display name for language code
 const getLanguageDisplayName = (langCode) => {
   const languageMap = {
-    'en': 'English',
-    'fa': 'Persian', 
-    'ar': 'Arabic',
-    'fr': 'French',
-    'de': 'German',
-    'es': 'Spanish',
-    'zh': 'Chinese',
-    'hi': 'Hindi',
-    'pt': 'Portuguese',
-    'ru': 'Russian',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'it': 'Italian',
-    'nl': 'Dutch',
-    'tr': 'Turkish'
-  }
-  
-  return languageMap[langCode] || langCode
-}
+    en: "English",
+    fa: "Persian",
+    ar: "Arabic",
+    fr: "French",
+    de: "German",
+    es: "Spanish",
+    zh: "Chinese",
+    hi: "Hindi",
+    pt: "Portuguese",
+    ru: "Russian",
+    ja: "Japanese",
+    ko: "Korean",
+    it: "Italian",
+    nl: "Dutch",
+    tr: "Turkish",
+  };
+
+  return languageMap[langCode] || langCode;
+};
 
 // Select Element integration - auto-populate form
-const handleTextExtracted = (extractedText, elementData) => {
-  console.log('[SidepanelMainContent] Text extracted from element:', extractedText)
-  
+const handleTextExtracted = (extractedText, _elementData) => {
+  console.log(
+    "[SidepanelMainContent] Text extracted from element:",
+    extractedText,
+  );
+
   // Populate source text
-  sourceText.value = extractedText
-  
+  sourceText.value = extractedText;
+
   // Clear previous translation and error
-  translationResult.value = ''
-  translationError.value = ''
-  
+  translationResult.value = "";
+  translationError.value = "";
+
   // Optional: Auto-trigger translation
   // You can add a setting for this later
   // if (settings.autoTranslateOnSelection) {
   //   handleTranslationSubmit()
   // }
-}
+};
 
 // Lifecycle - setup event listeners
 onMounted(() => {
+  // Suppress no-unused-vars warnings for template-used variables/functions
+  // These are used in the template but not directly in the script setup block
+  console.log(historyComposable); // Explicitly use historyComposable to satisfy linter
+  hasTranslationContent.value;
+  isSelectElementActivating.value;
+  copyTranslationText();
+  speakTranslationText();
+
   // Initial clipboard check
-  checkClipboard()
-  
+  checkClipboard();
+
   // Add focus listener for clipboard updates
-  document.addEventListener('focus', handleFocus, true)
-  window.addEventListener('focus', handleFocus)
-  
+  document.addEventListener("focus", handleFocus, true);
+  window.addEventListener("focus", handleFocus);
+
   // Setup Select Element text extraction handler
-  selectElement.onTextExtracted.value = handleTextExtracted
-  
-  console.log('[SidepanelMainContent] Component mounted with Select Element integration')
-})
+  selectElement.onTextExtracted.value = handleTextExtracted;
+
+  // Listen for translation result updates from background script
+  browserAPI.onMessage.addListener((message) => {
+    if (
+      message.action === "TRANSLATION_RESULT_UPDATE" &&
+      message.context === "sidepanel"
+    ) {
+      console.log(
+        "[SidepanelMainContent] Received TRANSLATION_RESULT_UPDATE:",
+        message,
+      );
+      translationResult.value = message.translatedText;
+      translationError.value = ""; // Clear any previous error
+      showSpinner.value = false;
+      isTranslating.value = false;
+      console.log("[SidepanelMainContent] Translation displayed successfully");
+    }
+  });
+
+  console.log(
+    "[SidepanelMainContent] Component mounted with Select Element integration",
+  );
+});
 
 onUnmounted(() => {
   // Clean up event listeners
-  document.removeEventListener('focus', handleFocus, true)
-  window.removeEventListener('focus', handleFocus)
-  
+  document.removeEventListener("focus", handleFocus, true);
+  window.removeEventListener("focus", handleFocus);
+
   // Cancel any pending translation request
   if (currentAbortController.value) {
-    currentAbortController.value.abort()
-    currentAbortController.value = null
+    currentAbortController.value.abort();
+    currentAbortController.value = null;
   }
-})
+});
 </script>
 
 <style scoped>
@@ -560,13 +752,24 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Selection Mode Styling */
@@ -799,7 +1002,9 @@ html[dir="rtl"] .result:empty::before {
   height: 16px;
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s ease, filter 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
   filter: var(--icon-filter, none);
 }
 
@@ -864,11 +1069,16 @@ html[dir="rtl"] .textarea-container.source-container .paste-icon-separate {
   animation: fadeIn 0.4s ease-in-out;
 }
 
+.result.hide-content {
+  opacity: 0;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

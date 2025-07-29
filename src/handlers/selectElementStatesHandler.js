@@ -7,17 +7,17 @@ import { logME } from "../utils/helpers.js";
 export function handleUpdateSelectElementState(
   message,
   sender,
-  selectElementStates
+  selectElementStates,
 ) {
   if (sender.tab?.id) {
     selectElementStates[sender.tab.id] = message.data;
     logME(
       `[Handler:State] Updated selectElementState for tab ${sender.tab.id}:`,
-      message.data
+      message.data,
     );
   } else {
     logME(
-      "[Handler:State] Received UPDATE_SELECT_ELEMENT_STATE without tab ID."
+      "[Handler:State] Received UPDATE_SELECT_ELEMENT_STATE without tab ID.",
     );
   }
   // No response needed, synchronous

@@ -108,7 +108,7 @@ export default class TwitterStrategy extends PlatformStrategy {
     try {
       // 1. پردازش فیلد جستجو
       const searchInput = document.querySelector(
-        '[data-testid="SearchBox_Search_Input"]'
+        '[data-testid="SearchBox_Search_Input"]',
       );
       if (searchInput && element.contains(searchInput)) {
         this.applyVisualFeedback(searchInput);
@@ -167,7 +167,7 @@ export default class TwitterStrategy extends PlatformStrategy {
   extractText(target) {
     try {
       const searchInput = target.closest(
-        '[data-testid="SearchBox_Search_Input"]'
+        '[data-testid="SearchBox_Search_Input"]',
       );
       if (searchInput) return searchInput.value.trim();
 

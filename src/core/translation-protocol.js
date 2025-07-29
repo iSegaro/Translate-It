@@ -52,48 +52,48 @@
  * Standard translation request actions
  */
 export const TRANSLATION_ACTIONS = {
-  TRANSLATE: 'TRANSLATE',
-  GET_PROVIDERS: 'GET_PROVIDERS',
-  GET_HISTORY: 'GET_HISTORY',
-  CLEAR_CACHE: 'CLEAR_CACHE',
-  CLEAR_HISTORY: 'CLEAR_HISTORY'
-}
+  TRANSLATE: "TRANSLATE",
+  GET_PROVIDERS: "GET_PROVIDERS",
+  GET_HISTORY: "GET_HISTORY",
+  CLEAR_CACHE: "CLEAR_CACHE",
+  CLEAR_HISTORY: "CLEAR_HISTORY",
+};
 
 /**
  * Standard translation contexts
  */
 export const TRANSLATION_CONTEXTS = {
-  POPUP: 'popup',
-  SIDEPANEL: 'sidepanel',
-  SELECTION: 'selection',
-  CONTENT: 'content',
-  SUBTITLE: 'subtitle',
-  CAPTURE: 'capture'
-}
+  POPUP: "popup",
+  SIDEPANEL: "sidepanel",
+  SELECTION: "selection",
+  CONTENT: "content",
+  SUBTITLE: "subtitle",
+  CAPTURE: "capture",
+};
 
 /**
  * Standard translation modes
  */
 export const TRANSLATION_MODES = {
-  SIMPLE: 'simple',
-  SELECTION: 'selection',
-  SUBTITLE: 'subtitle',
-  SMART: 'smart',
-  BULK: 'bulk'
-}
+  SIMPLE: "simple",
+  SELECTION: "selection",
+  SUBTITLE: "subtitle",
+  SMART: "smart",
+  BULK: "bulk",
+};
 
 /**
  * Standard error types
  */
 export const ERROR_TYPES = {
-  TRANSLATION_ERROR: 'TRANSLATION_ERROR',
-  PROVIDER_ERROR: 'PROVIDER_ERROR',
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  API_KEY_ERROR: 'API_KEY_ERROR',
-  RATE_LIMIT_ERROR: 'RATE_LIMIT_ERROR',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  INITIALIZATION_ERROR: 'INITIALIZATION_ERROR'
-}
+  TRANSLATION_ERROR: "TRANSLATION_ERROR",
+  PROVIDER_ERROR: "PROVIDER_ERROR",
+  NETWORK_ERROR: "NETWORK_ERROR",
+  API_KEY_ERROR: "API_KEY_ERROR",
+  RATE_LIMIT_ERROR: "RATE_LIMIT_ERROR",
+  VALIDATION_ERROR: "VALIDATION_ERROR",
+  INITIALIZATION_ERROR: "INITIALIZATION_ERROR",
+};
 
 /**
  * Create a standardized translation request
@@ -108,13 +108,13 @@ export function createTranslationRequest(context, text, options = {}) {
     context,
     data: {
       text,
-      provider: options.provider || 'google',
-      sourceLanguage: options.sourceLanguage || 'auto',
-      targetLanguage: options.targetLanguage || 'fa',
+      provider: options.provider || "google",
+      sourceLanguage: options.sourceLanguage || "auto",
+      targetLanguage: options.targetLanguage || "fa",
       mode: options.mode || TRANSLATION_MODES.SIMPLE,
-      options: options.additionalOptions || {}
-    }
-  }
+      options: options.additionalOptions || {},
+    },
+  };
 }
 
 /**
@@ -134,8 +134,8 @@ export function createSuccessResponse(translatedText, metadata) {
     timestamp: Date.now(),
     mode: metadata.mode || TRANSLATION_MODES.SIMPLE,
     detectedLanguage: metadata.detectedLanguage,
-    fromCache: metadata.fromCache || false
-  }
+    fromCache: metadata.fromCache || false,
+  };
 }
 
 /**
@@ -145,19 +145,19 @@ export function createSuccessResponse(translatedText, metadata) {
  * @param {string} [provider] - Provider that failed
  * @returns {TranslationResponse}
  */
-export function createErrorResponse(error, context, provider = 'unknown') {
+export function createErrorResponse(error, context, provider = "unknown") {
   return {
     success: false,
     provider,
     timestamp: Date.now(),
     error: {
       type: error.type || ERROR_TYPES.TRANSLATION_ERROR,
-      message: error.message || 'Translation failed',
+      message: error.message || "Translation failed",
       context,
       timestamp: Date.now(),
-      code: error.code
-    }
-  }
+      code: error.code,
+    },
+  };
 }
 
 /**
@@ -166,41 +166,44 @@ export function createErrorResponse(error, context, provider = 'unknown') {
  * @returns {boolean}
  */
 export function validateTranslationRequest(request) {
-  if (!request || typeof request !== 'object') {
-    return false
+  if (!request || typeof request !== "object") {
+    return false;
   }
 
   if (request.action !== TRANSLATION_ACTIONS.TRANSLATE) {
-    return false
+    return false;
   }
 
-  if (!request.context || !Object.values(TRANSLATION_CONTEXTS).includes(request.context)) {
-    return false
+  if (
+    !request.context ||
+    !Object.values(TRANSLATION_CONTEXTS).includes(request.context)
+  ) {
+    return false;
   }
 
-  if (!request.data || typeof request.data !== 'object') {
-    return false
+  if (!request.data || typeof request.data !== "object") {
+    return false;
   }
 
-  const { text, provider, sourceLanguage, targetLanguage } = request.data
+  const { text, provider, sourceLanguage, targetLanguage } = request.data;
 
-  if (!text || typeof text !== 'string' || text.trim().length === 0) {
-    return false
+  if (!text || typeof text !== "string" || text.trim().length === 0) {
+    return false;
   }
 
-  if (!provider || typeof provider !== 'string') {
-    return false
+  if (!provider || typeof provider !== "string") {
+    return false;
   }
 
-  if (!sourceLanguage || typeof sourceLanguage !== 'string') {
-    return false
+  if (!sourceLanguage || typeof sourceLanguage !== "string") {
+    return false;
   }
 
-  if (!targetLanguage || typeof targetLanguage !== 'string') {
-    return false
+  if (!targetLanguage || typeof targetLanguage !== "string") {
+    return false;
   }
 
-  return true
+  return true;
 }
 
 /**
@@ -211,8 +214,8 @@ export function validateTranslationRequest(request) {
 export function createProviderListRequest(context) {
   return {
     action: TRANSLATION_ACTIONS.GET_PROVIDERS,
-    context
-  }
+    context,
+  };
 }
 
 /**
@@ -223,8 +226,8 @@ export function createProviderListRequest(context) {
 export function createHistoryRequest(context) {
   return {
     action: TRANSLATION_ACTIONS.GET_HISTORY,
-    context
-  }
+    context,
+  };
 }
 
 /**
@@ -235,8 +238,8 @@ export function createHistoryRequest(context) {
 export function createClearCacheRequest(context) {
   return {
     action: TRANSLATION_ACTIONS.CLEAR_CACHE,
-    context
-  }
+    context,
+  };
 }
 
 /**
@@ -247,6 +250,6 @@ export function createClearCacheRequest(context) {
 export function createClearHistoryRequest(context) {
   return {
     action: TRANSLATION_ACTIONS.CLEAR_HISTORY,
-    context
-  }
+    context,
+  };
 }

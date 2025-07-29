@@ -37,7 +37,7 @@ export class CaptureManager {
       if (!this._validateProviderSupport(options.provider)) {
         throw this._createError(
           ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
-          "Provider does not support image translation"
+          "Provider does not support image translation",
         );
       }
 
@@ -52,7 +52,7 @@ export class CaptureManager {
       this.screenSelector = new ScreenSelector({
         mode: "area",
         onSelectionComplete: this._handleAreaSelection.bind(this),
-        onCancel: this._handleCaptureCancel.bind(this)
+        onCancel: this._handleCaptureCancel.bind(this),
       });
 
       // Store options for later use
@@ -82,7 +82,7 @@ export class CaptureManager {
       if (!this._validateProviderSupport(options.provider)) {
         throw this._createError(
           ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
-          "Provider does not support image translation"
+          "Provider does not support image translation",
         );
       }
 
@@ -96,7 +96,7 @@ export class CaptureManager {
 
       // Capture full screen directly
       const captureData = await this._captureScreen();
-      
+
       // Show preview for confirmation
       await this._showPreview(captureData, "fullscreen");
 
@@ -116,7 +116,9 @@ export class CaptureManager {
    */
   async processAreaCaptureImage(captureData, captureOptions) {
     try {
-      logME("[CaptureManager] Processing area capture image from content script");
+      logME(
+        "[CaptureManager] Processing area capture image from content script",
+      );
 
       // Store options
       this.captureOptions = captureOptions;
@@ -124,7 +126,6 @@ export class CaptureManager {
 
       // Show preview for confirmation (image already cropped by content script)
       await this._showPreview(captureData, "area", captureData.dimensions);
-
     } catch (error) {
       logME("[CaptureManager] Error processing area capture image:", error);
       this.cleanup();
@@ -140,11 +141,15 @@ export class CaptureManager {
    * @deprecated Use processAreaCaptureImage instead
    */
   async _handleAreaSelection(_selectionData) {
-    logME("[CaptureManager] Legacy area selection handler called - this should not happen");
-    logME("[CaptureManager] Image cropping should be handled in content script now");
+    logME(
+      "[CaptureManager] Legacy area selection handler called - this should not happen",
+    );
+    logME(
+      "[CaptureManager] Image cropping should be handled in content script now",
+    );
     throw this._createError(
       ErrorTypes.INTEGRATION,
-      "Legacy area selection method called - use content script cropping instead"
+      "Legacy area selection method called - use content script cropping instead",
     );
   }
 
@@ -169,15 +174,15 @@ export class CaptureManager {
       logME("[CaptureManager] Requesting preview display in content script");
 
       // Get active tab to send preview message
-      const [activeTab] = await getbrowser().tabs.query({ 
-        active: true, 
-        currentWindow: true 
+      const [activeTab] = await getbrowser().tabs.query({
+        active: true,
+        currentWindow: true,
       });
 
       if (!activeTab) {
         throw this._createError(
           ErrorTypes.TAB_AVAILABILITY,
-          "No active tab found for preview display"
+          "No active tab found for preview display",
         );
       }
 
@@ -188,8 +193,8 @@ export class CaptureManager {
           captureData,
           captureType,
           selectionData,
-          translationOptions: this.captureOptions
-        }
+          translationOptions: this.captureOptions,
+        },
       });
 
       logME("[CaptureManager] Preview request sent to content script");
@@ -212,7 +217,6 @@ export class CaptureManager {
 
       // Start translation process
       await this._translateCapturedImage(captureData);
-
     } catch (error) {
       logME("[CaptureManager] Error in preview confirmation:", error);
       handleUIError(this._normalizeError(error, "handlePreviewConfirm"));
@@ -234,42 +238,42 @@ export class CaptureManager {
   async handlePreviewRetry(captureType) {
     try {
       logME("[CaptureManager] Retrying capture", { captureType });
-      
+
       // Restart based on capture type
       if (captureType === "area") {
         // For area capture, restart the area selection process
         logME("[CaptureManager] Restarting area capture selection");
-        
+
         // Get active tab to send area selection restart message
-        const [activeTab] = await getbrowser().tabs.query({ 
-        active: true, 
-        currentWindow: true 
-      });
-        
+        const [activeTab] = await getbrowser().tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+
         if (!activeTab) {
           throw this._createError(
             ErrorTypes.TAB_AVAILABILITY,
-            "No active tab found for area capture retry"
+            "No active tab found for area capture retry",
           );
         }
-        
+
         // Send area selection start message to content script
         await getbrowser().tabs.sendMessage(activeTab.id, {
           action: "START_SCREEN_AREA_SELECTION",
-          data: this.captureOptions
+          data: this.captureOptions,
         });
-        
+
         logME("[CaptureManager] Area capture retry initiated successfully");
       } else {
         // For fullscreen, wait for preview to close then capture again
         logME("[CaptureManager] Restarting fullscreen capture");
-        
+
         // Add delay to ensure preview window is fully closed and DOM updated
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         const captureData = await this._captureScreen();
         await this._showPreview(captureData, "fullscreen");
-        
+
         logME("[CaptureManager] Fullscreen capture retry completed");
       }
     } catch (error) {
@@ -297,25 +301,30 @@ export class CaptureManager {
           provider,
           sourceLang: sourceLanguage,
           targetLang: targetLanguage,
-          mode: TranslationMode.ScreenCapture
-        }
+          mode: TranslationMode.ScreenCapture,
+        },
       );
 
       logME("[CaptureManager] Translation completed:", {
         method: extractionResult.method,
         success: !!extractionResult.translatedText,
-        textLength: extractionResult.translatedText?.length || 0
+        textLength: extractionResult.translatedText?.length || 0,
       });
 
       // Display translation result
       logME("[CaptureManager] About to display result:", {
         translatedText: extractionResult.translatedText,
         translatedTextType: typeof extractionResult.translatedText,
-        translatedTextStringified: JSON.stringify(extractionResult.translatedText)
+        translatedTextStringified: JSON.stringify(
+          extractionResult.translatedText,
+        ),
       });
-      
-      await this._displayTranslationResult(extractionResult.translatedText, captureData, extractionResult);
 
+      await this._displayTranslationResult(
+        extractionResult.translatedText,
+        captureData,
+        extractionResult,
+      );
     } catch (error) {
       logME("[CaptureManager] Error translating image:", error);
       throw this._normalizeError(error, "translateCapturedImage");
@@ -329,30 +338,37 @@ export class CaptureManager {
    * @param {Object} _extractionMetadata - Text extraction metadata
    * @private
    */
-  async _displayTranslationResult(translationResult, captureData, _extractionMetadata = {}) {
+  async _displayTranslationResult(
+    translationResult,
+    captureData,
+    _extractionMetadata = {},
+  ) {
     try {
       logME("[CaptureManager] Requesting result display in content script");
 
       // Use the tab ID from capture data instead of querying for active tab
       // This ensures we send result to the correct tab even if focus has changed
-      let targetTabId = captureData.tabId || (this.currentCapture && this.currentCapture.tabId);
-      
+      let targetTabId =
+        captureData.tabId || (this.currentCapture && this.currentCapture.tabId);
+
       if (!targetTabId) {
-        logME("[CaptureManager] No tab ID found in capture data, trying active tab fallback");
+        logME(
+          "[CaptureManager] No tab ID found in capture data, trying active tab fallback",
+        );
         // Fallback to active tab query
-        const [activeTab] = await getbrowser().tabs.query({ 
-          active: true, 
-          currentWindow: true 
+        const [activeTab] = await getbrowser().tabs.query({
+          active: true,
+          currentWindow: true,
         });
         if (!activeTab) {
           throw this._createError(
             ErrorTypes.TAB_AVAILABILITY,
-            "No active tab found for result display"
+            "No active tab found for result display",
           );
         }
         targetTabId = activeTab.id;
       }
-      
+
       logME("[CaptureManager] Using tab ID for result display:", targetTabId);
 
       // Send result data to content script
@@ -361,8 +377,8 @@ export class CaptureManager {
         data: {
           originalCapture: captureData,
           translationText: translationResult,
-          position: captureData.position || { x: 100, y: 100 }
-        }
+          position: captureData.position || { x: 100, y: 100 },
+        },
       });
 
       logME("[CaptureManager] Result display request sent to content script");
@@ -390,45 +406,47 @@ export class CaptureManager {
       logME("[CaptureManager] Capturing screen");
 
       // Get active tab
-      const [activeTab] = await getbrowser().tabs.query({ 
-        active: true, 
-        currentWindow: true 
+      const [activeTab] = await getbrowser().tabs.query({
+        active: true,
+        currentWindow: true,
       });
 
       if (!activeTab) {
         throw this._createError(
           ErrorTypes.TAB_AVAILABILITY,
-          "No active tab found"
+          "No active tab found",
         );
       }
 
       // Capture visible tab
-      const dataUrl = await getbrowser().tabs.captureVisibleTab(activeTab.windowId, {
-        format: "png",
-        quality: 100
-      });
+      const dataUrl = await getbrowser().tabs.captureVisibleTab(
+        activeTab.windowId,
+        {
+          format: "png",
+          quality: 100,
+        },
+      );
 
       return {
         imageData: dataUrl,
         timestamp: Date.now(),
         tabId: activeTab.id,
         url: activeTab.url,
-        position: { x: 0, y: 0 }
+        position: { x: 0, y: 0 },
       };
-
     } catch (error) {
       logME("[CaptureManager] Error capturing screen:", error);
-      
+
       if (error.message?.includes("permission")) {
         throw this._createError(
           ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED,
-          "Screen capture permission denied"
+          "Screen capture permission denied",
         );
       }
-      
+
       throw this._createError(
         ErrorTypes.SCREEN_CAPTURE_FAILED,
-        `Screen capture failed: ${error.message}`
+        `Screen capture failed: ${error.message}`,
       );
     }
   }
@@ -480,21 +498,24 @@ export class CaptureManager {
 
     // Normalize based on error characteristics
     let errorType = ErrorTypes.SCREEN_CAPTURE;
-    
+
     if (error.message?.includes("permission")) {
       errorType = ErrorTypes.SCREEN_CAPTURE_PERMISSION_DENIED;
     } else if (error.message?.includes("not supported")) {
       errorType = ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED;
     } else if (error.message?.includes("capture")) {
       errorType = ErrorTypes.SCREEN_CAPTURE_FAILED;
-    } else if (error.message?.includes("image") || error.message?.includes("canvas")) {
+    } else if (
+      error.message?.includes("image") ||
+      error.message?.includes("canvas")
+    ) {
       errorType = ErrorTypes.IMAGE_PROCESSING_FAILED;
     }
 
     const normalizedError = new Error(error.message || "Screen capture error");
     normalizedError.type = errorType;
     normalizedError.context = `screen-capture-${context}`;
-    
+
     return normalizedError;
   }
 
@@ -508,7 +529,7 @@ export class CaptureManager {
     this.currentCapture = null;
     this.captureOptions = null;
 
-    // Note: UI components (screenSelector, capturePreview, captureResult) 
+    // Note: UI components (screenSelector, capturePreview, captureResult)
     // are now managed in content script, not background script
     this.screenSelector = null;
     this.capturePreview = null;

@@ -2,7 +2,12 @@
 
 import { logME, isExtensionContextValid } from "../utils/helpers";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { CONFIG, TranslationMode, getThemeAsync, getSettingsAsync } from "../config.js";
+import {
+  CONFIG,
+  TranslationMode,
+  getThemeAsync,
+  getSettingsAsync,
+} from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../utils/tts/tts.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
@@ -26,12 +31,12 @@ export default class SelectionWindows {
     this.iconClickContext = null;
     this.isIconMode = false; // Track current mode
     this.pendingTranslationWindow = false; // Flag to prevent immediate dismissal
-    
+
     // Drag functionality
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
     this.dragHandle = null;
-    
+
     // Cross-iframe dismiss functionality - removed complex system
 
     this.show = this.show.bind(this);
@@ -48,7 +53,7 @@ export default class SelectionWindows {
     // Try to get the topmost document accessible
     let currentWindow = window;
     let topDocument = document;
-    
+
     try {
       // Traverse up the window hierarchy
       while (currentWindow.parent !== currentWindow) {
@@ -68,9 +73,12 @@ export default class SelectionWindows {
       }
     } catch (e) {
       // If anything fails, use current document
-      console.warn('[SelectionWindows] Could not access top document, using current:', e);
+      console.warn(
+        "[SelectionWindows] Could not access top document, using current:",
+        e,
+      );
     }
-    
+
     return topDocument;
   }
 
@@ -81,7 +89,7 @@ export default class SelectionWindows {
         let totalOffsetX = position.x;
         let totalOffsetY = position.y;
         let currentWindow = window;
-        
+
         // Add iframe offsets up the chain
         while (currentWindow.parent !== currentWindow) {
           try {
@@ -100,13 +108,16 @@ export default class SelectionWindows {
             break;
           }
         }
-        
+
         return { x: totalOffsetX, y: totalOffsetY };
       } catch (e) {
-        console.warn('[SelectionWindows] Could not calculate top window coords:', e);
+        console.warn(
+          "[SelectionWindows] Could not calculate top window coords:",
+          e,
+        );
       }
     }
-    
+
     return position;
   }
 
@@ -122,7 +133,7 @@ export default class SelectionWindows {
     if (changes.THEME && this.displayElement && this.isVisible) {
       logME(
         "[SelectionWindows] Theme changed, updating popup theme.",
-        changes.THEME.newValue
+        changes.THEME.newValue,
       );
       this._applyThemeToHost();
     }
@@ -136,7 +147,10 @@ export default class SelectionWindows {
     ) {
       // Store the bound function so it can be correctly removed
       this.boundHandleThemeChange = this._handleThemeChange.bind(this);
-      browser.storage.onChanged.addListener(this.boundHandleThemeChange);
+      browser.storage.onChanged.addListener.call(
+        browser.storage.onChanged,
+        this.boundHandleThemeChange,
+      );
       // logME("[SelectionWindows] Theme change listener added.");
     }
   }
@@ -159,7 +173,8 @@ export default class SelectionWindows {
     if (!selectedText) return;
 
     const settings = await getSettingsAsync();
-    const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    const selectionTranslationMode =
+      settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
     if (selectionTranslationMode === "onClick") {
       this.isIconMode = true;
@@ -208,7 +223,8 @@ export default class SelectionWindows {
     });
 
     // Get top window for positioning
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
 
     // --- شروع تغییرات برای افزودن انیمیشن ---
 
@@ -305,7 +321,7 @@ export default class SelectionWindows {
 
     const translationMode = determineTranslationMode(
       selectedText,
-      TranslationMode.Selection
+      TranslationMode.Selection,
     );
 
     logME("[SelectionWindows] Creating translation window ", translationMode);
@@ -360,7 +376,7 @@ export default class SelectionWindows {
     shadowRoot.appendChild(this.innerContainer);
     const loading = this.createLoadingDots();
     this.innerContainer.appendChild(loading);
-    
+
     // Get the top-level document to escape iframe constraints
     const topDocument = this._getTopDocument();
     topDocument.body.appendChild(this.displayElement);
@@ -395,11 +411,11 @@ export default class SelectionWindows {
             txt,
             loading,
             selectedText,
-            translationMode
+            translationMode,
           );
         } else {
           throw new Error(
-            response?.error?.message || response?.error || ErrorTypes.SERVICE
+            response?.error?.message || response?.error || ErrorTypes.SERVICE,
           );
         }
       })
@@ -443,15 +459,15 @@ export default class SelectionWindows {
     if (this.displayElement && this.isVisible) {
       // Get top document for proper element checking
       const topDocument = this._getTopDocument();
-      
+
       // Check if click target is outside our popup
       // Since popup is in top document, we can directly check contains
       const isClickInsidePopup = this.displayElement.contains(e.target);
-      
+
       // Check for potential icon clicks (shouldn't exist in window mode but safety check)
       const clickedIcon = topDocument.getElementById("translate-it-icon");
       const isClickOnIcon = clickedIcon && clickedIcon.contains(e.target);
-      
+
       // If click is outside popup and not on icon, dismiss
       if (!isClickInsidePopup && !isClickOnIcon) {
         // Immediate dismissal for outside clicks - no need for complex checks
@@ -471,7 +487,9 @@ export default class SelectionWindows {
     const topDocument = this._getTopDocument();
 
     // Only add listener to top document since popup is always there
-    topDocument.addEventListener("click", this._onOutsideClick, { capture: true });
+    topDocument.addEventListener("click", this._onOutsideClick, {
+      capture: true,
+    });
 
     // Store removal function
     this.removeMouseDownListener = () => {
@@ -480,7 +498,6 @@ export default class SelectionWindows {
       });
     };
   }
-
 
   _removeOutsideClickListener() {
     if (this.removeMouseDownListener) {
@@ -506,14 +523,15 @@ export default class SelectionWindows {
   applyInitialStyles(position) {
     // Calculate coordinates relative to top window if in iframe
     const topWindowPosition = this._calculateCoordsForTopWindow(position);
-    
+
     // Calculate smart position that stays within viewport
     const smartPosition = this.calculateSmartPosition(topWindowPosition);
-    
+
     // Get top document for proper viewport calculations
     const topDocument = this._getTopDocument();
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
-    
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
+
     Object.assign(this.displayElement.style, {
       position: "fixed", // Use fixed instead of absolute to escape iframe constraints
       zIndex: "2147483647", // Maximum z-index to ensure it's always on top
@@ -529,14 +547,15 @@ export default class SelectionWindows {
   calculateSmartPosition(position) {
     // Get top window for proper viewport calculations
     const topDocument = this._getTopDocument();
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
-    
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
+
     // Get viewport dimensions from top window
     const viewport = {
       width: topWindow.innerWidth,
       height: topWindow.innerHeight,
       scrollX: topWindow.scrollX,
-      scrollY: topWindow.scrollY
+      scrollY: topWindow.scrollY,
     };
 
     // Estimated popup dimensions (will be refined after DOM insertion)
@@ -582,7 +601,7 @@ export default class SelectionWindows {
       const maxBottom = viewport.scrollY + viewport.height - popupHeight - 10; // 10px margin
       const minTop = viewport.scrollY + 10; // 10px margin
       finalY = Math.max(minTop, Math.min(position.y, maxBottom));
-      
+
       // Adjust transform origin based on final position relative to selection
       if (finalY < position.y) {
         transformOrigin = transformOrigin.replace("top", "bottom");
@@ -590,40 +609,53 @@ export default class SelectionWindows {
     }
 
     // Handle fixed/sticky elements by checking for overlaps
-    finalY = this.adjustForFixedElements(finalX, finalY, popupWidth, popupHeight);
+    finalY = this.adjustForFixedElements(
+      finalX,
+      finalY,
+      popupWidth,
+      popupHeight,
+    );
 
     return {
       x: finalX,
       y: finalY,
-      origin: transformOrigin
+      origin: transformOrigin,
     };
   }
 
   adjustForFixedElements(x, y, width, height) {
     // Get top document and window for proper element detection
     const topDocument = this._getTopDocument();
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
-    
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
+
     // Get all fixed and sticky positioned elements from top document
-    const fixedElements = Array.from(topDocument.querySelectorAll('*')).filter(el => {
-      const style = topWindow.getComputedStyle(el);
-      return style.position === 'fixed' || style.position === 'sticky';
-    });
+    const fixedElements = Array.from(topDocument.querySelectorAll("*")).filter(
+      (el) => {
+        const style = topWindow.getComputedStyle(el);
+        return style.position === "fixed" || style.position === "sticky";
+      },
+    );
 
     const popupRect = {
       left: x - topWindow.scrollX,
       top: y - topWindow.scrollY,
-      right: (x - topWindow.scrollX) + width,
-      bottom: (y - topWindow.scrollY) + height
+      right: x - topWindow.scrollX + width,
+      bottom: y - topWindow.scrollY + height,
     };
 
     for (const element of fixedElements) {
       const rect = element.getBoundingClientRect();
-      
+
       // Skip if element is not visible or has no dimensions
-      if (rect.width === 0 || rect.height === 0 || 
-          rect.left >= window.innerWidth || rect.top >= window.innerHeight ||
-          rect.right <= 0 || rect.bottom <= 0) {
+      if (
+        rect.width === 0 ||
+        rect.height === 0 ||
+        rect.left >= window.innerWidth ||
+        rect.top >= window.innerHeight ||
+        rect.right <= 0 ||
+        rect.bottom <= 0
+      ) {
         continue;
       }
 
@@ -639,7 +671,7 @@ export default class SelectionWindows {
         // Try to reposition below the fixed element
         const newY = window.scrollY + rect.bottom + 10;
         const spaceBelow = window.innerHeight - (rect.bottom + 10);
-        
+
         if (spaceBelow >= height) {
           return newY;
         } else {
@@ -655,7 +687,6 @@ export default class SelectionWindows {
     return y;
   }
 
-
   _setupDragHandlers() {
     // We'll set up drag handlers when first-line is created in transitionToTranslatedText
     // This method is called early before content is ready
@@ -663,50 +694,57 @@ export default class SelectionWindows {
 
   _onMouseDown(e) {
     if (!this.displayElement) return;
-    
+
     this.isDragging = true;
     const rect = this.displayElement.getBoundingClientRect();
     this.dragOffset.x = e.clientX - rect.left;
     this.dragOffset.y = e.clientY - rect.top;
-    
+
     // Get top document for proper event handling
     const topDocument = this._getTopDocument();
-    
+
     // Add global listeners
-    topDocument.addEventListener('mousemove', this._onMouseMove);
-    topDocument.addEventListener('mouseup', this._onMouseUp);
-    
+    topDocument.addEventListener("mousemove", this._onMouseMove);
+    topDocument.addEventListener("mouseup", this._onMouseUp);
+
     // Prevent text selection during drag
     e.preventDefault();
-    
+
     // Add visual feedback
     if (this.dragHandle) {
-      this.dragHandle.style.opacity = '1';
+      this.dragHandle.style.opacity = "1";
     }
   }
 
   _onMouseMove(e) {
     if (!this.isDragging || !this.displayElement) return;
-    
+
     e.preventDefault();
-    
+
     const newX = e.clientX - this.dragOffset.x;
     const newY = e.clientY - this.dragOffset.y;
-    
+
     // Get top window for proper viewport calculations
     const topDocument = this._getTopDocument();
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
-    
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
+
     // Keep popup within viewport bounds
     const viewport = {
       width: topWindow.innerWidth,
-      height: topWindow.innerHeight
+      height: topWindow.innerHeight,
     };
-    
+
     const rect = this.displayElement.getBoundingClientRect();
-    const constrainedX = Math.max(0, Math.min(newX, viewport.width - rect.width));
-    const constrainedY = Math.max(0, Math.min(newY, viewport.height - rect.height));
-    
+    const constrainedX = Math.max(
+      0,
+      Math.min(newX, viewport.width - rect.width),
+    );
+    const constrainedY = Math.max(
+      0,
+      Math.min(newY, viewport.height - rect.height),
+    );
+
     // Apply position directly since we're using position: fixed
     this.displayElement.style.left = `${constrainedX}px`;
     this.displayElement.style.top = `${constrainedY}px`;
@@ -714,31 +752,31 @@ export default class SelectionWindows {
 
   _onMouseUp(_e) {
     if (!this.isDragging) return;
-    
+
     this.isDragging = false;
-    
+
     // Get top document for proper event handling
     const topDocument = this._getTopDocument();
-    
+
     // Remove global listeners
-    topDocument.removeEventListener('mousemove', this._onMouseMove);
-    topDocument.removeEventListener('mouseup', this._onMouseUp);
-    
+    topDocument.removeEventListener("mousemove", this._onMouseMove);
+    topDocument.removeEventListener("mouseup", this._onMouseUp);
+
     // Reset visual feedback
     if (this.dragHandle) {
-      this.dragHandle.style.opacity = '0.8';
+      this.dragHandle.style.opacity = "0.8";
     }
   }
 
   _removeDragHandlers() {
     if (this.dragHandle) {
-      this.dragHandle.removeEventListener('mousedown', this._onMouseDown);
+      this.dragHandle.removeEventListener("mousedown", this._onMouseDown);
     }
-    
+
     // Get top document for proper event handling
     const topDocument = this._getTopDocument();
-    topDocument.removeEventListener('mousemove', this._onMouseMove);
-    topDocument.removeEventListener('mouseup', this._onMouseUp);
+    topDocument.removeEventListener("mousemove", this._onMouseMove);
+    topDocument.removeEventListener("mouseup", this._onMouseUp);
     this.isDragging = false;
   }
 
@@ -758,7 +796,7 @@ export default class SelectionWindows {
     translatedText,
     loadingContainer,
     originalText,
-    trans_Mode
+    trans_Mode,
   ) {
     if (!this.innerContainer || !this.displayElement) return;
     if (
@@ -770,24 +808,24 @@ export default class SelectionWindows {
     this.innerContainer.textContent = "";
     const firstLine = document.createElement("div");
     firstLine.classList.add("first-line");
-    
+
     // Create a dedicated drag handle area in the middle
     const dragHandle = document.createElement("div");
     dragHandle.style.flex = "1"; // Take up available space between icons and close button
     dragHandle.style.cursor = "move";
     dragHandle.style.minHeight = "16px"; // Ensure there's a clickable area
     this.dragHandle = dragHandle;
-    
+
     const ttsIconOriginal = this.createTTSIcon(
       originalText,
-      CONFIG.SOURCE_LANGUAGE || "listen"
+      CONFIG.SOURCE_LANGUAGE || "listen",
     );
     firstLine.appendChild(ttsIconOriginal);
-    
+
     // Add copy button for translated text
     const copyIcon = this.createCopyIcon(translatedText);
     firstLine.appendChild(copyIcon);
-    
+
     // Add the drag handle (middle area)
     if (trans_Mode === TranslationMode.Dictionary_Translation) {
       const orig = document.createElement("span");
@@ -796,7 +834,7 @@ export default class SelectionWindows {
       dragHandle.appendChild(orig);
     }
     firstLine.appendChild(dragHandle);
-    
+
     // Add close button
     const closeButton = document.createElement("span");
     closeButton.textContent = "✕";
@@ -810,14 +848,14 @@ export default class SelectionWindows {
       this.cancelCurrentTranslation();
     });
     firstLine.appendChild(closeButton);
-    
+
     this.innerContainer.appendChild(firstLine);
-    
+
     // Setup drag handlers now that first-line exists
     if (this.dragHandle) {
-      this.dragHandle.addEventListener('mousedown', this._onMouseDown);
+      this.dragHandle.addEventListener("mousedown", this._onMouseDown);
     }
-    
+
     const secondLine = document.createElement("div");
     secondLine.classList.add("second-line");
     const textSpan = document.createElement("span");
@@ -840,7 +878,7 @@ export default class SelectionWindows {
     secondLine.appendChild(textSpan);
     this.applyTextDirection(secondLine, translatedText);
     this.innerContainer.appendChild(secondLine);
-    
+
     // Reposition popup after content is added to ensure it fits properly
     requestAnimationFrame(() => {
       if (this.displayElement) {
@@ -861,14 +899,15 @@ export default class SelectionWindows {
 
     // Get top window for proper viewport calculations
     const topDocument = this._getTopDocument();
-    const topWindow = topDocument.defaultView || topDocument.parentWindow || window;
+    const topWindow =
+      topDocument.defaultView || topDocument.parentWindow || window;
 
     // Check if popup is now outside viewport with actual dimensions
     const viewport = {
       width: topWindow.innerWidth,
-      height: topWindow.innerHeight
+      height: topWindow.innerHeight,
     };
-    
+
     let needsRepositioning = false;
     let newX = currentX;
     let newY = currentY;
@@ -965,9 +1004,9 @@ export default class SelectionWindows {
       this.dismiss(false);
     }
     const errObj =
-      error instanceof Error ? error : (
-        new Error(String(error.message || error))
-      );
+      error instanceof Error
+        ? error
+        : new Error(String(error.message || error));
     await this.translationHandler.errorHandler.handle(errObj, {
       type: errObj.type || ErrorTypes.API,
       context: "selection-window-translate",
@@ -1013,14 +1052,14 @@ export default class SelectionWindows {
           clearTimeout(fallbackTimeout);
           this.removeElement(el);
         },
-        { once: true }
+        { once: true },
       );
     } else {
       this.removeElement(this.displayElement);
     }
   }
 
-    _cleanupIcon(removeListener = true) {
+  _cleanupIcon(removeListener = true) {
     // فقط در صورتی که آیکونی برای حذف وجود داشته باشد، ادامه بده
     if (this.icon) {
       const iconElement = this.icon; // یک رفرنس به عنصر آیکون نگه می‌داریم
@@ -1031,8 +1070,8 @@ export default class SelectionWindows {
       // --- افزودن انیمیشن ناپدید شدن ---
 
       // 1. با تغییر استایل، انیمیشن بازگشت (ناپدید شدن) را فعال می‌کنیم
-      iconElement.style.opacity = '0';
-      iconElement.style.transform = 'scale(0.5)';
+      iconElement.style.opacity = "0";
+      iconElement.style.transform = "scale(0.5)";
 
       // 2. یک تایمر تنظیم می‌کنیم تا عنصر را پس از پایان انیمیشن از DOM حذف کند
       // زمان تایمر باید با زمان transition در استایل هماهنگ باشد (مثلاً 150 میلی‌ثانیه)
@@ -1101,7 +1140,7 @@ export function dismissAllSelectionWindows() {
     try {
       let currentWindow = window;
       let topDocument = document;
-      
+
       while (currentWindow.parent !== currentWindow) {
         try {
           const parentDoc = currentWindow.parent.document;
@@ -1125,7 +1164,7 @@ export function dismissAllSelectionWindows() {
   } catch (err) {
     logME(
       "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
-      err
+      err,
     );
   }
 }

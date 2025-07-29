@@ -37,7 +37,7 @@ export default class BaseSubtitleHandler {
   // شروع نظارت بر زیرنویس‌ها
   async start() {
     if (this.isActive) return true;
-    
+
     if (!this.isCompatibleSite()) {
       logME(`[${this.constructor.name}] Site not compatible`);
       return false;
@@ -48,7 +48,7 @@ export default class BaseSubtitleHandler {
       await this.waitForSubtitleContainer();
       this.setupObserver();
       this.setupPeriodicCheck();
-      
+
       logME(`[${this.constructor.name}] Subtitle translation started`);
       // const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
       // this.notifier?.show(startMessage, "success", 2000);
@@ -68,7 +68,7 @@ export default class BaseSubtitleHandler {
     if (!this.isActive) return;
 
     this.isActive = false;
-    
+
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
@@ -81,7 +81,7 @@ export default class BaseSubtitleHandler {
 
     this.translationCache.clear();
     this.lastProcessedText = "";
-    
+
     logME(`[${this.constructor.name}] Subtitle translation stopped`);
     // const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
     // this.notifier?.show(stopMessage, "info", 2000);
@@ -101,7 +101,9 @@ export default class BaseSubtitleHandler {
           logME(`[${this.constructor.name}] Subtitle container found`);
           resolve(container);
         } else if (elapsed >= maxWait) {
-          logME(`[${this.constructor.name}] Subtitle container not found after ${maxWait}ms, but continuing`);
+          logME(
+            `[${this.constructor.name}] Subtitle container not found after ${maxWait}ms, but continuing`,
+          );
           // بجای reject کردن، resolve می‌کنیم تا ادامه پیدا کند
           resolve(null);
         } else {
@@ -117,19 +119,26 @@ export default class BaseSubtitleHandler {
   setupObserver() {
     const selectors = this.getSelectors();
     const container = document.querySelector(selectors.container);
-    
+
     if (!container) {
-      logME(`[${this.constructor.name}] No container found for observer, will use periodic check only`);
+      logME(
+        `[${this.constructor.name}] No container found for observer, will use periodic check only`,
+      );
       return;
     }
 
-    logME(`[${this.constructor.name}] Setting up MutationObserver on container`);
-    
+    logME(
+      `[${this.constructor.name}] Setting up MutationObserver on container`,
+    );
+
     this.observer = new MutationObserver((mutations) => {
       let hasChanges = false;
-      
+
       for (const mutation of mutations) {
-        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+        if (
+          mutation.type === "childList" ||
+          mutation.type === "characterData"
+        ) {
           hasChanges = true;
           break;
         }
@@ -209,14 +218,19 @@ export default class BaseSubtitleHandler {
       }
 
       // بررسی اینکه آیا translate method وجود دارد
-      if (typeof this.translationProvider.translate !== 'function') {
-        logME(`Translation provider does not have translate method for: ${text}`);
+      if (typeof this.translationProvider.translate !== "function") {
+        logME(
+          `Translation provider does not have translate method for: ${text}`,
+        );
         return null;
       }
 
-      const result = await this.translationProvider.translate(text, TranslationMode.Subtitle);
+      const result = await this.translationProvider.translate(
+        text,
+        TranslationMode.Subtitle,
+      );
       const translatedText = result?.translatedText || result;
-      
+
       this.translationCache.set(text, translatedText);
       return translatedText;
     } catch (error) {
@@ -270,7 +284,9 @@ export default class BaseSubtitleHandler {
       element.dataset.translated = "true";
       element.dataset.originalText = originalText;
 
-      logME(`[${this.constructor.name}] Translated: "${originalText}" -> "${translatedText}"`);
+      logME(
+        `[${this.constructor.name}] Translated: "${originalText}" -> "${translatedText}"`,
+      );
     } catch (error) {
       this.errorHandler?.handle(error, {
         type: ErrorTypes.UI,

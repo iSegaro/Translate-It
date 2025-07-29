@@ -1,7 +1,7 @@
 // src/managers/sidepanel-chrome.js
 // Chrome side panel manager
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Chrome Side Panel Manager
@@ -21,17 +21,19 @@ export class ChromeSidePanelManager {
 
     try {
       this.browser = browser;
-      
+
       if (!browser.sidePanel) {
-        throw new Error('Chrome sidePanel API not available');
+        throw new Error("Chrome sidePanel API not available");
       }
 
-      console.log('📋 Initializing Chrome side panel manager');
+      console.log("📋 Initializing Chrome side panel manager");
       this.initialized = true;
-      console.log('✅ Chrome side panel manager initialized');
-
+      console.log("✅ Chrome side panel manager initialized");
     } catch (error) {
-      console.error('❌ Failed to initialize Chrome side panel manager:', error);
+      console.error(
+        "❌ Failed to initialize Chrome side panel manager:",
+        error,
+      );
       throw error;
     }
   }
@@ -48,9 +50,9 @@ export class ChromeSidePanelManager {
 
     try {
       await browser.sidePanel.open({ tabId });
-      console.log('📋 Chrome side panel opened');
+      console.log("📋 Chrome side panel opened");
     } catch (error) {
-      console.error('❌ Failed to open Chrome side panel:', error);
+      console.error("❌ Failed to open Chrome side panel:", error);
       throw error;
     }
   }
@@ -60,7 +62,7 @@ export class ChromeSidePanelManager {
    * @param {number} tabId - Tab ID
    * @param {string} behavior - Panel behavior ('enabled' | 'disabled')
    */
-  async setPanelBehavior(tabId, behavior = 'enabled') {
+  async setPanelBehavior(tabId, behavior = "enabled") {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -68,11 +70,11 @@ export class ChromeSidePanelManager {
     try {
       await browser.sidePanel.setPanelBehavior({
         tabId,
-        openPanelOnActionClick: behavior === 'enabled'
+        openPanelOnActionClick: behavior === "enabled",
       });
       console.log(`📋 Side panel behavior set to ${behavior} for tab ${tabId}`);
     } catch (error) {
-      console.error('❌ Failed to set side panel behavior:', error);
+      console.error("❌ Failed to set side panel behavior:", error);
     }
   }
 
@@ -90,9 +92,9 @@ export class ChromeSidePanelManager {
    */
   getDebugInfo() {
     return {
-      type: 'chrome-sidepanel',
+      type: "chrome-sidepanel",
       initialized: this.initialized,
-      hasSidePanelAPI: !!this.browser?.sidePanel
+      hasSidePanelAPI: !!this.browser?.sidePanel,
     };
   }
 }

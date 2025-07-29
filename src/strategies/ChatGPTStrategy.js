@@ -80,19 +80,19 @@ export default class ChatGPTStrategy extends PlatformStrategy {
       const htmlWithBreaks = translated.replace(/\n/g, "<br>");
       const sanitized = filterXSS(htmlWithBreaks, {
         whiteList: {
-          br: []
+          br: [],
         },
         stripIgnoreTag: true,
-        stripIgnoreTagBody: ['script', 'style'],
+        stripIgnoreTagBody: ["script", "style"],
         onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
           // Block javascript: and data: URLs
-          if (name === 'href' || name === 'src') {
+          if (name === "href" || name === "src") {
             if (value.match(/^(javascript|data|vbscript):/i)) {
-              return '';
+              return "";
             }
           }
           return false;
-        }
+        },
       });
 
       const parser = new DOMParser();

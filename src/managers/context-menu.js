@@ -1,7 +1,7 @@
 // src/managers/context-menu.js
 // Context menu manager for cross-browser compatibility
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Context Menu Manager
@@ -22,17 +22,16 @@ export class ContextMenuManager {
 
     try {
       this.browser = browser;
-      
-      console.log('📋 Initializing context menu manager');
-      
+
+      console.log("📋 Initializing context menu manager");
+
       // Set up default context menus
       await this.setupDefaultMenus();
-      
-      this.initialized = true;
-      console.log('✅ Context menu manager initialized');
 
+      this.initialized = true;
+      console.log("✅ Context menu manager initialized");
     } catch (error) {
-      console.error('❌ Failed to initialize context menu manager:', error);
+      console.error("❌ Failed to initialize context menu manager:", error);
       throw error;
     }
   }
@@ -48,54 +47,53 @@ export class ContextMenuManager {
 
       // Main translation menu
       await this.createMenu({
-        id: 'translate-selection',
+        id: "translate-selection",
         title: 'Translate "%s"',
-        contexts: ['selection'],
-        documentUrlPatterns: ['http://*/*', 'https://*/*']
+        contexts: ["selection"],
+        documentUrlPatterns: ["http://*/*", "https://*/*"],
       });
 
       // Translate page menu
       await this.createMenu({
-        id: 'translate-page',
-        title: 'Translate this page',
-        contexts: ['page'],
-        documentUrlPatterns: ['http://*/*', 'https://*/*']
+        id: "translate-page",
+        title: "Translate this page",
+        contexts: ["page"],
+        documentUrlPatterns: ["http://*/*", "https://*/*"],
       });
 
       // Element selection mode
       await this.createMenu({
-        id: 'select-element-mode',
-        title: 'Select element to translate',
-        contexts: ['page'],
-        documentUrlPatterns: ['http://*/*', 'https://*/*']
+        id: "select-element-mode",
+        title: "Select element to translate",
+        contexts: ["page"],
+        documentUrlPatterns: ["http://*/*", "https://*/*"],
       });
 
       // Separator
       await this.createMenu({
-        id: 'separator1',
-        type: 'separator',
-        contexts: ['selection', 'page']
+        id: "separator1",
+        type: "separator",
+        contexts: ["selection", "page"],
       });
 
       // Screen capture menu
       await this.createMenu({
-        id: 'capture-screen',
-        title: 'Capture and translate screen area',
-        contexts: ['page'],
-        documentUrlPatterns: ['http://*/*', 'https://*/*']
+        id: "capture-screen",
+        title: "Capture and translate screen area",
+        contexts: ["page"],
+        documentUrlPatterns: ["http://*/*", "https://*/*"],
       });
 
       // Options menu
       await this.createMenu({
-        id: 'open-options',
-        title: 'Translation settings',
-        contexts: ['action']
+        id: "open-options",
+        title: "Translation settings",
+        contexts: ["action"],
       });
 
-      console.log('✅ Default context menus created');
-
+      console.log("✅ Default context menus created");
     } catch (error) {
-      console.error('❌ Failed to setup default menus:', error);
+      console.error("❌ Failed to setup default menus:", error);
       throw error;
     }
   }
@@ -113,12 +111,13 @@ export class ContextMenuManager {
     try {
       const menuId = await browser.contextMenus.create(menuConfig);
       this.createdMenus.add(menuConfig.id || menuId);
-      
-      console.log(`📋 Created context menu: ${menuConfig.title || menuConfig.id}`);
-      return menuId;
 
+      console.log(
+        `📋 Created context menu: ${menuConfig.title || menuConfig.id}`,
+      );
+      return menuId;
     } catch (error) {
-      console.error('❌ Failed to create context menu:', error);
+      console.error("❌ Failed to create context menu:", error);
       throw error;
     }
   }
@@ -136,7 +135,6 @@ export class ContextMenuManager {
     try {
       await browser.contextMenus.update(menuId, updateInfo);
       console.log(`📋 Updated context menu: ${menuId}`);
-
     } catch (error) {
       console.error(`❌ Failed to update context menu ${menuId}:`, error);
       throw error;
@@ -155,9 +153,8 @@ export class ContextMenuManager {
     try {
       await browser.contextMenus.remove(menuId);
       this.createdMenus.delete(menuId);
-      
-      console.log(`📋 Removed context menu: ${menuId}`);
 
+      console.log(`📋 Removed context menu: ${menuId}`);
     } catch (error) {
       console.error(`❌ Failed to remove context menu ${menuId}:`, error);
       throw error;
@@ -175,11 +172,10 @@ export class ContextMenuManager {
     try {
       await browser.contextMenus.removeAll();
       this.createdMenus.clear();
-      
-      console.log('📋 Cleared all context menus');
 
+      console.log("📋 Cleared all context menus");
     } catch (error) {
-      console.error('❌ Failed to clear context menus:', error);
+      console.error("❌ Failed to clear context menus:", error);
       throw error;
     }
   }
@@ -194,32 +190,31 @@ export class ContextMenuManager {
       console.log(`📋 Context menu clicked: ${info.menuItemId}`);
 
       switch (info.menuItemId) {
-        case 'translate-selection':
+        case "translate-selection":
           await this.handleTranslateSelection(info, tab);
           break;
 
-        case 'translate-page':
+        case "translate-page":
           await this.handleTranslatePage(info, tab);
           break;
 
-        case 'select-element-mode':
+        case "select-element-mode":
           await this.handleSelectElementMode(info, tab);
           break;
 
-        case 'capture-screen':
+        case "capture-screen":
           await this.handleCaptureScreen(info, tab);
           break;
 
-        case 'open-options':
+        case "open-options":
           await this.handleOpenOptions(info, tab);
           break;
 
         default:
           console.warn(`Unhandled context menu: ${info.menuItemId}`);
       }
-
     } catch (error) {
-      console.error('❌ Context menu click handler failed:', error);
+      console.error("❌ Context menu click handler failed:", error);
     }
   }
 
@@ -233,16 +228,15 @@ export class ContextMenuManager {
     try {
       // Send message to content script to handle translation
       await browser.tabs.sendMessage(tab.id, {
-        action: 'TRANSLATE_SELECTION',
-        source: 'context-menu',
+        action: "TRANSLATE_SELECTION",
+        source: "context-menu",
         data: {
           text: info.selectionText,
-          pageUrl: info.pageUrl
-        }
+          pageUrl: info.pageUrl,
+        },
       });
-
     } catch (error) {
-      console.error('❌ Failed to handle translate selection:', error);
+      console.error("❌ Failed to handle translate selection:", error);
     }
   }
 
@@ -253,15 +247,14 @@ export class ContextMenuManager {
   async handleTranslatePage(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: 'TRANSLATE_PAGE',
-        source: 'context-menu',
+        action: "TRANSLATE_PAGE",
+        source: "context-menu",
         data: {
-          pageUrl: info.pageUrl
-        }
+          pageUrl: info.pageUrl,
+        },
       });
-
     } catch (error) {
-      console.error('❌ Failed to handle translate page:', error);
+      console.error("❌ Failed to handle translate page:", error);
     }
   }
 
@@ -272,15 +265,14 @@ export class ContextMenuManager {
   async handleSelectElementMode(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: 'ACTIVATE_SELECT_ELEMENT_MODE',
-        source: 'context-menu',
+        action: "ACTIVATE_SELECT_ELEMENT_MODE",
+        source: "context-menu",
         data: {
-          pageUrl: info.pageUrl
-        }
+          pageUrl: info.pageUrl,
+        },
       });
-
     } catch (error) {
-      console.error('❌ Failed to handle select element mode:', error);
+      console.error("❌ Failed to handle select element mode:", error);
     }
   }
 
@@ -291,15 +283,14 @@ export class ContextMenuManager {
   async handleCaptureScreen(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: 'START_SCREEN_CAPTURE',
-        source: 'context-menu',
+        action: "START_SCREEN_CAPTURE",
+        source: "context-menu",
         data: {
-          pageUrl: info.pageUrl
-        }
+          pageUrl: info.pageUrl,
+        },
       });
-
     } catch (error) {
-      console.error('❌ Failed to handle screen capture:', error);
+      console.error("❌ Failed to handle screen capture:", error);
     }
   }
 
@@ -309,11 +300,10 @@ export class ContextMenuManager {
    */
   async handleOpenOptions(info, tab) {
     try {
-      const optionsUrl = browser.runtime.getURL('options.html');
+      const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });
-
     } catch (error) {
-      console.error('❌ Failed to handle open options:', error);
+      console.error("❌ Failed to handle open options:", error);
     }
   }
 
@@ -322,10 +312,11 @@ export class ContextMenuManager {
    */
   registerClickListener() {
     if (browser?.contextMenus?.onClicked) {
-      browser.contextMenus.onClicked.addListener(
-        this.handleMenuClick.bind(this)
+      browser.contextMenus.onClicked.addListener.call(
+        browser.contextMenus.onClicked,
+        this.handleMenuClick.bind(this),
       );
-      console.log('📋 Context menu click listener registered');
+      console.log("📋 Context menu click listener registered");
     }
   }
 
@@ -351,10 +342,10 @@ export class ContextMenuManager {
    */
   getDebugInfo() {
     return {
-      type: 'context-menu',
+      type: "context-menu",
       initialized: this.initialized,
       createdMenus: this.getCreatedMenus(),
-      hasContextMenusAPI: !!this.browser?.contextMenus
+      hasContextMenusAPI: !!this.browser?.contextMenus,
     };
   }
 
@@ -362,12 +353,12 @@ export class ContextMenuManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log('🧹 Cleaning up context menu manager');
-    
+    console.log("🧹 Cleaning up context menu manager");
+
     try {
       await this.clearAllMenus();
     } catch (error) {
-      console.error('❌ Error during context menu cleanup:', error);
+      console.error("❌ Error during context menu cleanup:", error);
     }
 
     this.initialized = false;

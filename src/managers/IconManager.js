@@ -47,7 +47,7 @@ export default class IconManager {
     } catch (error) {
       logME(
         "[IconManager] Environment not compatible for icons due to error:",
-        error.message
+        error.message,
       );
       this.canShowIcons = false;
       if (this.container) {
@@ -121,7 +121,7 @@ export default class IconManager {
         icon.style.left = `${rect.left + window.scrollX + rect.width + 10}px`;
         icon.style.display = "block";
         icon.classList.add(
-          "AIWritingCompanion-translation-icon-extension-fade-in"
+          "AIWritingCompanion-translation-icon-extension-fade-in",
         );
       });
 

@@ -12,7 +12,7 @@ export default function setupIconBehavior(
   target,
   translationHandler,
   notifier,
-  strategies
+  strategies,
 ) {
   if (!icon || !target) return;
 
@@ -63,7 +63,7 @@ export default function setupIconBehavior(
         (await getTranslationString("STATUS_TRANSLATING_ICON")) ||
           "Translating...",
         "status",
-        false
+        false,
       );
       await translateFieldViaSmartHandler({ text, target, translationHandler });
     } catch (err) {

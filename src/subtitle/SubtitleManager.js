@@ -12,19 +12,19 @@ export default class SubtitleManager {
     this.notifier = notifier;
     this.currentHandler = null;
     this.isEnabled = false;
-    
+
     // تعریف handler های پشتیبانی شده
     this.supportedHandlers = [
       {
         handler: YouTubeSubtitleHandler,
         pattern: /youtube\.com|youtu\.be/,
-        name: "YouTube"
+        name: "YouTube",
       },
       {
         handler: NetflixSubtitleHandler,
         pattern: /netflix\.com/,
-        name: "Netflix"
-      }
+        name: "Netflix",
+      },
     ];
 
     this.setupUrlListener();
@@ -33,14 +33,14 @@ export default class SubtitleManager {
   // شناسایی سایت فعلی و انتخاب handler مناسب
   detectCurrentHandler() {
     const currentUrl = window.location.href;
-    
+
     for (const { handler, pattern, name } of this.supportedHandlers) {
       if (pattern.test(currentUrl)) {
         logME(`[SubtitleManager] Detected ${name} site`);
         return handler;
       }
     }
-    
+
     return null;
   }
 
@@ -67,12 +67,12 @@ export default class SubtitleManager {
       this.currentHandler = new HandlerClass(
         this.translationProvider,
         this.errorHandler,
-        this.notifier
+        this.notifier,
       );
 
       // شروع handler
       const started = await this.currentHandler.start();
-      
+
       if (started) {
         this.isEnabled = true;
         logME(`[SubtitleManager] Started with ${HandlerClass.name}`);
@@ -127,7 +127,7 @@ export default class SubtitleManager {
   // به‌روزرسانی translation provider
   updateTranslationProvider(newProvider) {
     this.translationProvider = newProvider;
-    
+
     if (this.currentHandler) {
       this.currentHandler.translationProvider = newProvider;
     }
@@ -136,7 +136,7 @@ export default class SubtitleManager {
   // تنظیم listener برای تغییر URL
   setupUrlListener() {
     let lastUrl = window.location.href;
-    
+
     // بررسی دوره‌ای تغییر URL
     const checkUrl = () => {
       const currentUrl = window.location.href;
@@ -157,7 +157,7 @@ export default class SubtitleManager {
   // مدیریت تغییر URL
   async handleUrlChange() {
     const newHandlerClass = this.detectCurrentHandler();
-    
+
     // اگر سایت جدید پشتیبانی نمی‌شود
     if (!newHandlerClass) {
       if (this.isEnabled) {
@@ -167,7 +167,10 @@ export default class SubtitleManager {
     }
 
     // اگر همان handler است
-    if (this.currentHandler && this.currentHandler.constructor === newHandlerClass) {
+    if (
+      this.currentHandler &&
+      this.currentHandler.constructor === newHandlerClass
+    ) {
       this.currentHandler.handleUrlChange();
       return;
     }
@@ -185,7 +188,7 @@ export default class SubtitleManager {
     return {
       isEnabled: this.isEnabled,
       currentHandler: this.currentHandler?.constructor?.name || null,
-      supportedSites: this.supportedHandlers.map(h => h.name),
+      supportedSites: this.supportedHandlers.map((h) => h.name),
       isVideoSite: this.isVideoSite(),
       currentUrl: window.location.href,
     };
@@ -203,16 +206,16 @@ export default class SubtitleManager {
 
 // توابع کمکی برای export
 export function isVideoSite() {
-  const videoSitePatterns = [
-    /youtube\.com/,
-    /youtu\.be/,
-    /netflix\.com/,
-  ];
-  
+  const videoSitePatterns = [/youtube\.com/, /youtu\.be/, /netflix\.com/];
+
   const currentUrl = window.location.href;
-  return videoSitePatterns.some(pattern => pattern.test(currentUrl));
+  return videoSitePatterns.some((pattern) => pattern.test(currentUrl));
 }
 
-export function createSubtitleManager(translationProvider, errorHandler, notifier) {
+export function createSubtitleManager(
+  translationProvider,
+  errorHandler,
+  notifier,
+) {
   return new SubtitleManager(translationProvider, errorHandler, notifier);
 }

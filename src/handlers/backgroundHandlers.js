@@ -1,6 +1,6 @@
 // src/handlers/backgroundHandlers.js
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { TranslationMode } from "../config.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
@@ -38,13 +38,18 @@ export async function handleFetchTranslation(
   sender,
   sendResponse,
   translateText,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Handler:Translation] Handling fetchTranslation request");
   try {
-    const { promptText, targetLanguage, sourceLanguage, translateMode, translationMode } =
-      message.payload;
-    
+    const {
+      promptText,
+      targetLanguage,
+      sourceLanguage,
+      translateMode,
+      translationMode,
+    } = message.payload;
+
     // Handle both translateMode and translationMode for compatibility
     const finalTranslateMode = translateMode || translationMode;
 
@@ -64,7 +69,7 @@ export async function handleFetchTranslation(
       promptText,
       finalTranslateMode,
       sourceLanguage,
-      targetLanguage
+      targetLanguage,
     );
 
     logME("[Handler:Translation] Translation result:", translation);
@@ -89,7 +94,9 @@ export async function handleFetchTranslation(
       });
     }
 
-    logME("[Handler:Translation] Sending success response:", { translatedText: translation });
+    logME("[Handler:Translation] Sending success response:", {
+      translatedText: translation,
+    });
     sendResponse({ success: true, data: { translatedText: translation } });
   } catch (err) {
     const processed = await errorHandler.handle(err, {
@@ -107,7 +114,9 @@ export async function handleFetchTranslation(
       (await getTranslationString("ERRORS_DURING_TRANSLATE_Fetch")) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 
-    logME("[Handler:Translation] Sending error response:", { error: safeMessage });
+    logME("[Handler:Translation] Sending error response:", {
+      error: safeMessage,
+    });
     sendResponse({ success: false, error: safeMessage });
   }
 }
@@ -117,7 +126,7 @@ export async function handleFetchTranslationBackground(
   sender,
   sendResponse,
   translateText,
-  errorHandler
+  errorHandler,
 ) {
   logME("[Background] fetchTranslationBackground");
   try {
@@ -136,7 +145,7 @@ export async function handleFetchTranslationBackground(
       promptText,
       translationMode,
       sourceLanguage,
-      targetLanguage
+      targetLanguage,
     );
 
     // بررسی نتیجه
@@ -175,7 +184,7 @@ export async function handleFetchTranslationBackground(
       processed?.message?.trim() ||
       err?.message?.trim() ||
       (await getTranslationString(
-        "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED"
+        "ERRORS_DURING_TRANSLATE_Fetch_BACKGROUND_FAILED",
       )) ||
       "(⚠️ خطایی در ترجمه رخ داد.)";
 

@@ -285,7 +285,7 @@ const stopSubtitleDetection = async () => {
 
 const startListeningForSubtitles = () => {
   // Set up message listener for subtitle events
-  browser.runtime.onMessage.addListener(handleSubtitleMessage)
+  browser.runtime.onMessage.addListener.call(browser.runtime.onMessage, handleSubtitleMessage)
 }
 
 const stopListeningForSubtitles = () => {

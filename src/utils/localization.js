@@ -13,8 +13,9 @@ function initLocalizationUI() {
   if (!localizationContainer) return;
 
   // Prepare language list
-  const languages =
-    Array.isArray(languagesData) ? languagesData : Object.values(languagesData);
+  const languages = Array.isArray(languagesData)
+    ? languagesData
+    : Object.values(languagesData);
 
   // 1. فیلتر کردن بر اساس وجود 'flagCode'
   const filtered = languages.filter((lang) => lang.flagCode);
@@ -29,7 +30,7 @@ function initLocalizationUI() {
     // 2. ایجاد تگ <img> برای نمایش پرچم
     const img = document.createElement("img");
     img.className = "language-flag-image"; // استفاده از کلاسی که در CSS تعریف کردیم
-        img.src = browser.runtime.getURL(`icons/flags/${lang.flagCode}.svg`);
+    img.src = browser.runtime.getURL(`icons/flags/${lang.flagCode}.svg`);
     img.alt = `${lang.name} flag`; // برای دسترسی‌پذیری بهتر
 
     li.appendChild(img); // ابتدا تصویر پرچم اضافه می‌شود
@@ -66,10 +67,15 @@ async function setLanguage(locale) {
     await app_localize(locale);
 
     // --- Send a message to the background script to refresh context menus ---
-    logME("[localization] Sending message to refresh context menus for locale:", locale);
-    browser.runtime.sendMessage({ action: "REFRESH_CONTEXT_MENUS" })
-      .catch(err => logME("Error sending REFRESH_CONTEXT_MENUS message:", err.message));
-
+    logME(
+      "[localization] Sending message to refresh context menus for locale:",
+      locale,
+    );
+    browser.runtime
+      .sendMessage({ action: "REFRESH_CONTEXT_MENUS" })
+      .catch((err) =>
+        logME("Error sending REFRESH_CONTEXT_MENUS message:", err.message),
+      );
   } catch (err) {
     logME("[localization] setLanguage error:", err);
   }
@@ -87,10 +93,13 @@ if (typeof document !== "undefined") {
 }
 
 // Listen for storage changes to reapply localization if changed from another context
-browser.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes.APPLICATION_LOCALIZE) {
-    const newLocale = changes.APPLICATION_LOCALIZE.newValue;
-    // We call app_localize directly here instead of setLanguage to avoid a message loop
-    app_localize(newLocale);
-  }
-});
+browser.storage.onChanged.addListener.call(
+  browser.storage.onChanged,
+  (changes, area) => {
+    if (area === "local" && changes.APPLICATION_LOCALIZE) {
+      const newLocale = changes.APPLICATION_LOCALIZE.newValue;
+      // We call app_localize directly here instead of setLanguage to avoid a message loop
+      app_localize(newLocale);
+    }
+  },
+);

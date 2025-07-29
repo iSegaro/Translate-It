@@ -51,7 +51,7 @@ export const setCursorPosition = (element, position = "end", offset = 0) => {
       } else {
         range.setStart(
           childNodes[childNodes.length - 1] || element,
-          element.textContent?.length || 0
+          element.textContent?.length || 0,
         );
       }
 

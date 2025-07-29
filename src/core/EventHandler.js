@@ -55,7 +55,7 @@ export default class EventHandler {
     this.selectionTimeoutId = null; // شناسه تایمر برای تاخیر در ترجمه انتخاب متن
     this.cancelSelectionTranslation =
       this.cancelSelectionTranslation.bind(this);
-    
+
     // Track Ctrl key state for better selection handling
     this.ctrlKeyPressed = false;
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -130,14 +130,15 @@ export default class EventHandler {
          * بررسی نیاز به Ctrl فقط در حالت immediate، نه onClick
          */
         const settings1 = await getSettingsAsync();
-        const selectionTranslationMode = settings1.selectionTranslationMode || CONFIG.selectionTranslationMode;
-        
+        const selectionTranslationMode =
+          settings1.selectionTranslationMode || CONFIG.selectionTranslationMode;
+
         // فقط در حالت immediate باید Ctrl را چک کنیم
         if (selectionTranslationMode === "immediate") {
           const requireCtrl = await getRequireCtrlForTextSelectionAsync();
           if (requireCtrl && !this.isMouseUpCtrl(event)) return;
         }
-        
+
         await this.handleMouseUp(event);
       }
     } catch (rawError) {
@@ -159,7 +160,12 @@ export default class EventHandler {
   }
 
   handleKeyDown(event) {
-    if (event.key === "Control" || event.key === "Meta" || event.ctrlKey || event.metaKey) {
+    if (
+      event.key === "Control" ||
+      event.key === "Meta" ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
       this.ctrlKeyPressed = true;
     }
   }
@@ -235,11 +241,12 @@ export default class EventHandler {
       return;
     }
 
-     if (selectedText) {
+    if (selectedText) {
       if (!this.selectionTimeoutId) {
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         const settings2 = await getSettingsAsync();
-        const selectionTranslationMode = settings2.selectionTranslationMode || CONFIG.selectionTranslationMode;
+        const selectionTranslationMode =
+          settings2.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
         // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
         //    - برای حالت آیکون (onClick)، تأخیر کمتر (10ms)
@@ -256,19 +263,20 @@ export default class EventHandler {
       }
     } else {
       const settings3 = await getSettingsAsync();
-      const selectionTranslationMode = settings3.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      const selectionTranslationMode =
+        settings3.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
       if (selectionTranslationMode === "onClick") {
         return;
       }
-      
+
       // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
       if (this.selectionTimeoutId) {
         clearTimeout(this.selectionTimeoutId);
         this.selectionTimeoutId = null;
         document.removeEventListener(
           "mousedown",
-          this.cancelSelectionTranslation
+          this.cancelSelectionTranslation,
         );
       }
 
@@ -288,7 +296,7 @@ export default class EventHandler {
       try {
         document.removeEventListener(
           "mousedown",
-          this.cancelSelectionTranslation
+          this.cancelSelectionTranslation,
         );
       } catch {
         // خطا در حذف
@@ -375,7 +383,7 @@ export default class EventHandler {
         element,
         this.translationHandler,
         this.notifier,
-        this.strategies
+        this.strategies,
       );
       return icon;
     }
@@ -406,7 +414,7 @@ export default class EventHandler {
         !document.activeElement?.isConnected ||
         (document.activeElement !== state.activeTranslateIcon &&
           !document.activeElement.closest(
-            ".AIWritingCompanion-translation-icon-extension"
+            ".AIWritingCompanion-translation-icon-extension",
           ))
       ) {
         this.IconManager?.cleanup();
@@ -420,7 +428,7 @@ export default class EventHandler {
       (await getTranslationString("STATUS_REMOVE_MEMORY")) || "Memory Cleared",
       "info",
       true,
-      2000
+      2000,
     );
   }
 
@@ -458,7 +466,7 @@ export default class EventHandler {
         "info",
         true,
         2000,
-        () => this.cleanCache()
+        () => this.cleanCache(),
       );
       return {
         status: "success",
@@ -476,7 +484,7 @@ export default class EventHandler {
       (await getTranslationString("STATUS_TRANSLATING_SELECT_ELEMENT")) ||
         "در حال ترجمه…",
       "status",
-      false
+      false,
     );
     state.translateMode = TranslationMode.SelectElement;
 
@@ -486,7 +494,7 @@ export default class EventHandler {
         expandTextsForTranslation(textsToTranslate);
 
       const jsonPayload = JSON.stringify(
-        expandedTexts.map((t) => ({ text: t }))
+        expandedTexts.map((t) => ({ text: t })),
       );
       if (jsonPayload.length > 20_000) {
         const m = `متن انتخابی بسیار بزرگ است (${jsonPayload.length} بایت)`;
@@ -522,13 +530,13 @@ export default class EventHandler {
  * ------------------------------------------------------------- */
       if (response && response.success === false) {
         const err =
-          typeof response.error === "string" ?
-            response.error
-          : response.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
+          typeof response.error === "string"
+            ? response.error
+            : response.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
 
         await this.translationHandler.errorHandler.handle(
           new Error(err), // یا آبجکت Error اختصاصى
-          { type: ErrorTypes.API, context: "select-element-response" }
+          { type: ErrorTypes.API, context: "select-element-response" },
         );
         return { status: "error", reason: "api_error", message: err };
       }
@@ -547,13 +555,13 @@ export default class EventHandler {
       /* 5) پردازش رشتهٔ JSON ترجمه‌شده */
       const translatedData = parseAndCleanTranslationResponse(
         translatedJsonString,
-        this.translationHandler
+        this.translationHandler,
       );
       if (!translatedData) {
         // const m = "(فرمت پاسخ نامعتبر است.)";
         await this.translationHandler.errorHandler.handle(
           new Error(ErrorTypes.API_RESPONSE_INVALID),
-          { type: ErrorTypes.API, context: "select-element-response-format" }
+          { type: ErrorTypes.API, context: "select-element-response-format" },
         );
         return {
           status: "error",
@@ -568,7 +576,7 @@ export default class EventHandler {
           "(طول پاسخ ناهمخوان؛ مجدداً امتحان کنید.)",
           "info",
           true,
-          1500
+          1500,
         );
 
       /* 7) چسباندن ترجمه‌ها به نودها */
@@ -577,7 +585,7 @@ export default class EventHandler {
         expandedTexts,
         originMapping,
         textsToTranslate,
-        cachedTranslations
+        cachedTranslations,
       );
       const allTranslations = new Map([
         ...cachedTranslations,
@@ -620,7 +628,9 @@ export default class EventHandler {
     // Check if NEW Vue select element manager is active
     // If so, let it handle ESC key instead of OLD system
     if (window.translateItNewSelectManager === true) {
-      console.log('[EventHandler] NEW select manager is active, skipping OLD ESC handling');
+      console.log(
+        "[EventHandler] NEW select manager is active, skipping OLD ESC handling",
+      );
       return;
     }
 

@@ -1,7 +1,7 @@
 // src/background/feature-loader.js
 // Dynamic feature loading based on browser capabilities
 
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 // Legacy listeners removed - now managed by UnifiedListenerManager
 const listenerModules = {};
@@ -50,66 +50,49 @@ export class FeatureLoader {
    * @private
    */
   async _loadTTSManagerImpl() {
-    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { offscreen: true } : { offscreen: false }; // Simplified capability detection
-    const ttsMethod = capabilities.offscreen ? "offscreen-document" : "background-page"; // Simplified TTS method selection
+    // Use the official browser.offscreen API for capability detection
+    const hasOffscreen = typeof browser.offscreen?.hasDocument === "function";
+    console.log(`🔊 Checking for Offscreen API. Available: ${hasOffscreen}`);
 
-    console.log(`🔊 Loading TTS manager with method: ${ttsMethod}`);
-
-    try {
-      switch (ttsMethod) {
-        case "offscreen-document": {
-          if (capabilities.offscreen) {
-            try {
-              const { OffscreenTTSManager } = await import(
-                "../managers/tts-offscreen.js"
-              );
-              const manager = new OffscreenTTSManager();
-              // Mark as Chrome offscreen manager to handle messages with offscreen target
-              manager.messageTarget = "offscreen";
-              // Test initialization
-              await manager.initialize();
-              return manager;
-            } catch (error) {
-              console.warn(
-                "Offscreen TTS initialization failed, falling back to background page TTS:",
-                error
-              );
-            }
-          } else {
-            console.warn(
-              "Offscreen API not available, falling back to background page TTS"
-            );
-          }
-          break;
-        }
-
-        case "background-page": {
-          if (capabilities.webAudio || capabilities.speechSynthesis) {
-            const { BackgroundTTSManager } = await import(
-              "../managers/tts-background.js"
-            );
-            const manager = new BackgroundTTSManager();
-            // Mark as Firefox background manager to handle messages with background target
-            manager.messageTarget = "background";
-            return manager;
-          }
-          // Fallback to content script
-          console.warn(
-            "Background audio APIs not available, falling back to content script TTS"
-          );
-          /* fallthrough */
-        }
-
-        default: {
-          const { ContentScriptTTSManager } = await import(
-            "../managers/tts-content.js"
-          );
-          return new ContentScriptTTSManager();
-        }
+    if (hasOffscreen) {
+      try {
+        console.log("Attempting to load OffscreenTTSManager...");
+        const { OffscreenTTSManager } = await import(
+          "../managers/tts-offscreen.js"
+        );
+        const manager = new OffscreenTTSManager();
+        await manager.initialize();
+        console.log("✅ OffscreenTTSManager initialized successfully.");
+        return manager;
+      } catch (error) {
+        console.warn(
+          "Offscreen TTS initialization failed, falling back to background page TTS:",
+          error,
+        );
+        // Fallback to background if offscreen fails for any reason
       }
+    } else {
+      console.log(
+        "Offscreen API not available, proceeding with background page TTS.",
+      );
+    }
+
+    // Fallback for Firefox or if offscreen fails
+    try {
+      console.log("Attempting to load BackgroundTTSManager...");
+      const { BackgroundTTSManager } = await import(
+        "../managers/tts-background.js"
+      );
+      const manager = new BackgroundTTSManager();
+      await manager.initialize();
+      console.log("✅ BackgroundTTSManager initialized successfully.");
+      return manager;
     } catch (error) {
-      console.error("Failed to load TTS manager:", error);
-      // Ultimate fallback - content script TTS
+      console.error(
+        "❌ Failed to load BackgroundTTSManager, falling back to content script TTS:",
+        error,
+      );
+      // Ultimate fallback
       const { ContentScriptTTSManager } = await import(
         "../managers/tts-content.js"
       );
@@ -151,8 +134,13 @@ export class FeatureLoader {
    * @private
    */
   async _loadPanelManagerImpl() {
-    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { sidePanel: true } : { sidePanel: false }; // Simplified capability detection
-    const panelSystem = capabilities.sidePanel ? "side_panel" : "sidebar_action"; // Simplified panel system selection
+    const capabilities =
+      browser.runtime.getManifest().incognito === "spanning"
+        ? { sidePanel: true }
+        : { sidePanel: false }; // Simplified capability detection
+    const panelSystem = capabilities.sidePanel
+      ? "side_panel"
+      : "sidebar_action"; // Simplified panel system selection
 
     console.log(`📋 Loading panel manager with system: ${panelSystem}`);
 
@@ -214,8 +202,13 @@ export class FeatureLoader {
    * @private
    */
   async _loadScreenCaptureManagerImpl() {
-    const capabilities = browser.runtime.getManifest().incognito === 'spanning' ? { offscreen: true } : { offscreen: false }; // Simplified capability detection
-    const browserName = browser.runtime.getURL('').startsWith('chrome') ? "chrome" : "firefox"; // Simplified browser detection
+    const capabilities =
+      browser.runtime.getManifest().incognito === "spanning"
+        ? { offscreen: true }
+        : { offscreen: false }; // Simplified capability detection
+    const browserName = browser.runtime.getURL("").startsWith("chrome")
+      ? "chrome"
+      : "firefox"; // Simplified browser detection
 
     console.log(`📸 Loading screen capture manager for ${browserName}`);
 
@@ -297,7 +290,7 @@ export class FeatureLoader {
       } else {
         console.error(
           `❌ Failed to load ${featureName} feature:`,
-          result.reason
+          result.reason,
         );
       }
     });
@@ -314,7 +307,9 @@ export class FeatureLoader {
    * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
    */
   async loadListener(listenerName, browser) {
-    console.warn(`[FeatureLoader] loadListener(${listenerName}) is deprecated - listeners are now managed by UnifiedListenerManager`);
+    console.warn(
+      `[FeatureLoader] loadListener(${listenerName}) is deprecated - listeners are now managed by UnifiedListenerManager`,
+    );
     return null;
   }
 
@@ -326,7 +321,9 @@ export class FeatureLoader {
    * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
    */
   async loadAllListeners() {
-    console.warn('[FeatureLoader] loadAllListeners is deprecated - listeners are now managed by UnifiedListenerManager');
+    console.warn(
+      "[FeatureLoader] loadAllListeners is deprecated - listeners are now managed by UnifiedListenerManager",
+    );
     return [];
   }
 

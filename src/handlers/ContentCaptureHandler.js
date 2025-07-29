@@ -6,7 +6,7 @@ import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { cropImageData } from "../utils/imageProcessing.js";
-import browser from 'webextension-polyfill';
+import browser from "webextension-polyfill";
 
 /**
  * Content Script handler for Screen Capture functionality
@@ -18,9 +18,10 @@ export class ContentCaptureHandler {
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
-    
+
     // Bind methods for event handlers
-    this.handleAreaSelectionComplete = this.handleAreaSelectionComplete.bind(this);
+    this.handleAreaSelectionComplete =
+      this.handleAreaSelectionComplete.bind(this);
     this.handlePreviewConfirm = this.handlePreviewConfirm.bind(this);
     this.handlePreviewCancel = this.handlePreviewCancel.bind(this);
     this.handlePreviewRetry = this.handlePreviewRetry.bind(this);
@@ -33,11 +34,17 @@ export class ContentCaptureHandler {
    */
   startScreenAreaSelection(captureOptions) {
     try {
-      logME("[ContentCaptureHandler] Starting screen area selection", captureOptions);
-      logME("[ContentCaptureHandler] Initializing screen area selection on page", {
-        url: window.location.href,
-        hasOptions: !!captureOptions
-      });
+      logME(
+        "[ContentCaptureHandler] Starting screen area selection",
+        captureOptions,
+      );
+      logME(
+        "[ContentCaptureHandler] Initializing screen area selection on page",
+        {
+          url: window.location.href,
+          hasOptions: !!captureOptions,
+        },
+      );
 
       // Clean up any existing screen selector
       if (this.screenSelector) {
@@ -53,13 +60,14 @@ export class ContentCaptureHandler {
         onCancel: () => {
           logME("[ContentCaptureHandler] Area selection cancelled");
           this.cleanup();
-        }
+        },
       });
 
       // Start area selection
       this.screenSelector.start();
-      logME("[ContentCaptureHandler] Screen area selection started successfully");
-
+      logME(
+        "[ContentCaptureHandler] Screen area selection started successfully",
+      );
     } catch (error) {
       logME("[ContentCaptureHandler] Error starting area selection:", error);
       this.handleCaptureError(error, "area-selection");
@@ -78,11 +86,13 @@ export class ContentCaptureHandler {
       // First request full screen capture from background
       const fullCaptureResponse = await browser.runtime.sendMessage({
         action: "requestFullScreenCapture",
-        data: {}
+        data: {},
       });
 
       if (!fullCaptureResponse || fullCaptureResponse.error) {
-        throw new Error(fullCaptureResponse.error || "Failed to capture full screen");
+        throw new Error(
+          fullCaptureResponse.error || "Failed to capture full screen",
+        );
       }
 
       logME("[ContentCaptureHandler] Cropping captured image to selected area");
@@ -90,7 +100,7 @@ export class ContentCaptureHandler {
       // Crop the image to selected area using imageProcessing utility
       const croppedImageData = await cropImageData(
         fullCaptureResponse.imageData,
-        selectionData
+        selectionData,
       );
 
       // Send cropped image to background for processing
@@ -101,8 +111,8 @@ export class ContentCaptureHandler {
           timestamp: Date.now(),
           selectionData,
           captureOptions,
-          originalCapture: fullCaptureResponse
-        }
+          originalCapture: fullCaptureResponse,
+        },
       });
 
       // Clean up screen selector
@@ -110,9 +120,11 @@ export class ContentCaptureHandler {
         this.screenSelector.cleanup();
         this.screenSelector = null;
       }
-
     } catch (error) {
-      logME("[ContentCaptureHandler] Error in area selection completion:", error);
+      logME(
+        "[ContentCaptureHandler] Error in area selection completion:",
+        error,
+      );
       this.handleCaptureError(error, "area-completion");
     }
   }
@@ -126,7 +138,7 @@ export class ContentCaptureHandler {
       logME("[ContentCaptureHandler] Showing capture preview", previewData);
       logME("[ContentCaptureHandler] Showing capture preview modal", {
         hasData: !!previewData.captureData,
-        captureType: previewData.captureType
+        captureType: previewData.captureType,
       });
 
       // Clean up any existing preview
@@ -141,20 +153,22 @@ export class ContentCaptureHandler {
         captureType: previewData.captureType,
         selectionData: previewData.selectionData,
         onConfirm: (captureData) => {
-          this.handlePreviewConfirm(captureData, previewData.translationOptions);
+          this.handlePreviewConfirm(
+            captureData,
+            previewData.translationOptions,
+          );
         },
         onCancel: () => {
           this.handlePreviewCancel();
         },
         onRetry: (captureType) => {
           this.handlePreviewRetry(captureType);
-        }
+        },
       });
 
       // Show the preview
       await this.capturePreview.show();
       logME("[ContentCaptureHandler] Capture preview shown successfully");
-
     } catch (error) {
       logME("[ContentCaptureHandler] Error showing capture preview:", error);
       this.handleCaptureError(error, "preview");
@@ -172,7 +186,7 @@ export class ContentCaptureHandler {
         hasTranslation: !!resultData.translationText,
         translationText: resultData.translationText,
         translationTextType: typeof resultData.translationText,
-        position: resultData.position
+        position: resultData.position,
       });
 
       // Clean up any existing result
@@ -188,13 +202,12 @@ export class ContentCaptureHandler {
         position: resultData.position || { x: 100, y: 100 },
         onClose: () => {
           this.handleResultClose();
-        }
+        },
       });
 
       // Show the result
       await this.captureResult.show();
       logME("[ContentCaptureHandler] Capture result shown successfully");
-
     } catch (error) {
       logME("[ContentCaptureHandler] Error showing capture result:", error);
       this.handleCaptureError(error, "result");
@@ -221,10 +234,9 @@ export class ContentCaptureHandler {
         action: "previewConfirmed",
         data: {
           captureData,
-          translationOptions
-        }
+          translationOptions,
+        },
       });
-
     } catch (error) {
       logME("[ContentCaptureHandler] Error confirming preview:", error);
       this.handleCaptureError(error, "preview-confirm");
@@ -245,13 +257,14 @@ export class ContentCaptureHandler {
       }
 
       // Notify background
-      browser.runtime.sendMessage({
-        action: "previewCancelled",
-        data: {}
-      }).catch(error => {
-        logME("[ContentCaptureHandler] Error sending preview cancel:", error);
-      });
-
+      browser.runtime
+        .sendMessage({
+          action: "previewCancelled",
+          data: {},
+        })
+        .catch((error) => {
+          logME("[ContentCaptureHandler] Error sending preview cancel:", error);
+        });
     } catch (error) {
       logME("[ContentCaptureHandler] Error in preview cancel:", error);
     }
@@ -272,13 +285,14 @@ export class ContentCaptureHandler {
       }
 
       // Send retry request to background
-      browser.runtime.sendMessage({
-        action: "previewRetry",
-        data: { captureType }
-      }).catch(error => {
-        logME("[ContentCaptureHandler] Error sending preview retry:", error);
-      });
-
+      browser.runtime
+        .sendMessage({
+          action: "previewRetry",
+          data: { captureType },
+        })
+        .catch((error) => {
+          logME("[ContentCaptureHandler] Error sending preview retry:", error);
+        });
     } catch (error) {
       logME("[ContentCaptureHandler] Error in preview retry:", error);
     }
@@ -298,13 +312,14 @@ export class ContentCaptureHandler {
       }
 
       // Notify background if needed
-      browser.runtime.sendMessage({
-        action: "resultClosed",
-        data: {}
-      }).catch(error => {
-        logME("[ContentCaptureHandler] Error sending result close:", error);
-      });
-
+      browser.runtime
+        .sendMessage({
+          action: "resultClosed",
+          data: {},
+        })
+        .catch((error) => {
+          logME("[ContentCaptureHandler] Error sending result close:", error);
+        });
     } catch (error) {
       logME("[ContentCaptureHandler] Error in result close:", error);
     }
@@ -335,21 +350,26 @@ export class ContentCaptureHandler {
     }
 
     // Send error to background
-    browser.runtime.sendMessage({
-      action: "captureError",
-      data: {
-        error: error.message,
-        context,
-        type: error.type || ErrorTypes.SCREEN_CAPTURE
-      }
-    }).catch(sendError => {
-      logME("[ContentCaptureHandler] Error sending capture error:", sendError);
-    });
+    browser.runtime
+      .sendMessage({
+        action: "captureError",
+        data: {
+          error: error.message,
+          context,
+          type: error.type || ErrorTypes.SCREEN_CAPTURE,
+        },
+      })
+      .catch((sendError) => {
+        logME(
+          "[ContentCaptureHandler] Error sending capture error:",
+          sendError,
+        );
+      });
 
     // Show user-friendly error message
     this._showErrorNotification(
       `Screen capture ${context} failed. Please try again.`,
-      error
+      error,
     );
   }
 
@@ -383,16 +403,21 @@ export class ContentCaptureHandler {
    */
   _showErrorNotification(message, error) {
     // Send error notification request to background
-    browser.runtime.sendMessage({
-      action: "SHOW_ERROR_NOTIFICATION",
-      data: {
-        message,
-        error: error.message,
-        type: error.type || ErrorTypes.SCREEN_CAPTURE
-      }
-    }).catch(sendError => {
-      logME("[ContentCaptureHandler] Error sending error notification:", sendError);
-    });
+    browser.runtime
+      .sendMessage({
+        action: "SHOW_ERROR_NOTIFICATION",
+        data: {
+          message,
+          error: error.message,
+          type: error.type || ErrorTypes.SCREEN_CAPTURE,
+        },
+      })
+      .catch((sendError) => {
+        logME(
+          "[ContentCaptureHandler] Error sending error notification:",
+          sendError,
+        );
+      });
   }
 
   /**
@@ -412,7 +437,7 @@ export class ContentCaptureHandler {
       screenSelector: !!this.screenSelector,
       capturePreview: !!this.capturePreview,
       captureResult: !!this.captureResult,
-      isActive: this.isActive()
+      isActive: this.isActive(),
     };
   }
 }

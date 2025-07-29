@@ -30,18 +30,21 @@ export default class DiscordStrategy extends PlatformStrategy {
    * تشخیص ادیتور Slate.js دیسکورد
    */
   _isSlateEditor(element) {
-    return element.hasAttribute('data-slate-editor') && 
-           element.hasAttribute('data-slate-node') && 
-           element.getAttribute('data-slate-node') === 'value';
+    return (
+      element.hasAttribute("data-slate-editor") &&
+      element.hasAttribute("data-slate-node") &&
+      element.getAttribute("data-slate-node") === "value"
+    );
   }
 
   /**
    * پیدا کردن React Fiber برای دسترسی به instance کامپوننت
    */
   _getReactFiber(element) {
-    const fiberKey = Object.keys(element).find(key => 
-      key.startsWith('__reactInternalInstance') || 
-      key.startsWith('__reactFiber')
+    const fiberKey = Object.keys(element).find(
+      (key) =>
+        key.startsWith("__reactInternalInstance") ||
+        key.startsWith("__reactFiber"),
     );
     return fiberKey ? element[fiberKey] : null;
   }
@@ -61,11 +64,11 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       while (currentFiber && attempts < maxAttempts) {
         attempts++;
-        
+
         // بررسی props و state برای Slate editor
         if (currentFiber.memoizedProps) {
           const props = currentFiber.memoizedProps;
-          if (props.editor && typeof props.editor === 'object') {
+          if (props.editor && typeof props.editor === "object") {
             if (props.editor.children || props.editor.operations) {
               return props.editor;
             }
@@ -77,7 +80,10 @@ export default class DiscordStrategy extends PlatformStrategy {
         }
 
         // ادامه جستجو در والدین
-        currentFiber = currentFiber.return || currentFiber._debugOwner || currentFiber.parent;
+        currentFiber =
+          currentFiber.return ||
+          currentFiber._debugOwner ||
+          currentFiber.parent;
       }
 
       return null;
@@ -103,11 +109,11 @@ export default class DiscordStrategy extends PlatformStrategy {
       // تلاش برای استفاده از Slate Transforms
       if (window.Slate && window.Slate.Transforms) {
         const { Transforms, Editor } = window.Slate;
-        
+
         // انتخاب تمام محتوا
         Transforms.select(slateEditor, {
           anchor: Editor.start(slateEditor, []),
-          focus: Editor.end(slateEditor, [])
+          focus: Editor.end(slateEditor, []),
         });
 
         // حذف محتوای فعلی
@@ -146,18 +152,18 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       // شبیه‌سازی کلید حذف برای پاک کردن محتوا
       const deleteEvents = [
-        new KeyboardEvent('keydown', { 
-          key: 'Backspace', 
-          keyCode: 8, 
-          bubbles: true, 
-          cancelable: true 
+        new KeyboardEvent("keydown", {
+          key: "Backspace",
+          keyCode: 8,
+          bubbles: true,
+          cancelable: true,
         }),
-        new KeyboardEvent('keyup', { 
-          key: 'Backspace', 
-          keyCode: 8, 
-          bubbles: true, 
-          cancelable: true 
-        })
+        new KeyboardEvent("keyup", {
+          key: "Backspace",
+          keyCode: 8,
+          bubbles: true,
+          cancelable: true,
+        }),
       ];
 
       for (const event of deleteEvents) {
@@ -168,36 +174,44 @@ export default class DiscordStrategy extends PlatformStrategy {
       // شبیه‌سازی تایپ کردن متن جدید
       for (let i = 0; i < translatedText.length; i++) {
         const char = translatedText[i];
-        
+
         // رویداد keydown
-        element.dispatchEvent(new KeyboardEvent('keydown', {
-          key: char,
-          bubbles: true,
-          cancelable: true
-        }));
+        element.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: char,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
 
         // رویداد beforeinput
-        element.dispatchEvent(new InputEvent('beforeinput', {
-          inputType: 'insertText',
-          data: char,
-          bubbles: true,
-          cancelable: true
-        }));
+        element.dispatchEvent(
+          new InputEvent("beforeinput", {
+            inputType: "insertText",
+            data: char,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
 
         // رویداد input
-        element.dispatchEvent(new InputEvent('input', {
-          inputType: 'insertText',
-          data: char,
-          bubbles: true,
-          cancelable: true
-        }));
+        element.dispatchEvent(
+          new InputEvent("input", {
+            inputType: "insertText",
+            data: char,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
 
         // رویداد keyup
-        element.dispatchEvent(new KeyboardEvent('keyup', {
-          key: char,
-          bubbles: true,
-          cancelable: true
-        }));
+        element.dispatchEvent(
+          new KeyboardEvent("keyup", {
+            key: char,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
 
         // تاخیر کوتاه برای شبیه‌سازی واقعی‌تر
         if (i % 5 === 0) await delay(10);
@@ -229,37 +243,39 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       // کپی متن جدید در کلیپ‌بورد
       await navigator.clipboard.writeText(translatedText);
-      
+
       // ارسال رویداد beforeinput برای paste
-      const beforeInputEvent = new InputEvent('beforeinput', {
-        inputType: 'insertFromPaste',
+      const beforeInputEvent = new InputEvent("beforeinput", {
+        inputType: "insertFromPaste",
         bubbles: true,
-        cancelable: true
+        cancelable: true,
       });
       element.dispatchEvent(beforeInputEvent);
 
       // ارسال رویداد paste
-      const pasteEvent = new ClipboardEvent('paste', {
+      const pasteEvent = new ClipboardEvent("paste", {
         bubbles: true,
         cancelable: true,
-        clipboardData: new DataTransfer()
+        clipboardData: new DataTransfer(),
       });
-      
+
       // تنظیم داده‌های clipboard
-      pasteEvent.clipboardData.setData('text/plain', translatedText);
-      pasteEvent.clipboardData.setData('text/html', translatedText);
-      
+      pasteEvent.clipboardData.setData("text/plain", translatedText);
+      pasteEvent.clipboardData.setData("text/html", translatedText);
+
       element.dispatchEvent(pasteEvent);
 
       // تاخیر برای اعمال تغییرات
       await delay(100);
 
       // تأیید نهایی با input event
-      element.dispatchEvent(new InputEvent('input', {
-        inputType: 'insertFromPaste',
-        bubbles: true,
-        cancelable: true
-      }));
+      element.dispatchEvent(
+        new InputEvent("input", {
+          inputType: "insertFromPaste",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
 
       return true;
     } catch (error) {
@@ -274,7 +290,7 @@ export default class DiscordStrategy extends PlatformStrategy {
   async _fallbackExecCommand(element, translatedText) {
     try {
       element.focus();
-      
+
       // انتخاب تمام محتوا
       const selection = window.getSelection();
       if (selection) {
@@ -285,10 +301,16 @@ export default class DiscordStrategy extends PlatformStrategy {
       }
 
       // استفاده از execCommand
-      if (document.queryCommandSupported('insertText')) {
-        const success = document.execCommand('insertText', false, translatedText);
+      if (document.queryCommandSupported("insertText")) {
+        const success = document.execCommand(
+          "insertText",
+          false,
+          translatedText,
+        );
         if (success) {
-          element.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(
+            new Event("input", { bubbles: true, cancelable: true }),
+          );
           return true;
         }
       }
@@ -306,16 +328,20 @@ export default class DiscordStrategy extends PlatformStrategy {
     }
 
     // بررسی وجود modal shortcuts
-    const shortcutsModal = document.querySelector(".keyboardShortcutsModal_f061f6");
+    const shortcutsModal = document.querySelector(
+      ".keyboardShortcutsModal_f061f6",
+    );
     if (shortcutsModal) {
       return false;
     }
 
     let success = false;
 
-
     try {
-      logME("[DiscordStrategy] شروع به‌روزرسانی element با متن:", translatedText.substring(0, 50) + "...");
+      logME(
+        "[DiscordStrategy] شروع به‌روزرسانی element با متن:",
+        translatedText.substring(0, 50) + "...",
+      );
 
       // روش 1: استفاده از Slate API (بهترین روش)
       if (this._isSlateEditor(element)) {
@@ -344,26 +370,28 @@ export default class DiscordStrategy extends PlatformStrategy {
       // تأیید نهایی و تنظیمات
       if (success) {
         await delay(100);
-        
+
         // بررسی صحت به‌روزرسانی
         const finalText = this.extractText(element);
         if (finalText.trim() === translatedText.trim()) {
           logME("[DiscordStrategy] به‌روزرسانی با موفقیت تأیید شد");
-          
+
           // اعمال direction
           this.applyTextDirection(element, translatedText);
-          
+
           // اعمال visual feedback
           await this.applyVisualFeedback(element);
-          
+
           // فوکوس مجدد برای حفظ حالت ادیتور
           element.focus();
-          
+
           // تنظیم cursor در انتهای متن
           const selection = window.getSelection();
           if (selection) {
             const range = document.createRange();
-            const textNode = element.querySelector('[data-slate-string="true"]');
+            const textNode = element.querySelector(
+              '[data-slate-string="true"]',
+            );
             if (textNode && textNode.firstChild) {
               range.setStart(textNode.firstChild, textNode.textContent.length);
               range.setEnd(textNode.firstChild, textNode.textContent.length);
@@ -371,13 +399,16 @@ export default class DiscordStrategy extends PlatformStrategy {
               selection.addRange(range);
             }
           }
-          
         } else {
-          logME("[DiscordStrategy] متن نهایی مطابقت نداشت. انتظار:", translatedText.trim(), "دریافت:", finalText.trim());
+          logME(
+            "[DiscordStrategy] متن نهایی مطابقت نداشت. انتظار:",
+            translatedText.trim(),
+            "دریافت:",
+            finalText.trim(),
+          );
           success = false;
         }
       }
-
     } catch (error) {
       logME("[DiscordStrategy] خطای عمومی در updateElement:", error);
       success = false;

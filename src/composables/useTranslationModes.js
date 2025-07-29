@@ -1,9 +1,9 @@
 // src/composables/useTranslationModes.js
-import { ref, reactive } from 'vue';
-import { TranslationService } from '../error-management/TranslationService.js';
-import { logME } from '@/utils/helpers.js';
-import { useLanguages } from '@/composables/useLanguages.js';
-import { AUTO_DETECT_VALUE } from '@/constants.js';
+import { ref, reactive } from "vue";
+import { TranslationService } from "../error-management/TranslationService.js";
+import { logME } from "@/utils/helpers.js";
+import { useLanguages } from "@/composables/useLanguages.js";
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 /**
  * Composable برای مدیریت Sidepanel Translation Mode
@@ -23,12 +23,12 @@ export function useSidepanelTranslation() {
    */
   const translateText = async (text, sourceLang, targetLang) => {
     if (!text?.trim()) {
-      error.value = 'Text is required for translation';
+      error.value = "Text is required for translation";
       return null;
     }
 
     if (!targetLang || targetLang === AUTO_DETECT_VALUE) {
-      error.value = 'Target language is required';
+      error.value = "Target language is required";
       return null;
     }
 
@@ -39,35 +39,36 @@ export function useSidepanelTranslation() {
     try {
       // تبدیل display names به language codes
       const languages = useLanguages();
-      const sourceLangCode = languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
+      const sourceLangCode =
+        languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
       const targetLangCode = languages.getLanguagePromptName(targetLang);
 
-      logME('[useSidepanelTranslation] Starting translation:', {
-        text: text.substring(0, 50) + '...',
+      logME("[useSidepanelTranslation] Starting translation:", {
+        text: text.substring(0, 50) + "...",
         sourceLangCode,
-        targetLangCode
+        targetLangCode,
       });
 
       const response = await TranslationService.sidepanelTranslate(
         text,
         sourceLangCode,
-        targetLangCode
+        targetLangCode,
       );
 
       if (response?.success) {
         result.value = response;
-        logME('[useSidepanelTranslation] Translation successful');
+        logME("[useSidepanelTranslation] Translation successful");
         return response;
       } else {
-        const errorMsg = response?.error || 'Translation failed';
+        const errorMsg = response?.error || "Translation failed";
         error.value = errorMsg;
-        logME('[useSidepanelTranslation] Translation failed:', errorMsg);
+        logME("[useSidepanelTranslation] Translation failed:", errorMsg);
         return null;
       }
     } catch (err) {
-      const errorMsg = err.message || 'Translation error occurred';
+      const errorMsg = err.message || "Translation error occurred";
       error.value = errorMsg;
-      logME('[useSidepanelTranslation] Translation error:', err);
+      logME("[useSidepanelTranslation] Translation error:", err);
       return null;
     } finally {
       isLoading.value = false;
@@ -88,10 +89,10 @@ export function useSidepanelTranslation() {
     isLoading,
     result,
     error,
-    
+
     // Methods
     translateText,
-    clearState
+    clearState,
   };
 }
 
@@ -112,16 +113,16 @@ export function useSelectElementTranslation() {
     error.value = null;
 
     try {
-      logME('[useSelectElementTranslation] Activating select element mode');
-      
+      logME("[useSelectElementTranslation] Activating select element mode");
+
       await TranslationService.activateSelectElementMode(true);
-      
-      logME('[useSelectElementTranslation] Select element mode activated');
+
+      logME("[useSelectElementTranslation] Select element mode activated");
       return true;
     } catch (err) {
-      const errorMsg = err.message || 'Failed to activate select element mode';
+      const errorMsg = err.message || "Failed to activate select element mode";
       error.value = errorMsg;
-      logME('[useSelectElementTranslation] Error activating select mode:', err);
+      logME("[useSelectElementTranslation] Error activating select mode:", err);
       return false;
     } finally {
       isActivating.value = false;
@@ -134,16 +135,20 @@ export function useSelectElementTranslation() {
    */
   const deactivateSelectMode = async () => {
     try {
-      logME('[useSelectElementTranslation] Deactivating select element mode');
-      
+      logME("[useSelectElementTranslation] Deactivating select element mode");
+
       await TranslationService.activateSelectElementMode(false);
-      
-      logME('[useSelectElementTranslation] Select element mode deactivated');
+
+      logME("[useSelectElementTranslation] Select element mode deactivated");
       return true;
     } catch (err) {
-      const errorMsg = err.message || 'Failed to deactivate select element mode';
+      const errorMsg =
+        err.message || "Failed to deactivate select element mode";
       error.value = errorMsg;
-      logME('[useSelectElementTranslation] Error deactivating select mode:', err);
+      logME(
+        "[useSelectElementTranslation] Error deactivating select mode:",
+        err,
+      );
       return false;
     }
   };
@@ -152,10 +157,10 @@ export function useSelectElementTranslation() {
     // State
     isActivating,
     error,
-    
+
     // Methods
     activateSelectMode,
-    deactivateSelectMode
+    deactivateSelectMode,
   };
 }
 
@@ -176,16 +181,16 @@ export function useSidepanelActions() {
     error.value = null;
 
     try {
-      logME('[useSidepanelActions] Reverting translation');
-      
+      logME("[useSidepanelActions] Reverting translation");
+
       await TranslationService.revertTranslation();
-      
-      logME('[useSidepanelActions] Translation reverted successfully');
+
+      logME("[useSidepanelActions] Translation reverted successfully");
       return true;
     } catch (err) {
-      const errorMsg = err.message || 'Failed to revert translation';
+      const errorMsg = err.message || "Failed to revert translation";
       error.value = errorMsg;
-      logME('[useSidepanelActions] Error reverting translation:', err);
+      logME("[useSidepanelActions] Error reverting translation:", err);
       return false;
     } finally {
       isProcessing.value = false;
@@ -198,11 +203,14 @@ export function useSidepanelActions() {
    */
   const stopTTS = async () => {
     try {
-      logME('[useSidepanelActions] Stopping TTS');
+      logME("[useSidepanelActions] Stopping TTS");
       await TranslationService.stopTTS();
     } catch (err) {
       // خطاها در TTS معمولاً مهم نیستند
-      logME('[useSidepanelActions] TTS stop failed (might not be active):', err);
+      logME(
+        "[useSidepanelActions] TTS stop failed (might not be active):",
+        err,
+      );
     }
   };
 
@@ -210,10 +218,10 @@ export function useSidepanelActions() {
     // State
     isProcessing,
     error,
-    
+
     // Methods
     revertTranslation,
-    stopTTS
+    stopTTS,
   };
 }
 

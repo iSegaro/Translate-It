@@ -12,13 +12,13 @@ export function applyTheme(theme) {
   let effectiveTheme = theme;
   if (theme === "auto") {
     const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
+      "(prefers-color-scheme: dark)",
     ).matches;
     effectiveTheme = prefersDark ? "dark" : "light";
   }
   // Ensure effectiveTheme is either 'light' or 'dark'
-  if (effectiveTheme !== 'light' && effectiveTheme !== 'dark') {
-    effectiveTheme = 'light'; // Default to light if something unexpected happens
+  if (effectiveTheme !== "light" && effectiveTheme !== "dark") {
+    effectiveTheme = "light"; // Default to light if something unexpected happens
   }
   root.classList.add(`theme-${effectiveTheme}`);
 }
@@ -31,11 +31,13 @@ export function applyTheme(theme) {
  */
 export function getResolvedUserTheme(themePreference) {
   if (themePreference === "auto") {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+      ).matches;
       return prefersDark ? "dark" : "light";
     }
     return "light"; // Fallback if window.matchMedia is not available
   }
-  return (themePreference === 'dark') ? 'dark' : 'light'; // Ensure only 'light' or 'dark'
+  return themePreference === "dark" ? "dark" : "light"; // Ensure only 'light' or 'dark'
 }
