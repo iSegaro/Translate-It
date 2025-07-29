@@ -165,28 +165,21 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
 import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
 import { useSelectElementTranslation } from "@/composables/useSelectElementTranslation.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
-import { UnifiedTranslationClient } from "@/core/UnifiedTranslationClient.js";
-import { useSettingsStore } from "@/store/core/settings.js";
 import { useHistory } from "@/composables/useHistory.js";
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
-const browserAPI = useBrowserAPI();
 const tts = useTTSSmart();
 const backgroundWarmup = useBackgroundWarmup();
 const selectElement = useSelectElementTranslation();
 const { t } = useI18n();
-
-// Settings Store
-const settingsStore = useSettingsStore();
 
 // Translation Composable - SAME AS POPUP
 const translation = useSidepanelTranslation();
@@ -197,10 +190,8 @@ const {
   translatedText,
   isTranslating,
   translationError,
-  hasTranslation,
   canTranslate,
   triggerTranslation,
-  clearTranslation,
   loadLastTranslation
 } = translation;
 
@@ -219,7 +210,7 @@ const hasSourceContent = computed(() => {
 
 const hasTranslationContent = computed(() => {
   return (
-    (translationResult.value || translationError.value || "").trim().length > 0
+    (translatedText.value || translationError.value || "").trim().length > 0
   );
 });
 
@@ -350,7 +341,7 @@ const copySourceText = async () => {
 // Copy translation text to clipboard
 const copyTranslationText = async () => {
   try {
-    await navigator.clipboard.writeText(translationResult.value);
+    await navigator.clipboard.writeText(translatedText.value);
     console.log("[SidepanelMainContent] Translation copied to clipboard");
   } catch (error) {
     console.error("[SidepanelMainContent] Failed to copy translation:", error);
@@ -448,7 +439,7 @@ const speakSourceText = async () => {
 const speakTranslationText = async () => {
   const targetLanguage = targetLanguageValue.value || "auto";
   const langCode = getLanguageCode(targetLanguage);
-  await tts.speak(translationResult.value, langCode);
+  await tts.speak(translatedText.value, langCode);
   console.log(
     "[SidepanelMainContent] Translation TTS started with language:",
     langCode,

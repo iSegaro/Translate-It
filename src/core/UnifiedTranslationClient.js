@@ -20,14 +20,6 @@ export class UnifiedTranslationClient {
    */
   async translate(sourceText, targetLanguage, options = {}) {
     try {
-      console.log(
-        `[UnifiedTranslationClient:${this.context}] 🔧 Starting translation with:`,
-        {
-          sourceText: sourceText.substring(0, 100) + "...",
-          targetLanguage,
-          options,
-        },
-      );
 
       // Use simplified messenger - format according to OLD implementation pattern
       const payload = {
@@ -39,20 +31,7 @@ export class UnifiedTranslationClient {
         options: options,
       };
 
-      console.log(
-        `[UnifiedTranslationClient:${this.context}] 🔧 Prepared payload for messenger:`,
-        payload,
-      );
-
-      console.log(
-        `[UnifiedTranslationClient:${this.context}] 🔧 About to call messenger.translate()`,
-      );
       const response = await this.messenger.translate(payload);
-
-      console.log(
-        `[UnifiedTranslationClient:${this.context}] 🔧 Translation response received:`,
-        response,
-      );
       return response;
     } catch (error) {
       console.error(

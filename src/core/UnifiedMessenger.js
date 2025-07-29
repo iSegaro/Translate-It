@@ -19,12 +19,7 @@ export class UnifiedMessenger {
   async sendMessage(message, timeout = 10000) {
     const messageId = `${this.context}-${++this.messageCounter}-${Date.now()}`;
 
-    console.log(`[UnifiedMessenger:${this.context}] Sending message:`, message);
-
     try {
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📤 About to send message`,
-      );
 
       // Manual Promise wrapper to fix webextension-polyfill Firefox bug
       const response = await new Promise((resolve, reject) => {
@@ -36,16 +31,8 @@ export class UnifiedMessenger {
           );
         }, timeout);
 
-        // Detect browser environment for debugging only
+        // Detect browser environment for Firefox workaround
         const isFirefox = typeof InstallTrigger !== "undefined";
-
-        console.log(
-          `[UnifiedMessenger:${this.context}] 🔧 Browser detection:`,
-          { isFirefox },
-        );
-        console.log(
-          `[UnifiedMessenger:${this.context}] 🔧 Using webextension-polyfill for cross-browser compatibility`,
-        );
 
         const messageToSend = {
           ...message,
@@ -54,9 +41,6 @@ export class UnifiedMessenger {
         };
 
         // Use webextension-polyfill for all browsers to ensure consistent behavior
-        console.log(
-          `[UnifiedMessenger:${this.context}] 🔧 Calling browser.runtime.sendMessage via webextension-polyfill`,
-        );
 
         try {
           const sendMessagePromise = browser.runtime.sendMessage(messageToSend);
@@ -65,22 +49,12 @@ export class UnifiedMessenger {
             sendMessagePromise &&
             typeof sendMessagePromise.then === "function"
           ) {
-            console.log(
-              `[UnifiedMessenger:${this.context}] 🔧 Using Promise-based approach`,
-            );
             sendMessagePromise
               .then((response) => {
                 clearTimeout(timeoutId);
-                console.log(
-                  `[UnifiedMessenger:${this.context}] 🔧 Promise response:`,
-                  response,
-                );
 
                 // Firefox MV3 workaround: check if response is undefined but message was actually processed
                 if (response === undefined && isFirefox) {
-                  console.warn(
-                    `[UnifiedMessenger:${this.context}] 🔧 Firefox MV3 undefined response - using fallback`,
-                  );
                   // For ping messages, we know it should work, so provide expected response
                   if (messageToSend.action === "ping") {
                     resolve({ success: true, message: "pong" });
@@ -114,48 +88,16 @@ export class UnifiedMessenger {
               })
               .catch((error) => {
                 clearTimeout(timeoutId);
-                console.error(
-                  `[UnifiedMessenger:${this.context}] 🔧 Promise error:`,
-                  error,
-                );
                 reject(error);
               });
           } else {
-            console.error(
-              `[UnifiedMessenger:${this.context}] 🔧 No Promise support available`,
-            );
             reject(new Error("Browser API does not support Promise"));
           }
         } catch (error) {
           clearTimeout(timeoutId);
-          console.error(
-            `[UnifiedMessenger:${this.context}] 🔧 sendMessage call failed:`,
-            error,
-          );
           reject(error);
         }
       });
-
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📥 Raw response received:`,
-        response,
-      );
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📥 Response type:`,
-        typeof response,
-      );
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📥 Response is null?`,
-        response === null,
-      );
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📥 Response is undefined?`,
-        response === undefined,
-      );
-      console.log(
-        `[UnifiedMessenger:${this.context}] 📥 Response stringified:`,
-        JSON.stringify(response),
-      );
 
       return response;
     } catch (error) {
@@ -171,10 +113,6 @@ export class UnifiedMessenger {
    * Translation-specific wrapper
    */
   async translate(payload) {
-    console.log(
-      `[UnifiedMessenger:${this.context}] 🔧 translate() called with payload:`,
-      payload,
-    );
 
     // Format message according to translation-protocol.js standard
     const message = {
@@ -183,18 +121,7 @@ export class UnifiedMessenger {
       data: payload, // Use 'data' instead of 'payload' to match protocol
     };
 
-    console.log(
-      `[UnifiedMessenger:${this.context}] 🔧 About to send TRANSLATE message:`,
-      message,
-    );
-
     const result = await this.sendMessage(message);
-
-    console.log(
-      `[UnifiedMessenger:${this.context}] 🔧 TRANSLATE response received:`,
-      result,
-    );
-
     return result;
   }
 
