@@ -536,6 +536,103 @@ class BackgroundService {
   }
 
   /**
+   * Process selected element and broadcast to Vue components
+   * @param {Object} elementData - Element data from content script
+   * @returns {Promise<Object>} Processing result
+   */
+  async processSelectedElement(elementData) {
+    console.log("[BackgroundService] Processing selected element:", elementData);
+    
+    try {
+      const { element, text, coordinates, tabId, sender } = elementData;
+      
+      // Validate input
+      if (!text || text.trim().length === 0) {
+        throw new Error("No text provided for element selection");
+      }
+      
+      // Broadcast element selection to all listeners (Vue components)
+      try {
+        await this.broadcastMessage({
+          action: "elementSelected",
+          data: {
+            element,
+            text: text.trim(),
+            coordinates,
+            tabId,
+            timestamp: Date.now()
+          }
+        });
+        
+        console.log("[BackgroundService] Element selection broadcasted to Vue components");
+      } catch (broadcastError) {
+        console.warn("[BackgroundService] Failed to broadcast element selection:", broadcastError);
+        // Continue processing even if broadcast fails
+      }
+      
+      // Return success result
+      return {
+        success: true,
+        text: text.trim(),
+        element,
+        processed: true
+      };
+      
+    } catch (error) {
+      console.error("[BackgroundService] Error processing selected element:", error);
+      
+      // Broadcast error to Vue components
+      try {
+        await this.broadcastMessage({
+          action: "elementSelectionError", 
+          data: {
+            error: error.message,
+            timestamp: Date.now()
+          }
+        });
+      } catch (broadcastError) {
+        console.warn("[BackgroundService] Failed to broadcast selection error:", broadcastError);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Broadcast message to all extension contexts (Vue components)
+   * @param {Object} message - Message to broadcast
+   */
+  async broadcastMessage(message) {
+    try {
+      // Send to all tabs that might have content scripts
+      const tabs = await browser.tabs.query({});
+      
+      const broadcastPromises = tabs.map(async (tab) => {
+        try {
+          await browser.tabs.sendMessage(tab.id, message);
+        } catch (error) {
+          // Ignore errors for tabs without content scripts
+          // This is expected behavior
+        }
+      });
+      
+      // Send to sidepanel and popup if they exist
+      try {
+        await browser.runtime.sendMessage(message);
+      } catch (error) {
+        // Ignore if no popup/sidepanel is open
+      }
+      
+      await Promise.allSettled(broadcastPromises);
+      
+      console.log(`[BackgroundService] Message ${message.action} broadcasted to ${tabs.length} tabs`);
+    } catch (error) {
+      console.error("[BackgroundService] Broadcast failed:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Test update notification (for development)
    */
   async testUpdateNotification(reason = "update") {
