@@ -855,9 +855,10 @@ export class SelectElementManager {
 }
 
 // Export singleton instance
-export const selectElementManager = new SelectElementManager();
+// Export singleton instance
+// export const selectElementManager = new SelectElementManager();
 
 // Auto-initialize when script loads
-if (typeof document !== "undefined") {
-  selectElementManager.initialize();
-}
+// if (typeof document !== "undefined") {
+//   selectElementManager.initialize();
+// }

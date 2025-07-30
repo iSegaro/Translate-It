@@ -632,6 +632,7 @@ export default class EventHandler {
       };
     } finally {
       if (statusNotif) {
+        logME("[EventHandler] Dismissing status notification in finally block.");
         this.notifier.dismiss(statusNotif);
       }
     }

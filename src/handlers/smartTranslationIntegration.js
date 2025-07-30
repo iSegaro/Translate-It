@@ -10,7 +10,7 @@
 //   }
 // It also includes functions to copy translations to the clipboard and manage notifications.
 
-import { smartTranslate } from "../backgrounds/bridgeIntegration.js";
+
 import {
   TranslationMode,
   getREPLACE_SPECIAL_SITESAsync,
@@ -66,7 +66,10 @@ export async function translateFieldViaSmartHandler({
     translationHandler.detectPlatform?.(target) ?? detectPlatform(target);
 
   try {
-    const response = await smartTranslate(text, mode);
+    const response = await browser.runtime.sendMessage({
+      action: "fetchTranslationBackground",
+      payload: { promptText: text, translationMode: mode },
+    });
 
     if (response?.success === false) {
       const err = new Error(response.error || ErrorTypes.API);

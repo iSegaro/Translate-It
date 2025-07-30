@@ -350,7 +350,8 @@ export function useSelectElementTranslation() {
   /**
    * Storage change listener for external updates (e.g., from OLD system)
    */
-  const setupStorageListener = () => {
+  const setupStorageListener = async () => {
+    await browserAPI.ensureReady();
     const storageListener = (changes, areaName) => {
       if (areaName === 'local' && changes.selectElementState) {
         const newState = !!changes.selectElementState.newValue;
@@ -514,11 +515,11 @@ export function useSelectElementTranslation() {
   let storageListenerCleanup = null;
 
   // Setup message listener on mount
-  onMounted(() => {
+  onMounted(async () => {
     setupBackgroundListener();
     
     // Setup storage listener for external state changes
-    storageListenerCleanup = setupStorageListener();
+    storageListenerCleanup = await setupStorageListener();
     
     // Load initial state from storage
     loadCurrentState().catch((error) => {

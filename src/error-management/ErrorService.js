@@ -2,7 +2,6 @@
 
 import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/NotificationManager.js";
-import { openOptionsPage } from "../utils/helpers.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
@@ -49,12 +48,32 @@ const OPEN_SETTINGS = new Set([
   ErrorTypes.GEMINI_QUOTA_REGION,
 ]);
 
+let _instance = null; // Singleton instance
+
 export class ErrorHandler {
   constructor() {
-    this.notifier = new NotificationManager();
+    if (_instance) {
+      return _instance;
+    }
+    this.notifier = NotificationManager.getInstance(); // Get singleton instance
     this.displayedErrors = new Set();
     this.handling = false;
+    this.openOptionsPageCallback = null; // Property to hold the callback
+    _instance = this; // Set singleton instance
   }
+
+  // Method to set the callback from outside
+  setOpenOptionsPageCallback(callback) {
+    this.openOptionsPageCallback = callback;
+  }
+
+  static getInstance() {
+    if (!_instance) {
+      _instance = new ErrorHandler();
+    }
+    return _instance;
+  }
+
   static async processError(err) {
     return err?.then ? await err : err;
   }
@@ -71,9 +90,11 @@ export class ErrorHandler {
       }
       if (SILENT.has(type)) return err;
 
-      const action = OPEN_SETTINGS.has(type)
-        ? () => openOptionsPage("api")
-        : undefined;
+      // Use the stored callback
+      const action =
+        OPEN_SETTINGS.has(type) && this.openOptionsPageCallback
+          ? () => this.openOptionsPageCallback("api")
+          : undefined;
 
       this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
       return err;
@@ -84,7 +105,10 @@ export class ErrorHandler {
 
   _logError(error, meta) {
     console.error(
-      `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
+      `[ErrorService] ${error.name}: ${error.message}
+Context: ${meta.context}
+Type: ${meta.type}
+Stack: ${error.stack}`,
     );
   }
 
@@ -116,6 +140,6 @@ export class ErrorHandler {
 }
 
 export async function handleUIError(err, context = "") {
-  const handler = new ErrorHandler();
+  const handler = ErrorHandler.getInstance();
   return handler.handle(err, { type: ErrorTypes.UI, context });
 }

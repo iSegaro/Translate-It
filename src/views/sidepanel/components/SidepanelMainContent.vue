@@ -557,26 +557,7 @@ const getLanguageDisplayName = (langCode) => {
   return languageMap[langCode] || langCode;
 };
 
-// Select Element integration - auto-populate form
-const handleTextExtracted = (extractedText, _elementData) => {
-  console.log(
-    "[SidepanelMainContent] Text extracted from element:",
-    extractedText,
-  );
 
-  // Populate source text
-  sourceText.value = extractedText;
-
-  // Clear previous translation and error - use composable state
-  translatedText.value = "";
-  translationError.value = "";
-
-  // Optional: Auto-trigger translation
-  // You can add a setting for this later
-  // if (settings.autoTranslateOnSelection) {
-  //   handleTranslationSubmit()
-  // }
-};
 
 // Lifecycle - setup event listeners
 onMounted(async () => {
@@ -595,8 +576,7 @@ onMounted(async () => {
   document.addEventListener("focus", handleFocus, true);
   window.addEventListener("focus", handleFocus);
 
-  // Setup Select Element text extraction handler
-  selectElement.onTextExtracted.value = handleTextExtracted;
+  
 
   // Message listener is now handled by useSidepanelTranslation composable - SAME AS POPUP
 

@@ -45,3 +45,28 @@ html, body {
     width: 100%;
     height: 100%;
 }
+
+.translate-it-select-highlight {
+  outline: 2px solid #4a90e2 !important;
+  outline-offset: 2px !important;
+  background-color: rgba(74, 144, 226, 0.1) !important;
+}
+
+.translate-it-select-overlay {
+  animation: translateItSelectPulse 2s infinite;
+}
+
+@keyframes translateItSelectPulse {
+  0%, 100% {
+    background-color: rgba(74, 144, 226, 0.3);
+    border-color: #4a90e2;
+  }
+  50% {
+    background-color: rgba(74, 144, 226, 0.5);
+    border-color: #2171b5;
+  }
+}
+
+.translate-it-cursor-select {
+  cursor: crosshair !important;
+}

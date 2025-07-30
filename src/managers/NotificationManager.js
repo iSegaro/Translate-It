@@ -14,8 +14,14 @@ const SAFE_ICONS = {
   ICON_REVERT: "↩️",
 };
 
+let _instance = null; // Singleton instance
+
 export default class NotificationManager {
   constructor(errorHandler) {
+    if (_instance) {
+      return _instance;
+    }
+
     this.errorHandler = errorHandler || { handle: () => {} };
     this.map = {
       error: {
@@ -59,9 +65,15 @@ export default class NotificationManager {
     this.container = null;
     this.canShowInPage = false;
 
-    // [REFACTOR] The premature initialization call is removed from the constructor.
-    // The container will be created on-demand by the `show` method.
-    // this._initializeContainer();
+    _instance = this; // Set singleton instance
+    this.initialize(); // Initialize on construction
+  }
+
+  static getInstance(errorHandler) {
+    if (!_instance) {
+      _instance = new NotificationManager(errorHandler);
+    }
+    return _instance;
   }
 
   initialize() {

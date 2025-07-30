@@ -1,38 +1,29 @@
 // src/utils/helpers.js
 import browser from "webextension-polyfill";
-import { ErrorHandler } from "../error-management/ErrorHandler.js";
+import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { IsDebug } from "../config.js";
 
-const errorHandler = new ErrorHandler();
+// Lazy loader for ErrorHandler to break circular dependency
+let errorHandlerInstance = null;
+const getErrorHandler = () => {
+  if (!errorHandlerInstance) {
+    errorHandlerInstance = ErrorHandler.getInstance();
+  }
+  return errorHandlerInstance;
+};
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Decorator برای افزودن لاگینگ به ابتدای متد
+ * Decorator for logging method calls for debugging purposes.
  */
 export function logMethod(target, propertyKey, descriptor) {
+  // This is disabled but kept for potential future debugging.
   void target;
   void propertyKey;
   void descriptor;
   return;
-  // const originalMethod = descriptor.value;
-  // descriptor.value = async function (...args) {
-  //   try {
-  //     const isDebugEnabled = await IsDebug();
-  //     if (isDebugEnabled) {
-  //       const className = target.constructor.name;
-  //       console.debug(`[${className}.${propertyKey}]`, ...args);
-  //     }
-  //     const result = await originalMethod.apply(this, args);
-  //     return result;
-  //   } catch (error) {
-  //     const className = target.constructor.name;
-  //     console.error(`[${className}.${propertyKey}] Error:`, error);
-  //     throw error;
-  //   }
-  // };
-  // return descriptor;
 }
 
 export const logME = (...args) => {
@@ -43,73 +34,49 @@ export const logME = (...args) => {
   // });
 };
 
+/**
+ * Injects a CSS file into the document's head.
+ * @param {string} cssPath - The path to the CSS file from the extension's root.
+ */
+export function injectIconStyle(cssPath) {
+  try {
+    const link = document.createElement("link");
+    link.href = browser.runtime.getURL(cssPath);
+    link.type = "text/css";
+    link.rel = "stylesheet";
+    (document.head || document.documentElement).appendChild(link);
+  } catch (error) {
+    getErrorHandler().handle(error, {
+      type: ErrorTypes.UI,
+      context: "injectIconStyle",
+    });
+  }
+}
+
 export const isEditable = (element) => {
-  // اگر عنصری وجود ندارد، false برگردان
-  if (!element) {
-    return false;
-  }
-
-  // ۱. بررسی مستقیم ویژگی isContentEditable که سریع‌ترین راه است.
-  if (element.isContentEditable) {
-    return true;
-  }
-
-  // ۲. بررسی برای <textarea>
-  if (element.tagName === "TEXTAREA") {
-    return true;
-  }
-
-  // ۳. بررسی دقیق برای <input>
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  if (element.tagName === "TEXTAREA") return true;
   if (element.tagName === "INPUT") {
-    // لیستی از انواع input که قابلیت ورود متن دارند.
-    // استفاده از Set برای جستجوی سریع و بهینه.
     const textEntryTypes = new Set([
-      "text",
-      "search",
-      "url",
-      "tel",
-      "email",
-      "password",
-      "number",
-      "date",
-      "month",
-      "week",
-      "time",
-      "datetime-local",
+      "text", "search", "url", "tel", "email", "password", "number",
+      "date", "month", "week", "time", "datetime-local",
     ]);
     return textEntryTypes.has(element.type.toLowerCase());
   }
-
-  // ۴. در نهایت، بررسی اینکه آیا عنصر داخل یک والد contenteditable قرار دارد یا خیر.
-  // این بررسی بعد از موارد دیگر انجام می‌شود چون کمی هزینه‌برتر است.
-  if (element.closest && element.closest('[contenteditable="true"]')) {
-    return true;
-  }
-
-  // در غیر این صورت، عنصر قابل ویرایش نیست.
+  if (element.closest && element.closest('[contenteditable="true"]')) return true;
   return false;
 };
 
 export const Is_Element_Need_to_RTL_Localize = (element) => {
-  // اگر element دارای isContentEditable باشد یا به صورت contenteditable باشد
   if (element?.isContentEditable) return true;
-
-  // اگر تگ آن TEXTAREA است
   if (element?.tagName === "TEXTAREA") return true;
-
-  // اگر تگ آن INPUT است، بررسی کنید نوع آن آیا متنی یا checkbox هست
   if (element?.tagName === "INPUT") {
     const inputType = element.getAttribute("type")?.toLowerCase() || "text";
     return ["text", "checkbox"].includes(inputType);
   }
-
-  // اگر تگ المان H2، LABEL یا SPAN است، true برگردانید
   if (["H2", "LABEL", "SPAN"].includes(element?.tagName)) return true;
-
-  // اگر المان در داخل یک المان دارای contenteditable قرار دارد
-  if (element?.closest && element.closest('[contenteditable="true"]'))
-    return true;
-
+  if (element?.closest && element.closest('[contenteditable="true"]')) return true;
   return false;
 };
 
@@ -137,254 +104,67 @@ export const openOptionsPage_from_Background = (message) => {
   const optionsPath = "html/options.html";
   const baseUrl = browser.runtime.getURL(optionsPath);
   const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
-
-  console.log("[openOptionsPage_from_Background] baseUrl:", baseUrl);
-  console.log("[openOptionsPage_from_Background] finalUrl:", finalUrl);
-
-  // This logic runs safely in the background context
-  browser.tabs
-    .query({})
-    .then((tabs) => {
-      // لاگ کردن همه URLs برای debugging
-      console.log(
-        "[openOptionsPage_from_Background] All tab URLs:",
-        tabs.map((tab) => tab.url),
-      );
-
-      // پیدا کردن همه تب‌های مربوط به صفحه تنظیمات - فقط path را چک کنیم (بدون extension ID)
-      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, "");
-      console.log(
-        "[openOptionsPage_from_Background] Looking for path:",
-        targetPath,
-      );
-
-      const existingTabs = tabs.filter((tab) => {
-        if (!tab.url) return false;
-        const tabPath = tab.url
-          .split("#")[0]
-          .replace(/^chrome-extension:\/\/[^/]+/, "");
-        const matches = tabPath === targetPath;
-        console.log(
-          "[openOptionsPage_from_Background] Comparing path:",
-          tabPath,
-          "===",
-          targetPath,
-          "→",
-          matches,
-        );
-        return matches;
-      });
-      console.log(
-        "[openOptionsPage_from_Background] Found existing tabs:",
-        existingTabs.length,
-        existingTabs.map((tab) => tab.url),
-      );
-
-      if (existingTabs.length > 0) {
-        // استفاده از اولین تب موجود و بستن بقیه
-        const firstTab = existingTabs[0];
-        const duplicateTabs = existingTabs.slice(1);
-
-        // بستن تب‌های اضافی (duplicate)
-        if (duplicateTabs.length > 0) {
-          const duplicateTabIds = duplicateTabs.map((tab) => tab.id);
-          browser.tabs.remove(duplicateTabIds).catch((err) => {
-            console.error("Error closing duplicate options tabs:", err);
-          });
-        }
-
-        // به‌روزرسانی و فوکوس کردن اولین تب
-        browser.tabs
-          .update(firstTab.id, { active: true, url: finalUrl })
-          .then((updatedTab) => {
-            if (updatedTab)
-              browser.windows.update(updatedTab.windowId, { focused: true });
-          })
-          .catch((err) => {
-            console.error("Error updating options tab:", err);
-            // اگر خطا رخ داد، تب جدید ایجاد کن
-            browser.tabs.create({ url: finalUrl });
-          });
-      } else {
-        // هیچ تب موجودی یافت نشد، تب جدید ایجاد کن
-        browser.tabs.create({ url: finalUrl });
-      }
-    })
-    .catch((err) => {
-      console.error("Error querying tabs:", err);
-      // در صورت خطا، مستقیماً تب جدید ایجاد کن
-      browser.tabs.create({ url: finalUrl });
-    });
+  focusOrCreateTab(finalUrl);
 };
 
-/**
- * A robust function to open an extension page.
- * It checks if tabs with the same base URL are already open, closes duplicates, and focuses one.
- * If found, it updates and focuses the existing tab. Otherwise, it creates a new one.
- * @param {string} url - The full URL of the extension page to open (e.g., including #anchor).
- */
 export function focusOrCreateTab(url) {
   const baseUrl = url.split("#")[0];
-  console.log("[focusOrCreateTab] Looking for tabs with baseUrl:", baseUrl);
-
-  browser.tabs
-    .query({})
-    .then((tabs) => {
-      // لاگ کردن همه URLs برای debugging
-      console.log(
-        "[focusOrCreateTab] All tab URLs:",
-        tabs.map((tab) => tab.url),
-      );
-
-      // پیدا کردن همه تب‌های مربوط به این صفحه - فقط path را چک کنیم (بدون extension ID)
-      const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, "");
-      console.log("[focusOrCreateTab] Looking for path:", targetPath);
-
-      const existingTabs = tabs.filter((tab) => {
-        if (!tab.url) return false;
-        const tabPath = tab.url
-          .split("#")[0]
-          .replace(/^chrome-extension:\/\/[^/]+/, "");
-        const matches = tabPath === targetPath;
-        console.log(
-          "[focusOrCreateTab] Comparing path:",
-          tabPath,
-          "===",
-          targetPath,
-          "→",
-          matches,
-        );
-        return matches;
-      });
-      console.log(
-        "[focusOrCreateTab] Found existing tabs:",
-        existingTabs.length,
-        existingTabs.map((tab) => tab.url),
-      );
-
-      if (existingTabs.length > 0) {
-        // استفاده از اولین تب موجود و بستن بقیه
-        const firstTab = existingTabs[0];
-        const duplicateTabs = existingTabs.slice(1);
-
-        // بستن تب‌های اضافی (duplicate)
-        if (duplicateTabs.length > 0) {
-          const duplicateTabIds = duplicateTabs.map((tab) => tab.id);
-          browser.tabs.remove(duplicateTabIds).catch((err) => {
-            console.error("Error closing duplicate tabs:", err);
-          });
-        }
-
-        // به‌روزرسانی و فوکوس کردن اولین تب
-        browser.tabs
-          .update(firstTab.id, { active: true, url: url })
-          .then((updatedTab) => {
-            if (updatedTab) {
-              browser.windows.update(updatedTab.windowId, { focused: true });
-            }
-          })
-          .catch((err) => {
-            console.error("Error updating tab:", err);
-            browser.tabs.create({ url: url });
-          });
-      } else {
-        browser.tabs.create({ url: url });
-      }
-    })
-    .catch((err) => {
-      console.error("Error in focusOrCreateTab:", err);
-      browser.tabs.create({ url: url });
+  browser.tabs.query({}).then((tabs) => {
+    const targetPath = baseUrl.replace(/^chrome-extension:\/\/[^/]+/, "");
+    const existingTabs = tabs.filter((tab) => {
+      if (!tab.url) return false;
+      const tabPath = tab.url.split("#")[0].replace(/^chrome-extension:\/\/[^/]+/, "");
+      return tabPath === targetPath;
     });
-}
 
-export const showStatus = (() => {
-  let currentNotification = null;
-
-  return (message, type, duration = 2000) => {
-    if (currentNotification) {
-      currentNotification.remove();
+    if (existingTabs.length > 0) {
+      const firstTab = existingTabs[0];
+      const duplicateTabIds = existingTabs.slice(1).map((tab) => tab.id);
+      if (duplicateTabIds.length > 0) {
+        browser.tabs.remove(duplicateTabIds).catch((err) => console.error("Error closing duplicate tabs:", err));
+      }
+      browser.tabs.update(firstTab.id, { active: true, url: url }).then((updatedTab) => {
+        if (updatedTab) browser.windows.update(updatedTab.windowId, { focused: true });
+      }).catch(() => browser.tabs.create({ url: url }));
+    } else {
+      browser.tabs.create({ url: url });
     }
-
-    const notification = document.createElement("div");
-    notification.className = `status-notification ${type}`;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-    currentNotification = notification;
-
-    setTimeout(() => {
-      notification.remove();
-      currentNotification = null;
-    }, duration);
-  };
-})();
+  }).catch((err) => {
+    console.error("Error in focusOrCreateTab:", err);
+    browser.tabs.create({ url: url });
+  });
+}
 
 export function taggleLinks(enable = true) {
   try {
     if (!document?.body) return;
-    document.documentElement.classList.toggle(
-      "AIWritingCompanion-disable-links",
-      enable,
-    );
+    document.documentElement.classList.toggle("AIWritingCompanion-disable-links", enable);
   } catch (error) {
-    const handlerError = errorHandler.handle(error, {
+    const handlerError = getErrorHandler().handle(error, {
       type: ErrorTypes.CONTEXT,
       context: "taggleLinks",
       details: {
-        errorType: error.message.includes("context invalidated")
-          ? "CONTEXT_INVALIDATED"
-          : "UNKNOWN_ERROR",
+        errorType: error.message.includes("context invalidated") ? "CONTEXT_INVALIDATED" : "UNKNOWN_ERROR",
       },
     });
     throw handlerError;
   }
 }
 
-/**
- * تابع تزریق CSS به صورت داینامیک
- */
-const injectCSS = (filePath) => {
-  try {
-    if (!document.head)
-      throw new Error(ErrorTypes.INTEGRATION || "document.head not available");
-
-    const linkElement = document.createElement("link");
-    linkElement.href = browser.runtime.getURL(filePath);
-    linkElement.rel = "stylesheet";
-    document.head.appendChild(linkElement);
-  } catch (error) {
-    const handlerError = errorHandler.handle(error, {
-      type: ErrorTypes.UI,
-      context: "injectCSS",
-      filePath,
-    });
-    throw handlerError;
-  }
-};
-
-export const injectStyle = () => {
-  try {
-    const hostname = window?.location.hostname;
-
-    if (hostname.includes("whatsapp.com")) {
-      injectCSS("styles/whatsapp.css");
+export const showStatus = (() => {
+  let currentNotification = null;
+  return (message, type, duration = 2000) => {
+    if (currentNotification) {
+      currentNotification.remove();
     }
-    if (hostname.includes("x.com")) {
-      injectCSS("styles/twitter.css");
-    }
-  } catch (error) {
-    const handlerError = errorHandler.handle(error, {
-      type: ErrorTypes.INTEGRATION,
-      context: "injectStyle",
-    });
-    throw handlerError;
-  }
-};
-
-export default function injectIconStyle(cssFileName) {
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.type = "text/css";
-  link.href = browser.runtime.getURL(cssFileName);
-  document.head.appendChild(link);
-}
+    const notification = document.createElement("div");
+    notification.className = `status-notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    currentNotification = notification;
+    setTimeout(() => {
+      notification.remove();
+      currentNotification = null;
+    }, duration);
+  };
+})();

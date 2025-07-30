@@ -2,7 +2,7 @@
 
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import injectIconStyle, { logME } from "../utils/helpers.js";
+import { injectIconStyle, logME } from "../utils/helpers.js";
 
 export default class IconManager {
   constructor(errorHandler) {
