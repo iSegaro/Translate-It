@@ -56,6 +56,17 @@ class BackgroundService {
       // Register all message handlers with simple handler
       this.registerMessageHandlers();
 
+      // Register Vue message handler
+      if (!this.vueMessageHandler) {
+        try {
+          this.vueMessageHandler = new VueMessageHandler();
+          await this.vueMessageHandler.register(this.messageHandler);
+          console.log("✅ VueMessageHandler registered successfully");
+        } catch (error) {
+          console.error("❌ Failed to register VueMessageHandler:", error);
+        }
+      }
+
       // Initialize error handlers for specific modules
       await this.initializeErrorHandlers();
 
@@ -229,12 +240,23 @@ class BackgroundService {
         globalThis.browser = this.browser;
       }
 
-      // Try to load Vue message handler
-      if (!this.vueMessageHandler) {
+      // CRITICAL: Set up MessageRouter first in minimal mode
+      try {
+        this.registerMessageHandlers();
+        console.log("✅ MessageRouter set up in minimal mode");
+      } catch (error) {
+        console.error(
+          "❌ Failed to set up MessageRouter in minimal mode:",
+          error,
+        );
+      }
+
+      // Try to load Vue message handler AFTER messageHandler is initialized
+      if (!this.vueMessageHandler && this.messageHandler) {
         try {
           // Import the class
           this.vueMessageHandler = new VueMessageHandler(); // Instantiate the class
-          await this.vueMessageHandler.register();
+          await this.vueMessageHandler.register(this.messageHandler);
         } catch (error) {
           console.error("Vue message handler unavailable in minimal mode");
         }
@@ -248,17 +270,6 @@ class BackgroundService {
         } catch (error) {
           console.error("Translation engine unavailable in minimal mode");
         }
-      }
-
-      // CRITICAL: Set up MessageRouter even in minimal mode
-      try {
-        this.registerMessageHandlers();
-        console.log("✅ MessageRouter set up in minimal mode");
-      } catch (error) {
-        console.error(
-          "❌ Failed to set up MessageRouter in minimal mode:",
-          error,
-        );
       }
 
       console.log("🔧 Minimal initialization completed");
