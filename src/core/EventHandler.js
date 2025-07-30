@@ -235,10 +235,23 @@ export default class EventHandler {
     ) {
       // اگر کلیک داخل پنجره اتفاق افتاده باشد، عملیات متوقف می‌شود
       // logME(
-      //   "[EventHandler] MouseUp target is inside the selection window. Ignoring."
+      //   "[EventHandler] MouseUp target is inside the selection windows. Ignoring."
       // );
       // listener mousedown در SelectionWindows کار خودش رو کرده (stopPropagation)
       return;
+    }
+
+    // Skip text selection handling if Vue select element mode is active
+    // Check storage for Vue-based select element state
+    try {
+      const storage = await browser.storage.local.get(['selectElementState']);
+      if (storage.selectElementState) {
+        // logME("[EventHandler] Vue select element mode is active, skipping text selection");
+        return;
+      }
+    } catch (error) {
+      // If storage check fails, continue with normal flow
+      console.warn("[EventHandler] Failed to check Vue select element state:", error);
     }
 
     if (selectedText) {
