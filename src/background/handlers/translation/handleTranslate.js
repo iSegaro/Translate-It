@@ -81,9 +81,8 @@ export async function handleTranslate(message, sender) {
     
     console.log('[Handler:TRANSLATE] Translation successful:', JSON.stringify(result, null, 2));
     
-    // Send TRANSLATION_RESULT_UPDATE for contexts that need it (event-handler, sidepanel)
-    // For popup context, return the result directly
-    if (result.success && result.translatedText && (message.context === 'event-handler' || message.context === 'sidepanel')) {
+    // Send TRANSLATION_RESULT_UPDATE for all contexts due to Firefox MV3 issues
+    if (result.success && result.translatedText) {
       const targetTabId = sender.tab?.id; // Get the tab ID from the sender
       if (targetTabId) {
         console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, {
@@ -132,14 +131,8 @@ export async function handleTranslate(message, sender) {
       }
     }
 
-    // For event-handler & sidepanel: return generic success (real result comes via TRANSLATION_RESULT_UPDATE)
-    // For popup: return full translation result directly
-    if (message.context === 'event-handler' || message.context === 'sidepanel') {
-      return { success: true, message: "Translation request processed in background." };
-    } else {
-      // Return full result for popup context
-      return result;
-    }
+    // All contexts: return generic success (real result comes via TRANSLATION_RESULT_UPDATE due to Firefox MV3)
+    return { success: true, message: "Translation request processed in background." };
     
   } catch (translationError) {
     console.error('[Handler:TRANSLATE] Translation error:', translationError);

@@ -378,12 +378,21 @@ export function useSelectElementTranslation() {
       }
     };
     
-    browserAPI.storage.onChanged.addListener(storageListener);
-    
-    // Return cleanup function
-    return () => {
-      browserAPI.storage.onChanged.removeListener(storageListener);
-    };
+    // Ensure browserAPI is ready before setting up listener
+    if (browserAPI && browserAPI.storage && browserAPI.storage.onChanged) {
+      browserAPI.storage.onChanged.addListener(storageListener);
+      
+      // Return cleanup function
+      return () => {
+        if (browserAPI && browserAPI.storage && browserAPI.storage.onChanged) {
+          browserAPI.storage.onChanged.removeListener(storageListener);
+        }
+      };
+    } else {
+      console.warn("[useSelectElementTranslation] browserAPI.storage not available for storage listener");
+      // Return no-op cleanup function
+      return () => {};
+    }
   };
 
   /**

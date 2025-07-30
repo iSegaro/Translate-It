@@ -61,8 +61,8 @@ export class UnifiedMessenger {
                     resolve({ success: true, message: "pong" });
                     return;
                   }
-                  // For TRANSLATE messages from event-handler & sidepanel contexts, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE
-                  if (messageToSend.action === "TRANSLATE" && (messageToSend.context === "event-handler" || messageToSend.context === "sidepanel")) {
+                  // For TRANSLATE messages from all contexts, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE (Firefox MV3 issue)
+                  if (messageToSend.action === "TRANSLATE") {
                     // Create a promise that resolves when the TRANSLATION_RESULT_UPDATE message is received
                     const actualTranslationResultPromise = new Promise((resolveResult, rejectResult) => {
                       const listener = (msg) => {
@@ -82,11 +82,10 @@ export class UnifiedMessenger {
                     resolve(actualTranslationResultPromise); // Resolve the outer promise with the inner promise
                     return;
                   }
-                  // For other TRANSLATE messages (popup only now), we should get results directly
+                  // This should not happen anymore for TRANSLATE messages
                   if (messageToSend.action === "TRANSLATE") {
-                    console.log("[UnifiedMessenger] TRANSLATE response should be handled by Promise pattern now for popup context");
-                    // This should not happen anymore with fixed SimpleMessageHandler
-                    resolve({ success: false, error: "Handler did not respond properly" });
+                    console.warn("[UnifiedMessenger] TRANSLATE got undefined response after TRANSLATION_RESULT_UPDATE implementation");
+                    resolve({ success: false, error: "Unexpected undefined response for TRANSLATE" });
                     return;
                   }
                   // For element selection messages, we need to handle the actual response from background

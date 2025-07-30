@@ -34,9 +34,9 @@ function isPageExcluded(url) {
  * Handles the 'isCurrentPageExcluded' message action.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @returns {Object} - Response object for CoreMessageRouter.
+ * @returns {Promise<Object>} - Response object for CoreMessageRouter.
  */
-export function handleIsCurrentPageExcluded(message, sender) {
+export async function handleIsCurrentPageExcluded(message, sender) {
   try {
     const { url } = message.data || {}
     

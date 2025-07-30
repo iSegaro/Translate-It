@@ -46,14 +46,27 @@ export function usePopupTranslation() {
         mode: "popup",
       });
 
-      // Check if the initial response indicates success (even if translatedText is not present)
-      if (response && response.success) {
+      // Check response - should be TRANSLATION_RESULT_UPDATE message
+      console.log("[usePopupTranslation] Received response:", response);
+      if (response && response.action === "TRANSLATION_RESULT_UPDATE" && response.translatedText) {
+        // Direct translation result via TRANSLATION_RESULT_UPDATE
+        console.log("[usePopupTranslation] TRANSLATION_RESULT_UPDATE received:", response.translatedText);
+        translatedText.value = response.translatedText;
+        lastTranslation.value = {
+          source: response.originalText || sourceText.value,
+          target: response.translatedText,
+          provider: response.provider,
+          timestamp: response.timestamp || Date.now(),
+        };
+        isTranslating.value = false;
+      } else if (response && response.success) {
         console.log(
-          "[usePopupTranslation] Translation request sent. Waiting for update...",
+          "[usePopupTranslation] Generic success response. Waiting for TRANSLATION_RESULT_UPDATE...",
         );
-        // The actual translatedText will be set by the message listener
+        // Fallback: wait for TRANSLATION_RESULT_UPDATE message listener
       } else {
-        throw new Error(response?.error || "Translation failed");
+        console.error("[usePopupTranslation] Response failed:", response);
+        throw new Error(response?.error || response?.message || "Translation failed");
       }
     } catch (error) {
       console.error("[usePopupTranslation] Translation error:", error);
