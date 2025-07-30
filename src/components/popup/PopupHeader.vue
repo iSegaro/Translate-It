@@ -23,6 +23,7 @@
         :alt="$i18n('popup_select_element_alt_icon') || 'Select Element'"
         :title="$i18n('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
+        :class="{ active: isSelectModeActive }"
       />
       <IconButton
         icon="clear.png"
@@ -64,11 +65,19 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Stores
 const settingsStore = useSettingsStore()
+
+// Composables
+const {
+  isSelectModeActive,
+  toggleSelectElement,
+  error: selectElementError
+} = useSelectElementTranslation()
 
 // State
 const excludeCurrentPage = ref(false)
@@ -118,13 +127,22 @@ const handleOpenSidePanel = async () => {
 
 const handleSelectElement = async () => {
   try {
-    await browser.runtime.sendMessage({
-      action: "activateSelectElementMode",
-      data: true,
-    })
+    console.log('[PopupHeader] Select element button clicked')
+    
+    // Use Vue composable instead of direct message
+    await toggleSelectElement()
+    
+    console.log('[PopupHeader] Select element mode toggled successfully')
+    
+    // Close popup after activation
     window.close()
   } catch (error) {
-    console.error('Error activating select element mode:', error)
+    console.error('[PopupHeader] Error toggling select element mode:', error)
+    
+    // Show error if composable provides it
+    if (selectElementError.value) {
+      console.error('[PopupHeader] Select element error:', selectElementError.value)
+    }
   }
 }
 
