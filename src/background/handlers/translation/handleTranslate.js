@@ -81,9 +81,9 @@ export async function handleTranslate(message, sender) {
     
     console.log('[Handler:TRANSLATE] Translation successful:', JSON.stringify(result, null, 2));
     
-    // Send the actual translation result back to the sidepanel via a separate message
-    // This is a workaround for Firefox MV3's unreliable sendMessage response
-    if (result.success && result.translatedText) {
+    // Send TRANSLATION_RESULT_UPDATE for contexts that need it (event-handler, sidepanel)
+    // For popup context, return the result directly
+    if (result.success && result.translatedText && (message.context === 'event-handler' || message.context === 'sidepanel')) {
       const targetTabId = sender.tab?.id; // Get the tab ID from the sender
       if (targetTabId) {
         console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, {
@@ -132,9 +132,14 @@ export async function handleTranslate(message, sender) {
       }
     }
 
-    // Return a generic success message for the initial sendMessage call
-    // The frontend will rely on the TRANSLATION_RESULT_UPDATE message for the actual text
-    return { success: true, message: "Translation request processed in background." };
+    // For event-handler & sidepanel: return generic success (real result comes via TRANSLATION_RESULT_UPDATE)
+    // For popup: return full translation result directly
+    if (message.context === 'event-handler' || message.context === 'sidepanel') {
+      return { success: true, message: "Translation request processed in background." };
+    } else {
+      // Return full result for popup context
+      return result;
+    }
     
   } catch (translationError) {
     console.error('[Handler:TRANSLATE] Translation error:', translationError);

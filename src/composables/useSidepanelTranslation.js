@@ -38,7 +38,6 @@ export function useSidepanelTranslation() {
 
     try {
       // Use UnifiedTranslationClient for translation request
-      // The actual translation result will come via a separate message
       const response = await translationClient.translate(sourceText.value, {
         provider: settingsStore.settings.TRANSLATION_API,
         sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
@@ -46,14 +45,27 @@ export function useSidepanelTranslation() {
         mode: "sidepanel",
       });
 
-      // Check if the initial response indicates success (even if translatedText is not present)
-      if (response && response.success) {
+      // Check response - it should be TRANSLATION_RESULT_UPDATE message with translatedText
+      console.log("[useSidepanelTranslation] Received response:", response);
+      if (response && response.action === "TRANSLATION_RESULT_UPDATE" && response.translatedText) {
+        // Direct translation result via TRANSLATION_RESULT_UPDATE
+        console.log("[useSidepanelTranslation] TRANSLATION_RESULT_UPDATE received:", response.translatedText);
+        translatedText.value = response.translatedText;
+        lastTranslation.value = {
+          source: response.originalText || sourceText.value,
+          target: response.translatedText,
+          provider: response.provider,
+          timestamp: response.timestamp || Date.now(),
+        };
+        isTranslating.value = false;
+      } else if (response && response.success) {
         console.log(
-          "[useSidepanelTranslation] Translation request sent. Waiting for update...",
+          "[useSidepanelTranslation] Generic success response. Waiting for TRANSLATION_RESULT_UPDATE...",
         );
-        // The actual translatedText will be set by the message listener
+        // Fallback: wait for TRANSLATION_RESULT_UPDATE message listener
       } else {
-        throw new Error(response?.error || "Translation failed");
+        console.error("[useSidepanelTranslation] Response failed:", response);
+        throw new Error(response?.error || response?.message || "Translation failed");
       }
     } catch (error) {
       console.error("[useSidepanelTranslation] Translation error:", error);

@@ -55,13 +55,14 @@ export class UnifiedMessenger {
 
                 // Firefox MV3 workaround: check if response is undefined but message was actually processed
                 if (response === undefined && isFirefox) {
+                  console.warn("[UnifiedMessenger] Firefox MV3 undefined response detected for", messageToSend.action);
                   // For ping messages, we know it should work, so provide expected response
                   if (messageToSend.action === "ping") {
                     resolve({ success: true, message: "pong" });
                     return;
                   }
-                  // For TRANSLATE messages, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE
-                  if (messageToSend.action === "TRANSLATE") {
+                  // For TRANSLATE messages from event-handler & sidepanel contexts, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE
+                  if (messageToSend.action === "TRANSLATE" && (messageToSend.context === "event-handler" || messageToSend.context === "sidepanel")) {
                     // Create a promise that resolves when the TRANSLATION_RESULT_UPDATE message is received
                     const actualTranslationResultPromise = new Promise((resolveResult, rejectResult) => {
                       const listener = (msg) => {
@@ -79,6 +80,13 @@ export class UnifiedMessenger {
                       }, 20000); // 20 seconds timeout for actual result
                     });
                     resolve(actualTranslationResultPromise); // Resolve the outer promise with the inner promise
+                    return;
+                  }
+                  // For other TRANSLATE messages (popup only now), we should get results directly
+                  if (messageToSend.action === "TRANSLATE") {
+                    console.log("[UnifiedMessenger] TRANSLATE response should be handled by Promise pattern now for popup context");
+                    // This should not happen anymore with fixed SimpleMessageHandler
+                    resolve({ success: false, error: "Handler did not respond properly" });
                     return;
                   }
                   // For element selection messages, we need to handle the actual response from background

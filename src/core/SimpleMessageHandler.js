@@ -43,9 +43,24 @@ class SimpleMessageHandler {
           return true; // Keep message channel open
         } else {
           console.log(`[SimpleMessageHandler] Using Promise pattern for: ${action}`);
-          // For Promise-based handlers, return the Promise directly
-          // The browser will wait for this Promise to resolve and send the response
-          return handler(message, sender);
+          // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
+          handler(message, sender).then((result) => {
+            console.log(`[SimpleMessageHandler] Promise resolved for ${action}:`, result);
+            try {
+              sendResponse(result);
+              console.log(`[SimpleMessageHandler] sendResponse called successfully for ${action}`);
+            } catch (sendError) {
+              console.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
+            }
+          }).catch((error) => {
+            console.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
+            try {
+              sendResponse({ success: false, error: error.message || 'Handler error' });
+            } catch (sendError) {
+              console.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
+            }
+          });
+          return true; // Keep message channel open for async response
         }
       } else {
         console.log(`[SimpleMessageHandler] No handler for action: ${action}`);

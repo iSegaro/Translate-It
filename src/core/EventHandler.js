@@ -588,8 +588,9 @@ export default class EventHandler {
         return { status: "error", reason: "backend_error", message: msg };
       }
 
-      /* ---------- ❷ پاسخِ موفق ---------- */
-      const translatedJsonString = response?.translatedText;
+      /* ---------- ❲ پاسخِ موفق ---------- */
+      // Handle both TRANSLATION_RESULT_UPDATE format and regular response format
+      const translatedJsonString = response?.translatedText || response?.data?.translatedText;
 
       if (
         typeof translatedJsonString !== "string" ||
