@@ -17,6 +17,7 @@ export * from "./lifecycle/handleBackgroundReloadExtension.js";
 
 // Translation handlers
 export * from "./translation/handleTranslate.js";
+export * from "./translation/handleTranslateText.js";
 export * from "./translation/handleFetchTranslation.js";
 export * from "./translation/handleTranslationAdded.js";
 export * from "./translation/handleFetchTranslationBackground.js";

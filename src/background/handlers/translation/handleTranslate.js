@@ -84,19 +84,52 @@ export async function handleTranslate(message, sender) {
     // Send the actual translation result back to the sidepanel via a separate message
     // This is a workaround for Firefox MV3's unreliable sendMessage response
     if (result.success && result.translatedText) {
-      browser.runtime.sendMessage({
-        action: 'TRANSLATION_RESULT_UPDATE',
-        context: message.context, // Should be 'sidepanel'
-        translatedText: result.translatedText,
-        originalText: result.originalText,
-        provider: result.provider,
-        sourceLanguage: result.sourceLanguage,
-        targetLanguage: result.targetLanguage,
-        timestamp: result.timestamp,
-        mode: result.mode
-      }).catch(error => {
-        console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message:', error);
-      });
+      const targetTabId = sender.tab?.id; // Get the tab ID from the sender
+      if (targetTabId) {
+        console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, {
+          action: 'TRANSLATION_RESULT_UPDATE',
+          context: message.context,
+          messageId: message.messageId,
+          translatedText: result.translatedText,
+          originalText: result.originalText,
+          provider: result.provider,
+          sourceLanguage: result.sourceLanguage,
+          targetLanguage: result.targetLanguage,
+          timestamp: result.timestamp,
+          mode: result.mode
+        });
+        browser.tabs.sendMessage(targetTabId, { // Use browser.tabs.sendMessage with tabId
+          action: 'TRANSLATION_RESULT_UPDATE',
+          context: message.context,
+          messageId: message.messageId,
+          translatedText: result.translatedText,
+          originalText: result.originalText,
+          provider: result.provider,
+          sourceLanguage: result.sourceLanguage,
+          targetLanguage: result.targetLanguage,
+          timestamp: result.timestamp,
+          mode: result.mode
+        }).catch(error => {
+          console.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
+        });
+      } else {
+        console.warn("[Handler:TRANSLATE] No tab ID found in sender, cannot send TRANSLATION_RESULT_UPDATE to specific content script.");
+        // Fallback to general runtime.sendMessage if no tabId, though this is less reliable for content scripts
+        browser.runtime.sendMessage({
+          action: 'TRANSLATION_RESULT_UPDATE',
+          context: message.context,
+          messageId: message.messageId,
+          translatedText: result.translatedText,
+          originalText: result.originalText,
+          provider: result.provider,
+          sourceLanguage: result.sourceLanguage,
+          targetLanguage: result.targetLanguage,
+          timestamp: result.timestamp,
+          mode: result.mode
+        }).catch(error => {
+          console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
+        });
+      }
     }
 
     // Return a generic success message for the initial sendMessage call

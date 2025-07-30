@@ -7,12 +7,12 @@ const errorHandler = new ErrorHandler();
 /**
  * Handles the 'fetchTranslation' message action.
  * This fetches a translation using the background translation engine.
+ * Uses Promise pattern for Firefox MV3 compatibility.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
- * @param {Function} sendResponse - The function to send a response back.
- * @returns {boolean} - True if sendResponse will be called asynchronously.
+ * @returns {Promise<Object>} - Promise that resolves to response data.
  */
-export async function handleFetchTranslation(message, sender, sendResponse) {
+export async function handleFetchTranslation(message, sender) {
   console.log('[Handler:fetchTranslation] Processing translation fetch request:', message.data);
   
   try {
@@ -27,28 +27,46 @@ export async function handleFetchTranslation(message, sender, sendResponse) {
       throw new Error('Text is required for translation');
     }
     
+    // Format request for TranslationEngine.handleTranslateMessage
+    const translationRequest = {
+      action: "TRANSLATE",
+      context: "legacy-handler",
+      data: {
+        text,
+        provider: provider || 'google',
+        sourceLanguage: from || 'auto',
+        targetLanguage: to || 'fa',
+        mode: 'simple',
+        options: {}
+      }
+    };
+    
     // Use the translation engine to fetch translation
-    const result = await backgroundService.translationEngine.translate({
-      text,
-      from: from || 'auto',
-      to: to || 'en',
-      provider: provider || 'google'
-    });
+    const result = await backgroundService.translationEngine.handleTranslateMessage(translationRequest, sender);
     
     console.log(`✅ [fetchTranslation] Translation completed: ${text.substring(0, 50)}... → ${result.translatedText?.substring(0, 50)}...`);
+    console.log('[Handler:fetchTranslation] Full result object:', result);
     
-    sendResponse({ 
+    const responseData = { 
       success: true, 
       data: result
-    });
-    return true;
+    };
+    
+    console.log('[Handler:fetchTranslation] 🚀 Returning Promise response:', responseData);
+    return responseData;
+    
   } catch (error) {
+    console.error('[Handler:fetchTranslation] ❌ Error occurred:', error);
+    console.error('[Handler:fetchTranslation] Error stack:', error.stack);
+    
     errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,
       context: "handleFetchTranslation",
       messageData: message
     });
-    sendResponse({ success: false, error: error.message || 'Translation fetch failed' });
-    return false;
+    
+    const errorResponse = { success: false, error: error.message || 'Translation fetch failed' };
+    console.log('[Handler:fetchTranslation] 🚀 Returning Promise error response:', errorResponse);
+    return errorResponse;
   }
 }

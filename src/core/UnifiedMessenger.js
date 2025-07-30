@@ -17,7 +17,7 @@ export class UnifiedMessenger {
    * Works reliably with both Chrome and Firefox
    */
   async sendMessage(message, timeout = 10000) {
-    const messageId = `${this.context}-${++this.messageCounter}-${Date.now()}`;
+    const messageId = message.messageId || `${this.context}-${++this.messageCounter}-${Date.now()}`;
 
     try {
 
@@ -36,7 +36,7 @@ export class UnifiedMessenger {
 
         const messageToSend = {
           ...message,
-          messageId,
+          messageId, // Use the determined messageId
           context: this.context,
         };
 
@@ -60,20 +60,25 @@ export class UnifiedMessenger {
                     resolve({ success: true, message: "pong" });
                     return;
                   }
-                  // For TRANSLATE messages, we need to indicate failure since we don't know the real response
+                  // For TRANSLATE messages, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE
                   if (messageToSend.action === "TRANSLATE") {
-                    // Assuming the background script successfully processed the translation
-                    // and the actual result is available in the background script's context.
-                    // Since we cannot directly access the background script's result here,
-                    // we will return a success message and rely on the background script
-                    // to have handled the translation and potentially updated the history.
-                    // This is a workaround for the undefined response in Firefox MV3.
-                    resolve({
-                      success: true,
-                      translatedText:
-                        "Translation completed in background (Firefox MV3 workaround).",
-                      firefoxBug: true,
+                    // Create a promise that resolves when the TRANSLATION_RESULT_UPDATE message is received
+                    const actualTranslationResultPromise = new Promise((resolveResult, rejectResult) => {
+                      const listener = (msg) => {
+                        if (msg.action === 'TRANSLATION_RESULT_UPDATE' && msg.context === messageToSend.context && msg.messageId === messageToSend.messageId) {
+                          browser.runtime.onMessage.removeListener(listener);
+                          resolveResult(msg);
+                        }
+                      };
+                      browser.runtime.onMessage.addListener(listener);
+
+                      // Set a timeout for the actual translation result
+                      setTimeout(() => {
+                        browser.runtime.onMessage.removeListener(listener);
+                        rejectResult(new Error('Actual translation result timeout'));
+                      }, 20000); // 20 seconds timeout for actual result
                     });
+                    resolve(actualTranslationResultPromise); // Resolve the outer promise with the inner promise
                     return;
                   }
                   // For element selection messages, we need to handle the actual response from background
@@ -125,12 +130,19 @@ export class UnifiedMessenger {
    * Translation-specific wrapper
    */
   async translate(payload) {
-
     // Format message according to translation-protocol.js standard
     const message = {
       action: "TRANSLATE",
       context: this.context,
-      data: payload, // Use 'data' instead of 'payload' to match protocol
+      messageId: payload.messageId, // Pass messageId from payload
+      data: {
+        text: payload.text,
+        provider: payload.provider,
+        sourceLanguage: payload.from || 'auto',
+        targetLanguage: payload.to || 'fa',
+        mode: payload.mode,
+        options: payload.options || {},
+      },
     };
 
     const result = await this.sendMessage(message);

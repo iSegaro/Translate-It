@@ -62,8 +62,8 @@ export class BaseTranslationProvider {
         let body = {};
         try {
           body = await response.json();
-        } catch {
-          //
+        } catch (jsonError) {
+          console.error(`[${this.providerName}] Failed to parse error response JSON:`, jsonError);
         }
         // Use detail or error.message or statusText, fallback to HTTP status
         const msg =
@@ -72,7 +72,13 @@ export class BaseTranslationProvider {
           response.statusText ||
           `HTTP ${response.status}`;
 
-        logME(`[${this.providerName}] _executeApiCall HTTP error: ${msg}`, body);
+        console.error(`[${this.providerName}] _executeApiCall HTTP error:`, {
+          status: response.status,
+          statusText: response.statusText,
+          body: body,
+          message: msg,
+          url: url
+        });
         const err = new Error(msg);
         // Mark as HTTP error (status codes 4xx/5xx)
         err.type = ErrorTypes.HTTP_ERROR;
@@ -90,8 +96,9 @@ export class BaseTranslationProvider {
       logME(`[${this.providerName}] _executeApiCall extracted result:`, result);
 
       if (result === undefined) {
-        logME(
-          `[${this.providerName}] _executeApiCall result is undefined - treating as invalid response`
+        console.error(
+          `[${this.providerName}] _executeApiCall result is undefined - treating as invalid response. Raw data:`,
+          data
         );
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
         err.type = ErrorTypes.API;

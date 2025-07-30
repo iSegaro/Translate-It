@@ -350,6 +350,8 @@ class BackgroundService {
 
     // Core translation handler
     this.messageHandler.registerHandler("TRANSLATE", Handlers.handleTranslate);
+    // Vue components use TRANSLATE_TEXT action
+    this.messageHandler.registerHandler("TRANSLATE_TEXT", Handlers.handleTranslateText);
 
     // Legacy translation handlers (to maintain compatibility)
     this.messageHandler.registerHandler(

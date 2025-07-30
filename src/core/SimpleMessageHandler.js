@@ -21,8 +21,8 @@ class SimpleMessageHandler {
 
     console.log("🎧 Initializing Simple Message Handler...");
 
-    // Use webextension-polyfill Promise-based listener for cross-browser compatibility
-    browser.runtime.onMessage.addListener(async (message, sender) => {
+    // Use callback pattern for Firefox MV3 compatibility
+    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log(
         "[SimpleMessageHandler] 🎯 Received message:",
         message,
@@ -30,32 +30,27 @@ class SimpleMessageHandler {
         sender,
       );
 
-      try {
-        // Handle message and return response directly (Promise-based)
-        const response = await this.handleMessage(message, sender);
-        console.log("[SimpleMessageHandler] 🚀 Response generated:", response);
-        console.log(
-          "[SimpleMessageHandler] 🚀 Response type:",
-          typeof response,
-        );
-        console.log(
-          "[SimpleMessageHandler] 🚀 Response is null?",
-          response === null,
-        );
-        console.log(
-          "[SimpleMessageHandler] 🚀 Response is undefined?",
-          response === undefined,
-        );
-        console.log("[SimpleMessageHandler] 🚀 About to return:", response);
-        return response;
-      } catch (error) {
-        console.error(
-          "[SimpleMessageHandler] ❌ Error handling message:",
-          error,
-        );
-        const errorResponse = { success: false, error: error.message };
-        console.log("[SimpleMessageHandler] 🚀 Error response:", errorResponse);
-        return errorResponse;
+      // Check if we have a handler for this message
+      const action = message?.action || message?.type;
+      const handler = this.handlers.get(action);
+      
+      if (handler) {
+        // Check if handler uses callback pattern (3+ parameters)
+        if (handler.length >= 3) {
+          console.log(`[SimpleMessageHandler] Using callback pattern for: ${action}`);
+          // Call handler directly with callback - it will handle sendResponse
+          handler(message, sender, sendResponse);
+          return true; // Keep message channel open
+        } else {
+          console.log(`[SimpleMessageHandler] Using Promise pattern for: ${action}`);
+          // For Promise-based handlers, return the Promise directly
+          // The browser will wait for this Promise to resolve and send the response
+          return handler(message, sender);
+        }
+      } else {
+        console.log(`[SimpleMessageHandler] No handler for action: ${action}`);
+        // No handler found - let other listeners handle it
+        return false;
       }
     });
 
@@ -76,41 +71,6 @@ class SimpleMessageHandler {
     }
     this.handlers.set(action, handlerFn);
     // console.log(`✅ SimpleMessageHandler: Registered handler for "${action}"`);
-  }
-
-  /**
-   * Processes an incoming message, finds the appropriate handler, and executes it.
-   * @param {object} message - The message received.
-   * @param {object} sender - The sender of the message.
-   * @returns {Promise<any>} A promise that resolves with the handler's response.
-   */
-  async handleMessage(message, sender) {
-    const action = message?.action || message?.type;
-
-    if (!action) {
-      console.error(
-        "[SimpleMessageHandler] Message has no 'action' or 'type'.",
-        message,
-      );
-      // Return a resolved promise with an error object, but don't throw
-      return Promise.resolve({
-        success: false,
-        error: "Message must have a valid 'action' or 'type' property.",
-      });
-    }
-
-    const handler = this.handlers.get(action);
-
-    if (handler) {
-      // console.log(`[SimpleMessageHandler] Executing handler for: ${action}`);
-      return handler(message, sender); // Directly return the promise
-    } else {
-      // console.log(
-      //   `[SimpleMessageHandler] No handler for action: ${action}. Passing to next listener.`
-      // );
-      // Return a resolved promise with undefined to indicate no handler was found
-      return Promise.resolve(undefined);
-    }
   }
 }
 

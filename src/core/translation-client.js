@@ -58,7 +58,6 @@ export class TranslationClient {
       this.port.onDisconnect,
       this.handleDisconnect.bind(this),
     );
-    this.port.onMessage.addListener.call(this.port.onMessage, ackListener);
 
     // Send a handshake message and wait for acknowledgment
     const handshakeTimeout = setTimeout(() => {
@@ -67,11 +66,6 @@ export class TranslationClient {
       );
       this.port.disconnect();
     }, 5000); // 5 seconds for handshake
-
-    this.port.postMessage({
-      action: "CONNECTION_READY",
-      context: this.context,
-    });
 
     // Only resolve readyPromise when CONNECTION_ACK is received
     this.readyPromise = new Promise((resolve, reject) => {
@@ -86,6 +80,11 @@ export class TranslationClient {
         }
       };
       this.port.onMessage.addListener(ackListener);
+    });
+
+    this.port.postMessage({
+      action: "CONNECTION_READY",
+      context: this.context,
     });
 
     console.log(

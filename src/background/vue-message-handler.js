@@ -360,7 +360,9 @@ export class VueMessageHandler {
   async handleLogError(data) {
     try {
       const { error, context, info } = data;
-      console.warn(`[${context}] Vue Error:`, error, info);
+      const errorMessage = error?.message || String(error) || "Unknown error";
+      const errorInfo = info ? String(info) : "(no info)";
+      console.warn(`[${context}] Vue Error:`, errorMessage, errorInfo);
 
       // In production, you might want to send to a logging service
       // For now, just log to console and return success

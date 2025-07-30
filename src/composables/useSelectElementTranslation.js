@@ -118,7 +118,7 @@ export function useSelectElementTranslation() {
         
         console.log("[useSelectElementTranslation] Select element mode activated successfully");
 
-        // تنظیم timeout برای selection
+        // Timeout disabled - let EventHandler manage the complete process like in OLD version
         startSelectionTimeout();
 
         // اطلاع‌رسانی به parent component
@@ -228,16 +228,11 @@ export function useSelectElementTranslation() {
   };
 
   /**
-   * شروع timeout برای selection
+   * شروع timeout برای selection - DISABLED to match OLD behavior
    */
   const startSelectionTimeout = () => {
-    // پاکسازی timeout قبلی در صورت وجود
-    clearSelectionTimeout();
-
-    selectionTimeout.value = setTimeout(() => {
-      console.warn("[useSelectElementTranslation] Selection timeout reached");
-      handleSelectElementError(new Error("Selection timeout"));
-    }, SELECTION_TIMEOUT_MS);
+    // Disabled timeout - let EventHandler complete the translation process
+    console.log("[useSelectElementTranslation] Timeout disabled - EventHandler will manage the process");
   };
 
   /**

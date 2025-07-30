@@ -27,6 +27,7 @@ import { clearAllCaches } from "../utils/textExtraction.js";
 import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
+import { UnifiedMessenger } from "./UnifiedMessenger.js"; // Add this import
 
 export default class EventHandler {
   /** @param {object} translationHandler
@@ -42,6 +43,8 @@ export default class EventHandler {
       translationHandler: translationHandler,
       notifier: translationHandler.notifier,
     });
+
+    this.unifiedMessenger = new UnifiedMessenger("event-handler"); // Initialize UnifiedMessenger
 
     this.select_Element_ModeActive =
       translationHandler.select_Element_ModeActive;
@@ -450,6 +453,7 @@ export default class EventHandler {
    EventHandler.handleSelect_ElementClick
 ------------------------------------------------------------------ */
   async handleSelect_ElementClick(event) {
+    logME("[EventHandler] handleSelect_ElementClick called.");
     // غیرفعال‌سازی حالت انتخاب المنت
     taggleLinks(false);
     this.translationHandler.select_Element_ModeActive = false;
@@ -460,16 +464,22 @@ export default class EventHandler {
 
     /* 1) جمع‌آوری متن‌ها از عنصرِ انتخاب‌شده */
     const targetElement = event.target;
+    logME("[EventHandler] Target element:", targetElement);
     const { textNodes, originalTextsMap } = collectTextNodes(targetElement);
+    logME("[EventHandler] Collected textNodes count:", textNodes.length);
+    logME("[EventHandler] originalTextsMap size:", originalTextsMap.size);
     if (!originalTextsMap.size)
       return { status: "empty", reason: "no_text_found" };
 
     /* 2) تفکیک کش و متن‌های جدید */
     const { textsToTranslate, cachedTranslations } =
       separateCachedAndNewTexts(originalTextsMap);
+    logME("[EventHandler] textsToTranslate count:", textsToTranslate.length);
+    logME("[EventHandler] cachedTranslations size:", cachedTranslations.size);
 
     /* ـــ فقط کش ـــ */
     if (!textsToTranslate.length && cachedTranslations.size) {
+      logME("[EventHandler] Using cached translations.");
       applyTranslationsToNodes(textNodes, cachedTranslations, {
         state,
         IconManager: this.IconManager,
@@ -501,10 +511,36 @@ export default class EventHandler {
     );
     state.translateMode = TranslationMode.SelectElement;
 
+    // Generate a unique messageId for this request
+    const messageId = `event-handler-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+
+    // Create a promise that resolves when the TRANSLATION_RESULT_UPDATE message is received
+    const translationResultPromise = new Promise((resolve, reject) => {
+      const listener = (msg) => {
+        logME(`[EventHandler] Listener received message: ${msg.action}, context: ${msg.context}, messageId: ${msg.messageId}`);
+        if (msg.action === 'TRANSLATION_RESULT_UPDATE' && msg.context === 'event-handler' && msg.messageId === messageId) {
+          logME(`[EventHandler] Matching TRANSLATION_RESULT_UPDATE received for messageId: ${messageId}`);
+          browser.runtime.onMessage.removeListener(listener);
+          resolve(msg);
+        } else {
+          logME(`[EventHandler] Non-matching message received. Expected messageId: ${messageId}, Actual: ${msg.messageId}`);
+        }
+      };
+      browser.runtime.onMessage.addListener(listener);
+
+      // Set a timeout for the translation result
+      setTimeout(() => {
+        browser.runtime.onMessage.removeListener(listener);
+        reject(new Error('Translation result timeout'));
+      }, 15000); // 15 seconds timeout
+    });
+
     try {
+      logME("[EventHandler] Starting translation process.");
       /* 3‑۱) فشرده‌سازی متن‌ها */
       const { expandedTexts, originMapping } =
         expandTextsForTranslation(textsToTranslate);
+      logME("[EventHandler] Expanded texts count:", expandedTexts.length);
 
       const jsonPayload = JSON.stringify(
         expandedTexts.map((t) => ({ text: t })),
@@ -515,20 +551,36 @@ export default class EventHandler {
         return { status: "error", reason: "payload_large", message: m };
       }
 
-      /* 4) درخواستِ ترجمه به پس‌زمینه */
-      const response = await browser.runtime.sendMessage({
-        action: "fetchTranslationBackground",
-        payload: {
-          promptText: jsonPayload,
-          translationMode: TranslationMode.SelectElement,
-        },
-      });
+      /* 4) درخواستِ ترجمه با fetchTranslation action (مثل sidepanel) */
+      logME("[EventHandler] *** Sending fetchTranslation message to background using UnifiedMessenger...");
+      
+      const payload = {
+        text: jsonPayload, // Send jsonPayload
+        from: 'auto',
+        to: 'fa',
+        provider: 'google',
+        messageId: messageId, // Pass messageId from EventHandler
+      };
+      
+      logME("[EventHandler] Payload to send:", JSON.stringify(payload, null, 2));
+      
+      // Send the translation request
+      const initialResponse = await this.unifiedMessenger.translate(payload);
+
+      logME("[EventHandler] *** Initial response from UnifiedMessenger:", initialResponse);
+
+      // Wait for the actual translation result
+      const response = await translationResultPromise;
+
+      logME("[EventHandler] *** Actual translation response received:", response);
+      logME("[EventHandler] Response structure:", JSON.stringify(response, null, 2));
+      logME("[EventHandler] Response type:", typeof response);
 
       /* ---------- ❶ پاسخِ خطادار ---------- */
-      if (!response?.success) {
-        const msg = response?.error || "(⚠️ خطایی در ترجمه رخ داد.)";
+      if (response?.error || !response?.translatedText) {
+        const msg = response?.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
         await this.translationHandler.errorHandler.handle(new Error(msg), {
-          type: ErrorTypes.API,
+          type: response?.error?.type || ErrorTypes.API,
           statusCode: response?.statusCode || 401,
           context: "select-element-response",
         });
@@ -537,24 +589,7 @@ export default class EventHandler {
       }
 
       /* ---------- ❷ پاسخِ موفق ---------- */
-      /* -------------------------------------------------------------
-  | اگر سرویس با success:false جواب داد متن خطا را مستقیماً نشان بده
-  | (کروم این حالت را به‌جای throw برمی‌گرداند)
- * ------------------------------------------------------------- */
-      if (response && response.success === false) {
-        const err =
-          typeof response.error === "string"
-            ? response.error
-            : response.error?.message || "(⚠️ خطایی در ترجمه رخ داد.)";
-
-        await this.translationHandler.errorHandler.handle(
-          new Error(err), // یا آبجکت Error اختصاصى
-          { type: ErrorTypes.API, context: "select-element-response" },
-        );
-        return { status: "error", reason: "api_error", message: err };
-      }
-
-      const translatedJsonString = response?.data?.translatedText;
+      const translatedJsonString = response?.translatedText;
 
       if (
         typeof translatedJsonString !== "string" ||
@@ -610,7 +645,14 @@ export default class EventHandler {
       });
 
       if (statusNotif) {
-        this.notifier.dismiss(statusNotif);
+        logME("[EventHandler] Dismissing status notification after success:", statusNotif);
+        // statusNotif is a Promise, need to await it first
+        const notifNode = await statusNotif;
+        if (notifNode) {
+          this.notifier.dismiss(notifNode);
+        }
+      } else {
+        logME("[EventHandler] No status notification to dismiss after success");
       }
 
       return {
@@ -620,6 +662,7 @@ export default class EventHandler {
         fromCache: cachedTranslations.size,
       };
     } catch (err) {
+      logME("[EventHandler] Error in handleSelect_ElementClick:", err);
       const processed = await ErrorHandler.processError(err);
       await this.translationHandler.errorHandler.handle(processed, {
         type: processed.type || ErrorTypes.SERVICE,
@@ -632,8 +675,15 @@ export default class EventHandler {
       };
     } finally {
       if (statusNotif) {
-        logME("[EventHandler] Dismissing status notification in finally block.");
-        this.notifier.dismiss(statusNotif);
+        // statusNotif is a Promise, need to await it first
+        try {
+          const notifNode = await statusNotif;
+          if (notifNode) {
+            this.notifier.dismiss(notifNode);
+          }
+        } catch (err) {
+          logME("[EventHandler] Error dismissing notification in finally:", err);
+        }
       }
     }
   }
@@ -697,7 +747,7 @@ export default class EventHandler {
       /**
        * اگر متنی داخل انتخاب شده باشد، آن را برای ترجمه انتخاب میکند می کند
        * ولی منطق برنامه برای هندل کردن آن متن انتخاب شده پیاده سازی نشده است
-       * این کدها را با کامنت برای آینده باقی میگذارم تا در صورت نیاز بازآوری شود
+       * این کدها را با کامنت برای آینده باقیگذارم تا در صورت نیاز بازآوری شود
        */
       // const isTextSelected = !select_element.isCollapsed;
 

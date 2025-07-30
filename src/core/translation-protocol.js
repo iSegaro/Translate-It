@@ -69,6 +69,7 @@ export const TRANSLATION_CONTEXTS = {
   CONTENT: "content",
   SUBTITLE: "subtitle",
   CAPTURE: "capture",
+  EVENT_HANDLER: "event-handler",
 };
 
 /**
