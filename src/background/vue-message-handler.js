@@ -394,10 +394,21 @@ export class VueMessageHandler {
   }
 
   // Method to register this handler with the existing message system
-  async register() {
-    // Registration is now handled by the MessageRouter in BackgroundService
-    console.log(
-      "[VueMessageHandler] Register method called, but actual registration is handled by MessageRouter.",
-    );
+  async register(messageHandler) {
+    if (!messageHandler) {
+      console.warn("[VueMessageHandler] No message handler provided for registration");
+      return;
+    }
+
+    // Register all Vue-specific handlers with the main message handler
+    for (const [action, handler] of this.handlers) {
+      messageHandler.registerHandler(action, async (data, sender) => {
+        // Ensure message is from Vue app
+        const message = { action, data, source: "vue-app" };
+        return await this.handleMessage(message, sender);
+      });
+    }
+
+    console.log("[VueMessageHandler] Registered", this.handlers.size, "Vue handlers");
   }
 }

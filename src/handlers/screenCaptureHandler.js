@@ -9,7 +9,7 @@ import {
   getTargetLanguageAsync,
   getTranslationApiAsync,
 } from "../config.js";
-import { ProviderRegistry } from "../providers/registry/ProviderRegistry.js";
+import { ProviderRegistry } from "../core/provider-registry.js";
 import { captureManager } from "../capture/CaptureManager.js";
 
 /**

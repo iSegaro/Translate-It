@@ -9,7 +9,7 @@ import {
   getSettingsAsync,
 } from "../config.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
-import { AUTO_DETECT_VALUE } from "../utils/tts/tts.js";
+import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 

@@ -3,7 +3,7 @@
  * Handles all translation requests from UI contexts via messaging
  */
 
-import { TranslationProviderFactory } from "../providers/factory/TranslationProviderFactory.js";
+import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
 import browser from "webextension-polyfill";
 
 export class TranslationEngine {

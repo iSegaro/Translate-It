@@ -4,7 +4,7 @@ import { getbrowser } from "@/utils/browser-polyfill.js";
 import { logME } from "../utils/helpers.js";
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { ProviderRegistry } from "../providers/registry/ProviderRegistry.js";
+import { ProviderRegistry } from "../core/provider-registry.js";
 import { TranslationMode } from "../config.js";
 import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";

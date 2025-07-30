@@ -1,23 +1,18 @@
 // src/providers/index.js - Main provider module exports
+// NOTE: All providers now live in src/background/providers/
 
-// Registry exports
-export { ProviderRegistry } from "./registry/index.js";
+// Re-export from background providers for compatibility
+export { TranslationProviderFactory } from "../background/providers/TranslationProviderFactory.js";
 
-// Factory exports
-export {
-  TranslationProviderFactory,
-  translationProviderFactory,
-} from "./factory/index.js";
-
-// Individual provider implementations (no barrel export to avoid circular dependencies)
-export { GoogleTranslateProvider } from "./implementations/GoogleTranslateProvider.js";
-export { BingTranslateProvider } from "./implementations/BingTranslateProvider.js";
-export { YandexTranslateProvider } from "./implementations/YandexTranslateProvider.js";
-export { GeminiProvider } from "./implementations/GeminiProvider.js";
-export { OpenAIProvider } from "./implementations/OpenAIProvider.js";
-export { OpenRouterProvider } from "./implementations/OpenRouterProvider.js";
-export { DeepSeekProvider } from "./implementations/DeepSeekProvider.js";
-export { WebAIProvider } from "./implementations/WebAIProvider.js";
-export { CustomProvider } from "./implementations/CustomProvider.js";
-export { BrowserTranslateProvider } from "./implementations/BrowserTranslateProvider.js";
-export { BaseTranslationProvider } from "./implementations/BaseTranslationProvider.js";
+// Individual provider implementations from background
+export { GoogleTranslateProvider } from "../background/providers/GoogleTranslateProvider.js";
+export { BingTranslateProvider } from "../background/providers/BingTranslateProvider.js";
+export { YandexTranslateProvider } from "../background/providers/YandexTranslateProvider.js";
+export { GeminiProvider } from "../background/providers/GeminiProvider.js";
+export { OpenAIProvider } from "../background/providers/OpenAIProvider.js";
+export { OpenRouterProvider } from "../background/providers/OpenRouterProvider.js";
+export { DeepSeekProvider } from "../background/providers/DeepSeekProvider.js";
+export { WebAIProvider } from "../background/providers/WebAIProvider.js";
+export { CustomProvider } from "../background/providers/CustomProvider.js";
+export { BrowserTranslateProvider } from "../background/providers/BrowserTranslateProvider.js";
+export { BaseTranslationProvider } from "../background/providers/BaseTranslationProvider.js";
