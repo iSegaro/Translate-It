@@ -22,6 +22,15 @@ function fixExtensionPaths() {
       await fs.copy(htmlOffscreenHtml, resolve(outDir, 'html/offscreen.html'));
       console.log('📄 Copied offscreen.html');
     }
+
+    // Copy CSS files for content scripts (CRITICAL FIX)
+    const stylesDir = resolve(process.cwd(), 'src/styles');
+    const outStylesDir = resolve(outDir, 'src/styles');
+    if (await fs.pathExists(stylesDir)) {
+      await fs.ensureDir(outStylesDir);
+      await fs.copy(stylesDir, outStylesDir);
+      console.log('✅ Copied CSS files from src/styles/ to build directory');
+    }
   };
 
   const fixHtmlPaths = async (outDir) => {
@@ -177,6 +186,15 @@ export default defineConfig({
         const srcDir = process.cwd();
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'src/assets/icons'), resolve(outDir, 'icons'));
+        
+        // Copy CSS files for content scripts (CRITICAL FIX)
+        const stylesDir = resolve(srcDir, 'src/styles');
+        const outStylesDir = resolve(outDir, 'src/styles');
+        if (await fs.pathExists(stylesDir)) {
+          await fs.ensureDir(outStylesDir);
+          await fs.copy(stylesDir, outStylesDir);
+          console.log('✅ Copied CSS files from src/styles/ to build directory');
+        }
         
         // Copy Changelog.md for About page
         const changelogSrc = resolve(srcDir, 'Changelog.md');

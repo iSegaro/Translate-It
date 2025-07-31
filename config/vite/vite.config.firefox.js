@@ -8,6 +8,26 @@ import pkg from '../../package.json' with { type: 'json' };
 
 const baseConfig = createBaseConfig('firefox')
 
+// Plugin to copy CSS files for Firefox
+function copyFirefoxAssets() {
+  return {
+    name: 'copy-firefox-assets',
+    writeBundle: {
+      order: 'pre',
+      handler: async (options) => {
+        // Copy CSS files for content scripts
+        const stylesDir = resolve(process.cwd(), 'src/styles');
+        const outStylesDir = resolve(options.dir, 'src/styles');
+        if (await fs.pathExists(stylesDir)) {
+          await fs.ensureDir(outStylesDir);
+          await fs.copy(stylesDir, outStylesDir);
+          console.log('✅ Copied CSS files from src/styles/ to Firefox build directory');
+        }
+      }
+    }
+  };
+}
+
 export default defineConfig({
   ...baseConfig,
   
@@ -25,6 +45,8 @@ export default defineConfig({
   
   plugins: [
     ...(baseConfig.plugins || []),
+    
+    copyFirefoxAssets(),
     
     webExtension({
       // Generate dynamic manifest for Firefox
@@ -66,6 +88,15 @@ export default defineConfig({
         const srcDir = process.cwd();
         await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'src/assets/icons'), resolve(outDir, 'icons'));
+        
+        // Copy CSS files for content scripts (CRITICAL FIX)
+        const stylesDir = resolve(srcDir, 'src/styles');
+        const outStylesDir = resolve(outDir, 'src/styles');
+        if (await fs.pathExists(stylesDir)) {
+          await fs.ensureDir(outStylesDir);
+          await fs.copy(stylesDir, outStylesDir);
+          console.log('✅ Copied CSS files from src/styles/ to build directory');
+        }
         
         // Copy Changelog.md for About page
         const changelogSrc = resolve(srcDir, 'Changelog.md');
