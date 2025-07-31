@@ -19,7 +19,6 @@ import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
-import EventRouter from "./EventRouter.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 /**
@@ -127,7 +126,6 @@ export default class TranslationHandler {
     });
 
     this.eventHandler = new EventHandler(this, this.featureManager);
-    this.eventRouter = new EventRouter(this, this.featureManager);
   }
 
   @logMethod

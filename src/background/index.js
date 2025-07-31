@@ -3,7 +3,6 @@
 
 import browser from "webextension-polyfill";
 import { featureLoader } from "./feature-loader.js";
-import { VueMessageHandler } from "./vue-message-handler.js";
 import NotificationManager from "../managers/NotificationManager.js";
 import { initializeSettingsListener } from "../config.js";
 import { TranslationEngine } from "./translation-engine.js";
@@ -21,7 +20,6 @@ class BackgroundService {
     this.browser = null;
     this.features = {};
     this.listeners = [];
-    this.vueMessageHandler = null;
     this.translationEngine = null;
     this.messageHandler = simpleMessageHandler;
     // Ensure SimpleMessageHandler is initialized
@@ -56,16 +54,6 @@ class BackgroundService {
       // Register all message handlers with simple handler
       this.registerMessageHandlers();
 
-      // Register Vue message handler
-      if (!this.vueMessageHandler) {
-        try {
-          this.vueMessageHandler = new VueMessageHandler();
-          await this.vueMessageHandler.register(this.messageHandler);
-          console.log("✅ VueMessageHandler registered successfully");
-        } catch (error) {
-          console.error("❌ Failed to register VueMessageHandler:", error);
-        }
-      }
 
       // Initialize error handlers for specific modules
       await this.initializeErrorHandlers();
@@ -251,16 +239,6 @@ class BackgroundService {
         );
       }
 
-      // Try to load Vue message handler AFTER messageHandler is initialized
-      if (!this.vueMessageHandler && this.messageHandler) {
-        try {
-          // Import the class
-          this.vueMessageHandler = new VueMessageHandler(); // Instantiate the class
-          await this.vueMessageHandler.register(this.messageHandler);
-        } catch (error) {
-          console.error("Vue message handler unavailable in minimal mode");
-        }
-      }
 
       // Try to initialize translation engine
       if (!this.translationEngine) {
@@ -290,7 +268,6 @@ class BackgroundService {
       browser: browser,
       features: Object.keys(this.features),
       listeners: this.listeners.length,
-      hasVueHandler: !!this.vueMessageHandler,
       hasTranslationEngine: !!this.translationEngine,
       translationStats: this.translationEngine
         ? this.translationEngine.getCacheStats()
@@ -481,6 +458,48 @@ class BackgroundService {
       Handlers.handleOpenSidePanel,
     );
 
+    // Vue integration handlers (previously from VueMessageHandler)
+    this.messageHandler.registerHandler(
+      "TRANSLATE_IMAGE",
+      Handlers.handleTranslateImage,
+    );
+    this.messageHandler.registerHandler(
+      "GET_PROVIDER_STATUS",
+      Handlers.handleProviderStatus,
+    );
+    this.messageHandler.registerHandler(
+      "TEST_PROVIDER_CONNECTION",
+      Handlers.handleTestProviderConnection,
+    );
+    this.messageHandler.registerHandler(
+      "SAVE_PROVIDER_CONFIG",
+      Handlers.handleSaveProviderConfig,
+    );
+    this.messageHandler.registerHandler(
+      "GET_PROVIDER_CONFIG",
+      Handlers.handleGetProviderConfig,
+    );
+    this.messageHandler.registerHandler(
+      "START_SCREEN_CAPTURE",
+      Handlers.handleStartScreenCapture,
+    );
+    this.messageHandler.registerHandler(
+      "CAPTURE_SCREEN_AREA",
+      Handlers.handleCaptureScreenArea,
+    );
+    this.messageHandler.registerHandler(
+      "UPDATE_CONTEXT_MENU",
+      Handlers.handleUpdateContextMenu,
+    );
+    this.messageHandler.registerHandler(
+      "GET_EXTENSION_INFO",
+      Handlers.handleGetExtensionInfo,
+    );
+    this.messageHandler.registerHandler(
+      "LOG_ERROR",
+      Handlers.handleLogError,
+    );
+
     console.log(
       "[BackgroundService] All message handlers registered with SimpleMessageHandler successfully.",
     );
@@ -530,7 +549,6 @@ class BackgroundService {
     this.initialized = false;
     this.features = {};
     this.listeners = [];
-    this.vueMessageHandler = null;
     this.translationEngine = null;
     this.listenerManager = null;
 

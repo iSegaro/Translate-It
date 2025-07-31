@@ -57,3 +57,15 @@ export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 
 // Sidepanel handlers
 export * from "./sidepanel/handleOpenSidePanel.js";
+
+// Vue integration handlers
+export * from "./vue-integration/handleTranslateImage.js";
+export * from "./vue-integration/handleProviderStatus.js";
+export * from "./vue-integration/handleTestProviderConnection.js";
+export * from "./vue-integration/handleSaveProviderConfig.js";
+export * from "./vue-integration/handleGetProviderConfig.js";
+export * from "./vue-integration/handleStartScreenCapture.js";
+export * from "./vue-integration/handleCaptureScreenArea.js";
+export * from "./vue-integration/handleUpdateContextMenu.js";
+export * from "./vue-integration/handleGetExtensionInfo.js";
+export * from "./vue-integration/handleLogError.js";

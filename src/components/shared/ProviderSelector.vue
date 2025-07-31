@@ -198,8 +198,8 @@ onMounted(() => {
   // Use provider registry for consistent provider information
   const providersFromRegistry = getProvidersForDropdown()
   availableProviders.value = providersFromRegistry.map(provider => ({
-    id: provider.value,
-    name: provider.label,
+    id: provider.id,
+    name: provider.name,
     icon: `api-providers/${provider.icon}`
   }))
   

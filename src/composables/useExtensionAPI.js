@@ -21,7 +21,6 @@ export function useExtensionAPI() {
       const response = await api.runtime.sendMessage({
         action,
         data,
-        source: "vue-app",
         timestamp: Date.now(),
       });
 
@@ -43,7 +42,6 @@ export function useExtensionAPI() {
       const response = await api.tabs.sendMessage(tabId, {
         action,
         data,
-        source: "vue-app",
         timestamp: Date.now(),
       });
       return response;

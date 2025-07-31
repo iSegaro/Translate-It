@@ -3,15 +3,7 @@ import { ref, computed } from 'vue'
 import { ErrorTypes } from '@/error-management/ErrorTypes.js'
 
 // Translation client for messaging with background service worker
-import { TranslationClient, TRANSLATION_CONTEXTS } from '@/core/translation-client.js'
-
-let translationClient = null
-const getTranslationClient = () => {
-  if (!translationClient) {
-    translationClient = new TranslationClient(TRANSLATION_CONTEXTS.POPUP)
-  }
-  return translationClient
-}
+// Note: TranslationClient removed - using UnifiedTranslationClient instead
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -40,6 +32,10 @@ export const useTranslationStore = defineStore('translation', () => {
 
   // Actions
   const translateText = async (text, options = {}) => {
+    // TODO: Reimplement using UnifiedTranslationClient when this store is activated
+    throw new Error('Translation store disabled - use UnifiedTranslationClient directly')
+    
+    /* 
     const { from = 'auto', to = 'en', provider = selectedProvider.value, mode = 'simple' } = options
     
     if (!text?.trim()) {
@@ -58,15 +54,16 @@ export const useTranslationStore = defineStore('translation', () => {
     error.value = null
     
     try {
-      // Use translation client for messaging with background service worker
-      const client = getTranslationClient()
+      // Use UnifiedTranslationClient for messaging with background service worker
+      const client = new UnifiedTranslationClient('store')
       const response = await client.translate(text, {
         provider,
         sourceLanguage: from,
         targetLanguage: to,
         mode
       })
-      
+    */
+      /*
       const result = {
         text: response.translatedText,
         sourceText: text,
@@ -93,6 +90,7 @@ export const useTranslationStore = defineStore('translation', () => {
     } finally {
       isLoading.value = false
     }
+    */
   }
 
   const addToHistory = (translation) => {
