@@ -16,8 +16,8 @@ import NotificationManager from "../managers/NotificationManager.js";
 import EventHandler from "../core/EventHandler.js";
 import { getTranslationHandlerInstance } from "../core/InstanceManager.js";
 
-// Import the new SelectElementModeManager
-import SelectElementModeManager from "../managers/SelectElementModeManager.js";
+// Import the new SelectElementManager
+import { SelectElementManager } from "./select-element-manager.js";
 
 console.log("Content script loaded via Vue build system");
 console.log("Vue bridge initialized:", vueBridge.isInitialized);
@@ -26,15 +26,7 @@ console.log("Content TTS Handler loaded:", !!contentTTSHandler);
 // Initialize TranslationHandler and EventHandler
 const translationHandler = getTranslationHandlerInstance();
 const eventHandler = new EventHandler(translationHandler, translationHandler.featureManager);
-const selectElementModeManager = new SelectElementModeManager(eventHandler, translationHandler);
+const selectElementManager = new SelectElementManager();
 
-// Setup message listener for select element mode
-browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  if (message.action === "ACTIVATE_ELEMENT_SELECTION") {
-    selectElementModeManager.activate();
-    sendResponse({ success: true });
-  } else if (message.action === "DEACTIVATE_ELEMENT_SELECTION") {
-    selectElementModeManager.deactivate();
-    sendResponse({ success: true });
-  }
-});
+// Initialize SelectElementManager
+selectElementManager.initialize();

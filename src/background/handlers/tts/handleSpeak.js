@@ -4,7 +4,7 @@ import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
 let errorHandlerInstance = null;
 
-export const initializeTTSHandler = (handler) => {
+export const initializeSpeakHandler = (handler) => {
   errorHandlerInstance = handler;
 };
 

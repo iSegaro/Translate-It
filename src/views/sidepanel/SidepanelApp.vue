@@ -19,20 +19,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useTranslationStore } from '@/store/core/translation'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
 
 // Stores
 const settingsStore = useSettingsStore()
+const translationStore = useTranslationStore()
 
 // State
 const isLoading = ref(true)
 const loadingText = ref('Loading Sidepanel...')
 const hasError = ref(false)
 const errorMessage = ref('')
+
+// Message listener
+const handleMessage = (message) => {
+  if (message.action === 'translationResult') {
+    translationStore.setTranslation(message.data);
+  }
+};
 
 // Lifecycle
 onMounted(async () => {
@@ -53,6 +62,9 @@ onMounted(async () => {
       )
     ])
     console.log('✅ Settings store loaded')
+
+    // Step 3: Add message listener
+    browser.runtime.onMessage.addListener(handleMessage);
     
   } catch (error) {
     console.error('❌ Failed to initialize sidepanel:', error)
@@ -63,6 +75,10 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
+
+onUnmounted(() => {
+  browser.runtime.onMessage.removeListener(handleMessage);
+});
 
 const retryLoading = () => {
   console.log('🔄 Retrying sidepanel loading...')

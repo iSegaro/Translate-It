@@ -65,7 +65,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 

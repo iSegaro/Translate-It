@@ -167,7 +167,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
 import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
-import { useSelectElementTranslation } from "@/composables/useSelectElementTranslation.js";
+import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useHistory } from "@/composables/useHistory.js";
@@ -215,9 +215,9 @@ const hasTranslationContent = computed(() => {
 });
 
 // Select Element computed properties
-const isSelecting = computed(() => selectElement.isSelecting.value);
+const isSelecting = computed(() => selectElement.isActivating.value);
 const isSelectElementActivating = computed(
-  () => selectElement.isSelecting.value,
+  () => selectElement.isActivating.value,
 );
 
 const targetLanguageValue = computed(() => {

@@ -34,7 +34,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import SidepanelToolbar from './components/SidepanelToolbar.vue'
 import SidepanelMainContent from './components/SidepanelMainContent.vue'
 import SidepanelHistory from './components/SidepanelHistory.vue'
@@ -43,7 +43,7 @@ import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue'
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const { closeDropdown: closeApiDropdown, setDropdownOpen } = useApiProvider()
-const { isSelectModeActive, deactivateSelectElement } = useSelectElementTranslation()
+const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
@@ -101,7 +101,7 @@ const handleSidepanelClick = async (event) => {
   if (isSelectModeActive.value) {
     try {
       console.log('[SidepanelLayout] Sidepanel clicked - deactivating select element mode')
-      await deactivateSelectElement()
+      await deactivateSelectMode()
     } catch (error) {
       console.error('[SidepanelLayout] Failed to deactivate select element mode:', error)
     }
@@ -119,7 +119,7 @@ const handleKeyDown = async (event) => {
       console.log('[SidepanelLayout] ESC pressed in sidepanel - deactivating select element mode')
       event.preventDefault()
       event.stopPropagation()
-      await deactivateSelectElement()
+      await deactivateSelectMode()
     } catch (error) {
       console.error('[SidepanelLayout] Failed to deactivate select element mode on ESC:', error)
     }

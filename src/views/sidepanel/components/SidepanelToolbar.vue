@@ -88,7 +88,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useUI } from '@/composables/useUI.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useHistory } from '@/composables/useHistory.js'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import browser from 'webextension-polyfill'
 
 // Import icons statically to ensure they're bundled

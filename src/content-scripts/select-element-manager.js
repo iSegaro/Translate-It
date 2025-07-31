@@ -3,10 +3,11 @@
 // Integrated with existing services and error handling
 
 import browser from "webextension-polyfill";
-import { logME } from "@/utils/helpers.js";
+import { logME, taggleLinks } from "@/utils/helpers.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import NotificationManager from "@/managers/NotificationManager.js";
+import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
 
 /**
  * SelectElementManager - Vue-compatible element selection system
@@ -32,6 +33,7 @@ export class SelectElementManager {
     // Service instances
     this.errorHandler = new ErrorHandler();
     this.notificationManager = new NotificationManager(this.errorHandler);
+    this.messenger = new UnifiedMessenger("content-select-element");
 
     // Event handlers (bound to this)
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -68,65 +70,6 @@ export class SelectElementManager {
     }
   }
 
-  /**
-   * Helper for retrying sendMessage with exponential backoff
-   */
-  async sendMessageWithRetry(action, data, retries = 3, delayMs = 100) {
-    for (let i = 0; i < retries; i++) {
-      try {
-        console.log(`[SelectElementManager] Sending message:`, {
-          action,
-          data,
-        });
-        const response = await this.browser.runtime.sendMessage({
-          action,
-          data,
-        });
-
-        console.log(`[SelectElementManager] Raw response received:`, response);
-
-        // Accept any truthy response or explicit success: true
-        if (
-          response &&
-          (response.success === true || response.success !== false)
-        ) {
-          console.log(
-            `[SelectElementManager] Message sent successfully:`,
-            response,
-          );
-          return response;
-        } else {
-          console.warn(`[SelectElementManager] Response failed:`, response);
-          // If response indicates explicit failure, re-throw immediately
-          if (response && response.success === false && response.error) {
-            throw new Error(response.error);
-          }
-          // If response is null/undefined, it's likely a connection issue - retry
-          if (!response) {
-            throw new Error(
-              `Retryable error: No response received (null/undefined)`,
-            );
-          }
-          // Otherwise, it's a retryable error
-          throw new Error(
-            `Retryable error: ${response?.error || "No success response"}`,
-          );
-        }
-      } catch (error) {
-        console.warn(
-          `[SelectElementManager] Message send failed (attempt ${i + 1}/${retries}):`,
-          error,
-        );
-        if (i < retries - 1) {
-          // Exponential backoff: 100ms, 200ms, 400ms
-          const waitTime = delayMs * Math.pow(2, i);
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-        } else {
-          throw error; // Re-throw after last retry
-        }
-      }
-    }
-  }
 
   /**
    * Setup message listener for background communication
@@ -459,48 +402,34 @@ export class SelectElementManager {
   }
 
   /**
-   * Highlight element with visual overlay
+   * Highlight element - relies on CSS :hover effects
    */
   highlightElement(element) {
-    // Add highlight class
-    element.classList.add("translate-it-select-highlight");
-
-    // Create overlay for better visibility
-    const overlay = document.createElement("div");
-    overlay.className = "translate-it-select-overlay";
-
-    const rect = element.getBoundingClientRect();
-    Object.assign(overlay.style, {
-      position: "fixed",
-      top: rect.top + "px",
-      left: rect.left + "px",
-      width: rect.width + "px",
-      height: rect.height + "px",
-      backgroundColor: "rgba(74, 144, 226, 0.3)",
-      border: "2px solid #4a90e2",
-      borderRadius: "4px",
-      pointerEvents: "none",
-      zIndex: "2147483646",
-      transition: "all 0.2s ease",
-    });
-
-    document.body.appendChild(overlay);
-    this.overlayElements.add(overlay);
+    console.log('[SelectElementManager] Highlighting element:', element.tagName, element.className);
+    
+    // The CSS class is applied globally, so :hover effects work automatically
+    // Just track the current element for mouseout handling
+    this.currentHighlighted = element;
+    
+    // Optional: Add explicit highlighting class for additional feedback
+    if (element && !element.classList.contains('translate-it-element-highlighted')) {
+      element.classList.add('translate-it-element-highlighted');
+      console.log('[SelectElementManager] Added highlight class to:', element.tagName);
+    }
   }
 
   /**
    * Clear current highlight
    */
   clearHighlight() {
-    // Remove highlight classes
-    document
-      .querySelectorAll(".translate-it-select-highlight")
-      .forEach((el) => {
-        el.classList.remove("translate-it-select-highlight");
-      });
-
-    // Remove overlay elements
-    this.clearOverlays();
+    // Remove explicit highlighting class if present
+    if (this.currentHighlighted) {
+      this.currentHighlighted.classList.remove('translate-it-element-highlighted');
+      console.log('[SelectElementManager] Removed highlight class from:', this.currentHighlighted.tagName);
+    }
+    
+    // Clear current element tracking
+    this.currentHighlighted = null;
   }
 
   /**
@@ -555,96 +484,142 @@ export class SelectElementManager {
   }
 
   /**
-   * Process selected element - send to background for translation
+   * Process selected element - send to background for translation using UnifiedMessenger
    */
   async processSelectedElement(element, text) {
-    if (!this.browser) return;
-
     try {
       console.log(
         "[SelectElementManager] Sending text to background for processing",
       );
 
-      // Send extracted text to background for translation with retry
-      // Use direct runtime.sendMessage instead of sendMessageWithRetry to avoid duplicate broadcasts
-      const response = await this.browser.runtime.sendMessage({
-        action: "elementSelected",
-        data: {
-          text: text,
+      // Get current provider and language settings
+      const { getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } = await import("../config.js");
+      
+      const provider = await getTranslationApiAsync();
+      const sourceLanguage = await getSourceLanguageAsync();
+      const targetLanguage = await getTargetLanguageAsync();
+
+      console.log("[SelectElementManager] Translation settings:", {
+        provider, sourceLanguage, targetLanguage
+      });
+
+      // Use UnifiedMessenger translate method like popup/sidepanel
+      const response = await this.messenger.translate({
+        text: text,
+        provider: provider,
+        from: sourceLanguage,
+        to: targetLanguage,
+        mode: 'selection',
+        options: {
           element: {
             tagName: element.tagName,
             className: element.className,
             id: element.id,
           },
           timestamp: Date.now(),
-        },
+        }
       });
 
-      if (response && response.success) {
+      console.log("[SelectElementManager] Raw response received:", response);
+      
+      // Handle TRANSLATION_RESULT_UPDATE message format (Firefox MV3 workaround)
+      if (response && response.action === 'TRANSLATION_RESULT_UPDATE') {
+        console.log("[SelectElementManager] TRANSLATION_RESULT_UPDATE received");
+        
+        // Replace element text with translation
+        if (response.translatedText) {
+          console.log("[SelectElementManager] Replacing element text with translation");
+          this.replaceElementText(element, response.translatedText);
+          await this.showSuccessNotification("Translation successful!");
+        } else {
+          console.warn("[SelectElementManager] No translatedText in TRANSLATION_RESULT_UPDATE:", response);
+        }
+      } 
+      // Handle standard success response format
+      else if (response && response.success) {
         console.log("[SelectElementManager] Element processed successfully");
+        
+        // Replace element text with translation
+        if (response.translatedText) {
+          console.log("[SelectElementManager] Replacing element text with translation");
+          this.replaceElementText(element, response.translatedText);
+          await this.showSuccessNotification("Translation successful!");
+        } else {
+          console.warn("[SelectElementManager] No translatedText in successful response:", response);
+        }
       } else {
         console.error(
           "[SelectElementManager] Background processing failed:",
-          response?.error,
+          response?.error || "Unknown error"
         );
+        console.error("[SelectElementManager] Full response object:", response);
+        throw new Error(response?.error || "Translation failed - no response");
       }
     } catch (error) {
       console.error(
         "[SelectElementManager] Failed to send element data:",
         error,
       );
-      // Don't retry on elementSelected - it causes duplicate messages
-      // Just throw the error to let the caller handle it
       throw error;
     }
   }
 
   /**
-   * Add global styles for select element mode
+   * Replace element text with translated text
    */
-  addGlobalStyles() {
-    if (document.getElementById("translate-it-select-styles")) return;
+  replaceElementText(element, translatedText) {
+    console.log("[SelectElementManager] Attempting to replace text");
+    console.log("[SelectElementManager] Element to replace:", element);
+    console.log("[SelectElementManager] New text:", translatedText);
 
-    const styles = document.createElement("style");
-    styles.id = "translate-it-select-styles";
-    styles.textContent = `
-      .translate-it-select-highlight {
-        outline: 2px solid #4a90e2 !important;
-        outline-offset: 2px !important;
-        background-color: rgba(74, 144, 226, 0.1) !important;
-      }
-      
-      .translate-it-select-overlay {
-        animation: translateItSelectPulse 2s infinite;
-      }
-      
-      @keyframes translateItSelectPulse {
-        0%, 100% { 
-          background-color: rgba(74, 144, 226, 0.3);
-          border-color: #4a90e2;
-        }
-        50% { 
-          background-color: rgba(74, 144, 226, 0.5);
-          border-color: #2171b5;
-        }
-      }
-      
-      .translate-it-cursor-select {
-        cursor: crosshair !important;
-      }
-    `;
+    if (!element || !translatedText) {
+      console.warn("[SelectElementManager] replaceElementText: Invalid element or translatedText provided");
+      return;
+    }
 
-    document.head.appendChild(styles);
+    try {
+      // Store original text for potential revert
+      const originalText = this.extractTextFromElement(element);
+      this.trackTranslatedElement(element, originalText);
+
+      if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+        console.log("[SelectElementManager] Replacing value of input/textarea");
+        element.value = translatedText;
+      } else {
+        console.log("[SelectElementManager] Replacing textContent of element");
+        element.textContent = translatedText;
+      }
+      
+      console.log("[SelectElementManager] Text replacement completed successfully");
+    } catch (error) {
+      console.error("[SelectElementManager] Error during text replacement:", error);
+      throw error;
+    }
   }
 
   /**
-   * Remove global styles
+   * Add global styles for select element mode using legacy system
+   */
+  addGlobalStyles() {
+    // Apply the CSS class that enables crosshair cursor and hover effects
+    taggleLinks(true);
+    
+    // Verify the class was applied
+    const hasClass = document.documentElement.classList.contains('AIWritingCompanion-disable-links');
+    console.log('[SelectElementManager] CSS class applied:', hasClass);
+    
+    if (!hasClass) {
+      console.warn('[SelectElementManager] CSS class failed to apply - trying manual application');
+      document.documentElement.classList.add('AIWritingCompanion-disable-links');
+    }
+  }
+
+  /**
+   * Remove global styles using legacy system
    */
   removeGlobalStyles() {
-    const styles = document.getElementById("translate-it-select-styles");
-    if (styles) {
-      styles.remove();
-    }
+    // Remove the CSS class that disables crosshair cursor and hover effects
+    taggleLinks(false);
   }
 
   /**

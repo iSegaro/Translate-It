@@ -1,6 +1,6 @@
 // src/composables/useTranslationModes.js
 import { ref, reactive } from "vue";
-import { TranslationService } from "../error-management/TranslationService.js";
+import { TranslationService } from "../core/TranslationService.js";
 import { logME } from "@/utils/helpers.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
@@ -102,6 +102,7 @@ export function useSidepanelTranslation() {
  */
 export function useSelectElementTranslation() {
   const isActivating = ref(false);
+  const isSelectModeActive = ref(false);
   const error = ref(null);
 
   /**
@@ -153,14 +154,36 @@ export function useSelectElementTranslation() {
     }
   };
 
+  /**
+   * تغییر وضعیت انتخاب عنصر (toggle)
+   * @returns {Promise<boolean>} موفقیت عملیات
+   */
+  const toggleSelectElement = async () => {
+    if (isSelectModeActive.value) {
+      const result = await deactivateSelectMode();
+      if (result) {
+        isSelectModeActive.value = false;
+      }
+      return result;
+    } else {
+      const result = await activateSelectMode();
+      if (result) {
+        isSelectModeActive.value = true;
+      }
+      return result;
+    }
+  };
+
   return {
     // State
     isActivating,
+    isSelectModeActive,
     error,
 
     // Methods
     activateSelectMode,
     deactivateSelectMode,
+    toggleSelectElement,
   };
 }
 

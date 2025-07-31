@@ -1,0 +1,79 @@
+/* src/styles/disable_links.css */
+
+/* ==========================================================================
+     Select Element Mode Styles
+     ========================================================================== */
+
+/* Global cursor change when in select element mode */
+.AIWritingCompanion-disable-links,
+.AIWritingCompanion-disable-links * {
+  cursor: crosshair !important;
+}
+
+/* Disable pointer events on interactive elements to prevent navigation */
+.AIWritingCompanion-disable-links a,
+.AIWritingCompanion-disable-links button,
+.AIWritingCompanion-disable-links [onclick],
+.AIWritingCompanion-disable-links [role="link"],
+.AIWritingCompanion-disable-links div[role="link"],
+.AIWritingCompanion-disable-links input[type="submit"],
+.AIWritingCompanion-disable-links input[type="button"] {
+  pointer-events: none !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* Visual highlighting for hoverable elements with text content */
+.AIWritingCompanion-disable-links *:hover {
+  background-color: rgba(255, 215, 0, 0.3) !important;
+  outline: 2px solid #ffaa00 !important;
+  outline-offset: 1px !important;
+  box-shadow: 0 0 5px rgba(255, 170, 0, 0.5) !important;
+  transition: all 0.1s ease !important;
+}
+
+/* Prevent highlighting on body and html elements */
+.AIWritingCompanion-disable-links body:hover,
+.AIWritingCompanion-disable-links html:hover {
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* More specific highlighting for text-containing elements */
+.AIWritingCompanion-disable-links p:hover,
+.AIWritingCompanion-disable-links div:hover,
+.AIWritingCompanion-disable-links span:hover,
+.AIWritingCompanion-disable-links h1:hover,
+.AIWritingCompanion-disable-links h2:hover,
+.AIWritingCompanion-disable-links h3:hover,
+.AIWritingCompanion-disable-links h4:hover,
+.AIWritingCompanion-disable-links h5:hover,
+.AIWritingCompanion-disable-links h6:hover,
+.AIWritingCompanion-disable-links li:hover,
+.AIWritingCompanion-disable-links td:hover,
+.AIWritingCompanion-disable-links th:hover,
+.AIWritingCompanion-disable-links article:hover,
+.AIWritingCompanion-disable-links section:hover {
+  background-color: rgba(255, 215, 0, 0.2) !important;
+  outline: 2px dashed #ffaa00 !important;
+  outline-offset: 2px !important;
+}
+
+/* Special styling for input elements */
+.AIWritingCompanion-disable-links input:hover,
+.AIWritingCompanion-disable-links textarea:hover {
+  background-color: rgba(173, 216, 230, 0.3) !important;
+  outline: 2px solid #4a90e2 !important;
+  outline-offset: 1px !important;
+}
+
+/* Additional highlighting for actively tracked elements */
+.translate-it-element-highlighted {
+  background-color: rgba(255, 215, 0, 0.4) !important;
+  outline: 3px solid #ff8800 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 8px rgba(255, 136, 0, 0.6) !important;
+  z-index: 999999 !important;
+  position: relative !important;
+}

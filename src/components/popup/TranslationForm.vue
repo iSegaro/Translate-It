@@ -41,7 +41,6 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
 import { useSettingsStore } from '@/store/core/settings'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationOutputField from '@/components/shared/TranslationOutputField.vue'
@@ -52,8 +51,6 @@ const settingsStore = useSettingsStore()
 // Composables (lightweight popup version)
 const translation = usePopupTranslation()
 
-// Select Element Integration
-const selectElementTranslation = useSelectElementTranslation()
 
 // Refs
 const sourceInputRef = ref(null)
@@ -127,54 +124,9 @@ const revertTranslation = () => {
   }
 }
 
-// Select Element Integration
-const setupSelectElementIntegration = () => {
-  // Handle text extracted from selected elements
-  selectElementTranslation.onTextExtracted.value = (extractedText, elementData) => {
-    console.log('[TranslationForm] Text extracted from selected element:', extractedText)
-    
-    // Populate source text field
-    sourceText.value = extractedText
-    
-    // Clear previous translation
-    translatedText.value = ''
-    translationError.value = ''
-    
-    // Focus on source input after population
-    nextTick(() => {
-      if (sourceInputRef.value?.focus) {
-        sourceInputRef.value.focus()
-      }
-    })
-    
-    // Auto-translate if setting is enabled (for now using TRANSLATE_ON_TEXT_SELECTION as proxy)
-    if (settingsStore.settings.TRANSLATE_ON_TEXT_SELECTION) {
-      nextTick(async () => {
-        if (extractedText.trim()) {
-          await handleTranslate()
-        }
-      })
-    }
-  }
-  
-  // Handle mode changes (activation/deactivation)
-  selectElementTranslation.onModeChanged.value = (isActive) => {
-    console.log('[TranslationForm] Select element mode changed:', isActive)
-    
-    if (isActive) {
-      // Visual feedback that select mode is active
-      console.log('[TranslationForm] Select element mode activated - ready to receive text')
-    } else {
-      // Mode deactivated
-      console.log('[TranslationForm] Select element mode deactivated')
-    }
-  }
-}
 
 // Event listeners
 onMounted(async () => {
-  // Setup select element integration
-  setupSelectElementIntegration()
   
   // Listen for global events from header component
   document.addEventListener('clear-storage', clearStorage)

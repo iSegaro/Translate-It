@@ -94,7 +94,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useSelectElementTranslation } from '@/composables/useSelectElementTranslation.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { useSidepanelActions } from '@/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
@@ -125,7 +125,7 @@ const { t } = useI18n()
 
 // State
 const isSelectElementActivating = computed(() => selectElement.isActivating.value)
-const isSelecting = computed(() => selectElement.isSelecting.value)
+const isSelecting = computed(() => selectElement.isActivating.value)
 const isReverting = computed(() => sidepanelActions.isProcessing.value)
 
 // API provider icon

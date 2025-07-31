@@ -70,6 +70,7 @@ export const TRANSLATION_CONTEXTS = {
   SUBTITLE: "subtitle",
   CAPTURE: "capture",
   EVENT_HANDLER: "event-handler",
+  CONTENT_SELECT_ELEMENT: "content-select-element",
 };
 
 /**
