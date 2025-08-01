@@ -250,6 +250,49 @@ describe('StorageManager', () => {
     });
   });
 
+  describe('Vue Proxy Support', () => {
+    it('should handle Vue reactive objects (Proxy)', async () => {
+      // Simulate a Vue reactive object (Proxy)
+      const reactiveData = new Proxy({
+        setting1: 'value1',
+        setting2: { nested: 'value2' },
+        setting3: [1, 2, 3]
+      }, {
+        get: (target, prop) => target[prop],
+        set: (target, prop, value) => {
+          target[prop] = value;
+          return true;
+        }
+      });
+
+      // Should not throw error with proxy objects
+      await expect(storageManager.set(reactiveData)).resolves.not.toThrow();
+
+      // Verify data was converted and stored correctly
+      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+        setting1: 'value1',
+        setting2: { nested: 'value2' },
+        setting3: [1, 2, 3]
+      });
+    });
+
+    it('should handle nested proxy objects', async () => {
+      const nestedProxy = new Proxy({
+        level1: new Proxy({
+          level2: 'deep value'
+        }, {})
+      }, {});
+
+      await expect(storageManager.set(nestedProxy)).resolves.not.toThrow();
+
+      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+        level1: {
+          level2: 'deep value'
+        }
+      });
+    });
+  });
+
   describe('Cleanup', () => {
     it('should cleanup resources properly', async () => {
       await storageManager.cleanup();

@@ -1,6 +1,7 @@
 // src/components/core/__tests__/EnhancedUnifiedMessenger.test.js
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EnhancedUnifiedMessenger } from '@/core/EnhancedUnifiedMessenger.js';
+import { MessageActions } from '../MessageActions';
 
 // Mock browser API
 const mockBrowser = {
@@ -260,16 +261,16 @@ describe('EnhancedUnifiedMessenger', () => {
     test('should activate selection mode', async () => {
       mockSendMessage.mockResolvedValue({ success: true });
 
-      await messenger.specialized.selection.activateMode('translate', {
+      await messenger.specialized.selection.activateMode(MessageActions.TRANSLATE, {
         tabId: 123,
         highlightColor: '#ff0000'
       });
 
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'activateSelectElementMode',
+          action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
           data: {
-            mode: 'translate',
+            mode: MessageActions.TRANSLATE,
             tabId: 123,
             highlightColor: '#ff0000',
             showTooltip: true
@@ -286,14 +287,14 @@ describe('EnhancedUnifiedMessenger', () => {
 
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'deactivateSelectElementMode'
+          action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE
         }),
         10000
       );
     });
 
     test('should get selection state', async () => {
-      const mockState = { active: true, mode: 'translate' };
+      const mockState = { active: true, mode: MessageActions.TRANSLATE };
       mockSendMessage.mockResolvedValue(mockState);
 
       const state = await messenger.specialized.selection.getSelectionState();
@@ -301,7 +302,7 @@ describe('EnhancedUnifiedMessenger', () => {
       expect(state).toEqual(mockState);
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'getSelectElementState'
+          action: MessageActions.GET_SELECT_ELEMENT_STATE
         }),
         10000
       );
@@ -317,7 +318,7 @@ describe('EnhancedUnifiedMessenger', () => {
 
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'processSelectedElement',
+          action: MessageActions.PROCESS_SELECTED_ELEMENT,
           data: {
             elementInfo,
             targetLanguage: 'fa',
@@ -348,7 +349,7 @@ describe('EnhancedUnifiedMessenger', () => {
       // Should call the parent translate method which uses TRANSLATE action
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'TRANSLATE',
+          action: MessageActions.TRANSLATE,
           data: expect.objectContaining({
             text: 'Hello world',
             provider: 'google',
@@ -375,7 +376,7 @@ describe('EnhancedUnifiedMessenger', () => {
       expect(history).toEqual(mockHistory);
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'GET_HISTORY',
+          action: MessageActions.GET_HISTORY,
           data: {
             limit: 50,
             offset: 0
@@ -394,7 +395,7 @@ describe('EnhancedUnifiedMessenger', () => {
       expect(providers).toEqual(mockProviders);
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'GET_PROVIDERS'
+          action: MessageActions.GET_PROVIDERS
         }),
         10000
       );
@@ -407,7 +408,7 @@ describe('EnhancedUnifiedMessenger', () => {
 
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'TEST_PROVIDER',
+          action: MessageActions.TEST_PROVIDER,
           data: { provider: 'google' }
         }),
         10000
@@ -434,7 +435,7 @@ describe('EnhancedUnifiedMessenger', () => {
       expect(results).toEqual(mockResults);
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'BATCH_TRANSLATE',
+          action: MessageActions.BATCH_TRANSLATE,
           data: {
             texts,
             provider: 'google',
@@ -462,7 +463,7 @@ describe('EnhancedUnifiedMessenger', () => {
       expect(result).toEqual({ success: true, message: 'pong' });
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'ping',
+          action: MessageActions.PING,
           data: { from: 'test-context' }
         }),
         10000

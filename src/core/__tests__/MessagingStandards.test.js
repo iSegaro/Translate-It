@@ -263,6 +263,7 @@ describe('MessagingContexts', () => {
     expect(MessagingContexts.OPTIONS).toBe('options');
     expect(MessagingContexts.BACKGROUND).toBe('background');
     expect(MessagingContexts.CONTENT).toBe('content');
+    expect(MessagingContexts.SELECT_ELEMENT).toBe('select-element');
     expect(MessagingContexts.OFFSCREEN).toBe('offscreen');
     expect(MessagingContexts.EVENT_HANDLER).toBe('event-handler');
   });
