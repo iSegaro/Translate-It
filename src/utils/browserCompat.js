@@ -1,36 +1,54 @@
 // src/utils/browserCompat.js
 // browser compatibility utilities
 
+import browser from "webextension-polyfill";
+
 /**
+ * Modern browser detection without deprecated APIs
  * Detect if we're running in Firefox
  */
 export async function isFirefox() {
   try {
-    if (
-      typeof chrome !== "undefined" &&
-      chrome.runtime &&
-      chrome.runtime.getbrowserInfo
-    ) {
-      const browserInfo = await chrome.runtime.getbrowserInfo();
-      return browserInfo.name.toLowerCase() === "firefox";
+    // Method 1: Use webextension-polyfill browser.runtime.getBrowserInfo() if available
+    if (typeof browser !== "undefined" && browser.runtime && browser.runtime.getBrowserInfo) {
+      try {
+        const browserInfo = await browser.runtime.getBrowserInfo();
+        return browserInfo.name.toLowerCase() === "firefox";
+      } catch (error) {
+        // getBrowserInfo might not be available in all contexts
+        console.debug('[browserCompat] getBrowserInfo not available:', error);
+      }
     }
-    // Fallback detection for content scripts/UI contexts
-    if (
-      typeof window !== "undefined" &&
-      typeof InstallTrigger !== "undefined"
-    ) {
+    
+    // Method 2: Check for Firefox-specific APIs that are not deprecated
+    if (typeof browser !== "undefined" && browser.runtime) {
+      // Firefox has different manifest structure and API availability
+      const manifest = browser.runtime.getManifest();
+      if (manifest && manifest.manifest_version === 3) {
+        // Firefox MV3 specific checks
+        const hasFirefoxSpecificAPI = 
+          browser.sidebarAction || // Firefox has sidebarAction instead of sidePanel
+          (browser.contextMenus && browser.contextMenus.OverrideContext); // Firefox-specific enum
+        if (hasFirefoxSpecificAPI) {
+          return true;
+        }
+      }
+    }
+    
+    // Method 3: User agent detection (most reliable fallback)
+    if (typeof navigator !== "undefined" && navigator.userAgent) {
+      return navigator.userAgent.includes("Firefox");
+    }
+    
+    // Method 4: Chrome API presence check (inverse detection)
+    if (typeof chrome === "undefined") {
+      // If chrome global is not available, likely Firefox with polyfill
       return true;
     }
-    // Additional Firefox detection for service workers
-    if (
-      typeof navigator !== "undefined" &&
-      navigator.userAgent &&
-      navigator.userAgent.includes("Firefox")
-    ) {
-      return true;
-    }
+    
     return false;
-  } catch {
+  } catch (error) {
+    console.error('[browserCompat] Error detecting Firefox:', error);
     return false;
   }
 }
@@ -43,28 +61,28 @@ export async function isChrome() {
 }
 
 /**
- * Get the appropriate TTS player for the current browser
+ * Get the appropriate TTS manager for the current browser
  */
-export async function getTTSPlayer() {
+export async function getTTSManager() {
   try {
     if (await isFirefox()) {
-      // Use dynamic import with webpack magic comment for proper chunking
+      // Use Firefox-compatible TTS manager
       const module = await import(
-        /* webpackChunkName: "tts-firefox" */ "../managers/tts-player/tts-player-firefox.js"
+        /* webpackChunkName: "tts-firefox" */ "../managers/tts-background.js"
       );
       return module;
     } else {
-      // Use dynamic import with webpack magic comment for proper chunking
+      // Use Chrome TTS manager with offscreen support
       const module = await import(
-        /* webpackChunkName: "tts-chrome" */ "../managers/tts-player/tts-player-chrome.js"
+        /* webpackChunkName: "tts-chrome" */ "../managers/tts-offscreen.js"
       );
       return module;
     }
   } catch (error) {
-    console.error("[browserCompat] Error loading TTS player:", error);
-    // Fallback to chrome implementation
+    console.error("[browserCompat] Error loading TTS manager:", error);
+    // Fallback to content script TTS
     const module = await import(
-      /* webpackChunkName: "tts-chrome-fallback" */ "../managers/tts-player/tts-player-chrome.js"
+      /* webpackChunkName: "tts-fallback" */ "../managers/tts-content.js"
     );
     return module;
   }
@@ -72,26 +90,10 @@ export async function getTTSPlayer() {
 
 /**
  * Get browser-specific TTS utilities
+ * Note: TTS utilities are now integrated into TTS managers
+ * This function is kept for backward compatibility
  */
 export async function getTTSUtils() {
-  try {
-    if (await isFirefox()) {
-      const module = await import(
-        /* webpackChunkName: "tts-utils-firefox" */ "./tts/tts-firefox.js"
-      );
-      return module;
-    } else {
-      const module = await import(
-        /* webpackChunkName: "tts-utils-chrome" */ "./tts/tts-chrome.js"
-      );
-      return module;
-    }
-  } catch (error) {
-    console.error("[browserCompat] Error loading TTS utils:", error);
-    // Fallback to chrome implementation
-    const module = await import(
-      /* webpackChunkName: "tts-utils-chrome-fallback" */ "./tts/tts-chrome.js"
-    );
-    return module;
-  }
+  console.warn("[browserCompat] getTTSUtils is deprecated. Use getTTSManager instead.");
+  return await getTTSManager();
 }

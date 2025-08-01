@@ -5,6 +5,7 @@
  */
 
 import browser from "webextension-polyfill";
+import { isFirefox } from "../utils/browserCompat.js";
 
 export class UnifiedMessenger {
   constructor(context = "unknown") {
@@ -20,6 +21,8 @@ export class UnifiedMessenger {
     const messageId = message.messageId || `${this.context}-${++this.messageCounter}-${Date.now()}`;
 
     try {
+      // Detect browser environment for Firefox workaround (before Promise creation)
+      const firefoxDetection = await isFirefox();
 
       // Manual Promise wrapper to fix webextension-polyfill Firefox bug
       const response = await new Promise((resolve, reject) => {
@@ -30,9 +33,6 @@ export class UnifiedMessenger {
             ),
           );
         }, timeout);
-
-        // Detect browser environment for Firefox workaround
-        const isFirefox = typeof InstallTrigger !== "undefined";
 
         const messageToSend = {
           ...message,
@@ -54,8 +54,8 @@ export class UnifiedMessenger {
                 clearTimeout(timeoutId);
 
                 // Firefox MV3 workaround: check if response is undefined but message was actually processed
-                if (response === undefined && isFirefox) {
-                  console.warn("[UnifiedMessenger] Firefox MV3 undefined response detected for", messageToSend.action);
+                if (response === undefined && firefoxDetection) {
+                  console.info("[UnifiedMessenger] Firefox MV3 undefined response detected for", messageToSend.action);
                   // For ping messages, we know it should work, so provide expected response
                   if (messageToSend.action === "ping") {
                     resolve({ success: true, message: "pong" });
