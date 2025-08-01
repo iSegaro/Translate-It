@@ -3,6 +3,7 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
+import { MessageActions } from "../core/MessageActions";
 
 export function useDirectMessage() {
   const isReady = ref(false);
@@ -50,7 +51,7 @@ export function useDirectMessage() {
     }
 
     const message = {
-      action: "fetchTranslation",
+      action: MessageActions.FETCH_TRANSLATION,
       target: "background", // Explicitly target background service worker
       payload: payload,
     };

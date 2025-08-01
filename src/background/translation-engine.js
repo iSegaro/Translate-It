@@ -4,8 +4,8 @@
  */
 
 import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
-import browser from "webextension-polyfill";
 import storageManager from "../core/StorageManager.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 export class TranslationEngine {
   constructor() {
@@ -30,8 +30,8 @@ export class TranslationEngine {
   /**
    * Handle incoming messages from UI contexts
    */
-  async handleMessage(request, sender, sendResponse) {
-    if (request.action === "TRANSLATE") {
+  async handleMessage(request, sender) {
+    if (request.action === MessageActions.TRANSLATE) {
       try {
         const result = await this.handleTranslateMessage(request, sender);
         return result;

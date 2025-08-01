@@ -29,6 +29,7 @@ import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
 import { UnifiedMessenger } from "./UnifiedMessenger.js"; // Add this import
+import { MessagingContexts } from "./MessagingStandards.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler
@@ -519,7 +520,7 @@ export default class EventHandler {
     const translationResultPromise = new Promise((resolve, reject) => {
       const listener = (msg) => {
         logME(`[EventHandler] Listener received message: ${msg.action}, context: ${msg.context}, messageId: ${msg.messageId}`);
-        if (msg.action === 'TRANSLATION_RESULT_UPDATE' && msg.context === 'event-handler' && msg.messageId === messageId) {
+        if (msg.action === MessageActions.TRANSLATION_RESULT_UPDATE && msg.context === MessagingContexts.EVENT_HANDLER && msg.messageId === messageId) {
           logME(`[EventHandler] Matching TRANSLATION_RESULT_UPDATE received for messageId: ${messageId}`);
           browser.runtime.onMessage.removeListener(listener);
           resolve(msg);

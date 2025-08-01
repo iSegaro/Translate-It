@@ -6,6 +6,7 @@
 import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import storageManager from "../core/StorageManager.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 /**
  * Handle translate element context menu
@@ -108,7 +109,7 @@ async function handleOpenSidepanel(info, tab) {
       } else {
         // Fallback - send message to background to handle
         await browser.runtime.sendMessage({
-          action: "OPEN_SIDE_PANEL",
+          action: MessageActions.OPEN_SIDE_PANEL,
           source: "context_menu",
           tabId: tab.id,
           timestamp: Date.now(),
@@ -132,7 +133,7 @@ async function handleScreenCapture(info, tab) {
 
     // Send message to background to start screen capture
     await browser.runtime.sendMessage({
-      action: "startAreaCapture",
+      action: MessageActions.START_CAPTURE_SELECTION,
       source: "context_menu",
       tabId: tab.id,
       timestamp: Date.now(),

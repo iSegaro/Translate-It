@@ -7,6 +7,7 @@
 import { UnifiedMessenger } from './UnifiedMessenger.js';
 import browser from 'webextension-polyfill';
 import { isFirefox } from '../utils/browserCompat.js';
+import { MessageActions } from './MessageActions.js';
 
 /**
  * Specialized TTS Messenger
@@ -41,7 +42,7 @@ class TTSMessenger {
     };
 
     return this.messenger.sendMessage({
-      action: 'TTS_SPEAK',
+      action: MessageActions.TTS_SPEAK,
       target: 'offscreen', // Explicitly target offscreen context for Chrome
       data: ttsOptions,
       timestamp: Date.now()
@@ -54,7 +55,7 @@ class TTSMessenger {
    */
   async stop() {
     return this.messenger.sendMessage({
-      action: 'TTS_STOP',
+      action: MessageActions.TTS_STOP,
       target: 'offscreen',
       timestamp: Date.now()
     });
@@ -66,7 +67,7 @@ class TTSMessenger {
    */
   async pause() {
     return this.messenger.sendMessage({
-      action: 'TTS_PAUSE',
+      action: MessageActions.TTS_PAUSE,
       target: 'offscreen',
       timestamp: Date.now()
     });
@@ -78,7 +79,7 @@ class TTSMessenger {
    */
   async resume() {
     return this.messenger.sendMessage({
-      action: 'TTS_RESUME',
+      action: MessageActions.TTS_RESUME,
       target: 'offscreen',
       timestamp: Date.now()
     });
@@ -90,7 +91,7 @@ class TTSMessenger {
    */
   async getVoices() {
     const response = await this.messenger.sendMessage({
-      action: 'TTS_GET_VOICES',
+      action: MessageActions.TTS_GET_VOICES,
       target: 'offscreen',
       timestamp: Date.now()
     });
@@ -113,7 +114,7 @@ class TTSMessenger {
     const audioData = Array.from(new Uint8Array(arrayBuffer));
 
     return this.messenger.sendMessage({
-      action: 'TTS_PLAY_CACHED_AUDIO',
+      action: MessageActions.TTS_PLAY_CACHED_AUDIO,
       target: 'offscreen',
       data: { audioData },
       timestamp: Date.now()
@@ -145,7 +146,7 @@ class CaptureMessenger {
     };
 
     return this.messenger.sendMessage({
-      action: 'SCREEN_CAPTURE',
+      action: MessageActions.SCREEN_CAPTURE,
       target: 'offscreen', // Chrome uses offscreen for capture
       data: captureOptions,
       timestamp: Date.now()
@@ -171,7 +172,7 @@ class CaptureMessenger {
    */
   async startSelectionMode(options = {}) {
     return this.messenger.sendMessage({
-      action: 'START_CAPTURE_SELECTION',
+      action: MessageActions.START_CAPTURE_SELECTION,
       data: options,
       timestamp: Date.now()
     });
@@ -189,7 +190,7 @@ class CaptureMessenger {
     }
 
     return this.messenger.sendMessage({
-      action: 'PROCESS_IMAGE_OCR',
+      action: MessageActions.PROCESS_IMAGE_OCR,
       data: {
         imageData,
         targetLanguage: options.targetLanguage || 'fa',
@@ -217,7 +218,7 @@ class SelectionMessenger {
    * @param {Object} options - Selection options
    * @returns {Promise<Object>} Activation result
    */
-  async activateMode(mode = 'translate', options = {}) {
+  async activateMode(mode = MessageActions.TRANSLATE, options = {}) {
     const selectionOptions = {
       mode,
       tabId: options.tabId,
@@ -227,7 +228,7 @@ class SelectionMessenger {
     };
 
     return this.messenger.sendMessage({
-      action: 'activateSelectElementMode',
+      action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
       data: selectionOptions,
       timestamp: Date.now()
     });
@@ -239,20 +240,7 @@ class SelectionMessenger {
    */
   async deactivateMode() {
     return this.messenger.sendMessage({
-      action: 'deactivateSelectElementMode',
-      timestamp: Date.now()
-    });
-  }
-
-  /**
-   * Toggle element selection mode
-   * @param {Object} options - Toggle options
-   * @returns {Promise<Object>} Toggle result
-   */
-  async toggleMode(options = {}) {
-    return this.messenger.sendMessage({
-      action: 'toggleSelectElementMode',
-      data: options,
+      action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
       timestamp: Date.now()
     });
   }
@@ -263,30 +251,7 @@ class SelectionMessenger {
    */
   async getSelectionState() {
     return this.messenger.sendMessage({
-      action: 'getSelectElementState',
-      timestamp: Date.now()
-    });
-  }
-
-  /**
-   * Process selected element for translation
-   * @param {Object} elementInfo - Selected element information
-   * @param {Object} options - Processing options
-   * @returns {Promise<Object>} Processing result
-   */
-  async processSelectedElement(elementInfo, options = {}) {
-    if (!elementInfo) {
-      throw new Error('Element information is required');
-    }
-
-    return this.messenger.sendMessage({
-      action: 'processSelectedElement',
-      data: {
-        elementInfo,
-        targetLanguage: options.targetLanguage || 'fa',
-        sourceLanguage: options.sourceLanguage || 'auto',
-        ...options
-      },
+      action: MessageActions.GET_SELECT_ELEMENT_STATE,
       timestamp: Date.now()
     });
   }
@@ -334,7 +299,7 @@ class TranslationMessenger {
    */
   async getHistory(options = {}) {
     const response = await this.messenger.sendMessage({
-      action: 'GET_HISTORY',
+      action: MessageActions.GET_HISTORY,
       data: {
         limit: options.limit || 100,
         offset: options.offset || 0,
@@ -353,7 +318,7 @@ class TranslationMessenger {
    */
   async clearHistory(options = {}) {
     return this.messenger.sendMessage({
-      action: 'CLEAR_HISTORY',
+      action: MessageActions.CLEAR_HISTORY,
       data: options,
       timestamp: Date.now()
     });
@@ -365,7 +330,7 @@ class TranslationMessenger {
    */
   async getProviders() {
     const response = await this.messenger.sendMessage({
-      action: 'GET_PROVIDERS',
+      action: MessageActions.GET_PROVIDERS,
       timestamp: Date.now()
     });
 
@@ -401,7 +366,7 @@ class TranslationMessenger {
     }
 
     return this.messenger.sendMessage({
-      action: 'BATCH_TRANSLATE',
+      action: MessageActions.BATCH_TRANSLATE,
       data: {
         texts,
         provider: options.provider || 'google',
@@ -534,22 +499,22 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
 
     // Enhanced Firefox MV3 workarounds based on action type
     switch (message.action) {
-      case 'TRANSLATE':
-      case 'fetchTranslation':
+      case MessageActions.TRANSLATE:
+      case MessageActions.FETCH_TRANSLATION:
         return await this.handleFirefoxTranslationMessage(message, timeout);
       
-      case 'TTS_SPEAK':
-      case 'TTS_STOP':
-      case 'TTS_PAUSE':
-      case 'TTS_RESUME':
+      case MessageActions.TTS_SPEAK:
+      case MessageActions.TTS_STOP:
+      case MessageActions.TTS_PAUSE:
+      case MessageActions.TTS_RESUME:
         return await this.handleFirefoxTTSMessage(message, timeout);
       
-      case 'SCREEN_CAPTURE':
-      case 'START_CAPTURE_SELECTION':
+      case MessageActions.SCREEN_CAPTURE:
+      case MessageActions.START_CAPTURE_SELECTION:
         return await this.handleFirefoxCaptureMessage(message, timeout);
       
-      case 'activateSelectElementMode':
-      case 'deactivateSelectElementMode':
+      case MessageActions.ACTIVATE_SELECT_ELEMENT_MODE:
+      case MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE:
         return await this.handleFirefoxSelectionMessage(message, timeout);
       
       default:
@@ -569,7 +534,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
     const resultPromise = new Promise((resolve, reject) => {
       const listener = (msg) => {
         if (
-          msg.action === 'TRANSLATION_RESULT_UPDATE' &&
+          msg.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
           msg.context === message.context &&
           msg.messageId === message.messageId
         ) {
@@ -729,7 +694,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
    */
   async ping() {
     return this.sendMessage({
-      action: 'ping',
+      action: MessageActions.PING,
       data: { from: this.context }
     });
   }

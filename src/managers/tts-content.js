@@ -2,6 +2,7 @@
 // Content script TTS implementation (fallback)
 
 import browser from "webextension-polyfill";
+import { MessageActions } from "../core/MessageActions";
 
 /**
  * Content Script TTS Manager
@@ -46,7 +47,7 @@ export class ContentScriptTTSManager {
    */
   setupMessageListener() {
     this.messageListener = async (message, sender, sendResponse) => {
-      if (message.action === "TTS_SPEAK" && message.source === "background") {
+      if (message.action === MessageActions.TTS_SPEAK && message.source === "background") {
         try {
           await this.speak(message.data.text, message.data);
           sendResponse({ success: true });
@@ -59,7 +60,7 @@ export class ContentScriptTTSManager {
         return true; // Keep message channel open for async response
       }
 
-      if (message.action === "TTS_STOP" && message.source === "background") {
+      if (message.action === MessageActions.TTS_STOP && message.source === "background") {
         await this.stop();
         sendResponse({ success: true });
         return true;

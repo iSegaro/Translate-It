@@ -6,6 +6,8 @@ import { ref, reactive, onMounted, onUnmounted, readonly, computed } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { useI18n } from "./useI18n.js";
 import SelectionWindows from "@/managers/SelectionWindows.js";
+import { MessagingContexts } from "../core/MessagingStandards.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 export function useSelectionWindows() {
   const { t } = useI18n();
@@ -190,7 +192,7 @@ export function useSelectionWindows() {
   const setupMessageListener = () => {
     const messageListener = (message, sender) => {
       // Only handle translation response messages
-      if (message.action === "translationComplete" && message.context === "selection") {
+      if (message.action === MessageActions.TRANSLATION_COMPLETE && message.context === MessagingContexts.SELECTION_MANAGER) {
         handleTranslationResponse(message);
       }
     };

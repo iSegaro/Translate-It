@@ -1,6 +1,7 @@
 import { MessagingStandards } from "./MessagingStandards.js";
 import { TranslationMode } from "@/config.js";
 import { logME } from "@/utils/helpers.js";
+import { MessageActions } from "./MessageActions.js";
 
 export class TranslationService {
   constructor(context) {
@@ -21,10 +22,14 @@ export class TranslationService {
     return this.translate(TranslationMode.Sidepanel_Translate, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
   }
 
+  async popupTranslate(text, sourceLang, targetLang) {
+    return this.translate(TranslationMode.Popup_Translate, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
+  }
+
   async activateSelectElementMode(active = true) {
     try {
       if (active) {
-        await this.messenger.specialized.selection.activateMode('translate');
+        await this.messenger.specialized.selection.activateMode(MessageActions.TRANSLATE);
       } else {
         await this.messenger.specialized.selection.deactivateMode();
       }
@@ -36,7 +41,7 @@ export class TranslationService {
 
   async revertTranslation() {
     try {
-      await this.messenger.sendMessage({ action: "revertTranslation" });
+      await this.messenger.sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
     } catch (error) {
       logME("[TranslationService] Error reverting translation:", error);
       throw error;

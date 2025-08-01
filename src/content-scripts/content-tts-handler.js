@@ -2,6 +2,7 @@
 // Content script TTS handler for fallback TTS functionality
 
 import browser from "webextension-polyfill";
+import { MessageActions } from "../core/MessageActions";
 
 /**
  * Content Script TTS Handler
@@ -49,7 +50,7 @@ class ContentTTSHandler {
         chrome.runtime.onMessage,
         (message, sender, sendResponse) => {
           // Only handle TTS_SPEAK_CONTENT messages that are explicitly targeted for content script
-          if (message.action === "TTS_SPEAK_CONTENT") {
+          if (message.action === MessageActions.TTS_SPEAK_CONTENT) {
             console.log("[ContentTTS] Received TTS speak request:", message);
             this.handleTTSSpeak(message.data, sendResponse);
             return true; // Keep async channel open

@@ -13,6 +13,7 @@ import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
 import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -399,7 +400,7 @@ export default class SelectionWindows {
     // Use specialized translation messenger for background translation
     this.messenger.specialized.translation.translateText(selectedText, {
       translationMode,
-      action: "fetchTranslationBackground"
+      action: MessageActions.FETCH_TRANSLATION
     }).then((response) => {
         if (
           this.isTranslationCancelled ||

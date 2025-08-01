@@ -8,6 +8,8 @@ import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import NotificationManager from "@/managers/NotificationManager.js";
 import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
+import { MessagingContexts } from "../core/MessagingStandards.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 /**
  * SelectElementManager - Vue-compatible element selection system
@@ -29,6 +31,7 @@ export class SelectElementManager {
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
+    
 
     // Service instances
     this.errorHandler = new ErrorHandler();
@@ -91,15 +94,14 @@ export class SelectElementManager {
   async handleMessage(message, sender, sendResponse) {
     console.log(`[SelectElementManager] Received message:`, message);
     
-    if (message.action === "TOGGLE_SELECT_ELEMENT_MODE" || 
-        message.action === "ACTIVATE_ELEMENT_SELECTION" ||
-        message.action === "DEACTIVATE_ELEMENT_SELECTION") {
+    if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE || 
+        message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
       
       // Determine activation state
       let shouldActivate;
-      if (message.action === "ACTIVATE_ELEMENT_SELECTION") {
+      if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
         shouldActivate = true;
-      } else if (message.action === "DEACTIVATE_ELEMENT_SELECTION") {
+      } else if (message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
         shouldActivate = false;
       } else {
         // Legacy TOGGLE_SELECT_ELEMENT_MODE
@@ -587,8 +589,8 @@ export class SelectElementManager {
 
       // 5) Send translation request to background (using TRANSLATE action)
       const response = await this.messenger.sendMessage({
-        action: "TRANSLATE",
-        context: "select-element",
+        action: MessageActions.TRANSLATE,
+        context: MessagingContexts.SELECT_ELEMENT,
         data: {
           text: jsonPayload,
           provider: await (async () => {
@@ -612,15 +614,16 @@ export class SelectElementManager {
       });
 
       // 6) Handle response (using standard TRANSLATE response format)
-      if (!response?.success && !response?.translatedText) {
-        const msg = response?.error || "Translation request failed";
+      // The response from UnifiedMessenger for TRANSLATE action is the TRANSLATION_RESULT_UPDATE message itself
+      if (response.action !== MessageActions.TRANSLATION_RESULT_UPDATE || !response.data?.translatedText) {
+        const msg = response.data?.error || "Translation request failed";
         console.error("[SelectElementManager] Translation request failed:", msg);
         await this.showErrorNotification(msg);
         return { status: "error", reason: "backend_error", message: msg };
       }
 
       // Get translated text from response
-      const translatedJsonString = response?.translatedText || response?.data?.translatedText;
+      const translatedJsonString = response.data.translatedText;
 
       if (!translatedJsonString || !translatedJsonString.trim()) {
         const message = "No translation received from API";

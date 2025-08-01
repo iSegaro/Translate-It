@@ -283,7 +283,7 @@ $_{TEXT}`,
 // --- Enums & State ---
 export const TranslationMode = {
   Field: "field",
-  SelectElement: "select_element",
+  Select_Element: "select_element",
   Selection: "selection",
   Dictionary_Translation: "dictionary",
   Popup_Translate: "popup_translate",

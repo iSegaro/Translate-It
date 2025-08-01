@@ -2,6 +2,8 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { MessageFormat, MessagingContexts } from '../../../core/MessagingStandards.js';
+import { MessageActions } from '../../../core/MessageActions.js';
 
 const errorHandler = new ErrorHandler();
 
@@ -38,31 +40,41 @@ export async function handleActivateSelectElementMode(message, sender) {
     let isActivating;
     let modeForContentScript = 'normal';
 
+    console.log(`[Handler:activateSelectElementMode] Message data: ${JSON.stringify(message, null, 2)}`);
+
     if (typeof message.data === 'boolean') {
       isActivating = message.data;
       modeForContentScript = isActivating ? 'select' : 'normal';
-    } else if (typeof message.data === 'string') {
-      isActivating = (message.data !== 'deactivate' && message.data !== 'normal');
-      modeForContentScript = message.data; // Use the string as mode (e.g., 'translate')
-    } else if (typeof message.data === 'object' && message.data !== null) {
-      isActivating = message.data.activate === true || message.data.mode === 'select' || message.data.mode === 'translate';
-      modeForContentScript = message.data.mode || (isActivating ? 'select' : 'normal');
+    } else if (typeof message === 'object' && message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
+      isActivating = true;
+      modeForContentScript = 'select';
+    } else if (typeof message === 'object' && message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
+      isActivating = false;
+      modeForContentScript = 'normal';
+    // } else if (typeof message.data === 'string') {
+    //   isActivating = (message.data !== 'deactivate' && message.data !== 'normal');
+    //   modeForContentScript = message.data; // Use the string as mode (e.g., 'translate')
+    // } else if (typeof message.data === 'object' && message.data !== null) {
+    //   isActivating = message.data.activate === true || message.data.mode === 'select' || message.data.mode === MessageActions.TRANSLATE;
+    //   modeForContentScript = message.data.mode || (isActivating ? 'select' : 'normal');
     } else {
       isActivating = false; // Default to deactivating if data is unclear
     }
 
-    const action = isActivating ? 'ACTIVATE_ELEMENT_SELECTION' : 'DEACTIVATE_ELEMENT_SELECTION';
+    const action = isActivating ? MessageActions.ACTIVATE_SELECT_ELEMENT_MODE : MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE;
     
     console.log(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
     
-    const response = await browser.tabs.sendMessage(targetTabId, {
-      action: action,
-      data: {
+    const contentMessage = MessageFormat.create(
+      action,
+      {
         mode: modeForContentScript,
         activate: isActivating,
-        timestamp: Date.now()
-      }
-    });
+      },
+      MessagingContexts.CONTENT // Context for content script
+    );
+
+    const response = await browser.tabs.sendMessage(targetTabId, contentMessage);
     
     const statusText = isActivating ? 'activated' : 'deactivated';
     console.log(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);

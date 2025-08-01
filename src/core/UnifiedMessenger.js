@@ -6,6 +6,7 @@
 
 import browser from "webextension-polyfill";
 import { isFirefox } from "../utils/browserCompat.js";
+import { MessageActions } from "./MessageActions.js";
 
 export class UnifiedMessenger {
   constructor(context = "unknown") {
@@ -25,7 +26,7 @@ export class UnifiedMessenger {
       const firefoxDetection = await isFirefox();
 
       // Manual Promise wrapper to fix webextension-polyfill Firefox bug
-      const response = await new Promise((resolve, reject) => {
+      const response = await new Promise(async (resolve, reject) => { // Make the Promise callback async
         const timeoutId = setTimeout(() => {
           reject(
             new Error(
@@ -40,8 +41,6 @@ export class UnifiedMessenger {
           context: this.context,
         };
 
-        // Use webextension-polyfill for all browsers to ensure consistent behavior
-
         try {
           const sendMessagePromise = browser.runtime.sendMessage(messageToSend);
 
@@ -50,23 +49,22 @@ export class UnifiedMessenger {
             typeof sendMessagePromise.then === "function"
           ) {
             sendMessagePromise
-              .then((response) => {
+              .then(async (response) => { // Make this callback async too
                 clearTimeout(timeoutId);
 
                 // Firefox MV3 workaround: check if response is undefined but message was actually processed
                 if (response === undefined && firefoxDetection) {
                   console.info("[UnifiedMessenger] Firefox MV3 undefined response detected for", messageToSend.action);
                   // For ping messages, we know it should work, so provide expected response
-                  if (messageToSend.action === "ping") {
+                  if (messageToSend.action === MessageActions.PING) {
                     resolve({ success: true, message: "pong" });
                     return;
                   }
                   // For TRANSLATE messages from all contexts, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE (Firefox MV3 issue)
-                  if (messageToSend.action === "TRANSLATE") {
-                    // Create a promise that resolves when the TRANSLATION_RESULT_UPDATE message is received
-                    const actualTranslationResultPromise = new Promise((resolveResult, rejectResult) => {
+                  if (messageToSend.action === MessageActions.TRANSLATE) {
+                    const actualTranslationResult = await new Promise((resolveResult, rejectResult) => {
                       const listener = (msg) => {
-                        if (msg.action === 'TRANSLATION_RESULT_UPDATE' && msg.context === messageToSend.context && msg.messageId === messageToSend.messageId) {
+                        if (msg.action === MessageActions.TRANSLATION_RESULT_UPDATE && msg.context === messageToSend.context && msg.messageId === messageToSend.messageId) {
                           browser.runtime.onMessage.removeListener(listener);
                           resolveResult(msg);
                         }
@@ -79,17 +77,17 @@ export class UnifiedMessenger {
                         rejectResult(new Error('Actual translation result timeout'));
                       }, 20000); // 20 seconds timeout for actual result
                     });
-                    resolve(actualTranslationResultPromise); // Resolve the outer promise with the inner promise
+                    resolve(actualTranslationResult); // Resolve with the actual result
                     return;
                   }
                   // This should not happen anymore for TRANSLATE messages
-                  if (messageToSend.action === "TRANSLATE") {
+                  if (messageToSend.action === MessageActions.TRANSLATE) {
                     console.warn("[UnifiedMessenger] TRANSLATE got undefined response after TRANSLATION_RESULT_UPDATE implementation");
                     resolve({ success: false, error: "Unexpected undefined response for TRANSLATE" });
                     return;
                   }
                   // For element selection messages, we need to handle the actual response from background
-                  if (messageToSend.action === "activateSelectElementMode") {
+                  if (messageToSend.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
                     // Check if we can determine success/failure from background logs or other indicators
                     // Since we can't get the real response, assume success for now
                     // The actual feedback will come from content script or storage updates
@@ -137,7 +135,6 @@ export class UnifiedMessenger {
    * Translation-specific wrapper
    */
   async translate(payload) {
-    // Format message according to translation-protocol.js standard
     const message = {
       action: "TRANSLATE",
       context: this.context,
