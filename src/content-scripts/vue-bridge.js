@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
 import { MessagingStandards, MessageFormat } from "../core/MessagingStandards.js";
+import { MessageActions } from "../core/MessageActions.js";
 
 class ContentScriptVueBridge {
   constructor() {
@@ -130,7 +131,7 @@ class ContentScriptVueBridge {
         try {
           const response = await this.messenger.sendMessage({ action: "PROCESS_SCREEN_CAPTURE", data: result });
           if (response.success && data.showPreview !== false) {
-            await this.showCapturePreview(result, instanceId);
+            await this.handleShowCapturePreview(result, instanceId);
           } else if (!response.success) {
             throw new Error(response.error || "Failed to process capture");
           }
@@ -148,14 +149,14 @@ class ContentScriptVueBridge {
     sendResponse({ success: true, instanceId });
   }
 
-  showCapturePreview = async (captureResult, selectorInstanceId) => {
+  handleShowCapturePreview = async (captureResult, selectorInstanceId) => {
     this.destroyMicroApp(selectorInstanceId);
     await this.createMicroApp("CapturePreview", {
       ...captureResult,
       onClose: (id) => this.destroyMicroApp(id),
       onRetake: (id) => { this.destroyMicroApp(id); this.handleStartScreenCapture({ showPreview: true }, () => {}); },
-      onTranslate: (result) => this.messenger.sendMessage({ action: "TRANSLATION_COMPLETED", data: result }),
-      onSave: (result) => this.messenger.sendMessage({ action: "SAVE_TRANSLATION", data: result }),
+      onTranslate: (result) => this.messenger.sendMessage({ action: MessageActions.CAPTURE_TRANSLATION_COMPLETED, data: result }),
+      onSave: (result) => this.messenger.sendMessage({ action: MessageActions.CAPTURE_SAVE_TRANSLATION, data: result }),
     });
   }
 
@@ -207,11 +208,11 @@ class ContentScriptVueBridge {
 
   performAutoCapture = async (detectText, autoTranslate, sendResponse) => {
     try {
-      const captureResponse = await this.messenger.sendMessage({ action: "CAPTURE_FULL_SCREEN" });
+      const captureResponse = await this.messenger.sendMessage({ action: MessageActions.CAPTURE_FULL_SCREEN });
       if (!captureResponse.success) throw new Error(captureResponse.error || "Failed to capture screen");
 
       if (detectText) {
-        const analysisResponse = await this.messenger.sendMessage({ action: "ANALYZE_IMAGE_TEXT", data: { imageData: captureResponse.data.imageData } });
+        const analysisResponse = await this.messenger.sendMessage({ action: CAPTURE_FULL_SCREEN.ANALYZE_IMAGE_TEXT, data: { imageData: captureResponse.data.imageData } });
         if (analysisResponse.success && analysisResponse.data.textRegions?.length > 0) {
           await this.showTextRegionSelector(captureResponse.data.imageData, analysisResponse.data.textRegions, autoTranslate);
           sendResponse({ success: true, mode: "text-regions" });
@@ -222,7 +223,7 @@ class ContentScriptVueBridge {
         if (autoTranslate) {
           await this.performDirectTranslation(captureResponse.data.imageData, sendResponse);
         } else {
-          await this.showCapturePreview(captureResponse.data, null);
+          await this.handleShowCapturePreview(captureResponse.data, null);
           sendResponse({ success: true, mode: "preview" });
         }
       }
@@ -241,7 +242,7 @@ class ContentScriptVueBridge {
           await this.performDirectTranslation(croppedImageData);
         } else {
           const croppedImageData = await this.cropImage(imageData, region);
-          await this.showCapturePreview({ imageData: croppedImageData, coordinates: region }, instanceId);
+          await this.handleShowCapturePreview({ imageData: croppedImageData, coordinates: region }, instanceId);
         }
       },
       onCancel: () => this.destroyMicroApp(instanceId),
@@ -251,7 +252,7 @@ class ContentScriptVueBridge {
 
   performDirectTranslation = async (imageData, sendResponse = null) => {
     try {
-      const translationResponse = await this.messenger.sendMessage({ action: "TRANSLATE_IMAGE_DIRECT", data: { imageData } });
+      const translationResponse = await this.messenger.sendMessage({ action: MessageActions.CAPTURE_TRANSLATE_IMAGE_DIRECT, data: { imageData } });
       if (translationResponse.success) {
         await this.showTranslationResult(translationResponse.data);
         sendResponse?.({ success: true, translation: translationResponse.data });
