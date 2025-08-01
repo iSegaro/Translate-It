@@ -18,9 +18,9 @@ export * from "./lifecycle/handleBackgroundReloadExtension.js";
 // Translation handlers
 export * from "./translation/handleTranslate.js";
 export * from "./translation/handleTranslateText.js";
-export * from "./translation/handleFetchTranslation.js";
-export * from "./translation/handleTranslationAdded.js";
-export * from "./translation/handleFetchTranslationBackground.js";
+// export * from "./translation/handleFetchTranslation.js";
+// export * from "./translation/handleTranslationAdded.js";
+// export * from "./translation/handleFetchTranslationBackground.js";
 export * from "./translation/handleRevertTranslation.js";
 
 // TTS handlers
@@ -34,7 +34,7 @@ export * from "./tts/handleTTSOffscreen.js";
 export * from "./element-selection/handleActivateSelectElementMode.js";
 export * from "./element-selection/handleUpdateSelectElementState.js";
 export * from "./element-selection/handleElementSelected.js";
-export * from "./element-selection/handleApplyTranslationToActiveElement.js";
+// export * from "./element-selection/handleApplyTranslationToActiveElement.js";
 
 // Screen capture handlers
 export * from "./screen-capture/handleStartAreaCapture.js";
