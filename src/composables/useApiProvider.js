@@ -7,6 +7,7 @@ import {
   getProvidersForDropdown,
   getProviderById,
 } from "@/core/provider-registry.js";
+import storageManager from "../core/StorageManager.js";
 
 export function useApiProvider() {
   // State
@@ -127,7 +128,7 @@ export function useApiProvider() {
 
       // Also directly update browser storage to ensure legacy code sees the change
       const browser = await browserAPI.ensureReady();
-      await browser.storage.local.set({ TRANSLATION_API: providerId });
+      await storageManager.set({ TRANSLATION_API: providerId });
 
       currentProvider.value = providerId;
       console.log(

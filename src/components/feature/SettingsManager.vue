@@ -348,6 +348,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import storageManager from '@/core/StorageManager.js'
 
 const { getStorageData, setStorageData } = useExtensionAPI()
 
@@ -778,7 +779,7 @@ const saveBackup = async (backup) => {
 const removeBackupFromStorage = async (backupId) => {
   try {
     const backupKey = `backup_${backupId}`
-    await browser.storage.local.remove([backupKey])
+    await storageManager.remove([backupKey])
     
     // Update backup list
     const backupList = await getStorageData(['backup_list'])

@@ -2,6 +2,7 @@
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
+import storageManager from "../../../core/StorageManager.js";
 
 const errorHandler = new ErrorHandler();
 
@@ -10,7 +11,7 @@ export async function handleGetProviderConfig(message, sender) {
 
   try {
     const key = `provider_config_${provider}`;
-    const result = await browser.storage.local.get(key);
+    const result = await storageManager.get([key]);
     const config = result[key] || null;
     
     return {

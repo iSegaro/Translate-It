@@ -5,6 +5,7 @@
 
 import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
 import browser from "webextension-polyfill";
+import storageManager from "../core/StorageManager.js";
 
 export class TranslationEngine {
   constructor() {
@@ -338,7 +339,7 @@ export class TranslationEngine {
    */
   async saveHistoryToStorage() {
     try {
-      await browser.storage.local.set({
+      await storageManager.set({
         translationHistory: this.history,
       });
     } catch (error) {
@@ -351,7 +352,7 @@ export class TranslationEngine {
    */
   async loadHistoryFromStorage() {
     try {
-      const data = await browser.storage.local.get(["translationHistory"]);
+      const data = await storageManager.get(["translationHistory"]);
       if (Array.isArray(data.translationHistory)) {
         this.history = data.translationHistory;
       } else {

@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/utils/secureStorage.js'
+import storageManager from '@/core/StorageManager.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
@@ -92,8 +93,8 @@ export const useSettingsStore = defineStore('settings', () => {
     
     isLoading.value = true
     try {
-      // Get all settings from storage
-      const stored = await browser.storage.local.get(null)
+      // Get all settings from storage using StorageManager
+      const stored = await storageManager.get(null)
       
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
@@ -133,7 +134,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const saveAllSettings = async () => {
     isSaving.value = true
     try {
-      await browser.storage.local.set(settings.value)
+      await storageManager.set(settings.value)
       return true
     } catch (error) {
       console.error('Failed to save all settings:', error)
@@ -153,7 +154,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       console.log(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
       settings.value[key] = value // Update local state
-      await browser.storage.local.set({ [key]: value }) // Persist immediately
+      await storageManager.set({ [key]: value }) // Persist immediately
       console.log(`[settingsStore] Successfully saved ${key} to browser storage`)
       return true
     } catch (error) {
@@ -168,7 +169,7 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.assign(settings.value, updates)
       
       // Get browser API and save to storage
-      await browser.storage.local.set(settings.value)
+      await storageManager.set(settings.value)
       
       return true
     } catch (error) {

@@ -1,5 +1,6 @@
 // src/config.js
 import browser from 'webextension-polyfill';
+import storageManager from './core/StorageManager.js';
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -299,70 +300,62 @@ export const state = {
   translateMode: null,
 };
 
-// --- Settings Cache & Retrieval ---
-let settingsCache = null;
+// --- Settings Cache & Retrieval via StorageManager ---
+// Note: StorageManager handles caching internally, no need for manual cache
 
-// Fetches all settings and caches them
+// Fetches all settings using StorageManager
 export const getSettingsAsync = async () => {
-  // Return cache if available
-  if (settingsCache !== null) {
-    return settingsCache;
+  try {
+    // Get all settings with CONFIG defaults through StorageManager
+    const items = await storageManager.get(null);
+    // Combine fetched items with defaults to ensure all keys exist
+    return { ...CONFIG, ...items };
+  } catch (error) {
+    // Handle error (e.g., log it, return default CONFIG)
+    console.error("Error fetching settings:", error);
+    return { ...CONFIG }; // Use defaults on error
   }
-  // Otherwise, fetch from storage
-  return browser.storage.local
-    .get(null)
-    .then((items) => {
-      // Combine fetched items with defaults to ensure all keys exist
-      settingsCache = { ...CONFIG, ...items };
-      return settingsCache;
-    })
-    .catch((error) => {
-      // Handle error (e.g., log it, return default CONFIG)
-      console.error("Error fetching settings:", error);
-      settingsCache = { ...CONFIG }; // Use defaults on error
-      return settingsCache;
-    });
 };
 
-export const initializeSettingsListener = async (browser) => {
-  console.log('[config.js] initializeSettingsListener called, browser.storage:', browser.storage);
-  console.log('[config.js] browser.storage.onChanged:', browser.storage?.onChanged);
+export const initializeSettingsListener = async () => {
+  console.log('[config.js] initializeSettingsListener called - using StorageManager events');
   
-  if (browser.storage && browser.storage.onChanged) {
-    console.log('[config.js] Setting up storage listener...');
-    browser.storage.onChanged.addListener.call(browser.storage.onChanged, (changes, areaName) => {
-      console.log(`[config.js] Storage change detected: area=${areaName}, changes=`, changes);
-      if (areaName === "local" && settingsCache) {
-        Object.keys(changes).forEach((key) => {
-          if (
-            Object.prototype.hasOwnProperty.call(CONFIG, key) ||
-            (settingsCache &&
-              Object.prototype.hasOwnProperty.call(settingsCache, key))
-          ) {
-            const newValue = changes[key].newValue;
-            if (settingsCache[key] !== newValue) {
-              console.log(`[config.js] Settings cache updated: ${key} = ${newValue} (was: ${settingsCache[key]})`);
-              settingsCache[key] = newValue;
-            }
-          }
-        });
-      }
-    });
-    console.log('[config.js] ✅ Storage listener successfully set up');
-  } else {
-    console.log(
-      "browser.storage.onChanged not available. Settings cache might become stale."
-    );
+  try {
+    // Setup listener through StorageManager event system
+    // Note: StorageManager automatically handles caching, no manual cache management needed
+    const listener = (data) => {
+      console.log(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
+      // StorageManager handles cache updates automatically
+      // Any additional processing can be added here if needed
+    };
+
+    storageManager.on('change', listener);
+    console.log('[config.js] ✅ Storage listener successfully set up via StorageManager');
+    
+    return listener; // Return listener for cleanup if needed
+  } catch (error) {
+    console.error('[config.js] Failed to setup storage listener:', error);
   }
 };
 
 // --- Individual Setting Getters (Using Cache) ---
 
-// Helper function to get a single setting value using the cache
+// Helper function to get a single setting value using StorageManager
 const getSettingValueAsync = async (key, defaultValue) => {
-  const settings = await getSettingsAsync(); // Ensures cache is populated
-  // Use optional chaining and nullish coalescing for safety
-  return settings?.[key] ?? defaultValue;
+  try {
+    // Try to get from cache first (synchronous and fast)
+    if (storageManager.hasCached(key)) {
+      const cachedValue = storageManager.getCached(key, defaultValue);
+      return cachedValue !== undefined ? cachedValue : defaultValue;
+    }
+    
+    // If not cached, get from storage with default
+    const result = await storageManager.get({ [key]: defaultValue });
+    return result[key];
+  } catch (error) {
+    console.error(`[config.js] Error getting setting '${key}':`, error);
+    return defaultValue;
+  }
 };
 
 export const getUseMockAsync = async () => {
@@ -379,9 +372,9 @@ export const getThemeAsync = async () => {
 
 // Function to check debug mode potentially faster if cache is warm
 export const IsDebug = async () => {
-  // Check cache directly first for slight performance gain if already loaded
-  if (settingsCache && settingsCache.DEBUG_MODE !== undefined) {
-    return settingsCache.DEBUG_MODE;
+  // Check StorageManager cache first for performance
+  if (storageManager.hasCached('DEBUG_MODE')) {
+    return storageManager.getCached('DEBUG_MODE', CONFIG.DEBUG_MODE);
   }
   return getDebugModeAsync();
 };

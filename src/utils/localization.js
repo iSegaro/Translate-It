@@ -4,6 +4,7 @@ import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 import { logME } from "./helpers.js";
+import storageManager from "../core/StorageManager.js";
 
 /**
  * Initializes the language selection UI and handles dynamic localization.
@@ -46,7 +47,7 @@ function initLocalizationUI() {
       li.classList.add("selected");
       // Persist selection
       // ذخیره زبان انتخاب‌شده برای لوکالایز
-      await browser.storage.local.set({ APPLICATION_LOCALIZE: lang.locale });
+      await storageManager.set({ APPLICATION_LOCALIZE: lang.locale });
     });
 
     ul.appendChild(li);

@@ -4,6 +4,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import browser from "webextension-polyfill";
 import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
+import storageManager from "../core/StorageManager.js";
 
 const messenger = new UnifiedMessenger("useBrowserAPI");
 
@@ -94,11 +95,10 @@ export function useBrowserAPI() {
     }
   };
 
-  // Safe storage operations
+  // Safe storage operations using StorageManager
   const safeStorageGet = async (keys) => {
     try {
-      const browser = await ensureReady();
-      return await browser.storage.local.get(keys);
+      return await storageManager.get(keys);
     } catch (err) {
       console.error("[useBrowserAPI] Storage get failed:", err);
       throw err;
@@ -107,8 +107,7 @@ export function useBrowserAPI() {
 
   const safeStorageSet = async (data) => {
     try {
-      const browser = await ensureReady();
-      return await browser.storage.local.set(data);
+      return await storageManager.set(data);
     } catch (err) {
       console.error("[useBrowserAPI] Storage set failed:", err);
       throw err;
@@ -131,27 +130,23 @@ export function useBrowserAPI() {
     }
   };
 
-  // Storage change listener setup
+  // Storage change listener setup using StorageManager
   const setupStorageListener = async (callback) => {
     try {
-      const browser = await ensureReady();
-      if (browser.storage && browser.storage.onChanged) {
-        const listener = (changes, areaName) => {
-          if (areaName === "local") {
-            callback(changes);
+      // Use StorageManager's event system instead of direct browser API
+      const listener = (data) => {
+        // Convert StorageManager event format to browser API format
+        const changes = {
+          [data.key]: {
+            newValue: data.newValue,
+            oldValue: data.oldValue
           }
         };
-        browser.storage.onChanged.addListener.call(
-          browser.storage.onChanged,
-          listener,
-        );
-        return listener;
-      } else {
-        console.warn(
-          "[useBrowserAPI] browser.storage.onChanged is not available. Settings cache might become stale.",
-        );
-        return null;
-      }
+        callback(changes);
+      };
+
+      storageManager.on("change", listener);
+      return listener;
     } catch (err) {
       console.warn("[useBrowserAPI] Storage listener setup failed:", err);
       return null;
@@ -162,10 +157,7 @@ export function useBrowserAPI() {
     if (!listener) return;
 
     try {
-      const browser = await ensureReady();
-      if (browser.storage && browser.storage.onChanged) {
-        browser.storage.onChanged.removeListener(listener);
-      }
+      storageManager.off("change", listener);
     } catch (err) {
       console.warn("[useBrowserAPI] Storage listener removal failed:", err);
     }

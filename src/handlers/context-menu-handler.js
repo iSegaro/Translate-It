@@ -5,6 +5,7 @@
 
 import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
+import storageManager from "../core/StorageManager.js";
 
 /**
  * Handle translate element context menu
@@ -63,7 +64,7 @@ async function handleProviderSelection(info, tab, providerId) {
     logME(`[ContextMenuHandler] Provider selection: ${providerId}`);
 
     // Update the translation API setting
-    await browser.storage.local.set({ TRANSLATION_API: providerId });
+    await storageManager.set({ TRANSLATION_API: providerId });
 
     // Refresh context menus to show updated selection
     // Note: Context menu refreshing is now handled by ContextMenuManager
@@ -172,7 +173,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
     const domain = new URL(currentUrl).hostname;
 
     // Get current excluded sites
-    const storage = await browser.storage.local.get(["EXCLUDED_SITES"]);
+    const storage = await storageManager.get(["EXCLUDED_SITES"]);
     const excludedSites = (storage.EXCLUDED_SITES || "")
       .split(",")
       .filter((site) => site.trim());
@@ -181,7 +182,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
       // Add domain to excluded sites
       if (!excludedSites.includes(domain)) {
         excludedSites.push(domain);
-        await browser.storage.local.set({
+        await storageManager.set({
           EXCLUDED_SITES: excludedSites.join(","),
         });
 
@@ -196,7 +197,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
     } else {
       // Remove domain from excluded sites
       const updatedSites = excludedSites.filter((site) => site !== domain);
-      await browser.storage.local.set({
+      await storageManager.set({
         EXCLUDED_SITES: updatedSites.join(","),
       });
 

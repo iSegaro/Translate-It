@@ -9,6 +9,7 @@ import {
 } from "../config.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import storageManager from "./StorageManager.js";
 
 import {
   separateCachedAndNewTexts,
@@ -247,7 +248,7 @@ export default class EventHandler {
     // Skip text selection handling if Vue select element mode is active
     // Check storage for Vue-based select element state
     try {
-      const storage = await browser.storage.local.get(['selectElementState']);
+      const storage = await storageManager.get(['selectElementState']);
       if (storage.selectElementState) {
         // logME("[EventHandler] Vue select element mode is active, skipping text selection");
         return;

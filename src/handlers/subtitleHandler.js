@@ -5,6 +5,7 @@ import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
+import storageManager from "../core/StorageManager.js";
 
 export class SubtitleHandler {
   /**
@@ -265,7 +266,7 @@ export class SubtitleHandler {
       const key = "ENABLE_SUBTITLE_TRANSLATION";
       const settings = await getSettingsAsync();
       const currentVal = settings[key] ?? true;
-      await browser.storage.local.set({ [key]: !currentVal });
+      await storageManager.set({ [key]: !currentVal });
       // The storage listener will trigger the update, but we call this directly for immediate feedback.
       if (this.site === "youtube") {
         this.updateYouTubeButtonState(!currentVal);

@@ -7,13 +7,14 @@ import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
+import storageManager from "../core/StorageManager.js";
 
 /**
  * Detects if this is a migration from old version to Vue version
  */
 async function detectLegacyMigration() {
   try {
-    const storage = await browser.storage.local.get();
+    const storage = await storageManager.get();
 
     const hasVueMarkers =
       "VUE_MIGRATED" in storage || "EXTENSION_VERSION" in storage;
@@ -90,8 +91,8 @@ async function performLegacyMigration(existingData) {
     });
 
     // 5. Save migrated data
-    await browser.storage.local.clear();
-    await browser.storage.local.set(migratedData);
+    await storageManager.clear();
+    await storageManager.set(migratedData);
 
     logME("[Migration] Legacy migration completed successfully:");
     migrationLog.forEach((entry) => logME(`  - ${entry}`));
@@ -120,7 +121,7 @@ async function migrateConfigSettings() {
       logME(
         "[InstallationHandler] Legacy migration detected - performing full migration",
       );
-      const existingData = await browser.storage.local.get();
+      const existingData = await storageManager.get();
       return await performLegacyMigration(existingData);
     }
 
@@ -150,7 +151,7 @@ async function migrateConfigSettings() {
         newSettings[key] = CONFIG[key];
       });
 
-      await browser.storage.local.set(newSettings);
+      await storageManager.set(newSettings);
       logME("[InstallationHandler] Config migration completed successfully");
     } else {
       logME(
@@ -171,7 +172,7 @@ async function migrateConfigSettings() {
 async function handleFreshInstallation() {
   logME("[InstallationHandler] First installation detected.");
 
-  const storage = await browser.storage.local.get();
+  const storage = await storageManager.get();
   const hasExistingData = Object.keys(storage).length > 0;
 
   if (hasExistingData) {
