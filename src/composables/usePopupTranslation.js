@@ -4,6 +4,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { TranslationService } from "../core/TranslationService.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
+import { MessagingContexts } from "../core/MessagingStandards.js";
 
 export function usePopupTranslation() {
   // State
@@ -17,7 +18,7 @@ export function usePopupTranslation() {
   const settingsStore = useSettingsStore();
 
   // Translation client
-  const translationService = new TranslationService("popup");
+  const translationService = new TranslationService(MessagingContexts.POPUP);
 
   // Browser API
   const browserAPI = useBrowserAPI();
@@ -25,7 +26,7 @@ export function usePopupTranslation() {
   // Computed
   const hasTranslation = computed(() => Boolean(translatedText.value?.trim()));
   const canTranslate = computed(
-    () => Boolean(sourceText.value?.trim()) && !isTranslating.value,
+    () => Boolean(sourceText.value?.trim()) && !isTranslating.value
   );
 
   // Methods
@@ -37,41 +38,20 @@ export function usePopupTranslation() {
     translatedText.value = ""; // Clear previous translation
 
     try {
-      // Use UnifiedTranslationClient for translation request
-      // The actual translation result will come via a separate message
-      const response = await translationService.sidepanelTranslate(sourceText.value, settingsStore.settings.SOURCE_LANGUAGE, settingsStore.settings.TARGET_LANGUAGE);
+      // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
+      await translationService.popupTranslate(
+        sourceText.value,
+        settingsStore.settings.SOURCE_LANGUAGE,
+        settingsStore.settings.TARGET_LANGUAGE
+      );
 
-      // Check response - should be TRANSLATION_RESULT_UPDATE message
-      console.log("[usePopupTranslation] Received response:", response);
-      if (response && response.action === "TRANSLATION_RESULT_UPDATE" && response.translatedText) {
-        // Direct translation result via TRANSLATION_RESULT_UPDATE
-        console.log("[usePopupTranslation] TRANSLATION_RESULT_UPDATE received:", response.translatedText);
-        translatedText.value = response.translatedText;
-        lastTranslation.value = {
-          source: response.originalText || sourceText.value,
-          target: response.translatedText,
-          provider: response.provider,
-          timestamp: response.timestamp || Date.now(),
-        };
-        isTranslating.value = false;
-      } else if (response && response.success) {
-        console.log(
-          "[usePopupTranslation] Generic success response. Waiting for TRANSLATION_RESULT_UPDATE...",
-        );
-        // Fallback: wait for TRANSLATION_RESULT_UPDATE message listener
-      } else {
-        console.error("[usePopupTranslation] Response failed:", response);
-        throw new Error(response?.error || response?.message || "Translation failed");
-      }
+      console.log(
+        "[usePopupTranslation] Translation request sent. Waiting for result..."
+      );
     } catch (error) {
       console.error("[usePopupTranslation] Translation error:", error);
       translationError.value = error.message || "Translation failed";
-    } finally {
-      // isTranslating will be set to false by the message listener
-      // if an error occurs before the listener, it will be handled here
-      if (translationError.value) {
-        isTranslating.value = false;
-      }
+      isTranslating.value = false; // Ensure loading state is reset on immediate error
     }
   };
 
@@ -93,21 +73,21 @@ export function usePopupTranslation() {
   onMounted(() => {
     browserAPI.onMessage.addListener((message) => {
       if (
-        message.action === "TRANSLATION_RESULT_UPDATE" &&
-        message.context === "popup"
+        message.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
+        message.context === MessagingContexts.POPUP
       ) {
         console.log(
           "[usePopupTranslation] Received TRANSLATION_RESULT_UPDATE:",
-          message,
+          message
         );
-        translatedText.value = message.translatedText;
+        translatedText.value = message.data.translatedText;
         translationError.value = ""; // Clear any previous error
         isTranslating.value = false;
         lastTranslation.value = {
-          source: message.originalText,
-          target: message.translatedText,
-          provider: message.provider,
-          timestamp: message.timestamp,
+          source: message.data.originalText,
+          target: message.data.translatedText,
+          provider: message.data.provider,
+          timestamp: message.data.timestamp,
         };
         console.log("[usePopupTranslation] Translation updated successfully");
       }
