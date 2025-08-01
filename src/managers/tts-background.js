@@ -2,6 +2,7 @@
 // Background page TTS implementation for Firefox and fallback
 
 import browser from "webextension-polyfill";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 /**
  * Background TTS Manager for Firefox and fallback scenarios
@@ -15,6 +16,9 @@ export class BackgroundTTSManager {
     this.currentAudio = null;
     this.initialized = false;
     this.availableMethods = [];
+    
+    // Enhanced messaging with context-aware TTS
+    this.messenger = MessagingStandards.getMessenger('tts-manager-background');
   }
 
   /**

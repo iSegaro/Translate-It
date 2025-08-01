@@ -416,6 +416,5 @@ export class MessagingStandards {
 // Export constants for easy access
 export { MessagingContexts as Contexts };
 export { MessageActions as Actions };
-export { MessageFormat };
 
 export default MessagingStandards;

@@ -3,10 +3,10 @@
 
 import { ref, onMounted, onUnmounted } from "vue";
 import browser from "webextension-polyfill";
-import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 import storageManager from "../core/StorageManager.js";
 
-const messenger = new UnifiedMessenger("useBrowserAPI");
+const messenger = MessagingStandards.getMessenger("vue-browser-api");
 
 // Global state for API readiness
 const globalApiReady = ref(false);

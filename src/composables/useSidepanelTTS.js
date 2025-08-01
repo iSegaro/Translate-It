@@ -1,13 +1,17 @@
 // src/composables/useSidepanelTTS.js
-// Simple TTS composable for sidepanel (matches original functionality)
+// Simple TTS composable for sidepanel (matches original functionality)  
 import { ref } from "vue";
 import browser from "webextension-polyfill";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { MessagingStandards } from "@/core/MessagingStandards.js";
 
 export function useSidepanelTTS() {
   // State
   const isSpeaking = ref(false);
   const ttsError = ref("");
+  
+  // Enhanced messaging for TTS operations
+  const messenger = MessagingStandards.getMessenger('sidepanel');
 
   // Speak text using background script TTS (matches original ttsManager.js)
   const speakText = async (text, lang = AUTO_DETECT_VALUE) => {
@@ -19,12 +23,8 @@ export function useSidepanelTTS() {
       isSpeaking.value = true;
       ttsError.value = "";
 
-      const browser = browser;
-      await browser.runtime.sendMessage({
-        action: "speak",
-        text: text.trim(),
-        lang,
-      });
+      // Use specialized TTS messenger for speaking
+      await messenger.specialized.tts.speak(text.trim(), lang);
 
       return true;
     } catch (error) {
@@ -42,8 +42,8 @@ export function useSidepanelTTS() {
   // Stop current TTS playback
   const stopTTS = async () => {
     try {
-      const browser = browser;
-      await browser.runtime.sendMessage({ action: "stopTTS" });
+      // Use specialized TTS messenger for stopping
+      await messenger.specialized.tts.stop();
       isSpeaking.value = false;
       return true;
     } catch (error) {

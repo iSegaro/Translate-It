@@ -12,6 +12,7 @@ import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -26,6 +27,9 @@ export default class SelectionWindows {
     this.originalText = null;
     this.isTranslationCancelled = false;
     this.themeChangeListener = null; // To store the theme change listener
+    
+    // Enhanced messaging with context-aware selection and translation
+    this.messenger = MessagingStandards.getMessenger('content');
 
     this.icon = null;
     this.iconClickContext = null;
@@ -392,12 +396,11 @@ export default class SelectionWindows {
       }
     });
 
-    browser.runtime
-      .sendMessage({
-        action: "fetchTranslationBackground",
-        payload: { promptText: selectedText, translationMode },
-      })
-      .then((response) => {
+    // Use specialized translation messenger for background translation
+    this.messenger.specialized.translation.translateText(selectedText, {
+      translationMode,
+      action: "fetchTranslationBackground"
+    }).then((response) => {
         if (
           this.isTranslationCancelled ||
           this.originalText !== selectedText ||
@@ -516,7 +519,10 @@ export default class SelectionWindows {
 
   stoptts_playing() {
     if (isExtensionContextValid()) {
-      browser.runtime.sendMessage({ action: "stopTTS" });
+      // Use specialized TTS messenger for stopping TTS
+      this.messenger.specialized.tts.stop().catch((error) => {
+        logME("[SelectionWindows] Error stopping TTS:", error);
+      });
     }
   }
 
@@ -950,10 +956,9 @@ export default class SelectionWindows {
     icon.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isExtensionContextValid()) {
-        browser.runtime.sendMessage({
-          action: "speak",
-          text: textToSpeak,
-          lang: AUTO_DETECT_VALUE,
+        // Use specialized TTS messenger for speaking
+        this.messenger.specialized.tts.speak(textToSpeak, AUTO_DETECT_VALUE).catch((error) => {
+          logME("[SelectionWindows] Error speaking text:", error);
         });
       }
     });

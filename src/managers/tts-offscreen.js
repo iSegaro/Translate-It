@@ -2,6 +2,7 @@
 // Chrome offscreen document TTS implementation
 
 import browser from "webextension-polyfill";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 /**
  * Offscreen TTS Manager for Chrome
@@ -15,6 +16,9 @@ export class OffscreenTTSManager {
     this.initialized = false;
     this.readinessListenerAdded = false;
     this.offscreenReady = false;
+    
+    // Enhanced messaging with context-aware TTS
+    this.messenger = MessagingStandards.getMessenger('tts-manager');
   }
 
   /**
@@ -157,11 +161,7 @@ export class OffscreenTTSManager {
       console.log("🔍 Testing offscreen document connection...");
 
       const response = await Promise.race([
-        browser.runtime.sendMessage({
-          action: "TTS_TEST",
-          target: "offscreen",
-          timestamp: Date.now(), // Add timestamp for request tracking
-        }),
+        this.messenger.specialized.tts.getVoices(), // Use specialized TTS messenger for testing
         new Promise(
           (_, reject) =>
             setTimeout(
@@ -304,14 +304,9 @@ export class OffscreenTTSManager {
           text.substring(0, 50),
         );
 
-        // Send message to offscreen document with explicit target and timeout
+        // Use specialized TTS messenger for speaking
         const response = await Promise.race([
-          browser.runtime.sendMessage({
-            action: "TTS_SPEAK",
-            target: "offscreen", // Explicitly target offscreen context
-            data: ttsOptions,
-            timestamp: Date.now(),
-          }),
+          this.messenger.specialized.tts.speak(text, ttsOptions.lang, ttsOptions),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("TTS request timeout")), 2000),
           ),
@@ -381,13 +376,9 @@ export class OffscreenTTSManager {
     if (!this.initialized) return;
 
     try {
-      // Stop speech in offscreen document with timeout
+      // Use specialized TTS messenger for stopping
       await Promise.race([
-        browser.runtime.sendMessage({
-          action: "TTS_STOP",
-          target: "offscreen",
-          timestamp: Date.now(),
-        }),
+        this.messenger.specialized.tts.stop(),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Stop request timeout")), 1000),
         ),
@@ -435,12 +426,9 @@ export class OffscreenTTSManager {
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioData = Array.from(new Uint8Array(arrayBuffer));
 
-      // Send cached audio to offscreen document
-      const response = await browser.runtime.sendMessage({
-        action: "TTS_PLAY_CACHED_AUDIO",
-        target: "offscreen",
-        data: { audioData },
-      });
+      // Use specialized TTS messenger for cached audio playback
+      const audioBlob = new Blob([new Uint8Array(audioData)], { type: 'audio/wav' });
+      const response = await this.messenger.specialized.tts.playAudioBlob(audioBlob);
 
       if (!response || !response.success) {
         throw new Error(
@@ -464,10 +452,7 @@ export class OffscreenTTSManager {
     if (!this.initialized || !this.currentSpeech) return;
 
     try {
-      await browser.runtime.sendMessage({
-        target: "offscreen",
-        action: "TTS_PAUSE",
-      });
+      await this.messenger.specialized.tts.pause();
 
       console.log("⏸️ TTS paused");
     } catch (error) {
@@ -483,10 +468,7 @@ export class OffscreenTTSManager {
     if (!this.initialized) return;
 
     try {
-      await browser.runtime.sendMessage({
-        target: "offscreen",
-        action: "TTS_RESUME",
-      });
+      await this.messenger.specialized.tts.resume();
 
       console.log("▶️ TTS resumed");
     } catch (error) {
@@ -504,16 +486,7 @@ export class OffscreenTTSManager {
     }
 
     try {
-      const response = await browser.runtime.sendMessage({
-        target: "offscreen",
-        action: "TTS_GET_VOICES",
-      });
-
-      if (!response || !response.success) {
-        throw new Error("Failed to get voices");
-      }
-
-      return response.voices || [];
+      return await this.messenger.specialized.tts.getVoices();
     } catch (error) {
       console.error("❌ Failed to get TTS voices:", error);
       return [];
@@ -591,9 +564,10 @@ export class OffscreenTTSManager {
     try {
       console.log("🔄 Trying content script TTS fallback via MessageRouter");
 
-      // Send TTS request through MessageRouter to content script handler
+      // Use MessagingStandards for content script TTS fallback
+      const contentMessenger = MessagingStandards.getMessenger('content');
       const response = await Promise.race([
-        browser.runtime.sendMessage({
+        contentMessenger.sendMessage({
           action: "TTS_SPEAK_CONTENT",
           data: {
             text: text,
@@ -635,8 +609,9 @@ export class OffscreenTTSManager {
         // Create Google TTS URL
         const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx&ttsspeed=${options.rate || 1}`;
 
-        // Send URL to offscreen for audio playback
-        const response = await browser.runtime.sendMessage({
+        // Use MessagingStandards for offscreen Google TTS fallback
+        const offscreenMessenger = MessagingStandards.getMessenger('offscreen');
+        const response = await offscreenMessenger.sendMessage({
           action: "playOffscreenAudio",
           target: "offscreen",
           url: googleTTSUrl,

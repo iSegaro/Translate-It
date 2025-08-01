@@ -2,6 +2,7 @@
 // Chrome offscreen document screen capture manager
 
 import browser from "webextension-polyfill";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 /**
  * Offscreen Screen Capture Manager for Chrome
@@ -12,6 +13,9 @@ export class OffscreenCaptureManager {
     this.browser = null;
     this.offscreenCreated = false;
     this.initialized = false;
+    
+    // Enhanced messaging with context-aware capture
+    this.messenger = MessagingStandards.getMessenger('capture-manager');
   }
 
   /**
@@ -102,13 +106,9 @@ export class OffscreenCaptureManager {
 
       // Process in offscreen document if needed
       if (options.processInOffscreen) {
-        const response = await browser.runtime.sendMessage({
-          target: "offscreen",
-          action: "PROCESS_CAPTURE",
-          data: {
-            imageData,
-            options,
-          },
+        const response = await this.messenger.specialized.capture.processCapture({
+          imageData,
+          options,
         });
 
         if (!response || !response.success) {
@@ -144,14 +144,10 @@ export class OffscreenCaptureManager {
       const fullImage = await this.captureVisibleTab(options);
 
       // Process cropping in offscreen document
-      const response = await browser.runtime.sendMessage({
-        target: "offscreen",
-        action: "CROP_IMAGE",
-        data: {
-          imageData: fullImage,
-          area: area,
-          options,
-        },
+      const response = await this.messenger.specialized.capture.cropImage({
+        imageData: fullImage,
+        area: area,
+        options,
       });
 
       if (!response || !response.success) {
@@ -182,17 +178,10 @@ export class OffscreenCaptureManager {
     try {
       console.log("🔍 Processing image for OCR in offscreen document");
 
-      const response = await browser.runtime.sendMessage({
-        target: "offscreen",
-        action: "OCR_PROCESS",
-        data: {
-          imageData,
-          options: {
-            language: options.language || "eng",
-            psm: options.psm || 6,
-            ...options,
-          },
-        },
+      const response = await this.messenger.specialized.capture.processImageOCR(imageData, {
+        language: options.language || "eng",
+        psm: options.psm || 6,
+        ...options,
       });
 
       if (!response || !response.success) {

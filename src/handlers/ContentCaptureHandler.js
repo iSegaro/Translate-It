@@ -7,6 +7,7 @@ import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { cropImageData } from "../utils/imageProcessing.js";
 import browser from "webextension-polyfill";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 /**
  * Content Script handler for Screen Capture functionality
@@ -18,6 +19,9 @@ export class ContentCaptureHandler {
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
+    
+    // Enhanced messaging with context-aware capture
+    this.messenger = MessagingStandards.getMessenger('content');
 
     // Bind methods for event handlers
     this.handleAreaSelectionComplete =
@@ -83,10 +87,9 @@ export class ContentCaptureHandler {
     try {
       logME("[ContentCaptureHandler] Area selection completed:", selectionData);
 
-      // First request full screen capture from background
-      const fullCaptureResponse = await browser.runtime.sendMessage({
-        action: "requestFullScreenCapture",
-        data: {},
+      // First request full screen capture using specialized capture messenger
+      const fullCaptureResponse = await this.messenger.specialized.capture.captureScreen({
+        mode: 'full'
       });
 
       if (!fullCaptureResponse || fullCaptureResponse.error) {
@@ -103,16 +106,12 @@ export class ContentCaptureHandler {
         selectionData,
       );
 
-      // Send cropped image to background for processing
-      await browser.runtime.sendMessage({
-        action: "processAreaCaptureImage",
-        data: {
-          imageData: croppedImageData,
-          timestamp: Date.now(),
-          selectionData,
-          captureOptions,
-          originalCapture: fullCaptureResponse,
-        },
+      // Process cropped image using specialized capture messenger
+      await this.messenger.specialized.capture.processImageOCR(croppedImageData, {
+        timestamp: Date.now(),
+        selectionData,
+        captureOptions,
+        originalCapture: fullCaptureResponse,
       });
 
       // Clean up screen selector
@@ -229,8 +228,8 @@ export class ContentCaptureHandler {
         this.capturePreview = null;
       }
 
-      // Send confirmation to background for translation
-      await browser.runtime.sendMessage({
+      // Process confirmation using enhanced messaging
+      await this.messenger.sendMessage({
         action: "previewConfirmed",
         data: {
           captureData,

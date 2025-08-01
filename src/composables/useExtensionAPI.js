@@ -1,6 +1,9 @@
 import { ref, onUnmounted } from "vue";
+import { MessagingStandards } from "../core/MessagingStandards.js";
 
 export function useExtensionAPI() {
+  // Enhanced messaging for Vue extension API
+  const messenger = MessagingStandards.getMessenger('vue-extension-api');
   const isConnected = ref(true);
   const messageListeners = ref([]);
 
@@ -17,8 +20,8 @@ export function useExtensionAPI() {
 
   const sendMessage = async (action, data = {}) => {
     try {
-      const api = getbrowserAPI();
-      const response = await api.runtime.sendMessage({
+      // Use enhanced messaging system for better reliability
+      const response = await messenger.sendMessage({
         action,
         data,
         timestamp: Date.now(),
