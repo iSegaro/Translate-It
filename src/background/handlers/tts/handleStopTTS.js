@@ -1,5 +1,4 @@
 import { featureLoader } from '../../feature-loader.js';
-import { ErrorHandler } from '../../../error-management/ErrorHandler.js'; // Assuming renamed path
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
 let errorHandlerInstance = null;
@@ -8,7 +7,7 @@ export const initializeStopTTSHandler = (handler) => {
   errorHandlerInstance = handler;
 };
 
-export const handleStopTTS = async (request, sender) => {
+export const handleStopTTS = async () => {
   try {
     const ttsManager = await featureLoader.loadTTSManager();
     await ttsManager.stop();

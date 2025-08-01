@@ -24,7 +24,7 @@ function isPageExcluded(url) {
     // For now, return false for all other pages
     // This can be enhanced to check user's exclusion settings
     return false
-  } catch (error) {
+  } catch (_error) {
     // If URL parsing fails, exclude for safety
     return true
   }
@@ -33,10 +33,9 @@ function isPageExcluded(url) {
 /**
  * Handles the 'isCurrentPageExcluded' message action.
  * @param {Object} message - The message object.
- * @param {Object} sender - The sender object.
  * @returns {Promise<Object>} - Response object for CoreMessageRouter.
  */
-export async function handleIsCurrentPageExcluded(message, sender) {
+export async function handleIsCurrentPageExcluded(message) {
   try {
     const { url } = message.data || {}
     

@@ -240,17 +240,17 @@ export class TextExtractor {
     const extractor = new TextExtractor();
 
     // Register AI method (current implementation)
-    extractor.registerMethod("ai", async (_imageData, _options) => {
+    extractor.registerMethod("ai", async (imageData, options) => {
       // This is handled by _aiExtractAndTranslate
       throw new Error("AI method should use extractAndTranslate");
     });
 
     // Register placeholder for future OCR methods
-    extractor.registerMethod("tesseract", async (_imageData, _options) => {
+    extractor.registerMethod("tesseract", async (imageData, options) => {
       throw new Error("Tesseract OCR not implemented yet");
     });
 
-    extractor.registerMethod("webocr", async (_imageData, _options) => {
+    extractor.registerMethod("webocr", async (imageData, options) => {
       throw new Error("Web OCR API not implemented yet");
     });
 

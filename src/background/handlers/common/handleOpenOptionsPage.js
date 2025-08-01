@@ -3,7 +3,7 @@
 import browser from 'webextension-polyfill';
 import { logME } from "../../../utils/helpers.js";
 
-export async function handleOpenOptionsPage(message, sender) {
+export async function handleOpenOptionsPage() {
   try {
     browser.runtime.openOptionsPage();
     return { success: true };

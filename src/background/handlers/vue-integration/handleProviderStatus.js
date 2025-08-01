@@ -1,10 +1,7 @@
 // Handler for provider status from Vue apps
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 
-const errorHandler = new ErrorHandler();
-
-export async function handleProviderStatus(message, sender) {
+export async function handleProviderStatus(message) {
   const { provider } = message.data;
 
   try {

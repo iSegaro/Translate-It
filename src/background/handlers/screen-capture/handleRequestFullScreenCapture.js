@@ -1,5 +1,4 @@
 // src/background/handlers/screen-capture/handleRequestFullScreenCapture.js
-import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
@@ -37,7 +36,7 @@ export async function handleRequestFullScreenCapture(message, sender, sendRespon
         video: { mediaSource: 'screen' },
         audio: false
       });
-    } catch (permissionError) {
+    } catch (_permissionError) {
       throw new Error('Screen capture permission denied by user');
     }
     

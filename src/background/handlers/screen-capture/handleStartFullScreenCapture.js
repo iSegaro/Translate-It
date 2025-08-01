@@ -1,5 +1,4 @@
 // src/background/handlers/screen-capture/handleStartFullScreenCapture.js
-import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 

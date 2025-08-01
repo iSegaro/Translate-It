@@ -5,7 +5,7 @@ import browser from "webextension-polyfill";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleStartScreenCapture(message, sender) {
+export async function handleStartScreenCapture(message) {
   try {
     // Get active tab
     const [tab] = await browser.tabs.query({

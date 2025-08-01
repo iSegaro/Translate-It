@@ -1,12 +1,11 @@
 // Handler for saving provider config from Vue apps
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
-import browser from "webextension-polyfill";
 import storageManager from "../../../core/StorageManager.js";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleSaveProviderConfig(message, sender) {
+export async function handleSaveProviderConfig(message) {
   const { provider, apiKey, customUrl, model } = message.data;
 
   try {

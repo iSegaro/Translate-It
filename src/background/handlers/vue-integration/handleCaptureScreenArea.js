@@ -5,7 +5,7 @@ import browser from "webextension-polyfill";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleCaptureScreenArea(message, sender) {
+export async function handleCaptureScreenArea(message) {
   const { coordinates } = message.data;
 
   try {

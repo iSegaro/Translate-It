@@ -2,7 +2,6 @@
 // Handler for content script TTS fallback requests
 
 import browser from 'webextension-polyfill';
-import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
 let errorHandlerInstance = null;
@@ -14,10 +13,9 @@ export const initializeTTSContentHandler = (handler) => {
 /**
  * Handle TTS speak request through content script fallback
  * @param {Object} request - Message request
- * @param {Object} sender - Message sender 
  * @returns {Promise<Object>} Response
  */
-export const handleTTSSpeakContent = async (request, sender) => {
+export const handleTTSSpeakContent = async (request) => {
   try {
     console.log('[TTSContentHandler] Processing content script TTS request:', request);
 

@@ -1,5 +1,4 @@
 import { featureLoader } from '../../feature-loader.js';
-import { ErrorHandler } from '../../../error-management/ErrorHandler.js'; // Assuming renamed path
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
 let errorHandlerInstance = null;
@@ -8,7 +7,7 @@ export const initializeSpeakHandler = (handler) => {
   errorHandlerInstance = handler;
 };
 
-export const handleSpeak = async (request, sender) => {
+export const handleSpeak = async (request) => {
   try {
     console.log('[TTSHandler] Processing speak request:', request);
     

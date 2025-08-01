@@ -5,7 +5,7 @@ import browser from "webextension-polyfill";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleUpdateContextMenu(message, sender) {
+export async function handleUpdateContextMenu(message) {
   const { menuItems } = message.data;
 
   try {

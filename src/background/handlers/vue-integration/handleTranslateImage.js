@@ -4,7 +4,7 @@ import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleTranslateImage(message, sender) {
+export async function handleTranslateImage(message) {
   const {
     imageData,
     from = "auto",

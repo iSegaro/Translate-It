@@ -1,8 +1,6 @@
 // src/background/feature-loader.js
 // Dynamic feature loading based on browser capabilities
 
-import browser from "webextension-polyfill";
-
 // Legacy listeners removed - now managed by UnifiedListenerManager
 const listenerModules = {};
 

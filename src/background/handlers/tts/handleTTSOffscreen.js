@@ -2,7 +2,6 @@
 // Handler for offscreen document TTS operations
 
 import browser from 'webextension-polyfill';
-import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
 let errorHandlerInstance = null;
@@ -14,10 +13,9 @@ export const initializeTTSOffscreenHandler = (handler) => {
 /**
  * Handle TTS operations targeted for offscreen document
  * @param {Object} request - Message request
- * @param {Object} sender - Message sender
  * @returns {Promise<Object>} Response
  */
-export const handleTTSOffscreen = async (request, sender) => {
+export const handleTTSOffscreen = async (request) => {
   try {
     console.log('[TTSOffscreenHandler] 🎯 Processing offscreen TTS request:', request.action);
     console.log('[TTSOffscreenHandler] 📨 Request data:', request.data ? 'Present' : 'Missing');

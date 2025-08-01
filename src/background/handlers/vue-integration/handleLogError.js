@@ -4,7 +4,7 @@ import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleLogError(message, sender) {
+export async function handleLogError(message) {
   try {
     const { error, context, info } = message.data;
     const errorMessage = error?.message || String(error) || "Unknown error";

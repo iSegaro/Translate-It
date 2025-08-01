@@ -124,7 +124,7 @@ export class browserTranslateProvider extends BaseTranslationProvider {
    * @param {string} targetLang - Target language for comparison
    * @returns {Promise<string|null>} - Detected language code or null if failed
    */
-  async _detectLanguageForSwapping(text, _targetLang) {
+  async _detectLanguageForSwapping(text) {
     let detectedLangCode = null;
     
     // Try Chrome's built-in LanguageDetector first

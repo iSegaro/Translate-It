@@ -3,7 +3,7 @@
 import browser from 'webextension-polyfill';
 import { logME } from "../../../utils/helpers.js";
 
-export async function handleOpenURL(message, sender) {
+export async function handleOpenURL(message) {
   try {
     const anchor = message.data?.anchor;
     const optionsUrl = browser.runtime.getURL(

@@ -5,7 +5,7 @@ import browser from "webextension-polyfill";
 
 const errorHandler = new ErrorHandler();
 
-export async function handleGetExtensionInfo(message, sender) {
+export async function handleGetExtensionInfo() {
   try {
     const manifest = browser.runtime.getManifest();
 
