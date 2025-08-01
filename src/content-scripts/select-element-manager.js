@@ -484,118 +484,213 @@ export class SelectElementManager {
   }
 
   /**
-   * Process selected element - send to background for translation using UnifiedMessenger
+   * Process selected element using complete advanced text extraction system
+   * Follows the exact same process as OLD handleSelect_ElementClick method
    */
   async processSelectedElement(element, text) {
+    console.log("[SelectElementManager] Starting advanced text extraction process");
+    
     try {
-      console.log(
-        "[SelectElementManager] Sending text to background for processing",
-      );
+      // Import all required functions from advanced text extraction
+      const { 
+        collectTextNodes, 
+        separateCachedAndNewTexts, 
+        expandTextsForTranslation,
+        parseAndCleanTranslationResponse,
+        reassembleTranslations,
+        applyTranslationsToNodes
+      } = await import("../utils/advanced-text-extraction.js");
 
-      // Get current provider and language settings
-      const { getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } = await import("../config.js");
-      
-      const provider = await getTranslationApiAsync();
-      const sourceLanguage = await getSourceLanguageAsync();
-      const targetLanguage = await getTargetLanguageAsync();
-
-      console.log("[SelectElementManager] Translation settings:", {
-        provider, sourceLanguage, targetLanguage
-      });
-
-      // Use UnifiedMessenger translate method like popup/sidepanel
-      const response = await this.messenger.translate({
-        text: text,
-        provider: provider,
-        from: sourceLanguage,
-        to: targetLanguage,
-        mode: 'selection',
-        options: {
-          element: {
-            tagName: element.tagName,
-            className: element.className,
-            id: element.id,
-          },
-          timestamp: Date.now(),
-        }
-      });
-
-      console.log("[SelectElementManager] Raw response received:", response);
-      
-      // Handle TRANSLATION_RESULT_UPDATE message format (Firefox MV3 workaround)
-      if (response && response.action === 'TRANSLATION_RESULT_UPDATE') {
-        console.log("[SelectElementManager] TRANSLATION_RESULT_UPDATE received");
-        
-        // Replace element text with translation
-        if (response.translatedText) {
-          console.log("[SelectElementManager] Replacing element text with translation");
-          this.replaceElementText(element, response.translatedText);
-          await this.showSuccessNotification("Translation successful!");
-        } else {
-          console.warn("[SelectElementManager] No translatedText in TRANSLATION_RESULT_UPDATE:", response);
-        }
-      } 
-      // Handle standard success response format
-      else if (response && response.success) {
-        console.log("[SelectElementManager] Element processed successfully");
-        
-        // Replace element text with translation
-        if (response.translatedText) {
-          console.log("[SelectElementManager] Replacing element text with translation");
-          this.replaceElementText(element, response.translatedText);
-          await this.showSuccessNotification("Translation successful!");
-        } else {
-          console.warn("[SelectElementManager] No translatedText in successful response:", response);
-        }
-      } else {
-        console.error(
-          "[SelectElementManager] Background processing failed:",
-          response?.error || "Unknown error"
-        );
-        console.error("[SelectElementManager] Full response object:", response);
-        throw new Error(response?.error || "Translation failed - no response");
-      }
-    } catch (error) {
-      console.error(
-        "[SelectElementManager] Failed to send element data:",
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Replace element text with translated text
-   */
-  replaceElementText(element, translatedText) {
-    console.log("[SelectElementManager] Attempting to replace text");
-    console.log("[SelectElementManager] Element to replace:", element);
-    console.log("[SelectElementManager] New text:", translatedText);
-
-    if (!element || !translatedText) {
-      console.warn("[SelectElementManager] replaceElementText: Invalid element or translatedText provided");
-      return;
-    }
-
-    try {
-      // Store original text for potential revert
-      const originalText = this.extractTextFromElement(element);
-      this.trackTranslatedElement(element, originalText);
-
+      // Handle input/textarea elements with simple processing first
       if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-        console.log("[SelectElementManager] Replacing value of input/textarea");
-        element.value = translatedText;
-      } else {
-        console.log("[SelectElementManager] Replacing textContent of element");
-        element.textContent = translatedText;
+        console.log("[SelectElementManager] Processing input/textarea with simple translation");
+        
+        // Get current provider and language settings
+        const { getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } = await import("../config.js");
+        
+        const provider = await getTranslationApiAsync();
+        const sourceLanguage = await getSourceLanguageAsync();
+        const targetLanguage = await getTargetLanguageAsync();
+
+        // Use UnifiedMessenger translate method
+        const response = await this.messenger.translate({
+          text: text,
+          provider: provider,
+          from: sourceLanguage,
+          to: targetLanguage,
+          mode: 'selection'
+        });
+
+        if (response && (response.success || response.translatedText)) {
+          const translatedText = response.translatedText || response.data?.translatedText;
+          if (translatedText) {
+            const originalText = element.value;
+            this.trackTranslatedElement(element, originalText);
+            element.value = translatedText;
+            await this.showSuccessNotification("Translation successful!");
+          }
+        } else {
+          throw new Error(response?.error || "Translation failed");
+        }
+        return;
       }
+
+      // 1) Collect text nodes from selected element (same as OLD)
+      const { textNodes, originalTextsMap } = collectTextNodes(element);
       
-      console.log("[SelectElementManager] Text replacement completed successfully");
+      if (!originalTextsMap.size) {
+        console.warn("[SelectElementManager] No text nodes found in element");
+        await this.showNoTextNotification();
+        return { status: "empty", reason: "no_text_found" };
+      }
+
+      // 2) Separate cached and new texts (same as OLD)
+      const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
+
+      // If only cached translations exist
+      if (!textsToTranslate.length && cachedTranslations.size) {
+        console.log("[SelectElementManager] Using only cached translations");
+        const context = {
+          translatedElements: this.translatedElements,
+          originalTexts: this.originalTexts,
+          errorHandler: this.errorHandler
+        };
+        applyTranslationsToNodes(textNodes, cachedTranslations, context);
+        await this.showSuccessNotification("Translation loaded from cache");
+        return {
+          status: "success",
+          source: "cache",
+          translatedCount: cachedTranslations.size,
+        };
+      }
+
+      // If no new texts to translate
+      if (!textsToTranslate.length) {
+        return { status: "skip", reason: "no_new_texts" };
+      }
+
+      // 3) Expand texts for translation (same as OLD)
+      const { expandedTexts, originMapping } = expandTextsForTranslation(textsToTranslate);
+
+      // 4) Create JSON payload (same as OLD)
+      const jsonPayload = JSON.stringify(
+        expandedTexts.map((t) => ({ text: t }))
+      );
+      
+      if (jsonPayload.length > 20_000) {
+        const message = `Selected text is too large (${jsonPayload.length} bytes)`;
+        await this.showErrorNotification(message);
+        return { status: "error", reason: "payload_large", message };
+      }
+
+      console.log("[SelectElementManager] Sending translation request to background");
+
+      // 5) Send translation request to background (using TRANSLATE action)
+      const response = await this.messenger.sendMessage({
+        action: "TRANSLATE",
+        context: "select-element",
+        data: {
+          text: jsonPayload,
+          provider: await (async () => {
+            const { getTranslationApiAsync } = await import("../config.js");
+            return await getTranslationApiAsync();
+          })(),
+          sourceLanguage: await (async () => {
+            const { getSourceLanguageAsync } = await import("../config.js");
+            return await getSourceLanguageAsync();
+          })(),
+          targetLanguage: await (async () => {
+            const { getTargetLanguageAsync } = await import("../config.js");
+            return await getTargetLanguageAsync();
+          })(),
+          mode: "SelectElement",
+          options: {
+            isSelectElement: true,
+            rawJsonPayload: true
+          }
+        }
+      });
+
+      // 6) Handle response (using standard TRANSLATE response format)
+      if (!response?.success && !response?.translatedText) {
+        const msg = response?.error || "Translation request failed";
+        console.error("[SelectElementManager] Translation request failed:", msg);
+        await this.showErrorNotification(msg);
+        return { status: "error", reason: "backend_error", message: msg };
+      }
+
+      // Get translated text from response
+      const translatedJsonString = response?.translatedText || response?.data?.translatedText;
+
+      if (!translatedJsonString || !translatedJsonString.trim()) {
+        const message = "No translation received from API";
+        console.error("[SelectElementManager] Empty translation response:", response);
+        await this.showErrorNotification(message);
+        return { status: "error", reason: "empty_translation", message };
+      }
+
+      console.log("[SelectElementManager] Received translation response, parsing JSON");
+
+      // 7) Parse translation response (same as OLD)
+      const translatedData = parseAndCleanTranslationResponse(translatedJsonString);
+      
+      if (!translatedData || !translatedData.length) {
+        const message = "Invalid translation response format";
+        await this.showErrorNotification(message);
+        return { status: "error", reason: "api_error", message };
+      }
+
+      // 8) Reassemble translations (same as OLD)
+      const newTranslations = reassembleTranslations(
+        translatedData,
+        expandedTexts,
+        originMapping,
+        textsToTranslate,
+        cachedTranslations
+      );
+
+      // Combine cached and new translations
+      const allTranslations = new Map([
+        ...cachedTranslations,
+        ...newTranslations,
+      ]);
+
+      // 9) Apply translations to DOM nodes (same as OLD)
+      const context = {
+        translatedElements: this.translatedElements,
+        originalTexts: this.originalTexts,
+        errorHandler: this.errorHandler
+      };
+
+      applyTranslationsToNodes(textNodes, allTranslations, context);
+
+      console.log("[SelectElementManager] Advanced text extraction process completed successfully");
+      await this.showSuccessNotification("Translation completed successfully!");
+
+      return {
+        status: "success",
+        source: "translated",
+        translatedCount: newTranslations.size,
+        fromCache: cachedTranslations.size,
+      };
+
     } catch (error) {
-      console.error("[SelectElementManager] Error during text replacement:", error);
-      throw error;
+      console.error("[SelectElementManager] Advanced text extraction process failed:", error);
+      
+      await this.errorHandler.handle(error, {
+        type: ErrorTypes.UI,
+        context: "select-element-advanced-extraction",
+      });
+      
+      await this.showErrorNotification(error.message);
+      return {
+        status: "error",
+        reason: "exception",
+        message: error.message,
+      };
     }
   }
+
 
   /**
    * Add global styles for select element mode using legacy system
@@ -709,73 +804,55 @@ export class SelectElementManager {
 
   /**
    * Revert all translations made during this session
-   * Based on OLD implementation in textExtraction.js
+   * Uses advanced text extraction revert system
    */
   async revertTranslations() {
     try {
-      let successfulReverts = 0;
+      console.log("[SelectElementManager] Starting translation revert process");
 
-      // Find all span elements with translation data
-      const containers = document.querySelectorAll(
-        "span[data-translate-it-original-text]",
-      );
+      // Use advanced text extraction revert system
+      const { revertAllTranslations } = await import("../utils/advanced-text-extraction.js");
+      
+      const context = {
+        translatedElements: this.translatedElements,
+        originalTexts: this.originalTexts
+      };
+      
+      const successfulReverts = revertAllTranslations(context);
 
-      for (const container of containers) {
-        const originalText = container.getAttribute(
-          "data-translate-it-original-text",
-        );
-        if (originalText !== null) {
+      // Also handle simple input/textarea reverts from tracking
+      let inputReverts = 0;
+      for (const [element, originalText] of this.originalTexts.entries()) {
+        if (element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')) {
           try {
-            // Get parent element
-            const parentElement = container.parentNode;
-            if (!parentElement) continue;
-
-            // Create original text node
-            const originalTextNode = document.createTextNode(originalText);
-
-            // Replace translated content with original
-            parentElement.replaceChild(originalTextNode, container);
-            successfulReverts++;
-
-            // Remove any added break elements
-            let nextNode = originalTextNode.nextSibling;
-            while (
-              nextNode &&
-              nextNode.nodeName === "BR" &&
-              nextNode.getAttribute("data-translate-it-br") === "true"
-            ) {
-              const nodeToRemove = nextNode;
-              nextNode = nextNode.nextSibling;
-              if (nodeToRemove.parentNode) {
-                nodeToRemove.parentNode.removeChild(nodeToRemove);
-              }
-            }
+            element.value = originalText;
+            inputReverts++;
+            console.log("[SelectElementManager] Reverted input/textarea element");
           } catch (error) {
-            console.error(
-              "[SelectElementManager] Failed to revert individual element:",
-              error,
-            );
+            console.error("[SelectElementManager] Failed to revert input element:", error);
           }
         }
       }
+
+      const totalReverts = successfulReverts + inputReverts;
 
       // Clear tracking sets
       this.translatedElements.clear();
       this.originalTexts.clear();
 
       // Show notification
-      if (successfulReverts > 0) {
+      if (totalReverts > 0) {
         await this.showSuccessNotification(
-          `${successfulReverts} translation(s) reverted successfully`,
+          `${totalReverts} translation(s) reverted successfully`,
         );
         console.log(
-          `[SelectElementManager] Successfully reverted ${successfulReverts} translations`,
+          `[SelectElementManager] Successfully reverted ${totalReverts} translations (${successfulReverts} DOM + ${inputReverts} inputs)`,
         );
       } else {
         console.log("[SelectElementManager] No translations found to revert");
       }
 
-      return successfulReverts;
+      return totalReverts;
     } catch (error) {
       console.error("[SelectElementManager] Error during revert:", error);
 
