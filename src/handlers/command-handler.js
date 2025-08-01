@@ -1,225 +1,61 @@
-/**
- * Command Handler - Unified handler for commands.onCommand events
- * Handles keyboard shortcuts and extension commands
- */
-
-import browser from "webextension-polyfill";
+import { MessagingStandards } from '../core/MessagingStandards.js';
 import { logME } from "../utils/helpers.js";
 
-/**
- * Handle translation shortcut command
- */
-async function handleTranslateCommand(tab) {
+const messenger = MessagingStandards.getMessenger('background');
+
+async function handleCommand(tab, action, data = {}) {
   try {
-    logME("[CommandHandler] Translate command triggered");
-
-    // Send message to content script to handle translation
-    await browser.tabs.sendMessage(tab.id, {
-      action: "KEYBOARD_SHORTCUT_TRANSLATE",
-      shortcut: "translate",
-      timestamp: Date.now(),
-    });
-
-    logME("[CommandHandler] Translate command sent to content script");
+    logME(`[CommandHandler] ${action} command triggered`);
+    await messenger.sendMessageToTab(tab.id, { action, data: { ...data, source: 'keyboard_shortcut' } });
+    logME(`[CommandHandler] ${action} command sent to content script`);
   } catch (error) {
-    logME("[CommandHandler] Error handling translate command:", error);
+    logME(`[CommandHandler] Error handling ${action} command:`, error);
+    // Fallback logic for injection can be added here if needed
+  }
+}
 
-    // If content script not ready, try to inject it
+async function handleBackgroundCommand(action, data = {}) {
     try {
-      await browser.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["src/content-scripts/index.js"],
-      });
-
-      // Retry the command
-      setTimeout(async () => {
-        try {
-          await browser.tabs.sendMessage(tab.id, {
-            action: "KEYBOARD_SHORTCUT_TRANSLATE",
-            shortcut: "translate",
-            timestamp: Date.now(),
-          });
-        } catch (retryError) {
-          logME("[CommandHandler] Retry failed:", retryError);
-        }
-      }, 500);
-    } catch (injectError) {
-      logME("[CommandHandler] Failed to inject content script:", injectError);
+        logME(`[CommandHandler] ${action} background command triggered`);
+        await messenger.sendMessage({ action, data: { ...data, source: 'keyboard_shortcut' } });
+        logME(`[CommandHandler] ${action} background command sent`);
+    } catch (error) {
+        logME(`[CommandHandler] Error handling ${action} background command:`, error);
     }
-  }
 }
 
-/**
- * Handle select element mode command
- */
-async function handleSelectElementCommand(tab) {
-  try {
-    logME("[CommandHandler] Select element command triggered");
-
-    // Send message to content script to activate element selection
-    await browser.tabs.sendMessage(tab.id, {
-      action: "ACTIVATE_SELECT_ELEMENT_MODE",
-      source: "keyboard_shortcut",
-      timestamp: Date.now(),
-    });
-
-    logME("[CommandHandler] Select element command sent to content script");
-  } catch (error) {
-    logME("[CommandHandler] Error handling select element command:", error);
-  }
-}
-
-/**
- * Handle popup toggle command
- */
-async function handlePopupToggleCommand(tab) {
-  try {
-    logME("[CommandHandler] Popup toggle command triggered");
-
-    // Get current popup state and toggle
-    const windows = await browser.windows.getAll({ populate: true });
-    const currentWindow = windows.find((w) => w.focused);
-
-    if (currentWindow) {
-      // Try to open popup or sidepanel
-      try {
-        await browser.action.openPopup();
-        logME("[CommandHandler] Popup opened via command");
-      } catch (popupError) {
-        // Fallback to sidepanel if available
-        try {
-          await browser.sidePanel.open({ windowId: currentWindow.id });
-          logME("[CommandHandler] Sidepanel opened via command");
-        } catch (sidepanelError) {
-          logME("[CommandHandler] Failed to open popup or sidepanel:", {
-            popupError,
-            sidepanelError,
-          });
-        }
-      }
-    }
-  } catch (error) {
-    logME("[CommandHandler] Error handling popup toggle command:", error);
-  }
-}
-
-/**
- * Handle TTS (Text-to-Speech) command
- */
-async function handleTTSCommand(tab) {
-  try {
-    logME("[CommandHandler] TTS command triggered");
-
-    // Send message to content script to handle TTS
-    await browser.tabs.sendMessage(tab.id, {
-      action: "KEYBOARD_SHORTCUT_TTS",
-      shortcut: "speak",
-      timestamp: Date.now(),
-    });
-
-    logME("[CommandHandler] TTS command sent to content script");
-  } catch (error) {
-    logME("[CommandHandler] Error handling TTS command:", error);
-  }
-}
-
-/**
- * Handle screenshot/capture command
- */
-async function handleCaptureCommand(tab) {
-  try {
-    logME("[CommandHandler] Capture command triggered");
-
-    // Send message to background to start area capture
-    await browser.runtime.sendMessage({
-      action: "startAreaCapture",
-      source: "keyboard_shortcut",
-      tabId: tab.id,
-      timestamp: Date.now(),
-    });
-
-    logME("[CommandHandler] Capture command processed");
-  } catch (error) {
-    logME("[CommandHandler] Error handling capture command:", error);
-  }
-}
-
-/**
- * Handle options page command
- */
 async function handleOptionsCommand() {
-  try {
-    logME("[CommandHandler] Options command triggered");
-
-    const optionsUrl = browser.runtime.getURL("options.html");
-
-    // Check if options page is already open
-    const tabs = await browser.tabs.query({ url: optionsUrl });
-
-    if (tabs.length > 0) {
-      // Focus existing options tab
-      await browser.tabs.update(tabs[0].id, { active: true });
-      await browser.windows.update(tabs[0].windowId, { focused: true });
-      logME("[CommandHandler] Focused existing options tab");
-    } else {
-      // Create new options tab
-      await browser.tabs.create({ url: optionsUrl });
-      logME("[CommandHandler] Created new options tab");
+    try {
+        logME("[CommandHandler] Options command triggered");
+        await messenger.sendMessage({ action: 'openOptionsPage' });
+    } catch (error) {
+        logME("[CommandHandler] Error handling options command:", error);
     }
-  } catch (error) {
-    logME("[CommandHandler] Error handling options command:", error);
-  }
 }
 
-/**
- * Main command event handler
- */
 export async function handleCommandEvent(command, tab) {
-  logME(`[CommandHandler] Command received: ${command}`, {
-    tabId: tab?.id,
-    url: tab?.url,
-  });
+  logME(`[CommandHandler] Command received: ${command}`, { tabId: tab?.id });
 
-  try {
-    switch (command) {
-      case "translate":
-      case "quick_translate":
-        await handleTranslateCommand(tab);
-        break;
+  const commandMap = {
+    translate: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TRANSLATE'),
+    quick_translate: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TRANSLATE'),
+    select_element: () => handleCommand(tab, 'ACTIVATE_SELECT_ELEMENT_MODE'),
+    activate_select_element: () => handleCommand(tab, 'ACTIVATE_SELECT_ELEMENT_MODE'),
+    toggle_popup: () => handleBackgroundCommand('togglePopup', { tabId: tab.id }),
+    open_popup: () => handleBackgroundCommand('togglePopup', { tabId: tab.id }),
+    speak: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TTS'),
+    tts: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TTS'),
+    capture: () => handleBackgroundCommand('startAreaCapture', { tabId: tab.id }),
+    screenshot: () => handleBackgroundCommand('startAreaCapture', { tabId: tab.id }),
+    options: handleOptionsCommand,
+    open_options: handleOptionsCommand,
+  };
 
-      case "select_element":
-      case "activate_select_element":
-        await handleSelectElementCommand(tab);
-        break;
-
-      case "toggle_popup":
-      case "open_popup":
-        await handlePopupToggleCommand(tab);
-        break;
-
-      case "speak":
-      case "tts":
-        await handleTTSCommand(tab);
-        break;
-
-      case "capture":
-      case "screenshot":
-        await handleCaptureCommand(tab);
-        break;
-
-      case "options":
-      case "open_options":
-        await handleOptionsCommand();
-        break;
-
-      default:
-        logME(`[CommandHandler] Unknown command: ${command}`);
-        break;
-    }
-
+  const handler = commandMap[command];
+  if (handler) {
+    await handler();
     logME(`[CommandHandler] Command ${command} handled successfully`);
-  } catch (error) {
-    logME(`[CommandHandler] Error handling command ${command}:`, error);
-    throw error;
+  } else {
+    logME(`[CommandHandler] Unknown command: ${command}`);
   }
 }

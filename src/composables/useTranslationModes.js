@@ -1,26 +1,15 @@
-// src/composables/useTranslationModes.js
 import { ref, reactive } from "vue";
 import { TranslationService } from "../core/TranslationService.js";
 import { logME } from "@/utils/helpers.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
-/**
- * Composable برای مدیریت Sidepanel Translation Mode
- * @returns {Object} state و methods های مربوط به ترجمه sidepanel
- */
 export function useSidepanelTranslation() {
   const isLoading = ref(false);
   const result = ref(null);
   const error = ref(null);
+  const translationService = new TranslationService();
 
-  /**
-   * ترجمه متن در sidepanel
-   * @param {string} text - متن برای ترجمه
-   * @param {string} sourceLang - زبان مبدأ
-   * @param {string} targetLang - زبان مقصد
-   * @returns {Promise<Object|null>} نتیجه ترجمه یا null در صورت خطا
-   */
   const translateText = async (text, sourceLang, targetLang) => {
     if (!text?.trim()) {
       error.value = "Text is required for translation";
@@ -37,7 +26,6 @@ export function useSidepanelTranslation() {
     result.value = null;
 
     try {
-      // تبدیل display names به language codes
       const languages = useLanguages();
       const sourceLangCode =
         languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
@@ -49,7 +37,7 @@ export function useSidepanelTranslation() {
         targetLangCode,
       });
 
-      const response = await TranslationService.sidepanelTranslate(
+      const response = await translationService.sidepanelTranslate(
         text,
         sourceLangCode,
         targetLangCode,
@@ -75,9 +63,6 @@ export function useSidepanelTranslation() {
     }
   };
 
-  /**
-   * پاک کردن state ها
-   */
   const clearState = () => {
     result.value = null;
     error.value = null;
@@ -85,39 +70,27 @@ export function useSidepanelTranslation() {
   };
 
   return {
-    // State
     isLoading,
     result,
     error,
-
-    // Methods
     translateText,
     clearState,
   };
 }
 
-/**
- * Composable برای مدیریت Select Element Mode
- * @returns {Object} methods های مربوط به انتخاب عنصر
- */
 export function useSelectElementTranslation() {
   const isActivating = ref(false);
   const isSelectModeActive = ref(false);
   const error = ref(null);
+  const translationService = new TranslationService();
 
-  /**
-   * فعال‌سازی حالت انتخاب عنصر
-   * @returns {Promise<boolean>} موفقیت عملیات
-   */
   const activateSelectMode = async () => {
     isActivating.value = true;
     error.value = null;
 
     try {
       logME("[useSelectElementTranslation] Activating select element mode");
-
-      await TranslationService.activateSelectElementMode(true);
-
+      await translationService.activateSelectElementMode(true);
       logME("[useSelectElementTranslation] Select element mode activated");
       return true;
     } catch (err) {
@@ -130,16 +103,10 @@ export function useSelectElementTranslation() {
     }
   };
 
-  /**
-   * غیرفعال‌سازی حالت انتخاب عنصر
-   * @returns {Promise<boolean>} موفقیت عملیات
-   */
   const deactivateSelectMode = async () => {
     try {
       logME("[useSelectElementTranslation] Deactivating select element mode");
-
-      await TranslationService.activateSelectElementMode(false);
-
+      await translationService.activateSelectElementMode(false);
       logME("[useSelectElementTranslation] Select element mode deactivated");
       return true;
     } catch (err) {
@@ -154,10 +121,6 @@ export function useSelectElementTranslation() {
     }
   };
 
-  /**
-   * تغییر وضعیت انتخاب عنصر (toggle)
-   * @returns {Promise<boolean>} موفقیت عملیات
-   */
   const toggleSelectElement = async () => {
     if (isSelectModeActive.value) {
       const result = await deactivateSelectMode();
@@ -175,39 +138,27 @@ export function useSelectElementTranslation() {
   };
 
   return {
-    // State
     isActivating,
     isSelectModeActive,
     error,
-
-    // Methods
     activateSelectMode,
     deactivateSelectMode,
     toggleSelectElement,
   };
 }
 
-/**
- * Composable برای مدیریت عملیات عمومی sidepanel
- * @returns {Object} methods های عمومی
- */
 export function useSidepanelActions() {
   const isProcessing = ref(false);
   const error = ref(null);
+  const translationService = new TranslationService();
 
-  /**
-   * بازگردانی ترجمه
-   * @returns {Promise<boolean>} موفقیت عملیات
-   */
   const revertTranslation = async () => {
     isProcessing.value = true;
     error.value = null;
 
     try {
       logME("[useSidepanelActions] Reverting translation");
-
-      await TranslationService.revertTranslation();
-
+      await translationService.revertTranslation();
       logME("[useSidepanelActions] Translation reverted successfully");
       return true;
     } catch (err) {
@@ -220,16 +171,11 @@ export function useSidepanelActions() {
     }
   };
 
-  /**
-   * توقف TTS
-   * @returns {Promise<void>}
-   */
   const stopTTS = async () => {
     try {
       logME("[useSidepanelActions] Stopping TTS");
-      await TranslationService.stopTTS();
+      await translationService.stopTTS();
     } catch (err) {
-      // خطاها در TTS معمولاً مهم نیستند
       logME(
         "[useSidepanelActions] TTS stop failed (might not be active):",
         err,
@@ -238,36 +184,17 @@ export function useSidepanelActions() {
   };
 
   return {
-    // State
     isProcessing,
     error,
-
-    // Methods
     revertTranslation,
     stopTTS,
   };
 }
 
-// آینده: سایر Translation Modes
-
-/**
- * Composable برای Field Translation (آینده)
- * @returns {Object} state و methods های مربوط به ترجمه فیلدها
- */
 export function useFieldTranslation() {
-  // پیاده‌سازی در آینده
-  return {
-    // placeholder
-  };
+  return {};
 }
 
-/**
- * Composable برای Selection Translation (آینده)
- * @returns {Object} state و methods های مربوط به ترجمه انتخاب متن
- */
 export function useSelectionTranslation() {
-  // پیاده‌سازی در آینده
-  return {
-    // placeholder
-  };
+  return {};
 }

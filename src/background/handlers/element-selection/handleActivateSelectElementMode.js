@@ -34,15 +34,31 @@ export async function handleActivateSelectElementMode(message, sender) {
     }
     
     // Send message to content script to activate/deactivate selection mode
-    const isActivating = message.data === true || message.data?.activate === true;
+    // Determine if activating or deactivating based on message.data
+    let isActivating;
+    let modeForContentScript = 'normal';
+
+    if (typeof message.data === 'boolean') {
+      isActivating = message.data;
+      modeForContentScript = isActivating ? 'select' : 'normal';
+    } else if (typeof message.data === 'string') {
+      isActivating = (message.data !== 'deactivate' && message.data !== 'normal');
+      modeForContentScript = message.data; // Use the string as mode (e.g., 'translate')
+    } else if (typeof message.data === 'object' && message.data !== null) {
+      isActivating = message.data.activate === true || message.data.mode === 'select' || message.data.mode === 'translate';
+      modeForContentScript = message.data.mode || (isActivating ? 'select' : 'normal');
+    } else {
+      isActivating = false; // Default to deactivating if data is unclear
+    }
+
     const action = isActivating ? 'ACTIVATE_ELEMENT_SELECTION' : 'DEACTIVATE_ELEMENT_SELECTION';
     
-    console.log(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId}`);
+    console.log(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
     
     const response = await browser.tabs.sendMessage(targetTabId, {
       action: action,
       data: {
-        mode: isActivating ? 'select' : 'normal',
+        mode: modeForContentScript,
         activate: isActivating,
         timestamp: Date.now()
       }
