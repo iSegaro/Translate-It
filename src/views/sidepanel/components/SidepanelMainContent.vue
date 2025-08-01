@@ -373,17 +373,8 @@ const checkClipboard = async () => {
     console.log("[SidepanelMainContent] Checking clipboard...");
     const text = await navigator.clipboard.readText();
     const hasContent = text.trim().length > 0;
-    console.log(
-      "[SidepanelMainContent] Clipboard content exists:",
-      hasContent,
-      "Length:",
-      text.length,
-    );
+
     showPasteButton.value = hasContent;
-    console.log(
-      "[SidepanelMainContent] showPasteButton set to:",
-      showPasteButton.value,
-    );
   } catch (error) {
     console.log(
       "[SidepanelMainContent] Clipboard check failed:",
@@ -391,7 +382,6 @@ const checkClipboard = async () => {
     );
     // Fallback: show button always if permission denied
     showPasteButton.value = true;
-    console.log("[SidepanelMainContent] Fallback: showPasteButton set to true");
   }
 };
 
