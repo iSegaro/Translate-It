@@ -2,7 +2,7 @@
 // Simplified version without heavy dependencies
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
-import { UnifiedTranslationClient } from "@/core/UnifiedTranslationClient.js";
+import { TranslationService } from "../core/TranslationService.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 
 export function usePopupTranslation() {
@@ -17,7 +17,7 @@ export function usePopupTranslation() {
   const settingsStore = useSettingsStore();
 
   // Translation client
-  const translationClient = new UnifiedTranslationClient("popup");
+  const translationService = new TranslationService("popup");
 
   // Browser API
   const browserAPI = useBrowserAPI();
@@ -39,12 +39,7 @@ export function usePopupTranslation() {
     try {
       // Use UnifiedTranslationClient for translation request
       // The actual translation result will come via a separate message
-      const response = await translationClient.translate(sourceText.value, {
-        provider: settingsStore.settings.TRANSLATION_API,
-        sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-        targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
-        mode: "popup",
-      });
+      const response = await translationService.sidepanelTranslate(sourceText.value, settingsStore.settings.SOURCE_LANGUAGE, settingsStore.settings.TARGET_LANGUAGE);
 
       // Check response - should be TRANSLATION_RESULT_UPDATE message
       console.log("[usePopupTranslation] Received response:", response);

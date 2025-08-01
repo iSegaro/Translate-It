@@ -1,9 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ErrorTypes } from '@/error-management/ErrorTypes.js'
-
-// Translation client for messaging with background service worker
-// Note: TranslationClient removed - using UnifiedTranslationClient instead
+import { TranslationService } from "@/core/TranslationService.js";
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -32,9 +30,12 @@ export const useTranslationStore = defineStore('translation', () => {
 
   // Actions
   const translateText = async (text, options = {}) => {
-    // TODO: Reimplement using UnifiedTranslationClient when this store is activated
-    throw new Error('Translation store disabled - use UnifiedTranslationClient directly')
-    
+    // This store is currently not directly handling translation requests.
+    // Translation logic is handled by composables (e.g., useSidepanelTranslation, usePopupTranslation)
+    // which use TranslationService.
+    console.warn("TranslationStore: translateText is a placeholder. Use composables for translation.");
+    return Promise.resolve(null);
+
     /* 
     const { from = 'auto', to = 'en', provider = selectedProvider.value, mode = 'simple' } = options
     
@@ -111,72 +112,29 @@ export const useTranslationStore = defineStore('translation', () => {
   }
 
   const setProvider = async (provider) => {
-    // Validate provider via background service
-    const client = getTranslationClient()
-    try {
-      await client.sendMessage({
-        action: 'VALIDATE_PROVIDER',
-        provider
-      })
-      selectedProvider.value = provider
-      error.value = null
-    } catch (error) {
-      throw new Error(`Unsupported provider: ${provider}`)
-    }
-  }
-
-  const translateImage = async (imageData, options = {}) => {
-    const { from = 'auto', to = 'en', provider = selectedProvider.value, mode = 'simple' } = options
-    
-    if (!imageData) {
-      throw new Error('Image data cannot be empty')
-    }
-
-    isLoading.value = true
-    error.value = null
-    
-    try {
-      // Image translation not yet implemented in the new messaging architecture
-      // This will be added in a future update
-      throw new Error('Image translation is not available in the new architecture yet')
-    } catch (err) {
-      error.value = err.message || 'Image translation failed'
-      console.error('Image translation error:', err)
-      throw new Error(`Image translation failed: ${err.message}`)
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const clearCache = () => {
-    cache.value.clear()
-  }
-
-  const clearError = () => {
-    error.value = null
+    // This store is currently not directly setting providers.
+    // Provider selection is handled by useApiProvider composable.
+    console.warn("TranslationStore: setProvider is a placeholder. Use useApiProvider for provider selection.");
+    selectedProvider.value = provider; // Still update local state
   }
 
   const resetProviders = async (apiType = null) => {
-    // Reset providers via background service
-    const client = getTranslationClient()
-    await client.sendMessage({
-      action: 'RESET_PROVIDERS',
-      apiType
-    })
+    // This store is currently not directly resetting providers.
+    console.warn("TranslationStore: resetProviders is a placeholder.");
   }
 
   const isProviderSupported = async (provider) => {
-    // Check provider support via background service
-    const client = getTranslationClient()
-    try {
-      const response = await client.sendMessage({
-        action: 'IS_PROVIDER_SUPPORTED',
-        provider
-      })
-      return response.supported
-    } catch (error) {
-      return false
-    }
+    // This store is currently not directly checking provider support.
+    console.warn("TranslationStore: isProviderSupported is a placeholder.");
+    return false;
+  }
+
+  const clearCache = () => {
+    cache.value.clear();
+  }
+
+  const clearError = () => {
+    error.value = null;
   }
 
   return {
@@ -194,7 +152,6 @@ export const useTranslationStore = defineStore('translation', () => {
     
     // Actions
     translateText,
-    translateImage,
     addToHistory,
     clearHistory,
     clearCache,

@@ -2,7 +2,7 @@
 // Based on usePopupTranslation but adapted for sidepanel context
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
-import { UnifiedTranslationClient } from "@/core/UnifiedTranslationClient.js";
+import { TranslationService } from "../core/TranslationService.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 
 export function useSidepanelTranslation() {
@@ -17,7 +17,7 @@ export function useSidepanelTranslation() {
   const settingsStore = useSettingsStore();
 
   // Translation client
-  const translationClient = new UnifiedTranslationClient("sidepanel");
+  const translationService = new TranslationService("sidepanel");
 
   // Browser API
   const browserAPI = useBrowserAPI();
@@ -38,12 +38,7 @@ export function useSidepanelTranslation() {
 
     try {
       // Use UnifiedTranslationClient for translation request
-      const response = await translationClient.translate(sourceText.value, {
-        provider: settingsStore.settings.TRANSLATION_API,
-        sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-        targetLanguage: settingsStore.settings.TARGET_LANGUAGE,
-        mode: "sidepanel",
-      });
+      const response = await translationService.sidepanelTranslate(sourceText.value, settingsStore.settings.SOURCE_LANGUAGE, settingsStore.settings.TARGET_LANGUAGE);
 
       // Check response - it should be TRANSLATION_RESULT_UPDATE message with translatedText
       console.log("[useSidepanelTranslation] Received response:", response);
