@@ -14,6 +14,7 @@ class BackgroundService {
     this.initialized = false;
     this.browser = null;
     this.translationEngine = null;
+    this.featureLoader = featureLoader;
     this.messageHandler = simpleMessageHandler;
     if (!this.messageHandler.initialized) {
       this.messageHandler.initialize();
@@ -28,9 +29,25 @@ class BackgroundService {
     await this.initializeTranslationEngine();
     this.registerMessageHandlers();
     await this.initializeErrorHandlers();
+    await this.preloadFeatures();
     await this.refreshContextMenus();
     this.initialized = true;
     console.log("✅ Background service initialized successfully");
+  }
+
+  /**
+   * Preload essential features using featureLoader
+   * @private
+   */
+  async preloadFeatures() {
+    try {
+      console.log("🚀 Preloading essential features...");
+      const features = await this.featureLoader.preloadEssentialFeatures();
+      console.log("✅ Essential features preloaded:", Object.keys(features));
+    } catch (error) {
+      console.error("❌ Failed to preload essential features:", error);
+      // Continue initialization even if preloading fails
+    }
   }
 
   async initializebrowserAPI() {
@@ -88,8 +105,15 @@ class BackgroundService {
   }
 
   async refreshContextMenus() {
-    const { createContextMenu } = await import("../managers/context-menu-manager.js");
-    await createContextMenu();
+    try {
+      const contextMenuManager = await this.featureLoader.loadContextMenuManager();
+      await contextMenuManager.setupDefaultMenus();
+    } catch (error) {
+      console.error("❌ Failed to refresh context menus via featureLoader:", error);
+      // Fallback to direct import
+      const { createContextMenu } = await import("../managers/context-menu-manager.js");
+      await createContextMenu();
+    }
   }
 }
 

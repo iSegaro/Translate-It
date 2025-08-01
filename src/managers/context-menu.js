@@ -104,12 +104,13 @@ export class ContextMenuManager {
    * @returns {Promise<string>} Menu item ID
    */
   async createMenu(menuConfig) {
-    if (!this.initialized) {
-      await this.initialize();
+    // Use browser API check instead of initialized check to avoid recursion
+    if (!this.browser) {
+      this.browser = browser;
     }
 
     try {
-      const menuId = await browser.contextMenus.create(menuConfig);
+      const menuId = await this.browser.contextMenus.create(menuConfig);
       this.createdMenus.add(menuConfig.id || menuId);
 
       console.log(
@@ -128,12 +129,13 @@ export class ContextMenuManager {
    * @param {Object} updateInfo - Updated menu properties
    */
   async updateMenu(menuId, updateInfo) {
-    if (!this.initialized) {
-      await this.initialize();
+    // Use browser API check instead of initialized check to avoid recursion
+    if (!this.browser) {
+      this.browser = browser;
     }
 
     try {
-      await browser.contextMenus.update(menuId, updateInfo);
+      await this.browser.contextMenus.update(menuId, updateInfo);
       console.log(`📋 Updated context menu: ${menuId}`);
     } catch (error) {
       console.error(`❌ Failed to update context menu ${menuId}:`, error);
@@ -146,12 +148,13 @@ export class ContextMenuManager {
    * @param {string} menuId - Menu item ID to remove
    */
   async removeMenu(menuId) {
-    if (!this.initialized) {
-      await this.initialize();
+    // Use browser API check instead of initialized check to avoid recursion
+    if (!this.browser) {
+      this.browser = browser;
     }
 
     try {
-      await browser.contextMenus.remove(menuId);
+      await this.browser.contextMenus.remove(menuId);
       this.createdMenus.delete(menuId);
 
       console.log(`📋 Removed context menu: ${menuId}`);
@@ -165,12 +168,13 @@ export class ContextMenuManager {
    * Clear all context menus
    */
   async clearAllMenus() {
-    if (!this.initialized) {
-      await this.initialize();
+    // Use browser API check instead of initialized check to avoid recursion
+    if (!this.browser) {
+      this.browser = browser;
     }
 
     try {
-      await browser.contextMenus.removeAll();
+      await this.browser.contextMenus.removeAll();
       this.createdMenus.clear();
 
       console.log("📋 Cleared all context menus");
