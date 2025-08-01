@@ -371,7 +371,7 @@ const stopListeningForSubtitles = () => {
   browser.runtime.onMessage.removeListener(handleSubtitleMessage)
 }
 
-const handleSubtitleMessage = async (message, sender, sendResponse) => {
+const handleSubtitleMessage = async (message) => {
   if (message.source !== 'subtitle-detector') return
 
   const { action, data } = message

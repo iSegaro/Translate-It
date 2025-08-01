@@ -696,8 +696,8 @@ const copyTranslation = async (item) => {
     await navigator.clipboard.writeText(item.text)
     emit('copy', item)
     showFeedback('Copied to clipboard!')
-  } catch (err) {
-    console.error('Copy failed:', err)
+  } catch (_err) {
+    console.error('Copy failed:', _err)
     showFeedback('Copy failed', 'error')
   }
 }

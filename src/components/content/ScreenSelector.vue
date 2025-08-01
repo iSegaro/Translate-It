@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useScreenCapture } from '@/composables/useScreenCapture.js'
 
 const props = defineProps({

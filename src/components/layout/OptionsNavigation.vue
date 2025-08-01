@@ -37,7 +37,6 @@ import { useSettingsStore } from '@/store/core/settings'
 const { proxy } = getCurrentInstance()
 const $i18n = proxy.$i18n
 
-const route = useRoute()
 const settingsStore = useSettingsStore()
 
 // Navigation items based on original options.html structure
@@ -73,7 +72,7 @@ const saveAllSettings = async () => {
       statusMessage.value = ''
       statusType.value = ''
     }, 2000)
-  } catch (error) {
+  } catch (_error) {
     statusType.value = 'error'
     statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
     

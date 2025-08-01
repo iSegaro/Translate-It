@@ -21,63 +21,6 @@ import { getTranslationString } from "../utils/i18n.js";
 import FeatureManager from "./FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
-/**
- * Background handler for fetching translations.
- */
-export async function handleFetchTranslationBackground(
-  message,
-  sender,
-  sendResponse,
-  translateText,
-  errorHandler,
-) {
-  try {
-    const { promptText, translationMode, sourceLang, targetLang } =
-      message.payload || {};
-
-    // Validation
-    if (!promptText || typeof promptText !== "string") {
-      const err = new Error(ErrorTypes.PROMPT_INVALID);
-      err.type = ErrorTypes.PROMPT_INVALID;
-      throw err;
-    }
-
-    // Call API
-    const translated = await translateText(
-      promptText,
-      translationMode,
-      sourceLang,
-      targetLang,
-    );
-
-    // Check result
-    if (typeof translated !== "string" || !translated.trim()) {
-      const err = new Error(ErrorTypes.TRANSLATION_FAILED);
-      err.type = ErrorTypes.API;
-      throw err;
-    }
-
-    sendResponse({
-      success: true,
-      data: { translatedText: translated.trim() },
-    });
-  } catch (err) {
-    // Centralized error handling
-    const processed = await errorHandler.handle(err, {
-      type: err.type || ErrorTypes.API,
-      context: "handler-fetchTranslation-background",
-    });
-
-    const safeMessage =
-      processed?.message ||
-      err.message ||
-      (await getTranslationString("ERRORS_UNKNOWN"));
-
-    sendResponse({ success: false, error: safeMessage });
-  }
-  return true;
-}
-
 export default class TranslationHandler {
   constructor() {
     // IMPORTANT: FIRST initialize the notifier, then the errorHandler

@@ -176,7 +176,7 @@
         <button 
           class="action-btn primary-btn" 
           :disabled="isTranslating || isAnalyzing"
-          @click="translateImage"
+          @click="callTranslateImage"
         >
           <span
             v-if="isTranslating"
@@ -287,7 +287,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -315,7 +315,7 @@ const emit = defineEmits(['close', 'retake', 'translate', 'save'])
 
 // Stores and APIs
 const translationStore = useTranslationStore()
-const { translateImage: translateImageAPI } = useExtensionAPI()
+const { translateImage } = useExtensionAPI()
 
 // Reactive state
 const isVisible = ref(true)
@@ -373,7 +373,7 @@ const handleImageLoad = () => {
   }
 }
 
-const translateImage = async () => {
+const callTranslateImage = async () => {
   if (!props.imageData || isTranslating.value) return
 
   isTranslating.value = true
@@ -387,7 +387,7 @@ const translateImage = async () => {
       mode: 'image'
     }
 
-    const result = await translationStore.translateImage(props.imageData, options)
+    const result = await translateImage(props.imageData, options)
     
     translationResult.value = {
       ...result,

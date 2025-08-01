@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { useSettingsStore } from '@/store/core/settings'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
@@ -76,11 +76,11 @@ const {
 const lastTranslation = ref(null)
 
 // Methods
-const handleSourceInput = (event) => {
+const handleSourceInput = (_event) => {
   // Handled by TranslationInputField component
 }
 
-const handleKeydown = (event) => {
+const handleKeydown = (_event) => {
   // Handled by TranslationInputField component
 }
 
@@ -134,7 +134,7 @@ onMounted(async () => {
   // Listen for global events from header component
   document.addEventListener('clear-storage', clearStorage)
   document.addEventListener('revert-translation', revertTranslation)
-  document.addEventListener('translate-request', (event) => {
+  document.addEventListener('translate-request', (_event) => {
     if (sourceText.value.trim()) {
       handleTranslate()
     }

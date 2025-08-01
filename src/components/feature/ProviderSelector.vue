@@ -29,7 +29,7 @@
 <script setup>
 import { ref } from 'vue'
 
-const props = defineProps({
+defineProps({
   modelValue: {
     type: String,
     required: true

@@ -69,6 +69,7 @@ import { useSelectElementTranslation } from '@/composables/useTranslationModes.j
 import { useMessaging } from '@/composables/useMessaging.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
+import { MessageActions } from '../../core/MessageActions'
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -104,7 +105,7 @@ const handleTranslatePage = async () => {
 
 const handleOpenSidePanel = async () => {
   try {
-    await sendMessage({ action: 'openSidePanel' })
+    await sendMessage({ action: MessageActions.OPEN_SIDE_PANEL })
     window.close()
   } catch (error) {
     console.error('Error opening side panel from popup:', error)
@@ -150,7 +151,7 @@ const handleExcludeToggle = async () => {
     
     if (activeTab) {
       await sendMessage({
-        action: "setExcludeCurrentPage",
+        action: MessageActions.Set_Exclude_Current_Page,
         data: {
           exclude: excludeCurrentPage.value,
           url: activeTab.url,
@@ -172,7 +173,7 @@ onMounted(async () => {
     
     if (activeTab) {
       const response = await sendMessage({
-        action: "isCurrentPageExcluded",
+        action: MessageActions.IS_Current_Page_Excluded,
         data: { url: activeTab.url },
       })
       excludeCurrentPage.value = response?.excluded || false

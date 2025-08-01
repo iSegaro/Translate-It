@@ -146,68 +146,11 @@ const toLanguage = ref('en')
 const isTranslating = ref(false)
 
 // Available languages based on context
-const availableLanguages = computed(() => {
-  // For source language selector, include auto-detect
-  return sourceLanguages.value
-})
-
-// Computed
-const canTranslate = computed(() => {
-  return !props.disabled && 
-         !isTranslating.value && 
-         sourceText.value.trim().length > 0 &&
-         settingsStore.canTranslate
-})
-
-// Methods
-const translate = async () => {
-  if (!canTranslate.value) return
-
-  isTranslating.value = true
-  translatedText.value = ''
-
-  try {
-    const result = await translationStore.translateText(sourceText.value, {
-      from: fromLanguage.value,
-      to: toLanguage.value,
-      provider: settingsStore.selectedProvider
-    })
-
-    translatedText.value = result.text
-    emit('translate', result)
-  } catch (error) {
-    console.error('Translation error:', error)
-    translatedText.value = 'Translation failed. Please try again.'
-  } finally {
-    isTranslating.value = false
-  }
-}
-
-const swapLanguages = () => {
-  if (fromLanguage.value === 'auto') return
-
-  // Swap language codes
-  const temp = fromLanguage.value
-  fromLanguage.value = toLanguage.value
-  toLanguage.value = temp
-
-  // Swap text content
-  const tempText = sourceTextRef.value
-  sourceTextRef.value = translatedText.value
-  translatedText.value = tempText
-}
-
-const clear = () => {
-  sourceTextRef.value = ''
-  translatedText.value = ''
-  emit('clear')
-}
-
 const handleInput = () => {
   translatedText.value = ''
 }
 
-const handlePaste = async (event) => {
+const handlePaste = async (_event) => {
   // Auto-translate on paste if enabled
   await nextTick()
   if (sourceTextRef.value.trim()) {
@@ -219,8 +162,8 @@ const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(translatedText.value)
     // Show success feedback
-  } catch (error) {
-    console.error('Failed to copy:', error)
+  } catch (_error) {
+    console.error('Failed to copy:', _error)
   }
 }
 
@@ -230,8 +173,8 @@ const playTTS = async () => {
       text: translatedText.value,
       language: toLanguage.value
     })
-  } catch (error) {
-    console.error('TTS error:', error)
+  } catch (_error) {
+    console.error('TTS error:', _error)
   }
 }
 
@@ -244,8 +187,8 @@ const saveToHistory = async () => {
       toLanguage: toLanguage.value,
       provider: settingsStore.selectedProvider
     })
-  } catch (error) {
-    console.error('Failed to save to history:', error)
+  } catch (_error) {
+    console.error('Failed to save to history:', _error)
   }
 }
 
