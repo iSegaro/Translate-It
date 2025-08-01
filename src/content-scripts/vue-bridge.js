@@ -129,7 +129,7 @@ class ContentScriptVueBridge {
     const instanceId = await this.createMicroApp("ScreenSelector", {
       onSelect: async (result) => {
         try {
-          const response = await this.messenger.sendMessage({ action: "PROCESS_SCREEN_CAPTURE", data: result });
+          const response = await this.messenger.sendMessage({ action: MessageActions.PROCESS_SCREEN_CAPTURE, data: result });
           if (response.success && data.showPreview !== false) {
             await this.handleShowCapturePreview(result, instanceId);
           } else if (!response.success) {
@@ -141,7 +141,7 @@ class ContentScriptVueBridge {
       },
       onCancel: () => {
         this.destroyMicroApp(instanceId);
-        this.messenger.sendMessage({ action: "SCREEN_CAPTURE_CANCELLED" });
+        this.messenger.sendMessage({ action: MessageActions.SCREEN_CAPTURE_CANCELLED });
       },
       onError: (error) => this.showCaptureError(error.message, instanceId),
       ...data,
