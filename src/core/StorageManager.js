@@ -169,6 +169,37 @@ class StorageManager {
   }
 
   /**
+   * Convert Vue reactive objects (Proxy) to plain JavaScript objects
+   * @param {*} obj - Object to convert
+   * @returns {*} Plain JavaScript object or primitive value
+   */
+  _convertToPlainObject(obj) {
+    // Handle null, undefined, primitives
+    if (obj === null || obj === undefined || typeof obj !== "object") {
+      return obj;
+    }
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      return obj.map(item => this._convertToPlainObject(item));
+    }
+
+    // Handle dates
+    if (obj instanceof Date) {
+      return obj;
+    }
+
+    // Handle Vue reactive objects (Proxy) or regular objects
+    const plainObj = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        plainObj[key] = this._convertToPlainObject(obj[key]);
+      }
+    }
+    return plainObj;
+  }
+
+  /**
    * Set values in storage
    * @param {Object} data - Key-value pairs to store
    * @param {boolean} updateCache - Whether to update cache (default: true)
@@ -182,22 +213,24 @@ class StorageManager {
     }
 
     try {
-      await browser.storage.local.set(data);
+      // Convert Vue reactive objects to plain objects
+      const plainData = this._convertToPlainObject(data);
+      await browser.storage.local.set(plainData);
 
-      // Update cache if requested
+      // Update cache if requested (use plain data)
       if (updateCache) {
-        for (const [key, value] of Object.entries(data)) {
+        for (const [key, value] of Object.entries(plainData)) {
           this.cache.set(key, value);
         }
       }
 
-      // Emit set events
-      for (const key of Object.keys(data)) {
-        this._emit("set", { key, value: data[key] });
-        this._emit(`set:${key}`, { value: data[key] });
+      // Emit set events (use plain data)
+      for (const key of Object.keys(plainData)) {
+        this._emit("set", { key, value: plainData[key] });
+        this._emit(`set:${key}`, { value: plainData[key] });
       }
 
-      console.log(`[StorageManager] Set ${Object.keys(data).length} key(s)`);
+      console.log(`[StorageManager] Set ${Object.keys(plainData).length} key(s)`);
     } catch (error) {
       console.error("[StorageManager] Set operation failed:", error);
       throw error;

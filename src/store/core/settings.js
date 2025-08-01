@@ -180,8 +180,8 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
-      // Get browser API and clear all storage
-      await browser.storage.local.clear()
+      // Clear all storage using StorageManager
+      await storageManager.clear()
       
       // Reset to CONFIG defaults
       const defaultSettings = {
@@ -387,30 +387,24 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  // Setup storage listener
+  // Setup storage listener using StorageManager
   const setupStorageListener = async () => {
     try {
-      if (browser.storage && browser.storage.onChanged) {
-        storageListener = handleStorageChange
-        browser.storage.onChanged.addListener.call(browser.storage.onChanged, storageListener)
-        console.log('[SettingsStore] Storage listener setup successfully')
-      } else {
-        console.log('[SettingsStore] browser.storage.onChanged is not available. Settings cache might become stale.')
-      }
+      storageListener = handleStorageChange
+      storageManager.on('change', storageListener)
+      console.log('[SettingsStore] Storage listener setup successfully with StorageManager')
     } catch (error) {
       console.warn('[SettingsStore] Unable to setup storage listener:', error.message)
     }
   }
 
-  // Cleanup storage listener
+  // Cleanup storage listener using StorageManager
   const cleanupStorageListener = async () => {
     if (storageListener) {
       try {
-        if (browser.storage && browser.storage.onChanged) {
-          browser.storage.onChanged.removeListener(storageListener)
-          storageListener = null
-          console.log('[SettingsStore] Storage listener cleaned up')
-        }
+        storageManager.off('change', storageListener)
+        storageListener = null
+        console.log('[SettingsStore] Storage listener cleaned up from StorageManager')
       } catch (error) {
         console.error('[SettingsStore] Error cleaning up storage listener:', error)
       }

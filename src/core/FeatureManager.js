@@ -3,6 +3,7 @@
 import browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { logME } from "../utils/helpers.js";
+import storageManager from "./StorageManager.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
@@ -48,9 +49,8 @@ export default class FeatureManager {
 
     this._subscribers = {};
 
-    // بارگذاری مقادیر فعلی از storage
-    browser.storage.local
-      .get(Object.keys(this.keyMap))
+    // بارگذاری مقادیر فعلی از StorageManager
+    storageManager.get(Object.keys(this.keyMap))
       .then((stored) => {
         Object.entries(stored).forEach(([storageKey, newValue]) => {
           const flag = this.keyMap[storageKey];
@@ -65,11 +65,8 @@ export default class FeatureManager {
         logME("[FeatureManager] failed to load initial flags", err);
       });
 
-    // افزودن listener برای تغییرات آینده
-    browser.storage.onChanged.addListener.call(
-      browser.storage.onChanged,
-      this._onStorageChanged.bind(this),
-    );
+    // افزودن listener برای تغییرات آینده با StorageManager
+    storageManager.on('change', this._onStorageChanged.bind(this));
   }
 
   /** @param {FeatureKey} flag */
@@ -86,16 +83,14 @@ export default class FeatureManager {
   }
 
   /** @private */
-  _onStorageChanged(changes) {
-    Object.entries(changes).forEach(([storageKey, { newValue }]) => {
-      const flag = this.keyMap[storageKey];
-      if (!flag) return;
+  _onStorageChanged({ key, newValue }) {
+    const flag = this.keyMap[key];
+    if (!flag) return;
 
-      const next = newValue ?? this.flags[flag];
-      if (this.flags[flag] !== next) {
-        this.flags[flag] = next;
-        this._subscribers[flag]?.forEach((fn) => fn());
-      }
-    });
+    const next = newValue ?? this.flags[flag];
+    if (this.flags[flag] !== next) {
+      this.flags[flag] = next;
+      this._subscribers[flag]?.forEach((fn) => fn());
+    }
   }
 }

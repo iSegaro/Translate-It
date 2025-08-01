@@ -8,6 +8,7 @@ import {
   getThemeAsync,
   getSettingsAsync,
 } from "../config.js";
+import storageManager from "../core/StorageManager.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
@@ -134,41 +135,30 @@ export default class SelectionWindows {
     this.displayElement.classList.add(`theme-${resolvedTheme}`);
   }
 
-  _handleThemeChange(changes) {
-    if (changes.THEME && this.displayElement && this.isVisible) {
+  _handleThemeChange({ newValue }) {
+    if (newValue && this.displayElement && this.isVisible) {
       logME(
         "[SelectionWindows] Theme changed, updating popup theme.",
-        changes.THEME.newValue,
+        newValue,
       );
       this._applyThemeToHost();
     }
   }
 
   _addThemeChangeListener() {
-    if (
-      !this.themeChangeListener &&
-      browser.storage &&
-      browser.storage.onChanged
-    ) {
+    if (!this.themeChangeListener) {
       // Store the bound function so it can be correctly removed
       this.boundHandleThemeChange = this._handleThemeChange.bind(this);
-      browser.storage.onChanged.addListener.call(
-        browser.storage.onChanged,
-        this.boundHandleThemeChange,
-      );
-      // logME("[SelectionWindows] Theme change listener added.");
+      storageManager.on('change:THEME', this.boundHandleThemeChange);
+      // logME("[SelectionWindows] Theme change listener added with StorageManager.");
     }
   }
 
   _removeThemeChangeListener() {
-    if (
-      this.boundHandleThemeChange &&
-      browser.storage &&
-      browser.storage.onChanged
-    ) {
-      browser.storage.onChanged.removeListener(this.boundHandleThemeChange);
+    if (this.boundHandleThemeChange) {
+      storageManager.off('change:THEME', this.boundHandleThemeChange);
       this.boundHandleThemeChange = null; // Clear the stored listener
-      // logME("[SelectionWindows] Theme change listener removed.");
+      // logME("[SelectionWindows] Theme change listener removed from StorageManager.");
     }
   }
 

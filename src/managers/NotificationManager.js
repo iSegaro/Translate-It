@@ -3,6 +3,7 @@
 import browser from "webextension-polyfill";
 import { isExtensionContextValid, logME } from "../utils/helpers.js";
 import { parseBoolean, getTranslationString } from "../utils/i18n.js";
+import storageManager from "../core/StorageManager.js";
 
 const SAFE_ICONS = {
   ICON_TRANSLATION: "🌐",
@@ -159,19 +160,12 @@ export default class NotificationManager {
   }
 
   async _setupLocaleListener() {
-    if (browser.storage && browser.storage.onChanged) {
-      browser.storage.onChanged.addListener.call(
-        browser.storage.onChanged,
-        (changes, area) => {
-          if (area === "local" && changes.APPLICATION_LOCALIZE) {
-            // Only apply alignment if the container has already been created
-            if (this.container) {
-              this._applyAlignment();
-            }
-          }
-        },
-      );
-    }
+    storageManager.on('change:APPLICATION_LOCALIZE', () => {
+      // Only apply alignment if the container has already been created  
+      if (this.container) {
+        this._applyAlignment();
+      }
+    });
   }
 
   async _applyAlignment() {

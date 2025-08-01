@@ -16,8 +16,9 @@ const initializebrowserAPI = () => {
   globalReadyPromise = new Promise((resolve, reject) => {
     const init = async () => {
       try {
-        if (browser && browser.storage && browser.runtime) {
-          await browser.storage.local.get(["test"]);
+        if (browser && browser.runtime) {
+          // Test storage via StorageManager instead of direct browser.storage
+          await storageManager.get(["__browser_api_test__"]);
           globalbrowserAPI.value = browser;
           globalApiReady.value = true;
           resolve(browser);
