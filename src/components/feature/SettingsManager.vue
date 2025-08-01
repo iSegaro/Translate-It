@@ -472,7 +472,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
-import storageManager from '@/core/StorageManager.js'
+import { storageManager } from '@/storage/core/StorageCore.js'
 
 const { getStorageData, setStorageData } = useExtensionAPI()
 

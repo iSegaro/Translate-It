@@ -4,7 +4,7 @@
  */
 
 import { ref, reactive, onMounted, onUnmounted, watch } from "vue";
-import storageManager from "../core/StorageManager.js";
+import { storageCore } from "../core/StorageCore.js";
 
 /**
  * Vue composable for storage operations
@@ -37,7 +37,7 @@ export function useStorage(keys = null, options = {}) {
     error.value = null;
 
     try {
-      const result = await storageManager.get(keysToLoad, useCache);
+      const result = await storageCore.get(keysToLoad, useCache);
       
       if (makeReactive) {
         // Update reactive object
@@ -67,7 +67,7 @@ export function useStorage(keys = null, options = {}) {
     error.value = null;
 
     try {
-      await storageManager.set(dataToSave);
+      await storageCore.set(dataToSave);
       
       if (makeReactive) {
         // Update reactive object
@@ -96,7 +96,7 @@ export function useStorage(keys = null, options = {}) {
     error.value = null;
 
     try {
-      await storageManager.remove(keyList);
+      await storageCore.remove(keyList);
       
       // Remove from reactive data
       for (const key of keyList) {
@@ -130,7 +130,7 @@ export function useStorage(keys = null, options = {}) {
    * Get cached value synchronously
    */
   const getCached = (key, defaultValue) => {
-    return storageManager.getCached(key, defaultValue);
+    return storageCore.getCached(key, defaultValue);
   };
 
   /**
@@ -161,7 +161,7 @@ export function useStorage(keys = null, options = {}) {
         }
       };
 
-      storageManager.on(`change:${key}`, listener);
+      storageCore.on(`change:${key}`, listener);
       listeners.push({ event: `change:${key}`, callback: listener });
     }
   };
@@ -171,7 +171,7 @@ export function useStorage(keys = null, options = {}) {
    */
   const cleanup = () => {
     for (const { event, callback } of listeners) {
-      storageManager.off(event, callback);
+      storageCore.off(event, callback);
     }
     listeners.length = 0;
   };
@@ -204,7 +204,7 @@ export function useStorage(keys = null, options = {}) {
 
     // Utilities
     cleanup,
-    storageManager // Expose manager for advanced operations
+    storageCore // Expose manager for advanced operations
   };
 }
 
@@ -228,7 +228,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
     error.value = null;
 
     try {
-      const result = await storageManager.get({ [key]: defaultValue }, useCache);
+      const result = await storageCore.get({ [key]: defaultValue }, useCache);
       value.value = result[key];
     } catch (err) {
       error.value = err.message;
@@ -246,7 +246,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
     error.value = null;
 
     try {
-      await storageManager.set({ [key]: newValue });
+      await storageCore.set({ [key]: newValue });
       value.value = newValue;
     } catch (err) {
       error.value = err.message;
@@ -265,7 +265,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
     error.value = null;
 
     try {
-      await storageManager.remove(key);
+      await storageCore.remove(key);
       value.value = defaultValue;
     } catch (err) {
       error.value = err.message;
@@ -284,7 +284,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = newValue !== undefined ? newValue : defaultValue;
     };
 
-    storageManager.on(`change:${key}`, changeListener);
+    storageCore.on(`change:${key}`, changeListener);
   };
 
   /**
@@ -292,7 +292,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
    */
   const cleanup = () => {
     if (changeListener) {
-      storageManager.off(`change:${key}`, changeListener);
+      storageCore.off(`change:${key}`, changeListener);
       changeListener = null;
     }
   };
@@ -346,17 +346,17 @@ export function useStorageDebug() {
   const isReady = ref(false);
 
   const updateStats = () => {
-    stats.value = storageManager.getCacheStats();
+    stats.value = storageCore.getCacheStats();
     isReady.value = stats.value.isReady;
   };
 
   const clearCache = () => {
-    storageManager.clearCache();
+    storageCore.clearCache();
     updateStats();
   };
 
   const invalidateCache = (keys) => {
-    storageManager.invalidateCache(keys);
+    storageCore.invalidateCache(keys);
     updateStats();
   };
 
@@ -365,10 +365,10 @@ export function useStorageDebug() {
     
     // Update stats on storage changes
     const listener = () => updateStats();
-    storageManager.on("change", listener);
+    storageCore.on("change", listener);
     
     onUnmounted(() => {
-      storageManager.off("change", listener);
+      storageCore.off("change", listener);
     });
   });
 
@@ -378,6 +378,6 @@ export function useStorageDebug() {
     updateStats,
     clearCache,
     invalidateCache,
-    storageManager
+    storageCore
   };
 }

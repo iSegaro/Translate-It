@@ -4,7 +4,7 @@
  */
 
 import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
-import storageManager from "../core/StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export class TranslationEngine {

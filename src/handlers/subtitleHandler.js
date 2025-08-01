@@ -5,7 +5,7 @@ import { logME } from "../utils/helpers.js";
 import { isUrlExcluded } from "../utils/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
-import storageManager from "../core/StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 
 export class SubtitleHandler {
   constructor(translationHandler) {

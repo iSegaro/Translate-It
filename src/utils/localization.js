@@ -4,7 +4,7 @@ import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 import { logME } from "./helpers.js";
-import storageManager from "../core/StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 
 /**
  * Initializes the language selection UI and handles dynamic localization.

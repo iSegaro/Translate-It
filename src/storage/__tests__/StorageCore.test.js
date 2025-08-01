@@ -1,5 +1,5 @@
 /**
- * StorageManager Tests
+ * StorageCore Tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -22,9 +22,9 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-import { StorageManager } from '../../../core/StorageManager.js';
+import { StorageCore, StorageManager } from '../core/StorageCore.js';
 
-describe('StorageManager', () => {
+describe('StorageCore', () => {
   let storageManager;
   let mockBrowser;
 
@@ -42,7 +42,7 @@ describe('StorageManager', () => {
     mockBrowser.storage.local.clear.mockResolvedValue();
 
     // Create new instance for each test
-    storageManager = new StorageManager();
+    storageManager = new StorageCore();
     
     // Wait for initialization
     await storageManager._readyPromise;

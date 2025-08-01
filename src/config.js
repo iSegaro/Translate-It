@@ -1,6 +1,6 @@
 // src/config.js
 import browser from 'webextension-polyfill';
-import storageManager from './core/StorageManager.js';
+import { storageManager } from '@/storage/core/StorageCore.js';
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:

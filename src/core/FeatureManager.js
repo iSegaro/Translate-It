@@ -3,7 +3,7 @@
 import browser from "webextension-polyfill";
 import { CONFIG } from "../config.js";
 import { logME } from "../utils/helpers.js";
-import storageManager from "./StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|

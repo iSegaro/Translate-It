@@ -7,7 +7,7 @@ import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
-import storageManager from "../core/StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 
 /**
  * Detects if this is a migration from old version to Vue version

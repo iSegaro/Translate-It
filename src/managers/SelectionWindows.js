@@ -8,7 +8,7 @@ import {
   getThemeAsync,
   getSettingsAsync,
 } from "../config.js";
-import storageManager from "../core/StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";

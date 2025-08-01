@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/utils/secureStorage.js'
-import storageManager from '@/core/StorageManager.js'
+import { storageManager } from '@/storage/core/StorageCore.js'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults

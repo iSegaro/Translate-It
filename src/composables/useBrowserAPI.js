@@ -1,7 +1,7 @@
 import { ref, onMounted } from 'vue';
 import browser from 'webextension-polyfill';
 import { MessagingCore } from '../messaging/core/MessagingCore.js';
-import storageManager from '../core/StorageManager.js';
+import { storageManager } from '@/storage/core/StorageCore.js';
 
 // Global state for API readiness
 const globalApiReady = ref(false);

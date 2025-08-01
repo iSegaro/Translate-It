@@ -1,12 +1,14 @@
 /**
- * StorageManager - Centralized Storage Management System
+ * StorageCore - Centralized Storage Management System
  * Provides unified API for browser extension storage with caching and event system
  * Compatible with both Chrome and Firefox through webextension-polyfill
+ * 
+ * This is the new unified storage system that replaces the old StorageManager
  */
 
 import browser from "webextension-polyfill";
 
-class StorageManager {
+class StorageCore {
   constructor() {
     this.cache = new Map();
     this.listeners = new Map(); // event_name -> Set of callbacks
@@ -42,9 +44,9 @@ class StorageManager {
       this._setupChangeListener();
 
       this._isReady = true;
-      console.log("✅ [StorageManager] Initialized successfully");
+      console.log("✅ [StorageCore] Initialized successfully");
     } catch (error) {
-      console.error("❌ [StorageManager] Initialization failed:", error);
+      console.error("❌ [StorageCore] Initialization failed:", error);
       throw error;
     }
   }
@@ -54,7 +56,7 @@ class StorageManager {
    */
   _setupChangeListener() {
     if (!browser?.storage?.onChanged) {
-      console.warn("[StorageManager] storage.onChanged not available");
+      console.warn("[StorageCore] storage.onChanged not available");
       return;
     }
 
@@ -82,7 +84,7 @@ class StorageManager {
         this._changeListener
       );
     } catch (error) {
-      console.warn("[StorageManager] Failed to setup change listener:", error);
+      console.warn("[StorageCore] Failed to setup change listener:", error);
     }
   }
 
@@ -163,7 +165,7 @@ class StorageManager {
       return { ...defaultValues, ...result };
 
     } catch (error) {
-      console.error("[StorageManager] Get operation failed:", error);
+      console.error("[StorageCore] Get operation failed:", error);
       throw error;
     }
   }
@@ -230,9 +232,9 @@ class StorageManager {
         this._emit(`set:${key}`, { value: plainData[key] });
       }
 
-      console.log(`[StorageManager] Set ${Object.keys(plainData).length} key(s)`);
+      console.log(`[StorageCore] Set ${Object.keys(plainData).length} key(s)`);
     } catch (error) {
-      console.error("[StorageManager] Set operation failed:", error);
+      console.error("[StorageCore] Set operation failed:", error);
       throw error;
     }
   }
@@ -264,9 +266,9 @@ class StorageManager {
         this._emit(`remove:${key}`, {});
       }
 
-      console.log(`[StorageManager] Removed ${keyList.length} key(s)`);
+      console.log(`[StorageCore] Removed ${keyList.length} key(s)`);
     } catch (error) {
-      console.error("[StorageManager] Remove operation failed:", error);
+      console.error("[StorageCore] Remove operation failed:", error);
       throw error;
     }
   }
@@ -287,9 +289,9 @@ class StorageManager {
       }
 
       this._emit("clear", {});
-      console.log("[StorageManager] Storage cleared");
+      console.log("[StorageCore] Storage cleared");
     } catch (error) {
-      console.error("[StorageManager] Clear operation failed:", error);
+      console.error("[StorageCore] Clear operation failed:", error);
       throw error;
     }
   }
@@ -324,7 +326,7 @@ class StorageManager {
       this.cache.delete(key);
     }
 
-    console.log(`[StorageManager] Invalidated cache for ${keyList.length} key(s)`);
+    console.log(`[StorageCore] Invalidated cache for ${keyList.length} key(s)`);
   }
 
   /**
@@ -332,7 +334,7 @@ class StorageManager {
    */
   clearCache() {
     this.cache.clear();
-    console.log("[StorageManager] Cache cleared");
+    console.log("[StorageCore] Cache cleared");
   }
 
   /**
@@ -386,7 +388,7 @@ class StorageManager {
         try {
           callback(data);
         } catch (error) {
-          console.error(`[StorageManager] Event listener error for '${event}':`, error);
+          console.error(`[StorageCore] Event listener error for '${event}':`, error);
         }
       }
     }
@@ -407,16 +409,22 @@ class StorageManager {
       this.listeners.clear();
 
       this._isReady = false;
-      console.log("[StorageManager] Cleanup completed");
+      console.log("[StorageCore] Cleanup completed");
     } catch (error) {
-      console.warn("[StorageManager] Cleanup error:", error);
+      console.warn("[StorageCore] Cleanup error:", error);
     }
   }
 }
 
 // Create singleton instance
-const storageManager = new StorageManager();
+const storageCore = new StorageCore();
 
-// Export singleton and class
-export { storageManager, StorageManager };
-export default storageManager;
+// Export singleton and class with new names
+export { storageCore, StorageCore };
+
+// Backward compatibility exports
+export const storageManager = storageCore;
+export const StorageManager = StorageCore;
+
+// Default export
+export default storageCore;

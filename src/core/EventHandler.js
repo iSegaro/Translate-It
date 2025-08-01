@@ -9,7 +9,7 @@ import {
 } from "../config.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import storageManager from "./StorageManager.js";
+import { storageManager } from "@/storage/core/StorageCore.js";
 
 import {
   separateCachedAndNewTexts,
