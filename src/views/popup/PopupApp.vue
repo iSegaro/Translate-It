@@ -1,14 +1,29 @@
 <template>
   <div class="popup-container">
-    <div v-if="isLoading" class="loading-container">
+    <div
+      v-if="isLoading"
+      class="loading-container"
+    >
       <LoadingSpinner size="sm" />
       <span class="loading-text">{{ loadingText }}</span>
     </div>
     
-    <div v-else-if="hasError" class="error-container">
-      <div class="error-icon">⚠️</div>
-      <p class="error-message">{{ errorMessage }}</p>
-      <button @click="retryLoading" class="retry-button">{{ $i18n('retry_button') || 'Retry' }}</button>
+    <div
+      v-else-if="hasError"
+      class="error-container"
+    >
+      <div class="error-icon">
+        ⚠️
+      </div>
+      <p class="error-message">
+        {{ errorMessage }}
+      </p>
+      <button
+        class="retry-button"
+        @click="retryLoading"
+      >
+        {{ $i18n('retry_button') || 'Retry' }}
+      </button>
     </div>
     
     <template v-else>
@@ -29,6 +44,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useMessaging } from '@/composables/useMessaging.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageControls from '@/components/popup/LanguageControls.vue'
@@ -38,6 +54,7 @@ import { applyTheme } from '@/utils/theme.js'
 
 // Stores
 const settingsStore = useSettingsStore()
+const { sendMessage } = useMessaging('popup')
 
 // State
 const isLoading = ref(true)
@@ -68,10 +85,7 @@ onMounted(async () => {
     // Step 3: Test background connection with simple ping
     console.log('🔗 Testing background connection...')
     try {
-      const response = await browser.runtime.sendMessage({
-        action: 'ping',
-        data: { from: 'popup' }
-      })
+      const response = await sendMessage({ action: 'ping', data: { from: 'popup' } })
       console.log('✅ Background connection test success:', response)
     } catch (err) {
       console.warn('⚠️ Background connection test failed:', err.message)

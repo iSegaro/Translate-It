@@ -2,8 +2,12 @@
   <header class="popup-header">
     <div class="header-content">
       <div class="logo-section">
-        <div class="logo">🌐</div>
-        <h1 class="title">Translate It</h1>
+        <div class="logo">
+          🌐
+        </div>
+        <h1 class="title">
+          Translate It
+        </h1>
       </div>
       
       <div class="actions-section">

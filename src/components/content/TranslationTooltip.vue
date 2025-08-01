@@ -6,31 +6,53 @@
   >
     <div class="tooltip-content">
       <!-- Loading state -->
-      <div v-if="isLoading" class="loading-state">
+      <div
+        v-if="isLoading"
+        class="loading-state"
+      >
         <LoadingSpinner size="sm" />
         <span class="loading-text">Translating...</span>
       </div>
       
       <!-- Translation result -->
-      <div v-else-if="translation && !hasError" class="translation-result">
+      <div
+        v-else-if="translation && !hasError"
+        class="translation-result"
+      >
         <div class="source-section">
-          <div class="source-text" :title="sourceText">{{ truncatedSourceText }}</div>
-          <div class="language-indicator">{{ fromLanguage }}</div>
+          <div
+            class="source-text"
+            :title="sourceText"
+          >
+            {{ truncatedSourceText }}
+          </div>
+          <div class="language-indicator">
+            {{ fromLanguage }}
+          </div>
         </div>
         
-        <div class="arrow-separator">→</div>
+        <div class="arrow-separator">
+          →
+        </div>
         
         <div class="target-section">
-          <div class="translated-text" :title="translation">{{ truncatedTranslation }}</div>
-          <div class="language-indicator">{{ toLanguage }}</div>
+          <div
+            class="translated-text"
+            :title="translation"
+          >
+            {{ truncatedTranslation }}
+          </div>
+          <div class="language-indicator">
+            {{ toLanguage }}
+          </div>
         </div>
         
         <!-- Action buttons -->
         <div class="tooltip-actions">
           <button
             class="action-btn copy-btn"
-            @click="copyTranslation"
             title="Copy translation"
+            @click="copyTranslation"
           >
             <span class="icon">📋</span>
           </button>
@@ -38,17 +60,17 @@
           <button
             v-if="supportsTTS"
             class="action-btn tts-btn"
-            @click="playTTS"
             :disabled="isPlayingTTS"
             title="Play audio"
+            @click="playTTS"
           >
             <span class="icon">{{ isPlayingTTS ? '⏸️' : '🔊' }}</span>
           </button>
           
           <button
             class="action-btn close-btn"
-            @click="close"
             title="Close tooltip"
+            @click="close"
           >
             <span class="icon">✕</span>
           </button>
@@ -56,26 +78,55 @@
       </div>
       
       <!-- Error state -->
-      <div v-else-if="hasError" class="error-state">
-        <div class="error-icon">⚠️</div>
+      <div
+        v-else-if="hasError"
+        class="error-state"
+      >
+        <div class="error-icon">
+          ⚠️
+        </div>
         <div class="error-content">
-          <div class="error-text">{{ errorMessage }}</div>
-          <button class="retry-btn" @click="retry" :disabled="isLoading">
+          <div class="error-text">
+            {{ errorMessage }}
+          </div>
+          <button
+            class="retry-btn"
+            :disabled="isLoading"
+            @click="retry"
+          >
             Retry
           </button>
         </div>
-        <button class="close-btn" @click="close">✕</button>
+        <button
+          class="close-btn"
+          @click="close"
+        >
+          ✕
+        </button>
       </div>
       
       <!-- Fallback state -->
-      <div v-else class="fallback-state">
-        <div class="fallback-text">{{ sourceText }}</div>
-        <button class="close-btn" @click="close">✕</button>
+      <div
+        v-else
+        class="fallback-state"
+      >
+        <div class="fallback-text">
+          {{ sourceText }}
+        </div>
+        <button
+          class="close-btn"
+          @click="close"
+        >
+          ✕
+        </button>
       </div>
     </div>
     
     <!-- Tooltip pointer -->
-    <div class="tooltip-pointer" :class="pointerClass"></div>
+    <div
+      class="tooltip-pointer"
+      :class="pointerClass"
+    />
   </div>
 </template>
 

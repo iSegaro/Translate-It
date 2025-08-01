@@ -1,12 +1,16 @@
 <template>
-  <label class="base-toggle" :class="{ disabled }" :title="title">
+  <label
+    class="base-toggle"
+    :class="{ disabled }"
+    :title="title"
+  >
     <input
       type="checkbox"
       :checked="modelValue"
       :disabled="disabled"
       @change="$emit('update:modelValue', $event.target.checked)"
-    />
-    <span class="slider round"></span>
+    >
+    <span class="slider round" />
   </label>
 </template>
 

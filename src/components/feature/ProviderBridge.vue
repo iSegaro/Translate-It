@@ -2,9 +2,15 @@
   <div class="provider-bridge">
     <!-- Provider status indicator -->
     <div class="provider-status">
-      <span class="status-dot" :class="providerStatus" />
+      <span
+        class="status-dot"
+        :class="providerStatus"
+      />
       <span class="provider-name">{{ currentProvider?.name || selectedProvider }}</span>
-      <span v-if="isAIProvider" class="provider-badge">AI</span>
+      <span
+        v-if="isAIProvider"
+        class="provider-badge"
+      >AI</span>
     </div>
     
     <!-- Provider configuration button -->
@@ -19,12 +25,24 @@
     </BaseButton>
     
     <!-- API key configuration modal -->
-    <BaseModal v-model="showConfigModal" title="Configure API Key" size="md">
+    <BaseModal
+      v-model="showConfigModal"
+      title="Configure API Key"
+      size="md"
+    >
       <div class="api-key-form">
-        <div v-if="providerInfo" class="provider-info">
+        <div
+          v-if="providerInfo"
+          class="provider-info"
+        >
           <h4>{{ providerInfo.name }}</h4>
           <p>{{ providerInfo.description }}</p>
-          <a v-if="providerInfo.docsUrl" :href="providerInfo.docsUrl" target="_blank" class="docs-link">
+          <a
+            v-if="providerInfo.docsUrl"
+            :href="providerInfo.docsUrl"
+            target="_blank"
+            class="docs-link"
+          >
             View Documentation
           </a>
         </div>
@@ -61,15 +79,19 @@
         
         <div class="test-section">
           <BaseButton 
-            @click="testConnection" 
             variant="outline" 
-            :loading="isTesting"
+            :loading="isTesting" 
             :disabled="!canTest"
+            @click="testConnection"
           >
             Test Connection
           </BaseButton>
           
-          <div v-if="testResult" class="test-result" :class="{ success: testResult.success }">
+          <div
+            v-if="testResult"
+            class="test-result"
+            :class="{ success: testResult.success }"
+          >
             <span class="test-icon">{{ testResult.success ? '✅' : '❌' }}</span>
             <span>{{ testResult.message }}</span>
           </div>
@@ -77,10 +99,17 @@
       </div>
       
       <template #footer>
-        <BaseButton @click="showConfigModal = false" variant="ghost">
+        <BaseButton
+          variant="ghost"
+          @click="showConfigModal = false"
+        >
           Cancel
         </BaseButton>
-        <BaseButton @click="saveConfiguration" variant="primary" :loading="isSaving">
+        <BaseButton
+          variant="primary"
+          :loading="isSaving"
+          @click="saveConfiguration"
+        >
           Save Configuration
         </BaseButton>
       </template>

@@ -13,7 +13,10 @@
 
     <div class="sidebar-section localization-controls">
       <h2>{{ $i18n('localization_section_title') }}</h2>
-      <LanguageSelector v-model="selectedLanguage" :languages="interfaceLanguages" />
+      <LanguageSelector
+        v-model="selectedLanguage"
+        :languages="interfaceLanguages"
+      />
     </div>
 
     <div class="sidebar-footer">
@@ -28,7 +31,7 @@
           alt="GitHub"
           height="22"
           class="github-icon"
-        />
+        >
       </a>
       <p>
         by

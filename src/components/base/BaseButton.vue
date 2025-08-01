@@ -11,13 +11,19 @@
       :variant="variant === 'primary' ? 'neutral' : 'primary'"
     />
     
-    <span v-if="icon && !loading" :class="iconClasses">
+    <span
+      v-if="icon && !loading"
+      :class="iconClasses"
+    >
       <slot name="icon">
         <i :class="`icon-${icon}`" />
       </slot>
     </span>
     
-    <span v-if="$slots.default || text" class="button-text">
+    <span
+      v-if="$slots.default || text"
+      class="button-text"
+    >
       <slot>{{ text }}</slot>
     </span>
   </button>

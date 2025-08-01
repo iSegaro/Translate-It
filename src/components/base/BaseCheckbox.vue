@@ -1,12 +1,18 @@
 <template>
-  <label class="base-checkbox" :class="{ disabled }">
+  <label
+    class="base-checkbox"
+    :class="{ disabled }"
+  >
     <input
       type="checkbox"
       :checked="modelValue"
       :disabled="disabled"
       @change="$emit('update:modelValue', $event.target.checked)"
-    />
-    <span v-if="label" class="checkbox-label">{{ label }}</span>
+    >
+    <span
+      v-if="label"
+      class="checkbox-label"
+    >{{ label }}</span>
     <slot v-else />
   </label>
 </template>

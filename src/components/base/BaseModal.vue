@@ -1,11 +1,24 @@
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="modelValue" class="modal-overlay" @click="handleOverlayClick">
-        <div class="modal-container" :class="[`size-${size}`, { fullscreen }]" @click.stop>
-          <header v-if="title || $slots.header" class="modal-header">
+      <div
+        v-if="modelValue"
+        class="modal-overlay"
+        @click="handleOverlayClick"
+      >
+        <div
+          class="modal-container"
+          :class="[`size-${size}`, { fullscreen }]"
+          @click.stop
+        >
+          <header
+            v-if="title || $slots.header"
+            class="modal-header"
+          >
             <slot name="header">
-              <h3 class="modal-title">{{ title }}</h3>
+              <h3 class="modal-title">
+                {{ title }}
+              </h3>
             </slot>
             <BaseButton
               v-if="closable"
@@ -21,7 +34,10 @@
             <slot />
           </div>
           
-          <footer v-if="$slots.footer" class="modal-footer">
+          <footer
+            v-if="$slots.footer"
+            class="modal-footer"
+          >
             <slot name="footer" />
           </footer>
         </div>

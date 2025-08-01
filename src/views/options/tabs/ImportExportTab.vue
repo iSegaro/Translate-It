@@ -20,9 +20,9 @@
             class="export-password-input"
           />
           <BaseButton
-            @click="exportSettings"
             :loading="isExporting"
             class="export-button"
+            @click="exportSettings"
           >
             {{ $i18n('export_settings_button') || 'Export Settings' }}
           </BaseButton>
@@ -38,12 +38,15 @@
           ref="importFileInput"
           type="file" 
           accept=".json"
-          @change="handleFileSelect"
           class="file-input"
-        />
+          @change="handleFileSelect"
+        >
       </div>
       
-      <div v-if="showPasswordField" class="setting-group">
+      <div
+        v-if="showPasswordField"
+        class="setting-group"
+      >
         <label>{{ $i18n('import_password_label') || '🔑 Import Password Required' }}</label>
         <div class="import-controls-row">
           <BaseInput
@@ -54,9 +57,9 @@
             @keydown.enter="importSettings"
           />
           <BaseButton
-            @click="importSettings"
             :loading="isImporting"
             class="import-button"
+            @click="importSettings"
           >
             {{ $i18n('import_settings_button') || 'Import Settings' }}
           </BaseButton>
@@ -71,7 +74,10 @@
     </BaseFieldset>
 
     <!-- Status messages -->
-    <div v-if="statusMessage" :class="`status-message status-${statusType}`">
+    <div
+      v-if="statusMessage"
+      :class="`status-message status-${statusType}`"
+    >
       {{ statusMessage }}
     </div>
   </section>

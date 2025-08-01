@@ -10,18 +10,24 @@
       <div class="backup-actions">
         <button
           class="action-btn primary"
-          @click="createFullBackup"
           :disabled="isCreatingBackup"
+          @click="createFullBackup"
         >
-          <span v-if="isCreatingBackup" class="loading-spinner"></span>
-          <span v-else class="btn-icon">💾</span>
+          <span
+            v-if="isCreatingBackup"
+            class="loading-spinner"
+          />
+          <span
+            v-else
+            class="btn-icon"
+          >💾</span>
           <span class="btn-text">Create Full Backup</span>
         </button>
         
         <button
           class="action-btn secondary"
-          @click="createSettingsBackup"
           :disabled="isCreatingBackup"
+          @click="createSettingsBackup"
         >
           <span class="btn-icon">⚙️</span>
           <span class="btn-text">Backup Settings Only</span>
@@ -29,8 +35,8 @@
         
         <button
           class="action-btn secondary"
-          @click="createHistoryBackup"
           :disabled="isCreatingBackup"
+          @click="createHistoryBackup"
         >
           <span class="btn-icon">📝</span>
           <span class="btn-text">Backup History Only</span>
@@ -49,11 +55,17 @@
         <div class="import-area">
           <button
             class="action-btn outline"
-            @click="triggerImport"
             :disabled="isImporting"
+            @click="triggerImport"
           >
-            <span v-if="isImporting" class="loading-spinner"></span>
-            <span v-else class="btn-icon">📥</span>
+            <span
+              v-if="isImporting"
+              class="loading-spinner"
+            />
+            <span
+              v-else
+              class="btn-icon"
+            >📥</span>
             <span class="btn-text">Import Settings</span>
           </button>
           
@@ -75,57 +87,98 @@
             <template #trigger="{ toggle, open }">
               <button
                 class="action-btn outline"
-                @click="toggle"
                 :class="{ active: open }"
                 :disabled="isExporting"
+                @click="toggle"
               >
-                <span v-if="isExporting" class="loading-spinner"></span>
-                <span v-else class="btn-icon">📤</span>
+                <span
+                  v-if="isExporting"
+                  class="loading-spinner"
+                />
+                <span
+                  v-else
+                  class="btn-icon"
+                >📤</span>
                 <span class="btn-text">Export Options</span>
                 <span class="dropdown-arrow">▼</span>
               </button>
             </template>
             
             <div class="export-dropdown">
-              <button class="export-option" @click="exportSettings">
+              <button
+                class="export-option"
+                @click="exportSettings"
+              >
                 <span class="option-icon">⚙️</span>
                 <div class="option-content">
-                  <div class="option-title">Export Settings</div>
-                  <div class="option-desc">Extension configuration only</div>
+                  <div class="option-title">
+                    Export Settings
+                  </div>
+                  <div class="option-desc">
+                    Extension configuration only
+                  </div>
                 </div>
               </button>
               
-              <button class="export-option" @click="exportHistory">
+              <button
+                class="export-option"
+                @click="exportHistory"
+              >
                 <span class="option-icon">📝</span>
                 <div class="option-content">
-                  <div class="option-title">Export History</div>
-                  <div class="option-desc">Translation history only</div>
+                  <div class="option-title">
+                    Export History
+                  </div>
+                  <div class="option-desc">
+                    Translation history only
+                  </div>
                 </div>
               </button>
               
-              <button class="export-option" @click="exportAll">
+              <button
+                class="export-option"
+                @click="exportAll"
+              >
                 <span class="option-icon">📦</span>
                 <div class="option-content">
-                  <div class="option-title">Export Everything</div>
-                  <div class="option-desc">Complete backup file</div>
+                  <div class="option-title">
+                    Export Everything
+                  </div>
+                  <div class="option-desc">
+                    Complete backup file
+                  </div>
                 </div>
               </button>
               
-              <div class="export-divider"></div>
+              <div class="export-divider" />
               
-              <button class="export-option" @click="exportAsCSV">
+              <button
+                class="export-option"
+                @click="exportAsCSV"
+              >
                 <span class="option-icon">📊</span>
                 <div class="option-content">
-                  <div class="option-title">Export as CSV</div>
-                  <div class="option-desc">History in spreadsheet format</div>
+                  <div class="option-title">
+                    Export as CSV
+                  </div>
+                  <div class="option-desc">
+                    History in spreadsheet format
+                  </div>
                 </div>
               </button>
               
-              <button class="export-option" @click="exportAsText">
+              <button
+                class="export-option"
+                @click="exportAsText"
+              >
                 <span class="option-icon">📄</span>
                 <div class="option-content">
-                  <div class="option-title">Export as Text</div>
-                  <div class="option-desc">Plain text format</div>
+                  <div class="option-title">
+                    Export as Text
+                  </div>
+                  <div class="option-desc">
+                    Plain text format
+                  </div>
                 </div>
               </button>
             </div>
@@ -142,13 +195,21 @@
       </div>
       
       <div class="backups-list">
-        <div v-if="recentBackups.length === 0" class="empty-backups">
-          <div class="empty-icon">📦</div>
+        <div
+          v-if="recentBackups.length === 0"
+          class="empty-backups"
+        >
+          <div class="empty-icon">
+            📦
+          </div>
           <p>No backups found</p>
           <small>Create your first backup above</small>
         </div>
         
-        <div v-else class="backup-items">
+        <div
+          v-else
+          class="backup-items"
+        >
           <div
             v-for="backup in recentBackups"
             :key="backup.id"
@@ -157,8 +218,13 @@
           >
             <div class="backup-info">
               <div class="backup-header">
-                <div class="backup-name">{{ backup.name }}</div>
-                <div class="backup-type" :class="`type-${backup.type}`">
+                <div class="backup-name">
+                  {{ backup.name }}
+                </div>
+                <div
+                  class="backup-type"
+                  :class="`type-${backup.type}`"
+                >
                   {{ getBackupTypeName(backup.type) }}
                 </div>
               </div>
@@ -169,7 +235,10 @@
                 <span class="backup-items">{{ backup.itemCount }} items</span>
               </div>
               
-              <div v-if="backup.description" class="backup-description">
+              <div
+                v-if="backup.description"
+                class="backup-description"
+              >
                 {{ backup.description }}
               </div>
             </div>
@@ -177,26 +246,32 @@
             <div class="backup-actions">
               <button
                 class="backup-btn restore-btn"
-                @click="showRestoreOptions(backup)"
                 :disabled="restoringBackup === backup.id"
+                @click="showRestoreOptions(backup)"
               >
-                <span v-if="restoringBackup === backup.id" class="loading-spinner small"></span>
-                <span v-else class="btn-icon">↩️</span>
+                <span
+                  v-if="restoringBackup === backup.id"
+                  class="loading-spinner small"
+                />
+                <span
+                  v-else
+                  class="btn-icon"
+                >↩️</span>
                 <span class="btn-text">Restore</span>
               </button>
               
               <button
                 class="backup-btn download-btn"
-                @click="downloadBackup(backup)"
                 title="Download backup file"
+                @click="downloadBackup(backup)"
               >
                 <span class="btn-icon">⬇️</span>
               </button>
               
               <button
                 class="backup-btn delete-btn"
-                @click="deleteBackup(backup)"
                 title="Delete backup"
+                @click="deleteBackup(backup)"
               >
                 <span class="btn-icon">🗑️</span>
               </button>
@@ -217,23 +292,32 @@
         <div class="setting-row">
           <label class="setting-label">
             <input
-              type="checkbox"
               v-model="syncSettings.autoBackup"
+              type="checkbox"
               @change="updateSyncSetting('autoBackup', $event.target.checked)"
-            />
-            <span class="checkmark"></span>
+            >
+            <span class="checkmark" />
             <span class="label-text">Enable automatic backups</span>
           </label>
           
-          <div v-if="syncSettings.autoBackup" class="setting-details">
+          <div
+            v-if="syncSettings.autoBackup"
+            class="setting-details"
+          >
             <select
               v-model="syncSettings.backupFrequency"
-              @change="updateSyncSetting('backupFrequency', $event.target.value)"
               class="frequency-select"
+              @change="updateSyncSetting('backupFrequency', $event.target.value)"
             >
-              <option value="hourly">Every hour</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
+              <option value="hourly">
+                Every hour
+              </option>
+              <option value="daily">
+                Daily
+              </option>
+              <option value="weekly">
+                Weekly
+              </option>
             </select>
           </div>
         </div>
@@ -241,11 +325,11 @@
         <div class="setting-row">
           <label class="setting-label">
             <input
-              type="checkbox"
               v-model="syncSettings.cloudSync"
+              type="checkbox"
               @change="updateSyncSetting('cloudSync', $event.target.checked)"
-            />
-            <span class="checkmark"></span>
+            >
+            <span class="checkmark" />
             <span class="label-text">Enable cloud sync (experimental)</span>
           </label>
         </div>
@@ -253,11 +337,11 @@
         <div class="setting-row">
           <label class="setting-label">
             <input
-              type="checkbox"
               v-model="syncSettings.encryptBackups"
+              type="checkbox"
               @change="updateSyncSetting('encryptBackups', $event.target.checked)"
-            />
-            <span class="checkmark"></span>
+            >
+            <span class="checkmark" />
             <span class="label-text">Encrypt backup files</span>
           </label>
         </div>
@@ -265,8 +349,15 @@
     </div>
 
     <!-- Restore Options Modal -->
-    <BaseModal v-model="showRestoreModal" title="Restore Options" size="md">
-      <div v-if="selectedBackup" class="restore-options">
+    <BaseModal
+      v-model="showRestoreModal"
+      title="Restore Options"
+      size="md"
+    >
+      <div
+        v-if="selectedBackup"
+        class="restore-options"
+      >
         <div class="restore-info">
           <h4>{{ selectedBackup.name }}</h4>
           <p>Choose what to restore from this backup:</p>
@@ -274,8 +365,11 @@
         
         <div class="restore-choices">
           <label class="restore-choice">
-            <input type="checkbox" v-model="restoreOptions.settings" />
-            <span class="checkmark"></span>
+            <input
+              v-model="restoreOptions.settings"
+              type="checkbox"
+            >
+            <span class="checkmark" />
             <div class="choice-content">
               <div class="choice-title">Extension Settings</div>
               <div class="choice-desc">Provider configurations, preferences, etc.</div>
@@ -283,8 +377,11 @@
           </label>
           
           <label class="restore-choice">
-            <input type="checkbox" v-model="restoreOptions.history" />
-            <span class="checkmark"></span>
+            <input
+              v-model="restoreOptions.history"
+              type="checkbox"
+            >
+            <span class="checkmark" />
             <div class="choice-content">
               <div class="choice-title">Translation History</div>
               <div class="choice-desc">All previous translations</div>
@@ -292,8 +389,11 @@
           </label>
           
           <label class="restore-choice">
-            <input type="checkbox" v-model="restoreOptions.favorites" />
-            <span class="checkmark"></span>
+            <input
+              v-model="restoreOptions.favorites"
+              type="checkbox"
+            >
+            <span class="checkmark" />
             <div class="choice-content">
               <div class="choice-title">Favorites & Bookmarks</div>
               <div class="choice-desc">Saved translations and bookmarks</div>
@@ -310,13 +410,16 @@
       </div>
       
       <template #footer>
-        <button class="modal-btn secondary" @click="showRestoreModal = false">
+        <button
+          class="modal-btn secondary"
+          @click="showRestoreModal = false"
+        >
           Cancel
         </button>
         <button
           class="modal-btn primary"
-          @click="confirmRestore"
           :disabled="!hasRestoreSelection"
+          @click="confirmRestore"
         >
           Restore Selected
         </button>
@@ -324,21 +427,42 @@
     </BaseModal>
 
     <!-- Progress Modal -->
-    <BaseModal v-model="showProgressModal" title="Processing..." size="sm" :closable="false">
+    <BaseModal
+      v-model="showProgressModal"
+      title="Processing..."
+      size="sm"
+      :closable="false"
+    >
       <div class="progress-content">
-        <div class="progress-spinner"></div>
-        <div class="progress-text">{{ progressMessage }}</div>
-        <div v-if="progressDetails" class="progress-details">{{ progressDetails }}</div>
+        <div class="progress-spinner" />
+        <div class="progress-text">
+          {{ progressMessage }}
+        </div>
+        <div
+          v-if="progressDetails"
+          class="progress-details"
+        >
+          {{ progressDetails }}
+        </div>
       </div>
     </BaseModal>
 
     <!-- Status Messages -->
-    <div v-if="statusMessage" class="status-message" :class="`status-${statusType}`">
+    <div
+      v-if="statusMessage"
+      class="status-message"
+      :class="`status-${statusType}`"
+    >
       <span class="status-icon">
         {{ statusType === 'success' ? '✅' : statusType === 'error' ? '❌' : 'ℹ️' }}
       </span>
       <span class="status-text">{{ statusMessage }}</span>
-      <button class="status-close" @click="clearStatus">×</button>
+      <button
+        class="status-close"
+        @click="clearStatus"
+      >
+        ×
+      </button>
     </div>
   </div>
 </template>

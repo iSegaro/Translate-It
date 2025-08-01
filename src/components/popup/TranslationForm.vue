@@ -1,9 +1,12 @@
 <template>
-  <form @submit.prevent="handleTranslate" class="translation-form">
+  <form
+    class="translation-form"
+    @submit.prevent="handleTranslate"
+  >
     <!-- Source Input Field -->
     <TranslationInputField
-      v-model="sourceText"
       ref="sourceInputRef"
+      v-model="sourceText"
       :placeholder="$i18n('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
       :language="settingsStore.settings.SOURCE_LANGUAGE"
       :rows="2"

@@ -1,5 +1,8 @@
 <template>
-  <form @submit.prevent="handleSubmit" class="translation-form">
+  <form
+    class="translation-form"
+    @submit.prevent="handleSubmit"
+  >
     <!-- Language Controls -->
     <LanguageSelector
       v-model:source-language="sourceLanguage"
@@ -15,8 +18,8 @@
 
     <!-- Source Input Field -->
     <TranslationInputField
-      v-model="sourceText"
       ref="sourceInputRef"
+      v-model="sourceText"
       :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Enter text to translate')"
       :language="sourceLanguage"
       :rows="6"
@@ -46,8 +49,11 @@
           v-if="!isTranslating"
           src="@/assets/icons/translate.png" 
           alt="Translate" 
+        >
+        <div
+          v-else
+          class="button-spinner"
         />
-        <div v-else class="button-spinner"></div>
       </button>
     </div>
   </form>

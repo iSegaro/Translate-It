@@ -24,9 +24,9 @@
           <template #trigger="{ toggle, open }">
             <button 
               class="filter-btn"
-              @click="toggle"
               :class="{ active: open }"
               title="Filter options"
+              @click="toggle"
             >
               <span class="filter-icon">⚙️</span>
               <span class="filter-text">Filter</span>
@@ -39,11 +39,11 @@
               <div class="filter-options">
                 <label class="filter-option">
                   <input 
-                    type="checkbox" 
                     v-model="filters.providers" 
+                    type="checkbox" 
                     value="all"
                     @change="handleProviderFilter('all')"
-                  />
+                  >
                   <span>All Providers</span>
                 </label>
                 <label 
@@ -52,10 +52,10 @@
                   class="filter-option"
                 >
                   <input 
-                    type="checkbox" 
                     v-model="filters.providers" 
+                    type="checkbox" 
                     :value="provider"
-                  />
+                  >
                   <span>{{ getProviderName(provider) }}</span>
                 </label>
               </div>
@@ -66,16 +66,16 @@
               <div class="filter-options">
                 <label class="filter-option">
                   <input 
-                    type="checkbox" 
                     v-model="filters.showTextTranslations" 
-                  />
+                    type="checkbox" 
+                  >
                   <span>Text Translations</span>
                 </label>
                 <label class="filter-option">
                   <input 
-                    type="checkbox" 
                     v-model="filters.showImageTranslations" 
-                  />
+                    type="checkbox" 
+                  >
                   <span>Image Translations</span>
                 </label>
               </div>
@@ -83,11 +83,22 @@
             
             <div class="filter-section">
               <h4>Time Period</h4>
-              <select v-model="filters.timePeriod" class="time-select">
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
+              <select
+                v-model="filters.timePeriod"
+                class="time-select"
+              >
+                <option value="all">
+                  All Time
+                </option>
+                <option value="today">
+                  Today
+                </option>
+                <option value="week">
+                  This Week
+                </option>
+                <option value="month">
+                  This Month
+                </option>
               </select>
             </div>
           </div>
@@ -97,9 +108,9 @@
           <template #trigger="{ toggle, open }">
             <button 
               class="sort-btn"
-              @click="toggle"
               :class="{ active: open }"
               title="Sort options"
+              @click="toggle"
             >
               <span class="sort-icon">📊</span>
               <span class="sort-text">Sort</span>
@@ -110,26 +121,26 @@
             <div class="sort-options">
               <label class="sort-option">
                 <input 
-                  type="radio" 
                   v-model="sortBy" 
+                  type="radio" 
                   value="timestamp"
-                />
+                >
                 <span>By Date</span>
               </label>
               <label class="sort-option">
                 <input 
-                  type="radio" 
                   v-model="sortBy" 
+                  type="radio" 
                   value="provider"
-                />
+                >
                 <span>By Provider</span>
               </label>
               <label class="sort-option">
                 <input 
-                  type="radio" 
                   v-model="sortBy" 
+                  type="radio" 
                   value="length"
-                />
+                >
                 <span>By Text Length</span>
               </label>
             </div>
@@ -137,18 +148,18 @@
             <div class="sort-order">
               <label class="sort-option">
                 <input 
-                  type="radio" 
                   v-model="sortOrder" 
+                  type="radio" 
                   value="desc"
-                />
+                >
                 <span>Newest First</span>
               </label>
               <label class="sort-option">
                 <input 
-                  type="radio" 
                   v-model="sortOrder" 
+                  type="radio" 
                   value="asc"
-                />
+                >
                 <span>Oldest First</span>
               </label>
             </div>
@@ -157,9 +168,9 @@
         
         <button 
           class="clear-btn"
-          @click="showClearConfirm = true"
           :disabled="history.length === 0"
           title="Clear all history"
+          @click="showClearConfirm = true"
         >
           <span class="clear-icon">🗑️</span>
           <span class="clear-text">Clear All</span>
@@ -169,19 +180,33 @@
     
     <!-- History list -->
     <div class="history-content">
-      <div v-if="isLoading" class="loading-state">
+      <div
+        v-if="isLoading"
+        class="loading-state"
+      >
         <LoadingSpinner size="md" />
         <p>Loading history...</p>
       </div>
       
-      <div v-else-if="filteredHistory.length === 0" class="empty-state">
-        <div class="empty-icon">📝</div>
+      <div
+        v-else-if="filteredHistory.length === 0"
+        class="empty-state"
+      >
+        <div class="empty-icon">
+          📝
+        </div>
         <h4>{{ searchQuery ? 'No results found' : 'No translation history yet' }}</h4>
         <p>{{ searchQuery ? 'Try adjusting your search or filters' : 'Your translations will appear here' }}</p>
       </div>
       
-      <div v-else class="history-list">
-        <TransitionGroup name="history-item" tag="div">
+      <div
+        v-else
+        class="history-list"
+      >
+        <TransitionGroup
+          name="history-item"
+          tag="div"
+        >
           <div 
             v-for="item in paginatedHistory"
             :key="item.id"
@@ -199,11 +224,14 @@
                 :checked="selectedItems.includes(item.id)"
                 @click.stop
                 @change="toggleSelection(item.id)"
-              />
+              >
             </div>
             
             <!-- Item content -->
-            <div class="item-content" @click="retranslate(item)">
+            <div
+              class="item-content"
+              @click="retranslate(item)"
+            >
               <div class="item-header">
                 <div class="item-type">
                   <span class="type-icon">
@@ -218,7 +246,10 @@
                   <span class="language-pair">
                     {{ getLanguageName(item.fromLanguage) }} → {{ getLanguageName(item.toLanguage) }}
                   </span>
-                  <span class="provider-badge" :class="`provider-${item.provider}`">
+                  <span
+                    class="provider-badge"
+                    :class="`provider-${item.provider}`"
+                  >
                     {{ getProviderName(item.provider) }}
                   </span>
                 </div>
@@ -237,14 +268,17 @@
               
               <div class="item-footer">
                 <span class="timestamp">{{ formatTime(item.timestamp) }}</span>
-                <div class="confidence-indicator" v-if="item.confidence">
+                <div
+                  v-if="item.confidence"
+                  class="confidence-indicator"
+                >
                   <span class="confidence-label">Confidence:</span>
                   <div class="confidence-bar">
                     <div 
                       class="confidence-fill" 
                       :style="{ width: `${item.confidence * 100}%` }"
                       :class="getConfidenceClass(item.confidence)"
-                    ></div>
+                    />
                   </div>
                   <span class="confidence-value">{{ Math.round(item.confidence * 100) }}%</span>
                 </div>
@@ -255,54 +289,69 @@
             <div class="item-actions">
               <button 
                 class="action-btn copy-btn"
-                @click.stop="copyTranslation(item)"
                 title="Copy translation"
+                @click.stop="copyTranslation(item)"
               >
                 <span class="action-icon">📋</span>
               </button>
               
               <button 
-                class="action-btn tts-btn"
-                @click.stop="playTTS(item)"
-                title="Play audio"
                 v-if="!item.isImageTranslation"
+                class="action-btn tts-btn"
+                title="Play audio"
+                @click.stop="playTTS(item)"
               >
                 <span class="action-icon">🔊</span>
               </button>
               
               <button 
                 class="action-btn retranslate-btn"
-                @click.stop="retranslate(item)"
                 title="Retranslate"
+                @click.stop="retranslate(item)"
               >
                 <span class="action-icon">🔄</span>
               </button>
               
-              <BaseDropdown position="bottom-end" size="sm">
+              <BaseDropdown
+                position="bottom-end"
+                size="sm"
+              >
                 <template #trigger="{ toggle }">
                   <button 
                     class="action-btn more-btn"
-                    @click.stop="toggle"
                     title="More actions"
+                    @click.stop="toggle"
                   >
                     <span class="action-icon">⋮</span>
                   </button>
                 </template>
                 
                 <div class="more-actions">
-                  <button class="more-action" @click="editTranslation(item)">
+                  <button
+                    class="more-action"
+                    @click="editTranslation(item)"
+                  >
                     <span class="more-icon">✏️</span>
                     <span>Edit</span>
                   </button>
-                  <button class="more-action" @click="favoriteItem(item)">
+                  <button
+                    class="more-action"
+                    @click="favoriteItem(item)"
+                  >
                     <span class="more-icon">{{ item.isFavorite ? '💔' : '❤️' }}</span>
                     <span>{{ item.isFavorite ? 'Unfavorite' : 'Favorite' }}</span>
                   </button>
-                  <button class="more-action" @click="exportItem(item)">
+                  <button
+                    class="more-action"
+                    @click="exportItem(item)"
+                  >
                     <span class="more-icon">📤</span>
                     <span>Export</span>
                   </button>
-                  <button class="more-action danger" @click="removeItem(item)">
+                  <button
+                    class="more-action danger"
+                    @click="removeItem(item)"
+                  >
                     <span class="more-icon">🗑️</span>
                     <span>Delete</span>
                   </button>
@@ -314,21 +363,24 @@
       </div>
       
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="pagination">
+      <div
+        v-if="totalPages > 1"
+        class="pagination"
+      >
         <button 
           class="page-btn"
-          @click="currentPage = 1"
           :disabled="currentPage === 1"
           title="First page"
+          @click="currentPage = 1"
         >
           ⏮️
         </button>
         
         <button 
           class="page-btn"
-          @click="currentPage = Math.max(1, currentPage - 1)"
           :disabled="currentPage === 1"
           title="Previous page"
+          @click="currentPage = Math.max(1, currentPage - 1)"
         >
           ◀️
         </button>
@@ -339,18 +391,18 @@
         
         <button 
           class="page-btn"
-          @click="currentPage = Math.min(totalPages, currentPage + 1)"
           :disabled="currentPage === totalPages"
           title="Next page"
+          @click="currentPage = Math.min(totalPages, currentPage + 1)"
         >
           ▶️
         </button>
         
         <button 
           class="page-btn"
-          @click="currentPage = totalPages"
           :disabled="currentPage === totalPages"
           title="Last page"
+          @click="currentPage = totalPages"
         >
           ⏭️
         </button>
@@ -358,45 +410,72 @@
     </div>
     
     <!-- Bulk actions -->
-    <div v-if="selectedItems.length > 0" class="bulk-actions">
+    <div
+      v-if="selectedItems.length > 0"
+      class="bulk-actions"
+    >
       <div class="bulk-info">
         {{ selectedItems.length }} item{{ selectedItems.length === 1 ? '' : 's' }} selected
       </div>
       
       <div class="bulk-buttons">
-        <button class="bulk-btn" @click="bulkCopy">
+        <button
+          class="bulk-btn"
+          @click="bulkCopy"
+        >
           <span class="bulk-icon">📋</span>
           Copy All
         </button>
         
-        <button class="bulk-btn" @click="bulkExport">
+        <button
+          class="bulk-btn"
+          @click="bulkExport"
+        >
           <span class="bulk-icon">📤</span>
           Export
         </button>
         
-        <button class="bulk-btn danger" @click="bulkDelete">
+        <button
+          class="bulk-btn danger"
+          @click="bulkDelete"
+        >
           <span class="bulk-icon">🗑️</span>
           Delete
         </button>
         
-        <button class="bulk-btn secondary" @click="clearSelection">
+        <button
+          class="bulk-btn secondary"
+          @click="clearSelection"
+        >
           Cancel
         </button>
       </div>
     </div>
     
     <!-- Clear confirmation modal -->
-    <BaseModal v-model="showClearConfirm" title="Clear History" size="sm">
+    <BaseModal
+      v-model="showClearConfirm"
+      title="Clear History"
+      size="sm"
+    >
       <div class="clear-confirm">
         <p>Are you sure you want to clear all translation history?</p>
-        <p class="warning-text">This action cannot be undone.</p>
+        <p class="warning-text">
+          This action cannot be undone.
+        </p>
       </div>
       
       <template #footer>
-        <button class="confirm-btn secondary" @click="showClearConfirm = false">
+        <button
+          class="confirm-btn secondary"
+          @click="showClearConfirm = false"
+        >
           Cancel
         </button>
-        <button class="confirm-btn danger" @click="confirmClearHistory">
+        <button
+          class="confirm-btn danger"
+          @click="confirmClearHistory"
+        >
           Clear All
         </button>
       </template>

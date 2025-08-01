@@ -1,5 +1,10 @@
 <template>
-  <BaseModal v-model="isVisible" size="lg" title="Capture Preview" :closable="!isTranslating">
+  <BaseModal
+    v-model="isVisible"
+    size="lg"
+    title="Capture Preview"
+    :closable="!isTranslating"
+  >
     <div class="capture-preview">
       <!-- Image preview section -->
       <div class="preview-section">
@@ -24,23 +29,29 @@
             alt="Captured screen area" 
             class="preview-image"
             @load="handleImageLoad"
-          />
+          >
           
           <!-- Image overlay for text detection -->
-          <div v-if="detectedTextRegions.length > 0" class="text-overlay">
+          <div
+            v-if="detectedTextRegions.length > 0"
+            class="text-overlay"
+          >
             <div 
               v-for="(region, index) in detectedTextRegions"
               :key="index"
               class="text-region"
               :style="getRegionStyle(region)"
-              @click="selectTextRegion(region)"
               :class="{ active: selectedRegion === region }"
+              @click="selectTextRegion(region)"
             />
           </div>
           
           <!-- Loading overlay -->
-          <div v-if="isAnalyzing" class="analysis-overlay">
-            <div class="analysis-spinner"></div>
+          <div
+            v-if="isAnalyzing"
+            class="analysis-overlay"
+          >
+            <div class="analysis-spinner" />
             <p>Analyzing image...</p>
           </div>
         </div>
@@ -57,22 +68,42 @@
           <div class="language-controls">
             <div class="language-group">
               <label>From:</label>
-              <select v-model="fromLanguage" class="language-select">
-                <option value="auto">Auto Detect</option>
-                <option v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
+              <select
+                v-model="fromLanguage"
+                class="language-select"
+              >
+                <option value="auto">
+                  Auto Detect
+                </option>
+                <option
+                  v-for="lang in availableLanguages"
+                  :key="lang.code"
+                  :value="lang.code"
+                >
                   {{ lang.name }}
                 </option>
               </select>
             </div>
             
-            <button class="swap-languages" @click="swapLanguages" title="Swap languages">
+            <button
+              class="swap-languages"
+              title="Swap languages"
+              @click="swapLanguages"
+            >
               ⇄
             </button>
             
             <div class="language-group">
               <label>To:</label>
-              <select v-model="toLanguage" class="language-select">
-                <option v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
+              <select
+                v-model="toLanguage"
+                class="language-select"
+              >
+                <option
+                  v-for="lang in availableLanguages"
+                  :key="lang.code"
+                  :value="lang.code"
+                >
                   {{ lang.name }}
                 </option>
               </select>
@@ -82,8 +113,15 @@
           <!-- Provider selection -->
           <div class="provider-controls">
             <label>Translation Provider:</label>
-            <select v-model="selectedProvider" class="provider-select">
-              <option v-for="provider in imageCapableProviders" :key="provider" :value="provider">
+            <select
+              v-model="selectedProvider"
+              class="provider-select"
+            >
+              <option
+                v-for="provider in imageCapableProviders"
+                :key="provider"
+                :value="provider"
+              >
                 {{ getProviderName(provider) }}
               </option>
             </select>
@@ -93,21 +131,21 @@
           <div class="ocr-options">
             <label class="checkbox-label">
               <input 
-                type="checkbox" 
-                v-model="ocrOptions.preprocessImage"
+                v-model="ocrOptions.preprocessImage" 
+                type="checkbox"
                 class="checkbox"
-              />
-              <span class="checkmark"></span>
+              >
+              <span class="checkmark" />
               Enhance image quality
             </label>
             
             <label class="checkbox-label">
               <input 
-                type="checkbox" 
-                v-model="ocrOptions.detectRegions"
+                v-model="ocrOptions.detectRegions" 
+                type="checkbox"
                 class="checkbox"
-              />
-              <span class="checkmark"></span>
+              >
+              <span class="checkmark" />
               Detect text regions
             </label>
           </div>
@@ -117,37 +155,46 @@
       <!-- Action buttons -->
       <div class="preview-actions">
         <button 
-          @click="retake" 
-          class="action-btn secondary-btn"
+          class="action-btn secondary-btn" 
           :disabled="isTranslating"
+          @click="retake"
         >
           <span class="btn-icon">📸</span>
           <span class="btn-text">Retake</span>
         </button>
         
         <button 
-          @click="analyzeImage" 
+          v-if="ocrOptions.detectRegions" 
           class="action-btn analyze-btn"
           :disabled="isAnalyzing || isTranslating"
-          v-if="ocrOptions.detectRegions"
+          @click="analyzeImage"
         >
           <span class="btn-icon">🔍</span>
           <span class="btn-text">Analyze</span>
         </button>
         
         <button 
-          @click="translateImage" 
-          class="action-btn primary-btn"
+          class="action-btn primary-btn" 
           :disabled="isTranslating || isAnalyzing"
+          @click="translateImage"
         >
-          <span v-if="isTranslating" class="loading-spinner small"></span>
-          <span v-else class="btn-icon">🌐</span>
+          <span
+            v-if="isTranslating"
+            class="loading-spinner small"
+          />
+          <span
+            v-else
+            class="btn-icon"
+          >🌐</span>
           <span class="btn-text">{{ isTranslating ? 'Translating...' : 'Translate' }}</span>
         </button>
       </div>
       
       <!-- Translation result -->
-      <div v-if="translationResult" class="translation-result">
+      <div
+        v-if="translationResult"
+        class="translation-result"
+      >
         <div class="result-header">
           <h4>Translation Result</h4>
           <div class="result-meta">
@@ -158,30 +205,50 @@
         
         <div class="result-content">
           <!-- Detected text (if available) -->
-          <div v-if="translationResult.detectedText" class="detected-text">
+          <div
+            v-if="translationResult.detectedText"
+            class="detected-text"
+          >
             <h5>Detected Text:</h5>
-            <div class="text-content">{{ translationResult.detectedText }}</div>
+            <div class="text-content">
+              {{ translationResult.detectedText }}
+            </div>
           </div>
           
           <!-- Translated text -->
           <div class="translated-text">
             <h5>Translation:</h5>
-            <div class="text-content primary">{{ translationResult.text }}</div>
+            <div class="text-content primary">
+              {{ translationResult.text }}
+            </div>
           </div>
         </div>
         
         <div class="result-actions">
-          <button @click="copyResult" class="result-btn copy-btn" title="Copy translation">
+          <button
+            class="result-btn copy-btn"
+            title="Copy translation"
+            @click="copyResult"
+          >
             <span class="btn-icon">📋</span>
             Copy
           </button>
           
-          <button @click="playTTS" class="result-btn tts-btn" title="Play audio" :disabled="isPlayingTTS">
+          <button
+            class="result-btn tts-btn"
+            title="Play audio"
+            :disabled="isPlayingTTS"
+            @click="playTTS"
+          >
             <span class="btn-icon">{{ isPlayingTTS ? '⏸️' : '🔊' }}</span>
             {{ isPlayingTTS ? 'Stop' : 'Speak' }}
           </button>
           
-          <button @click="saveToHistory" class="result-btn save-btn" title="Save to history">
+          <button
+            class="result-btn save-btn"
+            title="Save to history"
+            @click="saveToHistory"
+          >
             <span class="btn-icon">💾</span>
             Save
           </button>
@@ -189,16 +256,31 @@
       </div>
       
       <!-- Error display -->
-      <div v-if="error" class="error-display">
+      <div
+        v-if="error"
+        class="error-display"
+      >
         <div class="error-content">
           <span class="error-icon">⚠️</span>
           <div class="error-details">
-            <div class="error-message">{{ error.message }}</div>
-            <div v-if="error.details" class="error-meta">{{ error.details }}</div>
+            <div class="error-message">
+              {{ error.message }}
+            </div>
+            <div
+              v-if="error.details"
+              class="error-meta"
+            >
+              {{ error.details }}
+            </div>
           </div>
         </div>
         
-        <button @click="clearError" class="error-close">✕</button>
+        <button
+          class="error-close"
+          @click="clearError"
+        >
+          ✕
+        </button>
       </div>
     </div>
   </BaseModal>

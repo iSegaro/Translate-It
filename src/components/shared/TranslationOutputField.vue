@@ -1,27 +1,36 @@
 <template>
-  <div class="textarea-container result-container" :class="{ 'has-content': hasContent }">
+  <div
+    class="textarea-container result-container"
+    :class="{ 'has-content': hasContent }"
+  >
     <!-- Inline Toolbar (copy, tts) -->
-    <div class="inline-toolbar" :class="{ 'visible': hasContent }">
+    <div
+      class="inline-toolbar"
+      :class="{ 'visible': hasContent }"
+    >
       <IconButton
         icon="copy.png"
-        @click="handleCopy"
         :title="copyTitle"
         :alt="copyAlt"
         type="inline"
+        @click="handleCopy"
       />
       <IconButton
         icon="speaker.png"
-        @click="handleTTS"
         :title="ttsTitle"
         :alt="ttsAlt"
         type="inline"
+        @click="handleTTS"
       />
     </div>
     
     <!-- Loading Spinner (overlaid when loading) -->
-    <div v-if="isLoading" class="spinner-overlay">
+    <div
+      v-if="isLoading"
+      class="spinner-overlay"
+    >
       <div class="spinner-center">
-        <div class="spinner"></div>
+        <div class="spinner" />
       </div>
     </div>
     
@@ -31,7 +40,7 @@
       class="result-content"
       :class="{ 'has-error': hasError, 'fade-in': showFadeIn, 'loading-fade': isLoading }"
       v-html="renderedContent"
-    ></div>
+    />
   </div>
 </template>
 

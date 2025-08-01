@@ -15,7 +15,7 @@
       }
     ]"
     @click="$emit('click')"
-  />
+  >
 </template>
 
 <script setup>

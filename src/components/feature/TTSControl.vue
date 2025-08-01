@@ -1,5 +1,8 @@
 <template>
-  <div class="tts-control" :class="{ disabled: !isSupported, playing: isPlaying, error: hasError }">
+  <div
+    class="tts-control"
+    :class="{ disabled: !isSupported, playing: isPlaying, error: hasError }"
+  >
     <!-- Main TTS Button -->
     <div class="tts-main">
       <button
@@ -8,12 +11,15 @@
           isPlaying ? 'playing' : isPaused ? 'paused' : 'stopped',
           { disabled: !canPlay }
         ]"
-        @click="handleMainAction"
         :disabled="!canPlay"
         :title="buttonTooltip"
+        @click="handleMainAction"
       >
         <span class="tts-icon">
-          <span v-if="isLoading" class="loading-spinner"></span>
+          <span
+            v-if="isLoading"
+            class="loading-spinner"
+          />
           <span v-else-if="isPlaying">⏸️</span>
           <span v-else-if="isPaused">▶️</span>
           <span v-else>🔊</span>
@@ -25,19 +31,22 @@
       </button>
       
       <!-- Quick actions -->
-      <div v-if="isActive" class="quick-actions">
+      <div
+        v-if="isActive"
+        class="quick-actions"
+      >
         <button 
           class="quick-btn stop-btn"
-          @click="stop"
           title="Stop"
+          @click="stop"
         >
           ⏹️
         </button>
         
         <button 
           class="quick-btn settings-btn"
-          @click="toggleSettings"
           title="Settings"
+          @click="toggleSettings"
         >
           ⚙️
         </button>
@@ -45,25 +54,49 @@
     </div>
     
     <!-- Error display -->
-    <div v-if="hasError" class="error-message">
+    <div
+      v-if="hasError"
+      class="error-message"
+    >
       <span class="error-icon">⚠️</span>
       <span class="error-text">{{ error }}</span>
-      <button class="error-close" @click="clearError">✕</button>
+      <button
+        class="error-close"
+        @click="clearError"
+      >
+        ✕
+      </button>
     </div>
     
     <!-- Progress bar -->
-    <div v-if="showProgress && isActive" class="progress-container">
+    <div
+      v-if="showProgress && isActive"
+      class="progress-container"
+    >
       <div class="progress-bar">
-        <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+        <div
+          class="progress-fill"
+          :style="{ width: `${progress}%` }"
+        />
       </div>
-      <div class="progress-text">{{ progressText }}</div>
+      <div class="progress-text">
+        {{ progressText }}
+      </div>
     </div>
     
     <!-- Settings panel -->
-    <div v-if="showSettings" class="settings-panel">
+    <div
+      v-if="showSettings"
+      class="settings-panel"
+    >
       <div class="settings-header">
         <h4>Text-to-Speech Settings</h4>
-        <button class="settings-close" @click="showSettings = false">✕</button>
+        <button
+          class="settings-close"
+          @click="showSettings = false"
+        >
+          ✕
+        </button>
       </div>
       
       <div class="settings-content">
@@ -72,10 +105,12 @@
           <label class="setting-label">Voice:</label>
           <select 
             v-model="localSettings.voice" 
-            @change="updateVoice"
             class="voice-select"
+            @change="updateVoice"
           >
-            <option value="">Default</option>
+            <option value="">
+              Default
+            </option>
             <optgroup 
               v-for="(group, lang) in groupedVoices" 
               :key="lang" 
@@ -94,8 +129,8 @@
           <button 
             v-if="localSettings.voice"
             class="test-voice-btn"
-            @click="testCurrentVoice"
             :disabled="isLoading"
+            @click="testCurrentVoice"
           >
             Test
           </button>
@@ -108,14 +143,14 @@
           </label>
           <div class="slider-container">
             <input 
-              type="range"
               v-model.number="localSettings.rate"
-              @input="updateSetting('rate', $event.target.value)"
+              type="range"
               min="0.1"
               max="3.0"
               step="0.1"
               class="range-slider"
-            />
+              @input="updateSetting('rate', $event.target.value)"
+            >
             <div class="slider-marks">
               <span>0.1x</span>
               <span>1x</span>
@@ -131,14 +166,14 @@
           </label>
           <div class="slider-container">
             <input 
-              type="range"
               v-model.number="localSettings.pitch"
-              @input="updateSetting('pitch', $event.target.value)"
+              type="range"
               min="0.1"
               max="2.0"
               step="0.1"
               class="range-slider"
-            />
+              @input="updateSetting('pitch', $event.target.value)"
+            >
             <div class="slider-marks">
               <span>Low</span>
               <span>Normal</span>
@@ -154,14 +189,14 @@
           </label>
           <div class="slider-container">
             <input 
-              type="range"
               v-model.number="localSettings.volume"
-              @input="updateSetting('volume', $event.target.value)"
+              type="range"
               min="0"
               max="1"
               step="0.1"
               class="range-slider"
-            />
+              @input="updateSetting('volume', $event.target.value)"
+            >
             <div class="slider-marks">
               <span>0%</span>
               <span>50%</span>
@@ -175,11 +210,17 @@
           <label class="setting-label">Language:</label>
           <select 
             v-model="localSettings.language" 
-            @change="updateSetting('language', $event.target.value)"
             class="language-select"
+            @change="updateSetting('language', $event.target.value)"
           >
-            <option value="auto">Auto-detect</option>
-            <option v-for="lang in supportedLanguages" :key="lang.code" :value="lang.code">
+            <option value="auto">
+              Auto-detect
+            </option>
+            <option
+              v-for="lang in supportedLanguages"
+              :key="lang.code"
+              :value="lang.code"
+            >
               {{ lang.name }}
             </option>
           </select>
@@ -191,29 +232,29 @@
           <div class="radio-group">
             <label class="radio-option">
               <input 
-                type="radio" 
                 v-model="localSettings.preferredVoiceGender" 
+                type="radio" 
                 value="female"
                 @change="updateSetting('preferredVoiceGender', 'female')"
-              />
+              >
               <span class="radio-label">Female</span>
             </label>
             <label class="radio-option">
               <input 
-                type="radio" 
                 v-model="localSettings.preferredVoiceGender" 
+                type="radio" 
                 value="male"
                 @change="updateSetting('preferredVoiceGender', 'male')"
-              />
+              >
               <span class="radio-label">Male</span>
             </label>
             <label class="radio-option">
               <input 
-                type="radio" 
                 v-model="localSettings.preferredVoiceGender" 
+                type="radio" 
                 value="neutral"
                 @change="updateSetting('preferredVoiceGender', 'neutral')"
-              />
+              >
               <span class="radio-label">No Preference</span>
             </label>
           </div>
@@ -223,12 +264,12 @@
         <div class="setting-group">
           <label class="checkbox-label">
             <input 
-              type="checkbox" 
-              v-model="localSettings.autoPlay"
-              @change="updateSetting('autoPlay', $event.target.checked)"
+              v-model="localSettings.autoPlay" 
+              type="checkbox"
               class="checkbox"
-            />
-            <span class="checkmark"></span>
+              @change="updateSetting('autoPlay', $event.target.checked)"
+            >
+            <span class="checkmark" />
             Auto-play translations
           </label>
         </div>
@@ -236,10 +277,16 @@
       
       <!-- Settings actions -->
       <div class="settings-actions">
-        <button class="settings-btn reset-btn" @click="resetToDefaults">
+        <button
+          class="settings-btn reset-btn"
+          @click="resetToDefaults"
+        >
           Reset to Defaults
         </button>
-        <button class="settings-btn close-btn" @click="showSettings = false">
+        <button
+          class="settings-btn close-btn"
+          @click="showSettings = false"
+        >
           Close
         </button>
       </div>

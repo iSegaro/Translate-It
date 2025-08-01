@@ -1,6 +1,12 @@
 <template>
-  <div class="provider-selector" :class="{ compact: mode === 'compact' }">
-    <label v-if="mode !== 'compact'" class="provider-label">
+  <div
+    class="provider-selector"
+    :class="{ compact: mode === 'compact' }"
+  >
+    <label
+      v-if="mode !== 'compact'"
+      class="provider-label"
+    >
       Translation Provider
     </label>
     

@@ -1,7 +1,9 @@
 <template>
   <div class="translation-history">
     <div class="history-header">
-      <h3 class="section-title">Recent Translations</h3>
+      <h3 class="section-title">
+        Recent Translations
+      </h3>
       <BaseButton
         variant="ghost"
         size="xs"
@@ -12,7 +14,10 @@
     </div>
     
     <div class="history-list">
-      <div v-if="!historyItems.length" class="empty-state">
+      <div
+        v-if="!historyItems.length"
+        class="empty-state"
+      >
         <span class="empty-text">No recent translations</span>
       </div>
       
@@ -23,8 +28,12 @@
         @click="$emit('retranslate', item)"
       >
         <div class="item-content">
-          <div class="source-text">{{ item.sourceText }}</div>
-          <div class="translated-text">{{ item.translatedText }}</div>
+          <div class="source-text">
+            {{ item.sourceText }}
+          </div>
+          <div class="translated-text">
+            {{ item.translatedText }}
+          </div>
         </div>
         <div class="item-meta">
           <span class="language-pair">{{ item.fromLanguage }} → {{ item.toLanguage }}</span>

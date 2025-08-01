@@ -1,5 +1,8 @@
 <template>
-  <div class="textarea-wrapper" :class="{ disabled, loading }">
+  <div
+    class="textarea-wrapper"
+    :class="{ disabled, loading }"
+  >
     <textarea
       :value="modelValue"
       :placeholder="placeholder"
@@ -12,7 +15,11 @@
       @blur="handleBlur"
     />
     
-    <LoadingSpinner v-if="loading" size="sm" class="loading-overlay" />
+    <LoadingSpinner
+      v-if="loading"
+      size="sm"
+      class="loading-overlay"
+    />
   </div>
 </template>
 

@@ -1,15 +1,30 @@
 <template>
   <div class="extension-options">
-    <div v-if="isLoading" class="loading-container">
+    <div
+      v-if="isLoading"
+      class="loading-container"
+    >
       <LoadingSpinner size="xl" />
       <span class="loading-text">{{ loadingText }}</span>
     </div>
     
-    <div v-else-if="hasError" class="error-container">
-      <div class="error-icon">⚠️</div>
+    <div
+      v-else-if="hasError"
+      class="error-container"
+    >
+      <div class="error-icon">
+        ⚠️
+      </div>
       <h2>Failed to Load Options</h2>
-      <p class="error-message">{{ errorMessage }}</p>
-      <button @click="retryLoading" class="retry-button">Retry</button>
+      <p class="error-message">
+        {{ errorMessage }}
+      </p>
+      <button
+        class="retry-button"
+        @click="retryLoading"
+      >
+        Retry
+      </button>
     </div>
     
     <template v-else>

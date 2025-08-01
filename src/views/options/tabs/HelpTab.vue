@@ -7,8 +7,8 @@
       <div class="accordion-item">
         <button 
           class="accordion-header"
-          @click="toggleAccordion('shortcut')"
           :class="{ active: openAccordion === 'shortcut' }"
+          @click="toggleAccordion('shortcut')"
         >
           <span>{{ $i18n('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
           <span class="accordion-icon">{{ openAccordion === 'shortcut' ? '−' : '+' }}</span>
@@ -26,7 +26,7 @@
               <li>{{ $i18n('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (Chrome only).' }}</li>
             </ol>
             
-            <hr class="content-divider" />
+            <hr class="content-divider">
             
             <p>{{ $i18n('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:' }}</p>
             <ol>
@@ -42,8 +42,8 @@
       <div class="accordion-item">
         <button 
           class="accordion-header"
-          @click="toggleAccordion('apiKeys')"
           :class="{ active: openAccordion === 'apiKeys' }"
+          @click="toggleAccordion('apiKeys')"
         >
           <span>{{ $i18n('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
           <span class="accordion-icon">{{ openAccordion === 'apiKeys' ? '−' : '+' }}</span>
@@ -67,10 +67,34 @@
             <div class="provider-help-section">
               <h4>{{ $i18n('help_api_providers_title') || 'API-Based Providers (Require API Keys)' }}</h4>
               <ul>
-                <li><strong>Google Gemini</strong> - Get your free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a></li>
-                <li><strong>OpenAI</strong> - Register at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform</a></li>
-                <li><strong>OpenRouter</strong> - Access multiple models via <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter</a></li>
-                <li><strong>DeepSeek</strong> - Get API access from <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer">DeepSeek Platform</a></li>
+                <li>
+                  <strong>Google Gemini</strong> - Get your free API key from <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Google AI Studio</a>
+                </li>
+                <li>
+                  <strong>OpenAI</strong> - Register at <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >OpenAI Platform</a>
+                </li>
+                <li>
+                  <strong>OpenRouter</strong> - Access multiple models via <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >OpenRouter</a>
+                </li>
+                <li>
+                  <strong>DeepSeek</strong> - Get API access from <a
+                    href="https://platform.deepseek.com/api_keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >DeepSeek Platform</a>
+                </li>
               </ul>
             </div>
             

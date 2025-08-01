@@ -1,7 +1,11 @@
 <template>
   <div class="provider-settings">
-    <h2 class="page-title">Translation Providers</h2>
-    <p class="page-description">Configure your translation providers and API keys</p>
+    <h2 class="page-title">
+      Translation Providers
+    </h2>
+    <p class="page-description">
+      Configure your translation providers and API keys
+    </p>
     
     <div class="providers-list">
       <div 
@@ -10,12 +14,19 @@
         class="provider-card"
       >
         <div class="provider-header">
-          <h3 class="provider-name">{{ provider.name }}</h3>
+          <h3 class="provider-name">
+            {{ provider.name }}
+          </h3>
           <span class="provider-type">{{ provider.type }}</span>
         </div>
-        <p class="provider-description">{{ provider.description }}</p>
+        <p class="provider-description">
+          {{ provider.description }}
+        </p>
         
-        <div v-if="provider.requiresApiKey" class="api-key-section">
+        <div
+          v-if="provider.requiresApiKey"
+          class="api-key-section"
+        >
           <label class="api-key-label">API Key</label>
           <input 
             type="password" 

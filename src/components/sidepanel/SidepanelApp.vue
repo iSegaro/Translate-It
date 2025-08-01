@@ -47,7 +47,10 @@
         </div>
         <div class="history-list">
           <!-- History content will be handled by existing HistoryManager -->
-          <div id="historyList" ref="historyListElement"></div>
+          <div
+            id="historyList"
+            ref="historyListElement"
+          />
         </div>
         <div class="history-footer">
           <button
@@ -59,7 +62,7 @@
               src="@/assets/icons/trash.svg"
               alt="Clear All"
               class="clear-all-icon"
-            />
+            >
             <span>{{ t('SIDEPANEL_CLEAR_ALL_HISTORY', 'Clear All History') }}</span>
           </button>
         </div>
@@ -69,11 +72,11 @@
     <!-- API Provider Dropdown -->
     <div 
       v-if="showApiProviderDropdown"
-      class="dropdown-menu"
       ref="apiProviderDropdownElement"
+      class="dropdown-menu"
     >
       <!-- Dynamic provider options will be loaded here -->
-      <div id="apiProviderDropdown"></div>
+      <div id="apiProviderDropdown" />
     </div>
   </div>
 </template>

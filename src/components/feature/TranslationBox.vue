@@ -1,5 +1,8 @@
 <template>
-  <div class="translation-box" :class="{ disabled }">
+  <div
+    class="translation-box"
+    :class="{ disabled }"
+  >
     <!-- Source Text Section -->
     <div class="input-section">
       <div class="language-row">
@@ -59,7 +62,10 @@
     </div>
 
     <!-- Translation Result -->
-    <div v-if="translatedText || isTranslating" class="output-section">
+    <div
+      v-if="translatedText || isTranslating"
+      class="output-section"
+    >
       <BaseTextarea
         v-model="translatedText"
         placeholder="Translation will appear here..."
@@ -68,7 +74,10 @@
         :loading="isTranslating"
       />
       
-      <div v-if="translatedText" class="result-actions">
+      <div
+        v-if="translatedText"
+        class="result-actions"
+      >
         <BaseButton
           variant="ghost"
           size="sm"

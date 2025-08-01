@@ -2,9 +2,13 @@
   <header class="options-header">
     <div class="header-content">
       <div class="logo-section">
-        <div class="logo">🌐</div>
+        <div class="logo">
+          🌐
+        </div>
         <div class="title-section">
-          <h1 class="title">Translate It</h1>
+          <h1 class="title">
+            Translate It
+          </h1>
           <span class="subtitle">Extension Settings</span>
         </div>
       </div>

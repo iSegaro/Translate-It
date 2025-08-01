@@ -1,15 +1,27 @@
 <template>
   <div class="about-page">
-    <h2 class="page-title">{{ $i18n('about_section_title') || 'What\'s New' }}</h2>
+    <h2 class="page-title">
+      {{ $i18n('about_section_title') || 'What\'s New' }}
+    </h2>
     
     <div class="changelog-container">
-      <div v-if="isLoadingChangelog" class="loading-changelog">
+      <div
+        v-if="isLoadingChangelog"
+        class="loading-changelog"
+      >
         {{ $i18n('options_changelog_loading') || 'Loading changelog...' }}
       </div>
-      <div v-else-if="changelogError" class="error-changelog">
+      <div
+        v-else-if="changelogError"
+        class="error-changelog"
+      >
         {{ $i18n('options_changelog_error') || 'Failed to load changelog.' }}
       </div>
-      <div v-else v-html="renderedChangelog" class="changelog-content"></div>
+      <div
+        v-else
+        class="changelog-content"
+        v-html="renderedChangelog"
+      />
     </div>
   </div>
 </template>

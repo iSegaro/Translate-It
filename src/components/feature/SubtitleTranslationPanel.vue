@@ -4,7 +4,10 @@
     <div class="panel-header">
       <div class="header-title">
         <h3>Subtitle Translation</h3>
-        <span class="status-indicator" :class="connectionStatus">
+        <span
+          class="status-indicator"
+          :class="connectionStatus"
+        >
           {{ getStatusText() }}
         </span>
       </div>
@@ -12,19 +15,25 @@
       <div class="header-actions">
         <button
           class="action-btn"
-          @click="toggleConnection"
           :disabled="isConnecting"
           :class="{ active: isConnected }"
+          @click="toggleConnection"
         >
-          <span v-if="isConnecting" class="loading-spinner"></span>
-          <span v-else class="btn-icon">{{ isConnected ? '⏸️' : '▶️' }}</span>
+          <span
+            v-if="isConnecting"
+            class="loading-spinner"
+          />
+          <span
+            v-else
+            class="btn-icon"
+          >{{ isConnected ? '⏸️' : '▶️' }}</span>
           <span class="btn-text">{{ isConnected ? 'Stop' : 'Start' }}</span>
         </button>
         
         <button
           class="action-btn settings-btn"
-          @click="showSettings = !showSettings"
           :class="{ active: showSettings }"
+          @click="showSettings = !showSettings"
         >
           <span class="btn-icon">⚙️</span>
         </button>
@@ -32,11 +41,21 @@
     </div>
 
     <!-- Settings Panel -->
-    <div v-if="showSettings" class="settings-panel">
+    <div
+      v-if="showSettings"
+      class="settings-panel"
+    >
       <div class="setting-group">
         <label class="setting-label">Translation Provider:</label>
-        <select v-model="settings.provider" class="setting-select">
-          <option v-for="provider in availableProviders" :key="provider" :value="provider">
+        <select
+          v-model="settings.provider"
+          class="setting-select"
+        >
+          <option
+            v-for="provider in availableProviders"
+            :key="provider"
+            :value="provider"
+          >
             {{ getProviderName(provider) }}
           </option>
         </select>
@@ -44,8 +63,15 @@
       
       <div class="setting-group">
         <label class="setting-label">Target Language:</label>
-        <select v-model="settings.targetLanguage" class="setting-select">
-          <option v-for="lang in supportedLanguages" :key="lang.code" :value="lang.code">
+        <select
+          v-model="settings.targetLanguage"
+          class="setting-select"
+        >
+          <option
+            v-for="lang in supportedLanguages"
+            :key="lang.code"
+            :value="lang.code"
+          >
             {{ lang.name }}
           </option>
         </select>
@@ -54,11 +80,11 @@
       <div class="setting-group">
         <label class="checkbox-label">
           <input 
-            type="checkbox" 
-            v-model="settings.autoTranslate"
+            v-model="settings.autoTranslate" 
+            type="checkbox"
             class="checkbox"
-          />
-          <span class="checkmark"></span>
+          >
+          <span class="checkmark" />
           Auto-translate subtitles
         </label>
       </div>
@@ -66,11 +92,11 @@
       <div class="setting-group">
         <label class="checkbox-label">
           <input 
-            type="checkbox" 
-            v-model="settings.showOriginal"
+            v-model="settings.showOriginal" 
+            type="checkbox"
             class="checkbox"
-          />
-          <span class="checkmark"></span>
+          >
+          <span class="checkmark" />
           Show original text
         </label>
       </div>
@@ -78,22 +104,45 @@
 
     <!-- Subtitle Display -->
     <div class="subtitle-display">
-      <div v-if="!isConnected" class="empty-state">
-        <div class="empty-icon">📺</div>
+      <div
+        v-if="!isConnected"
+        class="empty-state"
+      >
+        <div class="empty-icon">
+          📺
+        </div>
         <h4>Subtitle Translation Ready</h4>
         <p>Click "Start" to begin detecting and translating subtitles</p>
       </div>
       
-      <div v-else-if="currentSubtitle" class="subtitle-content">
-        <div v-if="settings.showOriginal" class="original-subtitle">
-          <div class="subtitle-label">Original:</div>
-          <div class="subtitle-text">{{ currentSubtitle.original }}</div>
+      <div
+        v-else-if="currentSubtitle"
+        class="subtitle-content"
+      >
+        <div
+          v-if="settings.showOriginal"
+          class="original-subtitle"
+        >
+          <div class="subtitle-label">
+            Original:
+          </div>
+          <div class="subtitle-text">
+            {{ currentSubtitle.original }}
+          </div>
         </div>
         
         <div class="translated-subtitle">
-          <div class="subtitle-label">{{ getLanguageName(settings.targetLanguage) }}:</div>
-          <div class="subtitle-text" :class="{ loading: isTranslating }">
-            <span v-if="isTranslating" class="loading-spinner small"></span>
+          <div class="subtitle-label">
+            {{ getLanguageName(settings.targetLanguage) }}:
+          </div>
+          <div
+            class="subtitle-text"
+            :class="{ loading: isTranslating }"
+          >
+            <span
+              v-if="isTranslating"
+              class="loading-spinner small"
+            />
             <span v-else>{{ currentSubtitle.translated || 'Translation pending...' }}</span>
           </div>
         </div>
@@ -101,27 +150,39 @@
         <div class="subtitle-meta">
           <span class="timestamp">{{ formatTimestamp(currentSubtitle.timestamp) }}</span>
           <span class="provider">{{ getProviderName(settings.provider) }}</span>
-          <span v-if="currentSubtitle.confidence" class="confidence">
+          <span
+            v-if="currentSubtitle.confidence"
+            class="confidence"
+          >
             {{ Math.round(currentSubtitle.confidence * 100) }}%
           </span>
         </div>
       </div>
       
-      <div v-else-if="isConnected" class="waiting-state">
+      <div
+        v-else-if="isConnected"
+        class="waiting-state"
+      >
         <div class="waiting-animation">
-          <div class="pulse-dot"></div>
-          <div class="pulse-dot"></div>
-          <div class="pulse-dot"></div>
+          <div class="pulse-dot" />
+          <div class="pulse-dot" />
+          <div class="pulse-dot" />
         </div>
         <p>Waiting for subtitles...</p>
       </div>
     </div>
 
     <!-- Subtitle History -->
-    <div v-if="subtitleHistory.length > 0" class="subtitle-history">
+    <div
+      v-if="subtitleHistory.length > 0"
+      class="subtitle-history"
+    >
       <div class="history-header">
         <h4>Recent Subtitles</h4>
-        <button class="clear-history-btn" @click="clearHistory">
+        <button
+          class="clear-history-btn"
+          @click="clearHistory"
+        >
           <span class="btn-icon">🗑️</span>
         </button>
       </div>
@@ -131,19 +192,29 @@
           v-for="item in recentSubtitles"
           :key="item.id"
           class="history-item"
-          @click="selectHistoryItem(item)"
           :class="{ active: currentSubtitle?.id === item.id }"
+          @click="selectHistoryItem(item)"
         >
           <div class="history-content">
-            <div class="history-original">{{ truncateText(item.original, 50) }}</div>
-            <div class="history-translated">{{ truncateText(item.translated, 50) }}</div>
+            <div class="history-original">
+              {{ truncateText(item.original, 50) }}
+            </div>
+            <div class="history-translated">
+              {{ truncateText(item.translated, 50) }}
+            </div>
           </div>
           
           <div class="history-actions">
-            <button class="history-btn copy-btn" @click.stop="copySubtitle(item)">
+            <button
+              class="history-btn copy-btn"
+              @click.stop="copySubtitle(item)"
+            >
               📋
             </button>
-            <button class="history-btn tts-btn" @click.stop="playSubtitle(item)">
+            <button
+              class="history-btn tts-btn"
+              @click.stop="playSubtitle(item)"
+            >
               🔊
             </button>
           </div>
@@ -152,12 +223,20 @@
     </div>
 
     <!-- Error Display -->
-    <div v-if="error" class="error-display">
+    <div
+      v-if="error"
+      class="error-display"
+    >
       <div class="error-content">
         <span class="error-icon">⚠️</span>
         <span class="error-text">{{ error }}</span>
       </div>
-      <button class="error-close" @click="clearError">✕</button>
+      <button
+        class="error-close"
+        @click="clearError"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>

@@ -31,7 +31,10 @@
         class="model-select"
       />
     </div>
-    <div v-if="openrouterApiModel === 'custom'" class="setting-group">
+    <div
+      v-if="openrouterApiModel === 'custom'"
+      class="setting-group"
+    >
       <label>{{ $i18n('openrouter_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput
         v-model="openrouterCustomModel"

@@ -1,20 +1,37 @@
 <template>
-  <div class="history-item" @click="handleClick">
+  <div
+    class="history-item"
+    @click="handleClick"
+  >
     <div class="history-item-header">
       <div class="language-info">
         <span class="language-pair">{{ item.sourceLanguageName }} → {{ item.targetLanguageName }}</span>
       </div>
       <div class="history-item-actions">
         <span class="timestamp">{{ item.formattedTime }}</span>
-        <button class="delete-btn" title="Delete this item" @click.stop="handleDelete">
-          <img src="@/assets/icons/trash-small.svg" alt="Delete" class="delete-icon" />
+        <button
+          class="delete-btn"
+          title="Delete this item"
+          @click.stop="handleDelete"
+        >
+          <img
+            src="@/assets/icons/trash-small.svg"
+            alt="Delete"
+            class="delete-icon"
+          >
         </button>
       </div>
     </div>
     <div class="history-item-content">
-      <div class="source-text">{{ truncateText(item.sourceText) }}</div>
-      <div class="arrow">↓</div>
-      <div class="translated-text">{{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}</div>
+      <div class="source-text">
+        {{ truncateText(item.sourceText) }}
+      </div>
+      <div class="arrow">
+        ↓
+      </div>
+      <div class="translated-text">
+        {{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}
+      </div>
     </div>
   </div>
 </template>

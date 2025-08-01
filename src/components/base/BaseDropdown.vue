@@ -1,17 +1,24 @@
 <template>
-  <div class="dropdown-wrapper" ref="dropdownRef">
+  <div
+    ref="dropdownRef"
+    class="dropdown-wrapper"
+  >
     <div
       class="dropdown-trigger"
       :class="{ active: isOpen }"
+      tabindex="0"
       @click="toggle"
       @keydown.enter.prevent="toggle"
       @keydown.space.prevent="toggle"
       @keydown.escape="close"
       @keydown.arrow-down.prevent="openAndFocusFirst"
       @keydown.arrow-up.prevent="openAndFocusLast"
-      tabindex="0"
     >
-      <slot name="trigger" :open="isOpen" :toggle="toggle" />
+      <slot
+        name="trigger"
+        :open="isOpen"
+        :toggle="toggle"
+      />
     </div>
     
     <Transition name="dropdown">
@@ -25,7 +32,10 @@
         @keydown.home.prevent="focusFirst"
         @keydown.end.prevent="focusLast"
       >
-        <slot :close="close" :isOpen="isOpen" />
+        <slot
+          :close="close"
+          :is-open="isOpen"
+        />
       </div>
     </Transition>
   </div>

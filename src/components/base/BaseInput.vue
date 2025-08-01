@@ -1,8 +1,18 @@
 <template>
-  <div class="input-wrapper" :class="{ disabled, error: !!error }">
-    <label v-if="label" :for="inputId" class="input-label">
+  <div
+    class="input-wrapper"
+    :class="{ disabled, error: !!error }"
+  >
+    <label
+      v-if="label"
+      :for="inputId"
+      class="input-label"
+    >
       {{ label }}
-      <span v-if="required" class="required-mark">*</span>
+      <span
+        v-if="required"
+        class="required-mark"
+      >*</span>
     </label>
     
     <div class="input-container">
@@ -30,9 +40,18 @@
       />
     </div>
     
-    <div v-if="error || hint" class="input-help">
-      <span v-if="error" class="error-text">{{ error }}</span>
-      <span v-else-if="hint" class="hint-text">{{ hint }}</span>
+    <div
+      v-if="error || hint"
+      class="input-help"
+    >
+      <span
+        v-if="error"
+        class="error-text"
+      >{{ error }}</span>
+      <span
+        v-else-if="hint"
+        class="hint-text"
+      >{{ hint }}</span>
     </div>
   </div>
 </template>

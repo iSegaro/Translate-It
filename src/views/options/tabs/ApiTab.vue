@@ -8,14 +8,20 @@
     </div>
     
     <div class="provider-settings">
-      <div v-if="selectedProvider === 'google'" class="api-info">
+      <div
+        v-if="selectedProvider === 'google'"
+        class="api-info"
+      >
         <h3>{{ $i18n('google_translate_settings_title') || 'Google Translate' }}</h3>
         <p class="setting-description">
           {{ $i18n('google_translate_description') || 'Uses the free, public Google Translate endpoint. No API key is required.' }}
         </p>
       </div>
       
-      <div v-else-if="selectedProvider === 'bing'" class="api-info">
+      <div
+        v-else-if="selectedProvider === 'bing'"
+        class="api-info"
+      >
         <h3>{{ $i18n('bing_translate_settings_title') || 'Microsoft Bing Translate' }}</h3>
         <p class="setting-description">
           {{ $i18n('bing_translate_description') || 'Uses the free, public Microsoft Bing Translate endpoint. No API key is required.' }}

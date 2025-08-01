@@ -2,11 +2,20 @@
   <footer class="options-footer">
     <div class="footer-content">
       <div class="footer-links">
-        <a href="#" class="footer-link">Privacy Policy</a>
+        <a
+          href="#"
+          class="footer-link"
+        >Privacy Policy</a>
         <span class="separator">•</span>
-        <a href="#" class="footer-link">Support</a>
+        <a
+          href="#"
+          class="footer-link"
+        >Support</a>
         <span class="separator">•</span>
-        <a href="#" class="footer-link">GitHub</a>
+        <a
+          href="#"
+          class="footer-link"
+        >GitHub</a>
       </div>
       
       <div class="footer-info">

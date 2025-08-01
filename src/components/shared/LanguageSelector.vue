@@ -7,7 +7,9 @@
       :title="sourceTitle"
       :disabled="disabled"
     >
-      <option value="Auto-Detect">{{ autoDetectLabel }}</option>
+      <option value="Auto-Detect">
+        {{ autoDetectLabel }}
+      </option>
       <option
         v-for="language in availableLanguages"
         :key="language.code"
@@ -25,7 +27,10 @@
       :disabled="disabled || !canSwapLanguages"
       @click="handleSwapLanguages"
     >
-      <img src="@/assets/icons/swap.png" :alt="swapAlt" />
+      <img
+        src="@/assets/icons/swap.png"
+        :alt="swapAlt"
+      >
     </button>
 
     <!-- Target Language Dropdown -->

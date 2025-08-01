@@ -1,6 +1,11 @@
 <template>
-  <fieldset class="base-fieldset" :class="{ disabled }">
-    <legend v-if="legend">{{ legend }}</legend>
+  <fieldset
+    class="base-fieldset"
+    :class="{ disabled }"
+  >
+    <legend v-if="legend">
+      {{ legend }}
+    </legend>
     <slot />
   </fieldset>
 </template>

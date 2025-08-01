@@ -1,25 +1,28 @@
 <template>
   <!-- Split Button Mode for Popup -->
-  <div v-if="mode === 'split'" class="split-translate-button-container">
+  <div
+    v-if="mode === 'split'"
+    class="split-translate-button-container"
+  >
     <button
       type="submit"
-      @click="handleTranslate"
       class="split-translate-button"
       :title="$i18n('popup_translate_button_title') || 'ترجمه'"
       :disabled="isTranslating"
+      @click="handleTranslate"
     >
       <div class="translate-main-area">
         <img
           :src="currentProviderIcon"
           alt="API Provider"
           class="api-provider-icon"
-        />
+        >
         <span>{{ $i18n('popup_translate_button_text') || 'ترجمه' }}</span>
       </div>
       <div 
-        @click.stop="toggleDropdown"
         class="provider-dropdown-area"
         :class="{ active: isDropdownOpen }"
+        @click.stop="toggleDropdown"
       >
         <IconButton
           icon="dropdown-arrow.svg"
@@ -39,28 +42,34 @@
       <div
         v-for="provider in availableProviders"
         :key="provider.id"
-        @click="selectProvider(provider)"
         class="dropdown-item"
         :class="{ active: currentProvider === provider.id }"
+        @click="selectProvider(provider)"
       >
-        <img :src="getProviderIcon(provider.icon)" :alt="provider.name" />
+        <img
+          :src="getProviderIcon(provider.icon)"
+          :alt="provider.name"
+        >
         <span>{{ provider.name }}</span>
       </div>
     </div>
   </div>
   
   <!-- Regular Button Mode for Sidepanel -->
-  <div v-else-if="mode === 'button'" class="provider-button-container">
+  <div
+    v-else-if="mode === 'button'"
+    class="provider-button-container"
+  >
     <button
-      @click="toggleDropdown"
       class="provider-button"
       :class="{ active: isDropdownOpen }"
+      @click="toggleDropdown"
     >
       <img
         :src="currentProviderIcon"
         alt="API Provider"
         class="api-provider-icon"
-      />
+      >
       <span>{{ currentProviderName }}</span>
       <IconButton
         icon="dropdown-arrow.svg"
@@ -80,22 +89,28 @@
       <div
         v-for="provider in availableProviders"
         :key="provider.id"
-        @click="selectProvider(provider)"
         class="dropdown-item"
         :class="{ active: currentProvider === provider.id }"
+        @click="selectProvider(provider)"
       >
-        <img :src="getProviderIcon(provider.icon)" :alt="provider.name" />
+        <img
+          :src="getProviderIcon(provider.icon)"
+          :alt="provider.name"
+        >
         <span>{{ provider.name }}</span>
       </div>
     </div>
   </div>
   
   <!-- Compact Mode -->
-  <div v-else class="provider-compact-container">
+  <div
+    v-else
+    class="provider-compact-container"
+  >
     <select
       :value="currentProvider"
-      @change="handleProviderChange"
       class="provider-select"
+      @change="handleProviderChange"
     >
       <option
         v-for="provider in availableProviders"

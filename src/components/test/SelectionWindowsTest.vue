@@ -4,25 +4,25 @@
     
     <div class="test-controls">
       <button 
-        @click="testShowWindow"
         :disabled="isVisible"
         class="test-button"
+        @click="testShowWindow"
       >
         Show Test Window
       </button>
       
       <button 
-        @click="testDismissWindow"
         :disabled="!isVisible"
         class="test-button"
+        @click="testDismissWindow"
       >
         Dismiss Window
       </button>
       
       <button 
-        @click="testCancelTranslation"
         :disabled="!isTranslating"
         class="test-button"
+        @click="testCancelTranslation"
       >
         Cancel Translation
       </button>
@@ -38,13 +38,22 @@
       <div class="status-item">
         <strong>Translating:</strong> {{ isTranslating ? 'Yes' : 'No' }}
       </div>
-      <div class="status-item" v-if="selectedText">
+      <div
+        v-if="selectedText"
+        class="status-item"
+      >
         <strong>Selected Text:</strong> {{ selectedText.substring(0, 50) }}...
       </div>
-      <div class="status-item" v-if="translatedText">
+      <div
+        v-if="translatedText"
+        class="status-item"
+      >
         <strong>Translation:</strong> {{ translatedText.substring(0, 100) }}...
       </div>
-      <div class="status-item error" v-if="error">
+      <div
+        v-if="error"
+        class="status-item error"
+      >
         <strong>Error:</strong> {{ error }}
       </div>
     </div>

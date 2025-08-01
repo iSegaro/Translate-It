@@ -1,45 +1,51 @@
 <template>
-  <div class="textarea-container" :class="{ 'has-content': hasContent }">
+  <div
+    class="textarea-container"
+    :class="{ 'has-content': hasContent }"
+  >
     <!-- Inline Toolbar (copy, tts) -->
-    <div class="inline-toolbar" :class="{ 'visible': hasContent }">
+    <div
+      class="inline-toolbar"
+      :class="{ 'visible': hasContent }"
+    >
       <IconButton
         icon="copy.png"
-        @click="handleCopy"
         :title="copyTitle"
         :alt="copyAlt"
         type="inline"
+        @click="handleCopy"
       />
       <IconButton
         icon="speaker.png"
-        @click="handleTTS"
         :title="ttsTitle"
         :alt="ttsAlt"
         type="inline"
+        @click="handleTTS"
       />
     </div>
     
     <!-- Paste Button (separate positioning) -->
     <IconButton
       icon="paste.png"
-      @click="handlePaste"
       :title="pasteTitle"
       :alt="pasteAlt"
       type="paste-separate"
       :hidden-by-clipboard="!canPaste"
+      @click="handlePaste"
     />
     
     <!-- Textarea -->
     <textarea
       ref="textareaRef"
       :value="modelValue"
-      @input="handleInput"
-      @keydown="handleKeydown"
       :placeholder="placeholder"
       :rows="rows"
       :tabindex="tabindex"
       :class="textareaClass"
       class="translation-textarea"
-    ></textarea>
+      @input="handleInput"
+      @keydown="handleKeydown"
+    />
   </div>
 </template>
 

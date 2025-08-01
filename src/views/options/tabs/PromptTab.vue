@@ -22,7 +22,10 @@
       />
 
       <!-- Validation error -->
-      <div v-if="validationError" class="validation-error">
+      <div
+        v-if="validationError"
+        class="validation-error"
+      >
         {{ validationError }}
       </div>
 

@@ -3,9 +3,9 @@
     <div class="toolbar-left-group">
       <a
         id="translatePageLink"
-        @click="handleTranslatePage"
         class="toolbar-link"
         :title="$i18n('popup_translate_page_link_title') || 'ترجمه این صفحه در تب جدید'"
+        @click="handleTranslatePage"
       >
         {{ $i18n('popup_translate_page_link') || 'ترجمه این صفحه' }}
       </a>
@@ -13,50 +13,50 @@
     <div class="toolbar-right-group">
       <IconButton
         icon="side-panel.png"
-        @click="handleOpenSidePanel"
         :title="$i18n('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
         type="toolbar"
+        @click="handleOpenSidePanel"
       />
       <IconButton
         icon="select.png"
-        @click="handleSelectElement"
         :alt="$i18n('popup_select_element_alt_icon') || 'Select Element'"
         :title="$i18n('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
         :class="{ active: isSelectModeActive }"
+        @click="handleSelectElement"
       />
       <IconButton
         icon="clear.png"
-        @click="handleClearStorage"
         :title="$i18n('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
         :alt="$i18n('popup_clear_storage_alt_icon') || 'Clear Fields'"
         type="toolbar"
+        @click="handleClearStorage"
       />
       <IconButton
         icon="revert.png"
-        @click="handleRevert"
         :alt="$i18n('popup_revert_alt_icon') || 'Revert'"
         :title="$i18n('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
         type="toolbar"
         variant="revert"
+        @click="handleRevert"
       />
       <IconButton
         icon="settings.png"
-        @click="handleOpenSettings"
         :alt="$i18n('popup_settings_alt_icon') || 'Settings'"
         :title="$i18n('popup_settings_title_icon') || 'تنظیمات'"
         type="toolbar"
+        @click="handleOpenSettings"
       />
       <label
         class="switch"
         :title="$i18n('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
       >
         <input 
-          type="checkbox" 
-          v-model="excludeCurrentPage"
+          v-model="excludeCurrentPage" 
+          type="checkbox"
           @change="handleExcludeToggle"
-        />
-        <span class="slider round"></span>
+        >
+        <span class="slider round" />
       </label>
     </div>
   </div>
@@ -66,6 +66,7 @@
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
+import { useMessaging } from '@/composables/useMessaging.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 
@@ -78,6 +79,7 @@ const {
   toggleSelectElement,
   error: selectElementError
 } = useSelectElementTranslation()
+const { sendMessage } = useMessaging('popup')
 
 // State
 const excludeCurrentPage = ref(false)
@@ -102,23 +104,7 @@ const handleTranslatePage = async () => {
 
 const handleOpenSidePanel = async () => {
   try {
-    
-    // For Chrome, find the current tab and open its side panel
-    if (browser.sidePanel) {
-      const [activeTab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
-      if (activeTab) {
-        await browser.sidePanel.open({ tabId: activeTab.id })
-      }
-    }
-    // For Firefox, just open the sidebar
-    else if (browser.sidebarAction) {
-      await browser.sidebarAction.open()
-    }
-
-    // Close the popup after the action is initiated
+    await sendMessage({ action: 'openSidePanel' })
     window.close()
   } catch (error) {
     console.error('Error opening side panel from popup:', error)
@@ -128,34 +114,20 @@ const handleOpenSidePanel = async () => {
 const handleSelectElement = async () => {
   try {
     console.log('[PopupHeader] Select element button clicked')
-    
-    // Use Vue composable instead of direct message
     await toggleSelectElement()
-    
     console.log('[PopupHeader] Select element mode toggled successfully')
-    
-    // Close popup after activation
     window.close()
   } catch (error) {
-    console.error('[PopupHeader] Error toggling select element mode:', error)
-    
-    // Show error if composable provides it
-    if (selectElementError.value) {
-      console.error('[PopupHeader] Select element error:', selectElementError.value)
-    }
+    console.error('[PopupHeader] Error toggling select element mode:', error, selectElementError.value)
   }
 }
 
 const handleClearStorage = () => {
-  // Emit event to clear translation form
-  // This will be handled by parent component
   const event = new CustomEvent('clear-storage')
   document.dispatchEvent(event)
 }
 
 const handleRevert = () => {
-  // Emit event to revert translation
-  // This will be handled by parent component
   const event = new CustomEvent('revert-translation')
   document.dispatchEvent(event)
 }
@@ -177,7 +149,7 @@ const handleExcludeToggle = async () => {
     })
     
     if (activeTab) {
-      await browser.runtime.sendMessage({
+      await sendMessage({
         action: "setExcludeCurrentPage",
         data: {
           exclude: excludeCurrentPage.value,
@@ -199,7 +171,7 @@ onMounted(async () => {
     })
     
     if (activeTab) {
-      const response = await browser.runtime.sendMessage({
+      const response = await sendMessage({
         action: "isCurrentPageExcluded",
         data: { url: activeTab.url },
       })

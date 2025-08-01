@@ -1,18 +1,38 @@
 <template>
-  <div id="historyPanel" class="history-panel">
+  <div
+    id="historyPanel"
+    class="history-panel"
+  >
     <div class="history-header">
-      <h3 :data-i18n="$i18n('SIDEPANEL_HISTORY_TITLE')">Translation History</h3>
-      <button id="closeHistoryBtn" class="close-btn" @click="handleClose">✕</button>
+      <h3 :data-i18n="$i18n('SIDEPANEL_HISTORY_TITLE')">
+        Translation History
+      </h3>
+      <button
+        id="closeHistoryBtn"
+        class="close-btn"
+        @click="handleClose"
+      >
+        ✕
+      </button>
     </div>
-    <div id="historyList" class="history-list">
+    <div
+      id="historyList"
+      class="history-list"
+    >
       <template v-if="isLoading">
-        <div class="loading-message">Loading history...</div>
+        <div class="loading-message">
+          Loading history...
+        </div>
       </template>
       <template v-else-if="historyError">
-        <div class="error-message">{{ historyError }}</div>
+        <div class="error-message">
+          {{ historyError }}
+        </div>
       </template>
       <template v-else-if="!hasHistory">
-        <div class="empty-message">No translation history yet</div>
+        <div class="empty-message">
+          No translation history yet
+        </div>
       </template>
       <template v-else>
         <div
@@ -27,15 +47,29 @@
             </div>
             <div class="history-item-actions">
               <span class="timestamp">{{ item.formattedTime }}</span>
-              <button class="delete-btn" title="Delete this item" @click.stop="handleDeleteHistoryItem(item.index, $event)">
-                <img src="@/assets/icons/trash-small.svg" alt="Delete" class="delete-icon" />
+              <button
+                class="delete-btn"
+                title="Delete this item"
+                @click.stop="handleDeleteHistoryItem(item.index, $event)"
+              >
+                <img
+                  src="@/assets/icons/trash-small.svg"
+                  alt="Delete"
+                  class="delete-icon"
+                >
               </button>
             </div>
           </div>
           <div class="history-item-content">
-            <div class="source-text">{{ truncateText(item.sourceText) }}</div>
-            <div class="arrow">↓</div>
-            <div class="translated-text">{{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}</div>
+            <div class="source-text">
+              {{ truncateText(item.sourceText) }}
+            </div>
+            <div class="arrow">
+              ↓
+            </div>
+            <div class="translated-text">
+              {{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}
+            </div>
           </div>
         </div>
       </template>
@@ -52,10 +86,8 @@
           src="@assets/icons/trash.svg"
           alt="Clear All"
           class="clear-all-icon"
-        />
-        <span :data-i18n="$i18n('SIDEPANEL_CLEAR_ALL_HISTORY')"
-          >Clear All History</span
         >
+        <span :data-i18n="$i18n('SIDEPANEL_CLEAR_ALL_HISTORY')">Clear All History</span>
       </button>
     </div>
   </div>

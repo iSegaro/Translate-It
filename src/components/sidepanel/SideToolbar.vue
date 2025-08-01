@@ -16,7 +16,7 @@
           src="@/assets/icons/select.png"
           alt="Select Element"
           class="toolbar-icon"
-        />
+        >
       </button>
 
       <!-- Revert Action Button -->
@@ -30,7 +30,7 @@
           src="@/assets/icons/revert.png" 
           alt="Revert" 
           class="toolbar-icon" 
-        />
+        >
       </button>
 
       <!-- Clear Fields Button -->
@@ -43,10 +43,10 @@
           src="@/assets/icons/clear.png"
           alt="Clear Fields"
           class="toolbar-icon"
-        />
+        >
       </button>
 
-      <div class="toolbar-separator"></div>
+      <div class="toolbar-separator" />
 
       <!-- API Provider Button -->
       <button
@@ -58,7 +58,7 @@
           :src="apiProviderIcon"
           alt="API Provider"
           class="toolbar-icon"
-        />
+        >
       </button>
 
       <!-- History Button -->
@@ -71,7 +71,7 @@
           src="@/assets/icons/history.svg"
           alt="History"
           class="toolbar-icon"
-        />
+        >
       </button>
     </div>
 
@@ -86,7 +86,7 @@
           src="@/assets/icons/settings.png"
           alt="Settings"
           class="toolbar-icon"
-        />
+        >
       </button>
     </div>
   </div>

@@ -1,9 +1,13 @@
 <template>
   <div class="general-settings">
-    <h2 class="page-title">General Settings</h2>
+    <h2 class="page-title">
+      General Settings
+    </h2>
     
     <div class="settings-section">
-      <h3 class="section-title">Extension</h3>
+      <h3 class="section-title">
+        Extension
+      </h3>
       
       <div class="setting-item">
         <label class="setting-label">
@@ -22,7 +26,9 @@
     </div>
     
     <div class="settings-section">
-      <h3 class="section-title">Translation</h3>
+      <h3 class="section-title">
+        Translation
+      </h3>
       
       <div class="setting-item">
         <label class="setting-label-text">Default Source Language</label>
@@ -31,10 +37,18 @@
           class="setting-select"
           @change="handleSettingChange('sourceLanguage', $event.target.value)"
         >
-          <option value="auto">Auto Detect</option>
-          <option value="en">English</option>
-          <option value="fa">Persian</option>
-          <option value="ar">Arabic</option>
+          <option value="auto">
+            Auto Detect
+          </option>
+          <option value="en">
+            English
+          </option>
+          <option value="fa">
+            Persian
+          </option>
+          <option value="ar">
+            Arabic
+          </option>
         </select>
       </div>
       
@@ -45,15 +59,23 @@
           class="setting-select"
           @change="handleSettingChange('targetLanguage', $event.target.value)"
         >
-          <option value="en">English</option>
-          <option value="fa">Persian</option>
-          <option value="ar">Arabic</option>
+          <option value="en">
+            English
+          </option>
+          <option value="fa">
+            Persian
+          </option>
+          <option value="ar">
+            Arabic
+          </option>
         </select>
       </div>
     </div>
     
     <div class="settings-section">
-      <h3 class="section-title">Appearance</h3>
+      <h3 class="section-title">
+        Appearance
+      </h3>
       
       <div class="setting-item">
         <label class="setting-label-text">Theme</label>
@@ -62,9 +84,15 @@
           class="setting-select"
           @change="handleSettingChange('theme', $event.target.value)"
         >
-          <option value="auto">Auto (System)</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
+          <option value="auto">
+            Auto (System)
+          </option>
+          <option value="light">
+            Light
+          </option>
+          <option value="dark">
+            Dark
+          </option>
         </select>
       </div>
     </div>

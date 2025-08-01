@@ -1,9 +1,9 @@
 <template>
   <div 
     class="screen-selector-overlay" 
+    :class="{ selecting: isSelecting, capturing: isCapturing }"
     @mousedown="startSelection"
     @touchstart="handleTouchStart"
-    :class="{ selecting: isSelecting, capturing: isCapturing }"
   >
     <!-- Selection box -->
     <div 
@@ -13,10 +13,10 @@
     >
       <!-- Selection corners for resize handles -->
       <div class="selection-corners">
-        <div class="corner corner-tl"></div>
-        <div class="corner corner-tr"></div>
-        <div class="corner corner-bl"></div>
-        <div class="corner corner-br"></div>
+        <div class="corner corner-tl" />
+        <div class="corner corner-tr" />
+        <div class="corner corner-bl" />
+        <div class="corner corner-br" />
       </div>
       
       <!-- Selection info -->
@@ -26,9 +26,14 @@
     </div>
     
     <!-- Instructions -->
-    <div class="instruction-panel" :class="{ visible: !hasSelection && !isCapturing }">
+    <div
+      class="instruction-panel"
+      :class="{ visible: !hasSelection && !isCapturing }"
+    >
       <div class="instruction-content">
-        <div class="instruction-icon">📸</div>
+        <div class="instruction-icon">
+          📸
+        </div>
         <div class="instruction-text">
           <h3>Select Area to Translate</h3>
           <p>Click and drag to select text or image area</p>
@@ -41,15 +46,18 @@
     </div>
     
     <!-- Toolbar -->
-    <div class="capture-toolbar" :class="{ visible: hasSelection || isCapturing }">
+    <div
+      class="capture-toolbar"
+      :class="{ visible: hasSelection || isCapturing }"
+    >
       <div class="toolbar-content">
         <!-- Capture options -->
         <div class="capture-options">
           <button 
             class="toolbar-btn capture-btn"
-            @click="confirmSelection" 
-            :disabled="!hasSelection || isCapturing"
+            :disabled="!hasSelection || isCapturing" 
             title="Capture selected area"
+            @click="confirmSelection"
           >
             <span class="btn-icon">📸</span>
             <span class="btn-text">Capture</span>
@@ -57,9 +65,9 @@
           
           <button 
             class="toolbar-btn fullscreen-btn"
-            @click="captureFullScreen"
             :disabled="isCapturing"
             title="Capture entire screen"
+            @click="captureFullScreen"
           >
             <span class="btn-icon">🖼️</span>
             <span class="btn-text">Full Screen</span>
@@ -70,9 +78,9 @@
         <div class="action-buttons">
           <button 
             class="toolbar-btn reset-btn"
-            @click="resetSelection"
             :disabled="isCapturing"
             title="Reset selection"
+            @click="resetSelection"
           >
             <span class="btn-icon">🔄</span>
             <span class="btn-text">Reset</span>
@@ -80,9 +88,9 @@
           
           <button 
             class="toolbar-btn cancel-btn"
-            @click="cancel"
             :disabled="isCapturing"
             title="Cancel capture"
+            @click="cancel"
           >
             <span class="btn-icon">✕</span>
             <span class="btn-text">Cancel</span>
@@ -91,18 +99,29 @@
       </div>
       
       <!-- Loading indicator -->
-      <div v-if="isCapturing" class="capture-loading">
-        <div class="loading-spinner"></div>
+      <div
+        v-if="isCapturing"
+        class="capture-loading"
+      >
+        <div class="loading-spinner" />
         <span>Capturing...</span>
       </div>
     </div>
     
     <!-- Error message -->
-    <div v-if="error" class="error-panel">
+    <div
+      v-if="error"
+      class="error-panel"
+    >
       <div class="error-content">
         <span class="error-icon">⚠️</span>
         <span class="error-text">{{ error }}</span>
-        <button class="error-close" @click="clearError">✕</button>
+        <button
+          class="error-close"
+          @click="clearError"
+        >
+          ✕
+        </button>
       </div>
     </div>
     
@@ -111,7 +130,7 @@
       v-if="showCrosshair" 
       class="crosshair"
       :style="{ left: cursorX + 'px', top: cursorY + 'px' }"
-    ></div>
+    />
   </div>
 </template>
 

@@ -1,11 +1,15 @@
 <template>
-  <div class="sidepanel-container" @click="handleSidepanelClick">
+  <div
+    class="sidepanel-container"
+    @click="handleSidepanelClick"
+  >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
-      @history-toggle="handleHistoryToggle"
-      @api-dropdown-toggle="handleApiDropdownToggle"
       :is-api-dropdown-visible="isApiDropdownVisible"
       :is-history-visible="isHistoryVisible"
+      @history-toggle="handleHistoryToggle"
+      @api-dropdown-toggle="handleApiDropdownToggle"
+      @clear-fields="handleClearFields"
     />
 
     <!-- Content area -->
@@ -31,19 +35,21 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useHistory } from '@/composables/useHistory.js'
-import { useApiProvider } from '@/composables/useApiProvider.js'
-import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
-import SidepanelToolbar from './components/SidepanelToolbar.vue'
-import SidepanelMainContent from './components/SidepanelMainContent.vue'
-import SidepanelHistory from './components/SidepanelHistory.vue'
-import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue'
+import { useTranslationStore } from '@/store/modules/translation';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { useApiProvider } from '@/composables/useApiProvider.js';
+import { useHistory } from '@/composables/useHistory.js';
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
+import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue';
+import SidepanelHistory from './components/SidepanelHistory.vue';
+import SidepanelMainContent from './components/SidepanelMainContent.vue';
+import SidepanelToolbar from './components/SidepanelToolbar.vue';
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const { closeDropdown: closeApiDropdown, setDropdownOpen } = useApiProvider()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
+const translationStore = useTranslationStore()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
@@ -57,20 +63,17 @@ const handleHistoryToggle = (visible) => {
   } else {
     closeHistoryPanel()
   }
-  console.log('[SidepanelLayout] isHistoryVisible toggled to:', visible)
 }
 
 // Handle history panel close
 const handleHistoryClose = () => {
   isHistoryVisible.value = false
   closeHistoryPanel() // Sync with composable state
-  console.log('[SidepanelLayout] handleHistoryClose: isHistoryVisible set to false')
 }
 
 // Handle API dropdown toggle
 const handleApiDropdownToggle = (visible) => {
   isApiDropdownVisible.value = visible
-  console.log('[SidepanelLayout] isApiDropdownVisible toggled to:', visible)
 }
 
 // Watch for changes in isApiDropdownVisible and sync with composable
@@ -82,6 +85,12 @@ watch(isApiDropdownVisible, (newVal) => {
 watch(isHistoryVisible, (newVal) => {
   setHistoryPanelOpen(newVal)
 })
+
+// Handle clear fields event from toolbar
+const handleClearFields = () => {
+  translationStore.currentTranslation = null;
+  translationStore.clearError();
+}
 
 // Handle history item selection
 const handleHistoryItemSelect = (item) => {
@@ -100,7 +109,6 @@ const handleSidepanelClick = async (event) => {
   // Only deactivate if select mode is active
   if (isSelectModeActive.value) {
     try {
-      console.log('[SidepanelLayout] Sidepanel clicked - deactivating select element mode')
       await deactivateSelectMode()
     } catch (error) {
       console.error('[SidepanelLayout] Failed to deactivate select element mode:', error)
@@ -110,13 +118,9 @@ const handleSidepanelClick = async (event) => {
 
 // Handle ESC key in sidepanel
 const handleKeyDown = async (event) => {
-  // Only handle ESC key
   if (event.key !== 'Escape') return
-  
-  // Only deactivate if select mode is active
   if (isSelectModeActive.value) {
     try {
-      console.log('[SidepanelLayout] ESC pressed in sidepanel - deactivating select element mode')
       event.preventDefault()
       event.stopPropagation()
       await deactivateSelectMode()
@@ -128,15 +132,11 @@ const handleKeyDown = async (event) => {
 
 // Lifecycle management for ESC listener
 onMounted(() => {
-  // Add global keydown listener for ESC in sidepanel
   document.addEventListener('keydown', handleKeyDown, { capture: true })
-  console.log('[SidepanelLayout] ESC listener added to sidepanel')
 })
 
 onUnmounted(() => {
-  // Remove global keydown listener
   document.removeEventListener('keydown', handleKeyDown, { capture: true })
-  console.log('[SidepanelLayout] ESC listener removed from sidepanel')
 })
 </script>
 

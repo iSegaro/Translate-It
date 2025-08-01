@@ -1,15 +1,30 @@
 <template>
   <div class="extension-sidepanel">
-    <div v-if="isLoading" class="loading-container">
+    <div
+      v-if="isLoading"
+      class="loading-container"
+    >
       <LoadingSpinner size="lg" />
       <span class="loading-text">{{ loadingText }}</span>
     </div>
     
-    <div v-else-if="hasError" class="error-container">
-      <div class="error-icon">⚠️</div>
+    <div
+      v-else-if="hasError"
+      class="error-container"
+    >
+      <div class="error-icon">
+        ⚠️
+      </div>
       <h2>{{ $i18n('sidepanel_load_error_title') || 'Failed to Load Sidepanel' }}</h2>
-      <p class="error-message">{{ errorMessage }}</p>
-      <button @click="retryLoading" class="retry-button">{{ $i18n('retry_button') || 'Retry' }}</button>
+      <p class="error-message">
+        {{ errorMessage }}
+      </p>
+      <button
+        class="retry-button"
+        @click="retryLoading"
+      >
+        {{ $i18n('retry_button') || 'Retry' }}
+      </button>
     </div>
     
     <template v-else>

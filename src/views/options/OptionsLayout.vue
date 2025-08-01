@@ -1,5 +1,8 @@
 <template>
-  <div class="options-layout" :class="{ 'rtl': isRTL }">
+  <div
+    class="options-layout"
+    :class="{ 'rtl': isRTL }"
+  >
     <OptionsSidebar />
     <main class="options-main">
       <OptionsNavigation />

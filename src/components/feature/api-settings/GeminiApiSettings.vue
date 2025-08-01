@@ -31,14 +31,20 @@
         class="model-select"
       />
     </div>
-    <div v-if="geminiModel !== 'custom'" class="setting-group">
+    <div
+      v-if="geminiModel !== 'custom'"
+      class="setting-group"
+    >
       <label>{{ $i18n('gemini_thinking_label') || 'Enable Thinking Mode' }}</label>
       <BaseCheckbox v-model="geminiThinking" />
       <span class="setting-description">
         {{ $i18n('gemini_thinking_description') || 'Allow the model to think step-by-step before responding.' }}
       </span>
     </div>
-    <div v-if="geminiModel === 'custom'" class="setting-group">
+    <div
+      v-if="geminiModel === 'custom'"
+      class="setting-group"
+    >
       <label>{{ $i18n('gemini_api_url_label') || 'API URL' }}</label>
       <BaseInput
         v-model="geminiCustomUrl"

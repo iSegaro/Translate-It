@@ -1,11 +1,22 @@
 <template>
-  <div id="apiProviderDropdown" class="dropdown-menu" ref="dropdownMenu">
-    <div class="dropdown-content" ref="dropdownContent">
+  <div
+    id="apiProviderDropdown"
+    ref="dropdownMenu"
+    class="dropdown-menu"
+  >
+    <div
+      ref="dropdownContent"
+      class="dropdown-content"
+    >
       <template v-if="isLoading">
-        <div class="loading-message">Loading providers...</div>
+        <div class="loading-message">
+          Loading providers...
+        </div>
       </template>
       <template v-else-if="!hasProviders">
-        <div class="empty-message">No providers available</div>
+        <div class="empty-message">
+          No providers available
+        </div>
       </template>
       <template v-else>
         <ApiProviderItem

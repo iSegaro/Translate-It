@@ -6,11 +6,17 @@
     @click="handleClick"
   >
     <div class="provider-icon">
-      <img :src="item.iconUrl" :alt="item.name" />
+      <img
+        :src="item.iconUrl"
+        :alt="item.name"
+      >
     </div>
     <div class="provider-info">
       <span class="provider-name">{{ item.name }}</span>
-      <span v-if="item.isActive" class="active-indicator">Current</span>
+      <span
+        v-if="item.isActive"
+        class="active-indicator"
+      >Current</span>
     </div>
   </div>
 </template>

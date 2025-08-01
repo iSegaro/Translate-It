@@ -31,7 +31,10 @@
         class="model-select"
       />
     </div>
-    <div v-if="deepseekApiModel === 'custom'" class="setting-group">
+    <div
+      v-if="deepseekApiModel === 'custom'"
+      class="setting-group"
+    >
       <label>{{ $i18n('deepseek_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput
         v-model="deepseekCustomModel"

@@ -1,6 +1,8 @@
 <template>
   <div class="advanced-features">
-    <h3 class="section-title">Advanced Features</h3>
+    <h3 class="section-title">
+      Advanced Features
+    </h3>
     
     <div class="features-grid">
       <BaseButton

@@ -10,12 +10,17 @@
     </router-link>
     
     <div class="tabs-action-area">
-      <div id="status" :class="`status-${statusType}`">{{ statusMessage }}</div>
+      <div
+        id="status"
+        :class="`status-${statusType}`"
+      >
+        {{ statusMessage }}
+      </div>
       <button 
         id="saveSettings" 
-        @click="saveAllSettings"
         :disabled="isSaving"
         class="save-button"
+        @click="saveAllSettings"
       >
         {{ $i18n('save_settings_button') || 'Save' }}
       </button>
