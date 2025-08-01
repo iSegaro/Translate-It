@@ -71,6 +71,7 @@ class BackgroundService {
     
     // Manual registration for case-sensitive actions
     this.messageHandler.registerHandler('TRANSLATE', Handlers.handleTranslate);
+    this.messageHandler.registerHandler('TTS_SPEAK', Handlers.handleSpeak);
   }
 
   /**
