@@ -1,11 +1,11 @@
-// src/components/core/__tests__/MessagingStandards.test.js
+// src/components/core/__tests__/MessagingCore.test.js
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { 
-  MessagingStandards, 
-  MessagingContexts, 
-  MessageActions, 
+  MessagingCore, 
+  MessageContexts, 
   MessageFormat 
-} from '@/core/MessagingStandards.js';
+} from '../core/MessagingCore.js';
+import { MessageActions } from '../core/MessageActions.js';
 
 // Mock EnhancedUnifiedMessenger
 vi.mock('@/core/EnhancedUnifiedMessenger.js', () => ({
@@ -16,35 +16,35 @@ vi.mock('@/core/EnhancedUnifiedMessenger.js', () => ({
   }))
 }));
 
-describe('MessagingStandards', () => {
+describe('MessagingCore', () => {
   beforeEach(() => {
     // Clear instances before each test
-    MessagingStandards.clearInstances();
+    MessagingCore.clearInstances();
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    MessagingStandards.clearInstances();
+    MessagingCore.clearInstances();
   });
 
   describe('Messenger Factory', () => {
     test('should create messenger instance for valid context', () => {
-      const messenger = MessagingStandards.getMessenger('popup');
+      const messenger = MessagingCore.getMessenger('popup');
       
       expect(messenger).toBeDefined();
       expect(messenger.context).toBe('popup');
     });
 
     test('should return same instance for same context (singleton)', () => {
-      const messenger1 = MessagingStandards.getMessenger('popup');
-      const messenger2 = MessagingStandards.getMessenger('popup');
+      const messenger1 = MessagingCore.getMessenger('popup');
+      const messenger2 = MessagingCore.getMessenger('popup');
       
       expect(messenger1).toBe(messenger2);
     });
 
     test('should create different instances for different contexts', () => {
-      const popupMessenger = MessagingStandards.getMessenger('popup');
-      const sidepanelMessenger = MessagingStandards.getMessenger('sidepanel');
+      const popupMessenger = MessagingCore.getMessenger('popup');
+      const sidepanelMessenger = MessagingCore.getMessenger('sidepanel');
       
       expect(popupMessenger).not.toBe(sidepanelMessenger);
       expect(popupMessenger.context).toBe('popup');
@@ -54,7 +54,7 @@ describe('MessagingStandards', () => {
     test('should warn for unknown context but still create messenger', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       
-      const messenger = MessagingStandards.getMessenger('unknown-context');
+      const messenger = MessagingCore.getMessenger('unknown-context');
       
       expect(messenger).toBeDefined();
       expect(messenger.context).toBe('unknown-context');
@@ -68,7 +68,7 @@ describe('MessagingStandards', () => {
 
   describe('Message Format', () => {
     test('should create standardized message format', () => {
-      const message = MessagingStandards.standardMessageFormat(
+      const message = MessagingCore.standardMessageFormat(
         'TEST_ACTION',
         { test: 'data' },
         'popup',
@@ -88,19 +88,19 @@ describe('MessagingStandards', () => {
 
     test('should throw error for missing action', () => {
       expect(() => {
-        MessagingStandards.standardMessageFormat('', { test: 'data' }, 'popup');
+        MessagingCore.standardMessageFormat('', { test: 'data' }, 'popup');
       }).toThrow('Action is required and must be a string');
     });
 
     test('should throw error for missing context', () => {
       expect(() => {
-        MessagingStandards.standardMessageFormat('TEST_ACTION', { test: 'data' }, '');
+        MessagingCore.standardMessageFormat('TEST_ACTION', { test: 'data' }, '');
       }).toThrow('Context is required and must be a string');
     });
 
     test('should generate unique message IDs', () => {
-      const id1 = MessagingStandards.generateMessageId('popup');
-      const id2 = MessagingStandards.generateMessageId('popup');
+      const id1 = MessagingCore.generateMessageId('popup');
+      const id2 = MessagingCore.generateMessageId('popup');
       
       expect(id1).not.toBe(id2);
       expect(id1).toMatch(/^popup-\d+-[a-z0-9]+$/);
@@ -110,11 +110,11 @@ describe('MessagingStandards', () => {
 
   describe('Statistics and Management', () => {
     test('should track active contexts', () => {
-      MessagingStandards.getMessenger('popup');
-      MessagingStandards.getMessenger('sidepanel');
-      MessagingStandards.getMessenger('content');
+      MessagingCore.getMessenger('popup');
+      MessagingCore.getMessenger('sidepanel');
+      MessagingCore.getMessenger('content');
 
-      const activeContexts = MessagingStandards.getActiveContexts();
+      const activeContexts = MessagingCore.getActiveContexts();
       
       expect(activeContexts).toHaveLength(3);
       expect(activeContexts).toContain('popup');
@@ -123,10 +123,10 @@ describe('MessagingStandards', () => {
     });
 
     test('should provide statistics', () => {
-      MessagingStandards.getMessenger('popup');
-      MessagingStandards.getMessenger('sidepanel');
+      MessagingCore.getMessenger('popup');
+      MessagingCore.getMessenger('sidepanel');
 
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       
       expect(stats.totalInstances).toBe(2);
       expect(stats.activeContexts).toEqual(['popup', 'sidepanel']);
@@ -137,20 +137,20 @@ describe('MessagingStandards', () => {
     });
 
     test('should clear all instances', () => {
-      MessagingStandards.getMessenger('popup');
-      MessagingStandards.getMessenger('sidepanel');
+      MessagingCore.getMessenger('popup');
+      MessagingCore.getMessenger('sidepanel');
       
-      expect(MessagingStandards.getActiveContexts()).toHaveLength(2);
+      expect(MessagingCore.getActiveContexts()).toHaveLength(2);
       
-      MessagingStandards.clearInstances();
+      MessagingCore.clearInstances();
       
-      expect(MessagingStandards.getActiveContexts()).toHaveLength(0);
+      expect(MessagingCore.getActiveContexts()).toHaveLength(0);
     });
   });
 
   describe('Common Messengers', () => {
     test('should create pre-configured common messengers', () => {
-      const messengers = MessagingStandards.createCommonMessengers();
+      const messengers = MessagingCore.createCommonMessengers();
       
       expect(messengers).toHaveProperty('popup');
       expect(messengers).toHaveProperty('sidepanel');
@@ -169,26 +169,26 @@ describe('MessagingStandards', () => {
     test('should add request interceptors', () => {
       const interceptor = vi.fn();
       
-      MessagingStandards.addRequestInterceptor(interceptor);
+      MessagingCore.addRequestInterceptor(interceptor);
       
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       expect(stats.requestInterceptors).toBe(1);
     });
 
     test('should add response interceptors', () => {
       const interceptor = vi.fn();
       
-      MessagingStandards.addResponseInterceptor(interceptor);
+      MessagingCore.addResponseInterceptor(interceptor);
       
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       expect(stats.responseInterceptors).toBe(1);
     });
 
     test('should ignore non-function interceptors', () => {
-      MessagingStandards.addRequestInterceptor('not a function');
-      MessagingStandards.addResponseInterceptor(null);
+      MessagingCore.addRequestInterceptor('not a function');
+      MessagingCore.addResponseInterceptor(null);
       
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       expect(stats.requestInterceptors).toBe(0);
       expect(stats.responseInterceptors).toBe(0);
     });
@@ -196,10 +196,10 @@ describe('MessagingStandards', () => {
 
   describe('Messenger Testing', () => {
     test('should test all messengers successfully', async () => {
-      MessagingStandards.getMessenger('popup');
-      MessagingStandards.getMessenger('sidepanel');
+      MessagingCore.getMessenger('popup');
+      MessagingCore.getMessenger('sidepanel');
 
-      const results = await MessagingStandards.testAllMessengers();
+      const results = await MessagingCore.testAllMessengers();
       
       expect(results.success).toBe(true);
       expect(results.results).toHaveProperty('popup');
@@ -215,9 +215,9 @@ describe('MessagingStandards', () => {
         testSpecializedMessengers: vi.fn().mockRejectedValue(new Error('Test failed'))
       };
       
-      MessagingStandards.instances.set('failing', failingMessenger);
+      MessagingCore.instances.set('failing', failingMessenger);
 
-      const results = await MessagingStandards.testAllMessengers();
+      const results = await MessagingCore.testAllMessengers();
       
       expect(results.success).toBe(false);
       expect(results.results.failing.success).toBe(false);
@@ -231,9 +231,9 @@ describe('MessagingStandards', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
       
-      MessagingStandards.setupDevelopmentLogging();
+      MessagingCore.setupDevelopmentLogging();
       
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       expect(stats.requestInterceptors).toBe(1);
       expect(stats.responseInterceptors).toBe(1);
       
@@ -245,9 +245,9 @@ describe('MessagingStandards', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
       
-      MessagingStandards.setupDevelopmentLogging();
+      MessagingCore.setupDevelopmentLogging();
       
-      const stats = MessagingStandards.getStatistics();
+      const stats = MessagingCore.getStatistics();
       expect(stats.requestInterceptors).toBe(0);
       expect(stats.responseInterceptors).toBe(0);
       

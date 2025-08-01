@@ -1,9 +1,9 @@
 import { ref, onUnmounted } from "vue";
-import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
 
 export function useExtensionAPI() {
   // Enhanced messaging for Vue extension API
-  const messenger = MessagingStandards.getMessenger('vue-extension-api');
+  const messenger = MessagingCore.getMessenger('vue-extension-api');
   const isConnected = ref(true);
   const messageListeners = ref([]);
 

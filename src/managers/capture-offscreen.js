@@ -2,7 +2,7 @@
 // Chrome offscreen document screen capture manager
 
 import browser from "webextension-polyfill";
-import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
 
 /**
  * Offscreen Screen Capture Manager for Chrome
@@ -15,7 +15,7 @@ export class OffscreenCaptureManager {
     this.initialized = false;
     
     // Enhanced messaging with context-aware capture
-    this.messenger = MessagingStandards.getMessenger('capture-manager');
+    this.messenger = MessagingCore.getMessenger('capture-manager');
   }
 
   /**

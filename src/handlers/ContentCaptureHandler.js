@@ -1,4 +1,4 @@
-import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
@@ -11,7 +11,7 @@ export class ContentCaptureHandler {
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
-    this.messenger = MessagingStandards.getMessenger('content');
+    this.messenger = MessagingCore.getMessenger('content');
     this.handleAreaSelectionComplete = this.handleAreaSelectionComplete.bind(this);
     this.handlePreviewConfirm = this.handlePreviewConfirm.bind(this);
     this.handlePreviewCancel = this.handlePreviewCancel.bind(this);

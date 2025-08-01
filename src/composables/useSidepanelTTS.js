@@ -3,7 +3,7 @@
 import { ref } from "vue";
 import browser from "webextension-polyfill";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-import { MessagingStandards } from "@/core/MessagingStandards.js";
+import { MessagingCore } from "@/messaging/core/MessagingCore.js";
 
 export function useSidepanelTTS() {
   // State
@@ -11,7 +11,7 @@ export function useSidepanelTTS() {
   const ttsError = ref("");
   
   // Enhanced messaging for TTS operations
-  const messenger = MessagingStandards.getMessenger('sidepanel');
+  const messenger = MessagingCore.getMessenger('sidepanel');
 
   // Speak text using background script TTS (matches original ttsManager.js)
   const speakText = async (text, lang = AUTO_DETECT_VALUE) => {

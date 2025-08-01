@@ -2,7 +2,7 @@
 // Chrome offscreen document TTS implementation
 
 import browser from "webextension-polyfill";
-import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
 
 /**
  * Offscreen TTS Manager for Chrome
@@ -18,7 +18,7 @@ export class OffscreenTTSManager {
     this.offscreenReady = false;
     
     // Enhanced messaging with context-aware TTS
-    this.messenger = MessagingStandards.getMessenger('tts-manager');
+    this.messenger = MessagingCore.getMessenger('tts-manager');
   }
 
   /**
@@ -565,7 +565,7 @@ export class OffscreenTTSManager {
       console.log("🔄 Trying content script TTS fallback via MessageRouter");
 
       // Use MessagingStandards for content script TTS fallback
-      const contentMessenger = MessagingStandards.getMessenger('content');
+      const contentMessenger = MessagingCore.getMessenger('content');
       const response = await Promise.race([
         contentMessenger.sendMessage({
           action: "TTS_SPEAK_CONTENT",
@@ -610,7 +610,7 @@ export class OffscreenTTSManager {
         const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}&client=gtx&ttsspeed=${options.rate || 1}`;
 
         // Use MessagingStandards for offscreen Google TTS fallback
-        const offscreenMessenger = MessagingStandards.getMessenger('offscreen');
+        const offscreenMessenger = MessagingCore.getMessenger('offscreen');
         const response = await offscreenMessenger.sendMessage({
           action: "playOffscreenAudio",
           target: "offscreen",

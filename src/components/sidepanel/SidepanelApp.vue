@@ -94,7 +94,7 @@ import { useLanguages } from '@/composables/useLanguages.js'
 import { useI18n } from '@/composables/useI18n.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { logME } from '@/utils/helpers.js'
-import { MessageActions } from '../../core/MessageActions'
+import { MessageActions } from '@/messaging/core/MessageActions.js'
 
 // Composables
 const sidepanelTranslation = useSidepanelTranslation()

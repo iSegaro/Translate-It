@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { useMessaging } from '@/composables/useMessaging.js';
+import { useMessaging } from '@/messaging/composables/useMessaging.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useUI } from '@/composables/useUI.js';
 import { computed, ref } from 'vue';

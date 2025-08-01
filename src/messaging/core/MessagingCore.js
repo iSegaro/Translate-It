@@ -1,11 +1,11 @@
 /**
- * Messaging Standards - Factory and standardization system for extension messaging
+ * MessagingCore - Unified messaging system core
+ * Combines MessagingStandards factory with EnhancedUnifiedMessenger functionality
  * Provides context-specific messengers with standardized message formats
- * Implements singleton pattern for efficient resource management
  */
 
-import { EnhancedUnifiedMessenger } from "./EnhancedUnifiedMessenger.js";
-import { MessageActions } from "./MessageActions.js";
+import { EnhancedUnifiedMessenger } from '../../core/EnhancedUnifiedMessenger.js';
+import { MessageActions } from './MessageActions.js';
 
 /**
  * Standard message format interface
@@ -124,7 +124,7 @@ export class MessageFormat {
 /**
  * Context definitions for different extension contexts
  */
-export class MessagingContexts {
+export class MessageContexts {
   static POPUP = "popup";
   static SIDEPANEL = "sidepanel";
   static OPTIONS = "options";
@@ -168,9 +168,10 @@ export class MessagingContexts {
 }
 
 /**
- * Messaging Standards - Main factory and management class
+ * MessagingCore - Main factory and management class
+ * Combines the factory pattern from MessagingStandards with unified messaging capabilities
  */
-export class MessagingStandards {
+export class MessagingCore {
   /**
    * Singleton instances storage
    * @private
@@ -193,9 +194,9 @@ export class MessagingStandards {
    */
   static getMessenger(context) {
     // Validate context
-    if (!MessagingContexts.isValidContext(context)) {
+    if (!MessageContexts.isValidContext(context)) {
       console.warn(
-        `[MessagingStandards] Unknown context: ${context}, using as-is`
+        `[MessagingCore] Unknown context: ${context}, using as-is`
       );
     }
 
@@ -205,7 +206,7 @@ export class MessagingStandards {
       this.instances.set(context, messenger);
 
       console.log(
-        `[MessagingStandards] Created new messenger for context: ${context}`
+        `[MessagingCore] Created new messenger for context: ${context}`
       );
     }
 
@@ -270,7 +271,7 @@ export class MessagingStandards {
    */
   static clearInstances() {
     this.instances.clear();
-    console.log("[MessagingStandards] All messenger instances cleared");
+    console.log("[MessagingCore] All messenger instances cleared");
   }
 
   /**
@@ -334,13 +335,13 @@ export class MessagingStandards {
    */
   static createCommonMessengers() {
     return {
-      popup: this.getMessenger(MessagingContexts.POPUP),
-      sidepanel: this.getMessenger(MessagingContexts.SIDEPANEL),
-      options: this.getMessenger(MessagingContexts.OPTIONS),
-      select_element: this.getMessenger(MessagingContexts.SELECT_ELEMENT),
-      content: this.getMessenger(MessagingContexts.CONTENT),
-      background: this.getMessenger(MessagingContexts.BACKGROUND),
-      eventHandler: this.getMessenger(MessagingContexts.EVENT_HANDLER),
+      popup: this.getMessenger(MessageContexts.POPUP),
+      sidepanel: this.getMessenger(MessageContexts.SIDEPANEL),
+      options: this.getMessenger(MessageContexts.OPTIONS),
+      select_element: this.getMessenger(MessageContexts.SELECT_ELEMENT),
+      content: this.getMessenger(MessageContexts.CONTENT),
+      background: this.getMessenger(MessageContexts.BACKGROUND),
+      eventHandler: this.getMessenger(MessageContexts.EVENT_HANDLER),
     };
   }
 
@@ -355,7 +356,7 @@ export class MessagingStandards {
 
     // Request logging
     this.addRequestInterceptor((message, context) => {
-      console.group(`[MessagingStandards:${context}] 📤 Request`);
+      console.group(`[MessagingCore:${context}] 📤 Request`);
       console.log("Action:", message.action);
       console.log("Data:", message.data);
       console.log("MessageId:", message.messageId);
@@ -364,7 +365,7 @@ export class MessagingStandards {
 
     // Response logging
     this.addResponseInterceptor((response, context, originalMessage) => {
-      console.group(`[MessagingStandards:${context}] 📥 Response`);
+      console.group(`[MessagingCore:${context}] 📥 Response`);
       console.log("Original Action:", originalMessage?.action);
       console.log("Success:", response?.success);
       console.log("Data:", response?.data);
@@ -372,12 +373,16 @@ export class MessagingStandards {
       console.groupEnd();
     });
 
-    console.log("[MessagingStandards] Development logging enabled");
+    console.log("[MessagingCore] Development logging enabled");
   }
 }
 
 // Export constants for easy access
-export { MessagingContexts as Contexts };
+export { MessageContexts as Contexts };
 export { MessageActions as Actions };
 
-export default MessagingStandards;
+// Maintain backward compatibility
+export const MessagingStandards = MessagingCore;
+export const MessagingContexts = MessageContexts;
+
+export default MessagingCore;

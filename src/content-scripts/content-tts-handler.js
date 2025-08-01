@@ -2,7 +2,7 @@
 // Content script TTS handler for fallback TTS functionality
 
 import browser from "webextension-polyfill";
-import { MessageActions } from "../core/MessageActions";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
  * Content Script TTS Handler

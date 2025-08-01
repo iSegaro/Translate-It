@@ -1,7 +1,7 @@
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { MessageFormat } from '../../../core/MessagingStandards.js';
-import { MessageActions } from '../../../core/MessageActions.js';
+import { MessageFormat } from '../../../messaging/core/MessagingCore.js';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const errorHandler = new ErrorHandler();
 

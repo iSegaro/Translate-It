@@ -1,6 +1,6 @@
 import { ref, onMounted } from 'vue';
 import browser from 'webextension-polyfill';
-import { MessagingStandards } from '../core/MessagingStandards.js';
+import { MessagingCore } from '../messaging/core/MessagingCore.js';
 import storageManager from '../core/StorageManager.js';
 
 // Global state for API readiness
@@ -43,7 +43,7 @@ export function useBrowserAPI(context = 'vue-generic') {
   const isLoading = ref(!globalApiReady.value);
 
   // Get context-specific messenger
-  const messenger = MessagingStandards.getMessenger(context);
+  const messenger = MessagingCore.getMessenger(context);
 
   const updateState = () => {
     isReady.value = globalApiReady.value;

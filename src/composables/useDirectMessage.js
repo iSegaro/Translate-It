@@ -3,7 +3,7 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
-import { MessageActions } from "../core/MessageActions";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export function useDirectMessage() {
   const isReady = ref(false);

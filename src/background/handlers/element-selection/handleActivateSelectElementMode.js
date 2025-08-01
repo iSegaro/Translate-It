@@ -2,8 +2,8 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { MessageFormat, MessagingContexts } from '../../../core/MessagingStandards.js';
-import { MessageActions } from '../../../core/MessageActions.js';
+import { MessageFormat, MessagingContexts } from '../../../messaging/core/MessagingCore.js';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const errorHandler = new ErrorHandler();
 

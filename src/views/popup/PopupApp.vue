@@ -44,7 +44,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useMessaging } from '@/composables/useMessaging.js'
+import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageControls from '@/components/popup/LanguageControls.vue'

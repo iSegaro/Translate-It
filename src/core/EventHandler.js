@@ -29,7 +29,8 @@ import SelectionWindows from "../managers/SelectionWindows.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
 import { UnifiedMessenger } from "./UnifiedMessenger.js"; // Add this import
-import { MessagingContexts } from "./MessagingStandards.js";
+import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { MessageActions } from "../messaging/core/MessageActions.js";
 
 export default class EventHandler {
   /** @param {object} translationHandler

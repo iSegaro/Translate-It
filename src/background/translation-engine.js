@@ -5,7 +5,7 @@
 
 import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
 import storageManager from "../core/StorageManager.js";
-import { MessageActions } from "../core/MessageActions.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export class TranslationEngine {
   constructor() {

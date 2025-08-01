@@ -8,8 +8,8 @@ import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import NotificationManager from "@/managers/NotificationManager.js";
 import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
-import { MessagingContexts } from "../core/MessagingStandards.js";
-import { MessageActions } from "../core/MessageActions.js";
+import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
  * SelectElementManager - Vue-compatible element selection system

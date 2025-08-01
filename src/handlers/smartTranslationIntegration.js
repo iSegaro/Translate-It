@@ -1,4 +1,4 @@
-import { MessagingStandards } from "../core/MessagingStandards.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import { getTranslationString } from "../utils/i18n.js";
@@ -6,7 +6,7 @@ import { logME } from "../utils/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isComplexEditor } from "../utils/framework-compat/index.js";
 
-const messenger = MessagingStandards.getMessenger('background');
+const messenger = MessagingCore.getMessenger('background');
 
 function hasActiveElementTextSelection() {
   try {

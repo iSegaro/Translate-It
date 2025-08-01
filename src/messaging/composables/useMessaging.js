@@ -1,4 +1,4 @@
-import { MessagingStandards } from '@/core/MessagingStandards.js'
+import { MessagingCore } from '../core/MessagingCore.js'
 
 /**
  * Provides a standardized interface for messaging within Vue components.
@@ -7,7 +7,7 @@ import { MessagingStandards } from '@/core/MessagingStandards.js'
  * @returns {object} An object with messenger instances.
  */
 export function useMessaging(context) {
-  const messenger = MessagingStandards.getMessenger(context)
+  const messenger = MessagingCore.getMessenger(context)
 
   return {
     // General purpose sendMessage

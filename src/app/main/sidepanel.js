@@ -3,7 +3,7 @@ import { pinia } from '@/store'
 import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessagingStandards } from '@/core/MessagingStandards'
+import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -57,7 +57,7 @@ async function initializeApp() {
       
       // Send error to background script for logging
       try {
-        const messenger = MessagingStandards.getMessenger('sidepanel')
+        const messenger = MessagingCore.getMessenger('sidepanel')
         messenger.sendMessage({
           action: 'LOG_ERROR',
           data: {

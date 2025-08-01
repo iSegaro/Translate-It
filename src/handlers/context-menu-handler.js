@@ -6,7 +6,7 @@
 import browser from "webextension-polyfill";
 import { logME } from "../utils/helpers.js";
 import storageManager from "../core/StorageManager.js";
-import { MessageActions } from "../core/MessageActions.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
  * Handle translate element context menu

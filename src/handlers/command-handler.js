@@ -1,7 +1,7 @@
-import { MessagingStandards } from '../core/MessagingStandards.js';
+import { MessagingCore } from '../messaging/core/MessagingCore.js';
 import { logME } from "../utils/helpers.js";
 
-const messenger = MessagingStandards.getMessenger('background');
+const messenger = MessagingCore.getMessenger('background');
 
 async function handleCommand(tab, action, data = {}) {
   try {

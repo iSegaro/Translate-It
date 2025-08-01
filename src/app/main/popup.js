@@ -3,7 +3,7 @@ import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessagingStandards } from '@/core/MessagingStandards'
+import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -36,7 +36,7 @@ async function initializeApp() {
       
       // Send error to background script for logging
       try {
-        const messenger = MessagingStandards.getMessenger('popup')
+        const messenger = MessagingCore.getMessenger('popup')
         messenger.sendMessage({
           action: 'LOG_ERROR',
           data: {

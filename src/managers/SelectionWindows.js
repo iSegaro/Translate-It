@@ -13,8 +13,8 @@ import { getResolvedUserTheme } from "../utils/theme.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { determineTranslationMode } from "../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
-import { MessagingStandards } from "../core/MessagingStandards.js";
-import { MessageActions } from "../core/MessageActions.js";
+import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -31,7 +31,7 @@ export default class SelectionWindows {
     this.themeChangeListener = null; // To store the theme change listener
     
     // Enhanced messaging with context-aware selection and translation
-    this.messenger = MessagingStandards.getMessenger('content');
+    this.messenger = MessagingCore.getMessenger('content');
 
     this.icon = null;
     this.iconClickContext = null;

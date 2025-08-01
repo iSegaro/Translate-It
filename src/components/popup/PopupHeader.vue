@@ -66,10 +66,10 @@
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
-import { useMessaging } from '@/composables/useMessaging.js'
+import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
-import { MessageActions } from '../../core/MessageActions'
+import { MessageActions } from '@/messaging/core/MessageActions.js'
 
 // Stores
 const settingsStore = useSettingsStore()

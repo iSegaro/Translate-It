@@ -1,7 +1,7 @@
 // src/components/core/__tests__/EnhancedUnifiedMessenger.test.js
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EnhancedUnifiedMessenger } from '@/core/EnhancedUnifiedMessenger.js';
-import { MessageActions } from '../MessageActions';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 // Mock browser API
 const mockBrowser = {
