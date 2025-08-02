@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
+import browser from "webextension-polyfill";
 import { MessagingCore, MessageFormat, MessageContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
