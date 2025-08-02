@@ -2,7 +2,7 @@
 
 import browser from "webextension-polyfill";
 import { CONFIG } from "../../config.js";
-import { logME } from "../../utils/helpers.js";
+import { logME } from "../../utils/core/helpers.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 
 /**

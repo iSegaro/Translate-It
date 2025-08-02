@@ -4,7 +4,7 @@ import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { cropImageData } from "../utils/imageProcessing.js";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 
 export class ContentCaptureHandler {
   constructor() {

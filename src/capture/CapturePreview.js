@@ -1,9 +1,9 @@
 // src/capture/CapturePreview.js
 
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { createSafeElement, safeSetText } from "../utils/safeHtml.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
 
 /**
  * Screen capture preview and confirmation system

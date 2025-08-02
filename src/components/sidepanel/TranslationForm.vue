@@ -62,7 +62,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useI18n } from '@/composables/useI18n.js'
-import { logME } from '@/utils/helpers.js'
+import { logME } from '@/utils/core/helpers.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'

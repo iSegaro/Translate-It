@@ -50,7 +50,7 @@ import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageControls from '@/components/popup/LanguageControls.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
 import browser from 'webextension-polyfill'
-import { applyTheme } from '@/utils/theme.js'
+import { applyTheme } from '@/utils/ui/theme.js'
 
 // Stores
 const settingsStore = useSettingsStore()

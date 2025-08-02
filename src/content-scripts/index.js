@@ -7,7 +7,7 @@ import browser from "webextension-polyfill";
 import { vueBridge } from "../managers/content/VueBridgeManager.js";
 
 // Import and initialize content script TTS handler
-import { contentTTSHandler } from "./content-tts-handler.js";
+import { contentTTSHandler } from "../handlers/content/TTSHandler.js";
 
 // Import NotificationManager
 import NotificationManager from "../managers/core/NotificationManager.js";

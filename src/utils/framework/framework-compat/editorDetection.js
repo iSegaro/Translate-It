@@ -1,6 +1,6 @@
 // src/utils/framework-compat/editorDetection.js
 
-import { logME } from "../helpers.js";
+import { logME } from "../../core/helpers.js";
 
 /**
  * تشخیص ویرایشگرهای پیچیده که نیاز به copy-only دارند

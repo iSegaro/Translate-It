@@ -97,7 +97,7 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
-import { languageList } from '@/utils/languages.js'
+import { languageList } from '@/utils/i18n/languages.js'
 import browser from 'webextension-polyfill'
 
 // Helper function

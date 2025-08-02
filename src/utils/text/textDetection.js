@@ -1,7 +1,7 @@
 // src/utils/textDetection.js
 import browser from "webextension-polyfill";
-import { CONFIG } from "../config.js";
-import { languageList } from "./languages.js";
+import { CONFIG } from "../../config.js";
+import { languageList } from "../i18n/languages.js";
 // import { logME } from "./helpers.js";
 
 export const isPersianText = (text) => {

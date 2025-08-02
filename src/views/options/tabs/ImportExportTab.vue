@@ -89,7 +89,7 @@ import { useSettingsStore } from '@/store/core/settings'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import secureStorage from '@/utils/secureStorage.js'
+import secureStorage from '@/storage/core/SecureStorage.js'
 
 // Access i18n function through current instance
 const { proxy } = getCurrentInstance()

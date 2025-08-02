@@ -1,10 +1,10 @@
 import { MessagingCore } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "../config.js";
-import { detectPlatform, Platform } from "../utils/platformDetector.js";
-import { getTranslationString } from "../utils/i18n.js";
-import { logME } from "../utils/helpers.js";
+import { detectPlatform, Platform } from "../utils/browser/platform.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
+import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { isComplexEditor } from "../utils/framework-compat/index.js";
+import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 
 const messenger = MessagingCore.getMessenger('background');
 

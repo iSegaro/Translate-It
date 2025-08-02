@@ -1,10 +1,10 @@
 // src/utils/textExtraction.js
-import { ErrorHandler } from "../error-management/ErrorService.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { IsDebug } from "../config.js";
-import { logME } from "./helpers.js";
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import { IsDebug } from "../../config.js";
+import { logME } from "../core/helpers.js";
 import { correctTextDirection } from "./textDetection.js";
-import { getTranslationString } from "./i18n.js";
+import { getTranslationString } from "../i18n/i18n.js";
 
 const translationCache = new Map();
 

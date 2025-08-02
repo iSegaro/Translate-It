@@ -35,7 +35,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useValidation } from '@/utils/validation.js'
+import { useValidation } from '@/utils/core/validation.js'
 import { useLanguages } from '@/composables/useLanguages.js'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
 

@@ -2,8 +2,8 @@
 // Composable for language management
 
 import { ref, computed } from "vue";
-import { languageList } from "@/utils/languages.js";
-import { logME } from "@/utils/helpers.js";
+import { languageList } from "@/utils/i18n/languages.js";
+import { logME } from "@/utils/core/helpers.js";
 
 /**
  * Composable for managing different types of languages in the extension

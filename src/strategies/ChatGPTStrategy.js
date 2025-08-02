@@ -1,7 +1,7 @@
 // src/strategies/ChatGPTStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { setCursorToEnd } from "../utils/simulate_events.js";
+import { setCursorToEnd } from "../utils/browser/events.js";
 import { CONFIG } from "../config";
 import { filterXSS } from "xss";
 

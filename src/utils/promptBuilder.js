@@ -9,7 +9,7 @@ import {
   getPromptDictionaryAsync,
   TranslationMode,
 } from "../config.js";
-import { logME } from "./helpers.js";
+import { logME } from "./core/helpers.js";
 
 /**
  * بررسی می‌کند که آیا آبجکت ورودی مطابق با فرمت JSON خاص است

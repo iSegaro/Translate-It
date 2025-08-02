@@ -4,8 +4,8 @@
  * Handles complex DOM structures, multi-line text, and preserves styling
  */
 
-import { ErrorHandler } from "../error-management/ErrorService.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 
 // Translation cache (same as OLD version)
 const translationCache = new Map();

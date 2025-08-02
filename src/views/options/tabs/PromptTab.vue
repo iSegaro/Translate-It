@@ -52,7 +52,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useValidation } from '@/utils/validation.js'
+import { useValidation } from '@/utils/core/validation.js'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
 const settingsStore = useSettingsStore()

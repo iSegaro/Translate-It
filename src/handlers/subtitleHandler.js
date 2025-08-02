@@ -1,8 +1,8 @@
 import { MessagingCore } from "../messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { logME } from "../utils/helpers.js";
-import { isUrlExcluded } from "../utils/exclusion.js";
+import { logME } from "../utils/core/helpers.js";
+import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";

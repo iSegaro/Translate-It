@@ -2,7 +2,7 @@
 
 import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/core/NotificationManager.js";
-import { openOptionsPage } from "../utils/helpers.js";
+import { openOptionsPage } from "../utils/core/helpers.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";

@@ -2,7 +2,7 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/helpers";
+import { delay, logME } from "../utils/core/helpers.js";
 
 export default class TelegramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

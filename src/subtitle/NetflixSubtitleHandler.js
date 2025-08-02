@@ -1,7 +1,7 @@
 // src/subtitle/NetflixSubtitleHandler.js
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 
 export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {

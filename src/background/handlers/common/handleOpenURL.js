@@ -1,7 +1,7 @@
 // src/background/handlers/common/handleOpenURL.js
 
 import browser from 'webextension-polyfill';
-import { logME } from "../../../utils/helpers.js";
+import { logME } from "../../../utils/core/helpers.js";
 
 export async function handleOpenURL(message) {
   try {

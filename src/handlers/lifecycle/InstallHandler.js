@@ -4,8 +4,8 @@
  */
 
 import browser from "webextension-polyfill";
-import { logME } from "../utils/helpers.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { logME } from "../utils/core/helpers.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 

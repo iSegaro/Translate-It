@@ -1,5 +1,5 @@
 import { MessagingCore } from '../messaging/core/MessagingCore.js';
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 
 const messenger = MessagingCore.getMessenger('background');
 

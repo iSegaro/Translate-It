@@ -99,7 +99,7 @@ import { useSidepanelActions } from '@/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useI18n } from '@/composables/useI18n.js'
-import { logME } from '@/utils/helpers.js'
+import { logME } from '@/utils/core/helpers.js'
 
 // Props
 defineProps({

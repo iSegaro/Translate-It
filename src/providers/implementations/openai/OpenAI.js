@@ -7,7 +7,7 @@ import {
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
-import { logME } from "@/utils/helpers.js";
+import { logME } from "@/utils/core/helpers.js";
 
 export class OpenAIProvider extends BaseProvider {
   constructor() {

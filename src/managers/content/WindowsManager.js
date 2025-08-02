@@ -1,6 +1,6 @@
 // src/managers/SelectionWindows.js
 
-import { logME, isExtensionContextValid } from "../../utils/helpers.js";
+import { logME, isExtensionContextValid } from "../../utils/core/helpers.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import {
   CONFIG,
@@ -9,10 +9,10 @@ import {
   getSettingsAsync,
 } from "../../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
-import { getResolvedUserTheme } from "../../utils/theme.js";
+import { getResolvedUserTheme } from "../../utils/ui/theme.js";
 import { AUTO_DETECT_VALUE } from "../../constants.js";
 import { determineTranslationMode } from "../../utils/translationModeHelper.js";
-import { SimpleMarkdown } from "../../utils/simpleMarkdown.js";
+import { SimpleMarkdown } from "../../utils/text/markdown.js";
 import { MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 

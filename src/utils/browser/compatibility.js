@@ -68,13 +68,13 @@ export async function getTTSManager() {
     if (await isFirefox()) {
       // Use Firefox-compatible TTS manager
       const module = await import(
-        /* webpackChunkName: "tts-firefox" */ "../managers/browser-specific/tts/TTSFirefox.js"
+        /* webpackChunkName: "tts-firefox" */ "@/managers/browser-specific/tts/TTSFirefox.js"
       );
       return module;
     } else {
       // Use Chrome TTS manager with offscreen support
       const module = await import(
-        /* webpackChunkName: "tts-chrome" */ "../managers/browser-specific/tts/TTSChrome.js"
+        /* webpackChunkName: "tts-chrome" */ "@/managers/browser-specific/tts/TTSChrome.js"
       );
       return module;
     }
@@ -82,7 +82,7 @@ export async function getTTSManager() {
     console.error("[browserCompat] Error loading TTS manager:", error);
     // Fallback to content script TTS
     const module = await import(
-      /* webpackChunkName: "tts-fallback" */ "../managers/browser-specific/tts/TTSContent.js"
+      /* webpackChunkName: "tts-fallback" */ "@/managers/browser-specific/tts/TTSContent.js"
     );
     return module;
   }

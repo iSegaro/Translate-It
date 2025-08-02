@@ -1,8 +1,8 @@
 // src/providers/implementations/BingTranslateProvider.js
 import browser from 'webextension-polyfill';
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
-import { logME } from "@/utils/helpers.js";
-import { isPersianText } from "@/utils/textDetection.js";
+import { logME } from "@/utils/core/helpers.js";
+import { isPersianText } from "@/utils/text/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 const getLanguageCode = (lang) => lang;

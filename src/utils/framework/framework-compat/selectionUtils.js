@@ -1,6 +1,6 @@
 // src/utils/framework-compat/selectionUtils.js
 
-import { logME } from "../helpers.js";
+import { logME } from "../../core/helpers.js";
 
 /**
  * بررسی وجود انتخاب متن

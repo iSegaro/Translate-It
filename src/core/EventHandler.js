@@ -20,14 +20,14 @@ import {
   expandTextsForTranslation,
   handleTranslationLengthMismatch,
   reassembleTranslations,
-} from "../utils/textExtraction.js";
-import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
-import { detectPlatform, Platform } from "../utils/platformDetector.js";
+} from "../utils/text/extraction.js";
+import { isEditable, logME, logMethod, taggleLinks } from "../utils/core/helpers.js";
+import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
-import { clearAllCaches } from "../utils/textExtraction.js";
+import { clearAllCaches } from "../utils/text/extraction.js";
 import SelectionWindows from "../managers/content/WindowsManager.js";
-import { getTranslationString } from "../utils/i18n.js";
-import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
+import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/ui/exclusion.js";
 import { UnifiedMessenger } from "./UnifiedMessenger.js"; // Add this import
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";

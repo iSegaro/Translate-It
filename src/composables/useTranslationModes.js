@@ -1,6 +1,6 @@
 import { ref, reactive } from "vue";
 import { TranslationService } from "../core/TranslationService.js";
-import { logME } from "@/utils/helpers.js";
+import { logME } from "@/utils/core/helpers.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 

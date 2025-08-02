@@ -2,7 +2,7 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/helpers.js";
+import { delay, logME } from "../utils/core/helpers.js";
 
 export default class DiscordStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

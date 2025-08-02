@@ -1,10 +1,10 @@
 // src/capture/CaptureResult.js
 
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { createSafeElement, safeSetText } from "../utils/safeHtml.js";
-import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
+import { SimpleMarkdown } from "../utils/text/markdown.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
 
 /**
  * Screen capture translation result display system

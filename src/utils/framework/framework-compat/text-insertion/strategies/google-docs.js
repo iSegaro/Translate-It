@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/strategies/google-docs.js
 
-import { logME } from "../../../helpers.js";
+import { logME } from "../../../../core/helpers.js";
 import { tryOptimizedPasteInsertion } from "./paste-optimized.js";
 
 /**

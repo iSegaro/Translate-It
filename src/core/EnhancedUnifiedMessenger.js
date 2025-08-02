@@ -6,7 +6,7 @@
 
 import { UnifiedMessenger } from './UnifiedMessenger.js';
 import browser from 'webextension-polyfill';
-import { isFirefox } from '../utils/browserCompat.js';
+import { isFirefox } from '../utils/browser/compatibility.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { TTSMessenger } from '../messaging/specialized/TTSMessenger.js';
 import { CaptureMessenger } from '../messaging/specialized/CaptureMessenger.js';

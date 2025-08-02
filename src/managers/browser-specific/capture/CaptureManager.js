@@ -1,7 +1,7 @@
 // src/capture/CaptureManager.js
 
 import { getbrowser } from "@/utils/browser-polyfill.js";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { ProviderRegistry } from "../core/provider-registry.js";

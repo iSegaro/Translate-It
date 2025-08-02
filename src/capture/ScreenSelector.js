@@ -1,9 +1,9 @@
 // src/capture/ScreenSelector.js
 
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { createSafeElement } from "../utils/safeHtml.js";
+import { createSafeElement } from "../utils/ui/html-sanitizer.js";
 
 /**
  * Screen area selection overlay system

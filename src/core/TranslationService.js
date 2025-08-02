@@ -1,6 +1,6 @@
 import { MessagingCore } from "../messaging/core/MessagingCore.js";
 import { TranslationMode } from "@/config.js";
-import { logME } from "@/utils/helpers.js";
+import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 
 export class TranslationService {

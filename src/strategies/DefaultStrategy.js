@@ -2,12 +2,12 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/helpers.js";
+import { delay, logME } from "../utils/core/helpers.js";
 import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
-} from "../utils/framework-compat/index.js";
+} from "../utils/framework/framework-compat/index.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

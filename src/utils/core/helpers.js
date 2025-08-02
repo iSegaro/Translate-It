@@ -1,8 +1,8 @@
 // src/utils/helpers.js
 import browser from "webextension-polyfill";
-import { ErrorHandler } from "../error-management/ErrorService.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { IsDebug } from "../config.js";
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import { IsDebug } from "../../config.js";
 
 // Lazy loader for ErrorHandler to break circular dependency
 let errorHandlerInstance = null;

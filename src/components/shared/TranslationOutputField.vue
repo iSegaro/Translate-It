@@ -48,9 +48,9 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useClipboard } from '@/composables/useClipboard.js'
 import { useTTSSimple } from '@/composables/useTTSSimple.js'
-import { getLanguageCodeForTTS } from '@/utils/languages.js'
-import { correctTextDirection } from '@/utils/textDetection.js'
-import { SimpleMarkdown } from '@/utils/simpleMarkdown.js'
+import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
+import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import IconButton from '@/components/shared/IconButton.vue'
 
 // Props

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
-import { getLanguageCodeForTTS } from "@/utils/languages.js";
+import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 
 export function useTTSSmart() {
   const { messenger } = useBrowserAPI('tts-smart');

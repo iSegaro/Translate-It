@@ -1,7 +1,7 @@
 // src/providers/core/browserTranslateProvider.js
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
-import { logME } from "@/utils/helpers.js";
-import { isPersianText } from "@/utils/textDetection.js";
+import { logME } from "@/utils/core/helpers.js";
+import { isPersianText } from "@/utils/text/textDetection.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/config.js";

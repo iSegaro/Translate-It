@@ -1,7 +1,7 @@
 // src/strategies/WhatsAppStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/helpers";
+import { delay, logME } from "../utils/core/helpers.js";
 
 export default class WhatsAppStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

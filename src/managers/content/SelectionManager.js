@@ -3,7 +3,7 @@
 // Integrated with existing services and error handling
 
 import browser from "webextension-polyfill";
-import { logME, taggleLinks } from "@/utils/helpers.js";
+import { logME, taggleLinks } from "@/utils/core/helpers.js";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
@@ -519,7 +519,7 @@ export class SelectElementManager {
         parseAndCleanTranslationResponse,
         reassembleTranslations,
         applyTranslationsToNodes,
-      } = await import("../../utils/advanced-text-extraction.js");
+      } = await import("../../utils/text/extraction.js");
 
       // Handle input/textarea elements with simple processing first
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
@@ -865,7 +865,7 @@ export class SelectElementManager {
 
       // Use advanced text extraction revert system
       const { revertAllTranslations } = await import(
-        "../../utils/advanced-text-extraction.js"
+        "../../utils/text/extraction.js"
       );
 
       const context = {

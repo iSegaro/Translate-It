@@ -8,7 +8,7 @@ import {
   getGeminiThinkingEnabledAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-import { logME } from "@/utils/helpers.js";
+import { logME } from "@/utils/core/helpers.js";
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 
 export class GeminiProvider extends BaseProvider {

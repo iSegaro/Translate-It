@@ -1,7 +1,7 @@
 // src/strategies/InstagramStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/helpers";
+import { delay } from "../utils/core/helpers.js";
 import { filterXSS } from "xss";
 
 export default class InstagramStrategy extends PlatformStrategy {

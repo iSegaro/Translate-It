@@ -1,6 +1,6 @@
 // src/utils/framework-compat/naturalTyping.js
 
-import { logME } from "../helpers.js";
+import { logME } from "../../core/helpers.js";
 import { checkTextSelection } from "./selectionUtils.js";
 
 /**

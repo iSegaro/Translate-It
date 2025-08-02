@@ -1,9 +1,9 @@
 // src/handlers/ttsHandler.js
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import {
   detectTextLanguage,
   getLanguageInfoFromCode,
-} from "../utils/textDetection.js";
+} from "../utils/text/textDetection.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 // Dependencies passed as arguments: playAudioViaOffscreen, errorHandler

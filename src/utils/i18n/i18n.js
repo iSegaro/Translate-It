@@ -1,11 +1,11 @@
 // src/utils/i18n.js
 
 import browser from "webextension-polyfill";
-import { applyElementDirection } from "./textDetection.js";
-import { getApplication_LocalizeAsync } from "../config.js";
+import { applyElementDirection } from "../text/textDetection.js";
+import { getApplication_LocalizeAsync } from "../../config.js";
 import { languageList } from "./languages.js";
-import { fadeOutInElement, animatePopupEffect } from "./i18n.helper.js";
-import { SimpleMarkdown } from "./simpleMarkdown.js";
+import { fadeOutInElement, animatePopupEffect } from "./helper.js";
+import { SimpleMarkdown } from "../text/markdown.js";
 // import { logME } from "./helpers.js";
 
 export function parseBoolean(value) {

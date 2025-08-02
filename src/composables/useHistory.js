@@ -2,9 +2,9 @@
 // Vue composable for translation history management in sidepanel with improved API handling
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
-import { SimpleMarkdown } from "@/utils/simpleMarkdown.js";
-import { correctTextDirection } from "@/utils/textDetection.js";
-import { getTranslationString } from "@/utils/i18n.js";
+import { SimpleMarkdown } from "@/utils/text/markdown.js";
+import { correctTextDirection } from "@/utils/text/textDetection.js";
+import { getTranslationString } from "@/utils/i18n/i18n.js";
 
 const MAX_HISTORY_ITEMS = 100;
 

@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/index.js
 
-import { logME } from "../../helpers.js";
+import { logME } from "../../../core/helpers.js";
 import { checkTextSelection } from "../selectionUtils.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {

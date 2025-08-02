@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/helpers.js
 
-import { logME } from "../../helpers.js";
+import { logME } from "../../../core/helpers.js";
 
 /**
  * تأیید موفقیت‌آمیز بودن تزریق متن

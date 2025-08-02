@@ -1,8 +1,8 @@
 // src/subtitle/YouTubeSubtitleHandler.js
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
-import { logME } from "../utils/helpers.js";
-import { safeSetText } from "../utils/safeHtml.js";
+import { logME } from "../utils/core/helpers.js";
+import { safeSetText } from "../utils/ui/html-sanitizer.js";
 
 export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {

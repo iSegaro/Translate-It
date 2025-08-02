@@ -1,10 +1,10 @@
 // src/managers/IconBehavior.js
 
 import { state } from "../config.js";
-import { detectPlatform } from "../utils/platformDetector.js";
+import { detectPlatform } from "../utils/browser/platform.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { isExtensionContextValid, logME } from "../utils/helpers.js";
-import { getTranslationString } from "../utils/i18n.js";
+import { isExtensionContextValid, logME } from "../utils/core/helpers.js";
+import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 export default function setupIconBehavior(

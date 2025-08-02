@@ -4,7 +4,7 @@
  */
 
 import browser from "webextension-polyfill";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 

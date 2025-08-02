@@ -1,5 +1,5 @@
 // src/background/handlers/common/handlePing.js
-import { logME } from '../../../utils/helpers.js';
+import { logME } from '../../../utils/core/helpers.js';
 
 /**
  * Handles the 'ping' message action.

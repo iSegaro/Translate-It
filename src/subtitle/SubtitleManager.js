@@ -2,7 +2,7 @@
 
 import YouTubeSubtitleHandler from "./YouTubeSubtitleHandler.js";
 import NetflixSubtitleHandler from "./NetflixSubtitleHandler.js";
-import { logME } from "../utils/helpers.js";
+import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 export default class SubtitleManager {

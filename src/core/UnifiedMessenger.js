@@ -5,7 +5,7 @@
  */
 
 import browser from "webextension-polyfill";
-import { isFirefox } from "../utils/browserCompat.js";
+import { isFirefox } from "../utils/browser/compatibility.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export class UnifiedMessenger {

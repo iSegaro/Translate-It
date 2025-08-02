@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/strategies/input.js
 
-import { logME } from "../../../helpers.js";
+import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
 
 /**

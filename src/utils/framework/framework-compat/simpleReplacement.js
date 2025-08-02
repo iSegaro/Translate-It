@@ -1,6 +1,6 @@
 // src/utils/framework-compat/simpleReplacement.js
 
-import { logME } from "../helpers.js";
+import { logME } from "../../core/helpers.js";
 
 /**
  * جایگزینی ساده (fallback) با حفظ undo capability
