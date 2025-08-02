@@ -8,7 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
-    include: ['src/components/**/__tests__/*.test.js'], // Only include Vue component unit tests
+    include: [
+      'src/components/**/__tests__/*.test.js', // Vue component unit tests
+      'src/messaging/**/__tests__/*.test.js'   // Messaging system tests
+    ],
     exclude: ['tests/e2e/**'],
     coverage: {
       provider: 'v8',
@@ -34,14 +37,15 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      '@components': resolve(__dirname, 'src/components'),
-      '@views': resolve(__dirname, 'src/views'),
-      '@store': resolve(__dirname, 'src/store'),
-      '@composables': resolve(__dirname, 'src/composables'),
-      '@utils': resolve(__dirname, 'src/utils'),
-      '@providers': resolve(__dirname, 'src/providers'),
-      '@assets': resolve(__dirname, 'src/assets')
+      '@': resolve(__dirname, '../../src'),
+      '@components': resolve(__dirname, '../../src/components'),
+      '@views': resolve(__dirname, '../../src/views'),
+      '@store': resolve(__dirname, '../../src/store'),
+      '@composables': resolve(__dirname, '../../src/composables'),
+      '@utils': resolve(__dirname, '../../src/utils'),
+      '@providers': resolve(__dirname, '../../src/providers'),
+      '@assets': resolve(__dirname, '../../src/assets'),
+      '@messaging': resolve(__dirname, '../../src/messaging')
     }
   },
   define: {
