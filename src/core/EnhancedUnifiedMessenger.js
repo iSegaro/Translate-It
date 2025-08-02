@@ -360,6 +360,121 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
   }
 
   /**
+   * Send message to specific tab (for background script use)
+   * Enhanced version with cross-browser compatibility and error handling
+   * @param {number} tabId - Target tab ID
+   * @param {Object} message - Message object
+   * @param {number} timeout - Timeout in milliseconds (default: 10000)
+   * @returns {Promise<Object>} Tab message response
+   */
+  async sendToTab(tabId, message, timeout = 10000) {
+    try {
+      // Validate tab ID
+      if (!tabId || typeof tabId !== 'number') {
+        throw new Error('Valid tab ID is required for sendToTab');
+      }
+
+      // Enhanced message format using MessageFormat
+      const enhancedMessage = {
+        ...message,
+        messageId: message.messageId || `${this.context}-tab-${tabId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+        context: message.context || this.context,
+        timestamp: message.timestamp || Date.now(),
+        version: "2.0"
+      };
+
+      console.log(`[EnhancedMessenger:${this.context}] 📤 Sending to tab ${tabId}:`, {
+        action: enhancedMessage.action,
+        messageId: enhancedMessage.messageId
+      });
+
+      // Firefox MV3 compatibility handling
+      if (this.firefoxCompatibilityMode) {
+        return await this.sendToTabFirefox(tabId, enhancedMessage, timeout);
+      }
+
+      // Chrome/Standard approach with timeout handling
+      const response = await Promise.race([
+        browser.tabs.sendMessage(tabId, enhancedMessage),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Tab message timeout after ${timeout}ms`)), timeout)
+        )
+      ]);
+
+      console.log(`[EnhancedMessenger:${this.context}] ✅ Tab ${tabId} response received:`, {
+        success: response?.success !== false,
+        messageId: enhancedMessage.messageId
+      });
+
+      return response;
+    } catch (error) {
+      console.error(`[EnhancedMessenger:${this.context}] ❌ Tab ${tabId} message error:`, error);
+      
+      // Enhanced error information
+      const enhancedError = new Error(error.message);
+      enhancedError.context = this.context;
+      enhancedError.tabId = tabId;
+      enhancedError.action = message.action;
+      enhancedError.originalError = error;
+      enhancedError.timestamp = Date.now();
+      
+      throw enhancedError;
+    }
+  }
+
+  /**
+   * Firefox-specific tab messaging with enhanced compatibility
+   * @param {number} tabId - Target tab ID
+   * @param {Object} message - Enhanced message object
+   * @param {number} timeout - Timeout in milliseconds
+   * @returns {Promise<Object>} Tab message response
+   * @private
+   */
+  async sendToTabFirefox(tabId, message, timeout) {
+    try {
+      // Firefox sometimes has connection issues, so we add retry logic
+      let lastError;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await browser.tabs.sendMessage(tabId, message);
+          
+          // Firefox often returns undefined for successful operations
+          if (response === undefined) {
+            console.info(`[EnhancedMessenger:${this.context}] Firefox tab message returned undefined (likely successful):`, message.action);
+            return {
+              success: true,
+              message: `Firefox MV3: ${message.action} processed`,
+              firefoxWorkaround: true,
+              tabId
+            };
+          }
+          
+          return response;
+        } catch (error) {
+          lastError = error;
+          if (attempt === 1 && error.message.includes('Could not establish connection')) {
+            console.warn(`[EnhancedMessenger:${this.context}] Firefox connection retry for tab ${tabId}, attempt ${attempt + 1}`);
+            await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay before retry
+            continue;
+          }
+          throw error;
+        }
+      }
+      
+      throw lastError;
+    } catch (error) {
+      // Firefox-specific error handling
+      if (error.message.includes('Could not establish connection')) {
+        throw new Error(`Firefox: Content script not ready in tab ${tabId} - please reload the page`);
+      } else if (error.message.includes('message port closed')) {
+        throw new Error(`Firefox: Tab ${tabId} connection closed - content script may have been unloaded`);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
    * Test all specialized messengers
    * @returns {Promise<Object>} Test results for all specialized messengers
    */
