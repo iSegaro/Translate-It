@@ -4,6 +4,7 @@
  * Enhanced with context-aware routing for MessagingStandards integration
  */
 import browser from "webextension-polyfill";
+import { MessageContexts } from "../messaging/core/MessagingCore";
 
 class SimpleMessageHandler {
   constructor() {
@@ -142,17 +143,17 @@ class SimpleMessageHandler {
 
     // Enhanced routing logic for specific contexts
     switch (context) {
-      case 'popup':
+      case MessageContexts.POPUP:
         return this.handlePopupMessage(message, sender);
-      case 'sidepanel':
+      case MessageContexts.SIDEPANEL:
         return this.handleSidepanelMessage(message, sender);
-      case 'content':
+      case MessageContexts.CONTENT:
         return this.handleContentMessage(message, sender);
-      case 'offscreen':
+      case MessageContexts.OFFSCREEN:
         return this.handleOffscreenMessage(message, sender);
-      case 'options':
+      case MessageContexts.OPTIONS:
         return this.handleOptionsMessage(message, sender);
-      case 'event-handler':
+      case MessageContexts.EVENT_HANDLER:
         return this.handleEventHandlerMessage(message, sender);
       default:
         return this.handleGenericMessage(message, sender);
@@ -166,7 +167,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handlePopupMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'popup');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.POPUP);
     if (handler) {
       return handler(message, sender);
     }
@@ -180,7 +181,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handleSidepanelMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'sidepanel');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.SIDEPANEL);
     if (handler) {
       return handler(message, sender);
     }
@@ -194,7 +195,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handleContentMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'content');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.CONTENT);
     if (handler) {
       return handler(message, sender);
     }
@@ -208,7 +209,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handleOffscreenMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'offscreen');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.OFFSCREEN);
     if (handler) {
       return handler(message, sender);
     }
@@ -222,7 +223,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handleOptionsMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'options');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.OPTIONS);
     if (handler) {
       return handler(message, sender);
     }
@@ -236,7 +237,7 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async handleEventHandlerMessage(message, sender) {
-    const handler = this.getHandlerForMessage(message.action, 'event-handler');
+    const handler = this.getHandlerForMessage(message.action, MessageContexts.EVENT_HANDLER);
     if (handler) {
       return handler(message, sender);
     }
