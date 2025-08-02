@@ -35,7 +35,6 @@ export class TTSMessenger {
 
     return this.messenger.sendMessage({
       action: MessageActions.TTS_SPEAK,
-      target: 'offscreen', // Explicitly target offscreen context for Chrome
       data: ttsOptions,
       timestamp: Date.now()
     });
@@ -48,7 +47,6 @@ export class TTSMessenger {
   async stop() {
     return this.messenger.sendMessage({
       action: MessageActions.TTS_STOP,
-      target: 'offscreen',
       timestamp: Date.now()
     });
   }
@@ -60,7 +58,6 @@ export class TTSMessenger {
   async pause() {
     return this.messenger.sendMessage({
       action: MessageActions.TTS_PAUSE,
-      target: 'offscreen',
       timestamp: Date.now()
     });
   }
@@ -72,23 +69,27 @@ export class TTSMessenger {
   async resume() {
     return this.messenger.sendMessage({
       action: MessageActions.TTS_RESUME,
-      target: 'offscreen',
       timestamp: Date.now()
     });
   }
 
   /**
    * Get available voices
-   * @returns {Promise<Array>} Array of available voices
+   * @returns {Promise<Object>} Response with success status and voices array
    */
   async getVoices() {
     const response = await this.messenger.sendMessage({
       action: MessageActions.TTS_GET_VOICES,
-      target: 'offscreen',
       timestamp: Date.now()
     });
 
-    return response?.voices || [];
+    // Return full response for connection testing, but maintain backward compatibility
+    if (response && typeof response === 'object' && 'success' in response) {
+      return response; // Full response with success status
+    } else {
+      // Fallback for cases expecting just voices array
+      return { success: true, voices: response?.voices || [] };
+    }
   }
 
   /**
@@ -106,9 +107,8 @@ export class TTSMessenger {
     const audioData = Array.from(new Uint8Array(arrayBuffer));
 
     return this.messenger.sendMessage({
-      action: MessageActions.TTS_PLAY_CACHED_AUDIO,
-      target: 'offscreen',
-      data: { audioData },
+      action: 'playCachedAudio',
+      audioData: audioData,
       timestamp: Date.now()
     });
   }

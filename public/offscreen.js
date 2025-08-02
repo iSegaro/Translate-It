@@ -68,6 +68,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleTTSStop(sendResponse);
     return true;
   }
+  else if (action === "TTS_PAUSE") {
+    handleTTSPause(sendResponse);
+    return true;
+  }
+  else if (action === "TTS_RESUME") {
+    handleTTSResume(sendResponse);
+    return true;
+  }
   else if (action === "TTS_TEST") {
     sendResponse({ success: true, message: "Offscreen TTS ready" });
     return false; // synchronous response
@@ -78,6 +86,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   else if (action === "stopOffscreenAudio") {
     handleAudioStop(sendResponse);
+    return true;
+  }
+  else if (action === "TTS_GET_VOICES") {
+    handleTTSGetVoices(sendResponse);
     return true;
   }
   else if (action === "playCachedAudio" && cleanMessage.audioData) {
@@ -154,6 +166,79 @@ function handleTTSSpeak(data, sendResponse) {
 }
 
 /**
+ * Handle TTS get voices
+ */
+function handleTTSGetVoices(sendResponse) {
+  try {
+    console.log("[Offscreen] Getting available TTS voices");
+    
+    if ("speechSynthesis" in window) {
+      // Get available voices
+      let voices = speechSynthesis.getVoices();
+      
+      // If voices array is empty, wait for voiceschanged event
+      if (voices.length === 0) {
+        let responseAlreadySent = false;
+        
+        const voicesChangedHandler = () => {
+          if (responseAlreadySent) return;
+          responseAlreadySent = true;
+          
+          voices = speechSynthesis.getVoices();
+          console.log("[Offscreen] Voices loaded:", voices.length);
+          sendResponse({ 
+            success: true, 
+            voices: voices.map(voice => ({
+              name: voice.name,
+              lang: voice.lang,
+              default: voice.default,
+              localService: voice.localService
+            }))
+          });
+        };
+        
+        speechSynthesis.addEventListener('voiceschanged', voicesChangedHandler, { once: true });
+        
+        // Set a timeout in case voiceschanged doesn't fire
+        setTimeout(() => {
+          if (responseAlreadySent) return;
+          responseAlreadySent = true;
+          
+          voices = speechSynthesis.getVoices();
+          console.log("[Offscreen] Timeout reached, voices available:", voices.length);
+          sendResponse({ 
+            success: true, 
+            voices: voices.map(voice => ({
+              name: voice.name,
+              lang: voice.lang,
+              default: voice.default,
+              localService: voice.localService
+            }))
+          });
+        }, 1000);
+      } else {
+        console.log("[Offscreen] Voices available:", voices.length);
+        sendResponse({ 
+          success: true, 
+          voices: voices.map(voice => ({
+            name: voice.name,
+            lang: voice.lang,
+            default: voice.default,
+            localService: voice.localService
+          }))
+        });
+      }
+    } else {
+      console.warn("[Offscreen] Speech synthesis not available");
+      sendResponse({ success: true, voices: [] });
+    }
+  } catch (error) {
+    console.error("[Offscreen] Failed to get TTS voices:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
  * Handle TTS stop
  */
 function handleTTSStop(sendResponse) {
@@ -180,6 +265,65 @@ function handleTTSStop(sendResponse) {
     sendResponse({ success: true, stopped });
   } catch (error) {
     console.error("[Offscreen] TTS stop failed:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle TTS pause
+ */
+function handleTTSPause(sendResponse) {
+  try {
+    let paused = false;
+
+    // Pause speech synthesis
+    if (currentUtterance && speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+      paused = true;
+      console.log("[Offscreen] TTS speech paused");
+    }
+
+    // Pause audio playback
+    if (currentAudio && !currentAudio.paused) {
+      currentAudio.pause();
+      paused = true;
+      console.log("[Offscreen] TTS audio paused");
+    }
+
+    sendResponse({ success: true, paused });
+  } catch (error) {
+    console.error("[Offscreen] TTS pause failed:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle TTS resume
+ */
+function handleTTSResume(sendResponse) {
+  try {
+    let resumed = false;
+
+    // Resume speech synthesis
+    if (currentUtterance && speechSynthesis.paused) {
+      speechSynthesis.resume();
+      resumed = true;
+      console.log("[Offscreen] TTS speech resumed");
+    }
+
+    // Resume audio playback
+    if (currentAudio && currentAudio.paused) {
+      currentAudio.play().then(() => {
+        console.log("[Offscreen] TTS audio resumed");
+      }).catch((error) => {
+        console.error("[Offscreen] Failed to resume audio:", error);
+      });
+      resumed = true;
+    }
+
+    sendResponse({ success: true, resumed });
+  } catch (error) {
+    console.error("[Offscreen] TTS resume failed:", error);
     sendResponse({ success: false, error: error.message });
   }
 }
