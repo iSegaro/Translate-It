@@ -88,7 +88,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     };
   } catch (error) {
     errorHandler.handle(error, {
-      type: ErrorTypes.ELEMENT_SELECTION,
+      type: ErrorTypes.SELECT_ELEMENT,
       context: "handleActivateSelectElementMode",
       messageData: message
     });

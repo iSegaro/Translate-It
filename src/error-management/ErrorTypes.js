@@ -16,6 +16,8 @@ export class ErrorTypes {
   static SUBTITLE = "SUBTITLE";
   static SCREEN_CAPTURE = "SCREEN_CAPTURE";
   static UNKNOWN = "UNKNOWN";
+  static SELECT_ELEMENT = "SELECT_ELEMENT";
+
 
   // کلیدهای اعتبارسنجی (همان errorKeys بدون پیشوند ERRORS_)
   static PROMPT_INVALID = "PROMPT_INVALID";

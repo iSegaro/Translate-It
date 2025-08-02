@@ -107,7 +107,7 @@ src/
 │   │   └── panel/                     # Panel/sidebar managers
 │   └── content/                       # Content script managers
 │       ├── VueBridgeManager.js        # Vue component injection
-│       ├── SelectionManager.js        # Element selection
+│       ├── SelectElementManager.js        # Element selection
 │       └── WindowsManager.js          # Floating windows
 │
 ├── 🟠 utils/                          # Organized utility functions
@@ -515,7 +515,7 @@ The background handlers are organized by feature domain for clear separation of 
 import { vueBridge } from "../managers/content/VueBridgeManager.js";
 import { contentTTSHandler } from "../handlers/content/TTSHandler.js";
 import EventHandler from "../core/EventHandler.js";
-import { SelectElementManager } from "../managers/content/SelectionManager.js";
+import { SelectElementManager } from "../managers/content/SelectElementManager.js";
 
 // Initialize core systems
 const translationHandler = getTranslationHandlerInstance();
@@ -551,7 +551,7 @@ await vueBridge.destroyMicroApp('translation-tooltip');
 
 ### Content Manager Integration
 
-#### SelectionManager.js
+#### SelectElementManager.js
 **Element selection functionality**
 - Handles element targeting and selection
 - Integrates with translation workflow
@@ -868,7 +868,7 @@ pnpm run pre-submit      # Full validation (lint + test + build)
 #### Content Script Architecture
 - **`src/content-scripts/index.js`** - Content script entry point
 - **`src/managers/content/VueBridgeManager.js`** - Vue component injection
-- **`src/managers/content/SelectionManager.js`** - Element selection
+- **`src/managers/content/SelectElementManager.js`** - Element selection
 
 #### Vue.js Integration
 - **`src/store/core/settings.js`** - Enhanced settings store

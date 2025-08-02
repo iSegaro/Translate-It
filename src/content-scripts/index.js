@@ -17,7 +17,7 @@ import EventHandler from "../core/EventHandler.js";
 import { getTranslationHandlerInstance } from "../core/InstanceManager.js";
 
 // Import the new SelectElementManager
-import { SelectElementManager } from "../managers/content/SelectionManager.js";
+import { SelectElementManager } from "../managers/content/SelectElementManager.js";
 
 console.log("Content script loaded via Vue build system");
 console.log("Vue bridge initialized:", vueBridge.isInitialized);
