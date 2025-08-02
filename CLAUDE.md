@@ -13,12 +13,16 @@ pnpm install
 pnpm run setup
 
 # Development builds with hot reload
-pnpm run dev:chrome      # ✅ Chrome development server on port 3000 (MV3 Service Worker)
-pnpm run dev:firefox     # ✅ Firefox development server on port 3001 (MV3 with compatibility)
+pnpm run dev:chrome      # ✅ Chrome development build (production-like, console logs removed)
+pnpm run dev:firefox     # ✅ Firefox development build (production-like, console logs removed)
 
-# Watch builds (auto-rebuild on changes)
-pnpm run watch:chrome    # Watch for Chrome
-pnpm run watch:firefox   # Watch for Firefox
+# Development servers with console logs preserved
+pnpm run serve:chrome    # ✅ Chrome development server on port 3000 (preserves console logs)
+pnpm run serve:firefox   # ✅ Firefox development server on port 3001 (preserves console logs)
+
+# Watch builds (auto-rebuild on changes with console logs preserved)
+pnpm run watch:chrome    # ✅ Chrome watch mode with hot reload + console logs preserved
+pnpm run watch:firefox   # ✅ Firefox watch mode with hot reload + console logs preserved
 ```
 
 ### Building & Testing

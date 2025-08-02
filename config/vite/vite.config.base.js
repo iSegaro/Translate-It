@@ -7,8 +7,9 @@ import babel from '@rollup/plugin-babel'
 export const createBaseConfig = (browser, options = {}) => {
   const isProduction = process.env.NODE_ENV === 'production'
   const isDevelopment = !isProduction
+  const isWatchMode = process.env.VITE_WATCH_MODE === 'true'
 
-  console.log(`🔧 Creating base config for ${browser} (${isProduction ? 'production' : 'development'} mode)`);
+  console.log(`🔧 Creating base config for ${browser} (${isProduction ? 'production' : 'development'} mode)${isWatchMode ? ' [WATCH MODE]' : ''}`);
 
   return defineConfig({
     plugins: [
@@ -161,8 +162,8 @@ export const createBaseConfig = (browser, options = {}) => {
       },
       
       target: 'esnext',
-      minify: isProduction ? 'terser' : false,
-      terserOptions: isProduction ? {
+      minify: (isProduction && !isWatchMode) ? 'terser' : false,
+      terserOptions: (isProduction && !isWatchMode) ? {
         compress: {
           drop_console: true,
           drop_debugger: true,
@@ -228,7 +229,7 @@ export const createBaseConfig = (browser, options = {}) => {
     
     // ESBuild options
     esbuild: {
-      drop: isProduction ? ['console', 'debugger'] : [],
+      drop: (isProduction && !isWatchMode) ? ['console', 'debugger'] : [],
       legalComments: 'none',
       treeShaking: true
     }
