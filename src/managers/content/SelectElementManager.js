@@ -47,6 +47,7 @@ export class SelectElementManager {
     // State tracking
     this.messageListener = null;
     this.abortController = null;
+    this.pendingTranslation = null; // For waiting for TRANSLATION_RESULT_UPDATE
 
     console.log("[SelectElementManager] Initialized with service integration");
   }
@@ -145,7 +146,123 @@ export class SelectElementManager {
       }
     }
 
+    // Handle TRANSLATION_RESULT_UPDATE messages
+    if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+      console.log('[SelectElementManager] Received TRANSLATION_RESULT_UPDATE:', message);
+      await this.handleTranslationResult(message);
+      return true;
+    }
+
     return false; // Let other handlers process the message
+  }
+
+  /**
+   * Handle TRANSLATION_RESULT_UPDATE message
+   * @param {Object} message - Translation result message
+   */
+  async handleTranslationResult(message) {
+    try {
+      console.log('[SelectElementManager] Processing translation result:', message.data);
+      console.log('[SelectElementManager] Message ID from result:', message.messageId);
+      console.log('[SelectElementManager] Pending translation:', this.pendingTranslation);
+      
+      if (this.pendingTranslation) {
+        // TRANSLATION_RESULT_UPDATE uses the same messageId as the original TRANSLATE request
+        if (this.pendingTranslation.originalMessageId === message.messageId) {
+          const elapsed = Date.now() - this.pendingTranslation.startTime;
+          console.log('[SelectElementManager] Message ID matched, resolving translation after', elapsed + 'ms');
+          
+          // Cancel timeout since we got the result
+          if (this.pendingTranslation.timeoutId) {
+            clearTimeout(this.pendingTranslation.timeoutId);
+          }
+          
+          this.pendingTranslation.resolve({
+            success: message.data?.success !== false,
+            translatedText: message.data?.translatedText,
+            error: message.data?.error,
+            elapsed: elapsed
+          });
+          this.pendingTranslation = null;
+        } else {
+          console.log('[SelectElementManager] Message ID mismatch:', {
+            expected: this.pendingTranslation.originalMessageId,
+            received: message.messageId
+          });
+        }
+      } else {
+        console.log('[SelectElementManager] No pending translation found');
+      }
+    } catch (error) {
+      console.error('[SelectElementManager] Error handling translation result:', error);
+      if (this.pendingTranslation) {
+        this.pendingTranslation.reject(error);
+        this.pendingTranslation = null;
+      }
+    }
+  }
+
+  /**
+   * Setup translation waiting before sending request to avoid race condition
+   * @param {string} messageId - Message ID to wait for
+   * @param {number} timeout - Timeout in milliseconds (default: 10 seconds for long translations)
+   * @returns {Promise<Object>} Translation result promise
+   */
+  setupTranslationWaiting(messageId, timeout = 10000) {
+    console.log('[SelectElementManager] Setting up translation waiting for messageId:', messageId, 'timeout:', timeout + 'ms');
+    
+    return new Promise((resolve, reject) => {
+      // Store pending translation promise
+      this.pendingTranslation = { 
+        originalMessageId: messageId, 
+        resolve, 
+        reject,
+        startTime: Date.now()
+      };
+      
+      // Set timeout - but allow late results to still be processed
+      const timeoutId = setTimeout(() => {
+        if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
+          const elapsed = Date.now() - this.pendingTranslation.startTime;
+          console.warn('[SelectElementManager] Translation timeout after', elapsed + 'ms for messageId:', messageId);
+          console.warn('[SelectElementManager] Translation may still complete in background...');
+          
+          // Don't completely reject - just resolve with timeout error but keep listening
+          resolve({
+            success: false,
+            error: `Translation timeout after ${Math.round(elapsed/1000)}s. Translation may continue in background.`,
+            timeout: true
+          });
+          
+          // Don't clear pendingTranslation - allow late results to still be processed
+          // this.pendingTranslation = null;
+        }
+      }, timeout);
+      
+      // Store timeout ID for potential cancellation
+      this.pendingTranslation.timeoutId = timeoutId;
+    });
+  }
+
+  /**
+   * Cancel pending translation (for error cases)
+   * @param {string} messageId - Message ID to cancel
+   */
+  cancelPendingTranslation(messageId) {
+    if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
+      console.log('[SelectElementManager] Cancelling pending translation for messageId:', messageId);
+      this.pendingTranslation.reject(new Error('Translation cancelled'));
+      this.pendingTranslation = null;
+    }
+  }
+
+  /**
+   * Wait for TRANSLATION_RESULT_UPDATE message (deprecated - use setupTranslationWaiting)
+   * @param {string} messageId - Original message ID from TRANSLATE request
+   * @returns {Promise<Object>} Translation result
+   */
+  async waitForTranslationResult(messageId, timeout = 30000) {
+    return this.setupTranslationWaiting(messageId, timeout);
   }
 
   /**
@@ -329,11 +446,14 @@ export class SelectElementManager {
         extractedText.substring(0, 100) + "..."
       );
 
-      // Send extracted text to background for translation (once only)
-      await this.processSelectedElement(element, extractedText);
-
-      // Deactivate mode after successful selection
+      // Deactivate mode immediately after element selection (before translation)
       await this.deactivate();
+
+      // Send extracted text to background for translation (in background)
+      // Note: Translation continues in background, user can continue browsing
+      this.processSelectedElement(element, extractedText).catch(error => {
+        console.error("[SelectElementManager] Background translation failed:", error);
+      });
     } catch (error) {
       console.error("[SelectElementManager] Element selection error:", error);
 
@@ -618,10 +738,17 @@ export class SelectElementManager {
         "[SelectElementManager] Sending translation request to background"
       );
 
-      // 5) Send translation request to background (using TRANSLATE action)
+      // Generate message ID for tracking
+      const messageId = `content-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      
+      // 5) Setup pending translation BEFORE sending message (to avoid race condition)
+      const translationPromise = this.setupTranslationWaiting(messageId);
+
+      // 6) Send translation request to background (using TRANSLATE action)
       const response = await this.messenger.sendMessage({
         action: MessageActions.TRANSLATE,
         context: MessagingContexts.SELECT_ELEMENT,
+        messageId: messageId,
         data: {
           text: jsonPayload,
           provider: await (async () => {
@@ -644,23 +771,42 @@ export class SelectElementManager {
         },
       });
 
-      // 6) Handle response (using standard TRANSLATE response format)
-      // The response from UnifiedMessenger for TRANSLATE action is the TRANSLATION_RESULT_UPDATE message itself
-      if (
-        response.action !== MessageActions.TRANSLATION_RESULT_UPDATE ||
-        !response.data?.translatedText
-      ) {
-        const msg = response.data?.error || "Translation request failed";
+      // 7) Handle initial response from background (just acknowledgment)
+      if (!response.success) {
+        const msg = response.error || "Translation request failed";
         console.error(
           "[SelectElementManager] Translation request failed:",
           msg
         );
         await this.showErrorNotification(msg);
+        // Cancel pending translation
+        this.cancelPendingTranslation(messageId);
         return { status: "error", reason: "backend_error", message: msg };
       }
 
-      // Get translated text from response
-      const translatedJsonString = response.data.translatedText;
+      console.log("[SelectElementManager] Translation request accepted, waiting for result...");
+      
+      // 8) Wait for TRANSLATION_RESULT_UPDATE message
+      const translationResult = await translationPromise;
+      
+      if (!translationResult || !translationResult.success) {
+        const msg = translationResult?.error || "Translation result failed";
+        
+        // Handle timeout specifically - less severe than other errors
+        if (translationResult?.timeout) {
+          console.warn("[SelectElementManager] Translation timeout:", msg);
+          await this.showWarningNotification("Translation taking longer than expected. It may complete in background.");
+          // Don't return error - continue with fallback or just log it
+          return { status: "timeout", reason: "timeout", message: msg };
+        } else {
+          console.error("[SelectElementManager] Translation result failed:", msg);
+          await this.showErrorNotification(msg);
+          return { status: "error", reason: "translation_failed", message: msg };
+        }
+      }
+
+      // Get translated text from result
+      const translatedJsonString = translationResult.translatedText;
 
       if (!translatedJsonString || !translatedJsonString.trim()) {
         const message = "No translation received from API";
