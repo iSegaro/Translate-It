@@ -1,5 +1,6 @@
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { MessageActions } from '../../../messaging/core/MessageActions.js';
 
 const errorHandler = new ErrorHandler();
 
@@ -28,7 +29,7 @@ export async function handleTranslateText(message, sender) {
     
     // Format request for TranslationEngine.handleTranslateMessage
     const translationRequest = {
-      action: "TRANSLATE",
+      action: MessageActions.TRANSLATE,
       context: message.source || "vue-component",
       data: {
         text,
