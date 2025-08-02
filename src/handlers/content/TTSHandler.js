@@ -1,4 +1,4 @@
-// src/content-scripts/content-tts-handler.js
+// src/handlers/content/TTSHandler.js
 // Content script TTS handler for fallback TTS functionality
 
 import browser from "webextension-polyfill";
