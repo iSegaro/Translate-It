@@ -2,6 +2,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { getProvidersForDropdown, getProviderById } from "@/core/provider-registry.js";
+import browser from "webextension-polyfill";
 
 export function useApiProvider() {
   const currentProvider = ref("google");
@@ -24,6 +25,9 @@ export function useApiProvider() {
       providerError.value = "Failed to load providers";
     }
   };
+
+  // Load available providers immediately after function definition
+  loadAvailableProviders();
 
   const loadCurrentProvider = async () => {
     try {
@@ -58,8 +62,8 @@ export function useApiProvider() {
   };
 
   const getProviderIconUrl = (iconPath) => {
-      if (!messenger || !messenger.runtime || !messenger.runtime.getURL) return "";
-      return messenger.runtime.getURL(iconPath);
+      if (!browser || !browser.runtime || !browser.runtime.getURL) return "";
+      return browser.runtime.getURL(iconPath);
   }
 
   const createProviderItems = async () => {

@@ -42,20 +42,10 @@
 
       <div class="toolbar-separator" />
 
-      <button
-        id="apiProviderBtn"
-        class="toolbar-button"
-        :title="$i18n('SIDEPANEL_API_PROVIDER_TOOLTIP')"
-        :class="{ active: isApiDropdownVisible }"
-        @click="handleApiProviderClick"
-      >
-        <img
-          id="apiProviderIcon"
-          :src="apiProviderIconSrc"
-          alt="API Provider"
-          class="toolbar-icon"
-        >
-      </button>
+      <ProviderSelector 
+        mode="icon-only"
+        @provider-change="handleProviderChange"
+      />
       <button
         id="historyBtn"
         class="toolbar-button"
@@ -93,25 +83,9 @@ import { useSelectElementTranslation } from '@/composables/useTranslationModes.j
 import { useUI } from '@/composables/useUI.js';
 import { computed, ref } from 'vue';
 
-// Import icons statically to ensure they're bundled
-import bingIcon from '@/assets/icons/api-providers/bing.svg';
-import chromeTranslateIcon from '@/assets/icons/api-providers/chrome-translate.svg';
-import customIcon from '@/assets/icons/api-providers/custom.svg';
-import deepseekIcon from '@/assets/icons/api-providers/deepseek.svg';
-import geminiIcon from '@/assets/icons/api-providers/gemini.svg';
-import googleIcon from '@/assets/icons/api-providers/google.svg';
-import openaiIcon from '@/assets/icons/api-providers/openai.svg';
-import openrouterIcon from '@/assets/icons/api-providers/openrouter.svg';
-import providerIcon from '@/assets/icons/api-providers/provider.svg';
-import webaiIcon from '@/assets/icons/api-providers/webai.svg';
-import yandexIcon from '@/assets/icons/api-providers/yandex.svg';
-import { useApiProvider } from '@/composables/useApiProvider.js';
+import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 
 const props = defineProps({
-  isApiDropdownVisible: {
-    type: Boolean,
-    default: false
-  },
   isHistoryVisible: {
     type: Boolean,
     default: false
@@ -119,37 +93,12 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['historyToggle', 'apiDropdownToggle', 'clear-fields'])
+const emit = defineEmits(['historyToggle', 'clear-fields'])
 
 // Composables
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, toggleSelectElement } = useSelectElementTranslation()
-const { currentProviderIcon } = useApiProvider()
 const { sendMessage } = useMessaging('sidepanel')
-
-// Icon mapping
-const iconMap = {
-  'google.svg': googleIcon,
-  'gemini.svg': geminiIcon,
-  'openai.svg': openaiIcon,
-  'bing.svg': bingIcon,
-  'yandex.svg': yandexIcon,
-  'custom.svg': customIcon,
-  'provider.svg': providerIcon,
-  'chrome-translate.svg': chromeTranslateIcon,
-  'deepseek.svg': deepseekIcon,
-  'openrouter.svg': openrouterIcon,
-  'webai.svg': webaiIcon
-}
-
-// Computed properties
-const apiProviderIconSrc = computed(() => {
-  if (currentProviderIcon.value) {
-    const filename = currentProviderIcon.value.split('/').pop()
-    return iconMap[filename] || googleIcon
-  }
-  return googleIcon
-});
 
 // Debounce logic
 const isSelectElementDebounced = ref(false)
@@ -183,9 +132,8 @@ const handleClearFields = () => {
   showVisualFeedback(document.getElementById('clearFieldsBtn'), 'success')
 }
 
-const handleApiProviderClick = () => {
-  emit('apiDropdownToggle', !props.isApiDropdownVisible)
-  showVisualFeedback(document.getElementById('apiProviderBtn'), 'success', 300)
+const handleProviderChange = (provider) => {
+  console.log('[SidepanelToolbar] Provider changed to:', provider)
 }
 
 const handleHistoryClick = () => {

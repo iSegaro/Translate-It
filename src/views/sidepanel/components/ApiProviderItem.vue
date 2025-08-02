@@ -33,9 +33,8 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 const handleClick = () => {
-  if (!props.item.isActive) {
-    emit('select', props.item.id)
-  }
+  // Always emit the selection, even for active provider (to close the dropdown)
+  emit('select', props.item.id)
 }
 </script>
 

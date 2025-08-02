@@ -5,10 +5,8 @@
   >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
-      :is-api-dropdown-visible="isApiDropdownVisible"
       :is-history-visible="isHistoryVisible"
       @history-toggle="handleHistoryToggle"
-      @api-dropdown-toggle="handleApiDropdownToggle"
       @clear-fields="handleClearFields"
     />
 
@@ -24,36 +22,25 @@
         @select-history-item="handleHistoryItemSelect"
       />
     </div>
-
-    <!-- API Provider Dropdown -->
-    <SidepanelApiDropdown 
-      v-model:is-visible="isApiDropdownVisible"
-      @close="isApiDropdownVisible = false"
-      @provider-selected="handleProviderSelect"
-    />
   </div>
 </template>
 
 <script setup>
 import { useTranslationStore } from '@/store/modules/translation';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { useApiProvider } from '@/composables/useApiProvider.js';
 import { useHistory } from '@/composables/useHistory.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
-import SidepanelApiDropdown from './components/SidepanelApiDropdown.vue';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
 import SidepanelToolbar from './components/SidepanelToolbar.vue';
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
-const { closeDropdown: closeApiDropdown, setDropdownOpen } = useApiProvider()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 const translationStore = useTranslationStore()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
-const isApiDropdownVisible = ref(false)
 
 // Handle history panel toggle
 const handleHistoryToggle = (visible) => {
@@ -70,16 +57,6 @@ const handleHistoryClose = () => {
   isHistoryVisible.value = false
   closeHistoryPanel() // Sync with composable state
 }
-
-// Handle API dropdown toggle
-const handleApiDropdownToggle = (visible) => {
-  isApiDropdownVisible.value = visible
-}
-
-// Watch for changes in isApiDropdownVisible and sync with composable
-watch(isApiDropdownVisible, (newVal) => {
-  setDropdownOpen(newVal)
-})
 
 // Watch for changes in isHistoryVisible and sync with composable
 watch(isHistoryVisible, (newVal) => {
@@ -98,11 +75,6 @@ const handleHistoryItemSelect = (item) => {
   console.log('[SidepanelLayout] History item selected:', item)
 }
 
-// Handle API provider selection
-const handleProviderSelect = (providerId) => {
-  console.log('[SidepanelLayout] Provider selected:', providerId)
-  isApiDropdownVisible.value = false
-}
 
 // Handle sidepanel click to deactivate select element mode
 const handleSidepanelClick = async (event) => {

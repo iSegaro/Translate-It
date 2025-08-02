@@ -102,6 +102,46 @@
     </div>
   </div>
   
+  <!-- Icon Only Mode for Sidepanel Toolbar -->
+  <div
+    v-else-if="mode === 'icon-only'"
+    class="provider-icon-only-container"
+  >
+    <button
+      class="provider-icon-button"
+      :class="{ active: isDropdownOpen }"
+      :title="currentProviderName"
+      @click="toggleDropdown"
+    >
+      <img
+        :src="currentProviderIcon"
+        alt="API Provider"
+        class="provider-icon-only"
+      >
+    </button>
+    
+    <!-- Provider Dropdown -->
+    <div 
+      v-show="isDropdownOpen"
+      class="dropdown-menu dropdown-menu-right"
+      @click.stop
+    >
+      <div
+        v-for="provider in availableProviders"
+        :key="provider.id"
+        class="dropdown-item"
+        :class="{ active: currentProvider === provider.id }"
+        @click="selectProvider(provider)"
+      >
+        <img
+          :src="getProviderIcon(provider.icon)"
+          :alt="provider.name"
+        >
+        <span>{{ provider.name }}</span>
+      </div>
+    </div>
+  </div>
+  
   <!-- Compact Mode -->
   <div
     v-else
@@ -128,13 +168,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
+import browser from 'webextension-polyfill'
 
 // Props
 const props = defineProps({
   mode: {
     type: String,
-    default: 'split', // split, button, compact
-    validator: (value) => ['split', 'button', 'compact'].includes(value)
+    default: 'split', // split, button, icon-only, compact
+    validator: (value) => ['split', 'button', 'icon-only', 'compact'].includes(value)
   }
 })
 
@@ -203,13 +244,23 @@ const handleProviderChange = (event) => {
 }
 
 const closeDropdown = (event) => {
-  if (!event.target.closest('.split-translate-button-container, .provider-button-container')) {
+  if (!event.target.closest('.split-translate-button-container, .provider-button-container, .provider-icon-only-container')) {
     isDropdownOpen.value = false
   }
 }
 
+// Storage change handler for cross-context updates
+const handleStorageChange = (changes, areaName) => {
+  if (areaName === 'sync' || areaName === 'local') {
+    if (changes.TRANSLATION_API) {
+      // Force update the store to reflect storage changes
+      settingsStore.updateSettingLocally('TRANSLATION_API', changes.TRANSLATION_API.newValue)
+    }
+  }
+}
+
 // Initialize providers
-onMounted(() => {
+onMounted(async () => {
   // Use provider registry for consistent provider information
   const providersFromRegistry = getProvidersForDropdown()
   availableProviders.value = providersFromRegistry.map(provider => ({
@@ -220,10 +271,20 @@ onMounted(() => {
   
   // Add click listener to close dropdown
   document.addEventListener('click', closeDropdown)
+  
+  // Add storage listener for cross-context updates
+  if (typeof browser !== 'undefined' && browser.storage) {
+    browser.storage.onChanged.addListener(handleStorageChange)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', closeDropdown)
+  
+  // Clean up storage listener
+  if (typeof browser !== 'undefined' && browser.storage) {
+    browser.storage.onChanged.removeListener(handleStorageChange)
+  }
 })
 </script>
 
@@ -328,6 +389,74 @@ onUnmounted(() => {
 
 .provider-button.active {
   background-color: var(--language-controls-bg-color);
+}
+
+/* Icon Only Mode Styles */
+.provider-icon-only-container {
+  position: relative;
+}
+
+.provider-icon-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: var(--color-background);
+  }
+
+  &.active {
+    background-color: var(--color-primary);
+
+    .provider-icon-only {
+      filter: invert(1);
+    }
+  }
+}
+
+.provider-icon-only {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  opacity: var(--icon-opacity);
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Right-aligned dropdown for icon-only mode */
+.dropdown-menu-right {
+  right: 0;
+  left: auto;
+  background-color: var(--color-background, #ffffff) !important;
+  border: 1px solid var(--color-border, #e5e7eb) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Enhanced dropdown items for icon-only mode */
+.provider-icon-only-container .dropdown-item {
+  background-color: var(--color-background, #ffffff);
+  color: var(--color-text, #374151);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.provider-icon-only-container .dropdown-item:hover {
+  background-color: var(--color-surface-alt, #f3f4f6) !important;
+}
+
+.provider-icon-only-container .dropdown-item.active {
+  background-color: var(--color-primary, #3b82f6) !important;
+  color: white !important;
+}
+
+.provider-icon-only-container .dropdown-item.active span {
+  color: white !important;
 }
 
 /* Compact Select Styles */

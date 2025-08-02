@@ -72,7 +72,14 @@ const hasProviders = computed(() => providerItems.value.length > 0)
 
 // Handle provider selection
 const handleProviderSelect = async (providerId) => {
-  if (!providerId || providerId === currentProvider.value) {
+  if (!providerId) {
+    return
+  }
+  
+  // If same provider is selected, just close the dropdown
+  if (providerId === currentProvider.value) {
+    emit('close')
+    emit('update:isVisible', false)
     return
   }
 
@@ -84,6 +91,7 @@ const handleProviderSelect = async (providerId) => {
     if (success) {
       emit('providerSelected', providerId)
       emit('close')
+      emit('update:isVisible', false)
       
       // Visual feedback - assuming the button is the target
       const apiButton = document.getElementById('apiProviderBtn')
