@@ -462,10 +462,7 @@ The background handlers are organized by feature domain for clear separation of 
 - **handleCaptureError.js**: Error handling
 
 #### TTS Handlers (src/background/handlers/tts/)
-- **handleSpeak.js**: Text-to-speech operations
-- **handleStopTTS.js**: Stop TTS playback
-- **handleTTSOffscreen.js**: Offscreen document TTS (Chrome)
-- **handleOffscreenReady.js**: Offscreen initialization
+- **handleSpeak.js**: Text-to-speech operations (unified cross-browser handler)
 
 #### Common Handlers (src/background/handlers/common/)
 - **handlePing.js**: Health check and connectivity
@@ -576,28 +573,22 @@ The extension uses feature detection and browser-specific implementations:
 
 #### TTS System (src/managers/browser-specific/tts/)
 
-**TTSManager.js** - Unified TTS interface
-```javascript
-class TTSManager {
-  async initialize(browserType) {
-    if (browserType === 'chrome') {
-      const { TTSChrome } = await import('./TTSChrome.js');
-      this.ttsService = new TTSChrome(); // Uses offscreen documents
-    } else if (browserType === 'firefox') {
-      const { TTSFirefox } = await import('./TTSFirefox.js');
-      this.ttsService = new TTSFirefox(); // Uses background page audio
-    } else {
-      const { TTSContent } = await import('./TTSContent.js');
-      this.ttsService = new TTSContent(); // Fallback to Web Speech API
-    }
-  }
-}
-```
+**Simplified Cross-Browser TTS Architecture**
+- **TTSChrome.js** (OffscreenTTSManager): Chrome's offscreen documents for audio processing
+- **TTSFirefox.js** (BackgroundTTSManager): Firefox background page audio context
 
-**Implementation Strategy:**
-- **TTSChrome.js**: Uses Chrome's offscreen documents for audio processing
-- **TTSFirefox.js**: Uses background page for audio context
-- **TTSContent.js**: Fallback using content script Web Speech API
+**Automatic Browser Detection:**
+- Feature detection via `browser.offscreen?.hasDocument` determines implementation
+- Dynamic loading through `FeatureLoader.loadTTSManager()`
+- Direct message routing: `TTS_STOP`/`TTS_PAUSE`/`TTS_RESUME` → offscreen, `TTS_SPEAK` → background
+- Content script fallback through `TTSHandler.js` when needed
+
+**Message Flow:**
+```
+Vue Component → TTSMessenger → MessageActions.TTS_SPEAK → handleSpeak.js → FeatureLoader → TTSChrome/TTSFirefox
+Content Script → TTSHandler.js → Web Speech API (fallback)
+Offscreen Document → Direct TTS control (TTS_STOP, TTS_PAUSE, TTS_RESUME)
+```
 
 #### Capture System (src/managers/browser-specific/capture/)
 
