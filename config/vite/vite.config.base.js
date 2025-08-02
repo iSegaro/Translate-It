@@ -96,17 +96,7 @@ export const createBaseConfig = (browser, options = {}) => {
               return 'core/provider-registry'
             }
             
-            // Translation client and protocol (lightweight)
-            if (id.includes('src/core/translation-client') || id.includes('src/core/translation-protocol')) {
-              return 'core/translation-client'
-            }
-            
             // Legacy providers (should not be used in UI contexts)
-            if (id.includes('src/providers/implementations')) {
-              console.warn('🚨 Warning: Legacy provider implementation loaded in UI context:', id)
-              return 'legacy/providers'
-            }
-            
             if (id.includes('src/providers')) {
               return 'legacy/providers-core'
             }

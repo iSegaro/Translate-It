@@ -1,6 +1,7 @@
 {
   "name": "translate-it",
   "version": "0.10.0",
+  "type": "module",
   "description": "Smart Translation Assistant",
   "scripts": {
     "build": "node scripts/build/build-all.mjs",
@@ -50,6 +51,8 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-no-unsanitized": "^4.1.2",
     "eslint-plugin-vue": "^9.27.0",
+    "fs-extra": "^11.3.0",
+    "globals": "^16.3.0",
     "happy-dom": "^18.0.1",
     "jsdom": "^26.1.0",
     "playwright": "^1.54.1",
