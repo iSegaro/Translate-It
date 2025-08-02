@@ -87,14 +87,11 @@ export class FeatureLoader {
       return manager;
     } catch (error) {
       console.error(
-        "❌ Failed to load BackgroundTTSManager, falling back to content script TTS:",
+        "❌ Failed to load BackgroundTTSManager:",
         error,
       );
-      // Ultimate fallback
-      const { ContentScriptTTSManager } = await import(
-        "../managers/browser-specific/tts/TTSContent.js"
-      );
-      return new ContentScriptTTSManager();
+      // No fallback - TTS will not be available
+      throw new Error("TTS system could not be initialized");
     }
   }
 

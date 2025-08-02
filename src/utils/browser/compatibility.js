@@ -80,11 +80,8 @@ export async function getTTSManager() {
     }
   } catch (error) {
     console.error("[browserCompat] Error loading TTS manager:", error);
-    // Fallback to content script TTS
-    const module = await import(
-      /* webpackChunkName: "tts-fallback" */ "@/managers/browser-specific/tts/TTSContent.js"
-    );
-    return module;
+    // No fallback available - TTS functionality will not be available
+    throw new Error("TTS functionality is not available in this browser context");
   }
 }
 

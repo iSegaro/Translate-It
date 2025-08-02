@@ -90,7 +90,7 @@ class LifecycleManager {
         console.log("✅ TTS handleSpeak error handler initialized");
       }
 
-      const stopModule = await import("../../background/handlers/tts/handleStopTTS.js");
+      const stopModule = await import("../../background/handlers/tts/handleStopSpeak.js");
       if (stopModule.initializeStopTTSHandler) {
         stopModule.initializeStopTTSHandler(errorHandler);
         console.log("✅ TTS handleStopTTS error handler initialized");
