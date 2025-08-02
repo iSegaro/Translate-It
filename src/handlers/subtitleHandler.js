@@ -1,4 +1,4 @@
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { logME } from "../utils/core/helpers.js";
@@ -14,7 +14,7 @@ export class SubtitleHandler {
     this.featureManager = translationHandler.featureManager;
     this.site = this.detectSite();
     this.youtubeButtonInterval = null;
-    this.messenger = MessagingCore.getMessenger('content');
+    this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
 
     if (this.site) {
       this.initialize();

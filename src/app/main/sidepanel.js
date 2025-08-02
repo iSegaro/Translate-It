@@ -4,6 +4,7 @@ import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingCore } from '@/messaging/core/MessagingCore.js'
+import { MessageContexts } from '../../messaging/core/MessagingCore'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -49,7 +50,7 @@ async function initializeApp() {
 
     // Global properties for extension context
     app.config.globalProperties.$isExtension = true
-    app.config.globalProperties.$context = 'sidepanel'
+    app.config.globalProperties.$context = MessageContexts.SIDEPANEL
 
     // Error handling
     app.config.errorHandler = (err, instance, info) => {
@@ -57,7 +58,7 @@ async function initializeApp() {
       
       // Send error to background script for logging
       try {
-        const messenger = MessagingCore.getMessenger('sidepanel')
+        const messenger = MessagingCore.getMessenger(MessageContexts.SIDEPANEL)
         messenger.sendMessage({
           action: 'LOG_ERROR',
           data: {

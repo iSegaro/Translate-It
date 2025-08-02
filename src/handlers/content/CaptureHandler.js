@@ -5,13 +5,14 @@ import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { cropImageData } from "../utils/imageProcessing.js";
 import { logME } from "../utils/core/helpers.js";
+import { MessageContexts } from "../../messaging/core/MessagingCore.js";
 
 export class ContentCaptureHandler {
   constructor() {
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
-    this.messenger = MessagingCore.getMessenger('content');
+    this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
     this.handleAreaSelectionComplete = this.handleAreaSelectionComplete.bind(this);
     this.handlePreviewConfirm = this.handlePreviewConfirm.bind(this);
     this.handlePreviewCancel = this.handlePreviewCancel.bind(this);
