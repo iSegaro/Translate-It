@@ -124,11 +124,11 @@ export class TextExtractor {
     const { provider, sourceLang, targetLang, mode } = options;
 
     // Import here to avoid circular dependencies
-    const { translationProviderFactory } = await import(
-      "../providers/factory/index.js"
+    const { providerFactory } = await import(
+      "../providers/core/ProviderFactory.js"
     );
 
-    const providerInstance = translationProviderFactory.getProvider(provider);
+    const providerInstance = providerFactory.getProvider(provider);
     if (!providerInstance || !providerInstance.translateImage) {
       throw this._createError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,

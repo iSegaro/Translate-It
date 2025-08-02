@@ -1,15 +1,15 @@
 // src/core/providers/OpenAIProvider.js
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
   getOpenAIApiKeyAsync,
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
-} from "../../config.js";
-import { buildPrompt } from "../../utils/promptBuilder.js";
-import { getPromptBASEScreenCaptureAsync } from "../../config.js";
-import { logME } from "../../utils/helpers.js";
+} from "@/config.js";
+import { buildPrompt } from "@/utils/promptBuilder.js";
+import { getPromptBASEScreenCaptureAsync } from "@/config.js";
+import { logME } from "@/utils/helpers.js";
 
-export class OpenAIProvider extends BaseTranslationProvider {
+export class OpenAIProvider extends BaseProvider {
   constructor() {
     super("OpenAI");
   }

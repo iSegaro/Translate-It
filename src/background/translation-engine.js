@@ -3,7 +3,8 @@
  * Handles all translation requests from UI contexts via messaging
  */
 
-import { TranslationProviderFactory } from "./providers/TranslationProviderFactory.js";
+import { ProviderFactory } from "@/providers/core/ProviderFactory.js";
+import { providerRegistry } from "@/providers/core/ProviderRegistry.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
@@ -12,7 +13,7 @@ export class TranslationEngine {
     this.providers = new Map();
     this.cache = new Map();
     this.history = [];
-    this.factory = new TranslationProviderFactory();
+    this.factory = new ProviderFactory();
   }
 
   /**
@@ -267,7 +268,8 @@ export class TranslationEngine {
 
     try {
       // Create new provider instance
-      const provider = await this.factory.getProvider(providerId);
+      const ProviderClass = providerRegistry.get(providerId);
+      const provider = new ProviderClass();
 
       if (provider) {
         this.providers.set(providerId, provider);
@@ -383,7 +385,7 @@ export class TranslationEngine {
    */
   async getAvailableProviders() {
     try {
-      return await this.factory.getAvailableProviders();
+      return providerRegistry.getAll().map(p => ({ id: p.id, name: p.name }));
     } catch (error) {
       console.error("[TranslationEngine] Failed to get providers:", error);
       return [];

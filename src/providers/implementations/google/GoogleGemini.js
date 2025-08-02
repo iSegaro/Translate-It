@@ -1,17 +1,17 @@
 // src/core/providers/GeminiProvider.js
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
   CONFIG,
   getApiKeyAsync,
   getApiUrlAsync,
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
-} from "../../config.js";
-import { buildPrompt } from "../../utils/promptBuilder.js";
-import { logME } from "../../utils/helpers.js";
-import { getPromptBASEScreenCaptureAsync } from "../../config.js";
+} from "@/config.js";
+import { buildPrompt } from "@/utils/promptBuilder.js";
+import { logME } from "@/utils/helpers.js";
+import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 
-export class GeminiProvider extends BaseTranslationProvider {
+export class GeminiProvider extends BaseProvider {
   constructor() {
     super("Gemini");
   }

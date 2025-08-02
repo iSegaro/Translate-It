@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 // Mock the translation provider factory before importing the store
-vi.mock('@/providers', () => ({
-  translationProviderFactory: {
+vi.mock('@/providers/core/ProviderFactory.js', () => ({
+  providerFactory: {
     getProvider: vi.fn(),
     getAvailableProviders: vi.fn(() => [
       { id: 'google', name: 'Google Translate' },
@@ -14,6 +14,7 @@ vi.mock('@/providers', () => ({
 
 // Import after mocking
 const { useTranslationStore } = await import('../translation')
+import { providerFactory } from '@/providers/core/ProviderFactory.js'
 
 describe('Translation Store', () => {
   beforeEach(() => {
@@ -45,8 +46,8 @@ describe('Translation Store', () => {
       })
     }
 
-    const { translationProviderFactory } = await import('@/providers')
-    translationProviderFactory.getProvider.mockResolvedValue(mockProvider)
+    
+    providerFactory.getProvider.mockResolvedValue(mockProvider)
 
     const store = useTranslationStore()
     
@@ -71,8 +72,8 @@ describe('Translation Store', () => {
       translate: vi.fn().mockRejectedValue(new Error('Translation failed'))
     }
 
-    const { translationProviderFactory } = await import('@/providers')
-    translationProviderFactory.getProvider.mockResolvedValue(mockProvider)
+    
+    providerFactory.getProvider.mockResolvedValue(mockProvider)
 
     const store = useTranslationStore()
     
@@ -93,8 +94,8 @@ describe('Translation Store', () => {
       })
     }
 
-    const { translationProviderFactory } = await import('@/providers')
-    translationProviderFactory.getProvider.mockResolvedValue(mockProvider)
+    
+    providerFactory.getProvider.mockResolvedValue(mockProvider)
 
     const store = useTranslationStore()
     

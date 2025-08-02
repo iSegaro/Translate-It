@@ -1,15 +1,15 @@
 // src/core/providers/GoogleTranslateProvider.js
 import browser from 'webextension-polyfill';
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import { 
   getGoogleTranslateUrlAsync,
   getEnableDictionaryAsync,
   TranslationMode 
-} from "../../config.js";
-import { logME } from "../../utils/helpers.js";
-import { isPersianText } from "../../utils/textDetection.js";
+} from "@/config.js";
+import { logME } from "@/utils/helpers.js";
+import { isPersianText } from "@/utils/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
-const AUTO_DETECT_VALUE = 'auto';
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 const getLanguageCode = (lang) => lang;
 
 const TEXT_DELIMITER = "\n\n---\n\n";
@@ -81,7 +81,7 @@ const langNameToCodeMap = {
   vietnamese: "vi",
 };
 
-export class GoogleTranslateProvider extends BaseTranslationProvider {
+export class GoogleTranslateProvider extends BaseProvider {
   constructor() {
     super("GoogleTranslate");
   }

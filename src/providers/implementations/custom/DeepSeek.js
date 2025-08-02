@@ -1,13 +1,13 @@
 // src/core/providers/DeepSeekProvider.js
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
   CONFIG,
   getDeepSeekApiKeyAsync,
   getDeepSeekApiModelAsync,
-} from "../../config.js";
-import { buildPrompt } from "../../utils/promptBuilder.js";
+} from "@/config.js";
+import { buildPrompt } from "@/utils/promptBuilder.js";
 
-export class DeepSeekProvider extends BaseTranslationProvider {
+export class DeepSeekProvider extends BaseProvider {
   constructor() {
     super("DeepSeek");
   }

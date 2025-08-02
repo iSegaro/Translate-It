@@ -1,12 +1,12 @@
 // src/core/providers/WebAIProvider.js
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
-} from "../../config.js";
-import { buildPrompt } from "../../utils/promptBuilder.js";
+} from "@/config.js";
+import { buildPrompt } from "@/utils/promptBuilder.js";
 
-export class WebAIProvider extends BaseTranslationProvider {
+export class WebAIProvider extends BaseProvider {
   constructor() {
     super("WebAI");
   }

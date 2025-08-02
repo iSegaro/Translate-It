@@ -1,30 +1,30 @@
-// src/core/providers/OpenRouterProvider.js
-import browser from 'webextension-polyfill';
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
+// src/core/providers/CustomProvider.js
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
-  CONFIG,
-  getOpenRouterApiKeyAsync,
-  getOpenRouterApiModelAsync,
-} from "../../config.js";
-import { buildPrompt } from "../../utils/promptBuilder.js";
+  getCustomApiUrlAsync,
+  getCustomApiKeyAsync,
+  getCustomApiModelAsync,
+} from "@/config.js";
+import { buildPrompt } from "@/utils/promptBuilder.js";
 
-export class OpenRouterProvider extends BaseTranslationProvider {
+export class CustomProvider extends BaseProvider {
   constructor() {
-    super("OpenRouter");
+    super("Custom");
   }
 
   async translate(text, sourceLang, targetLang, translateMode) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    const [apiKey, model] = await Promise.all([
-      getOpenRouterApiKeyAsync(),
-      getOpenRouterApiModelAsync(),
+    const [apiUrl, apiKey, model] = await Promise.all([
+      getCustomApiUrlAsync(),
+      getCustomApiKeyAsync(),
+      getCustomApiModelAsync(),
     ]);
 
     // Validate configuration
     this._validateConfig(
-      { apiKey },
-      ["apiKey"],
+      { apiUrl, apiKey },
+      ["apiUrl", "apiKey"],
       `${this.providerName.toLowerCase()}-translation`
     );
 
@@ -40,17 +40,15 @@ export class OpenRouterProvider extends BaseTranslationProvider {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": browser.runtime.getURL("/"),
-        "X-Title": browser.runtime.getManifest().name,
       },
       body: JSON.stringify({
-        model: model || "openai/gpt-3.5-turbo",
+        model: model, // مدل باید توسط کاربر مشخص شود
         messages: [{ role: "user", content: prompt }],
       }),
     };
 
     return this._executeApiCall({
-      url: CONFIG.OPENROUTER_API_URL,
+      url: apiUrl,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,

@@ -1,12 +1,12 @@
-// src/core/providers/BaseTranslationProvider.js
-import { logME } from "../../utils/helpers.js";
-import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+// src/providers/core/BaseTranslationProvider.js
+import { logME } from "@utils/helpers.js";
+import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 
 /**
  * Base class for all translation providers
  * Provides common functionality like error handling, API calls, and validation
  */
-export class BaseTranslationProvider {
+export class BaseProvider {
   constructor(providerName) {
     this.providerName = providerName;
     this.sessionContext = null;

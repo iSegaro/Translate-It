@@ -1,13 +1,13 @@
 // src/providers/implementations/BingTranslateProvider.js
 import browser from 'webextension-polyfill';
-import { BaseTranslationProvider } from "./BaseTranslationProvider.js";
-import { logME } from "../../utils/helpers.js";
-import { isPersianText } from "../../utils/textDetection.js";
+import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { logME } from "@/utils/helpers.js";
+import { isPersianText } from "@/utils/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
-const AUTO_DETECT_VALUE = 'auto';
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 const getLanguageCode = (lang) => lang;
-import { ErrorTypes } from "../../error-management/ErrorTypes.js";
-import { TranslationMode } from "../../config.js";
+import { ErrorTypes } from "@/error-management/ErrorTypes.js";
+import { TranslationMode } from "@/config.js";
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -155,7 +155,7 @@ const langNameToCodeMap = {
   vietnamese: "vi",
 };
 
-export class BingTranslateProvider extends BaseTranslationProvider {
+export class BingTranslateProvider extends BaseProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
