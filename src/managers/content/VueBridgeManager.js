@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
-import { MessagingCore, MessageFormat } from "../messaging/core/MessagingCore.js";
+import { MessagingCore, MessageFormat } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 class ContentScriptVueBridge {
@@ -35,9 +35,9 @@ class ContentScriptVueBridge {
 
   async registerComponents() {
     const components = {
-      TranslationTooltip: () => import("../components/content/TranslationTooltip.vue"),
-      ScreenSelector: () => import("../components/content/ScreenSelector.vue"),
-      CapturePreview: () => import("../components/content/CapturePreview.vue"),
+      TranslationTooltip: () => import("../../components/content/TranslationTooltip.vue"),
+      ScreenSelector: () => import("../../components/content/ScreenSelector.vue"),
+      CapturePreview: () => import("../../components/content/CapturePreview.vue"),
     };
     for (const [name, loader] of Object.entries(components)) {
       this.componentRegistry.set(name, async () => (await loader()).default);

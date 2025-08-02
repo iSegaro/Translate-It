@@ -10,7 +10,7 @@ import {
   getTranslationApiAsync,
 } from "../config.js";
 import { ProviderRegistry } from "../core/provider-registry.js";
-import { captureManager } from "../capture/CaptureManager.js";
+import { captureManager } from "../managers/browser-specific/capture/CaptureManager.js";
 
 /**
  * Handle screen capture requests from sidepanel

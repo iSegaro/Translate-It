@@ -56,7 +56,7 @@ export class FeatureLoader {
       try {
         console.log("Attempting to load OffscreenTTSManager...");
         const { OffscreenTTSManager } = await import(
-          "../managers/tts-offscreen.js"
+          "../managers/browser-specific/tts/TTSChrome.js"
         );
         const manager = new OffscreenTTSManager();
         await manager.initialize();
@@ -79,7 +79,7 @@ export class FeatureLoader {
     try {
       console.log("Attempting to load BackgroundTTSManager...");
       const { BackgroundTTSManager } = await import(
-        "../managers/tts-background.js"
+        "../managers/browser-specific/tts/TTSFirefox.js"
       );
       const manager = new BackgroundTTSManager();
       await manager.initialize();
@@ -92,7 +92,7 @@ export class FeatureLoader {
       );
       // Ultimate fallback
       const { ContentScriptTTSManager } = await import(
-        "../managers/tts-content.js"
+        "../managers/browser-specific/tts/TTSContent.js"
       );
       return new ContentScriptTTSManager();
     }
@@ -145,13 +145,13 @@ export class FeatureLoader {
     try {
       if (panelSystem === "side_panel" && capabilities.sidePanel) {
         const { ChromeSidePanelManager } = await import(
-          "../managers/sidepanel-chrome.js"
+          "../managers/browser-specific/panel/SidepanelManager.js"
         );
         return new ChromeSidePanelManager();
       } else {
         // Firefox sidebar or fallback
         const { FirefoxSidebarManager } = await import(
-          "../managers/sidebar-firefox.js"
+          "../managers/browser-specific/panel/SidebarManager.js"
         );
         return new FirefoxSidebarManager();
       }
@@ -213,7 +213,7 @@ export class FeatureLoader {
     try {
       if (capabilities.offscreen && browser === "chrome") {
         const { OffscreenCaptureManager } = await import(
-          "../managers/capture-offscreen.js"
+          "../managers/browser-specific/capture/CaptureOffscreen.js"
         );
         return new OffscreenCaptureManager();
       } else {

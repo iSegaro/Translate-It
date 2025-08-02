@@ -2,7 +2,7 @@
 // Chrome offscreen document screen capture manager
 
 import browser from "webextension-polyfill";
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessagingCore } from "../../../messaging/core/MessagingCore.js";
 
 /**
  * Offscreen Screen Capture Manager for Chrome

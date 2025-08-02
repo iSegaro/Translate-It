@@ -5,7 +5,7 @@
 import { ref, reactive, onMounted, onUnmounted, readonly, computed } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { useI18n } from "./useI18n.js";
-import SelectionWindows from "@/managers/SelectionWindows.js";
+import SelectionWindows from "@/managers/content/WindowsManager.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 

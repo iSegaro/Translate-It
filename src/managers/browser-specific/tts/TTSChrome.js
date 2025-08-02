@@ -2,7 +2,7 @@
 // Chrome offscreen document TTS implementation
 
 import browser from "webextension-polyfill";
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessagingCore } from "../../../messaging/core/MessagingCore.js";
 
 /**
  * Offscreen TTS Manager for Chrome

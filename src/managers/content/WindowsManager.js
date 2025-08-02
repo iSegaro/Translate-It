@@ -1,19 +1,19 @@
 // src/managers/SelectionWindows.js
 
-import { logME, isExtensionContextValid } from "../utils/helpers";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { logME, isExtensionContextValid } from "../../utils/helpers.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import {
   CONFIG,
   TranslationMode,
   getThemeAsync,
   getSettingsAsync,
-} from "../config.js";
+} from "../../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
-import { getResolvedUserTheme } from "../utils/theme.js";
-import { AUTO_DETECT_VALUE } from "../constants.js";
-import { determineTranslationMode } from "../utils/translationModeHelper.js";
-import { SimpleMarkdown } from "../utils/simpleMarkdown.js";
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { getResolvedUserTheme } from "../../utils/theme.js";
+import { AUTO_DETECT_VALUE } from "../../constants.js";
+import { determineTranslationMode } from "../../utils/translationModeHelper.js";
+import { SimpleMarkdown } from "../../utils/simpleMarkdown.js";
+import { MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 export default class SelectionWindows {
@@ -29,9 +29,9 @@ export default class SelectionWindows {
     this.originalText = null;
     this.isTranslationCancelled = false;
     this.themeChangeListener = null; // To store the theme change listener
-    
+
     // Enhanced messaging with context-aware selection and translation
-    this.messenger = MessagingCore.getMessenger('content');
+    this.messenger = MessagingCore.getMessenger("content");
 
     this.icon = null;
     this.iconClickContext = null;
@@ -81,7 +81,7 @@ export default class SelectionWindows {
       // If anything fails, use current document
       console.warn(
         "[SelectionWindows] Could not access top document, using current:",
-        e,
+        e
       );
     }
 
@@ -119,7 +119,7 @@ export default class SelectionWindows {
       } catch (e) {
         console.warn(
           "[SelectionWindows] Could not calculate top window coords:",
-          e,
+          e
         );
       }
     }
@@ -139,7 +139,7 @@ export default class SelectionWindows {
     if (newValue && this.displayElement && this.isVisible) {
       logME(
         "[SelectionWindows] Theme changed, updating popup theme.",
-        newValue,
+        newValue
       );
       this._applyThemeToHost();
     }
@@ -149,14 +149,14 @@ export default class SelectionWindows {
     if (!this.themeChangeListener) {
       // Store the bound function so it can be correctly removed
       this.boundHandleThemeChange = this._handleThemeChange.bind(this);
-      storageManager.on('change:THEME', this.boundHandleThemeChange);
+      storageManager.on("change:THEME", this.boundHandleThemeChange);
       // logME("[SelectionWindows] Theme change listener added with StorageManager.");
     }
   }
 
   _removeThemeChangeListener() {
     if (this.boundHandleThemeChange) {
-      storageManager.off('change:THEME', this.boundHandleThemeChange);
+      storageManager.off("change:THEME", this.boundHandleThemeChange);
       this.boundHandleThemeChange = null; // Clear the stored listener
       // logME("[SelectionWindows] Theme change listener removed from StorageManager.");
     }
@@ -316,7 +316,7 @@ export default class SelectionWindows {
 
     const translationMode = determineTranslationMode(
       selectedText,
-      TranslationMode.Selection,
+      TranslationMode.Selection
     );
 
     logME("[SelectionWindows] Creating translation window ", translationMode);
@@ -388,10 +388,12 @@ export default class SelectionWindows {
     });
 
     // Use specialized translation messenger for background translation
-    this.messenger.specialized.translation.translateText(selectedText, {
-      translationMode,
-      action: MessageActions.FETCH_TRANSLATION
-    }).then((response) => {
+    this.messenger.specialized.translation
+      .translateText(selectedText, {
+        translationMode,
+        action: MessageActions.FETCH_TRANSLATION,
+      })
+      .then((response) => {
         if (
           this.isTranslationCancelled ||
           this.originalText !== selectedText ||
@@ -405,11 +407,11 @@ export default class SelectionWindows {
             txt,
             loading,
             selectedText,
-            translationMode,
+            translationMode
           );
         } else {
           throw new Error(
-            response?.error?.message || response?.error || ErrorTypes.SERVICE,
+            response?.error?.message || response?.error || ErrorTypes.SERVICE
           );
         }
       })
@@ -610,7 +612,7 @@ export default class SelectionWindows {
       finalX,
       finalY,
       popupWidth,
-      popupHeight,
+      popupHeight
     );
 
     return {
@@ -631,7 +633,7 @@ export default class SelectionWindows {
       (el) => {
         const style = topWindow.getComputedStyle(el);
         return style.position === "fixed" || style.position === "sticky";
-      },
+      }
     );
 
     const popupRect = {
@@ -735,11 +737,11 @@ export default class SelectionWindows {
     const rect = this.displayElement.getBoundingClientRect();
     const constrainedX = Math.max(
       0,
-      Math.min(newX, viewport.width - rect.width),
+      Math.min(newX, viewport.width - rect.width)
     );
     const constrainedY = Math.max(
       0,
-      Math.min(newY, viewport.height - rect.height),
+      Math.min(newY, viewport.height - rect.height)
     );
 
     // Apply position directly since we're using position: fixed
@@ -793,7 +795,7 @@ export default class SelectionWindows {
     translatedText,
     loadingContainer,
     originalText,
-    trans_Mode,
+    trans_Mode
   ) {
     if (!this.innerContainer || !this.displayElement) return;
     if (
@@ -815,7 +817,7 @@ export default class SelectionWindows {
 
     const ttsIconOriginal = this.createTTSIcon(
       originalText,
-      CONFIG.SOURCE_LANGUAGE || "listen",
+      CONFIG.SOURCE_LANGUAGE || "listen"
     );
     firstLine.appendChild(ttsIconOriginal);
 
@@ -948,9 +950,11 @@ export default class SelectionWindows {
       e.stopPropagation();
       if (isExtensionContextValid()) {
         // Use specialized TTS messenger for speaking
-        this.messenger.specialized.tts.speak(textToSpeak, AUTO_DETECT_VALUE).catch((error) => {
-          logME("[SelectionWindows] Error speaking text:", error);
-        });
+        this.messenger.specialized.tts
+          .speak(textToSpeak, AUTO_DETECT_VALUE)
+          .catch((error) => {
+            logME("[SelectionWindows] Error speaking text:", error);
+          });
       }
     });
     return icon;
@@ -1000,9 +1004,9 @@ export default class SelectionWindows {
       this.dismiss(false);
     }
     const errObj =
-      error instanceof Error
-        ? error
-        : new Error(String(error.message || error));
+      error instanceof Error ? error : (
+        new Error(String(error.message || error))
+      );
     await this.translationHandler.errorHandler.handle(errObj, {
       type: errObj.type || ErrorTypes.API,
       context: "selection-window-translate",
@@ -1048,7 +1052,7 @@ export default class SelectionWindows {
           clearTimeout(fallbackTimeout);
           this.removeElement(el);
         },
-        { once: true },
+        { once: true }
       );
     } else {
       this.removeElement(this.displayElement);
@@ -1160,7 +1164,7 @@ export function dismissAllSelectionWindows() {
   } catch (err) {
     logME(
       "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
-      err,
+      err
     );
   }
 }

@@ -25,7 +25,7 @@ import { isEditable, logME, logMethod, taggleLinks } from "../utils/helpers.js";
 import { detectPlatform, Platform } from "../utils/platformDetector.js";
 import setupIconBehavior from "../managers/IconBehavior.js";
 import { clearAllCaches } from "../utils/textExtraction.js";
-import SelectionWindows from "../managers/SelectionWindows.js";
+import SelectionWindows from "../managers/content/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../utils/exclusion.js";
 import { UnifiedMessenger } from "./UnifiedMessenger.js"; // Add this import

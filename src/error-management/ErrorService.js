@@ -1,7 +1,7 @@
 // File: src/error-management/ErrorService.js
 
 import { getDebugModeAsync, CONFIG } from "../config.js";
-import NotificationManager from "../managers/NotificationManager.js";
+import NotificationManager from "../managers/core/NotificationManager.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";

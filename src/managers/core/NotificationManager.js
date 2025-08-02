@@ -1,8 +1,8 @@
 // src/managers/NotificationManager.js
 
 import browser from "webextension-polyfill";
-import { isExtensionContextValid, logME } from "../utils/helpers.js";
-import { parseBoolean, getTranslationString } from "../utils/i18n.js";
+import { isExtensionContextValid, logME } from "../../utils/helpers.js";
+import { parseBoolean, getTranslationString } from "../../utils/i18n.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 
 const SAFE_ICONS = {

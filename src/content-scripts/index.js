@@ -4,20 +4,20 @@
 import browser from "webextension-polyfill";
 
 // Import and initialize Vue bridge
-import { vueBridge } from "./vue-bridge.js";
+import { vueBridge } from "../managers/content/VueBridgeManager.js";
 
 // Import and initialize content script TTS handler
 import { contentTTSHandler } from "./content-tts-handler.js";
 
 // Import NotificationManager
-import NotificationManager from "../managers/NotificationManager.js";
+import NotificationManager from "../managers/core/NotificationManager.js";
 
 // Import EventHandler and InstanceManager
 import EventHandler from "../core/EventHandler.js";
 import { getTranslationHandlerInstance } from "../core/InstanceManager.js";
 
 // Import the new SelectElementManager
-import { SelectElementManager } from "./select-element-manager.js";
+import { SelectElementManager } from "../managers/content/SelectionManager.js";
 
 console.log("Content script loaded via Vue build system");
 console.log("Vue bridge initialized:", vueBridge.isInitialized);

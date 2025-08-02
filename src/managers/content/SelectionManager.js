@@ -4,11 +4,11 @@
 
 import browser from "webextension-polyfill";
 import { logME, taggleLinks } from "@/utils/helpers.js";
-import { ErrorHandler } from "../error-management/ErrorService.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import NotificationManager from "@/managers/NotificationManager.js";
-import { UnifiedMessenger } from "../core/UnifiedMessenger.js";
-import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import NotificationManager from "@/managers/core/NotificationManager.js";
+import { MessagingCore } from "../../messaging/core/MessagingCore.js";
+import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
@@ -31,12 +31,11 @@ export class SelectElementManager {
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
-    
 
     // Service instances
     this.errorHandler = new ErrorHandler();
     this.notificationManager = new NotificationManager(this.errorHandler);
-    this.messenger = new UnifiedMessenger("content-select-element");
+    this.messenger = MessagingCore.getMessenger("content-select-element");
 
     // Event handlers (bound to this)
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -73,7 +72,6 @@ export class SelectElementManager {
     }
   }
 
-
   /**
    * Setup message listener for background communication
    */
@@ -83,7 +81,7 @@ export class SelectElementManager {
     this.messageListener = this.handleMessage;
     this.browser.runtime.onMessage.addListener.call(
       this.browser.runtime.onMessage,
-      this.messageListener,
+      this.messageListener
     );
     console.log("[SelectElementManager] Message listener registered");
   }
@@ -93,15 +91,18 @@ export class SelectElementManager {
    */
   async handleMessage(message, sender, sendResponse) {
     console.log(`[SelectElementManager] Received message:`, message);
-    
-    if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE || 
-        message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
-      
+
+    if (
+      message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE ||
+      message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE
+    ) {
       // Determine activation state
       let shouldActivate;
       if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
         shouldActivate = true;
-      } else if (message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
+      } else if (
+        message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE
+      ) {
         shouldActivate = false;
       } else {
         // Legacy TOGGLE_SELECT_ELEMENT_MODE
@@ -121,11 +122,11 @@ export class SelectElementManager {
           `[SelectElementManager] Mode ${shouldActivate ? "activated" : "deactivated"} successfully`,
           response
         );
-        
+
         if (sendResponse) {
           sendResponse(response);
         }
-        
+
         return response;
       } catch (error) {
         console.error("[SelectElementManager] Toggle error:", error);
@@ -226,7 +227,7 @@ export class SelectElementManager {
     // Note: Cancellation message removed to prevent "message port closed" errors
     // The Vue composable handles state synchronization via storage changes
     console.log(
-      "[SelectElementManager] Select element mode deactivated - state will sync via storage",
+      "[SelectElementManager] Select element mode deactivated - state will sync via storage"
     );
 
     console.log("[SelectElementManager] Select element mode deactivated");
@@ -304,7 +305,7 @@ export class SelectElementManager {
     if (!this.isValidTextElement(element)) {
       console.log("[SelectElementManager] Invalid element for translation");
       await this.showErrorNotification(
-        "Please select an element that contains text",
+        "Please select an element that contains text"
       );
       this.isProcessingClick = false;
       return;
@@ -325,7 +326,7 @@ export class SelectElementManager {
 
       console.log(
         "[SelectElementManager] Text extracted:",
-        extractedText.substring(0, 100) + "...",
+        extractedText.substring(0, 100) + "..."
       );
 
       // Send extracted text to background for translation (once only)
@@ -371,7 +372,7 @@ export class SelectElementManager {
       // If there are translated elements, revert them
       if (this.translatedElements.size > 0) {
         console.log(
-          "[SelectElementManager] Reverting translations before deactivation",
+          "[SelectElementManager] Reverting translations before deactivation"
         );
         await this.revertTranslations();
       }
@@ -407,16 +408,26 @@ export class SelectElementManager {
    * Highlight element - relies on CSS :hover effects
    */
   highlightElement(element) {
-    console.log('[SelectElementManager] Highlighting element:', element.tagName, element.className);
-    
+    console.log(
+      "[SelectElementManager] Highlighting element:",
+      element.tagName,
+      element.className
+    );
+
     // The CSS class is applied globally, so :hover effects work automatically
     // Just track the current element for mouseout handling
     this.currentHighlighted = element;
-    
+
     // Optional: Add explicit highlighting class for additional feedback
-    if (element && !element.classList.contains('translate-it-element-highlighted')) {
-      element.classList.add('translate-it-element-highlighted');
-      console.log('[SelectElementManager] Added highlight class to:', element.tagName);
+    if (
+      element &&
+      !element.classList.contains("translate-it-element-highlighted")
+    ) {
+      element.classList.add("translate-it-element-highlighted");
+      console.log(
+        "[SelectElementManager] Added highlight class to:",
+        element.tagName
+      );
     }
   }
 
@@ -426,10 +437,15 @@ export class SelectElementManager {
   clearHighlight() {
     // Remove explicit highlighting class if present
     if (this.currentHighlighted) {
-      this.currentHighlighted.classList.remove('translate-it-element-highlighted');
-      console.log('[SelectElementManager] Removed highlight class from:', this.currentHighlighted.tagName);
+      this.currentHighlighted.classList.remove(
+        "translate-it-element-highlighted"
+      );
+      console.log(
+        "[SelectElementManager] Removed highlight class from:",
+        this.currentHighlighted.tagName
+      );
     }
-    
+
     // Clear current element tracking
     this.currentHighlighted = null;
   }
@@ -490,26 +506,34 @@ export class SelectElementManager {
    * Follows the exact same process as OLD handleSelect_ElementClick method
    */
   async processSelectedElement(element, text) {
-    console.log("[SelectElementManager] Starting advanced text extraction process");
-    
+    console.log(
+      "[SelectElementManager] Starting advanced text extraction process"
+    );
+
     try {
       // Import all required functions from advanced text extraction
-      const { 
-        collectTextNodes, 
-        separateCachedAndNewTexts, 
+      const {
+        collectTextNodes,
+        separateCachedAndNewTexts,
         expandTextsForTranslation,
         parseAndCleanTranslationResponse,
         reassembleTranslations,
-        applyTranslationsToNodes
-      } = await import("../utils/advanced-text-extraction.js");
+        applyTranslationsToNodes,
+      } = await import("../../utils/advanced-text-extraction.js");
 
       // Handle input/textarea elements with simple processing first
-      if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-        console.log("[SelectElementManager] Processing input/textarea with simple translation");
-        
+      if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+        console.log(
+          "[SelectElementManager] Processing input/textarea with simple translation"
+        );
+
         // Get current provider and language settings
-        const { getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } = await import("../config.js");
-        
+        const {
+          getTranslationApiAsync,
+          getSourceLanguageAsync,
+          getTargetLanguageAsync,
+        } = await import("../../config.js");
+
         const provider = await getTranslationApiAsync();
         const sourceLanguage = await getSourceLanguageAsync();
         const targetLanguage = await getTargetLanguageAsync();
@@ -520,11 +544,12 @@ export class SelectElementManager {
           provider: provider,
           from: sourceLanguage,
           to: targetLanguage,
-          mode: 'selection'
+          mode: "selection",
         });
 
         if (response && (response.success || response.translatedText)) {
-          const translatedText = response.translatedText || response.data?.translatedText;
+          const translatedText =
+            response.translatedText || response.data?.translatedText;
           if (translatedText) {
             const originalText = element.value;
             this.trackTranslatedElement(element, originalText);
@@ -539,7 +564,7 @@ export class SelectElementManager {
 
       // 1) Collect text nodes from selected element (same as OLD)
       const { textNodes, originalTextsMap } = collectTextNodes(element);
-      
+
       if (!originalTextsMap.size) {
         console.warn("[SelectElementManager] No text nodes found in element");
         await this.showNoTextNotification();
@@ -547,7 +572,8 @@ export class SelectElementManager {
       }
 
       // 2) Separate cached and new texts (same as OLD)
-      const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
+      const { textsToTranslate, cachedTranslations } =
+        separateCachedAndNewTexts(originalTextsMap);
 
       // If only cached translations exist
       if (!textsToTranslate.length && cachedTranslations.size) {
@@ -555,7 +581,7 @@ export class SelectElementManager {
         const context = {
           translatedElements: this.translatedElements,
           originalTexts: this.originalTexts,
-          errorHandler: this.errorHandler
+          errorHandler: this.errorHandler,
         };
         applyTranslationsToNodes(textNodes, cachedTranslations, context);
         await this.showSuccessNotification("Translation loaded from cache");
@@ -572,20 +598,23 @@ export class SelectElementManager {
       }
 
       // 3) Expand texts for translation (same as OLD)
-      const { expandedTexts, originMapping } = expandTextsForTranslation(textsToTranslate);
+      const { expandedTexts, originMapping } =
+        expandTextsForTranslation(textsToTranslate);
 
       // 4) Create JSON payload (same as OLD)
       const jsonPayload = JSON.stringify(
         expandedTexts.map((t) => ({ text: t }))
       );
-      
+
       if (jsonPayload.length > 20_000) {
         const message = `Selected text is too large (${jsonPayload.length} bytes)`;
         await this.showErrorNotification(message);
         return { status: "error", reason: "payload_large", message };
       }
 
-      console.log("[SelectElementManager] Sending translation request to background");
+      console.log(
+        "[SelectElementManager] Sending translation request to background"
+      );
 
       // 5) Send translation request to background (using TRANSLATE action)
       const response = await this.messenger.sendMessage({
@@ -594,30 +623,36 @@ export class SelectElementManager {
         data: {
           text: jsonPayload,
           provider: await (async () => {
-            const { getTranslationApiAsync } = await import("../config.js");
+            const { getTranslationApiAsync } = await import("../../config.js");
             return await getTranslationApiAsync();
           })(),
           sourceLanguage: await (async () => {
-            const { getSourceLanguageAsync } = await import("../config.js");
+            const { getSourceLanguageAsync } = await import("../../config.js");
             return await getSourceLanguageAsync();
           })(),
           targetLanguage: await (async () => {
-            const { getTargetLanguageAsync } = await import("../config.js");
+            const { getTargetLanguageAsync } = await import("../../config.js");
             return await getTargetLanguageAsync();
           })(),
           mode: "SelectElement",
           options: {
             isSelectElement: true,
-            rawJsonPayload: true
-          }
-        }
+            rawJsonPayload: true,
+          },
+        },
       });
 
       // 6) Handle response (using standard TRANSLATE response format)
       // The response from UnifiedMessenger for TRANSLATE action is the TRANSLATION_RESULT_UPDATE message itself
-      if (response.action !== MessageActions.TRANSLATION_RESULT_UPDATE || !response.data?.translatedText) {
+      if (
+        response.action !== MessageActions.TRANSLATION_RESULT_UPDATE ||
+        !response.data?.translatedText
+      ) {
         const msg = response.data?.error || "Translation request failed";
-        console.error("[SelectElementManager] Translation request failed:", msg);
+        console.error(
+          "[SelectElementManager] Translation request failed:",
+          msg
+        );
         await this.showErrorNotification(msg);
         return { status: "error", reason: "backend_error", message: msg };
       }
@@ -627,16 +662,22 @@ export class SelectElementManager {
 
       if (!translatedJsonString || !translatedJsonString.trim()) {
         const message = "No translation received from API";
-        console.error("[SelectElementManager] Empty translation response:", response);
+        console.error(
+          "[SelectElementManager] Empty translation response:",
+          response
+        );
         await this.showErrorNotification(message);
         return { status: "error", reason: "empty_translation", message };
       }
 
-      console.log("[SelectElementManager] Received translation response, parsing JSON");
+      console.log(
+        "[SelectElementManager] Received translation response, parsing JSON"
+      );
 
       // 7) Parse translation response (same as OLD)
-      const translatedData = parseAndCleanTranslationResponse(translatedJsonString);
-      
+      const translatedData =
+        parseAndCleanTranslationResponse(translatedJsonString);
+
       if (!translatedData || !translatedData.length) {
         const message = "Invalid translation response format";
         await this.showErrorNotification(message);
@@ -662,12 +703,14 @@ export class SelectElementManager {
       const context = {
         translatedElements: this.translatedElements,
         originalTexts: this.originalTexts,
-        errorHandler: this.errorHandler
+        errorHandler: this.errorHandler,
       };
 
       applyTranslationsToNodes(textNodes, allTranslations, context);
 
-      console.log("[SelectElementManager] Advanced text extraction process completed successfully");
+      console.log(
+        "[SelectElementManager] Advanced text extraction process completed successfully"
+      );
       await this.showSuccessNotification("Translation completed successfully!");
 
       return {
@@ -676,15 +719,17 @@ export class SelectElementManager {
         translatedCount: newTranslations.size,
         fromCache: cachedTranslations.size,
       };
-
     } catch (error) {
-      console.error("[SelectElementManager] Advanced text extraction process failed:", error);
-      
+      console.error(
+        "[SelectElementManager] Advanced text extraction process failed:",
+        error
+      );
+
       await this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "select-element-advanced-extraction",
       });
-      
+
       await this.showErrorNotification(error.message);
       return {
         status: "error",
@@ -694,21 +739,26 @@ export class SelectElementManager {
     }
   }
 
-
   /**
    * Add global styles for select element mode using legacy system
    */
   addGlobalStyles() {
     // Apply the CSS class that enables crosshair cursor and hover effects
     taggleLinks(true);
-    
+
     // Verify the class was applied
-    const hasClass = document.documentElement.classList.contains('AIWritingCompanion-disable-links');
-    console.log('[SelectElementManager] CSS class applied:', hasClass);
-    
+    const hasClass = document.documentElement.classList.contains(
+      "AIWritingCompanion-disable-links"
+    );
+    console.log("[SelectElementManager] CSS class applied:", hasClass);
+
     if (!hasClass) {
-      console.warn('[SelectElementManager] CSS class failed to apply - trying manual application');
-      document.documentElement.classList.add('AIWritingCompanion-disable-links');
+      console.warn(
+        "[SelectElementManager] CSS class failed to apply - trying manual application"
+      );
+      document.documentElement.classList.add(
+        "AIWritingCompanion-disable-links"
+      );
     }
   }
 
@@ -753,11 +803,11 @@ export class SelectElementManager {
         "Select Element mode activated. Hover over elements to highlight them, click to translate.",
         "info",
         true,
-        3000,
+        3000
       );
     } catch (error) {
       console.log(
-        "[SelectElementManager] Select element mode activated - hover over elements to highlight",
+        "[SelectElementManager] Select element mode activated - hover over elements to highlight"
       );
     }
   }
@@ -771,7 +821,7 @@ export class SelectElementManager {
         `Selection error: ${message}`,
         "error",
         true,
-        4000,
+        4000
       );
     } catch (error) {
       console.error("[SelectElementManager] Error:", message);
@@ -787,7 +837,7 @@ export class SelectElementManager {
         "No text found in selected element. Please select an element with text content.",
         "warning",
         true,
-        3000,
+        3000
       );
     } catch (error) {
       console.log("[SelectElementManager] No text found in selected element");
@@ -814,25 +864,35 @@ export class SelectElementManager {
       console.log("[SelectElementManager] Starting translation revert process");
 
       // Use advanced text extraction revert system
-      const { revertAllTranslations } = await import("../utils/advanced-text-extraction.js");
-      
+      const { revertAllTranslations } = await import(
+        "../../utils/advanced-text-extraction.js"
+      );
+
       const context = {
         translatedElements: this.translatedElements,
-        originalTexts: this.originalTexts
+        originalTexts: this.originalTexts,
       };
-      
+
       const successfulReverts = revertAllTranslations(context);
 
       // Also handle simple input/textarea reverts from tracking
       let inputReverts = 0;
       for (const [element, originalText] of this.originalTexts.entries()) {
-        if (element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')) {
+        if (
+          element &&
+          (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
+        ) {
           try {
             element.value = originalText;
             inputReverts++;
-            console.log("[SelectElementManager] Reverted input/textarea element");
+            console.log(
+              "[SelectElementManager] Reverted input/textarea element"
+            );
           } catch (error) {
-            console.error("[SelectElementManager] Failed to revert input element:", error);
+            console.error(
+              "[SelectElementManager] Failed to revert input element:",
+              error
+            );
           }
         }
       }
@@ -846,10 +906,10 @@ export class SelectElementManager {
       // Show notification
       if (totalReverts > 0) {
         await this.showSuccessNotification(
-          `${totalReverts} translation(s) reverted successfully`,
+          `${totalReverts} translation(s) reverted successfully`
         );
         console.log(
-          `[SelectElementManager] Successfully reverted ${totalReverts} translations (${successfulReverts} DOM + ${inputReverts} inputs)`,
+          `[SelectElementManager] Successfully reverted ${totalReverts} translations (${successfulReverts} DOM + ${inputReverts} inputs)`
         );
       } else {
         console.log("[SelectElementManager] No translations found to revert");

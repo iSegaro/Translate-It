@@ -8,7 +8,7 @@ import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
 import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import DiscordStrategy from "../strategies/DiscordStrategy.js";
-import NotificationManager from "../managers/NotificationManager.js";
+import NotificationManager from "../managers/core/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/debounce.js";
 import { state, TranslationMode, CONFIG } from "../config.js";
@@ -18,7 +18,7 @@ import EventHandler from "./EventHandler.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n.js";
-import FeatureManager from "./FeatureManager.js";
+import FeatureManager from "../managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
 export default class TranslationHandler {
