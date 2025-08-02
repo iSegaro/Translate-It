@@ -35,7 +35,7 @@ export class SelectElementManager {
     // Service instances
     this.errorHandler = new ErrorHandler();
     this.notificationManager = new NotificationManager(this.errorHandler);
-    this.messenger = MessagingCore.getMessenger("content-select-element");
+    this.messenger = MessagingCore.getMessenger(MessagingContexts.CONTENT);
 
     // Event handlers (bound to this)
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -579,8 +579,10 @@ export class SelectElementManager {
       if (!textsToTranslate.length && cachedTranslations.size) {
         console.log("[SelectElementManager] Using only cached translations");
         const context = {
+          state: {
+            originalTexts: this.originalTexts
+          },
           translatedElements: this.translatedElements,
-          originalTexts: this.originalTexts,
           errorHandler: this.errorHandler,
         };
         applyTranslationsToNodes(textNodes, cachedTranslations, context);
@@ -701,8 +703,10 @@ export class SelectElementManager {
 
       // 9) Apply translations to DOM nodes (same as OLD)
       const context = {
+        state: {
+          originalTexts: this.originalTexts
+        },
         translatedElements: this.translatedElements,
-        originalTexts: this.originalTexts,
         errorHandler: this.errorHandler,
       };
 
