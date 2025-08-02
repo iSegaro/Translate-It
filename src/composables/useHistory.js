@@ -182,7 +182,10 @@ export function useHistory() {
     (newHistory) => {
       if (newHistory) {
         historyItems.value = newHistory;
-        console.log("[useHistory] History updated from settings store");
+        // Only log in development mode to reduce console noise
+        if (import.meta.env.DEV) {
+          console.debug("[useHistory] History updated from settings store");
+        }
       }
     },
     { deep: true },

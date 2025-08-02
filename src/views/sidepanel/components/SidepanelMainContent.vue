@@ -232,62 +232,73 @@ const sourceLanguageValue = computed(() => {
 watch(
   () => historyComposable.sortedHistoryItems,
   (newHistory) => {
-    console.log(
-      "[SidepanelMainContent] History watcher triggered. newHistory:",
-      newHistory,
-    );
+    if (import.meta.env.DEV) {
+      console.debug(
+        "[SidepanelMainContent] History watcher triggered. newHistory:",
+        newHistory,
+      );
+    }
     if (newHistory && newHistory.length > 0) {
       const lastItem = newHistory[0];
-      console.log("[SidepanelMainContent] Last history item:", lastItem);
-      console.log(
-        "[SidepanelMainContent] Current sourceText.value:",
-        sourceText.value,
+      if (import.meta.env.DEV) {
+        console.debug("[SidepanelMainContent] Last history item:", lastItem);
+        console.debug(
+          "[SidepanelMainContent] Current sourceText.value:",
+          sourceText.value,
       );
-      console.log(
-        "[SidepanelMainContent] Current translatedText.value:",
-        translatedText.value,
-      );
+        console.debug(
+          "[SidepanelMainContent] Current translatedText.value:",
+          translatedText.value,
+        );
+      }
 
       // If the last history item matches the current source text, update the result
       if (
         lastItem.sourceText.trim() === sourceText.value.trim() &&
         (translatedText.value === "" || translatedText.value === null)
       ) {
-        console.log(
-          "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
-        );
-        console.log("  lastItem.sourceText:", lastItem.sourceText);
-        console.log("  sourceText.value:", sourceText.value);
-        console.log(
-          "  translatedText.value (before update):",
-          translatedText.value,
-        );
+        if (import.meta.env.DEV) {
+          console.debug(
+            "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
+          );
+        }
+        if (import.meta.env.DEV) {
+          console.debug("  lastItem.sourceText:", lastItem.sourceText);
+          console.debug("  sourceText.value:", sourceText.value);
+          console.debug(
+            "  translatedText.value (before update):",
+            translatedText.value,
+          );
+        }
         
         translatedText.value = lastItem.translatedText;
         translationError.value = ""; // Clear any potential Firefox bug error message
         isTranslating.value = false;
-        console.log(
-          "  [History Watcher] translatedText.value (after update):",
-          translatedText.value,
-        );
-        console.log(
-          "  [History Watcher] translationError.value (after update):",
-          translationError.value,
-        );
-        console.log(
-          "  [History Watcher] isTranslating.value (after update):",
-          isTranslating.value,
-        );
-      } else {
-        console.log("[SidepanelMainContent] Watcher condition NOT met.");
-        console.log("  lastItem.sourceText:", lastItem.sourceText);
-        console.log("  sourceText.value:", sourceText.value);
-        console.log(
+        
+        if (import.meta.env.DEV) {
+          console.debug(
+            "  [History Watcher] translatedText.value (after update):",
+            translatedText.value,
+          );
+          console.debug(
+            "  [History Watcher] translationError.value (after update):",
+            translationError.value,
+          );
+          console.debug(
+            "  [History Watcher] isTranslating.value (after update):",
+            isTranslating.value,
+          );
+        }
+      } else if (import.meta.env.DEV) {
+        console.debug("[SidepanelMainContent] Watcher condition NOT met.");
+        console.debug("  lastItem.sourceText:", lastItem.sourceText);
+        console.debug("  sourceText.value:", sourceText.value);
+        console.debug(
           "  lastItem.sourceText === sourceText.value:",
           lastItem.sourceText === sourceText.value,
         );
-        console.log("  translatedText.value:", translatedText.value);
-        console.log(
+        console.debug("  translatedText.value:", translatedText.value);
+        console.debug(
           "  (translatedText.value === '' || translatedText.value === null):",
           translatedText.value === "" || translatedText.value === null,
         );
@@ -556,8 +567,7 @@ onMounted(async () => {
   console.log(historyComposable); // Explicitly use historyComposable to satisfy linter
   hasTranslationContent.value;
   isSelectElementActivating.value;
-  copyTranslationText();
-  speakTranslationText();
+  // Remove automatic clipboard/TTS operations on mount to prevent errors
 
   // Initial clipboard check
   checkClipboard();
