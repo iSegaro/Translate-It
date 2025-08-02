@@ -1,413 +1,909 @@
-# معماری سیستم - افزونه Translate-It
+# Translate-It Extension Architecture
 
-## خلاصه کلی
+## Overview
 
-این پروژه یک **browser extension** برای ترجمه هوشمند با استفاده از AI/Translator Services است که **کاملاً از JavaScript ساده به Vue.js modern architecture** انتقال یافته است. این افزونه از **Manifest V3** پشتیبانی می‌کند و با **Chrome و Firefox** کاملاً سازگار است.
+This project is a **modern browser extension** for AI-powered translation built with **Vue.js architecture**, supporting **Chrome and Firefox** with **Manifest V3**. The extension has undergone complete modernization from vanilla JavaScript to a well-organized, scalable Vue.js architecture with cross-browser compatibility.
 
-## وضعیت فعلی: فاز 2.3.1 به اتمام رسیده ✅
+## Current Status: Phase 5 Complete ✅
 
-### مراحل کامل شده:
-- ✅ **Vue.js Migration**: Options page کاملاً migrate شده
-- ✅ **Cross-Browser Architecture**: Chrome و Firefox با MV3 support
-- ✅ **Enhanced Messaging System**: سیستم پیام‌رسانی استاندارد و یکپارچه
-- ✅ **Centralized Storage Manager**: سیستم ذخیره‌سازی متمرکز با cache و events
-- ✅ **Background Service Modernization**: Service worker مدرن و cross-browser
-- ✅ **Provider System**: 10+ translation providers با factory pattern
-- ✅ **Migration System**: انتقال خودکار از نسخه‌های قدیمی
+### Completed Modernization:
+- ✅ **Vue.js Migration**: Options page fully migrated with modern Vue components
+- ✅ **Cross-Browser Architecture**: Chrome and Firefox with MV3 support and compatibility layer
+- ✅ **Unified Messaging System**: Standardized messaging with specialized messengers
+- ✅ **Centralized Storage System**: StorageCore with intelligent caching and event system
+- ✅ **Background Service Modernization**: Service worker with cross-browser feature detection
+- ✅ **Provider System**: 10+ translation providers with factory pattern
+- ✅ **Project Structure Reorganization**: Complete 5-phase reorganization with logical file grouping
+- ✅ **Migration System**: Automatic legacy data migration and import/export compatibility
 
 ---
 
-## 🏗️ معماری اصلی سیستم
+## 🏗️ Core Architecture Overview
 
-### 1. **سیستم پیام‌رسانی استاندارد (Enhanced Messaging System)**
-
-#### ساختار جدید: MessagingStandards + EnhancedUnifiedMessenger
+### System Architecture Flow
 
 ```
-Vue Apps / Content Scripts / Background Service
+User Interaction (Vue Components / Content Scripts)
     ↓
-MessagingStandards.getMessenger(context)
+MessagingCore (Standardized Message Format)
     ↓
-EnhancedUnifiedMessenger (instance per context)
-    ├── specialized.tts (TTS operations)
-    ├── specialized.capture (Screen capture)
-    ├── specialized.selection (Element selection)
-    └── specialized.translation (Translation requests)
+SimpleMessageHandler (Cross-browser routing)
     ↓
-Standardized Message Format (MessageFormat)
+Background Handlers (Feature-specific processing)
     ↓
-Cross-browser Communication (webextension-polyfill)
+Core Services (Translation, Storage, Providers)
+    ↓
+Browser APIs (Cross-browser compatibility layer)
 ```
 
-#### **کلیدی فایل‌ها:**
-- **`src/core/MessagingStandards.js`**: Factory و مدیریت messengers
-- **`src/core/EnhancedUnifiedMessenger.js`**: Main messenger class
-- **`src/core/MessageActions.js`**: Standardized action definitions
-- **`src/core/UnifiedMessenger.js`**: Base messenger functionality
+---
 
-#### **Context Management:**
-```javascript
-// مثال استفاده
-import { MessagingStandards, MessagingContexts } from '@/core/MessagingStandards.js';
+## 📁 Project Structure (Post Phase 5 Reorganization)
 
-const popupMessenger = MessagingStandards.getMessenger(MessagingContexts.POPUP);
-await popupMessenger.specialized.translation.translate(text, options);
-```
-
-#### **Specialized Messengers:**
-- **TTS Messenger**: `messenger.specialized.tts.speak(text, lang, options)`
-- **Capture Messenger**: `messenger.specialized.capture.captureScreen(options)`
-- **Selection Messenger**: `messenger.specialized.selection.activateMode(mode)`
-- **Translation Messenger**: `messenger.specialized.translation.translate(text, options)`
-
-### 2. **سیستم ذخیره‌سازی متمرکز (Centralized Storage System)**
-
-#### StorageManager Architecture:
-
-```
-Vue Components / Background Service / Content Scripts
-    ↓
-StorageManager (singleton instance)
-    ├── Intelligent Cache (Map-based with invalidation)
-    ├── Event System (change listeners)
-    ├── Cross-browser API (webextension-polyfill)
-    └── Error Handling (comprehensive try-catch)
-    ↓
-browser.storage.local (Chrome/Firefox compatible)
-```
-
-#### **کلیدی فایل‌ها:**
-- **`src/core/StorageManager.js`**: Main storage manager class
-- **`src/composables/useStorage.js`**: Vue integration composables
-- **`src/composables/useBrowserAPI.js`**: Enhanced with StorageManager
-
-#### **Usage Patterns:**
-```javascript
-// Direct usage
-import storageManager from '@/core/StorageManager.js';
-const data = await storageManager.get(['key1', 'key2']);
-await storageManager.set({ key1: 'value1' });
-
-// Vue composable
-const { data, save, remove } = useStorage(['key1', 'key2']);
-
-// Single item with auto-sync
-const { value } = useStorageItem('settings', {});
-```
-
-### 3. **Background Service Architecture (Service Worker)**
-
-#### Modern Background Service:
-
-```
-browser.runtime.onInstalled / onStartup
-    ↓
-BackgroundService (src/background/index.js)
-    ├── SimpleMessageHandler (message routing)
-    ├── TranslationEngine (translation orchestration)
-    ├── Feature Detection (browser-specific capabilities)
-    ├── Provider Factory (translation providers)
-    ├── TTS Manager (text-to-speech)
-    ├── Capture Manager (screen capture)
-    └── Migration System (legacy data handling)
-```
-
-#### **کلیدی Components:**
-- **`src/background/index.js`**: Main background service entry point
-- **`src/core/SimpleMessageHandler.js`**: Primary message routing system
-- **`src/background/translation-engine.js`**: Translation orchestration
-- **`src/background/providers/`**: Translation provider implementations
-
-### 4. **Vue.js Integration System**
-
-#### Vue Architecture:
-
-```
-Vue Apps (Popup, Sidepanel, Options)
-    ↓
-Vue Router + Pinia Stores
-    ├── enhanced-settings store (central settings)
-    ├── useMessaging composables (messaging)
-    ├── useStorage composables (storage)
-    └── useBrowserAPI (unified browser API)
-    ↓
-MessagingStandards + StorageManager
-    ↓
-Browser Extension APIs
-```
-
-#### **Vue Components Structure:**
 ```
 src/
-├── views/
-│   ├── popup/PopupApp.vue (main popup interface)
-│   ├── sidepanel/SidepanelApp.vue (sidepanel interface)
-│   └── options/OptionsApp.vue (✅ کاملاً migrate شده)
-├── components/
-│   ├── base/ (BaseButton, BaseInput, BaseDropdown, etc.)
-│   ├── feature/ (translation-specific components)
-│   └── content/ (injected components)
-├── composables/
-│   ├── useBrowserAPI.js (unified browser API access)
-│   ├── useStorage.js (storage management)
-│   ├── useMessaging.js (message handling)
-│   ├── usePopupTranslation.js (popup functionality)
-│   └── useSidepanelTranslation.js (sidepanel functionality)
-└── store/core/
-    └── settings.js (enhanced settings store)
+├── 🔵 core/                          # Core foundation systems
+│   ├── SimpleMessageHandler.js       # Cross-browser message routing
+│   ├── EnhancedUnifiedMessenger.js   # Advanced messaging functionality
+│   ├── TranslationHandler.js         # Main translation orchestration
+│   ├── EventHandler.js               # User interaction handling
+│   ├── InstanceManager.js            # Singleton pattern management
+│   ├── TranslationService.js         # Core translation logic
+│   └── provider-registry.js          # Provider protocol definitions
+│
+├── 🟢 messaging/                      # Unified messaging system
+│   ├── core/
+│   │   ├── MessagingCore.js           # Main messaging core & factory
+│   │   ├── MessageActions.js          # Standardized action constants
+│   │   └── MessageFormat.js           # Message format validation
+│   ├── specialized/                   # Feature-specific messengers
+│   │   ├── TTSMessenger.js
+│   │   ├── CaptureMessenger.js
+│   │   ├── TranslationMessenger.js
+│   │   └── SelectionMessenger.js
+│   └── composables/
+│       └── useMessaging.js            # Vue integration
+│
+├── 🔶 storage/                        # Centralized storage system
+│   ├── core/
+│   │   ├── StorageCore.js             # Main storage manager
+│   │   └── SecureStorage.js           # Encryption utilities
+│   ├── modules/                       # Domain-specific storage
+│   │   ├── SettingsStorage.js
+│   │   └── HistoryStorage.js
+│   └── composables/
+│       ├── useStorage.js              # Storage composables
+│       └── useStorageItem.js
+│
+├── 🟣 providers/                      # Translation provider system
+│   ├── core/
+│   │   ├── BaseProvider.js            # Abstract base provider
+│   │   ├── ProviderFactory.js         # Provider factory pattern
+│   │   └── ProviderRegistry.js        # Provider registration
+│   └── implementations/               # Provider implementations
+│       ├── google/                    # Google services
+│       ├── openai/                    # OpenAI & OpenRouter
+│       ├── microsoft/                 # Bing Translate
+│       ├── browser/                   # Browser Translation API
+│       └── custom/                    # DeepSeek, WebAI, Yandex
+│
+├── 🔴 handlers/                       # Event and message handlers
+│   ├── content/                       # Content script handlers
+│   │   ├── CaptureHandler.js
+│   │   └── TTSHandler.js
+│   ├── lifecycle/                     # Extension lifecycle
+│   │   ├── InstallHandler.js
+│   │   └── ExtensionLifecycleHandler.js
+│   └── [other handlers...]
+│
+├── 🟡 managers/                       # Service and feature managers
+│   ├── core/                          # Core managers
+│   │   ├── FeatureManager.js
+│   │   ├── NotificationManager.js
+│   │   └── LifecycleManager.js
+│   ├── browser-specific/              # Browser-specific implementations
+│   │   ├── tts/                       # TTS managers
+│   │   ├── capture/                   # Capture managers
+│   │   └── panel/                     # Panel/sidebar managers
+│   └── content/                       # Content script managers
+│       ├── VueBridgeManager.js        # Vue component injection
+│       ├── SelectionManager.js        # Element selection
+│       └── WindowsManager.js          # Floating windows
+│
+├── 🟠 utils/                          # Organized utility functions
+│   ├── core/                          # Core utilities
+│   │   ├── helpers.js
+│   │   ├── debounce.js
+│   │   └── validation.js
+│   ├── browser/                       # Browser compatibility
+│   │   ├── compatibility.js
+│   │   ├── events.js
+│   │   └── platform.js
+│   ├── i18n/                          # Internationalization
+│   │   ├── i18n.js
+│   │   ├── languages.js
+│   │   └── localization.js
+│   ├── text/                          # Text processing
+│   │   ├── extraction.js
+│   │   ├── detection.js
+│   │   └── markdown.js
+│   ├── ui/                            # UI utilities
+│   │   ├── theme.js
+│   │   ├── html-sanitizer.js
+│   │   └── exclusion.js
+│   └── framework/                     # Framework compatibility
+│
+├── 📱 components/                     # Vue components
+│   ├── base/                          # Base UI components
+│   ├── feature/                       # Feature-specific components
+│   ├── content/                       # Content script components
+│   └── shared/                        # Shared components
+│
+├── 📄 views/                          # Vue pages
+│   ├── options/                       # ✅ Fully migrated options page
+│   ├── popup/                         # Popup interface
+│   └── sidepanel/                     # Sidepanel interface
+│
+├── 🗂️ store/                          # Pinia state management
+├── 🎯 background/                     # Background service core
+├── 📄 content-scripts/                # Content script entry points
+├── 🎨 composables/                    # Vue composables
+├── ⚙️ config.js                       # Configuration management
+└── 📋 services/                       # Business logic services
 ```
-
-### 5. **Translation System Architecture**
-
-#### Translation Flow:
-
-```
-User Input (Vue Component)
-    ↓
-Translation Composable (usePopupTranslation/useSidepanelTranslation)
-    ↓
-MessagingStandards.getMessenger(context).specialized.translation
-    ↓
-Background: SimpleMessageHandler -> TranslationEngine
-    ↓
-Provider Factory -> Selected Provider (Google, Gemini, OpenAI, etc.)
-    ↓
-API Call -> Response
-    ↓
-Cache & Event Emission
-    ↓
-Response to Vue Component
-```
-
-#### **Provider System:**
-- **Factory Pattern**: `src/background/providers/TranslationProviderFactory.js`
-- **10+ Providers**: Google, Gemini, OpenAI, DeepSeek, Bing, Yandex, Browser API, etc.
-- **Implementation**: `src/background/providers/implementations/`
-
-### 6. **Content Scripts & Element Selection**
-
-#### Content Script Architecture:
-
-```
-Content Script Injection
-    ↓
-Vue Bridge System (src/content-scripts/vue-bridge.js)
-    ├── Element Selection Manager
-    ├── TTS Content Handler
-    ├── Translation Windows
-    └── Screen Capture Interface
-    ↓
-MessagingStandards (content context)
-    ↓
-Background Service Communication
-```
-
-#### **کلیدی فایل‌ها:**
-- **`src/content-scripts/vue-bridge.js`**: Vue component injection system
-- **`src/content-scripts/select-element-manager.js`**: Element selection functionality
-- **`src/content-scripts/content-tts-handler.js`**: Content-specific TTS handling
 
 ---
 
-## 🔄 جریان داده و Communication Patterns
+## 🔵 Core Foundation Systems (src/core/)
 
-### 1. **Message Flow Standardized:**
+The `src/core/` directory contains the foundational systems that power the entire extension:
+
+### SimpleMessageHandler.js
+**Cross-browser message routing with Promise-based API**
+- Handles all message routing between extension contexts
+- Provides context-aware routing for MessagingStandards integration
+- Uses webextension-polyfill for Chrome/Firefox compatibility
+- Supports both action-based and context-based message routing
+
+```javascript
+// Register handler for specific action
+messageHandler.register('TRANSLATE', handleTranslate);
+
+// Register context-specific handler
+messageHandler.registerContextHandler('popup', 'TRANSLATE', handlePopupTranslate);
+```
+
+### TranslationHandler.js
+**Main translation orchestration with strategy pattern**
+- Central orchestrator for all translation operations
+- Integrates with platform-specific strategies (WhatsApp, Twitter, Instagram, etc.)
+- Manages translation state and error handling
+- Coordinates with FeatureManager and NotificationManager
+
+**Key Responsibilities:**
+- Platform detection and strategy selection
+- Translation request orchestration
+- Error handling and user notifications
+- Integration with EventHandler for user interactions
+
+### EventHandler.js
+**User interaction handling and event processing**
+- Handles text selection, keyboard shortcuts, and element targeting
+- Integrates with text extraction utilities for translation preparation
+- Manages selection windows and translation UI
+- Coordinates with IconBehavior for visual feedback
+
+**Key Features:**
+- Text selection detection and processing
+- Element interaction handling
+- Platform-specific behavior adaptation
+- Translation preparation and cleanup
+
+### EnhancedUnifiedMessenger.js & UnifiedMessenger.js
+**Messaging system foundation**
+- Provides unified messaging interface across extension contexts
+- Supports specialized messengers for different feature domains
+- Ensures message format standardization
+- Handles cross-context communication
+
+### InstanceManager.js
+**Singleton pattern management**
+- Manages singleton instances of core services
+- Provides controlled access to TranslationHandler
+- Ensures proper initialization order
+- Supports testing and development scenarios
+
+---
+
+## 🟢 Messaging System Architecture (src/messaging/)
+
+### MessagingCore.js
+**Unified messaging factory and core**
+- Combines MessagingStandards factory functionality
+- Provides context-specific messenger instances
+- Ensures standardized message formats
+- Integrates with specialized messengers
+
+```javascript
+import { MessagingCore } from '@/messaging/core/MessagingCore.js';
+
+// Get context-specific messenger
+const popupMessenger = MessagingCore.getMessenger('popup');
+
+// Use specialized messengers
+await popupMessenger.specialized.translation.translate(text, options);
+await popupMessenger.specialized.tts.speak(text, language);
+```
+
+### Message Flow Architecture
 
 ```
-Vue Component
-    ↓ (action + data + context)
-MessagingStandards.getMessenger(context)
-    ↓ (standardized message format)
-EnhancedUnifiedMessenger.sendMessage()
+Vue Component / Content Script
+    ↓ (standardized message)
+MessagingCore.getMessenger(context)
+    ↓ (MessageFormat validation)
+Specialized Messenger (TTS/Capture/Translation/Selection)
     ↓ (webextension-polyfill)
 browser.runtime.sendMessage()
     ↓
 Background: SimpleMessageHandler
     ↓ (route to appropriate handler)
-Handler Function Execution
-    ↓ (standardized response format)
-Response back to Component
+Background Handler Execution
+    ↓ (standardized response)
+Response to Component
 ```
 
-### 2. **Storage Flow Centralized:**
+### Specialized Messengers
 
-```
-Vue Component / Background Service
-    ↓
-StorageManager.get() / set() / remove()
-    ↓ (check cache first)
-Cache Layer (Map-based)
-    ↓ (if not cached)
-browser.storage.local API
-    ↓ (on change)
-Event System Notification
-    ↓
-All Listeners Updated
-```
-
-### 3. **Translation Flow Optimized:**
-
-```
-User Translation Request
-    ↓
-Vue Composable (usePopupTranslation)
-    ↓
-MessagingStandards specialized.translation
-    ↓
-Background: TranslationEngine
-    ↓
-Provider Selection & Cache Check
-    ↓
-API Call (if not cached)
-    ↓
-Response Processing & Caching
-    ↓
-Event Emission & UI Update
-```
-
----
-
-## 📁 فایل‌های کلیدی سیستم
-
-### **Core System Files:**
-- **`src/core/MessagingStandards.js`** - Messaging factory و management
-- **`src/core/EnhancedUnifiedMessenger.js`** - Enhanced messenger class
-- **`src/core/StorageManager.js`** - Centralized storage system
-- **`src/core/MessageActions.js`** - Standardized action definitions
-
-### **Background Service:**
-- **`src/background/index.js`** - Main background service
-- **`src/core/SimpleMessageHandler.js`** - Primary message routing
-- **`src/background/translation-engine.js`** - Translation orchestration
-- **`src/background/providers/`** - Translation provider system
-
-### **Vue Integration:**
-- **`src/composables/useBrowserAPI.js`** - Enhanced browser API access
-- **`src/composables/useStorage.js`** - Storage management composables
-- **`src/store/core/settings.js`** - Enhanced settings store
-- **`src/views/options/OptionsApp.vue`** - ✅ Migrated options page
-
-### **Content Scripts:**
-- **`src/content-scripts/vue-bridge.js`** - Vue component injection
-- **`src/content-scripts/select-element-manager.js`** - Element selection
-- **`src/managers/`** - Feature-specific managers (TTS, Capture, etc.)
-
----
-
-## 🚀 Performance و Optimizations
-
-### **Bundle Sizes (Current):**
-- **Options**: ~31KB ✅ (well optimized)
-- **Popup**: Target <6KB (in migration)
-- **Sidepanel**: Target <8KB (in migration)
-- **Content Scripts**: ~900KB (needs continued optimization)
-
-### **Performance Improvements:**
-- **Messaging**: استانداردسازی باعث کاهش 50+ direct sendMessage calls
-- **Storage**: Intelligent caching کاهش 60% storage API calls
-- **Cross-browser**: Feature detection و graceful degradation
-- **Memory**: Proper cleanup و event listener management
-
-### **Browser Compatibility:**
-- **Chrome**: Full MV3 service worker support
-- **Firefox**: MV3 with compatibility layer
-- **Feature Detection**: Automatic capability detection
-- **Graceful Degradation**: Fallback strategies for missing APIs
-
----
-
-## 🔧 Migration System (Legacy Support)
-
-### **Complete Migration Support:**
-- **Legacy Detection**: Automatic detection از old extension data
-- **Data Preservation**: همه user data, settings, و API keys حفظ می‌شود
-- **Smart Installation**: مناسب welcome flow برای migrated vs new users
-- **Import/Export**: Full compatibility با old settings files
-- **One-time Migration**: Flags برای جلوگیری از duplicate migration
-
----
-
-## 📋 Development Guidelines
-
-### **Messaging Standards:**
+#### TTSMessenger.js
 ```javascript
-// ✅ استاندارد جدید
-const messenger = MessagingStandards.getMessenger(MessagingContexts.POPUP);
-await messenger.specialized.translation.translate(text, options);
-
-// ❌ روش قدیمی (deprecated)
-browser.runtime.sendMessage({ action: "TRANSLATE", data: {...} });
+// TTS operations
+await messenger.specialized.tts.speak(text, language, options);
+await messenger.specialized.tts.stop();
 ```
 
-### **Storage Patterns:**
+#### CaptureMessenger.js
 ```javascript
-// ✅ StorageManager استاندارد
+// Screen capture operations
+await messenger.specialized.capture.captureScreen(options);
+await messenger.specialized.capture.captureArea(bounds);
+```
+
+#### TranslationMessenger.js
+```javascript
+// Translation operations
+const result = await messenger.specialized.translation.translate(text, {
+  sourceLang: 'en',
+  targetLang: 'fa',
+  provider: 'google'
+});
+```
+
+#### SelectionMessenger.js
+```javascript
+// Element selection operations
+await messenger.specialized.selection.activateMode('translate');
+await messenger.specialized.selection.deactivateMode();
+```
+
+---
+
+## 🔶 Storage System Architecture (src/storage/)
+
+### StorageCore.js
+**Centralized storage management with caching and events**
+
+**Key Features:**
+- Intelligent Map-based caching system
+- Event-driven change notifications
+- Cross-browser compatibility via webextension-polyfill
+- Comprehensive error handling
+
+```javascript
+import { storageManager } from '@/storage/core/StorageCore.js';
+
+// Basic storage operations
 const data = await storageManager.get(['key1', 'key2']);
 await storageManager.set({ key1: 'value1' });
+await storageManager.remove(['key1']);
 
-// ✅ Vue composable
-const { data, save } = useStorage(['key1', 'key2']);
-
-// ❌ Direct browser.storage (deprecated)
-const data = await browser.storage.local.get(['key1']);
+// Event listening
+storageManager.addEventListener('change', (changes) => {
+  console.log('Storage changed:', changes);
+});
 ```
 
-### **Error Handling:**
-- **Centralized**: همه errors از MessagingStandards و StorageManager
-- **Standardized**: consistent error format و handling patterns
-- **Context-aware**: errors شامل context information برای debugging
+### Storage Modules
+
+#### SettingsStorage.js
+- Manages extension settings with validation
+- Integrates with SecureStorage for sensitive data
+- Provides setting-specific methods and validation
+
+#### HistoryStorage.js
+- Manages translation history
+- Provides cleanup and maintenance operations
+- Integrates with search and filtering functionality
+
+### Vue Integration
+
+#### useStorage.js Composable
+```javascript
+import { useStorage } from '@/storage/composables/useStorage.js';
+
+// Reactive storage access
+const { data, save, remove, loading, error } = useStorage(['settings', 'history']);
+
+// Auto-save on changes
+watch(data, async (newData) => {
+  await save();
+});
+```
+
+#### useStorageItem.js Composable
+```javascript
+import { useStorageItem } from '@/storage/composables/useStorageItem.js';
+
+// Single item with auto-sync
+const { value, save, loading } = useStorageItem('userSettings', {});
+```
 
 ---
 
-## 🎯 Next Steps (Upcoming Phases)
+## 🟣 Provider System Architecture (src/providers/)
 
-### **Phase 3: Popup Interface Migration**
-- Migrate `src/views/popup/PopupApp.vue` implementation
-- Translation interface with Vue components
-- Bundle size optimization (target <6KB)
+### BaseProvider.js
+**Abstract base class for all translation providers**
 
-### **Phase 4: Sidepanel Interface Migration**
-- Complete `src/views/sidepanel/SidepanelApp.vue`
-- Extended translation features
-- History management و advanced UI
+```javascript
+export class BaseProvider {
+  async translate(text, sourceLang, targetLang, translateMode) {
+    throw new Error('translate method must be implemented');
+  }
+  
+  async translateImage(imageData, sourceLang, targetLang, translateMode) {
+    throw new Error('translateImage not supported by this provider');
+  }
+  
+  async testConnection() {
+    // Base implementation with API key validation
+  }
+}
+```
 
-### **Phase 5: Content Scripts Enhancement**
-- Enhanced Vue bridge system
-- Improved selection windows
-- Better screen capture interface
+### ProviderFactory.js
+**Factory pattern for provider instantiation**
+
+```javascript
+import { ProviderFactory } from '@/providers/core/ProviderFactory.js';
+
+const factory = new ProviderFactory();
+
+// Get provider instance (cached)
+const provider = factory.getProvider('google-translate');
+
+// Get supported providers
+const providers = factory.getSupportedProviders();
+
+// Reset provider instances
+factory.resetProviders(); // Reset all
+factory.resetProviders('google-translate'); // Reset specific
+```
+
+### Provider Implementations
+
+#### Google Services (src/providers/implementations/google/)
+- **GoogleTranslate.js**: Free Google Translate API
+- **GoogleGemini.js**: Google Gemini AI for translation with context understanding
+
+#### OpenAI Services (src/providers/implementations/openai/)
+- **OpenAI.js**: Direct OpenAI API integration
+- **OpenRouter.js**: OpenRouter aggregation service
+
+#### Microsoft Services (src/providers/implementations/microsoft/)
+- **BingTranslate.js**: Microsoft Bing Translator API
+
+#### Browser Services (src/providers/implementations/browser/)
+- **BrowserAPI.js**: Chrome 138+ Browser Translation API
+
+#### Custom Services (src/providers/implementations/custom/)
+- **DeepSeek.js**: DeepSeek AI translation service
+- **WebAI.js**: Local server integration
+- **YandexTranslate.js**: Yandex translation service
+- **CustomProvider.js**: Generic OpenAI-compatible API provider
+
+### Creating New Providers
+
+```javascript
+import { BaseProvider } from '@/providers/core/BaseProvider.js';
+
+class NewProvider extends BaseProvider {
+  constructor() {
+    super('new-provider');
+  }
+  
+  async translate(text, sourceLang, targetLang, translateMode) {
+    // Implementation
+    return translatedText;
+  }
+  
+  async testConnection() {
+    // Test API connectivity
+    return { success: true };
+  }
+}
+
+// Register the provider
+import { providerRegistry } from '@/providers/core/ProviderRegistry.js';
+providerRegistry.register('new-provider', NewProvider, {
+  name: 'New Provider',
+  supportedFeatures: ['text', 'image']
+});
+```
 
 ---
 
-## 📊 Testing & Quality Assurance
+## 🔴 Handler System Architecture
 
-### **Test Coverage:**
-- **Unit Tests**: StorageManager, MessagingStandards, Composables
-- **Integration Tests**: Cross-context messaging, storage operations
-- **E2E Tests**: Extension functionality در Chrome و Firefox
-- **Build Validation**: Automatic bundle size monitoring
+### Background Handlers (src/background/handlers/)
 
-### **Quality Metrics:**
-- **Code Duplication**: -30% reduction با centralized systems
-- **Error Handling**: +40% improvement با standardized patterns
-- **Cross-browser Compatibility**: +20% بهتر با unified APIs
-- **Maintainability**: +25% بهتر با modern architecture
+The background handlers are organized by feature domain for clear separation of concerns:
+
+#### Translation Handlers (src/background/handlers/translation/)
+- **handleTranslate.js**: Main translation processing
+- **handleTranslateText.js**: Text-specific translation
+- **handleRevertTranslation.js**: Translation reversal
+
+#### Screen Capture Handlers (src/background/handlers/screen-capture/)
+- **handleStartAreaCapture.js**: Initiate area selection
+- **handleStartFullScreenCapture.js**: Full screen capture
+- **handleProcessAreaCaptureImage.js**: Process captured image
+- **handlePreviewConfirmed.js / handlePreviewCancelled.js**: Preview handling
+- **handleCaptureError.js**: Error handling
+
+#### TTS Handlers (src/background/handlers/tts/)
+- **handleSpeak.js**: Text-to-speech operations
+- **handleStopTTS.js**: Stop TTS playback
+- **handleTTSOffscreen.js**: Offscreen document TTS (Chrome)
+- **handleOffscreenReady.js**: Offscreen initialization
+
+#### Common Handlers (src/background/handlers/common/)
+- **handlePing.js**: Health check and connectivity
+- **handleOpenOptionsPage.js**: Options page navigation
+- **handleShowOSNotification.js**: System notifications
+- **handleRefreshContextMenus.js**: Context menu updates
+
+#### Lifecycle Handlers (src/background/handlers/lifecycle/)
+- **handleExtensionLifecycle.js**: Extension startup/shutdown
+- **handleBackgroundReloadExtension.js**: Development reload
+- **handleContextInvalid.js**: Context invalidation handling
+
+### Content Handlers (src/handlers/content/)
+
+#### CaptureHandler.js
+**Content-side screen capture operations**
+- Handles capture UI injection
+- Manages area selection interface
+- Coordinates with background capture handlers
+
+#### TTSHandler.js
+**Content-side TTS functionality**
+- Manages content script TTS operations
+- Handles TTS UI feedback
+- Coordinates with background TTS system
+
+### Lifecycle Handlers (src/handlers/lifecycle/)
+
+#### InstallHandler.js
+**Installation and migration handling**
+- Detects legacy extension data
+- Performs automatic migration
+- Handles first-time installation
+
+#### ExtensionLifecycleHandler.js
+**Runtime lifecycle management**
+- Manages extension updates
+- Handles context invalidation
+- Coordinates with background lifecycle
 
 ---
 
-## 🔒 Security & Best Practices
+## 📄 Content Scripts Architecture (src/content-scripts/)
 
-### **Security Measures:**
-- **API Key Protection**: Encrypted storage برای sensitive data
-- **Message Validation**: تمام messages validated با MessageFormat
-- **Context Isolation**: proper context boundaries برای security
-- **Input Sanitization**: تمام user inputs properly sanitized
+### Content Script Entry Point (src/content-scripts/index.js)
+**Unified content script initialization**
 
-### **Best Practices:**
-- **Single Responsibility**: هر component یک مسئولیت اصلی
-- **Dependency Injection**: services injected بجای global access
-- **Event-driven Architecture**: loose coupling با event system
-- **Progressive Enhancement**: graceful degradation برای missing features
+```javascript
+// Content script flow
+import { vueBridge } from "../managers/content/VueBridgeManager.js";
+import { contentTTSHandler } from "../handlers/content/TTSHandler.js";
+import EventHandler from "../core/EventHandler.js";
+import { SelectElementManager } from "../managers/content/SelectionManager.js";
+
+// Initialize core systems
+const translationHandler = getTranslationHandlerInstance();
+const eventHandler = new EventHandler(translationHandler, featureManager);
+const selectElementManager = new SelectElementManager();
+
+// Initialize Vue bridge
+await vueBridge.initialize();
+```
+
+### VueBridgeManager.js
+**Vue component injection system**
+
+**Key Features:**
+- Micro-app architecture for injecting Vue components
+- Component registry for reusable UI elements
+- Pinia store integration in content scripts
+- Message-based component lifecycle management
+
+```javascript
+import { VueBridgeManager } from '@/managers/content/VueBridgeManager.js';
+
+// Create micro Vue app
+await vueBridge.createMicroApp('translation-tooltip', {
+  component: 'TranslationTooltip',
+  props: { text: 'Hello', translation: 'سلام' },
+  container: document.body
+});
+
+// Destroy micro app
+await vueBridge.destroyMicroApp('translation-tooltip');
+```
+
+### Content Manager Integration
+
+#### SelectionManager.js
+**Element selection functionality**
+- Handles element targeting and selection
+- Integrates with translation workflow
+- Manages selection UI and feedback
+
+#### WindowsManager.js
+**Floating window management**
+- Manages translation popup windows
+- Handles window positioning and lifecycle
+- Coordinates with Vue components
 
 ---
 
-این معماری نشان‌دهنده یک **modern, scalable, و maintainable browser extension** است که از **latest web technologies** و **best practices** استفاده می‌کند. سیستم برای **future enhancements** و **additional features** آماده است و **cross-browser compatibility** کاملی دارد.
+## 🟡 Browser-Specific Manager System (src/managers/browser-specific/)
+
+### Cross-Browser Architecture Pattern
+
+The extension uses feature detection and browser-specific implementations:
+
+#### TTS System (src/managers/browser-specific/tts/)
+
+**TTSManager.js** - Unified TTS interface
+```javascript
+class TTSManager {
+  async initialize(browserType) {
+    if (browserType === 'chrome') {
+      const { TTSChrome } = await import('./TTSChrome.js');
+      this.ttsService = new TTSChrome(); // Uses offscreen documents
+    } else if (browserType === 'firefox') {
+      const { TTSFirefox } = await import('./TTSFirefox.js');
+      this.ttsService = new TTSFirefox(); // Uses background page audio
+    } else {
+      const { TTSContent } = await import('./TTSContent.js');
+      this.ttsService = new TTSContent(); // Fallback to Web Speech API
+    }
+  }
+}
+```
+
+**Implementation Strategy:**
+- **TTSChrome.js**: Uses Chrome's offscreen documents for audio processing
+- **TTSFirefox.js**: Uses background page for audio context
+- **TTSContent.js**: Fallback using content script Web Speech API
+
+#### Capture System (src/managers/browser-specific/capture/)
+
+**CaptureManager.js** - Unified capture interface
+- **CaptureOffscreen.js**: Chrome offscreen API for screen capture
+- **CaptureContent.js**: Firefox content script fallback
+
+#### Panel System (src/managers/browser-specific/panel/)
+
+**Browser-Specific Panel Implementations:**
+- **SidepanelManager.js**: Chrome's native side panel API
+- **SidebarManager.js**: Firefox's sidebar action API
+
+### Feature Detection Pattern
+
+```javascript
+import { detectFeatures } from '@/utils/browser/feature-detection.js';
+
+const features = await detectFeatures();
+
+if (features.offscreenDocuments) {
+  // Use Chrome offscreen API
+} else if (features.sidebarAction) {
+  // Use Firefox sidebar
+} else {
+  // Use fallback implementation
+}
+```
+
+---
+
+## 🟠 Organized Utilities System (src/utils/)
+
+### Core Utilities (src/utils/core/)
+**Essential functionality used throughout the extension**
+
+- **helpers.js**: General helper functions, DOM manipulation, extension context validation
+- **debounce.js**: Debouncing utility for performance optimization
+- **validation.js**: Input validation and form validation utilities
+
+### Browser Utilities (src/utils/browser/)
+**Browser compatibility and platform detection**
+
+- **compatibility.js**: Cross-browser API compatibility layer
+- **events.js**: Event simulation and handling utilities
+- **platform.js**: Platform and browser detection
+
+### Internationalization Utilities (src/utils/i18n/)
+**Localization and language support**
+
+- **i18n.js**: Main internationalization system
+- **languages.js**: Language definitions and mappings
+- **localization.js**: Localization helper functions
+- **langUtils.js**: Language-specific utilities
+
+### Text Processing Utilities (src/utils/text/)
+**Text extraction, processing, and manipulation**
+
+- **extraction.js**: Advanced text extraction from DOM elements
+- **detection.js**: Text detection and language identification
+- **markdown.js**: Simple Markdown processing
+- **textDetection.js**: Text direction and formatting detection
+
+### UI Utilities (src/utils/ui/)
+**User interface and visual utilities**
+
+- **theme.js**: Theme management and switching
+- **html-sanitizer.js**: HTML sanitization for security
+- **exclusion.js**: Site exclusion management
+
+### Framework Utilities (src/utils/framework/)
+**Framework compatibility and text insertion**
+
+- **framework-compat/**: Comprehensive framework detection and text insertion strategies
+- Supports various web frameworks and editors (Google Docs, React, Vue, etc.)
+
+---
+
+## 📱 Vue.js Integration Architecture
+
+### Component Organization
+
+#### Base Components (src/components/base/)
+**Reusable UI building blocks**
+- BaseButton, BaseInput, BaseDropdown, BaseModal, etc.
+- Consistent styling and behavior
+- Accessibility support
+
+#### Feature Components (src/components/feature/)
+**Translation-specific functionality**
+- LanguageSelector, ProviderSelector, TranslationBox
+- TTSControl, TranslationHistory, AdvancedFeatures
+- API settings components for each provider
+
+#### Content Components (src/components/content/)
+**Components injected into web pages**
+- TranslationTooltip, CapturePreview, ScreenSelector
+- Lightweight components for content script injection
+
+### Vue Pages (src/views/)
+
+#### Options Page (src/views/options/) - ✅ Fully Migrated
+**Complete modern Vue.js implementation**
+- Responsive 3-column layout with sidebar navigation
+- 8 feature tabs: Languages, Activation, Prompt, API, Import/Export, Advance, Help, About
+- Full theme support (light/dark/auto)
+- Comprehensive form validation
+- Real-time settings synchronization
+
+#### Popup Page (src/views/popup/)
+**Translation interface in popup window**
+- Compact translation form
+- Language selection and provider choice
+- TTS controls and clipboard integration
+
+#### Sidepanel Page (src/views/sidepanel/)
+**Extended translation interface**
+- Full-featured translation workspace
+- Translation history panel
+- Advanced provider settings
+
+### Pinia Store Integration
+
+#### Enhanced Settings Store (src/store/core/settings.js)
+```javascript
+import { useSettingsStore } from '@/store/core/settings.js';
+
+const settingsStore = useSettingsStore();
+
+// Reactive settings access
+const sourceLanguage = computed(() => settingsStore.settings.SOURCE_LANG);
+
+// Save settings
+await settingsStore.saveSettings({ SOURCE_LANG: 'en' });
+
+// Get specific setting
+const apiKey = await settingsStore.getSetting('OPENAI_API_KEY');
+```
+
+### Vue Composables Integration
+
+#### useMessaging.js
+```javascript
+import { useMessaging } from '@/messaging/composables/useMessaging.js';
+
+const { sendMessage, specialized } = useMessaging('popup');
+
+// Use specialized messengers
+await specialized.translation.translate(text, options);
+```
+
+#### useBrowserAPI.js
+```javascript
+import { useBrowserAPI } from '@/composables/useBrowserAPI.js';
+
+const { 
+  browserAPIReady, 
+  sendMessage, 
+  storage, 
+  tabs, 
+  notifications 
+} = useBrowserAPI();
+```
+
+---
+
+## 🎯 Development Guidelines for AI Systems
+
+### Finding Functionality
+
+#### Core Systems Location Guide
+- **Message Routing**: `src/core/SimpleMessageHandler.js`
+- **Translation Logic**: `src/core/TranslationHandler.js`
+- **User Interactions**: `src/core/EventHandler.js`
+- **Provider Management**: `src/providers/core/ProviderFactory.js`
+- **Storage Operations**: `src/storage/core/StorageCore.js`
+- **Cross-browser Features**: `src/managers/browser-specific/`
+
+#### Handler Organization
+- **Background Message Handlers**: `src/background/handlers/[feature]/`
+- **Content Script Handlers**: `src/handlers/content/`
+- **Lifecycle Management**: `src/handlers/lifecycle/`
+
+#### Utility Functions
+- **Core Utilities**: `src/utils/core/` (helpers, validation, debounce)
+- **Browser Utils**: `src/utils/browser/` (compatibility, platform detection)
+- **Text Processing**: `src/utils/text/` (extraction, detection, processing)
+- **UI Utils**: `src/utils/ui/` (theme, sanitization, exclusion)
+
+### Adding New Features
+
+#### Creating New Providers
+1. Extend `BaseProvider` class
+2. Implement required methods (`translate`, `testConnection`)
+3. Register in `ProviderRegistry`
+4. Add configuration UI in `src/components/feature/api-settings/`
+
+#### Adding New Handlers
+1. Create handler in appropriate `src/background/handlers/[category]/`
+2. Register in `SimpleMessageHandler`
+3. Add corresponding action in `MessageActions.js`
+4. Create frontend interface in Vue components
+
+#### Extending Messaging System
+1. Add new specialized messenger in `src/messaging/specialized/`
+2. Register in `MessagingCore`
+3. Add action constants in `MessageActions.js`
+4. Implement corresponding background handlers
+
+### Import Patterns (Post Phase 5 Reorganization)
+
+```javascript
+// Core systems
+import { MessagingCore } from '@/messaging/core/MessagingCore.js';
+import { storageManager } from '@/storage/core/StorageCore.js';
+import { ProviderFactory } from '@/providers/core/ProviderFactory.js';
+
+// Organized utilities
+import { logME, isEditable } from '@/utils/core/helpers.js';
+import { detectPlatform } from '@/utils/browser/platform.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { extractTextFromElement } from '@/utils/text/extraction.js';
+import { applyTheme } from '@/utils/ui/theme.js';
+
+// Handlers
+import { CaptureHandler } from '@/handlers/content/CaptureHandler.js';
+import { InstallHandler } from '@/handlers/lifecycle/InstallHandler.js';
+
+// Managers
+import { TTSManager } from '@/managers/browser-specific/tts/TTSManager.js';
+import { VueBridgeManager } from '@/managers/content/VueBridgeManager.js';
+```
+
+### Testing and Validation
+
+#### Build Commands
+```bash
+# Development builds
+pnpm run dev:chrome      # Chrome development server
+pnpm run dev:firefox     # Firefox development server
+
+# Production builds
+pnpm run build:chrome    # Chrome production build
+pnpm run build:firefox   # Firefox production build
+
+# Testing
+pnpm run test:vue:run    # Vue component unit tests
+pnpm run pre-submit      # Full validation (lint + test + build)
+```
+
+#### Validation Checklist
+- [ ] All imports use correct organized paths
+- [ ] Message routing works through SimpleMessageHandler
+- [ ] Cross-browser compatibility maintained
+- [ ] Vue components properly integrated
+- [ ] Storage operations use StorageCore
+- [ ] Error handling implemented
+
+---
+
+## 📋 File Reference Guide
+
+### Essential Files for AI Navigation
+
+#### Core System Entry Points
+- **`src/core/SimpleMessageHandler.js`** - Main message routing system
+- **`src/core/TranslationHandler.js`** - Central translation orchestration
+- **`src/messaging/core/MessagingCore.js`** - Unified messaging factory
+- **`src/storage/core/StorageCore.js`** - Centralized storage management
+- **`src/providers/core/ProviderFactory.js`** - Provider instantiation
+
+#### Background Service Architecture
+- **`src/background/index.js`** - Background service entry point
+- **`src/background/handlers/index.js`** - Handler registration
+- **`src/background/translation-engine.js`** - Translation orchestration
+
+#### Content Script Architecture
+- **`src/content-scripts/index.js`** - Content script entry point
+- **`src/managers/content/VueBridgeManager.js`** - Vue component injection
+- **`src/managers/content/SelectionManager.js`** - Element selection
+
+#### Vue.js Integration
+- **`src/store/core/settings.js`** - Enhanced settings store
+- **`src/composables/useBrowserAPI.js`** - Unified browser API access
+- **`src/views/options/OptionsApp.vue`** - Fully migrated options page
+
+#### Configuration and Setup
+- **`src/config.js`** - Extension configuration
+- **`CLAUDE.md`** - Development guidelines and commands
+- **`package.json`** - Dependencies and scripts
+
+### System Dependencies Map
+
+```
+Core Systems:
+├── SimpleMessageHandler → All background handlers
+├── TranslationHandler → Providers, Strategies, EventHandler
+├── MessagingCore → Specialized messengers, Vue composables
+├── StorageCore → Vue stores, Settings management
+└── ProviderFactory → All provider implementations
+
+Cross-System Integration:
+├── Vue Components → MessagingCore → SimpleMessageHandler → Background Handlers
+├── Content Scripts → VueBridgeManager → Vue Components
+├── Background → ProviderFactory → Provider Implementations
+└── Settings Store → StorageCore → Browser Storage API
+```
+
+This architecture represents a **modern, scalable, and maintainable browser extension** built with **latest web technologies** and **best practices**. The system is designed for **future enhancements**, **cross-browser compatibility**, and **comprehensive AI-powered translation functionality**.
