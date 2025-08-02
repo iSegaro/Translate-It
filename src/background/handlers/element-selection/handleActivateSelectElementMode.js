@@ -2,10 +2,12 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { MessageFormat, MessagingContexts } from '../../../messaging/core/MessagingCore.js';
+import { MessageFormat, MessagingContexts, MessagingCore } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const errorHandler = new ErrorHandler();
+// Create messenger instance for centralized tab messaging
+const messenger = MessagingCore.getMessenger(MessagingContexts.BACKGROUND);
 
 /**
  * Handles the 'activateSelectElementMode' message action.
@@ -74,7 +76,8 @@ export async function handleActivateSelectElementMode(message, sender) {
       MessagingContexts.CONTENT // Context for content script
     );
 
-    const response = await browser.tabs.sendMessage(targetTabId, contentMessage);
+    // Use centralized sendToTab method for enhanced cross-browser compatibility
+    const response = await messenger.sendToTab(targetTabId, contentMessage);
     
     const statusText = isActivating ? 'activated' : 'deactivated';
     console.log(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
