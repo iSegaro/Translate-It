@@ -36,7 +36,7 @@ const initializebrowserAPI = () => {
   return globalReadyPromise;
 };
 
-export function useBrowserAPI(context = 'vue-generic') {
+export function useBrowserAPI(context = 'vue-generic') { // This context is now properly defined
   const isReady = ref(globalApiReady.value);
   const api = ref(globalbrowserAPI.value);
   const error = ref("");

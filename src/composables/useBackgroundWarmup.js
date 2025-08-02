@@ -1,12 +1,14 @@
 import { ref, onMounted } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
+import { MessageContexts } from "../messaging/core/MessagingCore.js";
+import { MessageActions } from "../messaging/core/MessageActions.js";
 
 const isWarmedUp = ref(false);
 const warmupInProgress = ref(false);
 let warmupPromise = null;
 
 export function useBackgroundWarmup() {
-  const { messenger } = useBrowserAPI('background-warmup');
+  const { messenger } = useBrowserAPI(MessageContexts.BACKGROUND_WARMUP);
 
   const warmupBackground = () => {
     if (warmupPromise) return warmupPromise;
@@ -15,7 +17,10 @@ export function useBackgroundWarmup() {
     warmupPromise = new Promise(async (resolveOuter) => {
       for (let i = 0; i < 5; i++) {
         try {
-          const response = await messenger.sendMessage({ action: "ping", warmup: true });
+          const response = await messenger.sendMessage({
+            action: MessageActions.PING,
+            warmup: true,
+          });
           if (response && response.success) {
             isWarmedUp.value = true;
             warmupInProgress.value = false;
@@ -52,5 +57,11 @@ export function useBackgroundWarmup() {
     setTimeout(() => warmupBackground().catch(() => {}), 100);
   });
 
-  return { isWarmedUp, warmupInProgress, warmupBackground, ensureWarmedUp, resetWarmup };
+  return {
+    isWarmedUp,
+    warmupInProgress,
+    warmupBackground,
+    ensureWarmedUp,
+    resetWarmup,
+  };
 }

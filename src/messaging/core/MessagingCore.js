@@ -136,6 +136,14 @@ export class MessageContexts {
   static TTS_MANAGER = "tts-manager";
   static CAPTURE_MANAGER = "capture-manager";
   static SELECTION_MANAGER = "selection-manager";
+  
+  // Additional contexts for specialized services
+  static TTS_MANAGER_BACKGROUND = "tts-manager-background";
+  static API_PROVIDER = "api-provider";
+  static TRANSLATION_SERVICE = "translation-service";
+  static TTS_SMART = "tts-smart";
+  static BACKGROUND_WARMUP = "background-warmup";
+  static VUE_GENERIC = "vue-generic";
 
   /**
    * Get all available contexts
@@ -154,6 +162,12 @@ export class MessageContexts {
       this.TTS_MANAGER,
       this.CAPTURE_MANAGER,
       this.SELECTION_MANAGER,
+      this.TTS_MANAGER_BACKGROUND,
+      this.API_PROVIDER,
+      this.TRANSLATION_SERVICE,
+      this.TTS_SMART,
+      this.BACKGROUND_WARMUP,
+      this.VUE_GENERIC,
     ];
   }
 

@@ -1,11 +1,11 @@
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessagingCore, MessageContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode } from "@/config.js";
 import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 
 export class TranslationService {
   constructor(context) {
-    this.messenger = MessagingCore.getMessenger(context || 'translation-service');
+    this.messenger = MessagingCore.getMessenger(context || MessageContexts.TRANSLATION_SERVICE);
   }
 
   async translate(mode, payload) {

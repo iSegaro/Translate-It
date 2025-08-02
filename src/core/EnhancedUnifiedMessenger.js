@@ -12,6 +12,9 @@ import { TTSMessenger } from '../messaging/specialized/TTSMessenger.js';
 import { CaptureMessenger } from '../messaging/specialized/CaptureMessenger.js';
 import { SelectionMessenger } from '../messaging/specialized/SelectionMessenger.js';
 import { TranslationMessenger } from '../messaging/specialized/TranslationMessenger.js';
+import { ProviderMessenger } from '../messaging/specialized/ProviderMessenger.js';
+import { ServiceMessenger } from '../messaging/specialized/ServiceMessenger.js';
+import { BackgroundMessenger } from '../messaging/specialized/BackgroundMessenger.js';
 
 // Specialized messengers are now imported from dedicated files
 
@@ -33,7 +36,10 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       tts: new TTSMessenger(context, this),
       capture: new CaptureMessenger(context, this),
       selection: new SelectionMessenger(context, this),
-      translation: new TranslationMessenger(context, this)
+      translation: new TranslationMessenger(context, this),
+      provider: new ProviderMessenger(context, this),
+      service: new ServiceMessenger(context, this),
+      background: new BackgroundMessenger(context, this)
     };
 
     // Initialize Firefox detection
@@ -369,6 +375,9 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       results.capture = { available: typeof this.specialized.capture.captureScreen === 'function' };
       results.selection = { available: typeof this.specialized.selection.getSelectionState === 'function' };
       results.translation = { available: typeof this.specialized.translation.getProviders === 'function' };
+      results.provider = { available: typeof this.specialized.provider.getProviders === 'function' };
+      results.service = { available: typeof this.specialized.service.getServiceStatus === 'function' };
+      results.background = { available: typeof this.specialized.background.warmupServices === 'function' };
       
       return {
         success: true,

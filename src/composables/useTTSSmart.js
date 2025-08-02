@@ -3,7 +3,7 @@ import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 
 export function useTTSSmart() {
-  const { messenger } = useBrowserAPI('tts-smart');
+  const { messenger } = useBrowserAPI('tts-smart'); // This context is now properly defined
   const isPlaying = ref(false);
   const isLoading = ref(false);
 

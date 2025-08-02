@@ -2,7 +2,7 @@
 // Background page TTS implementation for Firefox and fallback
 
 import browser from "webextension-polyfill";
-import { MessagingCore } from "../../../messaging/core/MessagingCore.js";
+import { MessagingCore, MessageContexts } from "../../../messaging/core/MessagingCore.js";
 
 /**
  * Background TTS Manager for Firefox and fallback scenarios
@@ -18,7 +18,7 @@ export class BackgroundTTSManager {
     this.availableMethods = [];
     
     // Enhanced messaging with context-aware TTS
-    this.messenger = MessagingCore.getMessenger('tts-manager-background');
+    this.messenger = MessagingCore.getMessenger(MessageContexts.TTS_MANAGER_BACKGROUND);
   }
 
   /**
