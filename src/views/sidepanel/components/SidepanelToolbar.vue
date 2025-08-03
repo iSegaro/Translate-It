@@ -84,6 +84,7 @@ import { useUI } from '@/composables/useUI.js';
 import { computed, ref } from 'vue';
 
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
+import { MessageActions } from '../../../messaging/core/MessageActions';
 
 const props = defineProps({
   isHistoryVisible: {
@@ -119,7 +120,7 @@ const handleSelectElement = async () => {
 
 const handleRevertAction = async () => {
   try {
-    await sendMessage({ action: 'revertLastAction' })
+    await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE })
     showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
   } catch (error) {
     console.error('[SidepanelToolbar] Error reverting action:', error)
@@ -143,7 +144,7 @@ const handleHistoryClick = () => {
 
 const handleSettingsClick = async () => {
   try {
-    await sendMessage({ action: 'openOptionsPage' })
+    await sendMessage({ action: MessageActions.openOptionsPage })
     showVisualFeedback(document.getElementById('settingsBtn'), 'success')
   } catch (error) {
     console.error('[SidepanelToolbar] Error opening settings:', error)
