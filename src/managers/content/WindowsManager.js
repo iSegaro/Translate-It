@@ -2,6 +2,7 @@
 
 import { logME, isExtensionContextValid } from "../../utils/core/helpers.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import browser from "webextension-polyfill";
 import {
   CONFIG,
   TranslationMode,

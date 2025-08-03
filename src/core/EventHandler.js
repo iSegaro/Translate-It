@@ -47,7 +47,7 @@ export default class EventHandler {
       notifier: translationHandler.notifier,
     });
 
-    this.unifiedMessenger = new UnifiedMessenger("event-handler"); // Initialize UnifiedMessenger
+    this.unifiedMessenger = new UnifiedMessenger(MessagingContexts.EVENT_HANDLER); // Initialize UnifiedMessenger
 
     this.select_Element_ModeActive =
       translationHandler.select_Element_ModeActive;
@@ -692,7 +692,7 @@ export default class EventHandler {
     }
   }
 
-  handleEscape() {
+  async handleEscape() {
     // Check if NEW Vue select element manager is active
     // If so, let it handle ESC key instead of OLD system
     if (window.translateItNewSelectManager === true) {
@@ -714,13 +714,47 @@ export default class EventHandler {
     // Reset Ctrl key state
     this.ctrlKeyPressed = false;
 
-    if (state.translateMode === TranslationMode.SelectElement) {
-      revertTranslations({
-        state,
-        errorHandler: this.translationHandler.errorHandler,
-        notifier: this.notifier,
-        IconManager: this.IconManager,
-      });
+    // Check if Vue-based select element mode has translated elements
+    try {
+      const storage = await storageManager.get(['selectElementState']);
+      const hasVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
+      
+      if (storage.selectElementState || hasVueTranslations) {
+        // Use NEW revert system for Vue-based translations
+        console.log("[EventHandler] Reverting Vue-based translations");
+        const { revertAllTranslations } = await import("../utils/text/detection.js");
+        
+        // Create minimal context for revert
+        const context = {
+          translatedElements: new Set(document.querySelectorAll("span[data-translate-it-original-text]")),
+          originalTexts: new Map()
+        };
+        
+        const reverted = revertAllTranslations(context);
+        if (reverted > 0) {
+          this.notifier.show(`${reverted} translation(s) reverted`, "revert");
+        }
+      } else if (state.translateMode === TranslationMode.SelectElement) {
+        // Use OLD revert system for legacy translations  
+        console.log("[EventHandler] Reverting legacy translations");
+        revertTranslations({
+          state,
+          errorHandler: this.translationHandler.errorHandler,
+          notifier: this.notifier,
+          IconManager: this.IconManager,
+        });
+      }
+    } catch (error) {
+      // Fallback to OLD system if storage check fails
+      console.warn("[EventHandler] Storage check failed, using legacy revert:", error);
+      if (state.translateMode === TranslationMode.SelectElement) {
+        revertTranslations({
+          state,
+          errorHandler: this.translationHandler.errorHandler,
+          notifier: this.notifier,
+          IconManager: this.IconManager,
+        });
+      }
     }
 
     if (this.IconManager) {
