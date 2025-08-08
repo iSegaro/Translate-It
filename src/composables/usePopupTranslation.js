@@ -32,7 +32,7 @@ export function usePopupTranslation() {
 
   // Methods
   const triggerTranslation = async (sourceLang = null, targetLang = null) => {
-    if (!canTranslate.value) return;
+    if (!canTranslate.value) return false;
 
     isTranslating.value = true;
     translationError.value = "";
@@ -56,10 +56,13 @@ export function usePopupTranslation() {
       console.log(
         "[usePopupTranslation] Translation request sent. Waiting for result..."
       );
+      
+      return true; // Indicate successful initiation
     } catch (error) {
       console.error("[usePopupTranslation] Translation error:", error);
       translationError.value = error.message || "Translation failed";
       isTranslating.value = false; // Ensure loading state is reset on immediate error
+      return false; // Indicate failure
     }
   };
 

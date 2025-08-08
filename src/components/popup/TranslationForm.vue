@@ -8,7 +8,7 @@
       ref="sourceInputRef"
       v-model="sourceText"
       :placeholder="$i18n('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
-      :language="settingsStore.settings.SOURCE_LANGUAGE"
+      :language="currentSourceLanguage"
       :rows="2"
       :tabindex="1"
       :copy-title="$i18n('popup_copy_source_title_icon') || 'کپی'"
@@ -27,7 +27,7 @@
     <TranslationOutputField
       ref="translationResultRef"
       :content="translatedText"
-      :language="settingsStore.settings.TARGET_LANGUAGE"
+      :language="currentTargetLanguage"
       :is-loading="isTranslating"
       :error="translationError"
       :placeholder="'نتیجه ترجمه اینجا نمایش داده می‌شود...'"
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { useSettingsStore } from '@/store/core/settings'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
@@ -74,6 +74,18 @@ const {
 
 // Local state
 const lastTranslation = ref(null)
+
+// Reactive language values - these will update when settings change
+const currentSourceLanguage = computed(() => {
+  const lang = settingsStore.settings.SOURCE_LANGUAGE
+  console.log('[Debug] Popup currentSourceLanguage computed:', lang)
+  return lang
+})
+const currentTargetLanguage = computed(() => {
+  const lang = settingsStore.settings.TARGET_LANGUAGE
+  console.log('[Debug] Popup currentTargetLanguage computed:', lang)
+  return lang
+})
 
 // Methods
 const handleSourceInput = (_event) => {
