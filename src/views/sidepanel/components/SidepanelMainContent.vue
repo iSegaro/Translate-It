@@ -3,18 +3,18 @@
     <form @submit.prevent="handleTranslationSubmit">
       <div class="language-controls">
         <select
-          id="sourceLanguageInput"
-          ref="sourceLanguageInputRef"
+          id="targetLanguageInput"
+          ref="targetLanguageInputRef"
           class="language-select"
-          title="Source Language"
+          title="Target Language"
         >
-          <option value="auto">
-            Auto-Detect
-          </option>
           <option value="English">
             English
           </option>
-          <option value="Persian">
+          <option
+            value="Persian"
+            selected
+          >
             Persian
           </option>
           <option value="Arabic">
@@ -45,18 +45,18 @@
         </button>
 
         <select
-          id="targetLanguageInput"
-          ref="targetLanguageInputRef"
+          id="sourceLanguageInput"
+          ref="sourceLanguageInputRef"
           class="language-select"
-          title="Target Language"
+          title="Source Language"
         >
+          <option value="auto">
+            Auto-Detect
+          </option>
           <option value="English">
             English
           </option>
-          <option
-            value="Persian"
-            selected
-          >
+          <option value="Persian">
             Persian
           </option>
           <option value="Arabic">
