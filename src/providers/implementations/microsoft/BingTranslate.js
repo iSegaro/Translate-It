@@ -156,6 +156,8 @@ const langNameToCodeMap = {
 };
 
 export class BingTranslateProvider extends BaseProvider {
+  // Mark that Bing's JSON-mode output may be unreliable/variable
+  static reliableJsonMode = false;
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;

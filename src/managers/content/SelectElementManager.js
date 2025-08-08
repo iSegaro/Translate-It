@@ -223,7 +223,7 @@ export class SelectElementManager {
    * @param {number} timeout - Timeout in milliseconds (default: 10 seconds for long translations)
    * @returns {Promise<Object>} Translation result promise
    */
-  setupTranslationWaiting(messageId, timeout = 10000) {
+  setupTranslationWaiting(messageId, timeout = 30000) {
     console.log('[SelectElementManager] Setting up translation waiting for messageId:', messageId, 'timeout:', timeout + 'ms');
     
     return new Promise((resolve, reject) => {
@@ -884,6 +884,8 @@ export class SelectElementManager {
       const unifiedMessenger = new UnifiedMessenger(MessagingContexts.EVENT_HANDLER); // Use same context as OLD system
 
       const payload = {
+        // For Select Element we send a raw JSON payload (array of {text})
+        // and mark the message so the background handler knows to parse it.
         text: jsonPayload, // Send jsonPayload like OLD system
         from: 'auto',
         to: await (async () => {
@@ -895,6 +897,9 @@ export class SelectElementManager {
           return await getTranslationApiAsync();
         })(),
         messageId: messageId, // Pass messageId like OLD system
+        // Indicate translation mode and that the payload is raw JSON
+        mode: 'SelectElement',
+        options: { rawJsonPayload: true },
       };
       
       console.log("[SelectElementManager] Sending translation request with payload:", JSON.stringify(payload, null, 2));

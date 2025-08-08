@@ -12,6 +12,10 @@ export class BaseProvider {
     this.sessionContext = null;
   }
 
+  // By default providers are considered "not reliably returning JSON-mode"
+  // Consumers can opt-in by setting `static reliableJsonMode = true` on the provider class.
+  static reliableJsonMode = false;
+
   /**
    * Abstract method - must be implemented by subclasses
    * @param {string} text - Text to translate
