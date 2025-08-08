@@ -46,17 +46,15 @@ export class TextSelectionManager {
       return;
     }
 
-    // Skip text selection handling if Vue select element mode is active
-    // Check storage for Vue-based select element state
+    // Skip text selection handling if select element mode is active in this tab
     try {
-      const storage = await storageManager.get(['selectElementState']);
-      if (storage.selectElementState) {
-        // logME("[TextSelectionManager] Vue select element mode is active, skipping text selection");
+      // Prefer local content-script flag or selectElementManager instance if available
+      if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
         return;
       }
     } catch (error) {
-      // If storage check fails, continue with normal flow
-      console.warn("[TextSelectionManager] Failed to check Vue select element state:", error);
+      // If check fails, continue with normal flow
+      console.warn("[TextSelectionManager] Failed to check local select element state:", error);
     }
 
     if (selectedText) {

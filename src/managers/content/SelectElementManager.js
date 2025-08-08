@@ -319,6 +319,13 @@ export class SelectElementManager {
 
     // Disable page interactions
     this.disablePageInteractions();
+    // Notify background about activation so it can keep per-tab state
+    try {
+      await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: true } });
+      console.log('[SelectElementManager] Notified background: select element activated');
+    } catch (err) {
+      console.warn('[SelectElementManager] Failed to notify background about activation:', err);
+    }
 
     console.log("[SelectElementManager] Select element mode activated");
   }
@@ -355,10 +362,16 @@ export class SelectElementManager {
     // Clear NEW select manager flag
     window.translateItNewSelectManager = false;
 
-    // Note: Cancellation message removed to prevent "message port closed" errors
-    // The Vue composable handles state synchronization via storage changes
+    // Notify background about deactivation so it can keep per-tab state
+    try {
+      await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
+      console.log('[SelectElementManager] Notified background: select element deactivated');
+    } catch (err) {
+      console.warn('[SelectElementManager] Failed to notify background about deactivation:', err);
+    }
+
     console.log(
-      "[SelectElementManager] Select element mode deactivated - state will sync via storage"
+      "[SelectElementManager] Select element mode deactivated - state synced via storage"
     );
 
     console.log("[SelectElementManager] Select element mode deactivated");

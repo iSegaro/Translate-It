@@ -16,6 +16,8 @@ export class MessageActions {
 
   // Select Element
   static GET_SELECT_ELEMENT_STATE = 'getSelectElementState';
+  static SET_SELECT_ELEMENT_STATE = 'setSelectElementState';
+  static SELECT_ELEMENT_STATE_CHANGED = 'selectElementStateChanged';
   static PROCESS_SELECTED_ELEMENT = 'PROCESS_SELECTED_ELEMENT';
   
   // Floating Window

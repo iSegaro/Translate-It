@@ -69,6 +69,10 @@ class LifecycleManager {
     // Manual registration for case-sensitive actions
     this.messageHandler.registerHandler('TRANSLATE', Handlers.handleTranslate);
     this.messageHandler.registerHandler('TTS_SPEAK', Handlers.handleSpeak);
+    // Ensure element-selection deactivate action routes to the same handler
+    if (Handlers.handleActivateSelectElementMode) {
+      this.messageHandler.registerHandler('deactivateSelectElementMode', Handlers.handleActivateSelectElementMode);
+    }
   }
 
   /**

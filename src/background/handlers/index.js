@@ -25,6 +25,8 @@ export * from "./tts/handleSpeak.js";
 
 // Element selection handlers
 export * from "./element-selection/handleActivateSelectElementMode.js";
+export * from "./element-selection/handleSetSelectElementState.js";
+export * from "./element-selection/handleGetSelectElementState.js";
 
 // Screen capture handlers
 export * from "./screen-capture/handleStartAreaCapture.js";

@@ -5,7 +5,7 @@
         id="selectElementBtn"
         class="toolbar-button"
         :title="$i18n('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
-        :disabled="isSelectElementDebounced"
+        :disabled="isSelectElementDebounced || isActivating"
         :class="{ active: isSelectModeActive }"
         @click="handleSelectElement"
       >
@@ -54,7 +54,7 @@
         @click="handleHistoryClick"
       >
         <img
-          src="@assets/icons/history.svg"
+          src="@/assets/icons/history.svg"
           alt="History"
           class="toolbar-icon"
         >
@@ -68,7 +68,7 @@
         @click="handleSettingsClick"
       >
         <img
-          src="@assets/icons/settings.png"
+          src="@/assets/icons/settings.png"
           alt="Settings"
           class="toolbar-icon"
         >
@@ -98,7 +98,7 @@ const emit = defineEmits(['historyToggle', 'clear-fields'])
 
 // Composables
 const { showVisualFeedback } = useUI()
-const { isSelectModeActive, toggleSelectElement } = useSelectElementTranslation()
+const { isSelectModeActive, toggleSelectElement, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { sendMessage } = useMessaging('sidepanel')
 
 // Debounce logic
@@ -110,7 +110,18 @@ const handleSelectElement = async () => {
   setTimeout(() => { isSelectElementDebounced.value = false }, 500)
 
   try {
-    await toggleSelectElement()
+    // Send request and wait for confirmation from background/content script
+    if (isSelectModeActive.value) {
+      const result = await deactivateSelectMode()
+      if (result) {
+        // composable will update shared state; UI follows isSelectModeActive
+      }
+    } else {
+      const result = await activateSelectMode()
+      if (result) {
+        // composable will update shared state; UI follows isSelectModeActive
+      }
+    }
     showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
   } catch (error) {
     console.error('[SidepanelToolbar] Error toggling element selection:', error)
@@ -233,3 +244,4 @@ const handleSettingsClick = async () => {
   margin: $spacing-xs 0;
 }
 </style>
+
