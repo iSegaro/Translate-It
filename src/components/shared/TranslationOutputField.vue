@@ -222,6 +222,7 @@ watch(() => props.error, (newError) => {
   direction: ltr;
   text-align: left;
   min-height: 60px;
+  max-height: 200px; /* Default max height, will be overridden dynamically */
   background-color: var(--bg-result-color);
   color: var(--text-color);
   border: 1px solid var(--header-border-color);
@@ -229,6 +230,29 @@ watch(() => props.error, (newError) => {
   white-space: normal !important;
   word-wrap: break-word;
   overflow-y: auto;
+  transition: max-height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+  
+  /* Custom scrollbar for better UX */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: var(--header-border-color);
+    border-radius: 3px;
+    
+    &:hover {
+      background: var(--toolbar-link-color);
+    }
+  }
+  
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--header-border-color) transparent;
 }
 
 .result-content.has-error {
@@ -395,10 +419,10 @@ watch(() => props.error, (newError) => {
 }
 
 .result-content.fade-in {
-  animation: fadeIn 0.4s ease-in-out;
+  animation: fadeInWithResize 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
-@keyframes fadeIn {
+@keyframes fadeInWithResize {
   from {
     opacity: 0;
     transform: translateY(6px);

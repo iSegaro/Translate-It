@@ -1,42 +1,46 @@
 <template>
-  <div class="popup-container">
+  <div class="popup-wrapper">
     <div
       v-if="isLoading"
-      class="loading-container"
+      class="popup-container"
     >
-      <LoadingSpinner size="sm" />
-      <span class="loading-text">{{ loadingText }}</span>
+      <div class="loading-container">
+        <LoadingSpinner size="sm" />
+        <span class="loading-text">{{ loadingText }}</span>
+      </div>
     </div>
     
     <div
       v-else-if="hasError"
-      class="error-container"
+      class="popup-container"
     >
-      <div class="error-icon">
-        ⚠️
+      <div class="error-container">
+        <div class="error-icon">
+          ⚠️
+        </div>
+        <p class="error-message">
+          {{ errorMessage }}
+        </p>
+        <button
+          class="retry-button"
+          @click="retryLoading"
+        >
+          {{ $i18n('retry_button') || 'Retry' }}
+        </button>
       </div>
-      <p class="error-message">
-        {{ errorMessage }}
-      </p>
-      <button
-        class="retry-button"
-        @click="retryLoading"
-      >
-        {{ $i18n('retry_button') || 'Retry' }}
-      </button>
     </div>
     
     <template v-else>
-      <!-- Header Toolbar -->
-      <PopupHeader />
+      <!-- Sticky Header Section -->
+      <div class="sticky-header">
+        <PopupHeader />
+        <LanguageControls />
+      </div>
       
-      <!-- Language Controls -->
-      <LanguageControls />
-      
-      <!-- Translation Form -->
-      <TranslationForm />
-      
-      <!-- Provider selector is now integrated into LanguageControls -->
+      <!-- Scrollable Content Section -->
+      <div class="scrollable-content">
+        <TranslationForm />
+      </div>
     </template>
   </div>
 </template>
@@ -125,9 +129,12 @@ const retryLoading = () => {
 </script>
 
 <style scoped>
-.popup-container {
+/* Main popup wrapper using Flexbox */
+.popup-wrapper {
   width: 100%;
-  height: 100%;
+  height: 100vh; /* Full viewport height */
+  max-height: 600px; /* Popup maximum height */
+  min-height: 350px; /* Popup minimum height */
   background: var(--bg-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
@@ -137,6 +144,33 @@ const retryLoading = () => {
   font-family: "Vazirmatn", "Segoe UI", sans-serif;
   font-size: 15px;
   color: var(--text-color);
+  transition: height 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Legacy container for loading/error states */
+.popup-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sticky header section - flex shrink */
+.sticky-header {
+  flex-shrink: 0; /* Don't shrink */
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--header-border-color);
+}
+
+/* Scrollable content section - flex grow and scroll */
+.scrollable-content {
+  flex: 1; /* Take remaining space */
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; /* Important: allows flex item to shrink */
 }
 
 .loading-container {

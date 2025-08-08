@@ -42,8 +42,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
+import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationOutputField from '@/components/shared/TranslationOutputField.vue'
@@ -53,6 +54,7 @@ const settingsStore = useSettingsStore()
 
 // Composables (lightweight popup version)
 const translation = usePopupTranslation()
+const popupResize = usePopupResize()
 
 
 // Refs
@@ -165,6 +167,43 @@ onMounted(async () => {
   
   // Initialize translation data
   await loadLastTranslation()
+})
+
+// Watch for translation changes and adjust popup size
+watch(translatedText, (newText, oldText) => {
+  if (newText && newText !== oldText) {
+    // Wait for DOM update and handle resize immediately with fade-in
+    nextTick(() => {
+      // Get the result-content element directly from the component
+      const component = translationResultRef.value
+      const outputElement = component?.$el?.querySelector('.result-content') || 
+                           document.querySelector('.result-content')
+      
+      console.log('[PopupTranslationForm] Output element found:', !!outputElement)
+      if (outputElement) {
+        // Start resize immediately to synchronize with fade-in animation (600ms)
+        popupResize.handleTranslationResult(outputElement)
+      } else {
+        console.warn('[PopupTranslationForm] Could not find .result-content element')
+      }
+    })
+  } else if (!newText && oldText) {
+    // Reset output field when translation is cleared
+    const component = translationResultRef.value
+    const outputElement = component?.$el?.querySelector('.result-content') || 
+                         document.querySelector('.result-content')
+    if (outputElement) {
+      popupResize.resetOutputField(outputElement)
+    }
+  }
+})
+
+// Watch for loading state to reset layout when new translation starts
+watch(isTranslating, (newLoading, oldLoading) => {
+  if (newLoading && !oldLoading) {
+    // Reset layout when starting new translation
+    popupResize.resetLayout()
+  }
 })
 </script>
 
