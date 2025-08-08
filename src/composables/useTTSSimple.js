@@ -25,7 +25,7 @@ export function useTTSSimple() {
       console.log("[useTTSSimple] Speaking:", text.substring(0, 50) + "...");
 
       // Unified message format for consistency with popup
-      await browserAPI.safeSendMessage({
+      await browserAPI.sendMessage({
         action: "speak",
         data: {
           text: text.trim(),
