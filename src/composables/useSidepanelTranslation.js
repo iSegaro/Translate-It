@@ -41,7 +41,8 @@ export function useSidepanelTranslation() {
       const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
       const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
       
-      console.log("[useSidepanelTranslation] Translation with languages:", { sourceLanguage, targetLanguage });
+      console.log("[useSidepanelTranslation] Translation with languages (received params):", { sourceLang, targetLang });
+      console.log("[useSidepanelTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
       
       // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
       await translationService.sidepanelTranslate(sourceText.value, sourceLanguage, targetLanguage);

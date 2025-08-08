@@ -223,11 +223,15 @@ const isSelectElementActivating = computed(
 );
 
 const targetLanguageValue = computed(() => {
-  return targetLanguageInputRef.value?.value || "Persian";
+  const val = targetLanguageInputRef.value?.value || "Persian";
+  console.log('[Debug] targetLanguageValue computed:', val);
+  return val;
 });
 
 const sourceLanguageValue = computed(() => {
-  return sourceLanguageInputRef.value?.value || AUTO_DETECT_VALUE;
+  const val = sourceLanguageInputRef.value?.value || AUTO_DETECT_VALUE;
+  console.log('[Debug] sourceLanguageValue computed:', val);
+  return val;
 });
 
 // Watch for history changes to handle Firefox MV3 bug
@@ -330,9 +334,26 @@ const handleTranslationSubmit = async () => {
     console.log("[SidepanelMainContent] Ensuring background script is ready...");
     await backgroundWarmup.ensureWarmedUp();
 
-    // Use composable translation function with current UI language values
-    console.log("[SidepanelMainContent] Triggering translation via composable with languages:", { source: sourceLanguageValue.value, target: targetLanguageValue.value });
-    const success = await triggerTranslation(sourceLanguageValue.value, targetLanguageValue.value);
+    // Debug: Check DOM values directly before translation
+    const domSourceVal = sourceLanguageInputRef.value?.value;
+    const domTargetVal = targetLanguageInputRef.value?.value;
+    console.log("[DEBUG] DOM values:", { domSource: domSourceVal, domTarget: domTargetVal });
+    console.log("[DEBUG] Computed values:", { computedSource: sourceLanguageValue.value, computedTarget: targetLanguageValue.value });
+    
+    // Quick Fix: Use DOM values directly if computed values don't match
+    let finalSourceLang = sourceLanguageValue.value;
+    let finalTargetLang = targetLanguageValue.value;
+    
+    // If computed values don't match DOM, use DOM values directly
+    if (finalSourceLang !== domSourceVal || finalTargetLang !== domTargetVal) {
+      console.log("[QUICK_FIX] Computed values don't match DOM, using DOM values directly");
+      finalSourceLang = domSourceVal || AUTO_DETECT_VALUE;
+      finalTargetLang = domTargetVal || "Persian";
+    }
+    
+    // Use composable translation function with corrected language values  
+    console.log("[SidepanelMainContent] Triggering translation via composable with languages:", { source: finalSourceLang, target: finalTargetLang });
+    const success = await triggerTranslation(finalSourceLang, finalTargetLang);
     
     console.log("[SidepanelMainContent] Translation completed:", success);
     
@@ -467,13 +488,8 @@ const handleSwapLanguages = async () => {
     
     console.log("[SidepanelMainContent] Current languages before swap:", { sourceVal, targetVal });
 
-    // Always swap the text first (if both have content)
-    if (sourceText.value.trim() && translatedText.value.trim()) {
-      const tempText = sourceText.value;
-      sourceText.value = translatedText.value;
-      translatedText.value = tempText;
-      console.log("[SidepanelMainContent] Text swapped");
-    }
+    // Note: We only swap languages, not text content
+    // Text content should remain in their respective fields
 
     // Get language codes
     let sourceCode = getLanguageCode(sourceVal);
@@ -541,6 +557,23 @@ const handleSwapLanguages = async () => {
         from: `${sourceVal} → ${targetVal}`, 
         to: `${newSourceDisplay} → ${newTargetDisplay}` 
       });
+      
+      // Debug: Check DOM values immediately after swap
+      console.log("[DEBUG] DOM after swap:", { 
+        domSource: sourceSelect.value, 
+        domTarget: targetSelect.value 
+      });
+      console.log("[DEBUG] Computed after swap (immediate):", { 
+        computedSource: sourceLanguageValue.value, 
+        computedTarget: targetLanguageValue.value 
+      });
+      
+      // Wait for Vue reactivity to update
+      await nextTick();
+      console.log("[DEBUG] Computed after swap (nextTick):", { 
+        computedSource: sourceLanguageValue.value, 
+        computedTarget: targetLanguageValue.value 
+      });
     } else if (resolvedSourceCode === AUTO_DETECT_VALUE) {
       // When source is auto, just swap the target to auto and source to current target
       sourceSelect.value = targetVal;
@@ -549,6 +582,23 @@ const handleSwapLanguages = async () => {
       console.log("[SidepanelMainContent] Auto-detect swap:", { 
         from: `${AUTO_DETECT_VALUE} → ${targetVal}`, 
         to: `${targetVal} → ${AUTO_DETECT_VALUE}` 
+      });
+      
+      // Debug: Check DOM values immediately after auto swap
+      console.log("[DEBUG] DOM after auto swap:", { 
+        domSource: sourceSelect.value, 
+        domTarget: targetSelect.value 
+      });
+      console.log("[DEBUG] Computed after auto swap (immediate):", { 
+        computedSource: sourceLanguageValue.value, 
+        computedTarget: targetLanguageValue.value 
+      });
+      
+      // Wait for Vue reactivity to update
+      await nextTick();
+      console.log("[DEBUG] Computed after auto swap (nextTick):", { 
+        computedSource: sourceLanguageValue.value, 
+        computedTarget: targetLanguageValue.value 
       });
     } else {
       // Cannot swap - provide feedback
