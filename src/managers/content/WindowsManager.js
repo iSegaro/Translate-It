@@ -18,6 +18,8 @@ import { MessageContexts, MessagingCore } from "../../messaging/core/MessagingCo
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { TranslationService } from "../../core/TranslationService.js";
 import { generateTranslationMessageId } from "../../utils/messaging/messageId.js";
+import { getErrorMessage } from "../../error-management/ErrorMessages.js";
+import { matchErrorToType } from "../../error-management/ErrorMatcher.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -421,9 +423,18 @@ export default class SelectionWindows {
             clearTimeout(timeout);
             browser.runtime.onMessage.removeListener(messageListener);
             
-            if (message.data?.translatedText) {
+            // Check for error case first
+            if (message.data?.success === false && message.data?.error) {
+              logME(`[SelectionWindows] ❌ Translation error received:`, message.data.error);
+              const errorMessage = message.data.error.message || 'Translation failed';
+              reject(new Error(errorMessage));
+            } else if (message.data?.translatedText) {
+              // Success case
+              logME(`[SelectionWindows] ✅ Translation success received`);
               resolve({ translatedText: message.data.translatedText });
             } else {
+              // Unexpected case
+              logME(`[SelectionWindows] ❌ Unexpected message data:`, message.data);
               reject(new Error('No translated text in result'));
             }
           } else if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
@@ -1059,26 +1070,31 @@ export default class SelectionWindows {
     ) {
       loadingContainer.remove();
     }
+    
+    // Determine error type and get proper localized message
+    const errObj = error instanceof Error ? error : new Error(String(error.message || error));
+    const errorType = matchErrorToType(errObj.message);
+    const localizedErrorMessage = await getErrorMessage(errorType);
+    
+    logME(`[SelectionWindows] Handling translation error - Type: ${errorType}, Message: ${localizedErrorMessage}`);
+    
     if (this.innerContainer) {
       const errorMsgElement = document.createElement("div");
-      // Use textContent to safely display error message
-      errorMsgElement.textContent =
-        CONFIG.ICON_ERROR + "Translation failed. Please try again.";
+      // Use proper localized error message from centralized system
+      errorMsgElement.textContent = CONFIG.ICON_ERROR + localizedErrorMessage;
       errorMsgElement.style.color = "var(--sw-text-color)";
       errorMsgElement.style.padding = "5px";
       this.innerContainer.appendChild(errorMsgElement);
-      setTimeout(() => this.dismiss(true), 3000);
+      setTimeout(() => this.dismiss(true), 4000); // Slightly longer display time for error
     } else {
       this.dismiss(false);
     }
-    const errObj =
-      error instanceof Error ? error : (
-        new Error(String(error.message || error))
-      );
+    
+    // Use centralized error handler with proper context and error type
     await this.translationHandler.errorHandler.handle(errObj, {
-      type: errObj.type || ErrorTypes.API,
+      type: errorType,
       context: "selection-window-translate",
-      isSilent: true,
+      isSilent: true, // Keep silent to avoid duplicate notifications
     });
   }
 
