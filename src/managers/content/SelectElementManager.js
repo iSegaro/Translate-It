@@ -372,6 +372,24 @@ export class SelectElementManager {
 
     console.log("[SelectElementManager] Deactivating select element mode");
 
+    // If a translation is pending or processing, cancel it when user toggles off
+    if (this.pendingTranslation) {
+      try {
+        const pendingId = this.pendingTranslation.originalMessageId;
+        console.log('[SelectElementManager] Deactivate requested - cancelling pending translation for', pendingId);
+        this.logLifecycle(pendingId, 'CANCEL_REQUESTED', { via: 'deactivate' });
+        this.cancelPendingTranslation(pendingId);
+      } catch (err) {
+        console.warn('[SelectElementManager] Error while cancelling pending translation on deactivate:', err);
+      }
+      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+    } else if (this.selectionProcessing) {
+      // mark requestedCancel so pendingTranslation created shortly will be auto-cancelled
+      console.log('[SelectElementManager] Deactivate requested while processing selection - marking requestedCancel');
+      this.requestedCancel = true;
+      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+    }
+
     this.isActive = false;
 
     // Remove event listeners
@@ -734,6 +752,9 @@ export class SelectElementManager {
       "[SelectElementManager] Starting advanced text extraction process"
     );
 
+    // messageId is declared in outer scope so finally block can reference it
+    let messageId = null;
+
     try {
       // Import all required functions from advanced text extraction
       const {
@@ -851,7 +872,7 @@ export class SelectElementManager {
       );
 
       // Generate message ID for tracking
-      const messageId = generateContentMessageId('select-element');
+      messageId = generateContentMessageId('select-element');
       
       // 5) Setup pending translation BEFORE sending message (to avoid race condition)
       const translationPromise = this.setupTranslationWaiting(messageId);
