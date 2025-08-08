@@ -4,6 +4,7 @@
  */
 
 import { MessageActions } from '../core/MessageActions.js';
+import { generateTranslationMessageId } from '../../utils/messaging/messageId.js';
 
 export class TranslationMessenger {
   constructor(context, parentMessenger) {
@@ -33,7 +34,7 @@ export class TranslationMessenger {
     };
 
     // Use provided messageId or generate new one
-    const messageId = options.messageId || `${this.context}-translate-${Date.now()}`;
+    const messageId = options.messageId || generateTranslationMessageId(this.context);
 
     // Send translation request via standard messaging
     return this.messenger.sendMessage({

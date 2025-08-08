@@ -7,6 +7,7 @@
 import browser from "webextension-polyfill";
 import { isFirefox } from "../utils/browser/compatibility.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { generateMessageId } from "../utils/messaging/messageId.js";
 
 export class UnifiedMessenger {
   constructor(context = "unknown") {
@@ -19,7 +20,7 @@ export class UnifiedMessenger {
    * Works reliably with both Chrome and Firefox
    */
   async sendMessage(message, timeout = 10000) {
-    const messageId = message.messageId || `${this.context}-${++this.messageCounter}-${Date.now()}`;
+    const messageId = message.messageId || generateMessageId(this.context);
 
     try {
       // Detect browser environment for Firefox workaround (before Promise creation)

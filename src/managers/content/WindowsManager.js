@@ -17,6 +17,7 @@ import { SimpleMarkdown } from "../../utils/text/markdown.js";
 import { MessageContexts, MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { TranslationService } from "../../core/TranslationService.js";
+import { generateTranslationMessageId } from "../../utils/messaging/messageId.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -400,7 +401,7 @@ export default class SelectionWindows {
       const settings = await getSettingsAsync();
       
       // Set up result listener for Firefox MV3 compatibility
-      const messageId = `content-translate-${Date.now()}`;
+      const messageId = generateTranslationMessageId('content');
       logME(`[SelectionWindows] Generated messageId: ${messageId}`);
       
       const resultPromise = new Promise((resolve, reject) => {

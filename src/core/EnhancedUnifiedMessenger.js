@@ -8,6 +8,7 @@ import { UnifiedMessenger } from './UnifiedMessenger.js';
 import browser from 'webextension-polyfill';
 import { isFirefox } from '../utils/browser/compatibility.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { generateMessageId } from '../utils/messaging/messageId.js';
 import { TTSMessenger } from '../messaging/specialized/TTSMessenger.js';
 import { CaptureMessenger } from '../messaging/specialized/CaptureMessenger.js';
 import { SelectionMessenger } from '../messaging/specialized/SelectionMessenger.js';
@@ -85,7 +86,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
         context: this.context,
         timestamp: message.timestamp || Date.now(),
         version: '2.0', // Enhanced messenger version
-        messageId: message.messageId || `${this.context}-${++this.messageCounter}-${Date.now()}`,
+        messageId: message.messageId || generateMessageId(this.context),
         // Firefox compatibility metadata
         browserInfo: {
           isFirefox: this.isFirefox,
@@ -377,7 +378,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       // Enhanced message format using MessageFormat
       const enhancedMessage = {
         ...message,
-        messageId: message.messageId || `${this.context}-tab-${tabId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+        messageId: message.messageId || generateMessageId(`${this.context}-tab-${tabId}`),
         context: message.context || this.context,
         timestamp: message.timestamp || Date.now(),
         version: "2.0"

@@ -10,6 +10,7 @@ import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { generateContentMessageId } from "../../utils/messaging/messageId.js";
 
 /**
  * SelectElementManager - Vue-compatible element selection system
@@ -739,7 +740,7 @@ export class SelectElementManager {
       );
 
       // Generate message ID for tracking
-      const messageId = `content-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      const messageId = generateContentMessageId('select-element');
       
       // 5) Setup pending translation BEFORE sending message (to avoid race condition)
       const translationPromise = this.setupTranslationWaiting(messageId);

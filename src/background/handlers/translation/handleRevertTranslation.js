@@ -3,6 +3,7 @@ import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageActions } from '../../../messaging/core/MessageActions.js';
+import { generateRevertMessageId } from '../../../utils/messaging/messageId.js';
 
 const errorHandler = new ErrorHandler();
 
@@ -37,7 +38,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     const contentScriptResponse = await browser.tabs.sendMessage(targetTabId, {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
       context: 'revert-handler',
-      messageId: `revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+      messageId: generateRevertMessageId('background'),
       data: {
         ...message.data,
         fromBackground: true
