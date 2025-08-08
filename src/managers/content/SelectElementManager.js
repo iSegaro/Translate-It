@@ -31,6 +31,7 @@ export class SelectElementManager {
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
+    this.escapeAbortController = null; // For background ESC key handling
 
     // Create proper state structure like OLD system
     this.state = {
@@ -362,41 +363,26 @@ export class SelectElementManager {
   }
 
   /**
-   * Deactivate select element mode
+   * Deactivate select element mode UI only (keep translation processing)
    */
-  async deactivate() {
+  async deactivateUIOnly() {
     if (!this.isActive) {
       console.log("[SelectElementManager] Already inactive");
       return;
     }
 
-    console.log("[SelectElementManager] Deactivating select element mode");
-
-    // If a translation is pending or processing, cancel it when user toggles off
-    if (this.pendingTranslation) {
-      try {
-        const pendingId = this.pendingTranslation.originalMessageId;
-        console.log('[SelectElementManager] Deactivate requested - cancelling pending translation for', pendingId);
-        this.logLifecycle(pendingId, 'CANCEL_REQUESTED', { via: 'deactivate' });
-        this.cancelPendingTranslation(pendingId);
-      } catch (err) {
-        console.warn('[SelectElementManager] Error while cancelling pending translation on deactivate:', err);
-      }
-      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
-    } else if (this.selectionProcessing) {
-      // mark requestedCancel so pendingTranslation created shortly will be auto-cancelled
-      console.log('[SelectElementManager] Deactivate requested while processing selection - marking requestedCancel');
-      this.requestedCancel = true;
-      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
-    }
+    console.log("[SelectElementManager] Deactivating select element UI (keeping translation processing)");
 
     this.isActive = false;
 
-    // Remove event listeners
+    // Remove most event listeners but keep ESC key handling for cancellation
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
     }
+
+    // Re-add ESC key handling for background translation cancellation
+    this.setupEscapeKeyListener();
 
     // Clean up highlights
     this.clearHighlight();
@@ -414,16 +400,89 @@ export class SelectElementManager {
     // Notify background about deactivation so it can keep per-tab state
     try {
       await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
-      console.log('[SelectElementManager] Notified background: select element deactivated');
+      console.log('[SelectElementManager] Notified background: select element deactivated (UI only)');
     } catch (err) {
       console.warn('[SelectElementManager] Failed to notify background about deactivation:', err);
     }
 
-    console.log(
-      "[SelectElementManager] Select element mode deactivated - state synced via storage"
-    );
+    console.log("[SelectElementManager] Select element UI deactivated (translation continues)");
+  }
 
-    console.log("[SelectElementManager] Select element mode deactivated");
+  /**
+   * Deactivate select element mode (full deactivation with translation cancellation)
+   */
+  async deactivate() {
+    if (!this.isActive) {
+      console.log("[SelectElementManager] Already inactive");
+      return;
+    }
+
+    console.log("[SelectElementManager] Deactivating select element mode");
+
+    const wasActive = this.isActive;
+
+    // Cancel ongoing translations for full deactivation
+    if (this.pendingTranslation) {
+      try {
+        const pendingId = this.pendingTranslation.originalMessageId;
+        console.log('[SelectElementManager] Full deactivate requested - cancelling pending translation for', pendingId);
+        this.logLifecycle(pendingId, 'CANCEL_REQUESTED', { via: 'deactivate' });
+        this.cancelPendingTranslation(pendingId);
+      } catch (err) {
+        console.warn('[SelectElementManager] Error while cancelling pending translation on deactivate:', err);
+      }
+      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+    } else if (this.selectionProcessing) {
+      // mark requestedCancel so pendingTranslation created shortly will be auto-cancelled
+      console.log('[SelectElementManager] Full deactivate requested while processing selection - marking requestedCancel');
+      this.requestedCancel = true;
+      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+    }
+
+    // Use the common UI deactivation logic if still active
+    if (wasActive) {
+      // Temporarily set back to active to avoid the check in deactivateUIOnly
+      this.isActive = true;
+      await this.deactivateUIOnly();
+    }
+
+    // Remove ESC key listener for background translation
+    this.removeEscapeKeyListener();
+
+    console.log("[SelectElementManager] Select element mode fully deactivated");
+  }
+
+  /**
+   * Setup ESC key listener for background translation cancellation
+   */
+  setupEscapeKeyListener() {
+    if (this.escapeAbortController) {
+      this.escapeAbortController.abort();
+    }
+
+    this.escapeAbortController = new globalThis.AbortController();
+    
+    const keyOptions = {
+      signal: this.escapeAbortController.signal,
+      capture: true,
+      passive: false,
+    };
+
+    console.log("[SelectElementManager] Setting up ESC key listener for background translation");
+
+    document.addEventListener("keydown", this.handleKeyDown, keyOptions);
+    window.addEventListener("keydown", this.handleKeyDown, keyOptions);
+  }
+
+  /**
+   * Remove ESC key listener
+   */
+  removeEscapeKeyListener() {
+    if (this.escapeAbortController) {
+      console.log("[SelectElementManager] Removing ESC key listener");
+      this.escapeAbortController.abort();
+      this.escapeAbortController = null;
+    }
   }
 
   /**
@@ -543,6 +602,10 @@ export class SelectElementManager {
       // so ESC can cancel the in-flight translation.
       this.selectionProcessing = true;
 
+      // Deactivate select element mode immediately after click (UI only)
+      console.log("[SelectElementManager] Deactivating select element mode after element selection");
+      await this.deactivateUIOnly();
+
       // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
       this.processSelectedElement(element).catch(error => {
@@ -587,13 +650,16 @@ export class SelectElementManager {
    * Handle keyboard events
    */
   async handleKeyDown(event) {
-    if (!this.isActive) return;
+    // Allow ESC to work even when inactive if translation is processing
+    if (!this.isActive && !this.selectionProcessing && !this.pendingTranslation) return;
 
     console.log("[SelectElementManager] KeyDown event received:", {
       key: event.key,
       code: event.code,
       target: event.target?.tagName,
       isActive: this.isActive,
+      selectionProcessing: this.selectionProcessing,
+      hasPendingTranslation: !!this.pendingTranslation
     });
 
     if (event.key === "Escape" || event.code === "Escape") {
@@ -634,8 +700,18 @@ export class SelectElementManager {
         }
       }
 
+      // Clean up status notification
+      try { 
+        await this.dismissStatusNotification(); 
+      } catch (e) { 
+        /* ignore */ 
+      }
+
+      // Deactivate if still active
       try {
-        await this.deactivate();
+        if (this.isActive) {
+          await this.deactivate();
+        }
       } catch (err) {
         console.warn('[SelectElementManager] Error while deactivating on ESC:', err);
       }
@@ -1105,14 +1181,15 @@ export class SelectElementManager {
       // Ensure status notification is dismissed in finally block (like OLD system)
       await this.dismissStatusNotification();
       
-      // Clear selectionProcessing and ensure we deactivate to clean up listeners
+      // Clear selectionProcessing flag and remove ESC listener
       try {
         this.selectionProcessing = false;
         this.logLifecycle(messageId, 'CLEANED');
-        // Only deactivate if still active (guard against double deactivations)
-        if (this.isActive) {
-          await this.deactivate();
-        }
+        
+        // Remove ESC key listener since translation is complete
+        this.removeEscapeKeyListener();
+        
+        console.log('[SelectElementManager] Translation processing completed, selectionProcessing cleared');
       } catch (err) {
         console.warn('[SelectElementManager] Error during final cleanup after processing selection:', err);
       }
