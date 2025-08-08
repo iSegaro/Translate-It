@@ -92,25 +92,56 @@ export function usePopupResize() {
       )
       
       if (requiredPopupHeight > MIN_HEIGHT) {
-        // Resize popup wrapper directly
-        if (popupWrapper) {
-          popupWrapper.style.height = `${requiredPopupHeight}px`
+        // Check if content exceeds maximum popup height
+        if (requiredPopupHeight >= MAX_HEIGHT) {
+          // Content is too long, use maximum height and enable scrolling
+          if (popupWrapper) {
+            popupWrapper.style.height = `${MAX_HEIGHT}px`
+          }
+          document.body.style.height = `${MAX_HEIGHT}px`
+          
+          // Enable scroll in scrollable-content area instead of field itself
+          const scrollableContent = document.querySelector('.scrollable-content')
+          if (scrollableContent) {
+            scrollableContent.style.setProperty('overflow-y', 'auto', 'important')
+          }
+          
+          // Let field expand naturally within the scrollable area
+          outputElement.style.removeProperty('max-height')
+          outputElement.style.setProperty('height', 'auto', 'important')
+          outputElement.style.setProperty('overflow-y', 'visible', 'important')
+          
+          console.log('[usePopupResize] ✅ Maximum height reached - enabled scrolling:', {
+            popupHeight: MAX_HEIGHT,
+            contentHeight,
+            scrollEnabled: true
+          })
+        } else {
+          // Content fits within popup, resize to fit exactly
+          if (popupWrapper) {
+            popupWrapper.style.height = `${requiredPopupHeight}px`
+          }
+          document.body.style.height = `${requiredPopupHeight}px`
+          
+          // Disable scrolling - content fits
+          const scrollableContent = document.querySelector('.scrollable-content')
+          if (scrollableContent) {
+            scrollableContent.style.setProperty('overflow-y', 'visible', 'important')
+          }
+          
+          // Let output field expand naturally to fit content
+          outputElement.style.removeProperty('max-height')
+          outputElement.style.setProperty('height', 'auto', 'important')
+          outputElement.style.setProperty('overflow-y', 'visible', 'important')
+          
+          console.log('[usePopupResize] ✅ Flexbox resize to exact fit:', {
+            fromHeight: window.innerHeight,
+            toHeight: requiredPopupHeight,
+            headerHeight: actualHeaderHeight,
+            contentHeight,
+            scrollEnabled: false
+          })
         }
-        
-        // Also resize body for browser extension context
-        document.body.style.height = `${requiredPopupHeight}px`
-        
-        // Remove any max-height restrictions on the output field
-        outputElement.style.removeProperty('max-height')
-        outputElement.style.setProperty('overflow-y', 'visible', 'important')
-        
-        console.log('[usePopupResize] ✅ Flexbox resize:', {
-          fromHeight: window.innerHeight,
-          toHeight: requiredPopupHeight,
-          headerHeight: actualHeaderHeight,
-          contentHeight,
-          availableScrollHeight: requiredPopupHeight - actualHeaderHeight
-        })
       } else {
         // Reset to minimum height
         if (popupWrapper) {
@@ -119,6 +150,7 @@ export function usePopupResize() {
         document.body.style.height = `${MIN_HEIGHT}px`
         
         outputElement.style.removeProperty('max-height')
+        outputElement.style.setProperty('height', 'auto', 'important')
         outputElement.style.setProperty('overflow-y', 'visible', 'important')
         
         console.log('[usePopupResize] ✅ Using minimum height for flexbox layout')
@@ -151,8 +183,9 @@ export function usePopupResize() {
     }
     document.body.style.height = `${MIN_HEIGHT}px`
     
-    // Reset output field styles
+    // Reset output field styles to natural expansion
     outputElement.style.removeProperty('max-height')
+    outputElement.style.setProperty('height', 'auto', 'important')
     outputElement.style.setProperty('overflow-y', 'visible', 'important')
     
     console.log('[usePopupResize] Reset flexbox layout to default:', {

@@ -222,14 +222,16 @@ watch(() => props.error, (newError) => {
   direction: ltr;
   text-align: left;
   min-height: 60px;
-  max-height: 200px; /* Default max height, will be overridden dynamically */
+  height: auto; /* Allow natural height expansion */
   background-color: var(--bg-result-color);
   color: var(--text-color);
   border: 1px solid var(--header-border-color);
   line-height: 1.6;
   white-space: normal !important;
   word-wrap: break-word;
-  overflow-y: auto;
+  word-break: break-word; /* Better word breaking */
+  overflow-wrap: break-word; /* Additional word wrap support */
+  overflow-y: visible; /* Let content show naturally */
   transition: max-height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
   
   /* Custom scrollbar for better UX */
