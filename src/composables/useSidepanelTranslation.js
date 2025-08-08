@@ -29,7 +29,7 @@ export function useSidepanelTranslation() {
   );
 
   // Methods
-  const triggerTranslation = async () => {
+  const triggerTranslation = async (sourceLang = null, targetLang = null) => {
     if (!canTranslate.value) return;
 
     isTranslating.value = true;
@@ -37,8 +37,14 @@ export function useSidepanelTranslation() {
     translatedText.value = ""; // Clear previous translation - SAME AS POPUP
 
     try {
+      // Use provided languages or fallback to settings
+      const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
+      const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
+      
+      console.log("[useSidepanelTranslation] Translation with languages:", { sourceLanguage, targetLanguage });
+      
       // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
-      await translationService.sidepanelTranslate(sourceText.value, settingsStore.settings.SOURCE_LANGUAGE, settingsStore.settings.TARGET_LANGUAGE);
+      await translationService.sidepanelTranslate(sourceText.value, sourceLanguage, targetLanguage);
 
       console.log("[useSidepanelTranslation] Translation request sent. Waiting for result...");
 

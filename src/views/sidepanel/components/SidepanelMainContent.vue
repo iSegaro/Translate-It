@@ -172,6 +172,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useHistory } from "@/composables/useHistory.js";
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
 
@@ -192,7 +193,8 @@ const {
   translationError,
   canTranslate,
   triggerTranslation,
-  loadLastTranslation
+  loadLastTranslation,
+  lastTranslation
 } = translation;
 
 // Local UI state (not related to translation)
@@ -225,7 +227,7 @@ const targetLanguageValue = computed(() => {
 });
 
 const sourceLanguageValue = computed(() => {
-  return sourceLanguageInputRef.value?.value || "auto";
+  return sourceLanguageInputRef.value?.value || AUTO_DETECT_VALUE;
 });
 
 // Watch for history changes to handle Firefox MV3 bug
@@ -328,9 +330,9 @@ const handleTranslationSubmit = async () => {
     console.log("[SidepanelMainContent] Ensuring background script is ready...");
     await backgroundWarmup.ensureWarmedUp();
 
-    // Use composable translation function - EXACTLY LIKE POPUP
-    console.log("[SidepanelMainContent] Triggering translation via composable");
-    const success = await triggerTranslation();
+    // Use composable translation function with current UI language values
+    console.log("[SidepanelMainContent] Triggering translation via composable with languages:", { source: sourceLanguageValue.value, target: targetLanguageValue.value });
+    const success = await triggerTranslation(sourceLanguageValue.value, targetLanguageValue.value);
     
     console.log("[SidepanelMainContent] Translation completed:", success);
     
@@ -419,7 +421,7 @@ const getLanguageCode = (languageName) => {
     Italian: "it",
     Dutch: "nl",
     Turkish: "tr",
-    auto: "en",
+    [AUTO_DETECT_VALUE]: "en",
   };
 
   return languageMap[languageName] || "en";
@@ -427,7 +429,7 @@ const getLanguageCode = (languageName) => {
 
 // Speak source text using TTS
 const speakSourceText = async () => {
-  const sourceLanguage = sourceLanguageValue.value || "auto";
+  const sourceLanguage = sourceLanguageValue.value || AUTO_DETECT_VALUE;
   const langCode = getLanguageCode(sourceLanguage);
   await tts.speak(sourceText.value, langCode);
   console.log(
@@ -438,7 +440,7 @@ const speakSourceText = async () => {
 
 // Speak translation text using TTS
 const speakTranslationText = async () => {
-  const targetLanguage = targetLanguageValue.value || "auto";
+  const targetLanguage = targetLanguageValue.value || AUTO_DETECT_VALUE;
   const langCode = getLanguageCode(targetLanguage);
   await tts.speak(translatedText.value, langCode);
   console.log(
@@ -462,33 +464,54 @@ const handleSwapLanguages = async () => {
 
     let sourceVal = sourceSelect.value;
     let targetVal = targetSelect.value;
+    
+    console.log("[SidepanelMainContent] Current languages before swap:", { sourceVal, targetVal });
 
-    // Get language codes - for simplification we use the values directly
+    // Always swap the text first (if both have content)
+    if (sourceText.value.trim() && translatedText.value.trim()) {
+      const tempText = sourceText.value;
+      sourceText.value = translatedText.value;
+      translatedText.value = tempText;
+      console.log("[SidepanelMainContent] Text swapped");
+    }
+
+    // Get language codes
     let sourceCode = getLanguageCode(sourceVal);
     let targetCode = getLanguageCode(targetVal);
 
     let resolvedSourceCode = sourceCode;
     let resolvedTargetCode = targetCode;
 
-    // If source is "auto-detect", try to get actual source language from settings
-    if (sourceCode === "auto" || sourceVal === "auto") {
-      try {
-        resolvedSourceCode = await getSourceLanguageAsync();
+    // If source is "auto-detect", try to get actual source language from last translation
+    if (sourceCode === AUTO_DETECT_VALUE || sourceVal === AUTO_DETECT_VALUE) {
+      // If we have a translation, use the detected source language
+      if (lastTranslation.value && lastTranslation.value.sourceLanguage) {
+        const detectedLang = lastTranslation.value.sourceLanguage;
+        resolvedSourceCode = getLanguageCode(detectedLang);
         console.log(
-          "[SidepanelMainContent] Resolved source language from settings:",
-          resolvedSourceCode,
+          "[SidepanelMainContent] Using detected source language from last translation:",
+          detectedLang,
         );
-      } catch (err) {
-        console.error(
-          "[SidepanelMainContent] Failed to load source language from settings:",
-          err,
-        );
-        resolvedSourceCode = null;
+      } else {
+        // Fallback to settings
+        try {
+          resolvedSourceCode = await getSourceLanguageAsync();
+          console.log(
+            "[SidepanelMainContent] Resolved source language from settings:",
+            resolvedSourceCode,
+          );
+        } catch (err) {
+          console.error(
+            "[SidepanelMainContent] Failed to load source language from settings:",
+            err,
+          );
+          resolvedSourceCode = null;
+        }
       }
     }
 
     // In case target is somehow auto (shouldn't happen but for robustness)
-    if (targetCode === "auto" || targetVal === "auto") {
+    if (targetCode === AUTO_DETECT_VALUE || targetVal === AUTO_DETECT_VALUE) {
       try {
         resolvedTargetCode = await getTargetLanguageAsync();
         console.log(
@@ -504,12 +527,8 @@ const handleSwapLanguages = async () => {
       }
     }
 
-    // Only proceed if both languages are valid and source is not auto-detect
-    if (
-      resolvedSourceCode &&
-      resolvedTargetCode &&
-      resolvedSourceCode !== "auto"
-    ) {
+    // Swap languages if both are valid
+    if (resolvedSourceCode && resolvedTargetCode && resolvedSourceCode !== AUTO_DETECT_VALUE) {
       // Get display names for the resolved languages
       const newSourceDisplay = getLanguageDisplayName(resolvedTargetCode);
       const newTargetDisplay = getLanguageDisplayName(resolvedSourceCode);
@@ -518,7 +537,19 @@ const handleSwapLanguages = async () => {
       sourceSelect.value = newSourceDisplay || targetVal;
       targetSelect.value = newTargetDisplay || sourceVal;
 
-      console.log("[SidepanelMainContent] Languages swapped successfully");
+      console.log("[SidepanelMainContent] Languages swapped successfully:", { 
+        from: `${sourceVal} → ${targetVal}`, 
+        to: `${newSourceDisplay} → ${newTargetDisplay}` 
+      });
+    } else if (resolvedSourceCode === AUTO_DETECT_VALUE) {
+      // When source is auto, just swap the target to auto and source to current target
+      sourceSelect.value = targetVal;
+      targetSelect.value = AUTO_DETECT_VALUE;
+      
+      console.log("[SidepanelMainContent] Auto-detect swap:", { 
+        from: `${AUTO_DETECT_VALUE} → ${targetVal}`, 
+        to: `${targetVal} → ${AUTO_DETECT_VALUE}` 
+      });
     } else {
       // Cannot swap - provide feedback
       console.log(
@@ -528,7 +559,6 @@ const handleSwapLanguages = async () => {
           resolvedTargetCode,
         },
       );
-      // Could add visual feedback here like in the OLD implementation
     }
   } catch (error) {
     console.error("[SidepanelMainContent] Error swapping languages:", error);
@@ -553,6 +583,7 @@ const getLanguageDisplayName = (langCode) => {
     it: "Italian",
     nl: "Dutch",
     tr: "Turkish",
+    [AUTO_DETECT_VALUE]: AUTO_DETECT_VALUE,
   };
 
   return languageMap[langCode] || langCode;
