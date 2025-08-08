@@ -185,6 +185,7 @@ export class SelectElementManager {
         if (this.pendingTranslation.originalMessageId === message.messageId) {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
           console.log('[SelectElementManager] Message ID matched, resolving translation after', elapsed + 'ms');
+          this.logLifecycle(message.messageId, 'RESULT_RECEIVED', { elapsed });
           
           // Cancel timeout since we got the result
           if (this.pendingTranslation.timeoutId) {
@@ -255,6 +256,19 @@ export class SelectElementManager {
       
       // Store timeout ID for potential cancellation
       this.pendingTranslation.timeoutId = timeoutId;
+
+      // If a cancel was requested before the pendingTranslation existed,
+      // immediately cancel it now.
+      if (this.requestedCancel) {
+        try {
+          console.log('[SelectElementManager] Requested cancel detected - cancelling pending translation for', messageId);
+          // Reset flag before cancelling to avoid recursion
+          this.requestedCancel = false;
+          this.cancelPendingTranslation(messageId);
+        } catch (err) {
+          console.warn('[SelectElementManager] Error while auto-cancelling pending translation:', err);
+        }
+      }
     });
   }
 
@@ -265,7 +279,24 @@ export class SelectElementManager {
   cancelPendingTranslation(messageId) {
     if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
       console.log('[SelectElementManager] Cancelling pending translation for messageId:', messageId);
-      this.pendingTranslation.reject(new Error('Translation cancelled'));
+
+      // Log lifecycle: cancel requested
+      this.logLifecycle(messageId, 'CANCEL_REQUESTED');
+
+      // Clear timeout if present
+      if (this.pendingTranslation.timeoutId) {
+        try { clearTimeout(this.pendingTranslation.timeoutId); } catch (e) { /* ignore */ }
+      }
+
+      // Resolve the pending promise with a cancel result instead of rejecting it.
+      try {
+        this.pendingTranslation.resolve({ cancelled: true, messageId });
+        this.logLifecycle(messageId, 'CANCELLED');
+      } catch (e) {
+        // If resolve throws for any reason, swallow to avoid unhandled exceptions
+        console.warn('[SelectElementManager] Warning: resolving pending translation failed:', e);
+      }
+
       this.pendingTranslation = null;
     }
   }
@@ -381,7 +412,9 @@ export class SelectElementManager {
    * Handle mouse over event - highlight element
    */
   handleMouseOver(event) {
-    if (!this.isActive) return;
+    // Allow ESC to cancel even if we've deactivated normal select mode but a
+    // translation is still pending (selectionProcessing true or pendingTranslation exists).
+    if (!this.isActive && !this.selectionProcessing && !this.pendingTranslation) return;
 
     const element = event.target;
 
@@ -451,7 +484,23 @@ export class SelectElementManager {
       await this.showErrorNotification(
         "Please select an element that contains text"
       );
-      this.isProcessingClick = false;
+    this.isProcessingClick = false;
+    this.selectionProcessing = false; // true while an element's translation is being processed
+    this.requestedCancel = false; // set when ESC pressed before pending translation created
+    // Lifecycle tracing for messageIds
+    this.tracing = true; // enable by default for now; can be toggled
+    this.messageLifecycle = new Map();
+
+    // Expose tracing map for devtools inspection
+    try {
+      Object.defineProperty(window, '__TranslateItTracing', {
+        configurable: true,
+        enumerable: false,
+        get: () => this.messageLifecycle,
+      });
+    } catch (e) {
+      // ignore if window not writable in some contexts
+    }
       return;
     }
 
@@ -472,8 +521,9 @@ export class SelectElementManager {
         quickText.substring(0, 100) + "..."
       );
 
-      // Deactivate mode immediately after element selection (before translation)
-      await this.deactivate();
+      // Mark that we're processing this selection and keep manager active
+      // so ESC can cancel the in-flight translation.
+      this.selectionProcessing = true;
 
       // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
@@ -492,6 +542,26 @@ export class SelectElementManager {
       await this.showErrorNotification(error.message);
     } finally {
       this.isProcessingClick = false;
+    }
+  }
+
+  /**
+   * Log lifecycle events for a messageId (stores in internal Map and console.debug)
+   */
+  logLifecycle(messageId, state, extra = {}) {
+    if (!messageId) return;
+    const ts = Date.now();
+    const entry = { messageId, state, timestamp: ts, source: 'content', extra };
+    try {
+      // store history array for each messageId
+      const arr = this.messageLifecycle.get(messageId) || [];
+      arr.push(entry);
+      this.messageLifecycle.set(messageId, arr);
+      if (this.tracing) {
+        console.debug('[SelectElementManager][lifecycle]', entry);
+      }
+    } catch (err) {
+      // swallow any tracing errors
     }
   }
 
@@ -515,15 +585,43 @@ export class SelectElementManager {
 
       console.log("[SelectElementManager] ESC pressed - cancelling selection");
 
+      // If a translation is pending, cancel it first (notify background + resolve pending)
+      if (this.pendingTranslation) {
+        try {
+          const pendingId = this.pendingTranslation.originalMessageId;
+          console.log('[SelectElementManager] ESC pressed - cancelling pending translation for', pendingId);
+          this.cancelPendingTranslation(pendingId);
+          // Allow microtask queue to settle so pendingTranslation resolution is processed
+          await Promise.resolve();
+        } catch (err) {
+          console.warn('[SelectElementManager] Error while cancelling pending translation on ESC:', err);
+        }
+      } else if (this.selectionProcessing) {
+        // Translation hasn't started waiting yet (user pressed ESC quickly).
+        // Remember that a cancel was requested so setupTranslationWaiting can
+        // cancel the pending translation as soon as it's created.
+        console.log('[SelectElementManager] ESC pressed before pending translation created - marking requestedCancel');
+        this.requestedCancel = true;
+      }
+
       // If there are translated elements, revert them
       if (this.translatedElements.size > 0) {
         console.log(
           "[SelectElementManager] Reverting translations before deactivation"
         );
-        await this.revertTranslations();
+        try {
+          await this.revertTranslations();
+        } catch (err) {
+          console.warn('[SelectElementManager] Error while reverting translations on ESC:', err);
+        }
       }
 
-      await this.deactivate();
+      try {
+        await this.deactivate();
+      } catch (err) {
+        console.warn('[SelectElementManager] Error while deactivating on ESC:', err);
+      }
+
       return false;
     }
   }
@@ -757,6 +855,7 @@ export class SelectElementManager {
       
       // 5) Setup pending translation BEFORE sending message (to avoid race condition)
       const translationPromise = this.setupTranslationWaiting(messageId);
+      this.logLifecycle(messageId, 'PENDING', { startTime: Date.now() });
 
       // 6) Send translation request using UnifiedMessenger like OLD system
       const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
@@ -806,23 +905,50 @@ export class SelectElementManager {
       }
 
       console.log("[SelectElementManager] Translation request accepted, waiting for result...");
+      this.logLifecycle(messageId, 'SENT', { provider: payload.provider });
       
       // 8) Wait for TRANSLATION_RESULT_UPDATE message
       const translationResult = await translationPromise;
-      
+
+      // If the pending promise was resolved as cancelled, handle gracefully
+      if (translationResult && translationResult.cancelled) {
+        console.log('[SelectElementManager] Translation was cancelled for messageId:', translationResult.messageId);
+        await this.dismissStatusNotification();
+        return { status: 'cancelled', messageId: translationResult.messageId };
+      }
+
       // Handle translation errors like OLD system
       if (!translationResult || translationResult.error || !translationResult.translatedText) {
-        const msg = translationResult?.error?.message || translationResult?.error || "(⚠️ خطایی در ترجمه رخ داد.)"; // Persian like OLD system
-        
+        const rawError = translationResult?.error;
+        let msg = "(⚠️ خطایی در ترجمه رخ داد.)"; // Persian like OLD system
+
+        // Derive a human friendly message from the error object if possible
+        try {
+          if (rawError) {
+            if (typeof rawError === 'string') {
+              msg = rawError;
+            } else if (rawError.message) {
+              msg = rawError.message;
+            } else if (rawError.code) {
+              msg = `Error: ${rawError.code}`;
+            } else {
+              msg = JSON.stringify(rawError);
+            }
+          }
+        } catch (err) {
+          // fallback to default message
+          msg = "(⚠️ خطایی در ترجمه رخ داد.)";
+        }
+
         // Handle timeout specifically - less severe than other errors
         if (translationResult?.timeout) {
-          console.warn("[SelectElementManager] Translation timeout:", msg);
+          console.warn("[SelectElementManager] Translation timeout:", msg, rawError);
           await this.showWarningNotification("Translation taking longer than expected. It may complete in background.");
           return { status: "timeout", reason: "timeout", message: msg };
         } else {
-          console.error("[SelectElementManager] Translation result failed:", msg);
+          console.error("[SelectElementManager] Translation result failed:", msg, rawError);
           await this.showErrorNotification(msg);
-          return { status: "error", reason: "backend_error", message: msg }; // Same error type as OLD system
+          return { status: "error", reason: "backend_error", message: msg, rawError };
         }
       }
 
@@ -912,6 +1038,9 @@ export class SelectElementManager {
 
       applyTranslationsToNodes(textNodes, allTranslations, context);
 
+      // Log applied
+      this.logLifecycle(messageId, 'APPLIED', { translatedCount: newTranslations.size });
+
       // Dismiss status notification on success (like OLD system)
       await this.dismissStatusNotification();
 
@@ -949,6 +1078,18 @@ export class SelectElementManager {
     } finally {
       // Ensure status notification is dismissed in finally block (like OLD system)
       await this.dismissStatusNotification();
+      
+      // Clear selectionProcessing and ensure we deactivate to clean up listeners
+      try {
+        this.selectionProcessing = false;
+        this.logLifecycle(messageId, 'CLEANED');
+        // Only deactivate if still active (guard against double deactivations)
+        if (this.isActive) {
+          await this.deactivate();
+        }
+      } catch (err) {
+        console.warn('[SelectElementManager] Error during final cleanup after processing selection:', err);
+      }
     }
   }
 
