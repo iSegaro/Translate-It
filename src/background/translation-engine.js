@@ -235,7 +235,18 @@ export class TranslationEngine {
       );
     }
 
-    // Execute translation (attempt bulk JSON-mode first)
+    // Pre-check for JSON mode optimization
+    const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
+    const providerClass = providerInstance?.constructor;
+    const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
+
+    // For unreliable providers in JSON mode, use optimized strategy directly
+    if (isSelectJson && !providerReliableJson) {
+      console.log('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
+      return await this.executeOptimizedJsonTranslation(data, providerInstance);
+    }
+
+    // Standard translation for reliable providers or non-JSON mode
     let result;
     try {
       result = await providerInstance.translate(
@@ -245,141 +256,12 @@ export class TranslationEngine {
         mode,
       );
     } catch (initialError) {
-      // If provider failed for bulk request, but this is SelectElement JSON
-      // and the provider is marked unreliable for JSON, attempt per-segment
-      // fallback before giving up.
-      const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
-      const providerClass = providerInstance?.constructor;
-      const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
-
+      // Final fallback for SelectElement JSON
       if (isSelectJson && !providerReliableJson) {
-        console.warn('[TranslationEngine] Bulk translate failed, attempting per-segment fallback:', initialError);
-        // try to parse original JSON
-        let originalJson = null;
-        try {
-          originalJson = JSON.parse(text);
-        } catch (e) {
-          originalJson = null;
-        }
-
-        const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
-        if (expectedLen) {
-          // perform per-segment translations
-          const segments = originalJson.map(item => item.text);
-          const concurrency = 4;
-          const results = new Array(segments.length);
-
-          const translateSegment = async (segText, attempt = 1) => {
-            try {
-              return await providerInstance.translate(segText, sourceLanguage, targetLanguage, mode);
-            } catch (err) {
-              if (attempt < 3) return translateSegment(segText, attempt + 1);
-              return segText;
-            }
-          };
-
-          let idx = 0;
-          const workers = new Array(concurrency).fill(null).map(async () => {
-            while (idx < segments.length) {
-              const cur = idx++;
-              results[cur] = await translateSegment(segments[cur]);
-            }
-          });
-          await Promise.all(workers);
-
-          const merged = originalJson.map((item, i) => ({ ...item, text: (results[i] || '').trim() }));
-          result = JSON.stringify(merged);
-          console.log('[TranslationEngine] Per-segment fallback succeeded after bulk failure for provider', provider);
-        } else {
-          // cannot recover without original JSON structure
-          throw initialError;
-        }
-      } else {
-        // not recoverable here
-        throw initialError;
+        console.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
+        return await this.executeOptimizedJsonTranslation(data, providerInstance);
       }
-    }
-
-    // If this is SelectElement raw JSON and provider is known unreliable,
-    // attempt to normalize or fallback to per-segment translation.
-    const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
-    const providerClass = providerInstance?.constructor;
-    const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
-
-    if (isSelectJson && !providerReliableJson) {
-      let originalJson = null;
-      try {
-        originalJson = JSON.parse(text);
-      } catch (e) {
-        originalJson = null;
-      }
-
-      const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
-      if (expectedLen) {
-        let rebuilt = null;
-
-        // Try case: provider returned a JSON array matching expected length
-        try {
-          const parsed = JSON.parse(result);
-          if (Array.isArray(parsed) && parsed.length === expectedLen) {
-            rebuilt = result;
-            console.log('[TranslationEngine] Provider returned matching JSON array for SelectElement');
-          } else if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0].text === 'string') {
-            // single-element array containing joined text -> try split
-            const parts = parsed[0].text.split("\n\n---\n\n");
-            if (parts.length === expectedLen) {
-              const merged = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
-              rebuilt = JSON.stringify(merged);
-              console.log('[TranslationEngine] Rebuilt JSON array from single-element provider response');
-            }
-          }
-        } catch (e) {
-          // not JSON or parse failed
-        }
-
-        // Try splitting raw result by delimiter
-        if (!rebuilt && typeof result === 'string') {
-          const parts = result.split("\n\n---\n\n");
-          if (parts.length === expectedLen) {
-            const merged = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
-            rebuilt = JSON.stringify(merged);
-            console.log('[TranslationEngine] Rebuilt JSON array from raw translatedText by splitting delimiter');
-          }
-        }
-
-        // If still not rebuilt, perform per-segment translations as fallback
-        if (!rebuilt) {
-          const segments = originalJson.map(item => item.text);
-          const concurrency = 4;
-          const results = new Array(segments.length);
-
-          const translateSegment = async (segText, attempt = 1) => {
-            try {
-              return await providerInstance.translate(segText, sourceLanguage, targetLanguage, mode);
-            } catch (err) {
-              if (attempt < 3) return translateSegment(segText, attempt + 1);
-              return segText; // fallback to original if retries fail
-            }
-          };
-
-          let idx = 0;
-          const workers = new Array(concurrency).fill(null).map(async () => {
-            while (idx < segments.length) {
-              const cur = idx++;
-              results[cur] = await translateSegment(segments[cur]);
-            }
-          });
-          await Promise.all(workers);
-
-          const merged = originalJson.map((item, i) => ({ ...item, text: (results[i] || '').trim() }));
-          rebuilt = JSON.stringify(merged);
-          console.log('[TranslationEngine] Per-segment fallback used for provider', provider, 'segments', segments.length);
-        }
-
-        if (rebuilt) {
-          result = rebuilt;
-        }
-      }
+      throw initialError;
     }
 
     const response = {
@@ -394,6 +276,194 @@ export class TranslationEngine {
     };
 
     return response;
+  }
+
+  /**
+   * Optimized JSON translation for unreliable providers
+   */
+  async executeOptimizedJsonTranslation(data, providerInstance) {
+    const { text, provider, sourceLanguage, targetLanguage, mode } = data;
+    
+    let originalJson;
+    try {
+      originalJson = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Invalid JSON format for SelectElement mode');
+    }
+
+    if (!Array.isArray(originalJson)) {
+      throw new Error('SelectElement JSON must be an array');
+    }
+
+    const segments = originalJson.map(item => item.text);
+    const results = new Array(segments.length);
+    
+    // Smart cache-first approach
+    let cacheHits = 0;
+    const uncachedIndices = [];
+    
+    for (let i = 0; i < segments.length; i++) {
+      const cacheKey = this.generateCacheKey({
+        text: segments[i],
+        provider,
+        sourceLanguage,
+        targetLanguage,
+        mode
+      });
+      
+      if (this.cache.has(cacheKey)) {
+        const cached = this.cache.get(cacheKey);
+        results[i] = cached.translatedText || segments[i];
+        cacheHits++;
+      } else {
+        uncachedIndices.push(i);
+      }
+    }
+
+    console.log(`[TranslationEngine] Cache hits: ${cacheHits}/${segments.length}`);
+
+    // Only translate uncached segments
+    if (uncachedIndices.length > 0) {
+      const BATCH_SIZE = 8; // Optimized batch size
+      const MAX_CONCURRENT = 2; // Reduced concurrency for better stability
+      
+      // Process in batches with intelligent grouping
+      const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
+      
+      let batchIndex = 0;
+      const workers = Array.from({ length: Math.min(MAX_CONCURRENT, batches.length) }, async () => {
+        while (true) {
+          const idx = batchIndex++;
+          if (idx >= batches.length) break;
+          
+          const batch = batches[idx];
+          await this.processBatch(batch, segments, results, providerInstance, {
+            provider, sourceLanguage, targetLanguage, mode
+          });
+        }
+      });
+
+      await Promise.all(workers);
+    }
+
+    // Reconstruct JSON with translated texts
+    const translatedJson = originalJson.map((item, i) => ({
+      ...item,
+      text: results[i] || item.text // Fallback to original on failure
+    }));
+
+    const response = {
+      success: true,
+      translatedText: JSON.stringify(translatedJson),
+      provider,
+      sourceLanguage,
+      targetLanguage,
+      originalText: text,
+      timestamp: Date.now(),
+      mode: mode || "simple",
+    };
+
+    return response;
+  }
+
+  /**
+   * Create optimal batches based on text length and similarity
+   */
+  createOptimalBatches(indices, segments, maxBatchSize) {
+    const batches = [];
+    let currentBatch = [];
+    let currentLength = 0;
+    const MAX_BATCH_CHARS = 1000; // Character limit per batch
+    
+    for (const idx of indices) {
+      const segmentLength = segments[idx].length;
+      
+      // Start new batch if current would exceed limits
+      if (currentBatch.length >= maxBatchSize || 
+          (currentLength + segmentLength > MAX_BATCH_CHARS && currentBatch.length > 0)) {
+        batches.push(currentBatch);
+        currentBatch = [];
+        currentLength = 0;
+      }
+      
+      currentBatch.push(idx);
+      currentLength += segmentLength;
+    }
+    
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+    
+    return batches;
+  }
+
+  /**
+   * Process a single batch with fallback strategy
+   */
+  async processBatch(batch, segments, results, providerInstance, config) {
+    const { provider, sourceLanguage, targetLanguage, mode } = config;
+    const DELIMITER = "\n\n---\n\n";
+    
+    // Try batch translation first (most efficient)
+    try {
+      const batchText = batch.map(idx => segments[idx]).join(DELIMITER);
+      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode);
+      
+      if (typeof batchResult === 'string') {
+        const parts = batchResult.split(DELIMITER);
+        
+        if (parts.length === batch.length) {
+          // Successful batch translation
+          for (let i = 0; i < batch.length; i++) {
+            const idx = batch[i];
+            const translatedText = parts[i]?.trim() || segments[idx];
+            results[idx] = translatedText;
+            
+            // Cache individual result
+            const cacheKey = this.generateCacheKey({
+              text: segments[idx], provider, sourceLanguage, targetLanguage, mode
+            });
+            this.cache.set(cacheKey, { translatedText, cachedAt: Date.now() });
+          }
+          return;
+        }
+      }
+    } catch (batchError) {
+      console.log(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
+    }
+    
+    // Fallback to individual translations (with minimal retry)
+    const INDIVIDUAL_RETRY = 2;
+    const individualPromises = batch.map(async (idx) => {
+      let attempt = 0;
+      while (attempt < INDIVIDUAL_RETRY) {
+        try {
+          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode);
+          const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
+          
+          // Cache result
+          const cacheKey = this.generateCacheKey({
+            text: segments[idx], provider, sourceLanguage, targetLanguage, mode
+          });
+          this.cache.set(cacheKey, { translatedText, cachedAt: Date.now() });
+          
+          return { idx, result: translatedText };
+        } catch (err) {
+          attempt++;
+          if (attempt < INDIVIDUAL_RETRY) {
+            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+          }
+        }
+      }
+      
+      // Final fallback to original text
+      return { idx, result: segments[idx] };
+    });
+    
+    const individualResults = await Promise.all(individualPromises);
+    individualResults.forEach(({ idx, result }) => {
+      results[idx] = result;
+    });
   }
 
   /**
