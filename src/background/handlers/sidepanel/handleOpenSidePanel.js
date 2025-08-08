@@ -35,9 +35,9 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
       // Use Firefox's sidebar action
       await browser.sidebarAction.open();
     } else {
-      // Fallback: open options page in new tab
+      // Fallback: open sidepanel page in new tab
       await browser.tabs.create({
-        url: browser.runtime.getURL('/pages/sidepanel.html'),
+        url: browser.runtime.getURL('/html/sidepanel.html'),
         active: true
       });
     }
@@ -52,8 +52,9 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
     });
     return true;
   } catch (error) {
+    console.error('[Handler:OPEN_SIDE_PANEL] Side panel opening failed:', error);
     errorHandler.handle(error, {
-      type: ErrorTypes.SIDE_PANEL,
+      type: ErrorTypes.UI,
       context: "handleOpenSidePanel",
       messageData: message
     });

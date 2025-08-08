@@ -105,7 +105,23 @@ const handleTranslatePage = async () => {
 
 const handleOpenSidePanel = async () => {
   try {
-    await sendMessage({ action: MessageActions.OPEN_SIDE_PANEL })
+    // Get the current tab information to provide context
+    const [activeTab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
+    
+    console.log('[PopupHeader] Opening side panel for tab:', activeTab?.id)
+    
+    await sendMessage({ 
+      action: MessageActions.OPEN_SIDE_PANEL,
+      data: {
+        tabId: activeTab?.id,
+        windowId: activeTab?.windowId
+      }
+    })
+    
+    console.log('[PopupHeader] Side panel open request sent successfully')
     window.close()
   } catch (error) {
     console.error('Error opening side panel from popup:', error)
