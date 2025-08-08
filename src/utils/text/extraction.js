@@ -275,12 +275,11 @@ export function parseAndCleanTranslationResponse(
   );
 
   if (!jsonMatch || !jsonMatch[1]) {
+    // No JSON structure found — this is not always fatal: some providers
+    // return plain string responses (separated by markers). Don't notify
+    // the user here to avoid showing spurious errors; fall back to
+    // string-based parsing in the caller.
     logME("No JSON structure (array or object) found in the response string.");
-    const error = new Error("هیچ ساختار JSON معتبری در پاسخ یافت نشد.");
-    context.errorHandler.handle(error, {
-      type: ErrorTypes.API_RESPONSE_INVALID,
-      context: "parseAndCleanTranslationResponse-NoJsonFound",
-    });
     return []; // برگرداندن آرایه خالی
   }
 
