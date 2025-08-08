@@ -75,16 +75,35 @@ export function useSidepanelTranslation() {
           "[useSidepanelTranslation] Received TRANSLATION_RESULT_UPDATE:",
           message,
         );
-        translatedText.value = message.data.translatedText;
-        translationError.value = ""; // Clear any previous error
+        
+        // Always reset loading state when receiving any result
         isTranslating.value = false;
-        lastTranslation.value = {
-          source: message.data.originalText,
-          target: message.data.translatedText,
-          provider: message.data.provider,
-          timestamp: message.data.timestamp,
-        };
-        console.log("[useSidepanelTranslation] Translation updated successfully");
+        
+        if (message.data.success === false && message.data.error) {
+          // ERROR case - display error message and clear translation
+          console.log("[useSidepanelTranslation] Translation error received:", message.data.error);
+          translationError.value = message.data.error.message || "Translation failed";
+          translatedText.value = ""; // Clear any previous translation
+          lastTranslation.value = null; // Clear last translation on error
+          console.log("[useSidepanelTranslation] Error state updated:", translationError.value);
+        } else if (message.data.success !== false && message.data.translatedText) {
+          // SUCCESS case - display translation and clear error
+          console.log("[useSidepanelTranslation] Translation success received");
+          translatedText.value = message.data.translatedText;
+          translationError.value = ""; // Clear any previous error
+          lastTranslation.value = {
+            source: message.data.originalText,
+            target: message.data.translatedText,
+            provider: message.data.provider,
+            timestamp: message.data.timestamp,
+          };
+          console.log("[useSidepanelTranslation] Translation updated successfully");
+        } else {
+          // UNEXPECTED case - handle gracefully
+          console.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
+          translationError.value = "Unexpected response format";
+          translatedText.value = "";
+        }
       } else {
         console.log("[useSidepanelTranslation] Message filtered out. Action:", message.action, "Context:", message.context);
       }
