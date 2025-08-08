@@ -12,8 +12,8 @@ import { contentTTSHandler } from "../handlers/content/TTSHandler.js";
 // Import NotificationManager
 import NotificationManager from "../managers/core/NotificationManager.js";
 
-// Import EventHandler and InstanceManager
-import EventHandler from "../core/EventHandler.js";
+// Import EventCoordinator and InstanceManager
+import EventCoordinator from "../core/EventCoordinator.js";
 import { getTranslationHandlerInstance } from "../core/InstanceManager.js";
 
 // Import the new SelectElementManager
@@ -29,7 +29,7 @@ console.log("Content TTS Handler loaded:", !!contentTTSHandler);
 
 // Initialize core systems
 const translationHandler = getTranslationHandlerInstance();
-const eventHandler = new EventHandler(translationHandler, translationHandler.featureManager);
+const eventCoordinator = new EventCoordinator(translationHandler, translationHandler.featureManager);
 const selectElementManager = new SelectElementManager();
 
 // Store instances globally for handlers to access
@@ -39,7 +39,22 @@ window.selectElementManagerInstance = selectElementManager;
 // Initialize all systems
 selectElementManager.initialize();
 contentMessageHandler.initialize();
-shortcutManager.initialize();
+
+// Initialize shortcut manager with required dependencies
+shortcutManager.initialize({
+  translationHandler: translationHandler,
+  featureManager: translationHandler.featureManager
+});
+
+// Setup DOM event listeners for EventCoordinator (text selection, text fields)
+// Note: Keyboard shortcuts are now handled by ShortcutManager
+document.addEventListener('mouseup', eventCoordinator.handleEvent, { passive: true });
+document.addEventListener('click', eventCoordinator.handleEvent, { passive: true });
+// Removed keydown listener - now handled by ShortcutManager
+document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
+document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
+
+console.log('✅ DOM event listeners setup for EventCoordinator (modern event routing)');
 
 // Setup message listener integration with existing system
 browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {

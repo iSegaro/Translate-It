@@ -28,12 +28,20 @@ export class TranslationMessenger {
       sourceLanguage: options.from || 'auto',
       targetLanguage: options.to || 'fa',
       mode: options.mode || 'normal',
-      messageId: options.messageId || `${this.context}-translate-${Date.now()}`,
+      options: options.options || {},
       ...options
     };
 
-    // Use the existing translate method from parent messenger
-    return this.messenger.translate(translationOptions);
+    // Use provided messageId or generate new one
+    const messageId = options.messageId || `${this.context}-translate-${Date.now()}`;
+
+    // Send translation request via standard messaging
+    return this.messenger.sendMessage({
+      action: MessageActions.TRANSLATE,
+      data: translationOptions,
+      messageId: messageId,
+      timestamp: Date.now()
+    });
   }
 
   /**

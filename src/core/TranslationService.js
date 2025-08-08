@@ -1,8 +1,7 @@
 import { MessagingCore, MessageContexts } from "../messaging/core/MessagingCore.js";
-import { TranslationMode } from "@/config.js";
+import { TranslationMode, getSettingsAsync } from "@/config.js";
 import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
-import { useSettingsStore } from "@/store/core/settings.js";
 
 export class TranslationService {
   constructor(context) {
@@ -11,16 +10,18 @@ export class TranslationService {
 
   async translate(mode, payload) {
     try {
-      // Get current provider from settings store
-      const settingsStore = useSettingsStore();
-      const currentProvider = settingsStore.settings.TRANSLATION_API || 'google-translate';
+      // Get current provider from settings (async for cross-context compatibility)
+      const settings = await getSettingsAsync();
+      const currentProvider = settings.TRANSLATION_API || 'google-translate';
       
-      logME(`[TranslationService] Sending translation request for mode: ${mode}, provider: ${currentProvider}`);
-      return await this.messenger.specialized.translation.translate(payload.promptText, { 
+      const options = { 
         ...payload, 
         translationMode: mode,
         provider: currentProvider
-      });
+      };
+      
+      logME(`[TranslationService] Sending translation request for mode: ${mode}, provider: ${currentProvider}, messageId: ${options.messageId}`);
+      return await this.messenger.specialized.translation.translate(payload.promptText, options);
     } catch (error) {
       logME(`[TranslationService] Translation error for mode ${mode}:`, error);
       throw error;

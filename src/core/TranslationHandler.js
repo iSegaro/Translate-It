@@ -14,7 +14,7 @@ import { debounce } from "../utils/core/debounce.js";
 import { state, TranslationMode, CONFIG } from "../config.js";
 import { logMethod, isExtensionContextValid, logME } from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
-import EventHandler from "./EventHandler.js";
+import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
@@ -68,7 +68,7 @@ export default class TranslationHandler {
       SUBTITLE_TRANSLATION: CONFIG.ENABLE_SUBTITLE_TRANSLATION,
     });
 
-    this.eventHandler = new EventHandler(this, this.featureManager);
+    this.eventCoordinator = new EventCoordinator(this, this.featureManager);
   }
 
   @logMethod
@@ -81,7 +81,7 @@ export default class TranslationHandler {
   @logMethod
   async handleEvent(event) {
     try {
-      await this.eventHandler.handleEvent(event);
+      await this.eventCoordinator.handleEvent(event);
     } catch (error) {
       throw await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.UI,
@@ -121,23 +121,24 @@ export default class TranslationHandler {
   }
 
   handleEditableFocus(element) {
-    this.eventHandler.handleEditableFocus(element);
+    this.eventCoordinator.handleEditableFocus(element);
   }
 
   handleEditableBlur() {
-    this.eventHandler.handleEditableBlur();
+    this.eventCoordinator.handleEditableBlur();
   }
 
   handleEscape(event) {
-    this.eventHandler.handleEscape(event);
+    this.eventCoordinator.handleEscape(event);
   }
 
   async handleCtrlSlash(event) {
-    await this.eventHandler.handleCtrlSlash(event);
+    // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
+    logME('[TranslationHandler] Ctrl+/ handling delegated to ShortcutManager');
   }
 
   async handleEditableElement(event) {
-    await this.eventHandler.handleEditableElement(event);
+    await this.eventCoordinator.handleEditableElement(event);
   }
 
   @logMethod

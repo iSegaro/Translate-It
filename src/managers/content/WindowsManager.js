@@ -16,6 +16,7 @@ import { determineTranslationMode } from "../../utils/translationModeHelper.js";
 import { SimpleMarkdown } from "../../utils/text/markdown.js";
 import { MessageContexts, MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { TranslationService } from "../../core/TranslationService.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
@@ -33,6 +34,9 @@ export default class SelectionWindows {
 
     // Enhanced messaging with context-aware selection and translation
     this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
+    
+    // Translation service for proper background communication
+    this.translationService = new TranslationService(MessageContexts.CONTENT);
 
     this.icon = null;
     this.iconClickContext = null;
@@ -388,38 +392,100 @@ export default class SelectionWindows {
       }
     });
 
-    // Use specialized translation messenger for background translation
-    this.messenger.specialized.translation
-      .translateText(selectedText, {
-        translationMode,
-        action: MessageActions.FETCH_TRANSLATION,
-      })
-      .then((response) => {
-        if (
-          this.isTranslationCancelled ||
-          this.originalText !== selectedText ||
-          !this.innerContainer
-        )
-          return;
-        if (response?.success) {
-          const txt = (response.data.translatedText || "").trim();
-          if (!txt) throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
-          this.transitionToTranslatedText(
-            txt,
-            loading,
-            selectedText,
-            translationMode
-          );
-        } else {
-          throw new Error(
-            response?.error?.message || response?.error || ErrorTypes.SERVICE
-          );
-        }
-      })
-      .catch(async (err) => {
-        if (this.isTranslationCancelled || !this.innerContainer) return;
-        await this.handleTranslationError(err, loading);
+    // Use TranslationService for proper background communication
+    let timeout;
+    let messageListener;
+    
+    try {
+      const settings = await getSettingsAsync();
+      
+      // Set up result listener for Firefox MV3 compatibility
+      const messageId = `content-translate-${Date.now()}`;
+      logME(`[SelectionWindows] Generated messageId: ${messageId}`);
+      
+      const resultPromise = new Promise((resolve, reject) => {
+        timeout = setTimeout(() => {
+          if (messageListener) {
+            browser.runtime.onMessage.removeListener(messageListener);
+          }
+          reject(new Error('Translation timeout'));
+        }, 30000); // 30 second timeout
+        
+        messageListener = (message) => {
+          logME(`[SelectionWindows] Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
+          
+          if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
+              message.messageId === messageId) {
+            logME(`[SelectionWindows] ✅ Message matched! Processing translation result`);
+            clearTimeout(timeout);
+            browser.runtime.onMessage.removeListener(messageListener);
+            
+            if (message.data?.translatedText) {
+              resolve({ translatedText: message.data.translatedText });
+            } else {
+              reject(new Error('No translated text in result'));
+            }
+          } else if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+            logME(`[SelectionWindows] ❌ Message ID mismatch. Expected: ${messageId}, Got: ${message.messageId}`);
+          }
+        };
+        
+        browser.runtime.onMessage.addListener(messageListener);
       });
+      
+      // Send translation request
+      const directResultPromise = this.translationService.translate(
+        translationMode, 
+        {
+          promptText: selectedText,
+          sourceLanguage: settings.SOURCE_LANGUAGE || 'auto',
+          targetLanguage: settings.TARGET_LANGUAGE || 'fa',
+          messageId: messageId
+        }
+      );
+      
+      // Wait for either direct response or broadcast (whichever comes first)
+      const result = await Promise.race([directResultPromise, resultPromise]);
+      
+      // Check if translation was cancelled during async operation
+      if (
+        this.isTranslationCancelled ||
+        this.originalText !== selectedText ||
+        !this.innerContainer
+      ) {
+        return;
+      }
+      
+      if (result?.translatedText) {
+        const translatedText = result.translatedText.trim();
+        if (!translatedText) {
+          throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
+        }
+        
+        this.transitionToTranslatedText(
+          translatedText,
+          loading,
+          selectedText,
+          translationMode
+        );
+      } else {
+        throw new Error('Translation failed: No translated text received');
+      }
+      
+    } catch (error) {
+      // Cleanup listeners on error
+      if (timeout) clearTimeout(timeout);
+      if (messageListener) {
+        try {
+          browser.runtime.onMessage.removeListener(messageListener);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      
+      if (this.isTranslationCancelled || !this.innerContainer) return;
+      await this.handleTranslationError(error, loading);
+    }
 
     // Add outside click listener after translation window is ready AND
     // pendingTranslationWindow flag is false.

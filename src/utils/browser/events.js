@@ -70,3 +70,71 @@ export const setCursorPosition = (element, position = "end", offset = 0) => {
     });
   }
 };
+
+/**
+ * Get event path with fallback for older browsers
+ * Used for detecting if click is inside specific elements
+ * @param {Event} event - DOM event
+ * @returns {Array} Event path array
+ */
+export const getEventPath = (event) => {
+  try {
+    // Modern browsers support composedPath()
+    let path = event.composedPath ? event.composedPath() : [];
+    
+    if (!path || path.length === 0) {
+      // Fallback for older browsers - manually construct path
+      let node = event.target;
+      path = [];
+      while (node) {
+        path.push(node);
+        node = node.parentNode;
+      }
+    }
+    
+    return path;
+  } catch {
+    // If all fails, return array with just the target
+    return event.target ? [event.target] : [];
+  }
+};
+
+/**
+ * Get selected text with dash separator for multiple ranges
+ * Utility for handling complex text selections
+ * @returns {string} Selected text with proper formatting
+ */
+export const getSelectedTextWithDash = () => {
+  try {
+    const selection = window.getSelection();
+    let selectedText = "";
+
+    if (selection.rangeCount > 1) {
+      // Handle multiple selection ranges
+      for (let i = 0; i < selection.rangeCount; i++) {
+        const range = selection.getRangeAt(i);
+        selectedText += range.toString().trim();
+        if (i < selection.rangeCount - 1) {
+          selectedText += " - \\n";
+        }
+      }
+    } else {
+      // Single selection range
+      selectedText = selection.toString().trim();
+    }
+
+    return selectedText.trim();
+  } catch {
+    // Fallback to empty string if selection fails
+    return "";
+  }
+};
+
+/**
+ * Check if mouse event includes Ctrl or Meta key
+ * @param {MouseEvent} event - Mouse event
+ * @returns {boolean} Whether Ctrl/Meta key was pressed
+ */
+export const isCtrlClick = (event) => {
+  return event.type === "mouseup" && (event.ctrlKey || event.metaKey);
+};

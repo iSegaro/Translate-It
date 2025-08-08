@@ -9,12 +9,15 @@ export class ShortcutManager {
     this.listeners = new Map();
     this.initialized = false;
     this.globalListener = null;
+    this.keyboardStateManager = null;
+    this.ctrlSlashShortcut = null;
   }
 
   /**
    * Initialize the shortcut manager
+   * @param {Object} dependencies - Required dependencies for shortcuts
    */
-  initialize() {
+  async initialize(dependencies = {}) {
     if (this.initialized) {
       console.warn('[ShortcutManager] Already initialized');
       return;
@@ -22,11 +25,21 @@ export class ShortcutManager {
 
     console.log('[ShortcutManager] Initializing shortcut manager');
 
+    // Initialize KeyboardStateManager
+    const { KeyboardStateManager } = await import('../KeyboardStateManager.js');
+    this.keyboardStateManager = new KeyboardStateManager();
+    this.keyboardStateManager.initialize();
+
     // Setup global keyboard listener
     this.setupGlobalListener();
 
     // Register default shortcuts
-    this.registerDefaultShortcuts();
+    await this.registerDefaultShortcuts();
+    
+    // Initialize shortcuts with dependencies
+    if (dependencies.translationHandler && dependencies.featureManager) {
+      this.initializeShortcuts(dependencies);
+    }
     
     this.initialized = true;
     console.log('[ShortcutManager] ✅ Initialized successfully');
@@ -53,11 +66,37 @@ export class ShortcutManager {
   async registerDefaultShortcuts() {
     // Import shortcut handlers
     const { RevertShortcut } = await import('./RevertShortcut.js');
+    const { CtrlSlashShortcut } = await import('./CtrlSlashShortcut.js');
     
     // Register ESC shortcut for revert
     this.registerShortcut('Escape', new RevertShortcut());
     
+    // Register Ctrl+/ shortcut for translation
+    const ctrlSlashShortcut = new CtrlSlashShortcut();
+    this.registerShortcut('Ctrl+/', ctrlSlashShortcut);
+    
+    // Store reference for initialization later
+    this.ctrlSlashShortcut = ctrlSlashShortcut;
+    
     console.log('[ShortcutManager] Default shortcuts registered');
+  }
+
+  /**
+   * Initialize shortcuts with required dependencies
+   * @param {Object} dependencies - Dependencies for shortcuts
+   */
+  initializeShortcuts(dependencies) {
+    // Initialize CtrlSlashShortcut with dependencies
+    if (this.ctrlSlashShortcut) {
+      this.ctrlSlashShortcut.initialize({
+        translationHandler: dependencies.translationHandler,
+        featureManager: dependencies.featureManager
+      });
+      console.log('[ShortcutManager] CtrlSlashShortcut initialized with dependencies');
+    }
+
+    // Future: Initialize other shortcuts that need dependencies
+    console.log('[ShortcutManager] All shortcuts initialized with dependencies');
   }
 
   /**
@@ -175,6 +214,18 @@ export class ShortcutManager {
     if (this.globalListener) {
       document.removeEventListener('keydown', this.globalListener, { capture: true });
       this.globalListener = null;
+    }
+
+    // Cleanup KeyboardStateManager
+    if (this.keyboardStateManager) {
+      this.keyboardStateManager.cleanup();
+      this.keyboardStateManager = null;
+    }
+
+    // Cleanup individual shortcuts
+    if (this.ctrlSlashShortcut) {
+      this.ctrlSlashShortcut.cleanup();
+      this.ctrlSlashShortcut = null;
     }
 
     // Clear shortcuts

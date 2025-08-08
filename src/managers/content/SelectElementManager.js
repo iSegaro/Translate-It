@@ -25,12 +25,16 @@ export class SelectElementManager {
   constructor() {
     this.isActive = false;
     this.overlayElements = new Set();
-    this.originalTexts = new Map();
     this.currentHighlighted = null;
     this.browser = null;
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
+
+    // Create proper state structure like OLD system
+    this.state = {
+      originalTexts: new Map() // This matches the OLD system structure
+    };
 
     // Service instances
     this.errorHandler = new ErrorHandler();
@@ -48,6 +52,7 @@ export class SelectElementManager {
     this.messageListener = null;
     this.abortController = null;
     this.pendingTranslation = null; // For waiting for TRANSLATION_RESULT_UPDATE
+    this.statusNotification = null; // Track status notification for dismissal (like OLD system)
 
     console.log("[SelectElementManager] Initialized with service integration");
   }
@@ -146,11 +151,19 @@ export class SelectElementManager {
       }
     }
 
-    // Handle TRANSLATION_RESULT_UPDATE messages
+    // Handle TRANSLATION_RESULT_UPDATE messages - check context like OLD system
     if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
       console.log('[SelectElementManager] Received TRANSLATION_RESULT_UPDATE:', message);
-      await this.handleTranslationResult(message);
-      return true;
+      console.log('[SelectElementManager] Message context:', message.context);
+      
+      // Only handle messages for EVENT_HANDLER context (like OLD system)  
+      if (message.context === MessagingContexts.EVENT_HANDLER) {
+        await this.handleTranslationResult(message);
+        return true;
+      } else {
+        console.log('[SelectElementManager] Ignoring TRANSLATION_RESULT_UPDATE - wrong context:', message.context);
+        return false;
+      }
     }
 
     return false; // Let other handlers process the message
@@ -431,10 +444,9 @@ export class SelectElementManager {
     console.log("[SelectElementManager] Element selected:", element);
 
     try {
-      // Extract text from element
-      const extractedText = this.extractTextFromElement(element);
-
-      if (!extractedText || extractedText.trim().length === 0) {
+      // Quick check if element has text before expensive processing
+      const quickText = this.extractTextFromElement(element);
+      if (!quickText || quickText.trim().length === 0) {
         console.log("[SelectElementManager] No text found in selected element");
         await this.showNoTextNotification();
         this.isProcessingClick = false;
@@ -442,16 +454,16 @@ export class SelectElementManager {
       }
 
       console.log(
-        "[SelectElementManager] Text extracted:",
-        extractedText.substring(0, 100) + "..."
+        "[SelectElementManager] Text found:",
+        quickText.substring(0, 100) + "..."
       );
 
       // Deactivate mode immediately after element selection (before translation)
       await this.deactivate();
 
-      // Send extracted text to background for translation (in background)
+      // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
-      this.processSelectedElement(element, extractedText).catch(error => {
+      this.processSelectedElement(element).catch(error => {
         console.error("[SelectElementManager] Background translation failed:", error);
       });
     } catch (error) {
@@ -525,7 +537,7 @@ export class SelectElementManager {
   }
 
   /**
-   * Highlight element - relies on CSS :hover effects
+   * Highlight element - uses OLD system CSS only (no extra classes)
    */
   highlightElement(element) {
     console.log(
@@ -534,39 +546,19 @@ export class SelectElementManager {
       element.className
     );
 
-    // The CSS class is applied globally, so :hover effects work automatically
-    // Just track the current element for mouseout handling
+    // Just track the current element - CSS :hover effects handle the visual feedback
+    // This matches the OLD system behavior exactly
     this.currentHighlighted = element;
 
-    // Optional: Add explicit highlighting class for additional feedback
-    if (
-      element &&
-      !element.classList.contains("translate-it-element-highlighted")
-    ) {
-      element.classList.add("translate-it-element-highlighted");
-      console.log(
-        "[SelectElementManager] Added highlight class to:",
-        element.tagName
-      );
-    }
+    // No additional CSS classes needed - the OLD disable_links.css handles everything
   }
 
   /**
    * Clear current highlight
    */
   clearHighlight() {
-    // Remove explicit highlighting class if present
-    if (this.currentHighlighted) {
-      this.currentHighlighted.classList.remove(
-        "translate-it-element-highlighted"
-      );
-      console.log(
-        "[SelectElementManager] Removed highlight class from:",
-        this.currentHighlighted.tagName
-      );
-    }
-
-    // Clear current element tracking
+    // Just clear tracking - CSS :hover effects handle the rest automatically
+    // This matches the OLD system behavior exactly
     this.currentHighlighted = null;
   }
 
@@ -625,7 +617,7 @@ export class SelectElementManager {
    * Process selected element using complete advanced text extraction system
    * Follows the exact same process as OLD handleSelect_ElementClick method
    */
-  async processSelectedElement(element, text) {
+  async processSelectedElement(element) {
     console.log(
       "[SelectElementManager] Starting advanced text extraction process"
     );
@@ -647,6 +639,12 @@ export class SelectElementManager {
           "[SelectElementManager] Processing input/textarea with simple translation"
         );
 
+        const inputText = element.value;
+        if (!inputText.trim()) {
+          await this.showNoTextNotification();
+          return;
+        }
+
         // Get current provider and language settings
         const {
           getTranslationApiAsync,
@@ -660,7 +658,7 @@ export class SelectElementManager {
 
         // Use UnifiedMessenger translate method
         const response = await this.messenger.translate({
-          text: text,
+          text: inputText,
           provider: provider,
           from: sourceLanguage,
           to: targetLanguage,
@@ -672,7 +670,9 @@ export class SelectElementManager {
             response.translatedText || response.data?.translatedText;
           if (translatedText) {
             const originalText = element.value;
-            this.trackTranslatedElement(element, originalText);
+            // Store in proper state structure for input elements
+            this.state.originalTexts.set(element, originalText);
+            this.translatedElements.add(element);
             element.value = translatedText;
             await this.showSuccessNotification("Translation successful!");
           }
@@ -699,11 +699,8 @@ export class SelectElementManager {
       if (!textsToTranslate.length && cachedTranslations.size) {
         console.log("[SelectElementManager] Using only cached translations");
         const context = {
-          state: {
-            originalTexts: this.originalTexts
-          },
-          translatedElements: this.translatedElements,
-          errorHandler: this.errorHandler,
+          state: this.state,  // Use proper state structure
+          IconManager: null,  // Vue system doesn't use IconManager
         };
         applyTranslationsToNodes(textNodes, cachedTranslations, context);
         await this.showSuccessNotification("Translation loaded from cache");
@@ -719,6 +716,9 @@ export class SelectElementManager {
         return { status: "skip", reason: "no_new_texts" };
       }
 
+      // 3) Show status notification (like OLD system)
+      await this.showStatusNotification("در حال ترجمه…");
+
       // 3) Expand texts for translation (same as OLD)
       const { expandedTexts, originMapping } =
         expandTextsForTranslation(textsToTranslate);
@@ -729,7 +729,7 @@ export class SelectElementManager {
       );
 
       if (jsonPayload.length > 20_000) {
-        const message = `Selected text is too large (${jsonPayload.length} bytes)`;
+        const message = `متن انتخابی بسیار بزرگ است (${jsonPayload.length} بایت)`; // Persian like OLD system
         await this.showErrorNotification(message);
         return { status: "error", reason: "payload_large", message };
       }
@@ -744,32 +744,29 @@ export class SelectElementManager {
       // 5) Setup pending translation BEFORE sending message (to avoid race condition)
       const translationPromise = this.setupTranslationWaiting(messageId);
 
-      // 6) Send translation request to background (using TRANSLATE action)
-      const response = await this.messenger.sendMessage({
-        action: MessageActions.TRANSLATE,
-        context: MessagingContexts.SELECT_ELEMENT,
-        messageId: messageId,
-        data: {
-          text: jsonPayload,
-          provider: await (async () => {
-            const { getTranslationApiAsync } = await import("../../config.js");
-            return await getTranslationApiAsync();
-          })(),
-          sourceLanguage: await (async () => {
-            const { getSourceLanguageAsync } = await import("../../config.js");
-            return await getSourceLanguageAsync();
-          })(),
-          targetLanguage: await (async () => {
-            const { getTargetLanguageAsync } = await import("../../config.js");
-            return await getTargetLanguageAsync();
-          })(),
-          mode: "SelectElement",
-          options: {
-            isSelectElement: true,
-            rawJsonPayload: true,
-          },
-        },
-      });
+      // 6) Send translation request using UnifiedMessenger like OLD system
+      const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
+      const { MessagingContexts } = await import("../../messaging/core/MessagingCore.js");
+      const unifiedMessenger = new UnifiedMessenger(MessagingContexts.EVENT_HANDLER); // Use same context as OLD system
+      
+      const payload = {
+        text: jsonPayload, // Send jsonPayload like OLD system
+        from: 'auto',
+        to: await (async () => {
+          const { getTargetLanguageAsync } = await import("../../config.js");
+          return await getTargetLanguageAsync();
+        })(),
+        provider: await (async () => {
+          const { getTranslationApiAsync } = await import("../../config.js");
+          return await getTranslationApiAsync();
+        })(),
+        messageId: messageId, // Pass messageId like OLD system
+      };
+      
+      console.log("[SelectElementManager] Sending translation request with payload:", JSON.stringify(payload, null, 2));
+      
+      // Send the translation request (this returns acknowledgment, not final result)
+      const response = await unifiedMessenger.translate(payload);
 
       // 7) Handle initial response from background (just acknowledgment)
       if (!response.success) {
@@ -789,30 +786,30 @@ export class SelectElementManager {
       // 8) Wait for TRANSLATION_RESULT_UPDATE message
       const translationResult = await translationPromise;
       
-      if (!translationResult || !translationResult.success) {
-        const msg = translationResult?.error || "Translation result failed";
+      // Handle translation errors like OLD system
+      if (!translationResult || translationResult.error || !translationResult.translatedText) {
+        const msg = translationResult?.error?.message || translationResult?.error || "(⚠️ خطایی در ترجمه رخ داد.)"; // Persian like OLD system
         
         // Handle timeout specifically - less severe than other errors
         if (translationResult?.timeout) {
           console.warn("[SelectElementManager] Translation timeout:", msg);
           await this.showWarningNotification("Translation taking longer than expected. It may complete in background.");
-          // Don't return error - continue with fallback or just log it
           return { status: "timeout", reason: "timeout", message: msg };
         } else {
           console.error("[SelectElementManager] Translation result failed:", msg);
           await this.showErrorNotification(msg);
-          return { status: "error", reason: "translation_failed", message: msg };
+          return { status: "error", reason: "backend_error", message: msg }; // Same error type as OLD system
         }
       }
 
-      // Get translated text from result
-      const translatedJsonString = translationResult.translatedText;
+      // Get translated text from result (handle both formats like OLD system)
+      const translatedJsonString = translationResult?.translatedText || translationResult?.data?.translatedText;
 
-      if (!translatedJsonString || !translatedJsonString.trim()) {
-        const message = "No translation received from API";
+      if (typeof translatedJsonString !== "string" || !translatedJsonString.trim()) {
+        const message = "(⚠️ ترجمه‌ای دریافت نشد.)"; // Persian like OLD system
         console.error(
           "[SelectElementManager] Empty translation response:",
-          response
+          translationResult
         );
         await this.showErrorNotification(message);
         return { status: "error", reason: "empty_translation", message };
@@ -822,14 +819,50 @@ export class SelectElementManager {
         "[SelectElementManager] Received translation response, parsing JSON"
       );
 
-      // 7) Parse translation response (same as OLD)
-      const translatedData =
-        parseAndCleanTranslationResponse(translatedJsonString);
+      // 7) Parse translation response - handle both JSON and string formats
+      let translatedData;
+      
+      try {
+        // First try to parse as JSON (expected from OLD system)
+        translatedData = parseAndCleanTranslationResponse(
+          translatedJsonString,
+          this // Pass context like OLD system
+        );
+      } catch (error) {
+        console.log("[SelectElementManager] JSON parsing failed, treating as string response");
+        translatedData = null;
+      }
+
+      // If JSON parsing failed, handle as string response (some providers return string with separators)
+      if (!translatedData || !translatedData.length) {
+        console.log("[SelectElementManager] Converting string response to array format");
+        
+        // Split the string by separator (like "---" or spaces)
+        let parts;
+        if (translatedJsonString.includes('---')) {
+          parts = translatedJsonString.split('---');
+        } else {
+          // Fallback: split by spaces or try to guess
+          parts = translatedJsonString.trim().split(/\s+/);
+        }
+        
+        // Convert to expected format
+        translatedData = parts.map(part => ({ text: part.trim() })).filter(item => item.text);
+        
+        console.log(`[SelectElementManager] Converted ${translatedData.length} parts from string response`);
+      }
 
       if (!translatedData || !translatedData.length) {
-        const message = "Invalid translation response format";
+        const message = "(فرمت پاسخ نامعتبر است.)"; // Persian like OLD system
         await this.showErrorNotification(message);
         return { status: "error", reason: "api_error", message };
+      }
+
+      // 8) Handle length mismatch (same as OLD system)
+      const { handleTranslationLengthMismatch } = await import("../../utils/text/extraction.js");
+      const lengthMatch = handleTranslationLengthMismatch(translatedData, expandedTexts);
+      if (!lengthMatch) {
+        await this.showWarningNotification("(طول پاسخ ناهمخوان؛ مجدداً امتحان کنید.)"); // Persian like OLD system
       }
 
       // 8) Reassemble translations (same as OLD)
@@ -849,14 +882,14 @@ export class SelectElementManager {
 
       // 9) Apply translations to DOM nodes (same as OLD)
       const context = {
-        state: {
-          originalTexts: this.originalTexts
-        },
-        translatedElements: this.translatedElements,
-        errorHandler: this.errorHandler,
+        state: this.state,  // Use proper state structure
+        IconManager: null,  // Vue system doesn't use IconManager
       };
 
       applyTranslationsToNodes(textNodes, allTranslations, context);
+
+      // Dismiss status notification on success (like OLD system)
+      await this.dismissStatusNotification();
 
       console.log(
         "[SelectElementManager] Advanced text extraction process completed successfully"
@@ -870,6 +903,9 @@ export class SelectElementManager {
         fromCache: cachedTranslations.size,
       };
     } catch (error) {
+      // Dismiss status notification on error (like OLD system)
+      await this.dismissStatusNotification();
+
       console.error(
         "[SelectElementManager] Advanced text extraction process failed:",
         error
@@ -886,6 +922,9 @@ export class SelectElementManager {
         reason: "exception",
         message: error.message,
       };
+    } finally {
+      // Ensure status notification is dismissed in finally block (like OLD system)
+      await this.dismissStatusNotification();
     }
   }
 
@@ -1020,14 +1059,14 @@ export class SelectElementManager {
 
       const context = {
         translatedElements: this.translatedElements,
-        originalTexts: this.originalTexts,
+        originalTexts: this.state.originalTexts,  // Use proper state structure
       };
 
       const successfulReverts = revertAllTranslations(context);
 
       // Also handle simple input/textarea reverts from tracking
       let inputReverts = 0;
-      for (const [element, originalText] of this.originalTexts.entries()) {
+      for (const [element, originalText] of this.state.originalTexts.entries()) {
         if (
           element &&
           (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
@@ -1051,7 +1090,7 @@ export class SelectElementManager {
 
       // Clear tracking sets
       this.translatedElements.clear();
-      this.originalTexts.clear();
+      this.state.originalTexts.clear();
 
       // Show notification
       if (totalReverts > 0) {
@@ -1080,16 +1119,53 @@ export class SelectElementManager {
   }
 
   /**
-   * Add translated element tracking for revert functionality
+   * Show warning notification
    */
-  trackTranslatedElement(element, originalText) {
-    this.translatedElements.add(element);
-    this.originalTexts.set(element, originalText);
+  async showWarningNotification(message) {
+    try {
+      await this.notificationManager.show(message, "warning", true, 4000);
+    } catch (error) {
+      console.warn("[SelectElementManager] Warning:", message);
+    }
+  }
 
-    // Add data attributes for revert tracking
-    if (element.nodeType === Node.ELEMENT_NODE) {
-      element.setAttribute("data-translate-it-original-text", originalText);
-      element.setAttribute("data-translate-it-translated", "true");
+  /**
+   * Show status notification (persistent - like OLD system)
+   * Returns a promise that resolves to the notification node for dismissal
+   */
+  async showStatusNotification(message) {
+    try {
+      // Get i18n string like OLD system
+      const { getTranslationString } = await import("../../utils/i18n/i18n.js");
+      const statusMessage = (await getTranslationString("STATUS_TRANSLATING_SELECT_ELEMENT")) || message;
+      
+      // Create persistent notification (false = not auto-dismiss)
+      this.statusNotification = this.notificationManager.show(statusMessage, "status", false);
+      console.log("[SelectElementManager] Status notification created:", statusMessage);
+      return this.statusNotification;
+    } catch (error) {
+      console.log("[SelectElementManager] Status:", message);
+      return null;
+    }
+  }
+
+  /**
+   * Dismiss status notification (like OLD system)
+   */
+  async dismissStatusNotification() {
+    if (this.statusNotification) {
+      console.log("[SelectElementManager] Dismissing status notification");
+      try {
+        // statusNotification is a Promise, need to await it first (like OLD system)
+        const notifNode = await this.statusNotification;
+        if (notifNode) {
+          this.notificationManager.dismiss(notifNode);
+        }
+      } catch (error) {
+        console.warn("[SelectElementManager] Error dismissing status notification:", error);
+      } finally {
+        this.statusNotification = null;
+      }
     }
   }
 
@@ -1113,7 +1189,7 @@ export class SelectElementManager {
     }
 
     this.overlayElements.clear();
-    this.originalTexts.clear();
+    this.state.originalTexts.clear();
     this.translatedElements.clear();
     this.currentHighlighted = null;
   }
