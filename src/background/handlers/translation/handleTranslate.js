@@ -2,6 +2,7 @@ import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import browser from 'webextension-polyfill';
 
 const errorHandler = new ErrorHandler();
 
@@ -71,12 +72,14 @@ export async function handleTranslate(message, sender) {
       throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
     }
 
-    console.log('[Handler:TRANSLATE] Translation successful:', JSON.stringify(result, null, 2));
+    console.log('[Handler:TRANSLATE] Translation result:', JSON.stringify(result, null, 2));
 
-    // Send TRANSLATION_RESULT_UPDATE for all contexts due to Firefox MV3 issues
+    // Send TRANSLATION_RESULT_UPDATE for ALL cases (success AND error) due to Firefox MV3 issues
+    const targetTabId = sender.tab?.id;
+    let updateMessage;
+
     if (result.success && result.translatedText) {
-      const targetTabId = sender.tab?.id;
-
+      // SUCCESS case - send translation result
       let finalTranslatedText = result.translatedText;
       // If the original message was a raw JSON payload for SelectElement mode,
       // re-wrap the translated text into a JSON array format for the content script
@@ -86,10 +89,11 @@ export async function handleTranslate(message, sender) {
         console.log('[Handler:TRANSLATE] Re-wrapped translated text for SelectElement mode:', finalTranslatedText);
       }
 
-      const updateMessage = MessageFormat.create(
+      updateMessage = MessageFormat.create(
         MessageActions.TRANSLATION_RESULT_UPDATE,
         {
-          translatedText: finalTranslatedText, // Use the re-wrapped text
+          success: true,
+          translatedText: finalTranslatedText,
           originalText: result.originalText,
           provider: result.provider,
           sourceLanguage: result.sourceLanguage,
@@ -100,18 +104,38 @@ export async function handleTranslate(message, sender) {
         message.context, // Use original message context
         { messageId: message.messageId } // Use original messageId for correlation
       );
+    } else {
+      // ERROR case - send error information
+      console.log('[Handler:TRANSLATE] Translation failed, sending error update:', result.error);
+      
+      updateMessage = MessageFormat.create(
+        MessageActions.TRANSLATION_RESULT_UPDATE,
+        {
+          success: false,
+          error: result.error,
+          originalText: normalizedMessage.data.text,
+          provider: normalizedMessage.data.provider,
+          sourceLanguage: normalizedMessage.data.sourceLanguage,
+          targetLanguage: normalizedMessage.data.targetLanguage,
+          timestamp: Date.now(),
+          mode: normalizedMessage.data.mode || normalizedMessage.data.translationMode
+        },
+        message.context, // Use original message context
+        { messageId: message.messageId } // Use original messageId for correlation
+      );
+    }
 
-      if (targetTabId) {
-        console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, updateMessage);
-        browser.tabs.sendMessage(targetTabId, updateMessage).catch(error => {
-          console.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
-        });
-      } else {
-        console.warn("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
-        browser.runtime.sendMessage(updateMessage).catch(error => {
-          console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
-        });
-      }
+    // Send the update message (for both success and error cases)
+    if (targetTabId) {
+      console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, updateMessage);
+      browser.tabs.sendMessage(targetTabId, updateMessage).catch(error => {
+        console.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
+      });
+    } else {
+      console.warn("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
+      browser.runtime.sendMessage(updateMessage).catch(error => {
+        console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
+      });
     }
 
     return MessageFormat.createSuccessResponse("Translation request processed in background.", message.messageId);
