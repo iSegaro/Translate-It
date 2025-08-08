@@ -235,13 +235,152 @@ export class TranslationEngine {
       );
     }
 
-    // Execute translation
-    const result = await providerInstance.translate(
-      text,
-      sourceLanguage,
-      targetLanguage,
-      mode,
-    );
+    // Execute translation (attempt bulk JSON-mode first)
+    let result;
+    try {
+      result = await providerInstance.translate(
+        text,
+        sourceLanguage,
+        targetLanguage,
+        mode,
+      );
+    } catch (initialError) {
+      // If provider failed for bulk request, but this is SelectElement JSON
+      // and the provider is marked unreliable for JSON, attempt per-segment
+      // fallback before giving up.
+      const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
+      const providerClass = providerInstance?.constructor;
+      const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
+
+      if (isSelectJson && !providerReliableJson) {
+        console.warn('[TranslationEngine] Bulk translate failed, attempting per-segment fallback:', initialError);
+        // try to parse original JSON
+        let originalJson = null;
+        try {
+          originalJson = JSON.parse(text);
+        } catch (e) {
+          originalJson = null;
+        }
+
+        const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
+        if (expectedLen) {
+          // perform per-segment translations
+          const segments = originalJson.map(item => item.text);
+          const concurrency = 4;
+          const results = new Array(segments.length);
+
+          const translateSegment = async (segText, attempt = 1) => {
+            try {
+              return await providerInstance.translate(segText, sourceLanguage, targetLanguage, mode);
+            } catch (err) {
+              if (attempt < 3) return translateSegment(segText, attempt + 1);
+              return segText;
+            }
+          };
+
+          let idx = 0;
+          const workers = new Array(concurrency).fill(null).map(async () => {
+            while (idx < segments.length) {
+              const cur = idx++;
+              results[cur] = await translateSegment(segments[cur]);
+            }
+          });
+          await Promise.all(workers);
+
+          const merged = originalJson.map((item, i) => ({ ...item, text: (results[i] || '').trim() }));
+          result = JSON.stringify(merged);
+          console.log('[TranslationEngine] Per-segment fallback succeeded after bulk failure for provider', provider);
+        } else {
+          // cannot recover without original JSON structure
+          throw initialError;
+        }
+      } else {
+        // not recoverable here
+        throw initialError;
+      }
+    }
+
+    // If this is SelectElement raw JSON and provider is known unreliable,
+    // attempt to normalize or fallback to per-segment translation.
+    const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
+    const providerClass = providerInstance?.constructor;
+    const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
+
+    if (isSelectJson && !providerReliableJson) {
+      let originalJson = null;
+      try {
+        originalJson = JSON.parse(text);
+      } catch (e) {
+        originalJson = null;
+      }
+
+      const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
+      if (expectedLen) {
+        let rebuilt = null;
+
+        // Try case: provider returned a JSON array matching expected length
+        try {
+          const parsed = JSON.parse(result);
+          if (Array.isArray(parsed) && parsed.length === expectedLen) {
+            rebuilt = result;
+            console.log('[TranslationEngine] Provider returned matching JSON array for SelectElement');
+          } else if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0].text === 'string') {
+            // single-element array containing joined text -> try split
+            const parts = parsed[0].text.split("\n\n---\n\n");
+            if (parts.length === expectedLen) {
+              const merged = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
+              rebuilt = JSON.stringify(merged);
+              console.log('[TranslationEngine] Rebuilt JSON array from single-element provider response');
+            }
+          }
+        } catch (e) {
+          // not JSON or parse failed
+        }
+
+        // Try splitting raw result by delimiter
+        if (!rebuilt && typeof result === 'string') {
+          const parts = result.split("\n\n---\n\n");
+          if (parts.length === expectedLen) {
+            const merged = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
+            rebuilt = JSON.stringify(merged);
+            console.log('[TranslationEngine] Rebuilt JSON array from raw translatedText by splitting delimiter');
+          }
+        }
+
+        // If still not rebuilt, perform per-segment translations as fallback
+        if (!rebuilt) {
+          const segments = originalJson.map(item => item.text);
+          const concurrency = 4;
+          const results = new Array(segments.length);
+
+          const translateSegment = async (segText, attempt = 1) => {
+            try {
+              return await providerInstance.translate(segText, sourceLanguage, targetLanguage, mode);
+            } catch (err) {
+              if (attempt < 3) return translateSegment(segText, attempt + 1);
+              return segText; // fallback to original if retries fail
+            }
+          };
+
+          let idx = 0;
+          const workers = new Array(concurrency).fill(null).map(async () => {
+            while (idx < segments.length) {
+              const cur = idx++;
+              results[cur] = await translateSegment(segments[cur]);
+            }
+          });
+          await Promise.all(workers);
+
+          const merged = originalJson.map((item, i) => ({ ...item, text: (results[i] || '').trim() }));
+          rebuilt = JSON.stringify(merged);
+          console.log('[TranslationEngine] Per-segment fallback used for provider', provider, 'segments', segments.length);
+        }
+
+        if (rebuilt) {
+          result = rebuilt;
+        }
+      }
+    }
 
     const response = {
       success: true,

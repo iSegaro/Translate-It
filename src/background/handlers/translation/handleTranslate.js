@@ -3,6 +3,8 @@ import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
+// Delimiter used by providers (e.g. Bing) for JSON/segment mode
+const TEXT_DELIMITER = "\n\n---\n\n";
 
 const errorHandler = new ErrorHandler();
 
@@ -39,24 +41,11 @@ export async function handleTranslate(message, sender) {
     // The message should already be normalized by EnhancedUnifiedMessenger
     const normalizedMessage = message;
 
-    // Handle SelectElement mode with raw JSON payload
+    // When SelectElement raw JSON payload is present, do NOT pre-parse it here.
+    // The TranslationEngine/provider will detect and handle JSON-mode parsing itself
+    // (this preserves the original payload and allows provider-specific JSON handling).
     if (normalizedMessage.data.mode === 'SelectElement' && normalizedMessage.data.options?.rawJsonPayload) {
-      try {
-        const parsedPayload = JSON.parse(normalizedMessage.data.text);
-        let extractedText = '';
-        if (Array.isArray(parsedPayload)) {
-          extractedText = parsedPayload.map(item => item.text).join('\n');
-        } else if (typeof parsedPayload === 'object' && parsedPayload !== null && parsedPayload.text) {
-          extractedText = parsedPayload.text;
-        } else {
-          throw new Error('Unexpected JSON structure for SelectElement mode.');
-        }
-        normalizedMessage.data.text = extractedText; // Update the message data with plain text
-        console.log('[Handler:TRANSLATE] Parsed SelectElement text:', extractedText);
-      } catch (jsonParseError) {
-        console.error('[Handler:TRANSLATE] Failed to parse SelectElement JSON payload:', jsonParseError);
-        throw new Error(`Failed to parse SelectElement text as JSON: ${jsonParseError.message}`);
-      }
+      console.log('[Handler:TRANSLATE] SelectElement rawJsonPayload detected - leaving data.text as-is for provider handling');
     }
 
     console.log('[Handler:TRANSLATE] Normalized message:', JSON.stringify(normalizedMessage, null, 2));
@@ -84,9 +73,62 @@ export async function handleTranslate(message, sender) {
       // If the original message was a raw JSON payload for SelectElement mode,
       // re-wrap the translated text into a JSON array format for the content script
       if (normalizedMessage.data.mode === 'SelectElement' && normalizedMessage.data.options?.rawJsonPayload) {
-        // Assuming result.translatedText is a single string, wrap it in an array of objects
-        finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
-        console.log('[Handler:TRANSLATE] Re-wrapped translated text for SelectElement mode:', finalTranslatedText);
+        // Try to be resilient with provider outputs in JSON mode:
+        // - Provider may return a JSON array string with one element containing joined translation
+        // - Provider may return a plain joined string
+        // We want to produce a JSON array with the same length as the original JSON payload
+        try {
+          const originalJson = JSON.parse(normalizedMessage.data.text);
+          const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
+
+          // Try parse provider output as JSON array
+          let parsedProviderJson = null;
+          try {
+            parsedProviderJson = JSON.parse(result.translatedText);
+          } catch (e) {
+            parsedProviderJson = null;
+          }
+
+          if (parsedProviderJson && Array.isArray(parsedProviderJson) && expectedLen && parsedProviderJson.length === expectedLen) {
+            finalTranslatedText = result.translatedText; // provider returned matching array
+            console.log('[Handler:TRANSLATE] Provider returned matching JSON array for SelectElement mode');
+          } else {
+            // If provider returned single-element array where its text contains the delimiter,
+            // split it and reconstruct an array
+            if (parsedProviderJson && Array.isArray(parsedProviderJson) && parsedProviderJson.length === 1 && typeof parsedProviderJson[0].text === 'string' && expectedLen) {
+              const candidate = parsedProviderJson[0].text;
+              const parts = candidate.split(TEXT_DELIMITER);
+              if (parts.length === expectedLen) {
+                const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
+                finalTranslatedText = JSON.stringify(rebuilt);
+                console.log('[Handler:TRANSLATE] Rebuilt JSON array from single-element provider response');
+              }
+            }
+
+            // If still not rebuilt, try splitting raw translatedText by delimiter
+            if (!finalTranslatedText) {
+              const raw = result.translatedText;
+              if (typeof raw === 'string' && expectedLen) {
+                const parts = raw.split(TEXT_DELIMITER);
+                if (parts.length === expectedLen) {
+                  const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
+                  finalTranslatedText = JSON.stringify(rebuilt);
+                  console.log('[Handler:TRANSLATE] Rebuilt JSON array from raw translatedText by splitting delimiter');
+                }
+              }
+            }
+
+            // Fallback: if nothing matched, wrap entire translatedText as single element
+            if (!finalTranslatedText) {
+              finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
+              console.log('[Handler:TRANSLATE] Fallback: wrapped provider translatedText into single-element JSON array');
+            }
+          }
+        } catch (err) {
+          // On any error, fallback to wrapping
+          finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
+          console.warn('[Handler:TRANSLATE] Error while normalizing SelectElement provider output, fallback wrap used', err);
+        }
       }
 
       updateMessage = MessageFormat.create(
