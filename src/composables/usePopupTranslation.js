@@ -31,7 +31,7 @@ export function usePopupTranslation() {
   );
 
   // Methods
-  const triggerTranslation = async () => {
+  const triggerTranslation = async (sourceLang = null, targetLang = null) => {
     if (!canTranslate.value) return;
 
     isTranslating.value = true;
@@ -39,11 +39,18 @@ export function usePopupTranslation() {
     translatedText.value = ""; // Clear previous translation
 
     try {
+      // Use provided languages or fallback to settings
+      const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
+      const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
+      
+      console.log("[usePopupTranslation] Translation with languages (received params):", { sourceLang, targetLang });
+      console.log("[usePopupTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
+      
       // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
       await translationService.popupTranslate(
         sourceText.value,
-        settingsStore.settings.SOURCE_LANGUAGE,
-        settingsStore.settings.TARGET_LANGUAGE
+        sourceLanguage,
+        targetLanguage
       );
 
       console.log(

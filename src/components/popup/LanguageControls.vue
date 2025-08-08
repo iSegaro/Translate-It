@@ -23,6 +23,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
@@ -31,7 +32,7 @@ const settingsStore = useSettingsStore()
 
 // State - using computed to sync with settings store
 const sourceLanguage = computed({
-  get: () => settingsStore.settings.SOURCE_LANGUAGE || 'Auto-Detect',
+  get: () => settingsStore.settings.SOURCE_LANGUAGE || AUTO_DETECT_VALUE,
   set: async (value) => {
     try {
       await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
@@ -59,15 +60,23 @@ const handleSwapLanguages = async () => {
     const tempSource = sourceLanguage.value
     const tempTarget = targetLanguage.value
     
+    console.log("[PopupLanguageControls] Current languages before swap:", { tempSource, tempTarget });
+    
     // Check if swap is possible (source is not auto-detect and languages are different)
-    if (tempSource === 'Auto-Detect' || tempSource === tempTarget) {
+    if (tempSource === AUTO_DETECT_VALUE || tempSource === tempTarget) {
+      console.log("[PopupLanguageControls] Cannot swap - invalid language selection");
       return
     }
     
     sourceLanguage.value = tempTarget
     targetLanguage.value = tempSource
     
-    // Emit event to notify other components
+    console.log("[PopupLanguageControls] Languages swapped successfully:", { 
+      from: `${tempSource} → ${tempTarget}`, 
+      to: `${tempTarget} → ${tempSource}` 
+    });
+    
+    // Emit event to notify other components (but NOT to swap text content)
     const event = new CustomEvent('languages-swapped', {
       detail: {
         source: sourceLanguage.value,

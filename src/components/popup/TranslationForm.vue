@@ -88,16 +88,22 @@ const handleTranslate = async () => {
   if (!canTranslate.value) return
   
   try {
+    // Get current language values from settings store
+    const sourceLanguage = settingsStore.settings.SOURCE_LANGUAGE;
+    const targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
+    
+    console.log("[PopupTranslationForm] Translation with languages:", { sourceLanguage, targetLanguage });
+    
     // Store last translation for revert functionality
     lastTranslation.value = {
       source: sourceText.value,
       target: translatedText.value,
-      sourceLanguage: settingsStore.settings.SOURCE_LANGUAGE,
-      targetLanguage: settingsStore.settings.TARGET_LANGUAGE
+      sourceLanguage,
+      targetLanguage
     }
     
-    // Use composable translation function (pass the result ref element)
-    const success = await triggerTranslation(translationResultRef.value?.$refs?.resultRef)
+    // Use composable translation function with current language values
+    const success = await triggerTranslation(sourceLanguage, targetLanguage)
     
     console.log('[PopupTranslationForm] Translation completed:', success)
     
@@ -140,13 +146,9 @@ onMounted(async () => {
     }
   })
   document.addEventListener('languages-swapped', () => {
-    // Could trigger re-translation if text exists
-    if (sourceText.value.trim() && translatedText.value.trim()) {
-      // Swap the text content too
-      const temp = sourceText.value
-      sourceText.value = translatedText.value.replace(/<[^>]*>/g, '')
-      translatedText.value = temp
-    }
+    // Note: We only swap languages, not text content
+    // Text content should remain in their respective fields
+    console.log("[PopupTranslationForm] Languages swapped event received - no text swapping");
   })
   
   // Initialize translation data
