@@ -762,7 +762,7 @@ export class SelectElementManager {
       const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
       const { MessagingContexts } = await import("../../messaging/core/MessagingCore.js");
       const unifiedMessenger = new UnifiedMessenger(MessagingContexts.EVENT_HANDLER); // Use same context as OLD system
-      
+
       const payload = {
         text: jsonPayload, // Send jsonPayload like OLD system
         from: 'auto',
@@ -783,15 +783,25 @@ export class SelectElementManager {
       const response = await unifiedMessenger.translate(payload);
 
       // 7) Handle initial response from background (just acknowledgment)
-      if (!response.success) {
-        const msg = response.error || "Translation request failed";
+      // Some messenger implementations may return `undefined`/`null` for
+      // acknowledgement; treat an explicit negative ack (success===false
+      // or presence of an error) as failure, otherwise proceed to wait
+      // for the final TRANSLATION_RESULT_UPDATE.
+      if (response && (response.success === false || response.error)) {
+        const msg = (response.error || response.message) || "Translation request failed";
         console.error(
           "[SelectElementManager] Translation request failed:",
           msg
         );
         await this.showErrorNotification(msg);
-        // Cancel pending translation
+        // Cancel pending translation and consume its rejection to avoid
+        // an unhandled promise rejection (we created the promise earlier).
         this.cancelPendingTranslation(messageId);
+        try {
+          await translationPromise.catch(() => {});
+        } catch (e) {
+          // swallow - handled above
+        }
         return { status: "error", reason: "backend_error", message: msg };
       }
 
