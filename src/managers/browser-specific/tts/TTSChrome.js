@@ -126,13 +126,13 @@ export class OffscreenTTSManager {
       logger.debug("🔍 Using relative path for offscreen document:", relativePath);
       logger.debug("🔍 Absolute URL for accessibility test:", absoluteUrl);
       
-      // Test if file is accessible using absolute URL
+      // Test if file is accessible using absolute URL (for debugging only)
       try {
         const response = await fetch(absoluteUrl);
         logger.debug("📄 File accessibility test:", response.status, response.statusText);
       } catch (fetchError) {
-        logger.error("❌ File not accessible:", fetchError.message);
-        throw new Error(`Offscreen HTML file not accessible: ${fetchError.message}`);
+        logger.debug("⚠️ File accessibility test failed (might be normal in dev mode):", fetchError.message);
+        // Don't throw error - continue with offscreen creation anyway
       }
       
       // Use relative path for Chrome offscreen API
