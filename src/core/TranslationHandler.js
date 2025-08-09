@@ -157,7 +157,7 @@ export default class TranslationHandler {
         }
       }
 
-      statusNotification = this.notifier.show(
+      statusNotification = await this.notifier.show(
         (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
           "(translating...)",
         "status",
@@ -167,12 +167,16 @@ export default class TranslationHandler {
         ? TranslationMode.SelectElement
         : TranslationMode.Field;
 
+      // Store notification for dismissal after translation completes
+      window.pendingTranslationStatusNode = statusNotification;
+      window.pendingTranslationNotifier = this.notifier;
+      
       //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
         text: params.text,
-        translationHandler: this,
         target: params.target,
         selectionRange: params.selectionRange,
+        tabId: null
       });
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
@@ -200,9 +204,9 @@ export default class TranslationHandler {
 
       throw finalError;
     } finally {
-      if (statusNotification) {
-        this.notifier.dismiss(statusNotification);
-      }
+      // Note: For success case, notification is dismissed in applyTranslationToTextField
+      // Finally block should only clear references without dismissing
+      // because the notification might already be dismissed
     }
   }
 
