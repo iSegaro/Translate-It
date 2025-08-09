@@ -236,17 +236,34 @@ export default class NotificationManager {
   }
 
   dismiss(node) {
-    if (!node || typeof node.remove !== "function" || !node.parentNode) return;
+    logME("[NotificationManager] Attempting to dismiss node:", {
+      hasNode: !!node,
+      hasRemoveFunction: typeof node?.remove === "function",
+      hasParentNode: !!node?.parentNode,
+      nodeType: node?.constructor?.name,
+      nodeId: node?.id,
+      nodeClass: node?.className
+    });
+    
+    if (!node || typeof node.remove !== "function" || !node.parentNode) {
+      logME("[NotificationManager] Cannot dismiss - node invalid or not in DOM");
+      return;
+    }
 
     try {
+      logME("[NotificationManager] Setting opacity to 0");
       node.style.opacity = "0";
       setTimeout(() => {
         try {
           if (node.parentNode) {
+            logME("[NotificationManager] Removing node from DOM");
             node.remove();
+            logME("[NotificationManager] Node successfully removed");
+          } else {
+            logME("[NotificationManager] Node no longer has parentNode");
           }
-        } catch {
-          /* Already removed, which is fine. */
+        } catch (removeError) {
+          logME("[NotificationManager] Error removing node:", removeError);
         }
       }, 500);
     } catch (error) {
