@@ -38,14 +38,142 @@ export const logME = (...args) => {
  * Injects a CSS file into the document's head.
  * @param {string} cssPath - The path to the CSS file from the extension's root.
  */
+// Track injected CSS files globally to prevent duplicates across extension contexts
+window.injectedCSSFiles = window.injectedCSSFiles || new Set();
+
+// Track active extension IDs to detect duplicates  
+window.activeExtensionIds = window.activeExtensionIds || new Set();
+
 export function injectIconStyle(cssPath) {
   try {
-    const link = document.createElement("link");
-    link.href = browser.runtime.getURL(cssPath);
-    link.type = "text/css";
-    link.rel = "stylesheet";
-    (document.head || document.documentElement).appendChild(link);
+    // Log call stack to see who's calling this function
+    logME('[injectIconStyle] Called from:', new Error().stack?.split('\n')[2]?.trim());
+    
+    // Validate browser runtime context first
+    if (!browser || !browser.runtime || typeof browser.runtime.getURL !== 'function') {
+      logME('[injectIconStyle] Browser runtime not available, cannot inject CSS:', cssPath);
+      return;
+    }
+
+    // Check if extension context is still valid (basic sync check)
+    let manifest;
+    try {
+      manifest = browser.runtime.getManifest(); // This will throw if context is invalid
+      if (!manifest || !manifest.version) {
+        throw new Error('Invalid manifest');
+      }
+    } catch (contextError) {
+      logME('[injectIconStyle] Extension context invalid, cannot inject CSS:', cssPath, contextError);
+      return;
+    }
+
+    const cssURL = browser.runtime.getURL(cssPath);
+    
+    // Debug extension ID consistency  
+    const manifestId = manifest.name || 'unknown';
+    const urlExtensionId = cssURL.match(/chrome-extension:\/\/([^\/]+)/)?.[1];
+    logME('[injectIconStyle] Extension info:', {
+      manifestName: manifestId,
+      manifestVersion: manifest.version,
+      cssURL: cssURL,
+      urlExtensionId: urlExtensionId
+    });
+    
+    // Validate URL before using
+    if (!cssURL || cssURL.includes('invalid')) {
+      logME('[injectIconStyle] Invalid extension URL generated:', cssURL);
+      return;
+    }
+
+    // Check if this specific URL has already been injected (by exact URL match)
+    if (window.injectedCSSFiles.has(cssURL)) {
+      logME('[injectIconStyle] CSS already injected, skipping:', cssPath, 'URL:', cssURL);
+      return;
+    }
+
+    // Also check DOM for existing links with same URL (redundant safety check)  
+    if (document.querySelector(`link[href="${cssURL}"]`)) {
+      window.injectedCSSFiles.add(cssURL);
+      logME('[injectIconStyle] CSS link found in DOM, marking as injected:', cssPath);
+      return;
+    }
+
+    // Test if CSS file actually exists before injection
+    const testLink = document.createElement('link');
+    testLink.href = cssURL;
+    testLink.type = 'text/css';
+    testLink.rel = 'stylesheet';
+    testLink.onerror = () => {
+      const extensionId = cssURL.match(/chrome-extension:\/\/([^\/]+)/)?.[1];
+      logME('[injectIconStyle] CSS file not found, trying alternative paths:', cssPath, 'Extension ID:', extensionId);
+      testLink.remove(); // Clean up failed link
+      
+      // Try alternative path first - maybe it's in src/styles/ 
+      if (cssPath === 'styles/icon.css') {
+        const altPath = 'src/styles/icon.css';
+        const altURL = browser.runtime.getURL(altPath);
+        logME('[injectIconStyle] Trying alternative path:', altPath, 'URL:', altURL);
+        
+        const altLink = document.createElement('link');
+        altLink.href = altURL;
+        altLink.type = 'text/css';
+        altLink.rel = 'stylesheet';
+        altLink.onload = () => {
+          window.injectedCSSFiles.add(altURL);
+          logME('[injectIconStyle] Alternative CSS loaded successfully:', altPath);
+        };
+        altLink.onerror = () => {
+          logME('[injectIconStyle] Alternative path also failed, using fallback inline CSS');
+          altLink.remove();
+          injectFallbackCSS();
+        };
+        (document.head || document.documentElement).appendChild(altLink);
+        return;
+      }
+      
+      // If not icon.css or alternative failed, use inline fallback
+      injectFallbackCSS();
+    };
+    
+    function injectFallbackCSS() {
+      if (!document.getElementById('translate-icon-fallback-css')) {
+        const fallbackStyle = document.createElement('style');
+        fallbackStyle.id = 'translate-icon-fallback-css';
+        fallbackStyle.textContent = `
+          .AIWritingCompanion-translation-icon-extension,
+          .translate-icon-fallback {
+            position: absolute !important;
+            display: none !important;
+            background: white !important;
+            border: 1px solid gray !important;
+            border-radius: 4px !important;
+            padding: 2px 5px !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            z-index: 9999999999 !important;
+            pointer-events: auto !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+          }
+          .AIWritingCompanion-translation-icon-extension:hover {
+            background: #f0f0f0 !important;
+          }
+          .fade-in { opacity: 1 !important; }
+          .fade-out { opacity: 0 !important; transition: opacity 0.3s ease !important; }
+        `;
+        (document.head || document.documentElement).appendChild(fallbackStyle);
+        logME('[injectIconStyle] Fallback inline CSS injected for translate icons');
+      }
+    }
+    testLink.onload = () => {
+      window.injectedCSSFiles.add(cssURL);
+      logME('[injectIconStyle] CSS successfully loaded:', cssPath, 'URL:', cssURL);
+    };
+
+    // Add to DOM - let browser handle loading/error
+    (document.head || document.documentElement).appendChild(testLink);
   } catch (error) {
+    logME('[injectIconStyle] Error injecting CSS:', cssPath, error);
     getErrorHandler().handle(error, {
       type: ErrorTypes.UI,
       context: "injectIconStyle",
