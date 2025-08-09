@@ -1,5 +1,6 @@
 // src/managers/IconBehavior.js
 
+import { ErrorHandler } from "../error-management/ErrorService.js";
 import { state } from "../config.js";
 import { detectPlatform } from "../utils/browser/platform.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
@@ -51,7 +52,9 @@ export default function setupIconBehavior(
       const err = new Error(ErrorTypes.CONTEXT);
       err.type = ErrorTypes.CONTEXT;
       err.context = "iconbehavior-click-context";
-      throw err;
+      const handler = ErrorHandler.getInstance();
+      handler.handle(err, { type: ErrorTypes.CONTEXT, context: "iconbehavior-click-context" });
+      return; // Exit the function after handling the error
     }
 
     let statusNode = null;
@@ -72,7 +75,8 @@ export default function setupIconBehavior(
       
       await translateFieldViaSmartHandler({ text, target, tabId: null });
     } catch (err) {
-      logME("[IconBehavior] ", err);
+      const handler = ErrorHandler.getInstance();
+      handler.handle(err, { type: ErrorTypes.UI, context: "IconBehavior-clickHandler" });
       // Dismiss notification on error
       if (statusNode) notifier.dismiss(statusNode);
     } finally {

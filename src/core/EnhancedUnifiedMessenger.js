@@ -4,6 +4,9 @@
  * Provides context-aware messaging with improved error handling and Firefox MV3 compatibility
  */
 
+import { ErrorHandler } from '../error-management/ErrorService.js';
+import { ErrorTypes } from '../error-management/ErrorTypes.js';
+import { matchErrorToType } from '../error-management/ErrorMatcher.js';
 import { UnifiedMessenger } from './UnifiedMessenger.js';
 import browser from 'webextension-polyfill';
 import { isFirefox } from '../utils/browser/compatibility.js';
@@ -115,9 +118,23 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
 
       return response;
     } catch (error) {
-      console.error(`[EnhancedMessenger:${this.context}] ❌ Enhanced message error:`, error);
+      // Determine error type
+      const errorType = matchErrorToType(error.message || error);
       
-      // Add enhanced error information
+      const handler = ErrorHandler.getInstance();
+      await handler.handle(error, { type: errorType, context: `EnhancedMessenger-sendMessage-${this.context}` });
+      
+      // For extension context invalidation errors, return a graceful response instead of throwing
+      if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+        return { 
+          success: false, 
+          error: 'Extension context unavailable',
+          contextInvalidated: true,
+          gracefulFailure: true
+        };
+      }
+      
+      // For other errors, add enhanced error information and throw
       const enhancedError = new Error(error.message);
       enhancedError.context = this.context;
       enhancedError.action = message.action;
@@ -409,9 +426,25 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
 
       return response;
     } catch (error) {
-      console.error(`[EnhancedMessenger:${this.context}] ❌ Tab ${tabId} message error:`, error);
+      // Determine error type
+      const errorType = matchErrorToType(error.message || error);
       
-      // Enhanced error information
+      const handler = ErrorHandler.getInstance();
+      await handler.handle(error, { type: errorType, context: `EnhancedMessenger-sendToTab-${this.context}` });
+      
+      // For connection errors to tabs, return a graceful response instead of throwing
+      if (error.message?.includes('Could not establish connection') || 
+          error.message?.includes('Receiving end does not exist') ||
+          errorType === ErrorTypes.CONTEXT) {
+        return { 
+          success: false, 
+          error: 'Tab connection unavailable',
+          tabUnavailable: true,
+          gracefulFailure: true
+        };
+      }
+      
+      // For other errors, add enhanced error information and throw
       const enhancedError = new Error(error.message);
       enhancedError.context = this.context;
       enhancedError.tabId = tabId;
@@ -464,11 +497,23 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       
       throw lastError;
     } catch (error) {
-      // Firefox-specific error handling
-      if (error.message.includes('Could not establish connection')) {
-        throw new Error(`Firefox: Content script not ready in tab ${tabId} - please reload the page`);
-      } else if (error.message.includes('message port closed')) {
-        throw new Error(`Firefox: Tab ${tabId} connection closed - content script may have been unloaded`);
+      // Determine error type
+      const errorType = matchErrorToType(error.message || error);
+      
+      const handler = ErrorHandler.getInstance();
+      await handler.handle(error, { type: errorType, context: `EnhancedMessenger-sendToTabFirefox-${this.context}` });
+      
+      // For Firefox connection errors to tabs, return a graceful response instead of throwing
+      if (error.message?.includes('Could not establish connection') || 
+          error.message?.includes('message port closed') ||
+          error.message?.includes('Receiving end does not exist') ||
+          errorType === ErrorTypes.CONTEXT) {
+        return { 
+          success: false, 
+          error: 'Tab connection unavailable (Firefox)',
+          tabUnavailable: true,
+          gracefulFailure: true
+        };
       }
       
       throw error;

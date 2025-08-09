@@ -160,6 +160,14 @@ const handleRevertAction = async () => {
     }
     
   } catch (error) {
+    // Handle tab connection errors gracefully
+    if (error.message?.includes('Could not establish connection') || 
+        error.message?.includes('Receiving end does not exist')) {
+      console.log('[SidepanelToolbar] Tab not available for revert - content script may not be loaded')
+      showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
+      return // Exit gracefully without showing error
+    }
+    
     console.error('[SidepanelToolbar] Error reverting action:', error)
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
   }

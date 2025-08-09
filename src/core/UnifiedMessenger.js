@@ -4,6 +4,9 @@
  * Eliminates sendResponse callback issues with webextension-polyfill
  */
 
+import { ErrorHandler } from '../error-management/ErrorService.js';
+import { ErrorTypes } from '../error-management/ErrorTypes.js';
+import { matchErrorToType } from '../error-management/ErrorMatcher.js';
 import browser from "webextension-polyfill";
 import { isFirefox } from "../utils/browser/compatibility.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
@@ -124,10 +127,22 @@ export class UnifiedMessenger {
 
       return response;
     } catch (error) {
-      console.error(
-        `[UnifiedMessenger:${this.context}] ❌ Message error:`,
-        error,
-      );
+      // Determine error type
+      const errorType = matchErrorToType(error.message || error);
+      
+      const handler = ErrorHandler.getInstance();
+      await handler.handle(error, { type: errorType, context: `UnifiedMessenger-sendMessage-${this.context}` });
+      
+      // For extension context invalidation errors, return a graceful response instead of throwing
+      if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+        return { 
+          success: false, 
+          error: 'Extension context unavailable',
+          contextInvalidated: true,
+          gracefulFailure: true
+        };
+      }
+      
       throw error;
     }
   }

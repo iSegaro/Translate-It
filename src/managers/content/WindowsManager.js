@@ -1,5 +1,6 @@
 // src/managers/SelectionWindows.js
 
+import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { logME, isExtensionContextValid } from "../../utils/core/helpers.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
@@ -189,91 +190,96 @@ export default class SelectionWindows {
   }
 
   _createTranslateIcon(selectedText, position) {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
+    try {
+      const selection = window.getSelection();
+      if (selection.rangeCount === 0) return;
 
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
 
-    const topDocument = this._getTopDocument();
-    if (!topDocument?.body) {
-      logME("[SelectionWindows] Cannot access top document body.");
-      return;
-    }
-
-    const hostId = "aiwc-selection-icon-host";
-    let iconHost = topDocument.getElementById(hostId);
-    if (!iconHost) {
-      try {
-        iconHost = topDocument.createElement("div");
-        iconHost.id = hostId;
-        topDocument.body.appendChild(iconHost);
-      } catch (e) {
-        logME("[SelectionWindows] Failed to create icon host container.", e);
+      const topDocument = this._getTopDocument();
+      if (!topDocument?.body) {
+        logME("[SelectionWindows] Cannot access top document body.");
         return;
       }
-    }
 
-    this.icon = document.createElement("div");
-    this.icon.id = "translate-it-icon";
-
-    const iconUrl = browser.runtime.getURL("icons/extension_icon_32.png");
-
-    // Calculate position for iframe escape
-    const iconPosition = this._calculateCoordsForTopWindow({
-      x: window.scrollX + rect.left + rect.width / 2 - 12,
-      y: window.scrollY + rect.bottom + 5,
-    });
-
-    // Get top window for positioning
-    const topWindow =
-      topDocument.defaultView || topDocument.parentWindow || window;
-
-    // --- شروع تغییرات برای افزودن انیمیشن ---
-
-    // 1. تعریف استایل‌های اولیه (حالت شروع انیمیشن)
-    Object.assign(this.icon.style, {
-      position: "fixed", // Use fixed for iframe escape
-      zIndex: "2147483647",
-      left: `${iconPosition.x - topWindow.scrollX}px`,
-      top: `${iconPosition.y - topWindow.scrollY}px`,
-      width: "24px",
-      height: "24px",
-      backgroundColor: "#f0f0f0",
-      backgroundImage: `url('${iconUrl}')`,
-      backgroundSize: "16px 16px",
-      backgroundRepeat: "no-repeat",
-      backgroundPosition: "center",
-      borderRadius: "50%",
-      border: "1px solid #ccc",
-      cursor: "pointer",
-      boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-
-      // --- ویژگی‌های انیمیشن ---
-      opacity: "0", // شروع از حالت نامرئی
-      transform: "scale(0.5)", // شروع از اندازه کوچک‌تر
-      transformOrigin: "bottom center", // نقطه شروع بزرگ‌نمایی از پایین و وسط آیکون
-      transition:
-        "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
-    });
-
-    // 2. افزودن آیکون به صفحه (top document's HOST برای iframe escape)
-    iconHost.appendChild(this.icon);
-
-    // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
-    setTimeout(() => {
-      // اطمینان از اینکه آیکون هنوز در صفحه وجود دارد
-      if (this.icon) {
-        this.icon.style.opacity = "1";
-        this.icon.style.transform = "scale(1)";
+      const hostId = "aiwc-selection-icon-host";
+      let iconHost = topDocument.getElementById(hostId);
+      if (!iconHost) {
+        try {
+          iconHost = topDocument.createElement("div");
+          iconHost.id = hostId;
+          topDocument.body.appendChild(iconHost);
+        } catch (e) {
+          logME("[SelectionWindows] Failed to create icon host container.", e);
+          return;
+        }
       }
-    }, 10); // یک تأخیر کوتاه برای اجرای صحیح انیمیشن کافی است
 
-    this.iconClickContext = { text: selectedText, position };
-    this.icon.addEventListener("click", this.onIconClick);
+      this.icon = document.createElement("div");
+      this.icon.id = "translate-it-icon";
 
-    // Add outside click listener for icon dismissal
-    this._addOutsideClickListener();
+      const iconUrl = browser.runtime.getURL("icons/extension_icon_32.png");
+
+      // Calculate position for iframe escape
+      const iconPosition = this._calculateCoordsForTopWindow({
+        x: window.scrollX + rect.left + rect.width / 2 - 12,
+        y: window.scrollY + rect.bottom + 5,
+      });
+
+      // Get top window for positioning
+      const topWindow =
+        topDocument.defaultView || topDocument.parentWindow || window;
+
+      // --- شروع تغییرات برای افزودن انیمیشن ---
+
+      // 1. تعریف استایل‌های اولیه (حالت شروع انیمیشن)
+      Object.assign(this.icon.style, {
+        position: "fixed", // Use fixed for iframe escape
+        zIndex: "2147483647",
+        left: `${iconPosition.x - topWindow.scrollX}px`,
+        top: `${iconPosition.y - topWindow.scrollY}px`,
+        width: "24px",
+        height: "24px",
+        backgroundColor: "#f0f0f0",
+        backgroundImage: `url('${iconUrl}')`,
+        backgroundSize: "16px 16px",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        borderRadius: "50%",
+        border: "1px solid #ccc",
+        cursor: "pointer",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+
+        // --- ویژگی‌های انیمیشن ---
+        opacity: "0", // شروع از حالت نامرئی
+        transform: "scale(0.5)", // شروع از اندازه کوچک‌تر
+        transformOrigin: "bottom center", // نقطه شروع بزرگ‌نمایی از پایین و وسط آیکون
+        transition:
+          "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
+      });
+
+      // 2. افزودن آیکون به صفحه (top document's HOST برای iframe escape)
+      iconHost.appendChild(this.icon);
+
+      // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
+      setTimeout(() => {
+        // اطمینان از اینکه آیکون هنوز در صفحه وجود دارد
+        if (this.icon) {
+          this.icon.style.opacity = "1";
+          this.icon.style.transform = "scale(1)";
+        }
+      }, 10); // یک تأخیر کوتاه برای اجرای صحیح انیمیشن کافی است
+
+      this.iconClickContext = { text: selectedText, position };
+      this.icon.addEventListener("click", this.onIconClick);
+
+      // Add outside click listener for icon dismissal
+      this._addOutsideClickListener();
+    } catch (error) {
+      const handler = new ErrorHandler();
+      handler.handle(error, { type: ErrorTypes.CONTEXT, context: 'SelectionWindows-_createTranslateIcon' });
+    }
   }
 
   onIconClick(e) {

@@ -6,6 +6,8 @@
  * This is the new unified storage system that replaces the old StorageManager
  */
 
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 
 class StorageCore {
@@ -165,7 +167,8 @@ class StorageCore {
       return { ...defaultValues, ...result };
 
     } catch (error) {
-      console.error("[StorageCore] Get operation failed:", error);
+      const handler = ErrorHandler.getInstance();
+      handler.handle(error, { type: ErrorTypes.SERVICE, context: 'StorageCore-get' });
       throw error;
     }
   }

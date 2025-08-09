@@ -170,6 +170,13 @@ const handleRevert = async () => {
     }
     
   } catch (error) {
+    // Handle tab connection errors gracefully
+    if (error.message?.includes('Could not establish connection') || 
+        error.message?.includes('Receiving end does not exist')) {
+      console.log('[PopupHeader] Tab not available for revert - content script may not be loaded')
+      return // Exit gracefully without showing error
+    }
+    
     console.error('[PopupHeader] Error in revert action:', error)
   }
 }

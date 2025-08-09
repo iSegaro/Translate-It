@@ -1,6 +1,8 @@
 // src/utils/browserCompat.js
 // browser compatibility utilities
 
+import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 
 /**
@@ -48,7 +50,8 @@ export async function isFirefox() {
     
     return false;
   } catch (error) {
-    console.error('[browserCompat] Error detecting Firefox:', error);
+    const handler = ErrorHandler.getInstance();
+    handler.handle(error, { type: ErrorTypes.CONTEXT, context: 'browserCompat-isFirefox' });
     return false;
   }
 }

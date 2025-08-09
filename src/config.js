@@ -1,4 +1,6 @@
 // src/config.js
+import { ErrorHandler } from './error-management/ErrorService.js';
+import { ErrorTypes } from './error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 import { storageManager } from '@/storage/core/StorageCore.js';
 
@@ -311,8 +313,8 @@ export const getSettingsAsync = async () => {
     // Combine fetched items with defaults to ensure all keys exist
     return { ...CONFIG, ...items };
   } catch (error) {
-    // Handle error (e.g., log it, return default CONFIG)
-    console.error("Error fetching settings:", error);
+    const handler = ErrorHandler.getInstance();
+    handler.handle(error, { type: ErrorTypes.SERVICE, context: 'config-getSettingsAsync' });
     return { ...CONFIG }; // Use defaults on error
   }
 };
@@ -353,7 +355,8 @@ const getSettingValueAsync = async (key, defaultValue) => {
     const result = await storageManager.get({ [key]: defaultValue });
     return result[key];
   } catch (error) {
-    console.error(`[config.js] Error getting setting '${key}':`, error);
+    const handler = ErrorHandler.getInstance();
+    handler.handle(error, { type: ErrorTypes.SERVICE, context: `config-getSettingValueAsync-${key}` });
     return defaultValue;
   }
 };

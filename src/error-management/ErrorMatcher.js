@@ -211,7 +211,10 @@ export function matchErrorToType(rawOrError = "") {
     msg.includes("extension context") ||
     msg.includes("context invalidated") ||
     msg.includes("not establish") ||
-    msg.includes("not establish connection")
+    msg.includes("not establish connection") ||
+    msg.includes("could not establish connection") ||
+    msg.includes("receiving end does not exist") ||
+    msg.includes("message port closed")
   )
     return ErrorTypes.CONTEXT;
 
