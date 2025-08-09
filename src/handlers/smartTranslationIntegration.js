@@ -117,7 +117,8 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       hasPendingTarget: !!window.pendingTranslationTarget,
       activeElement: document.activeElement?.tagName,
       targetElement: target?.tagName,
-      targetIsEditable: isEditableElement(target)
+      targetIsEditable: isEditableElement(target),
+      translationMode: mode
     });
     
     // Clear pending data after use
@@ -152,14 +153,37 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       });
     }
     
-    if (!target || !isEditableElement(target)) {
+    // For dictionary mode (text selection), we don't need an editable target
+    const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === 'dictionary';
+    const isSelectElementMode = mode === TranslationMode.Select_Element || mode === 'select_element';
+    
+    if (!isDictionaryMode && (!target || !isEditableElement(target))) {
+      logME('[applyTranslationToTextField] Invalid target for non-dictionary mode:', {
+        mode,
+        isDictionaryMode,
+        isSelectElementMode,
+        hasTarget: !!target,
+        targetTag: target?.tagName,
+        isEditable: isEditableElement(target)
+      });
       throw new Error('No valid target element found');
+    }
+    
+    // For dictionary mode, we can proceed without editable target (copy mode)
+    if (isDictionaryMode && (!target || !isEditableElement(target))) {
+      logME('[applyTranslationToTextField] Dictionary mode with non-editable target - using copy mode');
+    }
+    
+    // For dictionary mode, we usually just display in tooltip/popup, not replace text
+    if (isDictionaryMode) {
+      logME('[applyTranslationToTextField] Dictionary mode - translation completed (displayed in UI)');
+      return { applied: true, mode: 'dictionary' };
     }
     
     const isReplaceMode = await determineReplaceMode(mode, platform);
     logME('[applyTranslationToTextField] Replace mode determined:', isReplaceMode, 'Mode:', mode, 'Platform:', platform);
     
-    if (isReplaceMode) {
+    if (isReplaceMode && target && isEditableElement(target)) {
       logME('[applyTranslationToTextField] Calling applyTranslation...');
       const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target);
       logME('[applyTranslationToTextField] applyTranslation result:', wasApplied);
