@@ -486,6 +486,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -495,6 +496,7 @@ const emit = defineEmits(['retranslate', 'copy', 'tts', 'export'])
 
 // Store
 const translationStore = useTranslationStore()
+const { handleError } = useErrorHandler()
 
 // State
 const isLoading = ref(false)
@@ -697,7 +699,7 @@ const copyTranslation = async (item) => {
     emit('copy', item)
     showFeedback('Copied to clipboard!')
   } catch (_err) {
-    console.error('Copy failed:', _err)
+    await handleError(_err, 'translation-history-copy')
     showFeedback('Copy failed', 'error')
   }
 }

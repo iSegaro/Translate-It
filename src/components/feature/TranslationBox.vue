@@ -113,6 +113,7 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useExtensionAPI } from '@/composables/useExtensionAPI'
 import { useLanguages } from '@/composables/useLanguages.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
@@ -136,6 +137,7 @@ const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
 const { sourceLanguages, targetLanguages } = useLanguages()
+const { handleError } = useErrorHandler()
 
 // State
 const sourceTextRef = ref('')
@@ -163,7 +165,7 @@ const copyToClipboard = async () => {
     await navigator.clipboard.writeText(translatedText.value)
     // Show success feedback
   } catch (_error) {
-    console.error('Failed to copy:', _error)
+    await handleError(_error, 'translation-box-copy')
   }
 }
 
@@ -174,7 +176,7 @@ const playTTS = async () => {
       language: toLanguage.value
     })
   } catch (_error) {
-    console.error('TTS error:', _error)
+    await handleError(_error, 'translation-box-tts')
   }
 }
 
@@ -188,7 +190,7 @@ const saveToHistory = async () => {
       provider: settingsStore.selectedProvider
     })
   } catch (_error) {
-    console.error('Failed to save to history:', _error)
+    await handleError(_error, 'translation-box-history')
   }
 }
 

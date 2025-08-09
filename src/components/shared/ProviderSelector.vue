@@ -166,6 +166,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
 import browser from 'webextension-polyfill'
@@ -184,6 +185,7 @@ const emit = defineEmits(['translate', 'provider-change'])
 
 // Stores
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
 
 // State
 const isDropdownOpen = ref(false)
@@ -235,7 +237,7 @@ const selectProvider = async (provider) => {
     emit('provider-change', provider.id)
     isDropdownOpen.value = false
   } catch (error) {
-    console.error('Error changing provider:', error)
+    await handleError(error, 'provider-selector-change')
   }
 }
 

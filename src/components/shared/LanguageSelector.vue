@@ -55,6 +55,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useSettingsStore } from '@/store/core/settings.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 
 // Props
@@ -104,6 +105,7 @@ const emit = defineEmits([
 // Composables
 const languages = useLanguages()
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
 
 // Computed
 const sourceLanguage = computed({
@@ -171,7 +173,7 @@ onMounted(async () => {
       targetLanguage.value = targetLangDisplay || 'English'
     }
   } catch (error) {
-    console.error('[LanguageSelector] Failed to load language settings:', error)
+    await handleError(error, 'language-selector-init')
   }
 })
 </script>

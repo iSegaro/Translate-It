@@ -30,6 +30,7 @@ import { useTranslationStore } from '@/store/modules/translation';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useHistory } from '@/composables/useHistory.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
+import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
 import SidepanelToolbar from './components/SidepanelToolbar.vue';
@@ -38,6 +39,7 @@ import SidepanelToolbar from './components/SidepanelToolbar.vue';
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
 const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 const translationStore = useTranslationStore()
+const { handleError } = useErrorHandler()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
@@ -72,7 +74,6 @@ const handleClearFields = () => {
 // Handle history item selection
 const handleHistoryItemSelect = (item) => {
   // This will be handled by the main content component
-  console.log('[SidepanelLayout] History item selected:', item)
 }
 
 
@@ -83,7 +84,7 @@ const handleSidepanelClick = async (event) => {
     try {
       await deactivateSelectMode()
     } catch (error) {
-      console.error('[SidepanelLayout] Failed to deactivate select element mode:', error)
+      await handleError(error, 'sidepanel-select-deactivate')
     }
   }
 }
@@ -97,7 +98,7 @@ const handleKeyDown = async (event) => {
       event.stopPropagation()
       await deactivateSelectMode()
     } catch (error) {
-      console.error('[SidepanelLayout] Failed to deactivate select element mode on ESC:', error)
+      await handleError(error, 'sidepanel-esc-deactivate')
     }
   }
 }

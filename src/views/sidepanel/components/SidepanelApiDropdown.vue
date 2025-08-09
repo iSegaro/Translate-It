@@ -34,7 +34,10 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useUI } from '@/composables/useUI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import ApiProviderItem from './ApiProviderItem.vue'
+
+const { handleError } = useErrorHandler()
 
 // Props
 const props = defineProps({
@@ -102,7 +105,7 @@ const handleProviderSelect = async (providerId) => {
       console.log(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
     }
   } catch (error) {
-    console.error('[SidepanelApiDropdown] Error selecting provider:', error)
+    await handleError(error, 'sidepanel-api-dropdown-select-provider')
     
     const apiButton = document.getElementById('apiProviderBtn')
     if (apiButton) {
@@ -154,7 +157,7 @@ const loadProviderItems = async () => {
     }
     
     if (availableProviders.value.length === 0) {
-      console.error('[SidepanelApiDropdown] No providers loaded after waiting')
+      await handleError(new Error('No providers loaded after waiting'), 'sidepanel-api-dropdown-no-providers')
       return
     }
     
@@ -164,7 +167,7 @@ const loadProviderItems = async () => {
     await nextTick()
     await renderProviderItems()
   } catch (error) {
-    console.error('[SidepanelApiDropdown] Error loading provider items:', error)
+    await handleError(error, 'sidepanel-api-dropdown-load-items')
   } finally {
     isLoading.value = false
   }
@@ -225,7 +228,7 @@ const initialize = async () => {
     
     console.log('[SidepanelApiDropdown] Component initialized')
   } catch (error) {
-    console.error('[SidepanelApiDropdown] Initialization error:', error)
+    await handleError(error, 'sidepanel-api-dropdown-init')
   }
 }
 

@@ -132,7 +132,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
+
+const { handleError } = useErrorHandler()
 
 const props = defineProps({
   text: {
@@ -240,7 +243,7 @@ const translateText = async () => {
       throw new Error(response.error || 'Translation failed')
     }
   } catch (error) {
-    console.error('Translation error:', error)
+    await handleError(error, 'translation-tooltip-translate')
     hasError.value = true
     errorMessage.value = error.message || 'Translation failed'
   } finally {
@@ -258,7 +261,7 @@ const copyTranslation = async () => {
     // Visual feedback
     showBriefFeedback('Copied!')
   } catch (error) {
-    console.error('Failed to copy:', error)
+    await handleError(error, 'translation-tooltip-copy')
     // Fallback for older browsers
     fallbackCopy(translation.value)
   }
@@ -292,15 +295,15 @@ const playTTS = async () => {
       isPlayingTTS.value = false
     }
     
-    utterance.onerror = () => {
+    utterance.onerror = async () => {
       isPlayingTTS.value = false
-      console.error('TTS error')
+      await handleError(new Error('TTS error'), 'translation-tooltip-tts-error')
     }
     
     speechSynthesis.speak(utterance)
     emit('tts', translation.value)
   } catch (error) {
-    console.error('TTS error:', error)
+    await handleError(error, 'translation-tooltip-tts')
     isPlayingTTS.value = false
   }
 }

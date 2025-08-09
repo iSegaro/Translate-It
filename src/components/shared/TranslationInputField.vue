@@ -54,6 +54,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useClipboard } from '@/composables/useClipboard.js'
 import { useTTSSimple } from '@/composables/useTTSSimple.js'
 import { useSettingsStore } from '@/store/core/settings.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import IconButton from '@/components/shared/IconButton.vue'
@@ -132,6 +133,7 @@ const canPaste = ref(true)
 const clipboard = useClipboard()
 const tts = useTTSSimple()
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
 
 // Computed
 const hasContent = computed(() => props.modelValue.trim().length > 0)
@@ -175,7 +177,7 @@ const handleCopy = async () => {
       console.log('[TranslationInputField] Text copied to clipboard')
     }
   } catch (error) {
-    console.error('[TranslationInputField] Failed to copy text:', error)
+    await handleError(error, 'translation-input-field-copy')
   }
 }
 
@@ -203,7 +205,7 @@ const handlePaste = async () => {
       console.log('[TranslationInputField] Text pasted from clipboard')
     }
   } catch (error) {
-    console.error('[TranslationInputField] Failed to paste text:', error)
+    await handleError(error, 'translation-input-field-paste')
   }
 }
 
@@ -215,7 +217,7 @@ const handleTTS = async () => {
     await tts.speak(props.modelValue, langCode)
     console.log('[TranslationInputField] Playing TTS for text')
   } catch (error) {
-    console.error('[TranslationInputField] Failed to play TTS:', error)
+    await handleError(error, 'translation-input-field-tts')
   }
 }
 

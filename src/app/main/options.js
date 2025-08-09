@@ -5,6 +5,7 @@ import OptionsApp from '@/views/options/OptionsApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
+import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 
 // Import route components (lazy loaded)
 const LanguagesTab = () => import('@/views/options/tabs/LanguagesTab.vue')
@@ -93,29 +94,9 @@ async function initializeApp() {
     // $i18n is automatically provided by the plugin, no manual setup needed
     console.log('✅ i18n global property will be available after plugin installation')
 
-    // Error handling
-    console.log('🛡️ Setting up error handler...')
-    app.config.errorHandler = (err, instance, info) => {
-      console.error('Options Vue Error:', err, info)
-      
-      // Send error to background script for logging (optional, no response expected)
-      try {
-        browser.runtime.sendMessage({
-          source: 'vue-app',
-          action: 'LOG_ERROR',
-          data: {
-            error: err.message,
-            context: 'options',
-            info
-          }
-        }).catch(e => {
-          // Silently ignore if background script doesn't handle this
-          console.debug('Background script did not respond to LOG_ERROR:', e.message)
-        })
-      } catch (e) {
-        console.debug('Failed to send error to background:', e.message)
-      }
-    }
+    // Setup unified error handling
+    console.log('🛡️ Setting up unified error handler...')
+    setupGlobalErrorHandler(app, 'options')
 
     // Mount the app
     console.log('🎯 Mounting Vue app to #app...')

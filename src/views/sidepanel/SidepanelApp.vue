@@ -37,6 +37,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/core/translation'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
@@ -44,6 +45,9 @@ import browser from 'webextension-polyfill'
 // Stores
 const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
+
+// Error handling
+const { handleError } = useErrorHandler()
 
 // State
 const isLoading = ref(true)
@@ -82,7 +86,7 @@ onMounted(async () => {
     browser.runtime.onMessage.addListener(handleMessage);
     
   } catch (error) {
-    console.error('❌ Failed to initialize sidepanel:', error)
+    await handleError(error, 'SidepanelApp-init')
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {

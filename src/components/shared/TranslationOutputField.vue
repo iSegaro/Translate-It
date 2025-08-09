@@ -48,6 +48,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useClipboard } from '@/composables/useClipboard.js'
 import { useTTSSimple } from '@/composables/useTTSSimple.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
@@ -110,6 +111,7 @@ const showFadeIn = ref(false)
 // Composables
 const clipboard = useClipboard()
 const tts = useTTSSimple()
+const { handleError } = useErrorHandler()
 
 // Computed
 const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)
@@ -156,7 +158,7 @@ const handleCopy = async () => {
       console.log('[TranslationOutputField] Result copied to clipboard')
     }
   } catch (error) {
-    console.error('[TranslationOutputField] Failed to copy result:', error)
+    await handleError(error, 'TranslationOutputField-copy')
   }
 }
 
@@ -170,7 +172,7 @@ const handleTTS = async () => {
     await tts.speak(textForTTS, langCode)
     console.log('[TranslationOutputField] Playing TTS for result')
   } catch (error) {
-    console.error('[TranslationOutputField] Failed to play TTS:', error)
+    await handleError(error, 'TranslationOutputField-tts')
   }
 }
 

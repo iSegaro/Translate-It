@@ -102,8 +102,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
 
 const settings = ref({
   extensionEnabled: true,
@@ -116,7 +118,7 @@ const handleSettingChange = async (key, value) => {
   try {
     await settingsStore.updateSetting(key, value)
   } catch (error) {
-    console.error(`Failed to update ${key}:`, error)
+    await handleError(error, `general-settings-update-${key}`)
   }
 }
 

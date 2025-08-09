@@ -297,6 +297,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTTS } from '@/composables/useTTS.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 
 const props = defineProps({
   text: {
@@ -344,6 +345,8 @@ const {
   resetSettings,
   setLanguageFromText
 } = useTTS()
+
+const { handleError } = useErrorHandler()
 
 // Local state
 const showSettings = ref(false)
@@ -452,7 +455,7 @@ const startSpeaking = async () => {
     await speak(props.text, speechOptions)
     emit('play', props.text)
   } catch (err) {
-    console.error('TTS Error:', err)
+    await handleError(err, 'tts-control-speak')
     emit('error', err)
   }
 }
@@ -474,7 +477,7 @@ const testCurrentVoice = async () => {
     const testText = getTestText()
     await testVoice(localSettings.value.voice, testText)
   } catch (err) {
-    console.error('Voice test failed:', err)
+    await handleError(err, 'tts-control-voice-test')
   }
 }
 

@@ -5,6 +5,7 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 import { MessageContexts } from '../../messaging/core/MessagingCore'
+import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -52,27 +53,8 @@ async function initializeApp() {
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = MessageContexts.SIDEPANEL
 
-    // Error handling
-    app.config.errorHandler = (err, instance, info) => {
-      console.error('Sidepanel Vue Error:', err, info)
-      
-      // Send error to background script for logging
-      try {
-        const messenger = MessagingCore.getMessenger(MessageContexts.SIDEPANEL)
-        messenger.sendMessage({
-          action: 'LOG_ERROR',
-          data: {
-            error: err.message,
-            context: 'sidepanel',
-            info
-          }
-        }).catch(e => {
-          console.debug('Background script did not respond to LOG_ERROR:', e.message)
-        })
-      } catch (e) {
-        console.debug('Failed to send error to background:', e.message)
-      }
-    }
+    // Setup unified error handling
+    setupGlobalErrorHandler(app, 'sidepanel')
 
     // Mount the app
     app.mount('#app')

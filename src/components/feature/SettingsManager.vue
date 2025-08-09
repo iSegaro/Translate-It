@@ -470,11 +470,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { storageManager } from '@/storage/core/StorageCore.js'
 
 const { getStorageData, setStorageData } = useExtensionAPI()
+const { handleError } = useErrorHandler()
 
 // State
 const isCreatingBackup = ref(false)
@@ -539,7 +541,7 @@ const createFullBackup = async () => {
 
     showStatus('Full backup created successfully', 'success')
   } catch (error) {
-    console.error('Backup creation failed:', error)
+    await handleError(error, 'settings-manager-full-backup')
     showStatus('Failed to create backup: ' + error.message, 'error')
   } finally {
     isCreatingBackup.value = false
@@ -580,7 +582,7 @@ const createSettingsBackup = async () => {
 
     showStatus('Settings backup created successfully', 'success')
   } catch (error) {
-    console.error('Settings backup failed:', error)
+    await handleError(error, 'settings-manager-settings-backup')
     showStatus('Failed to create settings backup: ' + error.message, 'error')
   } finally {
     isCreatingBackup.value = false
@@ -613,7 +615,7 @@ const createHistoryBackup = async () => {
 
     showStatus('History backup created successfully', 'success')
   } catch (error) {
-    console.error('History backup failed:', error)
+    await handleError(error, 'settings-manager-history-backup')
     showStatus('Failed to create history backup: ' + error.message, 'error')
   } finally {
     isCreatingBackup.value = false
@@ -646,7 +648,7 @@ const handleFileImport = async (event) => {
     
     showStatus('Settings imported successfully', 'success')
   } catch (error) {
-    console.error('Import failed:', error)
+    await handleError(error, 'settings-manager-import')
     showStatus('Failed to import settings: ' + error.message, 'error')
   } finally {
     isImporting.value = false
@@ -735,7 +737,7 @@ const performExport = async (type, name) => {
     downloadFile(jsonContent, filename, 'application/json')
     showStatus(`${name} exported successfully`, 'success')
   } catch (error) {
-    console.error('Export failed:', error)
+    await handleError(error, 'settings-manager-export')
     showStatus(`Failed to export ${name.toLowerCase()}: ` + error.message, 'error')
   } finally {
     isExporting.value = false
@@ -784,7 +786,7 @@ const confirmRestore = async () => {
     await setStorageData(dataToRestore)
     showStatus('Backup restored successfully', 'success')
   } catch (error) {
-    console.error('Restore failed:', error)
+    await handleError(error, 'settings-manager-restore')
     showStatus('Failed to restore backup: ' + error.message, 'error')
   } finally {
     restoringBackup.value = null
@@ -895,7 +897,7 @@ const saveBackup = async (backup) => {
     const recentList = currentList.slice(0, 10)
     await setStorageData({ backup_list: recentList })
   } catch (error) {
-    console.error('Failed to save backup:', error)
+    await handleError(error, 'settings-manager-save-backup')
     throw error
   }
 }
@@ -911,7 +913,7 @@ const removeBackupFromStorage = async (backupId) => {
     const updatedList = currentList.filter(id => id !== backupId)
     await setStorageData({ backup_list: updatedList })
   } catch (error) {
-    console.error('Failed to remove backup:', error)
+    await handleError(error, 'settings-manager-remove-backup')
   }
 }
 
@@ -931,7 +933,7 @@ const loadRecentBackups = async () => {
     
     recentBackups.value = backups
   } catch (error) {
-    console.error('Failed to load backups:', error)
+    await handleError(error, 'settings-manager-load-backups')
   }
 }
 
@@ -942,7 +944,7 @@ const loadSyncSettings = async () => {
       syncSettings.value = { ...syncSettings.value, ...data.sync_settings }
     }
   } catch (error) {
-    console.error('Failed to load sync settings:', error)
+    await handleError(error, 'settings-manager-load-sync')
   }
 }
 

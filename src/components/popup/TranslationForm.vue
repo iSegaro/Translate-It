@@ -46,6 +46,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationOutputField from '@/components/shared/TranslationOutputField.vue'
 
@@ -55,6 +56,7 @@ const settingsStore = useSettingsStore()
 // Composables (lightweight popup version)
 const translation = usePopupTranslation()
 const popupResize = usePopupResize()
+const { handleError } = useErrorHandler()
 
 
 // Refs
@@ -80,12 +82,10 @@ const lastTranslation = ref(null)
 // Reactive language values - these will update when settings change
 const currentSourceLanguage = computed(() => {
   const lang = settingsStore.settings.SOURCE_LANGUAGE
-  console.log('[Debug] Popup currentSourceLanguage computed:', lang)
   return lang
 })
 const currentTargetLanguage = computed(() => {
   const lang = settingsStore.settings.TARGET_LANGUAGE
-  console.log('[Debug] Popup currentTargetLanguage computed:', lang)
   return lang
 })
 
@@ -106,8 +106,6 @@ const handleTranslate = async () => {
     const sourceLanguage = settingsStore.settings.SOURCE_LANGUAGE;
     const targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
     
-    console.log("[PopupTranslationForm] Translation with languages:", { sourceLanguage, targetLanguage });
-    
     // Store last translation for revert functionality
     lastTranslation.value = {
       source: sourceText.value,
@@ -119,10 +117,8 @@ const handleTranslate = async () => {
     // Use composable translation function with current language values
     const success = await triggerTranslation(sourceLanguage, targetLanguage)
     
-    console.log('[PopupTranslationForm] Translation completed:', success)
-    
   } catch (error) {
-    console.error('[PopupTranslationForm] Translation error:', error)
+    await handleError(error, 'popup-translation')
   }
 }
 
@@ -162,7 +158,6 @@ onMounted(async () => {
   document.addEventListener('languages-swapped', () => {
     // Note: We only swap languages, not text content
     // Text content should remain in their respective fields
-    console.log("[PopupTranslationForm] Languages swapped event received - no text swapping");
   })
   
   // Initialize translation data
@@ -179,12 +174,9 @@ watch(translatedText, (newText, oldText) => {
       const outputElement = component?.$el?.querySelector('.result-content') || 
                            document.querySelector('.result-content')
       
-      console.log('[PopupTranslationForm] Output element found:', !!outputElement)
       if (outputElement) {
         // Start resize immediately to synchronize with fade-in animation (600ms)
         popupResize.handleTranslationResult(outputElement)
-      } else {
-        console.warn('[PopupTranslationForm] Could not find .result-content element')
       }
     })
   } else if (!newText && oldText) {

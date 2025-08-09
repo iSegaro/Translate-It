@@ -4,6 +4,7 @@ import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingCore } from '@/messaging/core/MessagingCore.js'
+import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -30,27 +31,8 @@ async function initializeApp() {
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = 'popup'
 
-    // Error handling
-    app.config.errorHandler = (err, instance, info) => {
-      console.error('Popup Vue Error:', err, info)
-      
-      // Send error to background script for logging
-      try {
-        const messenger = MessagingCore.getMessenger('popup')
-        messenger.sendMessage({
-          action: 'LOG_ERROR',
-          data: {
-            error: err.message,
-            context: 'popup',
-            info
-          }
-        }).catch(e => {
-          console.debug('Background script did not respond to LOG_ERROR:', e.message)
-        })
-      } catch (e) {
-        console.debug('Failed to send error to background:', e.message)
-      }
-    }
+    // Setup unified error handling
+    setupGlobalErrorHandler(app, 'popup')
 
     // Mount the app
     app.mount('#app')

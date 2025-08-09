@@ -67,6 +67,7 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
@@ -81,6 +82,7 @@ const {
   toggleSelectElement,
   error: selectElementError
 } = useSelectElementTranslation()
+const { handleError, handleConnectionError } = useErrorHandler()
 const { sendMessage } = useMessaging('popup')
 
 // State
@@ -100,7 +102,7 @@ const handleTranslatePage = async () => {
       window.close()
     }
   } catch (error) {
-    console.error('Error opening translate page:', error)
+    await handleError(error, 'PopupHeader-translatePage')
   }
 }
 
@@ -125,7 +127,7 @@ const handleOpenSidePanel = async () => {
     console.log('[PopupHeader] Side panel open request sent successfully')
     window.close()
   } catch (error) {
-    console.error('Error opening side panel from popup:', error)
+    await handleError(error, 'PopupHeader-sidePanel')
   }
 }
 
@@ -136,7 +138,7 @@ const handleSelectElement = async () => {
     console.log('[PopupHeader] Select element mode toggled successfully')
     window.close()
   } catch (error) {
-    console.error('[PopupHeader] Error toggling select element mode:', error, selectElementError.value)
+    await handleError(error, 'PopupHeader-selectElement')
   }
 }
 
@@ -166,18 +168,18 @@ const handleRevert = async () => {
       console.log(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      console.error('[PopupHeader] ❌ Revert failed:', errorMsg)
+      await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
     }
     
   } catch (error) {
-    // Handle tab connection errors gracefully
-    if (error.message?.includes('Could not establish connection') || 
-        error.message?.includes('Receiving end does not exist')) {
-      console.log('[PopupHeader] Tab not available for revert - content script may not be loaded')
-      return // Exit gracefully without showing error
+    // Check if it's a connection error first
+    const wasConnectionError = await handleConnectionError(error, 'PopupHeader-revert')
+    if (wasConnectionError) {
+      return // Exit gracefully
     }
     
-    console.error('[PopupHeader] Error in revert action:', error)
+    // Handle other errors
+    await handleError(error, 'PopupHeader-revert')
   }
 }
 
@@ -186,7 +188,7 @@ const handleOpenSettings = async () => {
     await browser.runtime.openOptionsPage()
     window.close()
   } catch (error) {
-    console.error('Error opening settings:', error)
+    await handleError(error, 'PopupHeader-openSettings')
   }
 }
 
@@ -207,7 +209,7 @@ const handleExcludeToggle = async () => {
       })
     }
   } catch (error) {
-    console.error('Error toggling exclude status:', error)
+    await handleError(error, 'PopupHeader-excludeToggle')
   }
 }
 
@@ -227,7 +229,7 @@ onMounted(async () => {
       excludeCurrentPage.value = response?.excluded || false
     }
   } catch (error) {
-    console.error('Error getting exclude status:', error)
+    await handleError(error, 'PopupHeader-getExcludeStatus')
   }
 })
 </script>

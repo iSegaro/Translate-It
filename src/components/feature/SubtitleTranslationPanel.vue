@@ -245,12 +245,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 
 const emit = defineEmits(['subtitleDetected', 'translationComplete', 'error'])
 
 // Stores and APIs
 const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
+const { handleError } = useErrorHandler()
 
 // State
 const isConnected = ref(false)
@@ -323,7 +325,7 @@ const toggleConnection = async () => {
       await startSubtitleDetection()
     }
   } catch (err) {
-    console.error('Connection toggle failed:', err)
+    await handleError(err, 'subtitle-translation-connection')
     error.value = err.message
     emit('error', err)
   } finally {
@@ -432,7 +434,7 @@ const translateSubtitle = async (subtitle) => {
     addToHistory(subtitle)
     emit('translationComplete', subtitle)
   } catch (err) {
-    console.error('Subtitle translation failed:', err)
+    await handleError(err, 'subtitle-translation-failed')
     subtitle.translated = `[Translation failed: ${err.message}]`
     error.value = `Translation failed: ${err.message}`
   } finally {
@@ -484,7 +486,7 @@ const copySubtitle = async (subtitle) => {
     await navigator.clipboard.writeText(text)
     showFeedback('Copied to clipboard!')
   } catch (err) {
-    console.error('Copy failed:', err)
+    await handleError(err, 'subtitle-translation-copy')
     showFeedback('Copy failed', 'error')
   }
 }
@@ -500,7 +502,7 @@ const playSubtitle = (subtitle) => {
     
     speechSynthesis.speak(utterance)
   } catch (err) {
-    console.error('TTS failed:', err)
+    await handleError(err, 'subtitle-translation-tts')
     showFeedback('Text-to-speech failed', 'error')
   }
 }

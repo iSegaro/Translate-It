@@ -168,6 +168,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
 import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
 import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
+import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useHistory } from "@/composables/useHistory.js";
@@ -180,6 +181,7 @@ import TranslationOutputField from "@/components/shared/TranslationOutputField.v
 const tts = useTTSSmart();
 const backgroundWarmup = useBackgroundWarmup();
 const selectElement = useSelectElementTranslation();
+const { handleError } = useErrorHandler();
 const { t } = useI18n();
 
 // Translation Composable - SAME AS POPUP
@@ -358,7 +360,7 @@ const handleTranslationSubmit = async () => {
     console.log("[SidepanelMainContent] Translation completed:", success);
     
   } catch (error) {
-    console.error("[SidepanelMainContent] Translation error:", error);
+    await handleError(error, 'SidepanelMainContent-translation');
   }
 };
 
@@ -368,7 +370,7 @@ const copySourceText = async () => {
     await navigator.clipboard.writeText(sourceText.value);
     console.log("[SidepanelMainContent] Source text copied to clipboard");
   } catch (error) {
-    console.error("[SidepanelMainContent] Failed to copy source text:", error);
+    await handleError(error, 'SidepanelMainContent-copySource');
   }
 };
 
@@ -378,7 +380,7 @@ const copyTranslationText = async () => {
     await navigator.clipboard.writeText(translatedText.value);
     console.log("[SidepanelMainContent] Translation copied to clipboard");
   } catch (error) {
-    console.error("[SidepanelMainContent] Failed to copy translation:", error);
+    await handleError(error, 'SidepanelMainContent-copyTranslation');
   }
 };
 
@@ -391,7 +393,7 @@ const pasteSourceText = async () => {
     handleSourceTextInput();
     console.log("[SidepanelMainContent] Text pasted from clipboard");
   } catch (error) {
-    console.error("[SidepanelMainContent] Failed to paste text:", error);
+    await handleError(error, 'SidepanelMainContent-paste');
   }
 };
 
@@ -477,9 +479,7 @@ const handleSwapLanguages = async () => {
     const targetSelect = targetLanguageInputRef.value;
 
     if (!sourceSelect || !targetSelect) {
-      console.error(
-        "[SidepanelMainContent] Language select elements not found",
-      );
+      await handleError(new Error('Language select elements not found'), 'SidepanelMainContent-languageElements');
       return;
     }
 
@@ -517,10 +517,7 @@ const handleSwapLanguages = async () => {
             resolvedSourceCode,
           );
         } catch (err) {
-          console.error(
-            "[SidepanelMainContent] Failed to load source language from settings:",
-            err,
-          );
+          await handleError(err, 'SidepanelMainContent-loadSourceLanguage');
           resolvedSourceCode = null;
         }
       }
@@ -535,10 +532,7 @@ const handleSwapLanguages = async () => {
           resolvedTargetCode,
         );
       } catch (err) {
-        console.error(
-          "[SidepanelMainContent] Failed to load target language from settings:",
-          err,
-        );
+        await handleError(err, 'SidepanelMainContent-loadTargetLanguage');
         resolvedTargetCode = null;
       }
     }
@@ -611,7 +605,7 @@ const handleSwapLanguages = async () => {
       );
     }
   } catch (error) {
-    console.error("[SidepanelMainContent] Error swapping languages:", error);
+    await handleError(error, 'SidepanelMainContent-swapLanguages');
   }
 };
 

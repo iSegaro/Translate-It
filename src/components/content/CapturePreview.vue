@@ -290,7 +290,10 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseModal from '@/components/base/BaseModal.vue'
+
+const { handleError } = useErrorHandler()
 
 const props = defineProps({
   imageData: {
@@ -397,7 +400,7 @@ const callTranslateImage = async () => {
 
     emit('translate', result)
   } catch (err) {
-    console.error('Image translation error:', err)
+    await handleError(err, 'capture-preview-image-translation')
     error.value = {
       message: err.message || 'Translation failed',
       details: err.type || 'Unknown error'
@@ -424,7 +427,7 @@ const analyzeImage = async () => {
       { x: 50, y: 80, width: 150, height: 25, confidence: 0.88 }
     ]
   } catch (err) {
-    console.error('Image analysis error:', err)
+    await handleError(err, 'capture-preview-image-analysis')
     error.value = {
       message: 'Failed to analyze image',
       details: err.message
@@ -478,7 +481,7 @@ const copyResult = async () => {
     await navigator.clipboard.writeText(translationResult.value.text)
     showFeedback('Copied to clipboard!')
   } catch (err) {
-    console.error('Copy failed:', err)
+    await handleError(err, 'capture-preview-copy')
     showFeedback('Copy failed', 'error')
   }
 }
@@ -511,7 +514,7 @@ const playTTS = async () => {
     
     speechSynthesis.speak(utterance)
   } catch (err) {
-    console.error('TTS error:', err)
+    await handleError(err, 'capture-preview-tts')
     isPlayingTTS.value = false
     showFeedback('Speech synthesis failed', 'error')
   }

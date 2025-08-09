@@ -97,8 +97,11 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { languageList } from '@/utils/i18n/languages.js'
 import browser from 'webextension-polyfill'
+
+const { handleError } = useErrorHandler()
 
 // Helper function
 const getLanguageNameByCode = (code) => {
@@ -182,7 +185,7 @@ const handleClearAllHistory = async () => {
       console.log('[SidepanelHistory] All history cleared')
     }
   } catch (error) {
-    console.error('[SidepanelHistory] Error clearing history:', error)
+    await handleError(error, 'sidepanel-history-clear-all')
     const button = document.getElementById('clearAllHistoryBtn')
     showVisualFeedback(button, 'error')
   }
@@ -218,7 +221,7 @@ const handleDeleteHistoryItem = async (index, event) => {
     
     console.log(`[SidepanelHistory] History item ${index} deleted`)
   } catch (error) {
-    console.error('[SidepanelHistory] Error deleting history item:', error)
+    await handleError(error, 'sidepanel-history-delete-item')
     const button = event.target.closest('.delete-btn')
     if (button) {
       showVisualFeedback(button, 'error')
@@ -270,7 +273,7 @@ const initialize = async () => {
     
     console.log('[SidepanelHistory] Component initialized')
   } catch (error) {
-    console.error('[SidepanelHistory] Initialization error:', error)
+    await handleError(error, 'sidepanel-history-init')
   }
 }
 

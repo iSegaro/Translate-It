@@ -23,12 +23,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
 // Stores
 const settingsStore = useSettingsStore()
+const { handleError } = useErrorHandler()
 
 // State - using computed to sync with settings store
 const sourceLanguage = computed({
@@ -37,7 +39,7 @@ const sourceLanguage = computed({
     try {
       await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
     } catch (error) {
-      console.error('Error updating source language:', error)
+      await handleError(error, 'language-controls-source')
     }
   }
 })
@@ -48,7 +50,7 @@ const targetLanguage = computed({
     try {
       await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', value)
     } catch (error) {
-      console.error('Error updating target language:', error)
+      await handleError(error, 'language-controls-target')
     }
   }
 })
@@ -60,21 +62,13 @@ const handleSwapLanguages = async () => {
     const tempSource = sourceLanguage.value
     const tempTarget = targetLanguage.value
     
-    console.log("[PopupLanguageControls] Current languages before swap:", { tempSource, tempTarget });
-    
     // Check if swap is possible (source is not auto-detect and languages are different)
     if (tempSource === AUTO_DETECT_VALUE || tempSource === tempTarget) {
-      console.log("[PopupLanguageControls] Cannot swap - invalid language selection");
       return
     }
     
     sourceLanguage.value = tempTarget
     targetLanguage.value = tempSource
-    
-    console.log("[PopupLanguageControls] Languages swapped successfully:", { 
-      from: `${tempSource} → ${tempTarget}`, 
-      to: `${tempTarget} → ${tempSource}` 
-    });
     
     // Emit event to notify other components (but NOT to swap text content)
     const event = new CustomEvent('languages-swapped', {
@@ -85,7 +79,7 @@ const handleSwapLanguages = async () => {
     })
     document.dispatchEvent(event)
   } catch (error) {
-    console.error('Error swapping languages:', error)
+    await handleError(error, 'language-controls-swap')
   }
 }
 

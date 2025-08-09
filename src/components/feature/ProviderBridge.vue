@@ -121,12 +121,14 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 
 const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
+const { handleError } = useErrorHandler()
 
 // Reactive state
 const showConfigModal = ref(false)
@@ -326,7 +328,7 @@ const saveConfiguration = async () => {
     showConfigModal.value = false
     testResult.value = null
   } catch (error) {
-    console.error('Failed to save configuration:', error)
+    await handleError(error, 'provider-bridge-save-config')
   } finally {
     isSaving.value = false
   }
@@ -344,7 +346,7 @@ const loadConfiguration = async () => {
       modelName.value = response.config.model || ''
     }
   } catch (error) {
-    console.error('Failed to load configuration:', error)
+    await handleError(error, 'provider-bridge-load-config')
   }
 }
 

@@ -81,6 +81,7 @@
 import { useMessaging } from '@/messaging/composables/useMessaging.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useUI } from '@/composables/useUI.js';
+import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { computed, ref } from 'vue';
 import browser from 'webextension-polyfill';
 
@@ -102,6 +103,7 @@ const emit = defineEmits(['historyToggle', 'clear-fields'])
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, toggleSelectElement, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { sendMessage } = useMessaging('sidepanel')
+const { handleError, handleConnectionError } = useErrorHandler()
 
 // Debounce logic
 const isSelectElementDebounced = ref(false)
@@ -126,7 +128,7 @@ const handleSelectElement = async () => {
     }
     showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
   } catch (error) {
-    console.error('[SidepanelToolbar] Error toggling element selection:', error)
+    await handleError(error, 'SidepanelToolbar-selectElement')
     showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
   }
 }
@@ -155,20 +157,20 @@ const handleRevertAction = async () => {
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      console.error('[SidepanelToolbar] ❌ Revert failed:', errorMsg)
+      await handleError(new Error(`Revert failed: ${errorMsg}`), 'sidepanel-toolbar-revert-failed')
       showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
     }
     
   } catch (error) {
-    // Handle tab connection errors gracefully
-    if (error.message?.includes('Could not establish connection') || 
-        error.message?.includes('Receiving end does not exist')) {
-      console.log('[SidepanelToolbar] Tab not available for revert - content script may not be loaded')
+    // Check if it's a connection error first
+    const wasConnectionError = await handleConnectionError(error, 'SidepanelToolbar-revert')
+    if (wasConnectionError) {
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
-      return // Exit gracefully without showing error
+      return // Exit gracefully
     }
     
-    console.error('[SidepanelToolbar] Error reverting action:', error)
+    // Handle other errors
+    await handleError(error, 'SidepanelToolbar-revert')
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
   }
 }
@@ -192,7 +194,7 @@ const handleSettingsClick = async () => {
     await browser.runtime.openOptionsPage();
     showVisualFeedback(document.getElementById('settingsBtn'), 'success')
   } catch (error) {
-    console.error('[SidepanelToolbar] Error opening settings:', error)
+    await handleError(error, 'SidepanelToolbar-openSettings')
     showVisualFeedback(document.getElementById('settingsBtn'), 'error')
   }
 }
