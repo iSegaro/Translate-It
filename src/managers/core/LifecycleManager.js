@@ -19,17 +19,27 @@ class LifecycleManager {
   }
 
   async initialize() {
-    if (this.initialized) return;
+    if (this.initialized) {
+      return;
+    }
+    
     await this.initializebrowserAPI();
+    
     this.notificationManager = new NotificationManager();
     this.notificationManager.initialize();
+
     await this.initializeTranslationEngine();
+
     this.registerMessageHandlers();
+
     await this.initializeErrorHandlers();
+
     await this.preloadFeatures();
+
     await this.refreshContextMenus();
+    
     this.initialized = true;
-    console.log("✅ Background service initialized successfully");
+    console.log("✅ [LifecycleManager] Background service initialized successfully");
   }
 
   /**
@@ -59,20 +69,85 @@ class LifecycleManager {
   }
 
   registerMessageHandlers() {
-    for (const handlerName in Handlers) {
-      if (Object.hasOwnProperty.call(Handlers, handlerName)) {
-        const actionName = handlerName.replace('handle', '').charAt(0).toLowerCase() + handlerName.slice(7);
-        this.messageHandler.registerHandler(actionName, Handlers[handlerName]);
+    console.log('🎯 Registering message handlers...');
+    console.log('Available handlers:', Object.keys(Handlers));
+    
+    // Manual registration for all needed actions to ensure correct mapping
+    const handlerMappings = {
+      // Common handlers
+      'ping': Handlers.handlePing,
+      'openOptionsPage': Handlers.handleOpenOptionsPage,
+      'openURL': Handlers.handleOpenURL,
+      'showOSNotification': Handlers.handleShowOSNotification,
+      'refreshContextMenus': Handlers.handleRefreshContextMenus,
+      'contentScriptWillReload': Handlers.handleContentScriptWillReload,
+      
+      // Lifecycle handlers
+      'contextInvalid': Handlers.handleContextInvalid,
+      'extensionReloaded': Handlers.handleExtensionReloaded,
+      'restartContentScript': Handlers.handleRestartContentScript,
+      'backgroundReloadExtension': Handlers.handleBackgroundReloadExtension,
+      
+      // Translation handlers
+      'TRANSLATE': Handlers.handleTranslate,
+      'translateText': Handlers.handleTranslateText,
+      'revertTranslation': Handlers.handleRevertTranslation,
+      
+      // TTS handlers
+      'TTS_SPEAK': Handlers.handleSpeak,
+      
+      // Element selection handlers
+      'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
+      'deactivateSelectElementMode': Handlers.handleActivateSelectElementMode,
+      'setSelectElementState': Handlers.handleSetSelectElementState,
+      'getSelectElementState': Handlers.handleGetSelectElementState,
+      
+      // Screen capture handlers
+      'startAreaCapture': Handlers.handleStartAreaCapture,
+      'startFullScreenCapture': Handlers.handleStartFullScreenCapture,
+      'requestFullScreenCapture': Handlers.handleRequestFullScreenCapture,
+      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImage,
+      'previewConfirmed': Handlers.handlePreviewConfirmed,
+      'previewCancelled': Handlers.handlePreviewCancelled,
+      'previewRetry': Handlers.handlePreviewRetry,
+      'resultClosed': Handlers.handleResultClosed,
+      'captureError': Handlers.handleCaptureError,
+      'areaSelectionCancel': Handlers.handleAreaSelectionCancel,
+      
+      // Text selection handlers
+      'getSelectedText': Handlers.handleGetSelectedText,
+      
+      // Page exclusion handlers
+      'isCurrentPageExcluded': Handlers.handleIsCurrentPageExcluded,
+      'setExcludeCurrentPage': Handlers.handleSetExcludeCurrentPage,
+      
+      // Sidepanel handlers
+      'openSidePanel': Handlers.handleOpenSidePanel,
+      
+      // Vue integration handlers
+      'translateImage': Handlers.handleTranslateImage,
+      'providerStatus': Handlers.handleProviderStatus,
+      'testProviderConnection': Handlers.handleTestProviderConnection,
+      'saveProviderConfig': Handlers.handleSaveProviderConfig,
+      'getProviderConfig': Handlers.handleGetProviderConfig,
+      'startScreenCapture': Handlers.handleStartScreenCapture,
+      'captureScreenArea': Handlers.handleCaptureScreenArea,
+      'updateContextMenu': Handlers.handleUpdateContextMenu,
+      'getExtensionInfo': Handlers.handleGetExtensionInfo,
+      'logError': Handlers.handleLogError
+    };
+    
+    // Register all handlers with proper action names
+    for (const [actionName, handlerFunction] of Object.entries(handlerMappings)) {
+      if (handlerFunction) {
+        this.messageHandler.registerHandler(actionName, handlerFunction);
+        console.log(`✅ Registered handler: ${actionName}`);
+      } else {
+        console.warn(`⚠️ Handler function not found for action: ${actionName}`);
       }
     }
     
-    // Manual registration for case-sensitive actions
-    this.messageHandler.registerHandler('TRANSLATE', Handlers.handleTranslate);
-    this.messageHandler.registerHandler('TTS_SPEAK', Handlers.handleSpeak);
-    // Ensure element-selection deactivate action routes to the same handler
-    if (Handlers.handleActivateSelectElementMode) {
-      this.messageHandler.registerHandler('deactivateSelectElementMode', Handlers.handleActivateSelectElementMode);
-    }
+    console.log('📊 Handler registration stats:', this.messageHandler.getStats());
   }
 
   /**
