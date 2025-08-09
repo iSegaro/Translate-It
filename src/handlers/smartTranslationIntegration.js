@@ -1,12 +1,27 @@
+import { ErrorHandler } from "../error-management/ErrorService.js";
+import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { logME } from "../utils/core/helpers.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 
 const messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
+
+// Helper function to dismiss pending translation notification
+function dismissPendingTranslationNotification(context = 'unknown') {
+  if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
+    try {
+      window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
+      window.pendingTranslationStatusNode = null;
+      window.pendingTranslationNotifier = null;
+      logME(`[${context}] Status notification dismissed due to context invalidation`);
+    } catch (notifierError) {
+      logME(`[${context}] Failed to dismiss notification:`, notifierError);
+    }
+  }
+}
 
 function hasActiveElementTextSelection() {
   try {
@@ -56,8 +71,16 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     try {
       const pingResult = await messenger.sendMessage({ action: 'ping', data: { test: true } }, 3000);
       logME('[translateFieldViaSmartHandler] Background connection test:', pingResult);
+      
+      // Handle graceful failure response
+      if (pingResult && pingResult.contextInvalidated) {
+        logME('[translateFieldViaSmartHandler] Extension context invalidated, aborting translation');
+        dismissPendingTranslationNotification('translateFieldViaSmartHandler-ping');
+        return; // Exit gracefully without error
+      }
     } catch (pingError) {
-      logME('[translateFieldViaSmartHandler] Background connection FAILED:', pingError);
+      const handler = ErrorHandler.getInstance();
+      handler.handle(pingError, { type: ErrorTypes.NETWORK_ERROR, context: 'smartTranslate-ping' });
       throw new Error('Background script not responding - extension may need reload');
     }
     
@@ -68,23 +91,22 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
     logME('[translateFieldViaSmartHandler] Translation request result:', result);
     
+    // Handle graceful failure response
+    if (result && result.contextInvalidated) {
+      logME('[translateFieldViaSmartHandler] Extension context invalidated during translation, aborting');
+      dismissPendingTranslationNotification('translateFieldViaSmartHandler-translate');
+      return; // Exit gracefully without error
+    }
+    
     // Note: The actual translation result will arrive via TRANSLATION_RESULT_UPDATE message
     // which is handled by ContentMessageHandler and will call applyTranslationToTextField
     
   } catch (err) {
-    logME('[translateFieldViaSmartHandler] Error:', err);
+    const handler = ErrorHandler.getInstance();
+    handler.handle(err, { type: ErrorTypes.SERVICE, context: 'smartTranslate-handler' });
     
     // Dismiss notification on error
-    if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
-      try {
-        window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
-        window.pendingTranslationStatusNode = null;
-        window.pendingTranslationNotifier = null;
-        logME('[translateFieldViaSmartHandler] Status notification dismissed due to error');
-      } catch (notifierError) {
-        logME('[translateFieldViaSmartHandler] Failed to dismiss notification on error:', notifierError);
-      }
-    }
+    dismissPendingTranslationNotification('translateFieldViaSmartHandler-error');
     
     try {
       messenger.sendMessage({ action: 'handleError', data: { error: err, context: 'smartTranslate-handler' } });
