@@ -206,6 +206,17 @@ export class SelectElementManager {
             clearTimeout(this.pendingTranslation.timeoutId);
           }
           
+          // Dismiss status notification
+          if (this.statusNotification) {
+            try {
+              this.notificationManager.dismiss(this.statusNotification);
+              this.statusNotification = null;
+              console.log('[SelectElementManager] Status notification dismissed');
+            } catch (dismissError) {
+              console.warn('[SelectElementManager] Failed to dismiss status notification:', dismissError);
+            }
+          }
+          
           this.pendingTranslation.resolve({
             success: translationData?.success !== false,
             translatedText: translationData?.translatedText,
@@ -303,6 +314,17 @@ export class SelectElementManager {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
           console.warn('[SelectElementManager] Translation timeout after', elapsed + 'ms for messageId:', messageId);
           console.warn('[SelectElementManager] Translation may still complete in background...');
+          
+          // Dismiss status notification on timeout
+          if (this.statusNotification) {
+            try {
+              this.notificationManager.dismiss(this.statusNotification);
+              this.statusNotification = null;
+              console.log('[SelectElementManager] Status notification dismissed due to timeout');
+            } catch (dismissError) {
+              console.warn('[SelectElementManager] Failed to dismiss status notification on timeout:', dismissError);
+            }
+          }
           
           // Don't completely reject - just resolve with timeout error but keep listening
           resolve({
@@ -1469,7 +1491,7 @@ export class SelectElementManager {
       const statusMessage = (await getTranslationString("STATUS_TRANSLATING_SELECT_ELEMENT")) || message;
       
       // Create persistent notification (false = not auto-dismiss)
-      this.statusNotification = this.notificationManager.show(statusMessage, "status", false);
+      this.statusNotification = await this.notificationManager.show(statusMessage, "status", false);
       console.log("[SelectElementManager] Status notification created:", statusMessage);
       return this.statusNotification;
     } catch (error) {

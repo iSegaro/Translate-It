@@ -63,7 +63,24 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
   } catch (err) {
     logME('[translateFieldViaSmartHandler] Error:', err);
-    messenger.sendMessage({ action: 'handleError', data: { error: err, context: 'smartTranslate-handler' } });
+    
+    // Dismiss notification on error
+    if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
+      try {
+        window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
+        window.pendingTranslationStatusNode = null;
+        window.pendingTranslationNotifier = null;
+        logME('[translateFieldViaSmartHandler] Status notification dismissed due to error');
+      } catch (notifierError) {
+        logME('[translateFieldViaSmartHandler] Failed to dismiss notification on error:', notifierError);
+      }
+    }
+    
+    try {
+      messenger.sendMessage({ action: 'handleError', data: { error: err, context: 'smartTranslate-handler' } });
+    } catch (errorSendError) {
+      logME('[translateFieldViaSmartHandler] Failed to send error message:', errorSendError);
+    }
   }
 }
 
