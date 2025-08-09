@@ -120,9 +120,24 @@ export class OffscreenTTSManager {
         return;
       }
 
-      // Create new offscreen document with absolute path
+      // Create new offscreen document with relative path (Chrome requires relative path)
+      const relativePath = "html/offscreen.html";
+      const absoluteUrl = browser.runtime.getURL(relativePath);
+      logger.debug("🔍 Using relative path for offscreen document:", relativePath);
+      logger.debug("🔍 Absolute URL for accessibility test:", absoluteUrl);
+      
+      // Test if file is accessible using absolute URL
+      try {
+        const response = await fetch(absoluteUrl);
+        logger.debug("📄 File accessibility test:", response.status, response.statusText);
+      } catch (fetchError) {
+        logger.error("❌ File not accessible:", fetchError.message);
+        throw new Error(`Offscreen HTML file not accessible: ${fetchError.message}`);
+      }
+      
+      // Use relative path for Chrome offscreen API
       await browser.offscreen.createDocument({
-        url: "html/offscreen.html",
+        url: relativePath,
         reasons: ["AUDIO_PLAYBACK"],
         justification: "TTS audio playback for translation extension",
       });
@@ -148,10 +163,13 @@ export class OffscreenTTSManager {
     } catch (error) {
       logger.error("❌ Failed to create offscreen document:", error);
 
-      // Try alternative approach
+      // Try alternative approach with relative path
       try {
+        const alternativeRelativePath = "html/offscreen.html";
+        logger.debug("🔍 Alternative attempt with relative path:", alternativeRelativePath);
+        
         await browser.offscreen.createDocument({
-          url: chrome.runtime.getURL("html/offscreen.html"),
+          url: alternativeRelativePath,
           reasons: ["AUDIO_PLAYBACK"],
           justification: "TTS audio playback for translation extension",
         });
