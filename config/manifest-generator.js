@@ -35,7 +35,7 @@ export function generateManifest(browser = 'chrome') {
     content_scripts: [
       {
         js: ['src/content-scripts/index.js'],
-        css: ['src/styles/disable_links.css'],
+        css: ['src/styles/disable_links.css', 'src/styles/icon.css'],
         matches: ['<all_urls>'],
         run_at: 'document_idle',
         all_frames: false
@@ -53,6 +53,8 @@ export function generateManifest(browser = 'chrome') {
           'icons/*.png', 
           'icons/*.svg',
           'css/*.css',
+          'styles/*.css',
+          'src/styles/*.css',
           'js/*.js',
           '_locales/*',
           'Changelog.md'
@@ -211,6 +213,8 @@ function generateFirefoxManifest(baseManifest) {
           'icons/*.png',
           'icons/*.svg', 
           'css/*.css',
+          'styles/*.css',
+          'src/styles/*.css',
           'js/*.js',
           '_locales/*',
           'Changelog.md'
