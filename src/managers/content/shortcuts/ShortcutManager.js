@@ -4,6 +4,7 @@
  */
 
 import { createLogger } from '../../../utils/core/logger.js';
+import { KeyboardStateManager } from '../KeyboardStateManager.js';
 
 export class ShortcutManager {
   constructor() {
@@ -27,7 +28,6 @@ export class ShortcutManager {
     }
 
     // Initialize KeyboardStateManager
-    const { KeyboardStateManager } = await import('../KeyboardStateManager.js');
     this.keyboardStateManager = new KeyboardStateManager();
     this.keyboardStateManager.initialize();
 
