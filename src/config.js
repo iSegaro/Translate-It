@@ -326,6 +326,12 @@ export const initializeSettingsListener = async () => {
   logger.debug('[config.js] initializeSettingsListener called - using StorageManager events');
   
   try {
+    // Check if storageManager is available and initialized
+    if (!storageManager || typeof storageManager.on !== 'function') {
+      logger.warn('[config.js] StorageManager not available or not initialized yet');
+      return null;
+    }
+
     // Setup listener through StorageManager event system
     // Note: StorageManager automatically handles caching, no manual cache management needed
     const listener = (data) => {
@@ -340,6 +346,7 @@ export const initializeSettingsListener = async () => {
     return listener; // Return listener for cleanup if needed
   } catch (error) {
     logger.error('[config.js] Failed to setup storage listener:', error);
+    return null;
   }
 };
 
