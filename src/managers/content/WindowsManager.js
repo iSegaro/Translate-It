@@ -446,7 +446,7 @@ export default class SelectionWindows {
       });
       
       // Send translation request
-      const directResultPromise = this.translationService.translate(
+      this.translationService.translate(
         translationMode, 
         {
           promptText: selectedText,
@@ -454,10 +454,13 @@ export default class SelectionWindows {
           targetLanguage: settings.TARGET_LANGUAGE || 'fa',
           messageId: messageId
         }
-      );
+      ).catch(error => {
+        logME(`[SelectionWindows] Translation request failed:`, error);
+        // Don't reject here, let resultPromise handle the timeout
+      });
       
-      // Wait for either direct response or broadcast (whichever comes first)
-      const result = await Promise.race([directResultPromise, resultPromise]);
+      // Wait for broadcast result only (directResult is just acknowledgment)
+      const result = await resultPromise;
       
       // Check if translation was cancelled during async operation
       if (
