@@ -97,7 +97,13 @@ export default class EventCoordinator {
 
       // === TEXT FIELD COORDINATION ===
       if (this.textFieldManager.isEditableElement(event.target)) {
-        await this.coordinateTextFieldHandling(event);
+        if (event.type === 'focus') {
+          await this.coordinateTextFieldFocus(event);
+        } else if (event.type === 'blur') {
+          await this.coordinateTextFieldBlur(event);
+        } else {
+          await this.coordinateTextFieldHandling(event);
+        }
         return;
       }
 
@@ -128,6 +134,38 @@ export default class EventCoordinator {
     } catch (error) {
       logME('[EventCoordinator] Error in text field coordination:', error);
       await this.handleCoordinationError(error, event, 'text-field-coordination');
+    }
+  }
+
+  /**
+   * Coordinate text field focus handling
+   * Delegates to TextFieldManager with error boundary
+   */
+  async coordinateTextFieldFocus(event) {
+    try {
+      const target = event.target;
+      
+      // Delegate to TextFieldManager focus handler
+      return await this.textFieldManager.handleEditableFocus(target);
+    } catch (error) {
+      logME('[EventCoordinator] Error in text field focus coordination:', error);
+      await this.handleCoordinationError(error, event, 'text-field-focus-coordination');
+    }
+  }
+
+  /**
+   * Coordinate text field blur handling
+   * Delegates to TextFieldManager with error boundary
+   */
+  async coordinateTextFieldBlur(event) {
+    try {
+      const target = event.target;
+      
+      // Delegate to TextFieldManager blur handler
+      this.textFieldManager.handleEditableBlur(target);
+    } catch (error) {
+      logME('[EventCoordinator] Error in text field blur coordination:', error);
+      await this.handleCoordinationError(error, event, 'text-field-blur-coordination');
     }
   }
 

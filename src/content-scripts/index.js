@@ -40,6 +40,9 @@ window.selectElementManagerInstance = selectElementManager;
 selectElementManager.initialize();
 contentMessageHandler.initialize();
 
+// Initialize TextFieldManager through EventCoordinator
+eventCoordinator.textFieldManager.initialize();
+
 // Initialize shortcut manager with required dependencies
 shortcutManager.initialize({
   translationHandler: translationHandler,
