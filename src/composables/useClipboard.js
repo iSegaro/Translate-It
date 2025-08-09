@@ -1,6 +1,9 @@
 // src/composables/useClipboard.js
 // Vue composable for clipboard functionality in sidepanel
 import { ref, onMounted, onUnmounted } from "vue";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useClipboard');
 
 export function useClipboard() {
   // State
@@ -18,7 +21,7 @@ export function useClipboard() {
       }
       return true;
     } catch (err) {
-      console.error("Failed to copy text:", err);
+      logger.error("Failed to copy text:", err);
       clipboardError.value = "Failed to copy text";
       if (feedbackCallback) {
         feedbackCallback("error");
@@ -33,7 +36,7 @@ export function useClipboard() {
       const text = await navigator.clipboard.readText();
       return text || "";
     } catch (err) {
-      console.error("Failed to paste text:", err);
+      logger.error("Failed to paste text:", err);
       clipboardError.value = "Failed to read clipboard";
       return "";
     }
@@ -83,7 +86,7 @@ export function useClipboard() {
       }
       return "";
     } catch (err) {
-      console.error("Failed to paste text:", err);
+      logger.error("Failed to paste text:", err);
       if (feedbackCallback) {
         feedbackCallback("error");
       }

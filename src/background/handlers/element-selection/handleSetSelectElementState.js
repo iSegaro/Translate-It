@@ -3,6 +3,9 @@ import { MessageActions } from '@/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
 import { generateBackgroundMessageId } from '@/utils/messaging/messageId.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleSetSelectElementState');
 
 /**
  * Handle setting select element state for a tab
@@ -32,7 +35,7 @@ export async function handleSetSelectElementState(message, sender) {
         });
       } else {
         // Skip sending to originating tab to avoid echoing the request back
-        console.log('[handleSetSelectElementState] Skipping tabs.sendMessage to originating tab to prevent echo', tabId);
+        logger.debug('[handleSetSelectElementState] Skipping tabs.sendMessage to originating tab to prevent echo', tabId);
       }
     } catch (e) {
       // ignore send errors (tab may not have listener)

@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'backup');
 
 export const useBackupStore = defineStore('backup', () => {
   // State
@@ -26,7 +29,7 @@ export const useBackupStore = defineStore('backup', () => {
       
       return { success: true, backup }
     } catch (error) {
-      console.error('Backup creation error:', error)
+      logger.error('Backup creation error:', error)
       throw error
     } finally {
       isCreatingBackup.value = false
@@ -42,11 +45,11 @@ export const useBackupStore = defineStore('backup', () => {
       }
       
       // Mock restore functionality
-      console.log('Restoring backup:', backup)
+      logger.debug('Restoring backup:', backup)
       
       return { success: true, backup }
     } catch (error) {
-      console.error('Backup restore error:', error)
+      logger.error('Backup restore error:', error)
       throw error
     } finally {
       isRestoringBackup.value = false

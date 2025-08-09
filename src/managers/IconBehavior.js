@@ -7,6 +7,7 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isExtensionContextValid, logME } from "../utils/core/helpers.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
+import { createLogger } from "../utils/core/logger.js";
 
 export default function setupIconBehavior(
   icon,
@@ -16,6 +17,9 @@ export default function setupIconBehavior(
   strategies,
 ) {
   if (!icon || !target) return;
+  
+  // Initialize logger for this icon instance
+  const logger = createLogger('UI', 'IconManager');
 
   let isCleanedUp = false;
   let resizeObserver;
@@ -117,12 +121,12 @@ export default function setupIconBehavior(
 
   try {
     if (!(icon instanceof HTMLElement) || !icon.isConnected) {
-      logME("[IconBehavior] Icon is not a valid or connected element.");
+      logger.warn("Icon is not a valid or connected element");
       return;
     }
 
     if (!target.isConnected || !document.contains(target)) {
-      logME("[IconBehavior] Target element is not in the DOM.");
+      logger.warn("Target element is not in the DOM");
       cleanupIcon();
       return;
     }
@@ -140,6 +144,7 @@ export default function setupIconBehavior(
     updatePosition();
 
     state.activeTranslateIcon = icon;
+    logger.init("Icon container created and appended successfully");
   } catch (err) {
     cleanupIcon();
     translationHandler.errorHandler.handle(err, {

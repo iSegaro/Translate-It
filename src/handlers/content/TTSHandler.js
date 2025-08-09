@@ -3,6 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '../../utils/core/logger.js';
 
 /**
  * Content Script TTS Handler
@@ -13,6 +14,7 @@ class ContentTTSHandler {
     this.browser = null;
     this.currentUtterance = null;
     this.initialized = false;
+    this.logger = createLogger('Content', 'TTSHandler');
     this.setupMessageListener();
   }
 
@@ -25,12 +27,9 @@ class ContentTTSHandler {
     try {
       this.browser = browser;
       this.initialized = true;
-      console.log("[ContentTTS] Content script TTS handler initialized");
+      this.logger.init('TTS handler initialized');
     } catch (error) {
-      console.error(
-        "[ContentTTS] Failed to initialize content TTS handler:",
-        error,
-      );
+      this.logger.error('Failed to initialize TTS handler', error);
       throw error;
     }
   }
@@ -51,7 +50,7 @@ class ContentTTSHandler {
         (message, sender, sendResponse) => {
           // Only handle TTS_SPEAK_CONTENT messages that are explicitly targeted for content script
           if (message.action === MessageActions.TTS_SPEAK_CONTENT) {
-            console.log("[ContentTTS] Received TTS speak request:", message);
+            this.logger.debug('Received TTS speak request', message);
             this.handleTTSSpeak(message.data, sendResponse);
             return true; // Keep async channel open
           }
@@ -59,13 +58,9 @@ class ContentTTSHandler {
         },
       );
 
-      console.log(
-        "[ContentTTS] Message listener setup complete (integrated with central routing)",
-      );
+      this.logger.debug('Message listener setup complete');
     } else {
-      console.warn(
-        "[ContentTTS] Chrome runtime not available, TTS fallback disabled",
-      );
+      this.logger.warn('Chrome runtime not available, TTS fallback disabled');
     }
   }
 
@@ -80,7 +75,7 @@ class ContentTTSHandler {
         await this.initialize();
       }
 
-      console.log("[ContentTTS] Processing TTS speak request:", data);
+      this.logger.debug('Processing TTS speak request', data);
 
       if (!data || !data.text || !data.text.trim()) {
         throw new Error("Text to speak cannot be empty");
@@ -115,11 +110,11 @@ class ContentTTSHandler {
 
       // Setup event handlers
       this.currentUtterance.onstart = () => {
-        console.log("[ContentTTS] TTS speech started");
+        this.logger.debug('TTS speech started');
       };
 
       this.currentUtterance.onend = () => {
-        console.log("[ContentTTS] TTS speech ended successfully");
+        this.logger.debug('TTS speech ended successfully');
         this.currentUtterance = null;
         if (!responseAlreadySent) {
           responseAlreadySent = true;
@@ -128,7 +123,7 @@ class ContentTTSHandler {
       };
 
       this.currentUtterance.onerror = (error) => {
-        console.error("[ContentTTS] TTS speech error:", error);
+        this.logger.error('TTS speech error', error);
         this.currentUtterance = null;
         if (!responseAlreadySent) {
           responseAlreadySent = true;
@@ -142,7 +137,7 @@ class ContentTTSHandler {
       // Add timeout as safety measure
       const timeout = setTimeout(() => {
         if (!responseAlreadySent && this.currentUtterance) {
-          console.warn("[ContentTTS] TTS timeout, cancelling speech");
+          this.logger.warn('TTS timeout, cancelling speech');
           speechSynthesis.cancel();
           this.currentUtterance = null;
           responseAlreadySent = true;
@@ -166,9 +161,9 @@ class ContentTTSHandler {
       // Start speech synthesis
       speechSynthesis.speak(this.currentUtterance);
 
-      console.log("[ContentTTS] TTS speech started via Web Speech API");
+      this.logger.debug('TTS speech started via Web Speech API');
     } catch (error) {
-      console.error("[ContentTTS] Failed to handle TTS speak request:", error);
+      this.logger.error('Failed to handle TTS speak request', error);
       sendResponse({
         success: false,
         error: error.message || "Content script TTS handler failed",
@@ -184,10 +179,10 @@ class ContentTTSHandler {
       if (this.currentUtterance) {
         speechSynthesis.cancel();
         this.currentUtterance = null;
-        console.log("[ContentTTS] TTS speech stopped");
+        this.logger.debug('TTS speech stopped');
       }
     } catch (error) {
-      console.warn("[ContentTTS] Error stopping TTS (non-critical):", error);
+      this.logger.warn('Error stopping TTS (non-critical)', error);
     }
   }
 
@@ -220,8 +215,5 @@ export const contentTTSHandler = new ContentTTSHandler();
 
 // Initialize immediately
 contentTTSHandler.initialize().catch((error) => {
-  console.error(
-    "[ContentTTS] Failed to initialize content TTS handler:",
-    error,
-  );
+  contentTTSHandler.logger.error('Failed to initialize content TTS handler', error);
 });

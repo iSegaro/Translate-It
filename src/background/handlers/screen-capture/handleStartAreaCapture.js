@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleStartAreaCapture.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleStartAreaCapture');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleStartAreaCapture(message, sender, sendResponse) {
-  console.log('[Handler:startAreaCapture] Processing area capture start:', message.data);
+  logger.debug('[Handler:startAreaCapture] Processing area capture start:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -36,7 +39,7 @@ export async function handleStartAreaCapture(message, sender, sendResponse) {
       sender
     });
     
-    console.log(`✅ [startAreaCapture] Area capture started for tab ${targetTabId}`);
+    logger.debug(`✅ [startAreaCapture] Area capture started for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

@@ -58,6 +58,9 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import IconButton from '@/components/shared/IconButton.vue'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
 
 // Props
 const props = defineProps({
@@ -174,7 +177,7 @@ const handleCopy = async () => {
   try {
     const success = await clipboard.copyToClipboard(props.modelValue)
     if (success) {
-      console.log('[TranslationInputField] Text copied to clipboard')
+      logger.debug('[TranslationInputField] Text copied to clipboard')
     }
   } catch (error) {
     await handleError(error, 'translation-input-field-copy')
@@ -202,7 +205,7 @@ const handlePaste = async () => {
         emit('translate')
       }
       
-      console.log('[TranslationInputField] Text pasted from clipboard')
+      logger.debug('[TranslationInputField] Text pasted from clipboard')
     }
   } catch (error) {
     await handleError(error, 'translation-input-field-paste')
@@ -215,7 +218,7 @@ const handleTTS = async () => {
   try {
     const langCode = getLanguageCodeForTTS(props.language)
     await tts.speak(props.modelValue, langCode)
-    console.log('[TranslationInputField] Playing TTS for text')
+    logger.debug('[TranslationInputField] Playing TTS for text')
   } catch (error) {
     await handleError(error, 'translation-input-field-tts')
   }
@@ -248,8 +251,7 @@ onMounted(async () => {
       }
     })
   }
-})
-</script>
+})</script>
 
 <style scoped>
 .textarea-container {

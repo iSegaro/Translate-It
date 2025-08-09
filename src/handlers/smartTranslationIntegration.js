@@ -4,10 +4,11 @@ import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { logME } from "../utils/core/helpers.js";
+import { createLogger } from "../utils/core/logger.js";
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 
 const messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
+const logger = createLogger('Translation', 'SmartTranslation');
 
 // Helper function to dismiss pending translation notification
 function dismissPendingTranslationNotification(context = 'unknown') {
@@ -16,9 +17,9 @@ function dismissPendingTranslationNotification(context = 'unknown') {
       window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
       window.pendingTranslationStatusNode = null;
       window.pendingTranslationNotifier = null;
-      logME(`[${context}] Status notification dismissed due to context invalidation`);
+      logger.debug('Status notification dismissed', { context });
     } catch (notifierError) {
-      logME(`[${context}] Failed to dismiss notification:`, notifierError);
+      logger.error('Failed to dismiss notification', { context, error: notifierError });
     }
   }
 }
@@ -40,10 +41,10 @@ function hasActiveElementTextSelection() {
 }
 
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId }) {
-  logME('[translateFieldViaSmartHandler] Called with:', { text, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
+  logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
   
   if (!text) {
-    logME('[translateFieldViaSmartHandler] No text provided, returning');
+    logger.warn('No text provided for translation');
     return;
   }
 
@@ -58,23 +59,19 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     window.pendingTranslationTabId = tabId;
     window.pendingSelectionRange = selectionRange;
     
-    logME('[translateFieldViaSmartHandler] Stored pending data:', {
-      target: target?.tagName,
-      mode,
-      platform
-    });
+    logger.debug('Stored pending translation data', { target: target?.tagName, mode, platform });
     
     // Send translation request - response will be handled by ContentMessageHandler
-    logME('[translateFieldViaSmartHandler] Sending translation request...');
+    logger.debug('Sending translation request to background');
     
     // Test connection first
     try {
       const pingResult = await messenger.sendMessage({ action: 'ping', data: { test: true } }, 3000);
-      logME('[translateFieldViaSmartHandler] Background connection test:', pingResult);
+      logger.debug('Background connection test result', pingResult);
       
       // Handle graceful failure response
       if (pingResult && pingResult.contextInvalidated) {
-        logME('[translateFieldViaSmartHandler] Extension context invalidated, aborting translation');
+        logger.warn('Extension context invalidated during ping, aborting translation');
         dismissPendingTranslationNotification('translateFieldViaSmartHandler-ping');
         return; // Exit gracefully without error
       }
@@ -89,11 +86,11 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       originalText: text 
     });
     
-    logME('[translateFieldViaSmartHandler] Translation request result:', result);
+    logger.debug('Translation request completed', result);
     
     // Handle graceful failure response
     if (result && result.contextInvalidated) {
-      logME('[translateFieldViaSmartHandler] Extension context invalidated during translation, aborting');
+      logger.warn('Extension context invalidated during translation, aborting');
       dismissPendingTranslationNotification('translateFieldViaSmartHandler-translate');
       return; // Exit gracefully without error
     }
@@ -111,7 +108,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     try {
       messenger.sendMessage({ action: 'handleError', data: { error: err, context: 'smartTranslate-handler' } });
     } catch (errorSendError) {
-      logME('[translateFieldViaSmartHandler] Failed to send error message:', errorSendError);
+      logger.error('Failed to send error message to background', errorSendError);
     }
   }
 }
@@ -125,7 +122,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
  * @returns {Promise<Object>} Application result
  */
 export async function applyTranslationToTextField(translatedText, originalText, translationMode) {
-  logME('[applyTranslationToTextField] Applying translation:', { translatedText, originalText, translationMode });
+  logger.info('Applying translation to text field', { translatedLength: translatedText?.length, originalLength: originalText?.length, translationMode });
   
   try {
     // Use stored pending data or fallback to active element
@@ -135,7 +132,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     const selectionRange = window.pendingSelectionRange || null;
     const tabId = window.pendingTranslationTabId || null;
     
-    logME('[applyTranslationToTextField] Target info:', {
+    logger.debug('Target element info', {
       hasPendingTarget: !!window.pendingTranslationTarget,
       activeElement: document.activeElement?.tagName,
       targetElement: target?.tagName,
@@ -153,7 +150,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     // Dismiss the status notification if it exists
     if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
       try {
-        logME('[applyTranslationToTextField] Attempting to dismiss notification:', {
+        logger.debug('Attempting to dismiss notification', {
           statusNode: !!window.pendingTranslationStatusNode,
           notifier: !!window.pendingTranslationNotifier,
           statusNodeType: window.pendingTranslationStatusNode?.constructor.name,
@@ -164,12 +161,12 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
         window.pendingTranslationStatusNode = null;
         window.pendingTranslationNotifier = null;
-        logME('[applyTranslationToTextField] Status notification dismissed successfully');
+        logger.debug('Status notification dismissed successfully');
       } catch (notifierError) {
-        logME('[applyTranslationToTextField] Failed to dismiss notification:', notifierError);
+        logger.error('Failed to dismiss notification', notifierError);
       }
     } else {
-      logME('[applyTranslationToTextField] No notification to dismiss:', {
+      logger.debug('No notification to dismiss', {
         statusNode: !!window.pendingTranslationStatusNode,
         notifier: !!window.pendingTranslationNotifier
       });
@@ -180,7 +177,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     const isSelectElementMode = mode === TranslationMode.Select_Element || mode === 'select_element';
     
     if (!isDictionaryMode && (!target || !isEditableElement(target))) {
-      logME('[applyTranslationToTextField] Invalid target for non-dictionary mode:', {
+      logger.warn('Invalid target for non-dictionary mode', {
         mode,
         isDictionaryMode,
         isSelectElementMode,
@@ -193,31 +190,31 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     
     // For dictionary mode, we can proceed without editable target (copy mode)
     if (isDictionaryMode && (!target || !isEditableElement(target))) {
-      logME('[applyTranslationToTextField] Dictionary mode with non-editable target - using copy mode');
+      logger.debug('Dictionary mode with non-editable target - using copy mode');
     }
     
     // For dictionary mode, we usually just display in tooltip/popup, not replace text
     if (isDictionaryMode) {
-      logME('[applyTranslationToTextField] Dictionary mode - translation completed (displayed in UI)');
+      logger.debug('Dictionary mode translation completed');
       return { applied: true, mode: 'dictionary' };
     }
     
     const isReplaceMode = await determineReplaceMode(mode, platform);
-    logME('[applyTranslationToTextField] Replace mode determined:', isReplaceMode, 'Mode:', mode, 'Platform:', platform);
+    logger.debug('Replace mode determined', { isReplaceMode, mode, platform });
     
     if (isReplaceMode && target && isEditableElement(target)) {
-      logME('[applyTranslationToTextField] Calling applyTranslation...');
+      logger.debug('Calling applyTranslation');
       const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target);
-      logME('[applyTranslationToTextField] applyTranslation result:', wasApplied);
+      logger.debug('applyTranslation completed', { success: wasApplied });
       return { applied: wasApplied, mode: 'replace' };
     } else {
-      logME('[applyTranslationToTextField] Copy mode - copying to clipboard');
+      logger.debug('Copy mode - copying to clipboard');
       await copyToClipboard(translatedText);
       return { applied: true, mode: 'copy' };
     }
     
   } catch (error) {
-    logME('[applyTranslationToTextField] Error:', error);
+    logger.error('Error in applyTranslationToTextField', error);
     throw error;
   }
 }
@@ -238,53 +235,53 @@ function isEditableElement(element) {
 }
 
 async function determineReplaceMode(mode, platform) {
-  logME('[determineReplaceMode] Input:', { mode, platform });
+  logger.debug('Determining replace mode', { mode, platform });
   
   if (mode === TranslationMode.SelectElement) {
-    logME('[determineReplaceMode] SelectElement mode -> true');
+    logger.debug('SelectElement mode detected, using replace mode');
     return true;
   }
 
   const isCopy = await getCOPY_REPLACEAsync();
-  logME('[determineReplaceMode] COPY_REPLACE setting:', isCopy);
+  logger.debug('COPY_REPLACE setting retrieved', { setting: isCopy });
   
   if (isCopy === "replace") {
-    logME('[determineReplaceMode] COPY_REPLACE=replace -> true');
+    logger.debug('COPY_REPLACE set to replace mode');
     return true;
   }
   if (isCopy === "copy") {
-    logME('[determineReplaceMode] COPY_REPLACE=copy -> false');
+    logger.debug('COPY_REPLACE set to copy mode');
     return false;
   }
 
   if (platform !== Platform.Default) {
     const replaceSpecial = await getREPLACE_SPECIAL_SITESAsync();
-    logME('[determineReplaceMode] Special platform, REPLACE_SPECIAL_SITES:', replaceSpecial);
+    logger.debug('Special platform detected', { platform, replaceSpecial });
     return replaceSpecial;
   }
 
   const activeElement = document.activeElement;
   const isComplex = isComplexEditor(activeElement);
   const result = !activeElement || !isComplex;
-  logME('[determineReplaceMode] Default platform, activeElement:', !!activeElement, 'isComplex:', isComplex, 'result:', result);
+  logger.debug('Default platform analysis', { hasActiveElement: !!activeElement, isComplex, result });
   return result;
 }
 
 async function applyTranslation(translatedText, selectionRange, platform, tabId, targetElement = null) {
-  logME('[applyTranslation] Applying translation directly to element:', { platform, tabId });
+  logger.debug('Applying translation directly to element', { platform, tabId });
   
   try {
     // Use provided target element or fallback
     const target = targetElement || window.pendingTranslationTarget || document.activeElement;
     
-    logME('[applyTranslation] Target element info:', {
+    logger.debug('Target element info for translation', {
       providedTarget: !!targetElement,
       targetTag: target?.tagName,
       isEditable: isEditableElement(target)
     });
     
     if (!target || !isEditableElement(target)) {
-      logME('[applyTranslation] No valid target element found');
+      logger.warn('No valid target element found for translation');
       return false;
     }
     
@@ -321,18 +318,18 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
         strategyName = 'DefaultStrategy';
     }
     
-    logME('[applyTranslation] Using strategy:', strategyName, 'for platform:', platform);
+    logger.debug('Translation strategy selected', { strategy: strategyName, platform });
     strategyModule = await import(`../strategies/${strategyName}.js`);
     const strategy = new strategyModule.default();
     
     // Apply translation using the strategy
     const success = await strategy.updateElement(target, translatedText);
-    logME('[applyTranslation] Strategy updateElement result:', success);
+    logger.debug('Translation strategy completed', { success });
     
     return success;
     
   } catch (err) {
-    logME('[applyTranslation] Error:', err);
+    logger.error('Error in applyTranslation', err);
     return false;
   }
 }

@@ -4,6 +4,9 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useTTSSimple');
 
 export function useTTSSimple() {
   const browserAPI = useBrowserAPI();
@@ -16,13 +19,13 @@ export function useTTSSimple() {
    */
   const speak = async (text, lang = "auto") => {
     if (!text || !text.trim()) {
-      console.warn("[useTTSSimple] No text provided for TTS");
+      logger.warn("[useTTSSimple] No text provided for TTS");
       return;
     }
 
     try {
       isPlaying.value = true;
-      console.log("[useTTSSimple] Speaking:", text.substring(0, 50) + "...");
+      logger.debug("[useTTSSimple] Speaking:", text.substring(0, 50) + "...");
 
       // Unified message format for consistency with popup
       await browserAPI.sendMessage({
@@ -36,9 +39,9 @@ export function useTTSSimple() {
         },
       });
 
-      console.log("[useTTSSimple] TTS message sent successfully");
+      logger.debug("[useTTSSimple] TTS message sent successfully");
     } catch (error) {
-      console.error("[useTTSSimple] TTS failed:", error);
+      logger.error("[useTTSSimple] TTS failed:", error);
     } finally {
       // Reset playing state after a delay
       setTimeout(() => {
@@ -56,9 +59,9 @@ export function useTTSSimple() {
         action: "stopTTS",
       });
       isPlaying.value = false;
-      console.log("[useTTSSimple] TTS stopped");
+      logger.debug("[useTTSSimple] TTS stopped");
     } catch (error) {
-      console.error("[useTTSSimple] Failed to stop TTS:", error);
+      logger.error("[useTTSSimple] Failed to stop TTS:", error);
     }
   };
 

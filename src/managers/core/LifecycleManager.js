@@ -5,6 +5,9 @@ import { initializeSettingsListener } from "../../config.js";
 import { TranslationEngine } from "../../background/translation-engine.js";
 import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // This might need to be moved later
 import * as Handlers from "../../background/handlers/index.js"; // This might need to be moved later
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'LifecycleManager');
 
 class LifecycleManager {
   constructor() {
@@ -39,7 +42,7 @@ class LifecycleManager {
     await this.refreshContextMenus();
     
     this.initialized = true;
-    console.log("✅ [LifecycleManager] Background service initialized successfully");
+    logger.debug("✅ [LifecycleManager] Background service initialized successfully");
   }
 
   /**
@@ -48,11 +51,11 @@ class LifecycleManager {
    */
   async preloadFeatures() {
     try {
-      console.log("🚀 Preloading essential features...");
+      logger.debug("🚀 Preloading essential features...");
       const features = await this.featureLoader.preloadEssentialFeatures();
-      console.log("✅ Essential features preloaded:", Object.keys(features));
+      logger.debug("✅ Essential features preloaded:", Object.keys(features));
     } catch (error) {
-      console.error("❌ Failed to preload essential features:", error);
+      logger.error("❌ Failed to preload essential features:", error);
       // Continue initialization even if preloading fails
     }
   }
@@ -69,8 +72,8 @@ class LifecycleManager {
   }
 
   registerMessageHandlers() {
-    console.log('🎯 Registering message handlers...');
-    console.log('Available handlers:', Object.keys(Handlers));
+    logger.debug('🎯 Registering message handlers...');
+    logger.debug('Available handlers:', Object.keys(Handlers));
     
     // Hybrid approach: explicit mapping with validation
     const handlerMappings = {
@@ -143,8 +146,8 @@ class LifecycleManager {
     // Register all handlers with proper action names
     const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
     
-    console.log(`📊 Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
-    console.log('📊 Handler registration stats:', this.messageHandler.getStats());
+    logger.debug(`📊 Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
+    logger.debug('📊 Handler registration stats:', this.messageHandler.getStats());
   }
 
   /**
@@ -158,14 +161,14 @@ class LifecycleManager {
     const unmappedHandlers = availableHandlers.filter(handler => !mappedHandlers.has(handler));
     
     if (unmappedHandlers.length > 0) {
-      console.warn('⚠️ Unmapped handlers detected (consider adding to handlerMappings):', 
+      logger.warn('⚠️ Unmapped handlers detected (consider adding to handlerMappings):', 
                    unmappedHandlers.map(h => h.name || 'anonymous'));
     } else {
-      console.log('✅ All available handlers are properly mapped');
+      logger.debug('✅ All available handlers are properly mapped');
     }
     
     // Log mapping statistics
-    console.log(`📊 Handler mapping validation: ${Object.keys(handlerMappings).length} mapped, ${unmappedHandlers.length} unmapped`);
+    logger.debug(`📊 Handler mapping validation: ${Object.keys(handlerMappings).length} mapped, ${unmappedHandlers.length} unmapped`);
   }
 
   /**
@@ -182,14 +185,14 @@ class LifecycleManager {
       if (handlerFunction) {
         try {
           this.messageHandler.registerHandler(actionName, handlerFunction);
-          console.log(`✅ Registered handler: ${actionName}`);
+          logger.debug(`✅ Registered handler: ${actionName}`);
           registeredCount++;
         } catch (error) {
-          console.error(`❌ Failed to register handler for action: ${actionName}`, error);
+          logger.error(`❌ Failed to register handler for action: ${actionName}`, error);
           failedCount++;
         }
       } else {
-        console.warn(`⚠️ Handler function not found for action: ${actionName}`);
+        logger.warn(`⚠️ Handler function not found for action: ${actionName}`);
         failedCount++;
       }
     }
@@ -202,7 +205,7 @@ class LifecycleManager {
    * @private
    */
   async initializeErrorHandlers() {
-    console.log("🛡️ Initializing error handlers...");
+    logger.debug("🛡️ Initializing error handlers...");
 
     try {
       const { ErrorHandler } = await import(
@@ -213,12 +216,12 @@ class LifecycleManager {
       const speakModule = await import("../../background/handlers/tts/handleSpeak.js");
       if (speakModule.initializeSpeakHandler) {
         speakModule.initializeSpeakHandler(errorHandler);
-        console.log("✅ TTS handleSpeak error handler initialized");
+        logger.debug("✅ TTS handleSpeak error handler initialized");
       }
 
-      console.log("✅ Error handlers initialization completed");
+      logger.debug("✅ Error handlers initialization completed");
     } catch (error) {
-      console.error("❌ Failed to initialize error handlers:", error);
+      logger.error("❌ Failed to initialize error handlers:", error);
     }
   }
 
@@ -227,7 +230,7 @@ class LifecycleManager {
       const contextMenuManager = await this.featureLoader.loadContextMenuManager();
       await contextMenuManager.setupDefaultMenus();
     } catch (error) {
-      console.error("❌ Failed to refresh context menus via featureLoader:", error);
+      logger.error("❌ Failed to refresh context menus via featureLoader:", error);
       // Fallback to direct import
       const { createContextMenu } = await import("../../managers/context-menu-manager.js"); // This might need to be moved later
       await createContextMenu();

@@ -2,6 +2,9 @@
 // Chrome side panel manager
 
 import browser from "webextension-polyfill";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'SidepanelManager');
 
 /**
  * Chrome Side Panel Manager
@@ -26,11 +29,11 @@ export class ChromeSidePanelManager {
         throw new Error("Chrome sidePanel API not available");
       }
 
-      console.log("📋 Initializing Chrome side panel manager");
+      logger.debug("📋 Initializing Chrome side panel manager");
       this.initialized = true;
-      console.log("✅ Chrome side panel manager initialized");
+      logger.debug("✅ Chrome side panel manager initialized");
     } catch (error) {
-      console.error(
+      logger.error(
         "❌ Failed to initialize Chrome side panel manager:",
         error,
       );
@@ -50,9 +53,9 @@ export class ChromeSidePanelManager {
 
     try {
       await browser.sidePanel.open({ tabId });
-      console.log("📋 Chrome side panel opened");
+      logger.debug("📋 Chrome side panel opened");
     } catch (error) {
-      console.error("❌ Failed to open Chrome side panel:", error);
+      logger.error("❌ Failed to open Chrome side panel:", error);
       throw error;
     }
   }
@@ -72,9 +75,9 @@ export class ChromeSidePanelManager {
         tabId,
         openPanelOnActionClick: behavior === "enabled",
       });
-      console.log(`📋 Side panel behavior set to ${behavior} for tab ${tabId}`);
+      logger.debug(`📋 Side panel behavior set to ${behavior} for tab ${tabId}`);
     } catch (error) {
-      console.error("❌ Failed to set side panel behavior:", error);
+      logger.error("❌ Failed to set side panel behavior:", error);
     }
   }
 

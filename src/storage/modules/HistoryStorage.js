@@ -4,6 +4,9 @@
  */
 
 import { storageCore } from '../core/StorageCore.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Storage', 'HistoryStorage');
 
 export class HistoryStorage {
   constructor() {
@@ -34,10 +37,10 @@ export class HistoryStorage {
       // Apply pagination
       const paginatedHistory = history.slice(offset, offset + limit);
       
-      console.log(`[HistoryStorage] Retrieved ${paginatedHistory.length} history items`);
+      logger.debug(`[HistoryStorage] Retrieved ${paginatedHistory.length} history items`);
       return paginatedHistory;
     } catch (error) {
-      console.error('[HistoryStorage] Get history failed:', error);
+      logger.error('[HistoryStorage] Get history failed:', error);
       return [];
     }
   }
@@ -80,10 +83,10 @@ export class HistoryStorage {
         }
 
         await this.storage.set({ [this.historyKey]: history });
-        console.log('[HistoryStorage] Added history item');
+        logger.debug('[HistoryStorage] Added history item');
       }
     } catch (error) {
-      console.error('[HistoryStorage] Add history item failed:', error);
+      logger.error('[HistoryStorage] Add history item failed:', error);
       throw error;
     }
   }
@@ -101,7 +104,7 @@ export class HistoryStorage {
 
       const itemIndex = history.findIndex(item => item.id === id);
       if (itemIndex === -1) {
-        console.warn(`[HistoryStorage] History item '${id}' not found`);
+        logger.warn(`[HistoryStorage] History item '${id}' not found`);
         return false;
       }
 
@@ -109,10 +112,10 @@ export class HistoryStorage {
       history[itemIndex] = { ...history[itemIndex], ...updates, updatedAt: Date.now() };
 
       await this.storage.set({ [this.historyKey]: history });
-      console.log(`[HistoryStorage] Updated history item '${id}'`);
+      logger.debug(`[HistoryStorage] Updated history item '${id}'`);
       return true;
     } catch (error) {
-      console.error(`[HistoryStorage] Update history item '${id}' failed:`, error);
+      logger.error(`[HistoryStorage] Update history item '${id}' failed:`, error);
       return false;
     }
   }
@@ -133,12 +136,12 @@ export class HistoryStorage {
 
       if (removedCount > 0) {
         await this.storage.set({ [this.historyKey]: filteredHistory });
-        console.log(`[HistoryStorage] Removed ${removedCount} history item(s)`);
+        logger.debug(`[HistoryStorage] Removed ${removedCount} history item(s)`);
       }
 
       return removedCount;
     } catch (error) {
-      console.error('[HistoryStorage] Remove history items failed:', error);
+      logger.error('[HistoryStorage] Remove history items failed:', error);
       return 0;
     }
   }
@@ -150,9 +153,9 @@ export class HistoryStorage {
   async clearHistory() {
     try {
       await this.storage.set({ [this.historyKey]: [] });
-      console.log('[HistoryStorage] History cleared');
+      logger.debug('[HistoryStorage] History cleared');
     } catch (error) {
-      console.error('[HistoryStorage] Clear history failed:', error);
+      logger.error('[HistoryStorage] Clear history failed:', error);
       throw error;
     }
   }
@@ -178,10 +181,10 @@ export class HistoryStorage {
       });
 
       const limitedMatches = matches.slice(0, limit);
-      console.log(`[HistoryStorage] Found ${limitedMatches.length} matches for '${query}'`);
+      logger.debug(`[HistoryStorage] Found ${limitedMatches.length} matches for '${query}'`);
       return limitedMatches;
     } catch (error) {
-      console.error('[HistoryStorage] Search history failed:', error);
+      logger.error('[HistoryStorage] Search history failed:', error);
       return [];
     }
   }
@@ -216,7 +219,7 @@ export class HistoryStorage {
 
       return stats;
     } catch (error) {
-      console.error('[HistoryStorage] Get history stats failed:', error);
+      logger.error('[HistoryStorage] Get history stats failed:', error);
       return { totalItems: 0, providers: {}, languages: {}, recentActivity: 0 };
     }
   }

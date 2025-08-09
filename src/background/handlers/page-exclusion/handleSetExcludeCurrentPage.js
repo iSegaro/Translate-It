@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleSetExcludeCurrentPage');
 /**
  * Handler for setting page exclusion status
  */
@@ -20,7 +23,7 @@ export function handleSetExcludeCurrentPage(message, sender, sendResponse) {
 
     // For now, just log the action - this can be enhanced later
     // to actually store exclusion settings
-    console.log(`[handleSetExcludeCurrentPage] Setting exclusion for ${url}: ${exclude}`)
+    logger.debug(`[handleSetExcludeCurrentPage] Setting exclusion for ${url}: ${exclude}`)
     
     // TODO: Implement actual storage of exclusion settings
     // await saveExclusionSetting(url, exclude)
@@ -32,7 +35,7 @@ export function handleSetExcludeCurrentPage(message, sender, sendResponse) {
     })
     return false
   } catch (error) {
-    console.error('[handleSetExcludeCurrentPage] Error:', error)
+    logger.error('[handleSetExcludeCurrentPage] Error:', error)
     sendResponse({ success: false, error: 'Failed to set page exclusion status' })
     return false
   }

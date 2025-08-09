@@ -4,6 +4,9 @@ import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageActions } from '../../../messaging/core/MessageActions.js';
 import { generateRevertMessageId } from '../../../utils/messaging/messageId.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleRevertTranslation');
 
 const errorHandler = new ErrorHandler();
 
@@ -17,18 +20,18 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleRevertTranslation(message, sender, sendResponse) {
-  console.log('[Handler:revertTranslation] Processing translation revert request:', message.data);
+  logger.debug('[Handler:revertTranslation] Processing translation revert request:', message.data);
   
   try {
     let targetTabId = message.data?.tabId || sender.tab?.id;
     
     // If no tab ID available (e.g., from sidepanel), get active tab
     if (!targetTabId) {
-      console.log('[Handler:revertTranslation] No tab ID in message, getting active tab');
+      logger.debug('[Handler:revertTranslation] No tab ID in message, getting active tab');
       const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (activeTab?.id) {
         targetTabId = activeTab.id;
-        console.log('[Handler:revertTranslation] Using active tab ID:', targetTabId);
+        logger.debug('[Handler:revertTranslation] Using active tab ID:', targetTabId);
       } else {
         throw new Error('Unable to determine target tab for translation revert');
       }
@@ -46,7 +49,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     });
     
     if (contentScriptResponse?.success) {
-      console.log(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+      logger.debug(`✅ [revertTranslation] Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
       
       sendResponse({ 
         success: true, 
@@ -61,7 +64,7 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
     
     return true;
   } catch (error) {
-    console.error('[Handler:revertTranslation] Error:', error);
+    logger.error('[Handler:revertTranslation] Error:', error);
     
     errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,

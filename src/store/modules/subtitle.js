@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'subtitle');
 
 export const useSubtitleStore = defineStore('subtitle', () => {
   // State
@@ -11,14 +14,14 @@ export const useSubtitleStore = defineStore('subtitle', () => {
   // Actions
   const enable = () => {
     isEnabled.value = true
-    console.log('Subtitle translation enabled')
+    logger.debug('Subtitle translation enabled')
   }
   
   const disable = () => {
     isEnabled.value = false
     currentSubtitle.value = null
     translatedSubtitle.value = null
-    console.log('Subtitle translation disabled')
+    logger.debug('Subtitle translation disabled')
   }
   
   const setCurrentSubtitle = (subtitle) => {
@@ -34,7 +37,7 @@ export const useSubtitleStore = defineStore('subtitle', () => {
     isTranslating.value = true
     try {
       // Mock subtitle translation
-      console.log('Translating subtitle:', subtitle)
+      logger.debug('Translating subtitle:', subtitle)
       
       // Simulate translation delay
       await new Promise(resolve => setTimeout(resolve, 300))
@@ -47,7 +50,7 @@ export const useSubtitleStore = defineStore('subtitle', () => {
       
       return translatedSubtitle.value
     } catch (error) {
-      console.error('Subtitle translation error:', error)
+      logger.error('Subtitle translation error:', error)
       throw error
     } finally {
       isTranslating.value = false

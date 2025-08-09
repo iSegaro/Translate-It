@@ -2,6 +2,9 @@
 // Firefox sidebar manager (and fallback for other browsers)
 
 import browser from "webextension-polyfill";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'SidebarManager');
 
 /**
  * Firefox Sidebar Manager
@@ -22,11 +25,11 @@ export class FirefoxSidebarManager {
     try {
       this.browser = browser;
 
-      console.log("📋 Initializing Firefox sidebar manager");
+      logger.debug("📋 Initializing Firefox sidebar manager");
       this.initialized = true;
-      console.log("✅ Firefox sidebar manager initialized");
+      logger.debug("✅ Firefox sidebar manager initialized");
     } catch (error) {
-      console.error("❌ Failed to initialize Firefox sidebar manager:", error);
+      logger.error("❌ Failed to initialize Firefox sidebar manager:", error);
       throw error;
     }
   }
@@ -56,17 +59,17 @@ export class FirefoxSidebarManager {
           left: window.screen.width - 420,
           top: 100,
         });
-        console.log("📋 Firefox sidebar opened as popup window");
+        logger.debug("📋 Firefox sidebar opened as popup window");
       } else {
         // Fallback: open in new tab
         await browser.tabs.create({
           url: sidebarUrl,
           active: true,
         });
-        console.log("📋 Firefox sidebar opened in new tab");
+        logger.debug("📋 Firefox sidebar opened in new tab");
       }
     } catch (error) {
-      console.error("❌ Failed to open Firefox sidebar:", error);
+      logger.error("❌ Failed to open Firefox sidebar:", error);
       throw error;
     }
   }
@@ -79,7 +82,7 @@ export class FirefoxSidebarManager {
   async setPanelBehavior(tabId, behavior = "enabled") {
     // Firefox sidebar behavior is controlled by manifest
     // This is a no-op but we'll log for consistency
-    console.log(`📋 Firefox sidebar behavior is always enabled (no-op)`);
+    logger.debug(`📋 Firefox sidebar behavior is always enabled (no-op)`);
   }
 
   /**

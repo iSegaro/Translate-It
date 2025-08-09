@@ -1,5 +1,8 @@
 import { ref, onUnmounted } from "vue";
 import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useExtensionAPI');
 
 export function useExtensionAPI() {
   // Enhanced messaging for Vue extension API - use generic Vue context
@@ -33,7 +36,7 @@ export function useExtensionAPI() {
 
       return response;
     } catch (error) {
-      console.error("Extension API error:", error);
+      logger.error("Extension API error:", error);
       isConnected.value = false;
       throw error;
     }
@@ -49,7 +52,7 @@ export function useExtensionAPI() {
       });
       return response;
     } catch (error) {
-      console.error("Failed to send tab message:", error);
+      logger.error("Failed to send tab message:", error);
       throw error;
     }
   };
@@ -65,7 +68,7 @@ export function useExtensionAPI() {
       }
       return await sendToTab(tab.id, action, data);
     } catch (error) {
-      console.error("Failed to send content script message:", error);
+      logger.error("Failed to send content script message:", error);
       throw error;
     }
   };
@@ -93,7 +96,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       return await api.storage.local.get(keys);
     } catch (error) {
-      console.error("Failed to get storage data:", error);
+      logger.error("Failed to get storage data:", error);
       throw error;
     }
   };
@@ -103,7 +106,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       return await api.storage.local.set(data);
     } catch (error) {
-      console.error("Failed to set storage data:", error);
+      logger.error("Failed to set storage data:", error);
       throw error;
     }
   };
@@ -114,7 +117,7 @@ export function useExtensionAPI() {
       const [tab] = await api.tabs.query({ active: true, currentWindow: true });
       return tab;
     } catch (error) {
-      console.error("Failed to get current tab:", error);
+      logger.error("Failed to get current tab:", error);
       throw error;
     }
   };
@@ -124,7 +127,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       await api.runtime.openOptionsPage();
     } catch (error) {
-      console.error("Failed to open options page:", error);
+      logger.error("Failed to open options page:", error);
       throw error;
     }
   };
@@ -140,7 +143,7 @@ export function useExtensionAPI() {
         await api.tabs.create({ url: api.runtime.getURL("sidepanel.html") });
       }
     } catch (error) {
-      console.error("Failed to open sidepanel:", error);
+      logger.error("Failed to open sidepanel:", error);
       throw error;
     }
   };
@@ -150,7 +153,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       return await api.notifications.create(options);
     } catch (error) {
-      console.error("Failed to create notification:", error);
+      logger.error("Failed to create notification:", error);
       throw error;
     }
   };
@@ -160,7 +163,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       return await api.tabs.captureVisibleTab(options);
     } catch (error) {
-      console.error("Failed to capture visible tab:", error);
+      logger.error("Failed to capture visible tab:", error);
       throw error;
     }
   };
@@ -170,7 +173,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       return await api.tabs.executeScript(tabId, details);
     } catch (error) {
-      console.error("Failed to execute script:", error);
+      logger.error("Failed to execute script:", error);
       throw error;
     }
   };
@@ -216,7 +219,7 @@ export function useExtensionAPI() {
       const api = getbrowserAPI();
       await api.tabs.executeScript(tabId, { file: scriptPath });
     } catch (error) {
-      console.error("Failed to inject content script:", error);
+      logger.error("Failed to inject content script:", error);
       throw error;
     }
   };
@@ -257,7 +260,7 @@ export function useExtensionAPI() {
       });
       messageListeners.value = [];
     } catch (error) {
-      console.error("Failed to cleanup message listeners:", error);
+      logger.error("Failed to cleanup message listeners:", error);
     }
   });
 

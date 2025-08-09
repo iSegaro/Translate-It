@@ -6,6 +6,9 @@
 
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'detection');
 
 // Translation cache (same as OLD version)
 const translationCache = new Map();
@@ -56,7 +59,7 @@ export function collectTextNodes(targetElement) {
     }
   }
 
-  console.log('[AdvancedTextExtraction] Collected text nodes:', {
+  logger.debug('[AdvancedTextExtraction] Collected text nodes:', {
     totalNodes: textNodes.length,
     uniqueTexts: originalTextsMap.size
   });
@@ -115,7 +118,7 @@ function storeOriginalParentStyles(parentElement) {
  * @param {Object} context - context شامل tracking و error handling
  */
 export function applyTranslationsToNodes(textNodes, translations, context = {}) {
-  console.log('[AdvancedTextExtraction] Applying translations to nodes:', {
+  logger.debug('[AdvancedTextExtraction] Applying translations to nodes:', {
     nodeCount: textNodes.length,
     translationCount: translations.size
   });
@@ -130,7 +133,7 @@ export function applyTranslationsToNodes(textNodes, translations, context = {}) 
 
   textNodes.forEach((textNode, index) => {
     if (!textNode.parentNode || textNode.nodeType !== Node.TEXT_NODE) {
-      console.warn('[AdvancedTextExtraction] Invalid text node:', textNode);
+      logger.warn('[AdvancedTextExtraction] Invalid text node:', textNode);
       return;
     }
 
@@ -198,14 +201,14 @@ export function applyTranslationsToNodes(textNodes, translations, context = {}) 
       // Track for revert capability
       context.translatedElements.add(containerSpan);
 
-      console.log('[AdvancedTextExtraction] Successfully replaced text node:', {
+      logger.debug('[AdvancedTextExtraction] Successfully replaced text node:', {
         uniqueId,
         originalText: trimmedOriginalText.substring(0, 50) + '...',
         translatedText: translatedText.substring(0, 50) + '...'
       });
 
     } catch (error) {
-      console.error('[AdvancedTextExtraction] Error replacing text node:', error, {
+      logger.error('[AdvancedTextExtraction] Error replacing text node:', error, {
         textNode,
         originalText: originalText.substring(0, 100),
         parentElement: textNode.parentNode
@@ -223,7 +226,7 @@ export function applyTranslationsToNodes(textNodes, translations, context = {}) 
     }
   });
 
-  console.log('[AdvancedTextExtraction] Translation application completed:', {
+  logger.debug('[AdvancedTextExtraction] Translation application completed:', {
     trackedElements: context.translatedElements?.size || 0,
     trackedTexts: context.originalTexts?.size || 0
   });
@@ -234,10 +237,10 @@ export function applyTranslationsToNodes(textNodes, translations, context = {}) 
  * @param {Object} context - context شامل tracking data
  */
 export function revertAllTranslations(context = {}) {
-  console.log('[AdvancedTextExtraction] Starting revert process');
+  logger.debug('[AdvancedTextExtraction] Starting revert process');
 
   if (!context.translatedElements || !context.originalTexts) {
-    console.warn('[AdvancedTextExtraction] No tracking data found for revert');
+    logger.warn('[AdvancedTextExtraction] No tracking data found for revert');
     return 0;
   }
 
@@ -273,12 +276,12 @@ export function revertAllTranslations(context = {}) {
         }
 
       } catch (error) {
-        console.error('[AdvancedTextExtraction] Failed to revert individual element:', error);
+        logger.error('[AdvancedTextExtraction] Failed to revert individual element:', error);
       }
     }
   }
 
-  console.log('[AdvancedTextExtraction] Revert completed:', {
+  logger.debug('[AdvancedTextExtraction] Revert completed:', {
     successfulReverts,
     remainingElements: context.translatedElements?.size || 0
   });
@@ -304,7 +307,7 @@ export function separateCachedAndNewTexts(originalTextsMap) {
     }
   });
 
-  console.log('[AdvancedTextExtraction] Text separation completed:', {
+  logger.debug('[AdvancedTextExtraction] Text separation completed:', {
     totalTexts: originalTextsMap.size,
     cachedTexts: cachedTranslations.size,
     newTexts: textsToTranslate.length
@@ -377,7 +380,7 @@ export function reassembleTranslations(
       }
       translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
     } else {
-      console.log(
+      logger.debug(
         `[AdvancedTextExtraction] Invalid or missing translation data for item at index ${i}:`,
         translatedItem,
         mappingInfo
@@ -399,7 +402,7 @@ export function reassembleTranslations(
       newTranslations.set(originalText, reassembledText);
       translationCache.set(originalText, reassembledText);
     } else if (!cachedTranslations.has(originalText)) {
-      console.log(
+      logger.debug(
         `[AdvancedTextExtraction] No translation segments found for original text "${originalText}". Using original text.`
       );
       newTranslations.set(originalText, originalText);
@@ -423,7 +426,7 @@ export function parseAndCleanTranslationResponse(translatedJsonString) {
   );
 
   if (!jsonMatch || !jsonMatch[1]) {
-    console.error('[AdvancedTextExtraction] No JSON structure found in response');
+    logger.error('[AdvancedTextExtraction] No JSON structure found in response');
     return [];
   }
 
@@ -432,7 +435,7 @@ export function parseAndCleanTranslationResponse(translatedJsonString) {
   try {
     return JSON.parse(potentialJsonString);
   } catch (initialError) {
-    console.warn('[AdvancedTextExtraction] Initial JSON parse failed, attempting repair');
+    logger.warn('[AdvancedTextExtraction] Initial JSON parse failed, attempting repair');
 
     // Attempt repair if it looks like an array
     if (potentialJsonString.startsWith("[") && initialError instanceof SyntaxError) {
@@ -444,16 +447,16 @@ export function parseAndCleanTranslationResponse(translatedJsonString) {
 
         try {
           const parsedResult = JSON.parse(repairedJsonString);
-          console.warn('[AdvancedTextExtraction] Successfully parsed JSON after repair');
+          logger.warn('[AdvancedTextExtraction] Successfully parsed JSON after repair');
           return parsedResult;
         } catch (repairError) {
-          console.error('[AdvancedTextExtraction] Repair attempt also failed:', repairError);
+          logger.error('[AdvancedTextExtraction] Repair attempt also failed:', repairError);
           return [];
         }
       }
     }
 
-    console.error('[AdvancedTextExtraction] Cannot repair JSON:', initialError);
+    logger.error('[AdvancedTextExtraction] Cannot repair JSON:', initialError);
     return [];
   }
 }
@@ -469,5 +472,5 @@ export function clearTrackingData(context = {}) {
   if (context.originalTexts) {
     context.originalTexts.clear();
   }
-  console.log('[AdvancedTextExtraction] Tracking data cleared');
+  logger.debug('[AdvancedTextExtraction] Tracking data cleared');
 }

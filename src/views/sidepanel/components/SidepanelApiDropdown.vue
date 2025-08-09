@@ -36,6 +36,9 @@ import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useUI } from '@/composables/useUI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import ApiProviderItem from './ApiProviderItem.vue'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApiDropdown');
 
 const { handleError } = useErrorHandler()
 
@@ -102,7 +105,7 @@ const handleProviderSelect = async (providerId) => {
         showVisualFeedback(apiButton, 'success', 300)
       }
       
-      console.log(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
+      logger.debug(`[SidepanelApiDropdown] Provider selected: ${providerId}`)
     }
   } catch (error) {
     await handleError(error, 'sidepanel-api-dropdown-select-provider')
@@ -119,14 +122,14 @@ const handleProviderSelect = async (providerId) => {
 // Render provider items
 const renderProviderItems = async () => {
   if (!dropdownContent.value) {
-    console.log('[SidepanelApiDropdown] dropdownContent not available')
+    logger.debug('[SidepanelApiDropdown] dropdownContent not available')
     return
   }
 
-  console.log('[SidepanelApiDropdown] Rendering provider items...')
-  console.log('[SidepanelApiDropdown] isLoading:', isLoading.value)
-  console.log('[SidepanelApiDropdown] hasProviders:', hasProviders.value)  
-  console.log('[SidepanelApiDropdown] providerItems count:', providerItems.value.length)
+  logger.debug('[SidepanelApiDropdown] Rendering provider items...')
+  logger.debug('[SidepanelApiDropdown] isLoading:', isLoading.value)
+  logger.debug('[SidepanelApiDropdown] hasProviders:', hasProviders.value)  
+  logger.debug('[SidepanelApiDropdown] providerItems count:', providerItems.value.length)
 
   if (isLoading.value) {
     // Handled by template
@@ -138,7 +141,7 @@ const renderProviderItems = async () => {
     return
   }
   // No longer manually rendering, Vue will handle it
-  console.log('[SidepanelApiDropdown] Finished rendering', providerItems.value.length, 'items')
+  logger.debug('[SidepanelApiDropdown] Finished rendering', providerItems.value.length, 'items')
 }
 
 // Load provider items
@@ -151,7 +154,7 @@ const loadProviderItems = async () => {
     const maxAttempts = 10
     
     while (availableProviders.value.length === 0 && attempts < maxAttempts) {
-      console.log(`[SidepanelApiDropdown] No providers available, waiting... (attempt ${attempts + 1}/${maxAttempts})`)
+      logger.debug(`[SidepanelApiDropdown] No providers available, waiting... (attempt ${attempts + 1}/${maxAttempts})`)
       await new Promise(resolve => setTimeout(resolve, 100))
       attempts++
     }
@@ -162,7 +165,7 @@ const loadProviderItems = async () => {
     }
     
     providerItems.value = await createProviderItems()
-    console.log('[SidepanelApiDropdown] Provider items loaded:', providerItems.value.length)
+    logger.debug('[SidepanelApiDropdown] Provider items loaded:', providerItems.value.length)
     
     await nextTick()
     await renderProviderItems()
@@ -212,7 +215,7 @@ const handleOutsideClick = (event) => {
       !dropdownMenu.value.contains(event.target) && 
       !apiButton.contains(event.target)) {
     emit('update:isVisible', false)
-    console.log('[SidepanelApiDropdown] Outside click detected, emitting update:isVisible(false)')
+    logger.debug('[SidepanelApiDropdown] Outside click detected, emitting update:isVisible(false)')
   }
 }
 
@@ -221,12 +224,12 @@ const initialize = async () => {
   try {
     setupEventListeners()
     
-    console.log('[SidepanelApiDropdown] Initializing with', availableProviders.value.length, 'providers')
-    console.log('[SidepanelApiDropdown] Available providers:', availableProviders.value)
+    logger.debug('[SidepanelApiDropdown] Initializing with', availableProviders.value.length, 'providers')
+    logger.debug('[SidepanelApiDropdown] Available providers:', availableProviders.value)
     
     await loadProviderItems()
     
-    console.log('[SidepanelApiDropdown] Component initialized')
+    logger.debug('[SidepanelApiDropdown] Component initialized')
   } catch (error) {
     await handleError(error, 'sidepanel-api-dropdown-init')
   }
@@ -268,8 +271,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupEventListeners()
-})
-</script>
+})</script>
 
 <style lang="scss" scoped>
 @use '@/assets/styles/variables.scss' as *;

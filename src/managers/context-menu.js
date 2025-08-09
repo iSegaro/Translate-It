@@ -2,6 +2,9 @@
 // Context menu manager for cross-browser compatibility
 
 import browser from "webextension-polyfill";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'context-menu');
 
 /**
  * Context Menu Manager
@@ -23,15 +26,15 @@ export class ContextMenuManager {
     try {
       this.browser = browser;
 
-      console.log("📋 Initializing context menu manager");
+      logger.debug("📋 Initializing context menu manager");
 
       // Set up default context menus
       await this.setupDefaultMenus();
 
       this.initialized = true;
-      console.log("✅ Context menu manager initialized");
+      logger.debug("✅ Context menu manager initialized");
     } catch (error) {
-      console.error("❌ Failed to initialize context menu manager:", error);
+      logger.error("❌ Failed to initialize context menu manager:", error);
       throw error;
     }
   }
@@ -91,9 +94,9 @@ export class ContextMenuManager {
         contexts: ["action"],
       });
 
-      console.log("✅ Default context menus created");
+      logger.debug("✅ Default context menus created");
     } catch (error) {
-      console.error("❌ Failed to setup default menus:", error);
+      logger.error("❌ Failed to setup default menus:", error);
       throw error;
     }
   }
@@ -113,12 +116,12 @@ export class ContextMenuManager {
       const menuId = await this.browser.contextMenus.create(menuConfig);
       this.createdMenus.add(menuConfig.id || menuId);
 
-      console.log(
+      logger.debug(
         `📋 Created context menu: ${menuConfig.title || menuConfig.id}`,
       );
       return menuId;
     } catch (error) {
-      console.error("❌ Failed to create context menu:", error);
+      logger.error("❌ Failed to create context menu:", error);
       throw error;
     }
   }
@@ -136,9 +139,9 @@ export class ContextMenuManager {
 
     try {
       await this.browser.contextMenus.update(menuId, updateInfo);
-      console.log(`📋 Updated context menu: ${menuId}`);
+      logger.debug(`📋 Updated context menu: ${menuId}`);
     } catch (error) {
-      console.error(`❌ Failed to update context menu ${menuId}:`, error);
+      logger.error(`❌ Failed to update context menu ${menuId}:`, error);
       throw error;
     }
   }
@@ -157,9 +160,9 @@ export class ContextMenuManager {
       await this.browser.contextMenus.remove(menuId);
       this.createdMenus.delete(menuId);
 
-      console.log(`📋 Removed context menu: ${menuId}`);
+      logger.debug(`📋 Removed context menu: ${menuId}`);
     } catch (error) {
-      console.error(`❌ Failed to remove context menu ${menuId}:`, error);
+      logger.error(`❌ Failed to remove context menu ${menuId}:`, error);
       throw error;
     }
   }
@@ -177,9 +180,9 @@ export class ContextMenuManager {
       await this.browser.contextMenus.removeAll();
       this.createdMenus.clear();
 
-      console.log("📋 Cleared all context menus");
+      logger.debug("📋 Cleared all context menus");
     } catch (error) {
-      console.error("❌ Failed to clear context menus:", error);
+      logger.error("❌ Failed to clear context menus:", error);
       throw error;
     }
   }
@@ -191,7 +194,7 @@ export class ContextMenuManager {
    */
   async handleMenuClick(info, tab) {
     try {
-      console.log(`📋 Context menu clicked: ${info.menuItemId}`);
+      logger.debug(`📋 Context menu clicked: ${info.menuItemId}`);
 
       switch (info.menuItemId) {
         case "translate-selection":
@@ -215,10 +218,10 @@ export class ContextMenuManager {
           break;
 
         default:
-          console.warn(`Unhandled context menu: ${info.menuItemId}`);
+          logger.warn(`Unhandled context menu: ${info.menuItemId}`);
       }
     } catch (error) {
-      console.error("❌ Context menu click handler failed:", error);
+      logger.error("❌ Context menu click handler failed:", error);
     }
   }
 
@@ -240,7 +243,7 @@ export class ContextMenuManager {
         },
       });
     } catch (error) {
-      console.error("❌ Failed to handle translate selection:", error);
+      logger.error("❌ Failed to handle translate selection:", error);
     }
   }
 
@@ -258,7 +261,7 @@ export class ContextMenuManager {
         },
       });
     } catch (error) {
-      console.error("❌ Failed to handle translate page:", error);
+      logger.error("❌ Failed to handle translate page:", error);
     }
   }
 
@@ -276,7 +279,7 @@ export class ContextMenuManager {
         },
       });
     } catch (error) {
-      console.error("❌ Failed to handle select element mode:", error);
+      logger.error("❌ Failed to handle select element mode:", error);
     }
   }
 
@@ -294,7 +297,7 @@ export class ContextMenuManager {
         },
       });
     } catch (error) {
-      console.error("❌ Failed to handle screen capture:", error);
+      logger.error("❌ Failed to handle screen capture:", error);
     }
   }
 
@@ -307,7 +310,7 @@ export class ContextMenuManager {
       const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });
     } catch (error) {
-      console.error("❌ Failed to handle open options:", error);
+      logger.error("❌ Failed to handle open options:", error);
     }
   }
 
@@ -320,7 +323,7 @@ export class ContextMenuManager {
         browser.contextMenus.onClicked,
         this.handleMenuClick.bind(this),
       );
-      console.log("📋 Context menu click listener registered");
+      logger.debug("📋 Context menu click listener registered");
     }
   }
 
@@ -357,12 +360,12 @@ export class ContextMenuManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log("🧹 Cleaning up context menu manager");
+    logger.debug("🧹 Cleaning up context menu manager");
 
     try {
       await this.clearAllMenus();
     } catch (error) {
-      console.error("❌ Error during context menu cleanup:", error);
+      logger.error("❌ Error during context menu cleanup:", error);
     }
 
     this.initialized = false;

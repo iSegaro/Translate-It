@@ -5,6 +5,9 @@
  */
 import browser from "webextension-polyfill";
 import { MessageContexts } from "../messaging/core/MessagingCore";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'SimpleMessageHandler');
 
 class SimpleMessageHandler {
   constructor() {
@@ -23,11 +26,11 @@ class SimpleMessageHandler {
       return;
     }
 
-    console.log("🎧 [SimpleMessageHandler] Initializing Simple Message Handler...");
+    logger.debug("🎧 [SimpleMessageHandler] Initializing Simple Message Handler...");
 
     // Use callback pattern for Firefox MV3 compatibility
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      console.log(
+      logger.debug(
         "[SimpleMessageHandler] 🎯 Received message:",
         message,
         "from:",
@@ -42,45 +45,45 @@ class SimpleMessageHandler {
       if (handler) {
         // Log context-aware routing info
         if (context) {
-          console.log(`[SimpleMessageHandler] Context-aware routing: ${context} -> ${action}`);
+          logger.debug(`[SimpleMessageHandler] Context-aware routing: ${context} -> ${action}`);
         }
 
         // Check if handler uses callback pattern (3+ parameters)
         if (handler.length >= 3) {
-          console.log(`[SimpleMessageHandler] Using callback pattern for: ${action}`);
+          logger.debug(`[SimpleMessageHandler] Using callback pattern for: ${action}`);
           // Call handler directly with callback - it will handle sendResponse
           handler(message, sender, sendResponse);
           return true; // Keep message channel open
         } else {
-          console.log(`[SimpleMessageHandler] Using Promise pattern for: ${action}`);
+          logger.debug(`[SimpleMessageHandler] Using Promise pattern for: ${action}`);
           // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
           handler(message, sender).then((result) => {
-            console.log(`[SimpleMessageHandler] Promise resolved for ${action}:`, result);
+            logger.debug(`[SimpleMessageHandler] Promise resolved for ${action}:`, result);
             try {
               sendResponse(result);
-              console.log(`[SimpleMessageHandler] sendResponse called successfully for ${action}`);
+              logger.debug(`[SimpleMessageHandler] sendResponse called successfully for ${action}`);
             } catch (sendError) {
-              console.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
+              logger.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
             }
           }).catch((error) => {
-            console.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
+            logger.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
             try {
               sendResponse({ success: false, error: error.message || 'Handler error' });
             } catch (sendError) {
-              console.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
+              logger.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
             }
           });
           return true; // Keep message channel open for async response
         }
       } else {
-        console.log(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);
+        logger.debug(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);
         // No handler found - let other listeners handle it
         return false;
       }
     });
 
     this.initialized = true;
-    console.log("✅ Simple Message Handler initialized successfully.");
+    logger.debug("✅ Simple Message Handler initialized successfully.");
   }
 
   /**
@@ -99,14 +102,14 @@ class SimpleMessageHandler {
     // Check for context-specific handler first
     const contextKey = `${context}:${action}`;
     if (this.contextHandlers.has(contextKey)) {
-      console.log(`[SimpleMessageHandler] Using context-specific handler: ${contextKey}`);
+      logger.debug(`[SimpleMessageHandler] Using context-specific handler: ${contextKey}`);
       return this.contextHandlers.get(contextKey);
     }
 
     // Check for context-generic handler
     const contextGenericKey = `${context}:*`;
     if (this.contextHandlers.has(contextGenericKey)) {
-      console.log(`[SimpleMessageHandler] Using context-generic handler: ${contextGenericKey}`);
+      logger.debug(`[SimpleMessageHandler] Using context-generic handler: ${contextGenericKey}`);
       return this.contextHandlers.get(contextGenericKey);
     }
 
@@ -124,11 +127,11 @@ class SimpleMessageHandler {
     const contextKey = `${context}:${action}`;
     
     if (this.contextHandlers.has(contextKey)) {
-      console.warn(`[SimpleMessageHandler] Overwriting context handler: "${contextKey}"`);
+      logger.warn(`[SimpleMessageHandler] Overwriting context handler: "${contextKey}"`);
     }
     
     this.contextHandlers.set(contextKey, handlerFn);
-    console.log(`✅ SimpleMessageHandler: Registered context handler for "${contextKey}"`);
+    logger.debug(`✅ SimpleMessageHandler: Registered context handler for "${contextKey}"`);
   }
 
   /**
@@ -265,12 +268,12 @@ class SimpleMessageHandler {
    */
   registerHandler(action, handlerFn) {
     if (this.handlers.has(action)) {
-      console.warn(
+      logger.warn(
         `[SimpleMessageHandler] Overwriting handler for action: "${action}".`,
       );
     }
     this.handlers.set(action, handlerFn);
-    // console.log(`✅ SimpleMessageHandler: Registered handler for "${action}"`);
+    // logger.debug(`✅ SimpleMessageHandler: Registered handler for "${action}"`);
   }
 
   /**
@@ -279,7 +282,7 @@ class SimpleMessageHandler {
    */
   setContextRouting(enabled) {
     this.routingEnabled = enabled;
-    console.log(`[SimpleMessageHandler] Context routing ${enabled ? 'enabled' : 'disabled'}`);
+    logger.debug(`[SimpleMessageHandler] Context routing ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -303,7 +306,7 @@ class SimpleMessageHandler {
   clearHandlers() {
     this.handlers.clear();
     this.contextHandlers.clear();
-    console.log('[SimpleMessageHandler] All handlers cleared');
+    logger.debug('[SimpleMessageHandler] All handlers cleared');
   }
 }
 

@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'tts');
 
 export const useTTSStore = defineStore('tts', () => {
   // State
@@ -21,7 +24,7 @@ export const useTTSStore = defineStore('tts', () => {
     
     try {
       // Mock TTS functionality
-      console.log(`Speaking: "${text}" in ${language}`)
+      logger.debug(`Speaking: "${text}" in ${language}`)
       
       // Simulate speech duration
       const duration = Math.max(1000, text.length * 50)
@@ -29,7 +32,7 @@ export const useTTSStore = defineStore('tts', () => {
       
       return { success: true }
     } catch (error) {
-      console.error('TTS error:', error)
+      logger.error('TTS error:', error)
       throw error
     } finally {
       isPlaying.value = false
@@ -41,7 +44,7 @@ export const useTTSStore = defineStore('tts', () => {
     if (isPlaying.value) {
       isPlaying.value = false
       currentText.value = ''
-      console.log('TTS stopped')
+      logger.debug('TTS stopped')
     }
   }
   

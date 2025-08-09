@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleAreaSelectionCancel.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleAreaSelectionCancel');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleAreaSelectionCancel(message, sender, sendResponse) {
-  console.log('[Handler:areaSelectionCancel] Processing area selection cancellation:', message.data);
+  logger.debug('[Handler:areaSelectionCancel] Processing area selection cancellation:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -32,7 +35,7 @@ export async function handleAreaSelectionCancel(message, sender, sendResponse) {
       sender
     });
     
-    console.log(`✅ [areaSelectionCancel] Area selection cancelled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`✅ [areaSelectionCancel] Area selection cancelled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

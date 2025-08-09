@@ -2,6 +2,9 @@
 // Safe i18n composable with fallback support
 
 import { ref, computed, getCurrentInstance } from "vue";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useI18n');
 
 /**
  * Safe i18n composable that provides fallback when i18n is not ready
@@ -33,7 +36,7 @@ export function useI18n() {
       // Fallback to original key or provided fallback
       return fallback;
     } catch (error) {
-      console.debug("[useI18n] Translation failed for key:", key, error);
+      logger.debug("[useI18n] Translation failed for key:", key, error);
       return fallback;
     }
   };

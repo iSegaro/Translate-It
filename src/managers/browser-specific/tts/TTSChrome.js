@@ -3,6 +3,9 @@
 
 import browser from "webextension-polyfill";
 import { MessageContexts, MessagingCore } from "../../../messaging/core/MessagingCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'TTSChrome');
 
 /**
  * Offscreen TTS Manager for Chrome
@@ -35,7 +38,7 @@ export class OffscreenTTSManager {
         throw new Error("Offscreen API not available");
       }
 
-      console.log("🔊 Initializing Chrome offscreen TTS manager");
+      logger.debug("🔊 Initializing Chrome offscreen TTS manager");
 
       // Setup readiness listener for faster detection
       this.setupReadinessListener();
@@ -44,9 +47,9 @@ export class OffscreenTTSManager {
       await this.createOffscreenDocument();
 
       this.initialized = true;
-      console.log("✅ Offscreen TTS manager initialized");
+      logger.debug("✅ Offscreen TTS manager initialized");
     } catch (error) {
-      console.error("❌ Failed to initialize offscreen TTS manager:", error);
+      logger.error("❌ Failed to initialize offscreen TTS manager:", error);
       throw error;
     }
   }
@@ -55,7 +58,7 @@ export class OffscreenTTSManager {
    * Force reinitialize offscreen document (e.g., when it gets closed)
    */
   async forceReinitialize() {
-    console.log("🔄 Force reinitializing offscreen TTS manager...");
+    logger.debug("🔄 Force reinitializing offscreen TTS manager...");
     
     // Reset states
     this.initialized = false;
@@ -81,12 +84,12 @@ export class OffscreenTTSManager {
     }
 
     globalThis.offscreenReadyCallbacks.push(() => {
-      console.log("⚡ Offscreen document signaled readiness via MessageRouter");
+      logger.debug("⚡ Offscreen document signaled readiness via MessageRouter");
       this.offscreenReady = true;
     });
 
     this.readinessListenerAdded = true;
-    console.log(
+    logger.debug(
       "✅ Offscreen readiness callback registered with MessageRouter",
     );
   }
@@ -96,7 +99,7 @@ export class OffscreenTTSManager {
    * @public
    */
   handleOffscreenReady() {
-    console.log("⚡ TTS Manager: Offscreen document is ready");
+    logger.debug("⚡ TTS Manager: Offscreen document is ready");
     this.offscreenReady = true;
   }
 
@@ -112,7 +115,7 @@ export class OffscreenTTSManager {
       });
 
       if (existingContexts.length > 0) {
-        console.log("📄 Offscreen document already exists");
+        logger.debug("📄 Offscreen document already exists");
         this.offscreenCreated = true;
         return;
       }
@@ -125,7 +128,7 @@ export class OffscreenTTSManager {
       });
 
       this.offscreenCreated = true;
-      console.log("📄 Offscreen document created for TTS");
+      logger.debug("📄 Offscreen document created for TTS");
 
       // Minimal wait for script initialization
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -134,16 +137,16 @@ export class OffscreenTTSManager {
       try {
         const testResponse = await this.messenger.specialized.tts.getVoices();
         if (!testResponse || !testResponse.success) {
-          console.warn("⚠️ Offscreen document created but not responding properly");
+          logger.warn("⚠️ Offscreen document created but not responding properly");
         } else {
-          console.log("✅ Offscreen document created and responding");
+          logger.debug("✅ Offscreen document created and responding");
         }
       } catch (testError) {
-        console.warn("⚠️ Could not test offscreen document readiness:", testError.message);
+        logger.warn("⚠️ Could not test offscreen document readiness:", testError.message);
       }
 
     } catch (error) {
-      console.error("❌ Failed to create offscreen document:", error);
+      logger.error("❌ Failed to create offscreen document:", error);
 
       // Try alternative approach
       try {
@@ -154,23 +157,23 @@ export class OffscreenTTSManager {
         });
 
         this.offscreenCreated = true;
-        console.log("📄 Offscreen document created with alternative URL");
+        logger.debug("📄 Offscreen document created with alternative URL");
         await new Promise((resolve) => setTimeout(resolve, 100));
         
         // Quick test to ensure offscreen document is responding
         try {
           const testResponse = await this.messenger.specialized.tts.getVoices();
           if (!testResponse || !testResponse.success) {
-            console.warn("⚠️ Alternative offscreen document created but not responding properly");
+            logger.warn("⚠️ Alternative offscreen document created but not responding properly");
           } else {
-            console.log("✅ Alternative offscreen document created and responding");
+            logger.debug("✅ Alternative offscreen document created and responding");
           }
         } catch (testError) {
-          console.warn("⚠️ Could not test alternative offscreen document readiness:", testError.message);
+          logger.warn("⚠️ Could not test alternative offscreen document readiness:", testError.message);
         }
         
       } catch (alternativeError) {
-        console.error(
+        logger.error(
           "❌ Alternative offscreen creation also failed:",
           alternativeError,
         );
@@ -211,7 +214,7 @@ export class OffscreenTTSManager {
         lang: options.lang || "en-US",
       };
 
-      console.log(`🔊 Speaking text via offscreen document:`, text.substring(0, 50));
+      logger.debug(`🔊 Speaking text via offscreen document:`, text.substring(0, 50));
 
       // Use specialized TTS messenger for speaking
       const response = await this.messenger.specialized.tts.speak(text, ttsOptions.lang, ttsOptions);
@@ -229,9 +232,9 @@ export class OffscreenTTSManager {
         startTime: Date.now(),
       };
 
-      console.log(`✅ TTS started successfully`);
+      logger.debug(`✅ TTS started successfully`);
     } catch (error) {
-      console.error("❌ TTS speak failed:", error);
+      logger.error("❌ TTS speak failed:", error);
       throw error;
     }
   }
@@ -248,10 +251,10 @@ export class OffscreenTTSManager {
       await this.messenger.specialized.tts.stop();
 
       this.currentSpeech = null;
-      console.log("🛑 TTS stopped");
+      logger.debug("🛑 TTS stopped");
     } catch (error) {
       // Don't throw on stop errors, just log them
-      console.warn("⚠️ Failed to stop TTS (non-critical):", error);
+      logger.warn("⚠️ Failed to stop TTS (non-critical):", error);
       this.currentSpeech = null; // Clear state anyway
     }
   }
@@ -271,7 +274,7 @@ export class OffscreenTTSManager {
     }
 
     try {
-      console.log(
+      logger.debug(
         "🔊 Playing cached audio blob via offscreen:",
         audioBlob.size,
         "bytes",
@@ -292,9 +295,9 @@ export class OffscreenTTSManager {
         );
       }
 
-      console.log("✅ Cached audio playback completed");
+      logger.debug("✅ Cached audio playback completed");
     } catch (error) {
-      console.error("❌ Cached audio playback failed:", error);
+      logger.error("❌ Cached audio playback failed:", error);
       throw error;
     }
   }
@@ -309,9 +312,9 @@ export class OffscreenTTSManager {
     try {
       await this.messenger.specialized.tts.pause();
 
-      console.log("⏸️ TTS paused");
+      logger.debug("⏸️ TTS paused");
     } catch (error) {
-      console.error("❌ Failed to pause TTS:", error);
+      logger.error("❌ Failed to pause TTS:", error);
     }
   }
 
@@ -325,9 +328,9 @@ export class OffscreenTTSManager {
     try {
       await this.messenger.specialized.tts.resume();
 
-      console.log("▶️ TTS resumed");
+      logger.debug("▶️ TTS resumed");
     } catch (error) {
-      console.error("❌ Failed to resume TTS:", error);
+      logger.error("❌ Failed to resume TTS:", error);
     }
   }
 
@@ -343,7 +346,7 @@ export class OffscreenTTSManager {
     try {
       return await this.messenger.specialized.tts.getVoices();
     } catch (error) {
-      console.error("❌ Failed to get TTS voices:", error);
+      logger.error("❌ Failed to get TTS voices:", error);
       return { success: false, voices: [], error: error.message };
     }
   }
@@ -390,7 +393,7 @@ export class OffscreenTTSManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log("🧹 Cleaning up offscreen TTS manager");
+    logger.debug("🧹 Cleaning up offscreen TTS manager");
 
     try {
       await this.stop();
@@ -401,7 +404,7 @@ export class OffscreenTTSManager {
         this.offscreenCreated = false;
       }
     } catch (error) {
-      console.error("❌ Error during TTS cleanup:", error);
+      logger.error("❌ Error during TTS cleanup:", error);
     }
 
     this.initialized = false;

@@ -1,6 +1,9 @@
 // src/background/handlers/common/handleContentScriptWillReload.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleContentScriptWillReload');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,13 +16,13 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleContentScriptWillReload(message, sender, sendResponse) {
-  console.log('[Handler:CONTENT_SCRIPT_WILL_RELOAD] Processing content script reload notification:', message);
+  logger.debug('[Handler:CONTENT_SCRIPT_WILL_RELOAD] Processing content script reload notification:', message);
   
   try {
     const tabId = sender.tab?.id;
     const frameId = sender.frameId;
     
-    console.log(`🔄 [CONTENT_SCRIPT_WILL_RELOAD] Content script will reload in tab ${tabId}, frame ${frameId}`);
+    logger.debug(`🔄 [CONTENT_SCRIPT_WILL_RELOAD] Content script will reload in tab ${tabId}, frame ${frameId}`);
     
     const backgroundService = globalThis.backgroundService;
     if (backgroundService) {

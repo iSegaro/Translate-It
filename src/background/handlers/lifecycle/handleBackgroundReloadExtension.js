@@ -2,6 +2,9 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleBackgroundReloadExtension');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,11 +17,11 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleBackgroundReloadExtension(message, sender, sendResponse) {
-  console.log('[Handler:BACKGROUND_RELOAD_EXTENSION] Processing extension reload request:', message);
+  logger.debug('[Handler:BACKGROUND_RELOAD_EXTENSION] Processing extension reload request:', message);
   
   try {
     
-    console.warn('🔄 [BACKGROUND_RELOAD_EXTENSION] Triggering complete extension reload');
+    logger.warn('🔄 [BACKGROUND_RELOAD_EXTENSION] Triggering complete extension reload');
     
     // Send response before reload to ensure it gets delivered
     sendResponse({ 
@@ -33,7 +36,7 @@ export async function handleBackgroundReloadExtension(message, sender, sendRespo
         // Reload the extension runtime
         await browser.runtime.reload();
       } catch (reloadError) {
-        console.error('❌ [BACKGROUND_RELOAD_EXTENSION] Reload failed:', reloadError);
+        logger.error('❌ [BACKGROUND_RELOAD_EXTENSION] Reload failed:', reloadError);
         errorHandler.handle(reloadError, {
           type: ErrorTypes.LIFECYCLE,
           context: "handleBackgroundReloadExtension-reload",

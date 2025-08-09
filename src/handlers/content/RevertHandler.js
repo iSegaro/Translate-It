@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Content', 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
  * Handles both Vue and Legacy translation systems
@@ -14,7 +17,7 @@ export class RevertHandler {
    * @returns {Promise<Object>} Revert result
    */
   async executeRevert() {
-    console.log('[RevertHandler] Starting unified revert process');
+    logger.debug('[RevertHandler] Starting unified revert process');
     
     try {
       let totalRevertedCount = 0;
@@ -28,7 +31,7 @@ export class RevertHandler {
           systemsUsed.push('vue');
         }
       } catch (error) {
-        console.error('[RevertHandler] Error during Vue revert portion:', error);
+        logger.error('[RevertHandler] Error during Vue revert portion:', error);
       }
 
       // Attempt to revert legacy translations
@@ -39,15 +42,15 @@ export class RevertHandler {
           systemsUsed.push('legacy');
         }
       } catch (error) {
-        console.error('[RevertHandler] Error during legacy revert portion:', error);
+        logger.error('[RevertHandler] Error during legacy revert portion:', error);
       }
       
       const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
-      console.log(`[RevertHandler] Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+      logger.debug(`[RevertHandler] Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
       return { success: true, revertedCount: totalRevertedCount, system: finalSystem };
       
     } catch (error) {
-      console.error('[RevertHandler] Error in executeRevert:', error);
+      logger.error('[RevertHandler] Error in executeRevert:', error);
       return { success: false, error: error.message };
     }
   }
@@ -79,7 +82,7 @@ export class RevertHandler {
       
       return revertedCount;
     } catch (error) {
-      console.error('[RevertHandler] Error in Vue revert:', error);
+      logger.error('[RevertHandler] Error in Vue revert:', error);
       throw error;
     }
   }
@@ -105,7 +108,7 @@ export class RevertHandler {
       
       return await revertTranslations(context);
     } catch (error) {
-      console.error('[RevertHandler] Error in legacy revert:', error);
+      logger.error('[RevertHandler] Error in legacy revert:', error);
       throw error;
     }
   }
@@ -124,7 +127,7 @@ export class RevertHandler {
       // Fallback: try to find in existing instances
       return null;
     } catch (error) {
-      console.warn('[RevertHandler] Could not get SelectElementManager:', error);
+      logger.warn('[RevertHandler] Could not get SelectElementManager:', error);
       return null;
     }
   }
@@ -144,7 +147,7 @@ export class RevertHandler {
       const { getTranslationHandlerInstance } = await import("../../core/InstanceManager.js");
       return getTranslationHandlerInstance();
     } catch (error) {
-      console.warn('[RevertHandler] Could not get TranslationHandler:', error);
+      logger.warn('[RevertHandler] Could not get TranslationHandler:', error);
       return null;
     }
   }

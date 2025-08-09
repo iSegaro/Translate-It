@@ -6,16 +6,19 @@ import browser from 'webextension-polyfill'
 import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 import { MessageContexts } from '../../messaging/core/MessagingCore'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'sidepanel');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
-    console.log('🚀 Starting sidepanel app initialization...')
+    logger.debug('🚀 Starting sidepanel app initialization...')
     
     // Wait for browser API to be ready
-    console.log('⏳ Waiting for browser API to be ready...')
+    logger.debug('⏳ Waiting for browser API to be ready...')
     
-    console.log('✅ browser API is ready')
+    logger.debug('✅ browser API is ready')
 
     // Ensure browser API is globally available for i18n plugin
     if (typeof window !== 'undefined') {
@@ -23,7 +26,7 @@ async function initializeApp() {
       window.chrome = browser; // Some plugins expect chrome object
       
       // Debug: Check if i18n is available
-      console.log('🔍 Checking i18n availability:', {
+      logger.debug('🔍 Checking i18n availability:', {
         'browserAPI.i18n': !!browser.i18n,
         'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
         'window.browser.i18n': !!window.browser.i18n,
@@ -32,22 +35,22 @@ async function initializeApp() {
     }
 
     // Import i18n plugin after browser API is ready and globally available
-    console.log('📦 Importing i18n plugin...')
+    logger.debug('📦 Importing i18n plugin...')
     const { default: i18n } = await import('vue-plugin-webextension-i18n')
-    console.log('✅ i18n plugin imported successfully')
+    logger.debug('✅ i18n plugin imported successfully')
 
     // Create Vue app
-    console.log('🎨 Creating Vue app...')
+    logger.debug('🎨 Creating Vue app...')
     const app = createApp(SidepanelApp)
 
     // Use Pinia for state management
-    console.log('🔌 Installing Pinia...')
+    logger.debug('🔌 Installing Pinia...')
     app.use(pinia)
-    console.log('✅ Pinia installed')
+    logger.debug('✅ Pinia installed')
     
-    console.log('🔌 Installing i18n...')
+    logger.debug('🔌 Installing i18n...')
     app.use(i18n)
-    console.log('✅ i18n installed')
+    logger.debug('✅ i18n installed')
 
     // Global properties for extension context
     app.config.globalProperties.$isExtension = true
@@ -59,7 +62,7 @@ async function initializeApp() {
     // Mount the app
     app.mount('#app')
   } catch (error) {
-    console.error('Failed to initialize sidepanel app:', error)
+    logger.error('Failed to initialize sidepanel app:', error)
     // Show error UI
     document.getElementById('app').innerHTML = '<div style="padding: 16px; color: red;">Failed to load extension sidepanel. Please try reloading.</div>'
   }
@@ -98,6 +101,6 @@ setTimeout(async () => {
     // Then load advanced features
     await loadAdvancedFeatures()
   } catch (error) {
-    console.error('Failed to preload features:', error)
+    logger.error('Failed to preload features:', error)
   }
 }, 200)

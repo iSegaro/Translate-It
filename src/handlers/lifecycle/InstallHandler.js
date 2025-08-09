@@ -8,6 +8,9 @@ import { logME } from "../utils/core/helpers.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'InstallHandler');
 
 /**
  * Detects if this is a migration from old version to Vue version
@@ -212,13 +215,13 @@ async function handleFreshInstallation() {
  */
 async function handleExtensionUpdate() {
   try {
-    console.log(
+    logger.debug(
       "[InstallationHandler] Starting update notification creation...",
     );
 
     const manifest = browser.runtime.getManifest();
     const version = manifest.version;
-    console.log("[InstallationHandler] Extension version:", version);
+    logger.debug("[InstallationHandler] Extension version:", version);
 
     const appName = (await getTranslationString("name")) || "Translate It!";
     const title =
@@ -232,7 +235,7 @@ async function handleExtensionUpdate() {
       .replace("{appName}", appName)
       .replace("{version}", version);
 
-    console.log("[InstallationHandler] Notification details:", {
+    logger.debug("[InstallationHandler] Notification details:", {
       appName,
       title,
       message,
@@ -248,14 +251,14 @@ async function handleExtensionUpdate() {
       message: message,
     };
 
-    console.log(
+    logger.debug(
       "[InstallationHandler] Notification options:",
       notificationOptions,
     );
 
     // --- Clear any existing notification with the same ID before creating a new one ---
     await browser.notifications.clear("update-notification");
-    console.log("[InstallationHandler] Cleared existing notifications");
+    logger.debug("[InstallationHandler] Cleared existing notifications");
 
     // --- END: BROWSER-AWARE NOTIFICATION OPTIONS ---
 
@@ -265,7 +268,7 @@ async function handleExtensionUpdate() {
       notificationOptions,
     );
 
-    console.log(
+    logger.debug(
       "[InstallationHandler] Notification created with ID:",
       notificationId,
     );
@@ -274,7 +277,7 @@ async function handleExtensionUpdate() {
     );
   } catch (e) {
     // This will now only catch unexpected errors, not the compatibility error.
-    console.error(
+    logger.error(
       "[InstallationHandler] Failed to create update notification:",
       e,
     );
@@ -287,18 +290,18 @@ async function handleExtensionUpdate() {
  */
 async function setupContextMenus() {
   try {
-    console.log("[InstallationHandler] Setting up context menus...");
+    logger.debug("[InstallationHandler] Setting up context menus...");
 
     // Clear all previous context menus to prevent duplicate errors
     await browser.contextMenus.removeAll();
-    console.log("[InstallationHandler] All previous context menus removed.");
+    logger.debug("[InstallationHandler] All previous context menus removed.");
     logME("[InstallationHandler] All previous context menus removed.");
 
     // Basic context menu setup - will be expanded when full context menu system is implemented
     const pageMenuTitle =
       (await getTranslationString("context_menu_translate_with_selection")) ||
       "Translate Element";
-    console.log(
+    logger.debug(
       "[InstallationHandler] Creating context menu with title:",
       pageMenuTitle,
     );
@@ -309,10 +312,10 @@ async function setupContextMenus() {
       contexts: ["page", "selection"],
     });
 
-    console.log("[InstallationHandler] Context menu created:", menuItem);
+    logger.debug("[InstallationHandler] Context menu created:", menuItem);
     logME("[InstallationHandler] Basic context menus setup completed");
   } catch (error) {
-    console.error(
+    logger.error(
       "[InstallationHandler] Failed to setup context menus:",
       error,
     );
@@ -324,7 +327,7 @@ async function setupContextMenus() {
  * Main installation event handler
  */
 export async function handleInstallationEvent(details) {
-  console.log(
+  logger.debug(
     `[InstallationHandler] 🌟 Installation event triggered: ${details.reason}`,
   );
   logME(`[InstallationHandler] 🌟 Success: ${details.reason}`);

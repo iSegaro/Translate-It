@@ -5,6 +5,9 @@
 
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { storageCore } from "../core/StorageCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Storage', 'useStorageItem');
 
 /**
  * Vue composable for single storage item operations
@@ -51,10 +54,10 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = result[key];
       isInternalUpdate = false;
 
-      console.log(`[useStorageItem] Loaded '${key}':`, result[key]);
+      logger.debug(`[useStorageItem] Loaded '${key}':`, result[key]);
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
     } finally {
       isLoading.value = false;
     }
@@ -79,10 +82,10 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = newValue;
       isInternalUpdate = false;
 
-      console.log(`[useStorageItem] Saved '${key}':`, newValue);
+      logger.debug(`[useStorageItem] Saved '${key}':`, newValue);
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
       throw err;
     } finally {
       isSaving.value = false;
@@ -108,10 +111,10 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = defaultValue;
       isInternalUpdate = false;
 
-      console.log(`[useStorageItem] Removed '${key}'`);
+      logger.debug(`[useStorageItem] Removed '${key}'`);
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
       throw err;
     } finally {
       isSaving.value = false;
@@ -155,7 +158,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       // Only update if this wasn't an internal change
       if (!isInternalUpdate) {
         value.value = newValue !== undefined ? newValue : defaultValue;
-        console.log(`[useStorageItem] External change detected for '${key}':`, newValue);
+        logger.debug(`[useStorageItem] External change detected for '${key}':`, newValue);
       }
     };
 

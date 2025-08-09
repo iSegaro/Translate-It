@@ -153,7 +153,7 @@ const handleSelectElement = async () => {
     await selectElement.toggleSelectElement()
     emit('select-element')
   } catch (error) {
-    console.error('[SideToolbar] Failed to toggle select element mode:', error)
+    logger.error('[SideToolbar] Failed to toggle select element mode:', error)
   }
 }
 
@@ -164,7 +164,7 @@ const handleRevert = async () => {
   if (success) {
     emit('revert')
   } else {
-    console.error('[SideToolbar] Failed to revert translation:', sidepanelActions.error.value)
+    logger.error('[SideToolbar] Failed to revert translation:', sidepanelActions.error.value)
   }
 }
 
@@ -189,7 +189,7 @@ const handleSettings = () => {
   // باز کردن صفحه تنظیمات
   browserAPI.safeSendMessage({ action: 'openOptionsPage' })
     .catch(error => {
-      console.error('[SideToolbar] Failed to open settings:', error)
+      logger.error('[SideToolbar] Failed to open settings:', error)
     })
   
   emit('settings')
@@ -207,12 +207,14 @@ if (typeof document !== 'undefined') {
 
 // Cleanup
 import { onUnmounted } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'SideToolbar');
 onUnmounted(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('click', handleGlobalClick)
   }
-})
-</script>
+})</script>
 
 <style scoped>
 .side-toolbar {

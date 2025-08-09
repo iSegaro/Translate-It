@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handlePreviewConfirmed.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handlePreviewConfirmed');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handlePreviewConfirmed(message, sender, sendResponse) {
-  console.log('[Handler:previewConfirmed] Processing preview confirmation:', message.data);
+  logger.debug('[Handler:previewConfirmed] Processing preview confirmation:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -36,7 +39,7 @@ export async function handlePreviewConfirmed(message, sender, sendResponse) {
       sender
     });
     
-    console.log(`✅ [previewConfirmed] Preview confirmed and processed for tab ${targetTabId}`);
+    logger.debug(`✅ [previewConfirmed] Preview confirmed and processed for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

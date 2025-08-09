@@ -2,6 +2,7 @@
 
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { logME, isExtensionContextValid } from "../../utils/core/helpers.js";
+import { createLogger } from "../../utils/core/logger.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import {
@@ -24,6 +25,8 @@ import { matchErrorToType } from "../../error-management/ErrorMatcher.js";
 
 export default class SelectionWindows {
   constructor(options = {}) {
+    // Initialize logger
+    this.logger = createLogger('Content', 'SelectionWindows');
     this.fadeInDuration = options.fadeInDuration || 50;
     this.fadeOutDuration = options.fadeOutDuration || 125;
     this.isVisible = false;
@@ -88,8 +91,8 @@ export default class SelectionWindows {
       }
     } catch (e) {
       // If anything fails, use current document
-      console.warn(
-        "[SelectionWindows] Could not access top document, using current:",
+      logger.warn(
+        "Could not access top document, using current:",
         e
       );
     }
@@ -126,10 +129,7 @@ export default class SelectionWindows {
 
         return { x: totalOffsetX, y: totalOffsetY };
       } catch (e) {
-        console.warn(
-          "[SelectionWindows] Could not calculate top window coords:",
-          e
-        );
+        this.logger.warn("Could not calculate top window coords:", e);
       }
     }
 
@@ -146,10 +146,7 @@ export default class SelectionWindows {
 
   _handleThemeChange({ newValue }) {
     if (newValue && this.displayElement && this.isVisible) {
-      logME(
-        "[SelectionWindows] Theme changed, updating popup theme.",
-        newValue
-      );
+      this.logger.debug("Theme changed, updating popup theme", newValue);
       this._applyThemeToHost();
     }
   }
@@ -199,7 +196,7 @@ export default class SelectionWindows {
 
       const topDocument = this._getTopDocument();
       if (!topDocument?.body) {
-        logME("[SelectionWindows] Cannot access top document body.");
+        this.logger.warn("Cannot access top document body");
         return;
       }
 
@@ -211,7 +208,7 @@ export default class SelectionWindows {
           iconHost.id = hostId;
           topDocument.body.appendChild(iconHost);
         } catch (e) {
-          logME("[SelectionWindows] Failed to create icon host container.", e);
+          this.logger.error("Failed to create icon host container", e);
           return;
         }
       }
@@ -333,7 +330,7 @@ export default class SelectionWindows {
       TranslationMode.Selection
     );
 
-    logME("[SelectionWindows] Creating translation window ", translationMode);
+    this.logger.debug("Creating translation window", { translationMode });
 
     this.displayElement = document.createElement("div");
     this.displayElement.classList.add("aiwc-selection-popup-host");
@@ -410,7 +407,7 @@ export default class SelectionWindows {
       
       // Set up result listener for Firefox MV3 compatibility
       const messageId = generateTranslationMessageId('content');
-      logME(`[SelectionWindows] Generated messageId: ${messageId}`);
+      this.logger.debug(`Generated messageId: ${messageId}`);
       
       const resultPromise = new Promise((resolve, reject) => {
         timeout = setTimeout(() => {
@@ -421,30 +418,30 @@ export default class SelectionWindows {
         }, 30000); // 30 second timeout
         
         messageListener = (message) => {
-          logME(`[SelectionWindows] Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
+          this.logger.debug(`Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
           
           if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
               message.messageId === messageId) {
-            logME(`[SelectionWindows] ✅ Message matched! Processing translation result`);
+            this.logger.operation("Message matched! Processing translation result");
             clearTimeout(timeout);
             browser.runtime.onMessage.removeListener(messageListener);
             
             // Check for error case first
             if (message.data?.success === false && message.data?.error) {
-              logME(`[SelectionWindows] ❌ Translation error received:`, message.data.error);
+              this.logger.error("Translation error received", message.data.error);
               const errorMessage = message.data.error.message || 'Translation failed';
               reject(new Error(errorMessage));
             } else if (message.data?.translatedText) {
               // Success case
-              logME(`[SelectionWindows] ✅ Translation success received`);
+              this.logger.operation("Translation success received");
               resolve({ translatedText: message.data.translatedText });
             } else {
               // Unexpected case
-              logME(`[SelectionWindows] ❌ Unexpected message data:`, message.data);
+              this.logger.error("Unexpected message data", message.data);
               reject(new Error('No translated text in result'));
             }
           } else if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
-            logME(`[SelectionWindows] ❌ Message ID mismatch. Expected: ${messageId}, Got: ${message.messageId}`);
+            this.logger.warn(`Message ID mismatch. Expected: ${messageId}, Got: ${message.messageId}`);
           }
         };
         
@@ -461,7 +458,7 @@ export default class SelectionWindows {
           messageId: messageId
         }
       ).catch(error => {
-        logME(`[SelectionWindows] Translation request failed:`, error);
+        this.logger.error("Translation request failed", error);
         // Don't reject here, let resultPromise handle the timeout
       });
       
@@ -602,7 +599,7 @@ export default class SelectionWindows {
     if (isExtensionContextValid()) {
       // Use specialized TTS messenger for stopping TTS
       this.messenger.specialized.tts.stop().catch((error) => {
-        logME("[SelectionWindows] Error stopping TTS:", error);
+        this.logger.warn("Error stopping TTS", error);
       });
     }
   }
@@ -1041,7 +1038,7 @@ export default class SelectionWindows {
         this.messenger.specialized.tts
           .speak(textToSpeak, AUTO_DETECT_VALUE)
           .catch((error) => {
-            logME("[SelectionWindows] Error speaking text:", error);
+            this.logger.warn("Error speaking text", error);
           });
       }
     });
@@ -1066,7 +1063,7 @@ export default class SelectionWindows {
           icon.style.opacity = originalOpacity;
         }, 150);
       } catch (err) {
-        logME("[SelectionWindows] Failed to copy text:", err);
+        this.logger.warn("Failed to copy text", err);
       }
     });
     return icon;
@@ -1085,7 +1082,7 @@ export default class SelectionWindows {
     const errorType = matchErrorToType(errObj.message);
     const localizedErrorMessage = await getErrorMessage(errorType);
     
-    logME(`[SelectionWindows] Handling translation error - Type: ${errorType}, Message: ${localizedErrorMessage}`);
+    this.logger.error(`Handling translation error - Type: ${errorType}, Message: ${localizedErrorMessage}`);
     
     if (this.innerContainer) {
       const errorMsgElement = document.createElement("div");
@@ -1210,7 +1207,8 @@ export default class SelectionWindows {
 }
 
 export function dismissAllSelectionWindows() {
-  logME("[SelectionWindows] Dismissing all selection windows");
+  const logger = createLogger('Content', 'SelectionWindows');
+  logger.debug("Dismissing all selection windows");
   try {
     // Function to clean up from a specific document
     const cleanupDocument = (doc) => {
@@ -1219,7 +1217,7 @@ export function dismissAllSelectionWindows() {
         try {
           host.remove();
         } catch (innerErr) {
-          logME("[SelectionWindows] Failed to remove a host:", innerErr);
+          logger.warn("Failed to remove a host", innerErr);
         }
       });
       const icons = doc.querySelectorAll("#translate-it-icon");
@@ -1252,12 +1250,9 @@ export function dismissAllSelectionWindows() {
         cleanupDocument(topDocument);
       }
     } catch (err) {
-      logME("[SelectionWindows] Could not clean top document:", err);
+      logger.warn("Could not clean top document", err);
     }
   } catch (err) {
-    logME(
-      "[SelectionWindows] Unknown error in dismissAllSelectionWindows:",
-      err
-    );
+    logger.error("Unknown error in dismissAllSelectionWindows", err);
   }
 }

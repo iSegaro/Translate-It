@@ -57,6 +57,9 @@ import { useLanguages } from '@/composables/useLanguages.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'LanguageSelector');
 
 // Props
 const props = defineProps({
@@ -141,7 +144,7 @@ const canSwapLanguages = computed(() => {
 // Methods
 const handleSwapLanguages = () => {
   if (canSwapLanguages.value && !props.disabled) {
-    console.log('[LanguageSelector] Swapping languages:', {
+    logger.debug('[LanguageSelector] Swapping languages:', {
       source: sourceLanguage.value,
       target: targetLanguage.value
     })
@@ -175,8 +178,7 @@ onMounted(async () => {
   } catch (error) {
     await handleError(error, 'language-selector-init')
   }
-})
-</script>
+})</script>
 
 <style scoped>
 .language-controls {

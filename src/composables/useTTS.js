@@ -1,5 +1,8 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useExtensionAPI } from "./useExtensionAPI.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useTTS');
 
 export function useTTS() {
   const { getStorageData, setStorageData } = useExtensionAPI();
@@ -291,7 +294,7 @@ export function useTTS() {
     try {
       await setStorageData({ tts_settings: settings.value });
     } catch (err) {
-      console.error("Failed to save TTS settings:", err);
+      logger.error("Failed to save TTS settings:", err);
     }
   };
 
@@ -302,7 +305,7 @@ export function useTTS() {
         settings.value = { ...settings.value, ...data.tts_settings };
       }
     } catch (err) {
-      console.error("Failed to load TTS settings:", err);
+      logger.error("Failed to load TTS settings:", err);
     }
   };
 
@@ -398,7 +401,7 @@ export function useTTS() {
   // Initialize
   const initialize = async () => {
     if (!checkSupport()) {
-      console.warn("TTS not supported in this browser");
+      logger.warn("TTS not supported in this browser");
       return false;
     }
 

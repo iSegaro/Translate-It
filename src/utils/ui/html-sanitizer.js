@@ -2,6 +2,9 @@
 // Utility for safe HTML insertion with XSS protection
 
 import { filterXSS } from "xss";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'html-sanitizer');
 
 /**
  * XSS configuration that matches the project's security requirements
@@ -49,7 +52,7 @@ export function safeSetHTML(element, htmlContent) {
     });
   } catch (error) {
     // Fallback to safe text content on error
-    console.warn("safeSetHTML failed, falling back to textContent:", error);
+    logger.warn("safeSetHTML failed, falling back to textContent:", error);
     element.textContent = htmlContent.replace(/<[^>]*>/g, ""); // Strip HTML tags
   }
 }

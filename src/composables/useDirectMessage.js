@@ -4,6 +4,9 @@
 import { ref } from "vue";
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useDirectMessage');
 
 export function useDirectMessage() {
   const isReady = ref(false);
@@ -17,15 +20,15 @@ export function useDirectMessage() {
         throw new Error("browser API not available");
       }
 
-      console.log("[useDirectMessage] Sending direct message:", message);
+      logger.debug("Sending direct message:", message);
 
       // Direct call without Promise.race or timeout wrapper
       const response = await browser.runtime.sendMessage(message);
 
-      console.log("[useDirectMessage] Direct response received:", response);
+      logger.debug("Direct response received:", response);
       return response;
     } catch (error) {
-      console.error("[useDirectMessage] Direct message failed:", error);
+      logger.error("Direct message failed", error);
 
       // Return a simple error object
       return {
@@ -40,10 +43,7 @@ export function useDirectMessage() {
    * Send translation message with minimal wrapping
    */
   const sendTranslation = async (payload, abortSignal) => {
-    console.log(
-      "[useDirectMessage] Sending translation with payload:",
-      payload,
-    );
+    logger.debug("Sending translation with payload:", payload);
 
     // Check if request was cancelled before starting
     if (abortSignal?.aborted) {

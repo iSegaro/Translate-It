@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleIsCurrentPageExcluded');
 /**
  * Handler for checking if current page is excluded from extension
  */
@@ -47,7 +50,7 @@ export async function handleIsCurrentPageExcluded(message) {
     
     return { success: true, excluded }
   } catch (error) {
-    console.error('[handleIsCurrentPageExcluded] Error:', error)
+    logger.error('[handleIsCurrentPageExcluded] Error:', error)
     return { success: false, error: 'Failed to check page exclusion status' }
   }
 }

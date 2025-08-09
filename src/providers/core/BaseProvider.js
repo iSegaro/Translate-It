@@ -1,6 +1,9 @@
 // src/providers/core/BaseTranslationProvider.js
 import { logME } from "@/utils/core/helpers.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'BaseProvider');
 
 /**
  * Base class for all translation providers
@@ -67,7 +70,7 @@ export class BaseProvider {
         try {
           body = await response.json();
         } catch (jsonError) {
-          console.error(`[${this.providerName}] Failed to parse error response JSON:`, jsonError);
+          logger.error(`[${this.providerName}] Failed to parse error response JSON:`, jsonError);
         }
         // Use detail or error.message or statusText, fallback to HTTP status
         const msg =
@@ -76,7 +79,7 @@ export class BaseProvider {
           response.statusText ||
           `HTTP ${response.status}`;
 
-        console.error(`[${this.providerName}] _executeApiCall HTTP error:`, {
+        logger.error(`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
           statusText: response.statusText,
           body: body,
@@ -100,7 +103,7 @@ export class BaseProvider {
       logME(`[${this.providerName}] _executeApiCall extracted result:`, result);
 
       if (result === undefined) {
-        console.error(
+        logger.error(
           `[${this.providerName}] _executeApiCall result is undefined - treating as invalid response. Raw data:`,
           data
         );

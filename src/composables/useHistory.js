@@ -5,6 +5,9 @@ import { useSettingsStore } from "@/store/core/settings.js";
 import { SimpleMarkdown } from "@/utils/text/markdown.js";
 import { correctTextDirection } from "@/utils/text/textDetection.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useHistory');
 
 const MAX_HISTORY_ITEMS = 100;
 
@@ -32,11 +35,9 @@ export function useHistory() {
     try {
       await settingsStore.loadSettings(); // Ensure settings are loaded
       historyItems.value = settingsStore.settings.translationHistory || [];
-      console.log(
-        `[useHistory] Loaded ${historyItems.value.length} history items`,
-      );
+      logger.info(`Loaded ${historyItems.value.length} history items`);
     } catch (error) {
-      console.error("[useHistory] Error loading history:", error);
+      logger.error("Error loading history", error);
       historyError.value = "Failed to load history";
       historyItems.value = [];
     } finally {
@@ -68,14 +69,9 @@ export function useHistory() {
         newHistory,
       );
 
-      console.log(
-        "[useHistory] Added to history:",
-        translationData.sourceText,
-        "Translated:",
-        translationData.translatedText,
-      );
+      logger.info("Added to history:", translationData.sourceText, "Translated:", translationData.translatedText);
     } catch (error) {
-      console.error("[useHistory] Error adding to history:", error);
+      logger.error("Error adding to history", error);
       historyError.value = "Failed to save to history";
     }
   };
@@ -93,10 +89,10 @@ export function useHistory() {
           newHistory,
         );
 
-        console.log("[useHistory] Deleted history item at index:", index);
+        logger.info("Deleted history item at index:", index);
       }
     } catch (error) {
-      console.error("[useHistory] Error deleting history item:", error);
+      logger.error("Error deleting history item", error);
       historyError.value = "Failed to delete history item";
     }
   };
@@ -115,12 +111,12 @@ export function useHistory() {
 
         await settingsStore.updateSettingAndPersist("translationHistory", []);
 
-        console.log("[useHistory] Cleared all history");
+        logger.info("Cleared all history");
         return true;
       }
       return false;
     } catch (error) {
-      console.error("[useHistory] Error clearing history:", error);
+      logger.error("Error clearing history", error);
       historyError.value = "Failed to clear history";
       return false;
     }
@@ -148,7 +144,7 @@ export function useHistory() {
     try {
       return SimpleMarkdown.render(text);
     } catch (error) {
-      console.error("[useHistory] Error parsing markdown:", error);
+      logger.error("Error parsing markdown", error);
       return null;
     }
   };
@@ -168,12 +164,12 @@ export function useHistory() {
   // Convenience functions for opening/closing history panel
   const openHistoryPanel = () => {
     isHistoryPanelOpen.value = true;
-    console.log("[useHistory] History panel opened");
+    logger.info("History panel opened");
   };
 
   const closeHistoryPanel = () => {
     isHistoryPanelOpen.value = false;
-    console.log("[useHistory] History panel closed");
+    logger.info("History panel closed");
   };
 
   // Watch for changes in settingsStore.settings.translationHistory
@@ -184,7 +180,7 @@ export function useHistory() {
         historyItems.value = newHistory;
         // Only log in development mode to reduce console noise
         if (import.meta.env.DEV) {
-          console.debug("[useHistory] History updated from settings store");
+          logger.debug("History updated from settings store");
         }
       }
     },

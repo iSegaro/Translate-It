@@ -40,6 +40,9 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
 import browser from 'webextension-polyfill'
 import { loadSettingsModules } from '@/utils/settings-modules.js'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'OptionsApp');
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -52,35 +55,35 @@ const errorMessage = ref('')
 
 // Lifecycle
 onMounted(async () => {
-  console.log('🚀 OptionsApp mounting...')
+  logger.debug('🚀 OptionsApp mounting...')
   
   try {
     // Step 1: Set loading text
-    console.log('📝 Setting loading text...')
+    logger.debug('📝 Setting loading text...')
     loadingText.value = browser.i18n.getMessage('options_loading') || 'Loading Settings...'
-    console.log('✅ Loading text set')
+    logger.debug('✅ Loading text set')
     
     // Step 2: Load settings store
-    console.log('⚙️ Loading settings store...')
+    logger.debug('⚙️ Loading settings store...')
     await Promise.race([
       settingsStore.loadSettings(),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-    console.log('✅ Settings store loaded')
+    logger.debug('✅ Settings store loaded')
     
     // Step 3: Load additional modules
-    console.log('🔧 Loading additional modules...')
+    logger.debug('🔧 Loading additional modules...')
     await initializeOptions()
-    console.log('✅ Additional modules loaded')
+    logger.debug('✅ Additional modules loaded')
     
   } catch (error) {
-    console.error('❌ Failed to initialize options:', error)
+    logger.error('❌ Failed to initialize options:', error)
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
-    console.log('✨ OptionsApp initialization complete')
+    logger.debug('✨ OptionsApp initialization complete')
     isLoading.value = false
   }
 })
@@ -89,13 +92,13 @@ const initializeOptions = async () => {
   try {
     await loadSettingsModules()
   } catch (error) {
-    console.warn('⚠️ Failed to load settings modules:', error)
+    logger.warn('⚠️ Failed to load settings modules:', error)
     // Don't throw - this is optional
   }
 }
 
 const retryLoading = () => {
-  console.log('🔄 Retrying options loading...')
+  logger.debug('🔄 Retrying options loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
@@ -107,8 +110,7 @@ const retryLoading = () => {
   setTimeout(() => {
     onMounted()
   }, 100)
-}
-</script>
+}</script>
 
 <style scoped>
 .extension-options {

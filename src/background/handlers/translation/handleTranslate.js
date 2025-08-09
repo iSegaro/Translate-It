@@ -3,6 +3,9 @@ import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleTranslate');
 // Delimiter used by providers (e.g. Bing) for JSON/segment mode
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -16,10 +19,10 @@ const errorHandler = new ErrorHandler();
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
 export async function handleTranslate(message, sender) {
-  console.log('[Handler:TRANSLATE] Raw message received:', JSON.stringify(message, null, 2));
-  console.log('[Handler:TRANSLATE] Sender info:', sender);
-  console.log('[Handler:TRANSLATE] Sender.tab:', sender.tab);
-  console.log('[Handler:TRANSLATE] Sender.tab.id:', sender.tab?.id);
+  logger.debug('[Handler:TRANSLATE] Raw message received:', JSON.stringify(message, null, 2));
+  logger.debug('[Handler:TRANSLATE] Sender info:', sender);
+  logger.debug('[Handler:TRANSLATE] Sender.tab:', sender.tab);
+  logger.debug('[Handler:TRANSLATE] Sender.tab.id:', sender.tab?.id);
 
   try {
     const backgroundService = globalThis.backgroundService;
@@ -45,23 +48,23 @@ export async function handleTranslate(message, sender) {
     // The TranslationEngine/provider will detect and handle JSON-mode parsing itself
     // (this preserves the original payload and allows provider-specific JSON handling).
     if (normalizedMessage.data.mode === 'SelectElement' && normalizedMessage.data.options?.rawJsonPayload) {
-      console.log('[Handler:TRANSLATE] SelectElement rawJsonPayload detected - leaving data.text as-is for provider handling');
+      logger.debug('[Handler:TRANSLATE] SelectElement rawJsonPayload detected - leaving data.text as-is for provider handling');
     }
 
-    console.log('[Handler:TRANSLATE] Normalized message:', JSON.stringify(normalizedMessage, null, 2));
+    logger.debug('[Handler:TRANSLATE] Normalized message:', JSON.stringify(normalizedMessage, null, 2));
 
     // Call the translation engine with the normalized message (ASYNC OPERATION)
-    console.log('[Handler:TRANSLATE] Starting async translation...');
+    logger.debug('[Handler:TRANSLATE] Starting async translation...');
 
     const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
 
-    console.log('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
+    logger.debug('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
 
     if (!result || typeof result !== 'object' || !Object.prototype.hasOwnProperty.call(result, 'success')) {
       throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
     }
 
-    console.log('[Handler:TRANSLATE] Translation result:', JSON.stringify(result, null, 2));
+    logger.debug('[Handler:TRANSLATE] Translation result:', JSON.stringify(result, null, 2));
 
     // Send TRANSLATION_RESULT_UPDATE for ALL cases (success AND error) due to Firefox MV3 issues
     const targetTabId = sender.tab?.id;
@@ -91,7 +94,7 @@ export async function handleTranslate(message, sender) {
 
           if (parsedProviderJson && Array.isArray(parsedProviderJson) && expectedLen && parsedProviderJson.length === expectedLen) {
             finalTranslatedText = result.translatedText; // provider returned matching array
-            console.log('[Handler:TRANSLATE] Provider returned matching JSON array for SelectElement mode');
+            logger.debug('[Handler:TRANSLATE] Provider returned matching JSON array for SelectElement mode');
           } else {
             // If provider returned single-element array where its text contains the delimiter,
             // split it and reconstruct an array
@@ -101,7 +104,7 @@ export async function handleTranslate(message, sender) {
               if (parts.length === expectedLen) {
                 const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
                 finalTranslatedText = JSON.stringify(rebuilt);
-                console.log('[Handler:TRANSLATE] Rebuilt JSON array from single-element provider response');
+                logger.debug('[Handler:TRANSLATE] Rebuilt JSON array from single-element provider response');
               }
             }
 
@@ -113,7 +116,7 @@ export async function handleTranslate(message, sender) {
                 if (parts.length === expectedLen) {
                   const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
                   finalTranslatedText = JSON.stringify(rebuilt);
-                  console.log('[Handler:TRANSLATE] Rebuilt JSON array from raw translatedText by splitting delimiter');
+                  logger.debug('[Handler:TRANSLATE] Rebuilt JSON array from raw translatedText by splitting delimiter');
                 }
               }
             }
@@ -121,13 +124,13 @@ export async function handleTranslate(message, sender) {
             // Fallback: if nothing matched, wrap entire translatedText as single element
             if (!finalTranslatedText) {
               finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
-              console.log('[Handler:TRANSLATE] Fallback: wrapped provider translatedText into single-element JSON array');
+              logger.debug('[Handler:TRANSLATE] Fallback: wrapped provider translatedText into single-element JSON array');
             }
           }
         } catch (err) {
           // On any error, fallback to wrapping
           finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
-          console.warn('[Handler:TRANSLATE] Error while normalizing SelectElement provider output, fallback wrap used', err);
+          logger.warn('[Handler:TRANSLATE] Error while normalizing SelectElement provider output, fallback wrap used', err);
         }
       }
 
@@ -148,7 +151,7 @@ export async function handleTranslate(message, sender) {
       );
     } else {
       // ERROR case - send error information
-      console.log('[Handler:TRANSLATE] Translation failed, sending error update:', result.error);
+      logger.debug('[Handler:TRANSLATE] Translation failed, sending error update:', result.error);
       
       updateMessage = MessageFormat.create(
         MessageActions.TRANSLATION_RESULT_UPDATE,
@@ -169,22 +172,22 @@ export async function handleTranslate(message, sender) {
 
     // Send the update message (for both success and error cases)
     if (targetTabId) {
-      console.log(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, updateMessage);
+      logger.debug(`[Handler:TRANSLATE] Sending TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, updateMessage);
       browser.tabs.sendMessage(targetTabId, updateMessage).catch(error => {
-        console.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
+        logger.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
       });
     } else {
-      console.warn("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
+      logger.warn("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
       browser.runtime.sendMessage(updateMessage).catch(error => {
-        console.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
+        logger.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
       });
     }
 
     return MessageFormat.createSuccessResponse("Translation request processed in background.", message.messageId);
 
   } catch (translationError) {
-    console.error('[Handler:TRANSLATE] Translation error:', translationError);
-    console.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
+    logger.error('[Handler:TRANSLATE] Translation error:', translationError);
+    logger.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
 
     errorHandler.handle(translationError, {
       type: ErrorTypes.TRANSLATION,
@@ -198,7 +201,7 @@ export async function handleTranslate(message, sender) {
       { context: message.context || 'unknown' } // Pass context as part of options
     );
 
-    console.log('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
+    logger.debug('[Handler:TRANSLATE] Returning error response:', JSON.stringify(errorResponse, null, 2));
     return errorResponse;
   }
 }

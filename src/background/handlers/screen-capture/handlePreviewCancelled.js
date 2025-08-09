@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handlePreviewCancelled.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handlePreviewCancelled');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handlePreviewCancelled(message, sender, sendResponse) {
-  console.log('[Handler:previewCancelled] Processing preview cancellation:', message.data);
+  logger.debug('[Handler:previewCancelled] Processing preview cancellation:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -32,7 +35,7 @@ export async function handlePreviewCancelled(message, sender, sendResponse) {
       sender
     });
     
-    console.log(`✅ [previewCancelled] Preview cancelled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`✅ [previewCancelled] Preview cancelled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

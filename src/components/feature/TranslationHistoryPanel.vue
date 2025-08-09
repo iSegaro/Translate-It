@@ -491,6 +491,9 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');
 
 const emit = defineEmits(['retranslate', 'copy', 'tts', 'export'])
 
@@ -710,7 +713,7 @@ const playTTS = (item) => {
 
 const editTranslation = (item) => {
   // This would open an edit modal
-  console.log('Edit translation:', item)
+  logger.debug('Edit translation:', item)
 }
 
 const favoriteItem = (item) => {
@@ -825,8 +828,7 @@ watch(filters, () => {
 onMounted(() => {
   // Load history if needed
   isLoading.value = false
-})
-</script>
+})</script>
 
 <style scoped>
 .history-panel {

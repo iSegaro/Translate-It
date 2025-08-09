@@ -3,6 +3,9 @@
 
 import { LifecycleManager } from "../managers/core/LifecycleManager.js";
 import { registerAllProviders } from "../providers/register-providers.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'index');
 
 registerAllProviders();
 
@@ -10,9 +13,9 @@ const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
 
 backgroundService.initialize().then(() => {
-  console.log("✅ [Background] Background service initialization completed!");
+  logger.debug("✅ [Background] Background service initialization completed!");
 }).catch((error) => {
-  console.error("❌ [Background] Background service initialization failed:", error);
+  logger.error("❌ [Background] Background service initialization failed:", error);
 });
 
 export { backgroundService };

@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'feature-loader');
 // src/background/feature-loader.js
 // Dynamic feature loading based on browser capabilities
 
@@ -50,43 +53,43 @@ export class FeatureLoader {
   async _loadTTSManagerImpl() {
     // Use the official browser.offscreen API for capability detection
     const hasOffscreen = typeof browser.offscreen?.hasDocument === "function";
-    console.log(`🔊 Checking for Offscreen API. Available: ${hasOffscreen}`);
+    logger.debug(`🔊 Checking for Offscreen API. Available: ${hasOffscreen}`);
 
     if (hasOffscreen) {
       try {
-        console.log("Attempting to load OffscreenTTSManager...");
+        logger.debug("Attempting to load OffscreenTTSManager...");
         const { OffscreenTTSManager } = await import(
           "../managers/browser-specific/tts/TTSChrome.js"
         );
         const manager = new OffscreenTTSManager();
         await manager.initialize();
-        console.log("✅ OffscreenTTSManager initialized successfully.");
+        logger.debug("✅ OffscreenTTSManager initialized successfully.");
         return manager;
       } catch (error) {
-        console.warn(
+        logger.warn(
           "Offscreen TTS initialization failed, falling back to background page TTS:",
           error,
         );
         // Fallback to background if offscreen fails for any reason
       }
     } else {
-      console.log(
+      logger.debug(
         "Offscreen API not available, proceeding with background page TTS.",
       );
     }
 
     // Fallback for Firefox or if offscreen fails
     try {
-      console.log("Attempting to load BackgroundTTSManager...");
+      logger.debug("Attempting to load BackgroundTTSManager...");
       const { BackgroundTTSManager } = await import(
         "../managers/browser-specific/tts/TTSFirefox.js"
       );
       const manager = new BackgroundTTSManager();
       await manager.initialize();
-      console.log("✅ BackgroundTTSManager initialized successfully.");
+      logger.debug("✅ BackgroundTTSManager initialized successfully.");
       return manager;
     } catch (error) {
-      console.error(
+      logger.error(
         "❌ Failed to load BackgroundTTSManager:",
         error,
       );
@@ -137,7 +140,7 @@ export class FeatureLoader {
       ? "side_panel"
       : "sidebar_action"; // Simplified panel system selection
 
-    console.log(`📋 Loading panel manager with system: ${panelSystem}`);
+    logger.debug(`📋 Loading panel manager with system: ${panelSystem}`);
 
     try {
       if (panelSystem === "side_panel" && capabilities.sidePanel) {
@@ -153,12 +156,12 @@ export class FeatureLoader {
         return new FirefoxSidebarManager();
       }
     } catch (error) {
-      console.error("Failed to load panel manager:", error);
+      logger.error("Failed to load panel manager:", error);
       // Fallback to basic implementation
       return {
         initialize: () => Promise.resolve(),
-        open: () => console.warn("Panel functionality not available"),
-        close: () => console.warn("Panel functionality not available"),
+        open: () => logger.warn("Panel functionality not available"),
+        close: () => logger.warn("Panel functionality not available"),
       };
     }
   }
@@ -205,7 +208,7 @@ export class FeatureLoader {
       ? "chrome"
       : "firefox"; // Simplified browser detection
 
-    console.log(`📸 Loading screen capture manager for ${browserName}`);
+    logger.debug(`📸 Loading screen capture manager for ${browserName}`);
 
     try {
       if (capabilities.offscreen && browser === "chrome") {
@@ -220,7 +223,7 @@ export class FeatureLoader {
         return new ContentScriptCaptureManager();
       }
     } catch (error) {
-      console.error("Failed to load screen capture manager:", error);
+      logger.error("Failed to load screen capture manager:", error);
       // Fallback to basic content script implementation
       const { ContentScriptCaptureManager } = await import(
         "../managers/capture-content.js"
@@ -248,7 +251,7 @@ export class FeatureLoader {
       this.loadedFeatures.set(cacheKey, manager);
       return manager;
     } catch (error) {
-      console.error("Failed to load context menu manager:", error);
+      logger.error("Failed to load context menu manager:", error);
       throw error;
     }
   }
@@ -258,7 +261,7 @@ export class FeatureLoader {
    * @returns {Promise<Object>} Object containing all loaded features
    */
   async preloadEssentialFeatures() {
-    console.log("🚀 Pre-loading essential features...");
+    logger.debug("🚀 Pre-loading essential features...");
 
     const results = await Promise.allSettled([
       this.loadTTSManager(),
@@ -281,9 +284,9 @@ export class FeatureLoader {
 
       if (result.status === "fulfilled") {
         features[featureName] = result.value;
-        console.log(`✅ ${featureName} feature loaded successfully`);
+        logger.debug(`✅ ${featureName} feature loaded successfully`);
       } else {
-        console.error(
+        logger.error(
           `❌ Failed to load ${featureName} feature:`,
           result.reason,
         );
@@ -302,7 +305,7 @@ export class FeatureLoader {
    * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
    */
   async loadListener(listenerName, browser) {
-    console.warn(
+    logger.warn(
       `[FeatureLoader] loadListener(${listenerName}) is deprecated - listeners are now managed by UnifiedListenerManager`,
     );
     return null;
@@ -316,7 +319,7 @@ export class FeatureLoader {
    * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
    */
   async loadAllListeners() {
-    console.warn(
+    logger.warn(
       "[FeatureLoader] loadAllListeners is deprecated - listeners are now managed by UnifiedListenerManager",
     );
     return [];

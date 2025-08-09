@@ -7,12 +7,14 @@
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
 import { TranslationMode } from '../../config.js';
+import { createLogger } from '../../utils/core/logger.js';
 
 export class ContentMessageHandler {
   constructor() {
     this.handlers = new Map();
     this.initialized = false;
     this.context = MessagingContexts.CONTENT;
+    this.logger = createLogger('Content', 'MessageHandler');
   }
 
   /**
@@ -21,17 +23,15 @@ export class ContentMessageHandler {
    */
   initialize() {
     if (this.initialized) {
-      console.warn('[ContentMessageHandler] Already initialized');
+      this.logger.warn('Already initialized');
       return;
     }
-
-    console.log('[ContentMessageHandler] Initializing content script message handler');
 
     // Register message handlers for content-specific actions
     this.registerHandlers();
     
     this.initialized = true;
-    console.log('[ContentMessageHandler] ✅ Initialized successfully');
+    this.logger.init('Content message handler initialized');
   }
 
   /**
@@ -52,11 +52,11 @@ export class ContentMessageHandler {
    */
   registerHandler(action, handler) {
     if (this.handlers.has(action)) {
-      console.warn(`[ContentMessageHandler] Overwriting handler for action: ${action}`);
+      this.logger.warn(`Overwriting handler for action: ${action}`);
     }
     
     this.handlers.set(action, handler);
-    console.log(`[ContentMessageHandler] ✅ Registered handler for: ${action}`);
+    this.logger.debug(`Registered handler for: ${action}`);
   }
 
   /**
@@ -67,7 +67,7 @@ export class ContentMessageHandler {
    * @returns {boolean|Promise} Handler result
    */
   async handleMessage(message, sender, sendResponse) {
-    console.log('[ContentMessageHandler] Processing message:', message.action);
+    this.logger.debug('Processing message:', message.action);
 
     const handler = this.handlers.get(message.action);
     if (!handler) {
@@ -84,7 +84,7 @@ export class ContentMessageHandler {
       
       return result;
     } catch (error) {
-      console.error(`[ContentMessageHandler] Error handling ${message.action}:`, error);
+      this.logger.error(`Error handling ${message.action}`, error);
       
       const errorResponse = {
         success: false,
@@ -112,7 +112,7 @@ export class ContentMessageHandler {
     const { translationMode } = message.data;
     const messageId = message.messageId;
     
-    console.log('[ContentMessageHandler] Processing translation result:', {
+    this.logger.debug('Processing translation result', {
       mode: translationMode,
       messageId,
       hasTranslatedText: !!message.data.translatedText
@@ -136,7 +136,7 @@ export class ContentMessageHandler {
       return this.createNoActionResponse(translationMode);
       
     } catch (error) {
-      console.error('[ContentMessageHandler] Error in translation result handling:', error);
+      this.logger.error('Error in translation result handling', error);
       return {
         success: false,
         error: error.message || 'Failed to handle translation result',
@@ -186,7 +186,7 @@ export class ContentMessageHandler {
   async handleFieldTranslation(message) {
     const { translatedText, originalText, translationMode } = message.data;
     
-    console.log('[ContentMessageHandler] Handling field translation');
+    this.logger.debug('Handling field translation');
     
     // Import and apply to text field
     const { applyTranslationToTextField } = await import('../smartTranslationIntegration.js');
@@ -216,7 +216,7 @@ export class ContentMessageHandler {
     
     const delegatedTo = delegateMapping[translationMode] || 'SpecializedHandler';
     
-    console.log(`[ContentMessageHandler] Delegating ${translationMode} to ${delegatedTo}`);
+    this.logger.debug(`Delegating ${translationMode} to ${delegatedTo}`);
     
     return {
       success: true,
@@ -246,7 +246,7 @@ export class ContentMessageHandler {
     ];
     
     if (noActionModes.includes(translationMode)) {
-      console.log(`[ContentMessageHandler] No action needed for ${translationMode}`);
+      this.logger.debug(`No action needed for ${translationMode}`);
       
       return {
         success: true,
@@ -258,7 +258,7 @@ export class ContentMessageHandler {
     }
     
     // Unknown mode - log warning but don't fail
-    console.warn(`[ContentMessageHandler] Unknown translation mode: ${translationMode}`);
+    this.logger.warn(`Unknown translation mode: ${translationMode}`);
     
     return {
       success: true,
@@ -288,7 +288,7 @@ export class ContentMessageHandler {
   cleanup() {
     this.handlers.clear();
     this.initialized = false;
-    console.log('[ContentMessageHandler] Cleaned up');
+    this.logger.operation('Cleaned up');
   }
 }
 

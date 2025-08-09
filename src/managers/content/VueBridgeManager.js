@@ -4,6 +4,9 @@ import DOMPurify from "dompurify";
 import browser from "webextension-polyfill";
 import { MessagingCore, MessageFormat, MessageContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Content', 'VueBridgeManager');
 
 class ContentScriptVueBridge {
   constructor() {
@@ -30,7 +33,7 @@ class ContentScriptVueBridge {
       this.setupMessageListener();
       this.isInitialized = true;
     } catch (error) {
-      console.error("[Vue Bridge] Failed to initialize:", error);
+      logger.error("[Vue Bridge] Failed to initialize:", error);
     }
   }
 
@@ -48,7 +51,7 @@ class ContentScriptVueBridge {
   setupMessageListener() {
     this.messageHandler = (message, sender, sendResponse) => {
       if (!MessageFormat.validate(message)) {
-        console.warn("[Vue Bridge] Received invalid message format:", message);
+        logger.warn("[Vue Bridge] Received invalid message format:", message);
         return;
       }
 

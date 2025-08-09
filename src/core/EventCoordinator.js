@@ -18,7 +18,8 @@ import {
 } from "../config.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { logME, logMethod, taggleLinks } from "../utils/core/helpers.js";
+import { createLogger } from "../utils/core/logger.js";
+import { logMethod, taggleLinks } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
 import SelectionWindows from "../managers/content/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
@@ -35,6 +36,9 @@ export default class EventCoordinator {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
+    
+    // Initialize logger
+    this.logger = createLogger('Content', 'EventCoordinator');
     
     // Initialize SelectionWindows for text selection manager
     this.SelectionWindows = new SelectionWindows({
@@ -66,7 +70,7 @@ export default class EventCoordinator {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
 
-    logME('[EventCoordinator] Initialized with specialized managers');
+    this.logger.init('EventCoordinator initialized with specialized managers');
   }
 
   /**
@@ -132,7 +136,7 @@ export default class EventCoordinator {
       // Delegate to TextFieldManager
       return await this.textFieldManager.processEditableElement(target);
     } catch (error) {
-      logME('[EventCoordinator] Error in text field coordination:', error);
+      this.logger.error('Error in text field coordination:', error);
       await this.handleCoordinationError(error, event, 'text-field-coordination');
     }
   }
@@ -148,7 +152,7 @@ export default class EventCoordinator {
       // Delegate to TextFieldManager focus handler
       return await this.textFieldManager.handleEditableFocus(target);
     } catch (error) {
-      logME('[EventCoordinator] Error in text field focus coordination:', error);
+      this.logger.error('Error in text field focus coordination:', error);
       await this.handleCoordinationError(error, event, 'text-field-focus-coordination');
     }
   }
@@ -164,7 +168,7 @@ export default class EventCoordinator {
       // Delegate to TextFieldManager blur handler
       this.textFieldManager.handleEditableBlur(target);
     } catch (error) {
-      logME('[EventCoordinator] Error in text field blur coordination:', error);
+      this.logger.error('Error in text field blur coordination:', error);
       await this.handleCoordinationError(error, event, 'text-field-blur-coordination');
     }
   }
@@ -182,7 +186,7 @@ export default class EventCoordinator {
       // Delegate to TextSelectionManager
       await this.textSelectionManager.handleTextSelection(event);
     } catch (error) {
-      logME('[EventCoordinator] Error in text selection coordination:', error);
+      this.logger.error('Error in text selection coordination:', error);
       await this.handleCoordinationError(error, event, 'text-selection-coordination');
     }
   }

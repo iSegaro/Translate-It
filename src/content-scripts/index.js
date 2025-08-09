@@ -2,6 +2,7 @@
 // Modern modular architecture with organized handlers and shortcuts
 
 import browser from "webextension-polyfill";
+import { createLogger } from "../utils/core/logger.js";
 
 // Import and initialize Vue bridge
 import { vueBridge } from "../managers/content/VueBridgeManager.js";
@@ -23,13 +24,14 @@ import { SelectElementManager } from "../managers/content/SelectElementManager.j
 import { contentMessageHandler } from "../handlers/content/ContentMessageHandler.js";
 import { shortcutManager } from "../managers/content/shortcuts/ShortcutManager.js";
 
-console.log("Content script loaded via Vue build system");
-console.log("Vue bridge initialized:", vueBridge.isInitialized);
-console.log("Content TTS Handler loaded:", !!contentTTSHandler);
+// Create logger for content script
+const logger = createLogger('Content', 'ContentScript');
+
+logger.init("Content script loading...");
 
 // Initialize core systems
 const translationHandler = getTranslationHandlerInstance();
-const eventCoordinator = new EventCoordinator(translationHandler, translationHandler.featureManager);
+const eventCoordinator = translationHandler.eventCoordinator; // Use existing instance
 const selectElementManager = new SelectElementManager();
 
 // Store instances globally for handlers to access
@@ -57,11 +59,11 @@ document.addEventListener('click', eventCoordinator.handleEvent, { passive: true
 document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
 document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
 
-console.log('✅ DOM event listeners setup for EventCoordinator (modern event routing)');
+logger.debug('DOM event listeners registered');
 
 // Setup message listener integration with existing system
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[ContentScript] Received message:', message);
+  logger.debug('Message received', { action: message.action, from: message.context });
 
   // handleMessage returns false if no handler is found, or a promise if a handler is found.
   const wasHandled = contentMessageHandler.handleMessage(message, sender, sendResponse);
@@ -76,6 +78,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-console.log("✅ Content script initialized with modular architecture:");
-console.log("  - Content Message Handler:", contentMessageHandler.getInfo());
-console.log("  - Shortcut Manager:", shortcutManager.getShortcutsInfo());
+// Final initialization summary
+logger.init('Content script initialized', {
+  messageHandlers: contentMessageHandler.getInfo?.()?.handlerCount || 0,
+  shortcuts: shortcutManager.getShortcutsInfo?.()?.shortcutCount || 0,
+  vueBridge: vueBridge.isInitialized,
+  ttsHandler: !!contentTTSHandler
+});

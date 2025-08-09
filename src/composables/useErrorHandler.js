@@ -5,6 +5,9 @@ import { ref } from 'vue'
 import { ErrorHandler } from '../error-management/ErrorService.js'
 import { ErrorTypes } from '../error-management/ErrorTypes.js'
 import { matchErrorToType } from '../error-management/ErrorMatcher.js'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useErrorHandler');
 
 /**
  * Vue composable for unified error handling
@@ -46,7 +49,7 @@ export function useErrorHandler() {
       return silentErrors.includes(errorType)
       
     } catch (handlerError) {
-      console.error('[useErrorHandler] Failed to handle error:', handlerError)
+      logger.error('[useErrorHandler] Failed to handle error:', handlerError)
       return false
     } finally {
       isHandlingError.value = false
@@ -147,12 +150,12 @@ export function setupGlobalErrorHandler(app, appName = 'vue-app') {
       })
       
     } catch (handlerError) {
-      console.error(`[${appName}] Global error handler failed:`, handlerError)
+      logger.error(`[${appName}] Global error handler failed:`, handlerError)
     }
   }
   
   // Also handle unhandled promise rejections in Vue context
   app.config.warnHandler = (msg, instance, trace) => {
-    console.warn(`[${appName}] Vue Warning:`, msg, trace)
+    logger.warn(`[${appName}] Vue Warning:`, msg, trace)
   }
 }

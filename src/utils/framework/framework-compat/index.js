@@ -1,6 +1,6 @@
 // src/utils/framework-compat/index.js
 
-import { logME } from "../../core/helpers.js";
+import { createLogger } from "../../core/logger.js";
 import { checkTextSelection } from "./selectionUtils.js";
 import { simulateNaturalTyping } from "./naturalTyping.js";
 import {
@@ -8,6 +8,8 @@ import {
   optimizedTextInsertion,
 } from "./text-insertion/index.js";
 import { handleSimpleReplacement } from "./simpleReplacement.js";
+
+const logger = createLogger('Translation', 'TextReplacement');
 
 
 /**
@@ -28,7 +30,7 @@ export async function smartTextReplacement(
   if (!element) return false;
 
   try {
-    logME("[smartTextReplacement] Starting with strategies:", {
+    logger.debug('Starting text replacement with strategies', {
       tagName: element.tagName,
       isContentEditable: element.isContentEditable,
       hasSpellcheck: element.hasAttribute("spellcheck"),
@@ -44,7 +46,7 @@ export async function smartTextReplacement(
       end
     );
     if (optimizedSuccess) {
-      logME("[smartTextReplacement] ✅ Optimized insertion succeeded");
+      logger.debug('Optimized text insertion succeeded');
       return true;
     }
 
@@ -56,7 +58,7 @@ export async function smartTextReplacement(
       end
     );
     if (universalSuccess) {
-      logME("[smartTextReplacement] ✅ Universal insertion succeeded");
+      logger.debug('Universal text insertion succeeded');
       return true;
     }
 
@@ -74,10 +76,7 @@ export async function smartTextReplacement(
       );
 
     if (shouldUseNaturalTyping) {
-      logME(
-        "[smartTextReplacement] Trying natural typing for:",
-        window.location.hostname
-      );
+      logger.debug('Trying natural typing', { hostname: window.location.hostname });
 
       // بررسی انتخاب فعلی
       const hasCurrentSelection = checkTextSelection(element);
@@ -89,7 +88,7 @@ export async function smartTextReplacement(
         }
         const success = await simulateNaturalTyping(element, newValue, 5, true);
         if (success) {
-          logME("[smartTextReplacement] ✅ Natural typing (partial) succeeded");
+          logger.debug('Natural typing (partial replacement) succeeded');
           return true;
         }
       } else {
@@ -100,7 +99,7 @@ export async function smartTextReplacement(
           false
         );
         if (success) {
-          logME("[smartTextReplacement] ✅ Natural typing (full) succeeded");
+          logger.debug('Natural typing (full replacement) succeeded');
           return true;
         }
       }

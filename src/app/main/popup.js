@@ -5,6 +5,9 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'popup');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -37,7 +40,7 @@ async function initializeApp() {
     // Mount the app
     app.mount('#app')
   } catch (error) {
-    console.error('Failed to initialize popup app:', error)
+    logger.error('Failed to initialize popup app:', error)
     // Show error UI
     document.getElementById('app').innerHTML = '<div style="padding: 16px; color: red;">Failed to load extension. Please try reloading.</div>'
   }

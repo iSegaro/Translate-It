@@ -3,6 +3,9 @@ import { ErrorHandler } from './error-management/ErrorService.js';
 import { ErrorTypes } from './error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 import { storageManager } from '@/storage/core/StorageCore.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'config');
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:
@@ -320,23 +323,23 @@ export const getSettingsAsync = async () => {
 };
 
 export const initializeSettingsListener = async () => {
-  console.log('[config.js] initializeSettingsListener called - using StorageManager events');
+  logger.debug('[config.js] initializeSettingsListener called - using StorageManager events');
   
   try {
     // Setup listener through StorageManager event system
     // Note: StorageManager automatically handles caching, no manual cache management needed
     const listener = (data) => {
-      console.log(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
+      logger.debug(`[config.js] Storage change detected via StorageManager: ${data.key} = ${data.newValue}`);
       // StorageManager handles cache updates automatically
       // Any additional processing can be added here if needed
     };
 
     storageManager.on('change', listener);
-    console.log('[config.js] ✅ Storage listener successfully set up via StorageManager');
+    logger.debug('[config.js] ✅ Storage listener successfully set up via StorageManager');
     
     return listener; // Return listener for cleanup if needed
   } catch (error) {
-    console.error('[config.js] Failed to setup storage listener:', error);
+    logger.error('[config.js] Failed to setup storage listener:', error);
   }
 };
 
@@ -465,7 +468,7 @@ export const getPromptBASEScreenCaptureAsync = async () => {
 
 export const getTranslationApiAsync = async () => {
   const result = await getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
-  console.log(`[config.js] getTranslationApiAsync - Returning: ${result}`);
+  logger.debug(`[config.js] getTranslationApiAsync - Returning: ${result}`);
   return result;
 };
 

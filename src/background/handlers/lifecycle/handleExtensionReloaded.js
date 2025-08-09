@@ -1,6 +1,9 @@
 // src/background/handlers/lifecycle/handleExtensionReloaded.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleExtensionReloaded');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,11 +16,11 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleExtensionReloaded(message, sender, sendResponse) {
-  console.log('[Handler:EXTENSION_RELOADED] Processing extension reload notification:', message);
+  logger.debug('[Handler:EXTENSION_RELOADED] Processing extension reload notification:', message);
   
   try {
     // Log the extension reload
-    console.log('🔄 [EXTENSION_RELOADED] Extension has been reloaded, reinitializing systems');
+    logger.debug('🔄 [EXTENSION_RELOADED] Extension has been reloaded, reinitializing systems');
     
     const backgroundService = globalThis.backgroundService;
     if (backgroundService) {

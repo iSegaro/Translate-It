@@ -1,6 +1,9 @@
 // src/background/handlers/common/handleRefreshContextMenus.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleRefreshContextMenus');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleRefreshContextMenus(message, sender, sendResponse) {
-  console.log('[Handler:REFRESH_CONTEXT_MENUS] Processing context menu refresh:', message);
+  logger.debug('[Handler:REFRESH_CONTEXT_MENUS] Processing context menu refresh:', message);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -25,7 +28,7 @@ export async function handleRefreshContextMenus(message, sender, sendResponse) {
     // Refresh context menus via the background service
     await backgroundService.refreshContextMenus();
     
-    console.log('✅ [REFRESH_CONTEXT_MENUS] Context menus refreshed successfully');
+    logger.debug('✅ [REFRESH_CONTEXT_MENUS] Context menus refreshed successfully');
     
     sendResponse({ 
       success: true, 

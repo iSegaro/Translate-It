@@ -6,6 +6,7 @@ import browser from "webextension-polyfill";
 import { logME, taggleLinks } from "@/utils/core/helpers.js";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
+import { createLogger } from "../../utils/core/logger.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
@@ -28,6 +29,7 @@ export class SelectElementManager {
     this.overlayElements = new Set();
     this.currentHighlighted = null;
     this.browser = null;
+    this.logger = createLogger('Content', 'SelectElement');
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
@@ -56,7 +58,7 @@ export class SelectElementManager {
     this.pendingTranslation = null; // For waiting for TRANSLATION_RESULT_UPDATE
     this.statusNotification = null; // Track status notification for dismissal (like OLD system)
 
-    console.log("[SelectElementManager] Initialized with service integration");
+    this.logger.init('Select element manager initialized');
   }
 
   /**
@@ -70,9 +72,9 @@ export class SelectElementManager {
       // Initialize services
       this.notificationManager.initialize();
 
-      console.log("[SelectElementManager] browser API initialized");
+      this.logger.debug('Browser API initialized');
     } catch (error) {
-      console.error("[SelectElementManager] Initialization failed:", error);
+      this.logger.error("Initialization failed", error);
       await this.errorHandler.handle(error, {
         type: ErrorTypes.INTEGRATION,
         context: "select-element-manager-init",
@@ -91,14 +93,14 @@ export class SelectElementManager {
       this.browser.runtime.onMessage,
       this.messageListener
     );
-    console.log("[SelectElementManager] Message listener registered");
+    this.logger.debug('Message listener registered');
   }
 
   /**
    * Handle messages from background script
    */
   async handleMessage(message, sender, sendResponse) {
-    console.log(`[SelectElementManager] Received message:`, message);
+    this.logger.debug(`Received message:`, message);
 
     if (
       message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE ||
@@ -126,7 +128,7 @@ export class SelectElementManager {
 
         // Send success response to background
         const response = { success: true, isActive: this.isActive };
-        console.log(
+        logger.debug(
           `[SelectElementManager] Mode ${shouldActivate ? "activated" : "deactivated"} successfully`,
           response
         );
@@ -137,7 +139,7 @@ export class SelectElementManager {
 
         return response;
       } catch (error) {
-        console.error("[SelectElementManager] Toggle error:", error);
+        this.logger.error("Toggle error", error);
 
         // Handle error via ErrorService
         await this.errorHandler.handle(error, {
@@ -172,15 +174,14 @@ export class SelectElementManager {
 
     // Handle TRANSLATION_RESULT_UPDATE messages - check context like OLD system
     if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
-      console.log('[SelectElementManager] Received TRANSLATION_RESULT_UPDATE:', message);
-      console.log('[SelectElementManager] Message context:', message.context);
+      this.logger.debug('Received TRANSLATION_RESULT_UPDATE', { message, context: message.context });
       
       // Only handle messages for EVENT_HANDLER context (like OLD system)  
       if (message.context === MessagingContexts.EVENT_HANDLER) {
         await this.handleTranslationResult(message);
         return true;
       } else {
-        console.log('[SelectElementManager] Ignoring TRANSLATION_RESULT_UPDATE - wrong context:', message.context);
+        this.logger.debug('Ignoring TRANSLATION_RESULT_UPDATE - wrong context', message.context);
         return false;
       }
     }
@@ -194,9 +195,11 @@ export class SelectElementManager {
    */
   async handleTranslationResult(message) {
     try {
-      console.log('[SelectElementManager] Processing translation result:', message.data);
-      console.log('[SelectElementManager] Message ID from result:', message.messageId);
-      console.log('[SelectElementManager] Pending translation:', this.pendingTranslation);
+      this.logger.debug('Processing translation result', {
+        data: message.data,
+        messageId: message.messageId,
+        pendingTranslation: this.pendingTranslation
+      });
       
       const translationData = message.data;
       const messageId = message.messageId;
@@ -204,10 +207,10 @@ export class SelectElementManager {
       // Always try to cache successful translation results, even if cancelled
       if (translationData?.success && translationData?.translatedText) {
         try {
-          console.log('[SelectElementManager] Caching translation result for future use (even if cancelled)');
+          this.logger.debug('Caching translation result for future use (even if cancelled)');
           await this.cacheTranslationResult(translationData);
         } catch (cacheError) {
-          console.warn('[SelectElementManager] Failed to cache translation result:', cacheError);
+          this.logger.warn('Failed to cache translation result', cacheError);
         }
       }
       
@@ -215,7 +218,7 @@ export class SelectElementManager {
         // TRANSLATION_RESULT_UPDATE uses the same messageId as the original TRANSLATE request
         if (this.pendingTranslation.originalMessageId === messageId) {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
-          console.log('[SelectElementManager] Message ID matched, resolving translation after', elapsed + 'ms');
+          this.logger.operation(`Message ID matched, resolving translation after ${elapsed}ms`);
           this.logLifecycle(messageId, 'RESULT_RECEIVED', { elapsed });
           
           // Cancel timeout since we got the result
@@ -228,9 +231,9 @@ export class SelectElementManager {
             try {
               this.notificationManager.dismiss(this.statusNotification);
               this.statusNotification = null;
-              console.log('[SelectElementManager] Status notification dismissed');
+              this.logger.debug('Status notification dismissed');
             } catch (dismissError) {
-              console.warn('[SelectElementManager] Failed to dismiss status notification:', dismissError);
+              this.logger.warn('Failed to dismiss status notification', dismissError);
             }
           }
           
@@ -242,16 +245,16 @@ export class SelectElementManager {
           });
           this.pendingTranslation = null;
         } else {
-          console.log('[SelectElementManager] Message ID mismatch:', {
+          this.logger.warn('Message ID mismatch', {
             expected: this.pendingTranslation.originalMessageId,
             received: messageId
           });
         }
       } else {
-        console.log('[SelectElementManager] No pending translation found - likely cancelled, but result cached if successful');
+        this.logger.debug('No pending translation found - likely cancelled, but result cached if successful');
       }
     } catch (error) {
-      console.error('[SelectElementManager] Error handling translation result:', error);
+      this.logger.error('Error handling translation result', error);
       if (this.pendingTranslation) {
         this.pendingTranslation.reject(error);
         this.pendingTranslation = null;
@@ -268,7 +271,7 @@ export class SelectElementManager {
       const { translatedText, originalText } = translationData;
       
       if (!translatedText || !originalText) {
-        console.log('[SelectElementManager] Cannot cache: missing translated or original text');
+        this.logger.debug('Cannot cache: missing translated or original text');
         return;
       }
 
@@ -284,7 +287,7 @@ export class SelectElementManager {
       } catch (e) {
         // Not JSON format, cache as-is
         translationCache.set(originalText.trim(), translatedText.trim());
-        console.log('[SelectElementManager] Cached simple text translation');
+        this.logger.debug('Cached simple text translation');
         return;
       }
 
@@ -300,10 +303,10 @@ export class SelectElementManager {
             cachedCount++;
           }
         }
-        console.log(`[SelectElementManager] Cached ${cachedCount} JSON segments for future use`);
+        this.logger.debug(`Cached ${cachedCount} JSON segments for future use`);
       }
     } catch (error) {
-      console.error('[SelectElementManager] Error caching translation result:', error);
+      this.logger.error('Error caching translation result', error);
     }
   }
 
@@ -314,7 +317,7 @@ export class SelectElementManager {
    * @returns {Promise<Object>} Translation result promise
    */
   setupTranslationWaiting(messageId, timeout = 30000) {
-    console.log('[SelectElementManager] Setting up translation waiting for messageId:', messageId, 'timeout:', timeout + 'ms');
+    this.logger.debug(`Setting up translation waiting for messageId: ${messageId}, timeout: ${timeout}ms`);
     
     return new Promise((resolve, reject) => {
       // Store pending translation promise
@@ -329,17 +332,17 @@ export class SelectElementManager {
       const timeoutId = setTimeout(() => {
         if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
-          console.warn('[SelectElementManager] Translation timeout after', elapsed + 'ms for messageId:', messageId);
-          console.warn('[SelectElementManager] Translation may still complete in background...');
+          this.logger.warn(`Translation timeout after ${elapsed}ms for messageId: ${messageId}`);
+          this.logger.warn('Translation may still complete in background...');
           
           // Dismiss status notification on timeout
           if (this.statusNotification) {
             try {
               this.notificationManager.dismiss(this.statusNotification);
               this.statusNotification = null;
-              console.log('[SelectElementManager] Status notification dismissed due to timeout');
+              this.logger.debug('Status notification dismissed due to timeout');
             } catch (dismissError) {
-              console.warn('[SelectElementManager] Failed to dismiss status notification on timeout:', dismissError);
+              this.logger.warn('Failed to dismiss status notification on timeout', dismissError);
             }
           }
           
@@ -362,12 +365,12 @@ export class SelectElementManager {
       // immediately cancel it now.
       if (this.requestedCancel) {
         try {
-          console.log('[SelectElementManager] Requested cancel detected - cancelling pending translation for', messageId);
+          this.logger.debug(`Requested cancel detected - cancelling pending translation for ${messageId}`);
           // Reset flag before cancelling to avoid recursion
           this.requestedCancel = false;
           this.cancelPendingTranslation(messageId);
         } catch (err) {
-          console.warn('[SelectElementManager] Error while auto-cancelling pending translation:', err);
+          this.logger.warn('Error while auto-cancelling pending translation', err);
         }
       }
     });
@@ -379,7 +382,7 @@ export class SelectElementManager {
    */
   cancelPendingTranslation(messageId) {
     if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
-      console.log('[SelectElementManager] Cancelling pending translation for messageId:', messageId);
+      this.logger.debug(`Cancelling pending translation for messageId: ${messageId}`);
 
       // Log lifecycle: cancel requested
       this.logLifecycle(messageId, 'CANCEL_REQUESTED');
@@ -395,7 +398,7 @@ export class SelectElementManager {
         this.logLifecycle(messageId, 'CANCELLED');
       } catch (e) {
         // If resolve throws for any reason, swallow to avoid unhandled exceptions
-        console.warn('[SelectElementManager] Warning: resolving pending translation failed:', e);
+        this.logger.warn('Warning: resolving pending translation failed', e);
       }
 
       this.pendingTranslation = null;
@@ -416,11 +419,11 @@ export class SelectElementManager {
    */
   async activate() {
     if (this.isActive) {
-      console.log("[SelectElementManager] Already active");
+      this.logger.debug("Already active");
       return;
     }
 
-    console.log("[SelectElementManager] Activating select element mode");
+    this.logger.operation("Activating select element mode");
 
     this.isActive = true;
     this.abortController = new globalThis.AbortController();
@@ -454,12 +457,12 @@ export class SelectElementManager {
     // Notify background about activation so it can keep per-tab state
     try {
       await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: true } });
-      console.log('[SelectElementManager] Notified background: select element activated');
+      this.logger.debug('Notified background: select element activated');
     } catch (err) {
-      console.warn('[SelectElementManager] Failed to notify background about activation:', err);
+      this.logger.warn('Failed to notify background about activation', err);
     }
 
-    console.log("[SelectElementManager] Select element mode activated");
+    this.logger.operation("Select element mode activated");
   }
 
   /**
@@ -467,11 +470,11 @@ export class SelectElementManager {
    */
   async deactivateUIOnly() {
     if (!this.isActive) {
-      console.log("[SelectElementManager] Already inactive");
+      this.logger.debug("Already inactive");
       return;
     }
 
-    console.log("[SelectElementManager] Deactivating select element UI (keeping translation processing)");
+    this.logger.operation("Deactivating select element UI (keeping translation processing)");
 
     this.isActive = false;
 
@@ -500,12 +503,12 @@ export class SelectElementManager {
     // Notify background about deactivation so it can keep per-tab state
     try {
       await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
-      console.log('[SelectElementManager] Notified background: select element deactivated (UI only)');
+      this.logger.debug('Notified background: select element deactivated (UI only)');
     } catch (err) {
-      console.warn('[SelectElementManager] Failed to notify background about deactivation:', err);
+      this.logger.warn('Failed to notify background about deactivation', err);
     }
 
-    console.log("[SelectElementManager] Select element UI deactivated (translation continues)");
+    this.logger.operation("Select element UI deactivated (translation continues)");
   }
 
   /**
@@ -513,11 +516,11 @@ export class SelectElementManager {
    */
   async deactivate() {
     if (!this.isActive) {
-      console.log("[SelectElementManager] Already inactive");
+      this.logger.debug("Already inactive");
       return;
     }
 
-    console.log("[SelectElementManager] Deactivating select element mode");
+    this.logger.operation("Deactivating select element mode");
 
     const wasActive = this.isActive;
 
@@ -525,16 +528,16 @@ export class SelectElementManager {
     if (this.pendingTranslation) {
       try {
         const pendingId = this.pendingTranslation.originalMessageId;
-        console.log('[SelectElementManager] Full deactivate requested - cancelling pending translation for', pendingId);
+        this.logger.debug(`Full deactivate requested - cancelling pending translation for ${pendingId}`);
         this.logLifecycle(pendingId, 'CANCEL_REQUESTED', { via: 'deactivate' });
         this.cancelPendingTranslation(pendingId);
       } catch (err) {
-        console.warn('[SelectElementManager] Error while cancelling pending translation on deactivate:', err);
+        this.logger.warn('Error while cancelling pending translation on deactivate', err);
       }
       try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
     } else if (this.selectionProcessing) {
       // mark requestedCancel so pendingTranslation created shortly will be auto-cancelled
-      console.log('[SelectElementManager] Full deactivate requested while processing selection - marking requestedCancel');
+      this.logger.debug('Full deactivate requested while processing selection - marking requestedCancel');
       this.requestedCancel = true;
       try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
     }
@@ -549,7 +552,7 @@ export class SelectElementManager {
     // Remove ESC key listener for background translation
     this.removeEscapeKeyListener();
 
-    console.log("[SelectElementManager] Select element mode fully deactivated");
+    this.logger.operation("Select element mode fully deactivated");
   }
 
   /**
@@ -568,7 +571,7 @@ export class SelectElementManager {
       passive: false,
     };
 
-    console.log("[SelectElementManager] Setting up ESC key listener for background translation");
+    this.logger.debug("Setting up ESC key listener for background translation");
 
     document.addEventListener("keydown", this.handleKeyDown, keyOptions);
     window.addEventListener("keydown", this.handleKeyDown, keyOptions);
@@ -579,7 +582,7 @@ export class SelectElementManager {
    */
   removeEscapeKeyListener() {
     if (this.escapeAbortController) {
-      console.log("[SelectElementManager] Removing ESC key listener");
+      this.logger.debug("Removing ESC key listener");
       this.escapeAbortController.abort();
       this.escapeAbortController = null;
     }
@@ -641,13 +644,13 @@ export class SelectElementManager {
 
     // Prevent multiple rapid clicks or processing
     if (this.isProcessingClick) {
-      console.log("[SelectElementManager] Already processing click, ignoring");
+      this.logger.debug("Already processing click, ignoring");
       return;
     }
 
     // Add a small debounce to prevent double clicks
     if (this.lastClickTime && Date.now() - this.lastClickTime < 100) {
-      console.log("[SelectElementManager] Double click detected, ignoring");
+      this.logger.debug("Double click detected, ignoring");
       return;
     }
 
@@ -657,7 +660,7 @@ export class SelectElementManager {
     const element = event.target;
 
     if (!this.isValidTextElement(element)) {
-      console.log("[SelectElementManager] Invalid element for translation");
+      this.logger.warn("Invalid element for translation");
       await this.showErrorNotification(
         "Please select an element that contains text"
       );
@@ -681,19 +684,19 @@ export class SelectElementManager {
       return;
     }
 
-    console.log("[SelectElementManager] Element selected:", element);
+    this.logger.info("Element selected", element);
 
     try {
       // Quick check if element has text before expensive processing
       const quickText = this.extractTextFromElement(element);
       if (!quickText || quickText.trim().length === 0) {
-        console.log("[SelectElementManager] No text found in selected element");
+        this.logger.warn("No text found in selected element");
         await this.showNoTextNotification();
         this.isProcessingClick = false;
         return;
       }
 
-      console.log(
+      logger.debug(
         "[SelectElementManager] Text found:",
         quickText.substring(0, 100) + "..."
       );
@@ -703,16 +706,16 @@ export class SelectElementManager {
       this.selectionProcessing = true;
 
       // Deactivate select element mode immediately after click (UI only)
-      console.log("[SelectElementManager] Deactivating select element mode after element selection");
+      this.logger.operation("Deactivating select element mode after element selection");
       await this.deactivateUIOnly();
 
       // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
       this.processSelectedElement(element).catch(error => {
-        console.error("[SelectElementManager] Background translation failed:", error);
+        this.logger.error("Background translation failed", error);
       });
     } catch (error) {
-      console.error("[SelectElementManager] Element selection error:", error);
+      this.logger.error("Element selection error", error);
 
       // Handle error via ErrorService
       await this.errorHandler.handle(error, {
@@ -739,7 +742,7 @@ export class SelectElementManager {
       arr.push(entry);
       this.messageLifecycle.set(messageId, arr);
       if (this.tracing) {
-        console.debug('[SelectElementManager][lifecycle]', entry);
+        logger.debug('[SelectElementManager][lifecycle]', entry);
       }
     } catch (err) {
       // swallow any tracing errors
@@ -753,7 +756,7 @@ export class SelectElementManager {
     // Allow ESC to work even when inactive if translation is processing
     if (!this.isActive && !this.selectionProcessing && !this.pendingTranslation) return;
 
-    console.log("[SelectElementManager] KeyDown event received:", {
+    this.logger.debug("KeyDown event received", {
       key: event.key,
       code: event.code,
       target: event.target?.tagName,
@@ -767,36 +770,36 @@ export class SelectElementManager {
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      console.log("[SelectElementManager] ESC pressed - cancelling selection");
+      this.logger.operation("ESC pressed - cancelling selection");
 
       // If a translation is pending, cancel it first (notify background + resolve pending)
       if (this.pendingTranslation) {
         try {
           const pendingId = this.pendingTranslation.originalMessageId;
-          console.log('[SelectElementManager] ESC pressed - cancelling pending translation for', pendingId);
+          this.logger.debug(`ESC pressed - cancelling pending translation for ${pendingId}`);
           this.cancelPendingTranslation(pendingId);
           // Allow microtask queue to settle so pendingTranslation resolution is processed
           await Promise.resolve();
         } catch (err) {
-          console.warn('[SelectElementManager] Error while cancelling pending translation on ESC:', err);
+          this.logger.warn('Error while cancelling pending translation on ESC', err);
         }
       } else if (this.selectionProcessing) {
         // Translation hasn't started waiting yet (user pressed ESC quickly).
         // Remember that a cancel was requested so setupTranslationWaiting can
         // cancel the pending translation as soon as it's created.
-        console.log('[SelectElementManager] ESC pressed before pending translation created - marking requestedCancel');
+        this.logger.debug('ESC pressed before pending translation created - marking requestedCancel');
         this.requestedCancel = true;
       }
 
       // If there are translated elements, revert them
       if (this.translatedElements.size > 0) {
-        console.log(
+        logger.debug(
           "[SelectElementManager] Reverting translations before deactivation"
         );
         try {
           await this.revertTranslations();
         } catch (err) {
-          console.warn('[SelectElementManager] Error while reverting translations on ESC:', err);
+          this.logger.warn('Error while reverting translations on ESC', err);
         }
       }
 
@@ -813,7 +816,7 @@ export class SelectElementManager {
           await this.deactivate();
         }
       } catch (err) {
-        console.warn('[SelectElementManager] Error while deactivating on ESC:', err);
+        this.logger.warn('Error while deactivating on ESC', err);
       }
 
       return false;
@@ -846,7 +849,7 @@ export class SelectElementManager {
    * Highlight element - uses OLD system CSS only (no extra classes)
    */
   highlightElement(element) {
-    console.log(
+    logger.debug(
       "[SelectElementManager] Highlighting element:",
       element.tagName,
       element.className
@@ -924,7 +927,7 @@ export class SelectElementManager {
    * Follows the exact same process as OLD handleSelect_ElementClick method
    */
   async processSelectedElement(element) {
-    console.log(
+    logger.debug(
       "[SelectElementManager] Starting advanced text extraction process"
     );
 
@@ -944,7 +947,7 @@ export class SelectElementManager {
 
       // Handle input/textarea elements with simple processing first
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-        console.log(
+        logger.debug(
           "[SelectElementManager] Processing input/textarea with simple translation"
         );
 
@@ -995,7 +998,7 @@ export class SelectElementManager {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
 
       if (!originalTextsMap.size) {
-        console.warn("[SelectElementManager] No text nodes found in element");
+        this.logger.warn("No text nodes found in element");
         await this.showNoTextNotification();
         return { status: "empty", reason: "no_text_found" };
       }
@@ -1006,7 +1009,7 @@ export class SelectElementManager {
 
       // If only cached translations exist
       if (!textsToTranslate.length && cachedTranslations.size) {
-        console.log("[SelectElementManager] Using only cached translations");
+        this.logger.info("Using only cached translations");
         const context = {
           state: this.state,  // Use proper state structure
           IconManager: null,  // Vue system doesn't use IconManager
@@ -1043,7 +1046,7 @@ export class SelectElementManager {
         return { status: "error", reason: "payload_large", message };
       }
 
-      console.log(
+      logger.debug(
         "[SelectElementManager] Sending translation request to background"
       );
 
@@ -1078,7 +1081,7 @@ export class SelectElementManager {
         options: { rawJsonPayload: true },
       };
       
-      console.log("[SelectElementManager] Sending translation request with payload:", JSON.stringify(payload, null, 2));
+      this.logger.debug("Sending translation request with payload", payload);
       
       // Send the translation request (this returns acknowledgment, not final result)
       const response = await unifiedMessenger.translate(payload);
@@ -1090,7 +1093,7 @@ export class SelectElementManager {
       // for the final TRANSLATION_RESULT_UPDATE.
       if (response && (response.success === false || response.error)) {
         const msg = (response.error || response.message) || "Translation request failed";
-        console.error(
+        logger.error(
           "[SelectElementManager] Translation request failed:",
           msg
         );
@@ -1106,7 +1109,7 @@ export class SelectElementManager {
         return { status: "error", reason: "backend_error", message: msg };
       }
 
-      console.log("[SelectElementManager] Translation request accepted, waiting for result...");
+      this.logger.info("Translation request accepted, waiting for result...");
       this.logLifecycle(messageId, 'SENT', { provider: payload.provider });
       
       // 8) Wait for TRANSLATION_RESULT_UPDATE message
@@ -1114,7 +1117,7 @@ export class SelectElementManager {
 
       // If the pending promise was resolved as cancelled, handle gracefully
       if (translationResult && translationResult.cancelled) {
-        console.log('[SelectElementManager] Translation was cancelled for messageId:', translationResult.messageId);
+        this.logger.info(`Translation was cancelled for messageId: ${translationResult.messageId}`);
         await this.dismissStatusNotification();
         return { status: 'cancelled', messageId: translationResult.messageId };
       }
@@ -1144,11 +1147,11 @@ export class SelectElementManager {
 
         // Handle timeout specifically - less severe than other errors
         if (translationResult?.timeout) {
-          console.warn("[SelectElementManager] Translation timeout:", msg, rawError);
+          this.logger.warn("Translation timeout", { msg, rawError });
           await this.showWarningNotification("Translation taking longer than expected. It may complete in background.");
           return { status: "timeout", reason: "timeout", message: msg };
         } else {
-          console.error("[SelectElementManager] Translation result failed:", msg, rawError);
+          this.logger.error("Translation result failed", { msg, rawError });
           await this.showErrorNotification(msg);
           return { status: "error", reason: "backend_error", message: msg, rawError };
         }
@@ -1159,7 +1162,7 @@ export class SelectElementManager {
 
       if (typeof translatedJsonString !== "string" || !translatedJsonString.trim()) {
         const message = "(⚠️ ترجمه‌ای دریافت نشد.)"; // Persian like OLD system
-        console.error(
+        logger.error(
           "[SelectElementManager] Empty translation response:",
           translationResult
         );
@@ -1167,7 +1170,7 @@ export class SelectElementManager {
         return { status: "error", reason: "empty_translation", message };
       }
 
-      console.log(
+      logger.debug(
         "[SelectElementManager] Received translation response, parsing JSON"
       );
 
@@ -1181,13 +1184,13 @@ export class SelectElementManager {
           this // Pass context like OLD system
         );
       } catch (error) {
-        console.log("[SelectElementManager] JSON parsing failed, treating as string response");
+        this.logger.debug("JSON parsing failed, treating as string response");
         translatedData = null;
       }
 
       // If JSON parsing failed, handle as string response (some providers return string with separators)
       if (!translatedData || !translatedData.length) {
-        console.log("[SelectElementManager] Converting string response to array format");
+        this.logger.debug("Converting string response to array format");
         
         // Split the string by separator (like "---" or spaces)
         let parts;
@@ -1201,7 +1204,7 @@ export class SelectElementManager {
         // Convert to expected format
         translatedData = parts.map(part => ({ text: part.trim() })).filter(item => item.text);
         
-        console.log(`[SelectElementManager] Converted ${translatedData.length} parts from string response`);
+        this.logger.debug(`Converted ${translatedData.length} parts from string response`);
       }
 
       if (!translatedData || !translatedData.length) {
@@ -1246,7 +1249,7 @@ export class SelectElementManager {
       // Dismiss status notification on success (like OLD system)
       await this.dismissStatusNotification();
 
-      console.log(
+      logger.debug(
         "[SelectElementManager] Advanced text extraction process completed successfully"
       );
       await this.showSuccessNotification("Translation completed successfully!");
@@ -1261,7 +1264,7 @@ export class SelectElementManager {
       // Dismiss status notification on error (like OLD system)
       await this.dismissStatusNotification();
 
-      console.error(
+      logger.error(
         "[SelectElementManager] Advanced text extraction process failed:",
         error
       );
@@ -1289,9 +1292,9 @@ export class SelectElementManager {
         // Remove ESC key listener since translation is complete
         this.removeEscapeKeyListener();
         
-        console.log('[SelectElementManager] Translation processing completed, selectionProcessing cleared');
+        this.logger.operation('Translation processing completed, selectionProcessing cleared');
       } catch (err) {
-        console.warn('[SelectElementManager] Error during final cleanup after processing selection:', err);
+        this.logger.warn('Error during final cleanup after processing selection', err);
       }
     }
   }
@@ -1307,10 +1310,10 @@ export class SelectElementManager {
     const hasClass = document.documentElement.classList.contains(
       "AIWritingCompanion-disable-links"
     );
-    console.log("[SelectElementManager] CSS class applied:", hasClass);
+    this.logger.debug("CSS class applied", hasClass);
 
     if (!hasClass) {
-      console.warn(
+      logger.warn(
         "[SelectElementManager] CSS class failed to apply - trying manual application"
       );
       document.documentElement.classList.add(
@@ -1363,7 +1366,7 @@ export class SelectElementManager {
         3000
       );
     } catch (error) {
-      console.log(
+      logger.debug(
         "[SelectElementManager] Select element mode activated - hover over elements to highlight"
       );
     }
@@ -1381,7 +1384,7 @@ export class SelectElementManager {
         4000
       );
     } catch (error) {
-      console.error("[SelectElementManager] Error:", message);
+      this.logger.error("Error", message);
     }
   }
 
@@ -1397,7 +1400,7 @@ export class SelectElementManager {
         3000
       );
     } catch (error) {
-      console.log("[SelectElementManager] No text found in selected element");
+      this.logger.debug("No text found in selected element");
     }
   }
 
@@ -1408,7 +1411,7 @@ export class SelectElementManager {
     try {
       await this.notificationManager.show(message, "success", true, 2000);
     } catch (error) {
-      console.log("[SelectElementManager] Success:", message);
+      this.logger.debug("Success", message);
     }
   }
 
@@ -1418,7 +1421,7 @@ export class SelectElementManager {
    */
   async revertTranslations() {
     try {
-      console.log("[SelectElementManager] Starting translation revert process");
+      this.logger.info("Starting translation revert process");
 
       const { revertTranslations } = await import(
         "../../utils/text/extraction.js"
@@ -1443,11 +1446,11 @@ export class SelectElementManager {
           try {
             element.value = originalText;
             inputReverts++;
-            console.log(
+            logger.debug(
               "[SelectElementManager] Reverted input/textarea element"
             );
           } catch (error) {
-            console.error(
+            logger.error(
               "[SelectElementManager] Failed to revert input element:",
               error
             );
@@ -1466,16 +1469,16 @@ export class SelectElementManager {
         await this.showSuccessNotification(
           `${totalReverts} translation(s) reverted successfully`
         );
-        console.log(
+        logger.debug(
           `[SelectElementManager] Successfully reverted ${totalReverts} translations (${successfulReverts} DOM + ${inputReverts} inputs)`
         );
       } else {
-        console.log("[SelectElementManager] No translations found to revert");
+        this.logger.info("No translations found to revert");
       }
 
       return totalReverts;
     } catch (error) {
-      console.error("[SelectElementManager] Error during revert:", error);
+      this.logger.error("Error during revert", error);
 
       await this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -1494,7 +1497,7 @@ export class SelectElementManager {
     try {
       await this.notificationManager.show(message, "warning", true, 4000);
     } catch (error) {
-      console.warn("[SelectElementManager] Warning:", message);
+      this.logger.warn("Warning", message);
     }
   }
 
@@ -1510,10 +1513,10 @@ export class SelectElementManager {
       
       // Create persistent notification (false = not auto-dismiss)
       this.statusNotification = await this.notificationManager.show(statusMessage, "status", false);
-      console.log("[SelectElementManager] Status notification created:", statusMessage);
+      this.logger.debug("Status notification created", statusMessage);
       return this.statusNotification;
     } catch (error) {
-      console.log("[SelectElementManager] Status:", message);
+      this.logger.debug("Status", message);
       return null;
     }
   }
@@ -1523,7 +1526,7 @@ export class SelectElementManager {
    */
   async dismissStatusNotification() {
     if (this.statusNotification) {
-      console.log("[SelectElementManager] Dismissing status notification");
+      this.logger.debug("Dismissing status notification");
       try {
         // statusNotification is a Promise, need to await it first (like OLD system)
         const notifNode = await this.statusNotification;
@@ -1531,7 +1534,7 @@ export class SelectElementManager {
           this.notificationManager.dismiss(notifNode);
         }
       } catch (error) {
-        console.warn("[SelectElementManager] Error dismissing status notification:", error);
+        this.logger.warn("Error dismissing status notification", error);
       } finally {
         this.statusNotification = null;
       }
@@ -1542,7 +1545,7 @@ export class SelectElementManager {
    * Cleanup - remove all listeners and overlays
    */
   async cleanup() {
-    console.log("[SelectElementManager] Cleaning up");
+    this.logger.info("Cleaning up");
 
     // Revert any active translations
     if (this.translatedElements.size > 0) {

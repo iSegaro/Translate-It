@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'import-export');
 
 export const useImportExportStore = defineStore('import-export', () => {
   // State
@@ -35,7 +38,7 @@ export const useImportExportStore = defineStore('import-export', () => {
       
       return { success: true }
     } catch (error) {
-      console.error('Export error:', error)
+      logger.error('Export error:', error)
       throw error
     } finally {
       isExporting.value = false
@@ -49,11 +52,11 @@ export const useImportExportStore = defineStore('import-export', () => {
       const settings = JSON.parse(text)
       
       // Mock import functionality
-      console.log('Importing settings:', settings)
+      logger.debug('Importing settings:', settings)
       
       return { success: true, settings }
     } catch (error) {
-      console.error('Import error:', error)
+      logger.error('Import error:', error)
       throw error
     } finally {
       isImporting.value = false

@@ -41,6 +41,9 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -64,23 +67,23 @@ const handleMessage = (message) => {
 
 // Lifecycle
 onMounted(async () => {
-  console.log('🚀 SidepanelApp mounting...')
+  logger.debug('🚀 SidepanelApp mounting...')
   
   try {
     // Step 1: Set loading text
-    console.log('📝 Setting loading text...')
+    logger.debug('📝 Setting loading text...')
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
-    console.log('✅ Loading text set')
+    logger.debug('✅ Loading text set')
     
     // Step 2: Load settings store
-    console.log('⚙️ Loading settings store...')
+    logger.debug('⚙️ Loading settings store...')
     await Promise.race([
       settingsStore.loadSettings(),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-    console.log('✅ Settings store loaded')
+    logger.debug('✅ Settings store loaded')
 
     // Step 3: Add message listener
     browser.runtime.onMessage.addListener(handleMessage);
@@ -90,7 +93,7 @@ onMounted(async () => {
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
-    console.log('✨ SidepanelApp initialization complete')
+    logger.debug('✨ SidepanelApp initialization complete')
     isLoading.value = false
   }
 })
@@ -100,7 +103,7 @@ onUnmounted(() => {
 });
 
 const retryLoading = () => {
-  console.log('🔄 Retrying sidepanel loading...')
+  logger.debug('🔄 Retrying sidepanel loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
@@ -112,8 +115,7 @@ const retryLoading = () => {
   setTimeout(() => {
     onMounted()
   }, 100)
-}
-</script>
+}</script>
 
 <style scoped>
 .extension-sidepanel {

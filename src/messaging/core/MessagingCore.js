@@ -6,6 +6,9 @@
 
 import { EnhancedUnifiedMessenger } from '../../core/EnhancedUnifiedMessenger.js';
 import { MessageActions } from './MessageActions.js';
+import { createLogger } from '../../utils/core/logger.js';
+
+const DEFAULT_COMPONENT = 'Messaging';
 
 /**
  * Standard message format interface
@@ -40,10 +43,8 @@ export class MessageFormat {
    */
   static validate(message) {
     if (!message || typeof message !== "object") {
-      console.warn(
-        "[MessageFormat.validate] Invalid message type or null:",
-        message
-      );
+      const logger = createLogger(DEFAULT_COMPONENT, 'Format');
+      logger.warn('Invalid message type or null', message);
       return false;
     }
 
@@ -57,22 +58,13 @@ export class MessageFormat {
     );
 
     if (!isValid) {
-      console.warn(
-        "[MessageFormat.validate] Validation failed for message:",
-        message
-      );
-      console.warn(
-        "  - action valid:",
-        message.action && typeof message.action === "string"
-      );
-      console.warn(
-        "  - context valid:",
-        message.context && typeof message.context === "string"
-      );
-      console.warn(
-        "  - messageId valid:",
-        message.messageId && typeof message.messageId === "string"
-      );
+      const logger = createLogger(DEFAULT_COMPONENT, 'Format');
+      logger.warn('Validation failed for message', {
+        message,
+        actionValid: message.action && typeof message.action === "string",
+        contextValid: message.context && typeof message.context === "string",
+        messageIdValid: message.messageId && typeof message.messageId === "string"
+      });
     }
 
     return isValid;
@@ -209,9 +201,8 @@ export class MessagingCore {
   static getMessenger(context) {
     // Validate context
     if (!MessageContexts.isValidContext(context)) {
-      console.warn(
-        `[MessagingCore] Unknown context: ${context}, using as-is`
-      );
+      const logger = createLogger(DEFAULT_COMPONENT, 'Core');
+      logger.warn(`Unknown context: ${context}, using as-is`);
     }
 
     // Get or create instance
@@ -219,9 +210,8 @@ export class MessagingCore {
       const messenger = new EnhancedUnifiedMessenger(context);
       this.instances.set(context, messenger);
 
-      console.log(
-        `[MessagingCore] Created new messenger for context: ${context}`
-      );
+      const logger = createLogger(DEFAULT_COMPONENT, 'Core');
+      logger.debug(`Created new messenger for context: ${context}`);
     }
 
     return this.instances.get(context);
@@ -285,7 +275,8 @@ export class MessagingCore {
    */
   static clearInstances() {
     this.instances.clear();
-    console.log("[MessagingCore] All messenger instances cleared");
+    const logger = createLogger(DEFAULT_COMPONENT, 'Core');
+    logger.operation('All messenger instances cleared');
   }
 
   /**
@@ -371,23 +362,24 @@ export class MessagingCore {
     // Request logging
     this.addRequestInterceptor((message, context) => {
       console.group(`[MessagingCore:${context}] 📤 Request`);
-      console.log("Action:", message.action);
-      console.log("Data:", message.data);
-      console.log("MessageId:", message.messageId);
+      logger.debug("Action:", message.action);
+      logger.debug("Data:", message.data);
+      logger.debug("MessageId:", message.messageId);
       console.groupEnd();
     });
 
     // Response logging
     this.addResponseInterceptor((response, context, originalMessage) => {
       console.group(`[MessagingCore:${context}] 📥 Response`);
-      console.log("Original Action:", originalMessage?.action);
-      console.log("Success:", response?.success);
-      console.log("Data:", response?.data);
-      console.log("Error:", response?.error);
+      logger.debug("Original Action:", originalMessage?.action);
+      logger.debug("Success:", response?.success);
+      logger.debug("Data:", response?.data);
+      logger.debug("Error:", response?.error);
       console.groupEnd();
     });
 
-    console.log("[MessagingCore] Development logging enabled");
+    const logger = createLogger(DEFAULT_COMPONENT, 'Core');
+    logger.init('Development logging enabled');
   }
 }
 

@@ -73,6 +73,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useSelectionWindows } from '@/composables/useSelectionWindows.js'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'SelectionWindowsTest');
 
 // Use the SelectionWindows composable
 const selectionWindows = useSelectionWindows()
@@ -93,27 +96,26 @@ const testShowWindow = async () => {
     y: window.innerHeight / 2
   }
   
-  console.log('[SelectionWindowsTest] Showing test window...')
+  logger.debug('[SelectionWindowsTest] Showing test window...')
   
   const success = await selectionWindows.showSelectionWindow(testText, testPosition)
   
   if (success) {
-    console.log('[SelectionWindowsTest] Test window shown successfully')
+    logger.debug('[SelectionWindowsTest] Test window shown successfully')
   } else {
-    console.error('[SelectionWindowsTest] Failed to show test window')
+    logger.error('[SelectionWindowsTest] Failed to show test window')
   }
 }
 
 const testDismissWindow = () => {
-  console.log('[SelectionWindowsTest] Dismissing test window...')
+  logger.debug('[SelectionWindowsTest] Dismissing test window...')
   selectionWindows.dismissSelectionWindow(true)
 }
 
 const testCancelTranslation = () => {
-  console.log('[SelectionWindowsTest] Canceling translation...')
+  logger.debug('[SelectionWindowsTest] Canceling translation...')
   selectionWindows.cancelCurrentTranslation()
-}
-</script>
+}</script>
 
 <style scoped>
 .selection-windows-test {

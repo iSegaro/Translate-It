@@ -3,6 +3,9 @@ import browser from "webextension-polyfill";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { IsDebug } from "../../config.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'helpers');
 
 // Lazy loader for ErrorHandler to break circular dependency
 let errorHandlerInstance = null;
@@ -29,7 +32,7 @@ export function logMethod(target, propertyKey, descriptor) {
 export const logME = (...args) => {
   // IsDebug().then((IsDebug) => {
   //   if (IsDebug) {
-  console.debug(...args);
+  logger.debug(...args);
   //   }
   // });
 };
@@ -77,7 +80,7 @@ export const openOptionsPage = (anchor = null) => {
       data: { anchor: anchor },
     })
     .catch((err) => {
-      console.error("Error sending open_options_page message:", err);
+      logger.error("Error sending open_options_page message:", err);
     });
 };
 
@@ -103,7 +106,7 @@ export function focusOrCreateTab(url) {
       const firstTab = existingTabs[0];
       const duplicateTabIds = existingTabs.slice(1).map((tab) => tab.id);
       if (duplicateTabIds.length > 0) {
-        browser.tabs.remove(duplicateTabIds).catch((err) => console.error("Error closing duplicate tabs:", err));
+        browser.tabs.remove(duplicateTabIds).catch((err) => logger.error("Error closing duplicate tabs:", err));
       }
       browser.tabs.update(firstTab.id, { active: true, url: url }).then((updatedTab) => {
         if (updatedTab) browser.windows.update(updatedTab.windowId, { focused: true });
@@ -112,7 +115,7 @@ export function focusOrCreateTab(url) {
       browser.tabs.create({ url: url });
     }
   }).catch((err) => {
-    console.error("Error in focusOrCreateTab:", err);
+    logger.error("Error in focusOrCreateTab:", err);
     browser.tabs.create({ url: url });
   });
 }

@@ -3,6 +3,9 @@
 
 import browser from "webextension-polyfill";
 import { MessagingCore } from "../../../messaging/core/MessagingCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'CaptureOffscreen');
 
 /**
  * Offscreen Screen Capture Manager for Chrome
@@ -31,15 +34,15 @@ export class OffscreenCaptureManager {
         throw new Error("Offscreen API not available");
       }
 
-      console.log("📸 Initializing Chrome offscreen capture manager");
+      logger.debug("📸 Initializing Chrome offscreen capture manager");
 
       // Create offscreen document for advanced capture functionality
       await this.createOffscreenDocument();
 
       this.initialized = true;
-      console.log("✅ Offscreen capture manager initialized");
+      logger.debug("✅ Offscreen capture manager initialized");
     } catch (error) {
-      console.error(
+      logger.error(
         "❌ Failed to initialize offscreen capture manager:",
         error,
       );
@@ -59,7 +62,7 @@ export class OffscreenCaptureManager {
       });
 
       if (existingContexts.length > 0) {
-        console.log("📄 Offscreen document already exists for capture");
+        logger.debug("📄 Offscreen document already exists for capture");
         this.offscreenCreated = true;
         return;
       }
@@ -73,9 +76,9 @@ export class OffscreenCaptureManager {
       });
 
       this.offscreenCreated = true;
-      console.log("📄 Offscreen document created for screen capture");
+      logger.debug("📄 Offscreen document created for screen capture");
     } catch (error) {
-      console.error(
+      logger.error(
         "❌ Failed to create offscreen document for capture:",
         error,
       );
@@ -99,7 +102,7 @@ export class OffscreenCaptureManager {
         quality: options.quality || 90,
       };
 
-      console.log("📸 Capturing visible tab with offscreen processing");
+      logger.debug("📸 Capturing visible tab with offscreen processing");
 
       // Capture visible tab
       const imageData = await browser.tabs.captureVisibleTab(captureOptions);
@@ -123,7 +126,7 @@ export class OffscreenCaptureManager {
 
       return imageData;
     } catch (error) {
-      console.error("❌ Screen capture failed:", error);
+      logger.error("❌ Screen capture failed:", error);
       throw new Error(`Screen capture failed: ${error.message}`);
     }
   }
@@ -156,10 +159,10 @@ export class OffscreenCaptureManager {
         );
       }
 
-      console.log("📸 Screen area captured and cropped");
+      logger.debug("📸 Screen area captured and cropped");
       return response.croppedData;
     } catch (error) {
-      console.error("❌ Screen area capture failed:", error);
+      logger.error("❌ Screen area capture failed:", error);
       throw new Error(`Screen area capture failed: ${error.message}`);
     }
   }
@@ -176,7 +179,7 @@ export class OffscreenCaptureManager {
     }
 
     try {
-      console.log("🔍 Processing image for OCR in offscreen document");
+      logger.debug("🔍 Processing image for OCR in offscreen document");
 
       const response = await this.messenger.specialized.capture.processImageOCR(imageData, {
         language: options.language || "eng",
@@ -188,10 +191,10 @@ export class OffscreenCaptureManager {
         throw new Error(response?.error || "OCR processing failed");
       }
 
-      console.log("✅ OCR processing completed");
+      logger.debug("✅ OCR processing completed");
       return response.extractedText;
     } catch (error) {
-      console.error("❌ OCR processing failed:", error);
+      logger.error("❌ OCR processing failed:", error);
       throw new Error(`OCR processing failed: ${error.message}`);
     }
   }
@@ -221,7 +224,7 @@ export class OffscreenCaptureManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log("🧹 Cleaning up offscreen capture manager");
+    logger.debug("🧹 Cleaning up offscreen capture manager");
 
     try {
       // Close offscreen document if we created it
@@ -230,7 +233,7 @@ export class OffscreenCaptureManager {
         this.offscreenCreated = false;
       }
     } catch (error) {
-      console.error("❌ Error during capture manager cleanup:", error);
+      logger.error("❌ Error during capture manager cleanup:", error);
     }
 
     this.initialized = false;

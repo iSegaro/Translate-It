@@ -2,6 +2,9 @@
 // Content script-based screen capture manager (fallback)
 
 import browser from "webextension-polyfill";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'capture-content');
 
 /**
  * Content Script Screen Capture Manager
@@ -22,11 +25,11 @@ export class ContentScriptCaptureManager {
     try {
       this.browser = browser;
 
-      console.log("📸 Initializing content script capture manager");
+      logger.debug("📸 Initializing content script capture manager");
       this.initialized = true;
-      console.log("✅ Content script capture manager initialized");
+      logger.debug("✅ Content script capture manager initialized");
     } catch (error) {
-      console.error(
+      logger.error(
         "❌ Failed to initialize content script capture manager:",
         error,
       );
@@ -50,14 +53,14 @@ export class ContentScriptCaptureManager {
         quality: options.quality || 90,
       };
 
-      console.log("📸 Capturing visible tab via content script method");
+      logger.debug("📸 Capturing visible tab via content script method");
 
       // Use basic tab capture API
       const imageData = await browser.tabs.captureVisibleTab(captureOptions);
 
       return imageData;
     } catch (error) {
-      console.error("❌ Content script screen capture failed:", error);
+      logger.error("❌ Content script screen capture failed:", error);
       throw new Error(`Screen capture failed: ${error.message}`);
     }
   }
@@ -83,7 +86,7 @@ export class ContentScriptCaptureManager {
         throw new Error("No active tab found");
       }
 
-      console.log("📸 Starting area capture via content script");
+      logger.debug("📸 Starting area capture via content script");
 
       // Inject capture UI into content script
       await browser.tabs.sendMessage(tab.id, {
@@ -107,7 +110,7 @@ export class ContentScriptCaptureManager {
 
       return fullImage;
     } catch (error) {
-      console.error("❌ Content script area capture failed:", error);
+      logger.error("❌ Content script area capture failed:", error);
       throw new Error(`Area capture failed: ${error.message}`);
     }
   }
@@ -120,13 +123,13 @@ export class ContentScriptCaptureManager {
     try {
       // This is a basic implementation
       // In a real scenario, this would be done in a content script or offscreen document
-      console.log("✂️ Performing basic image crop");
+      logger.debug("✂️ Performing basic image crop");
 
       // Return original image for now - proper cropping would need canvas API
       // which is not available in service worker context
       return imageData;
     } catch (error) {
-      console.error("❌ Basic image crop failed:", error);
+      logger.error("❌ Basic image crop failed:", error);
       return imageData; // Return original on failure
     }
   }
@@ -152,7 +155,7 @@ export class ContentScriptCaptureManager {
         throw new Error("No active tab found for OCR processing");
       }
 
-      console.log("🔍 Processing image for OCR via content script");
+      logger.debug("🔍 Processing image for OCR via content script");
 
       // Send image to content script for OCR processing
       const response = await browser.tabs.sendMessage(tab.id, {
@@ -173,10 +176,10 @@ export class ContentScriptCaptureManager {
         );
       }
 
-      console.log("✅ OCR processing completed via content script");
+      logger.debug("✅ OCR processing completed via content script");
       return response.extractedText;
     } catch (error) {
-      console.error("❌ Content script OCR processing failed:", error);
+      logger.error("❌ Content script OCR processing failed:", error);
       throw new Error(`OCR processing failed: ${error.message}`);
     }
   }
@@ -206,7 +209,7 @@ export class ContentScriptCaptureManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log("🧹 Cleaning up content script capture manager");
+    logger.debug("🧹 Cleaning up content script capture manager");
     this.initialized = false;
   }
 }

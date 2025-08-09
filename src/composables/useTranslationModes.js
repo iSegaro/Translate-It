@@ -6,6 +6,9 @@ import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useMessaging } from '@/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useTranslationModes');
 
 // Shared reactive state for select element mode (module-level so all callers share it)
 const sharedIsSelectModeActive = ref(false);
@@ -28,7 +31,7 @@ const _registerSelectStateListener = async () => {
       _currentTabId = response.tabId;
     }
   } catch (err) {
-    console.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
+    logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
   }
 
   // Register runtime message listener for background broadcasts
@@ -52,14 +55,14 @@ const _registerSelectStateListener = async () => {
         }
       }
     } catch (e) {
-      console.warn('[useSelectElementTranslation] broadcast handler error:', e);
+      logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
     }
   };
 
   try {
     browser.runtime.onMessage.addListener(_selectStateHandler);
   } catch (e) {
-    console.warn('[useSelectElementTranslation] Could not register runtime.onMessage listener:', e);
+    logger.warn('[useSelectElementTranslation] Could not register runtime.onMessage listener:', e);
   }
 };
 

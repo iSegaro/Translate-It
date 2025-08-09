@@ -4,6 +4,9 @@ import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/storage/core/SecureStorage.js'
 import { storageManager } from '@/storage/core/StorageCore.js'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'settings');
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
@@ -120,11 +123,11 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       })
       
-      console.log('✅ Settings after merge:', settings.value)
+      logger.debug('✅ Settings after merge:', settings.value)
       isInitialized.value = true
       return settings.value
     } catch (error) {
-      console.error('Failed to load settings:', error)
+      logger.error('Failed to load settings:', error)
       throw error
     } finally {
       isLoading.value = false
@@ -137,7 +140,7 @@ export const useSettingsStore = defineStore('settings', () => {
       await storageManager.set(settings.value)
       return true
     } catch (error) {
-      console.error('Failed to save all settings:', error)
+      logger.error('Failed to save all settings:', error)
       throw error
     } finally {
       isSaving.value = false
@@ -152,13 +155,13 @@ export const useSettingsStore = defineStore('settings', () => {
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
-      console.log(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
+      logger.debug(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
       settings.value[key] = value // Update local state
       await storageManager.set({ [key]: value }) // Persist immediately
-      console.log(`[settingsStore] Successfully saved ${key} to browser storage`)
+      logger.debug(`[settingsStore] Successfully saved ${key} to browser storage`)
       return true
     } catch (error) {
-      console.error(`Failed to update and persist setting ${key}:`, error)
+      logger.error(`Failed to update and persist setting ${key}:`, error)
       throw error
     }
   }
@@ -173,7 +176,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       return true
     } catch (error) {
-      console.error('Failed to update multiple settings:', error)
+      logger.error('Failed to update multiple settings:', error)
       throw error
     }
   }
@@ -229,7 +232,7 @@ export const useSettingsStore = defineStore('settings', () => {
       
       return true
     } catch (error) {
-      console.error('Failed to reset settings:', error)
+      logger.error('Failed to reset settings:', error)
       throw error
     }
   }
@@ -251,48 +254,48 @@ export const useSettingsStore = defineStore('settings', () => {
       
       return exportData
     } catch (error) {
-      console.error('Failed to export settings:', error)
+      logger.error('Failed to export settings:', error)
       throw error
     }
   }
   
   const importSettings = async (importData, password = '') => {
-    console.log('[Import Settings] Starting import process.');
+    logger.debug('[Import Settings] Starting import process.');
     try {
-      console.log('[Import Settings] Raw importData:', importData);
-      console.log('[Import Settings] Password provided:', !!password);
+      logger.debug('[Import Settings] Raw importData:', importData);
+      logger.debug('[Import Settings] Password provided:', !!password);
 
       // Process imported settings (with optional decryption)
       const processedSettings = await secureStorage.processImportedSettings(
         importData,
         password
       );
-      console.log('[Import Settings] Processed settings from secureStorage:', processedSettings);
+      logger.debug('[Import Settings] Processed settings from secureStorage:', processedSettings);
 
       // Update settings
       Object.assign(settings.value, processedSettings)
-      console.log('[Import Settings] Settings after Object.assign:', settings.value);
+      logger.debug('[Import Settings] Settings after Object.assign:', settings.value);
 
       // Special handling for RegExp objects that might be imported as empty objects
       if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
         settings.value.RTL_REGEX = CONFIG.RTL_REGEX;
-        console.log('[Import Settings] Corrected RTL_REGEX to default.');
+        logger.debug('[Import Settings] Corrected RTL_REGEX to default.');
       }
       if (typeof settings.value.PERSIAN_REGEX === 'object' && settings.value.PERSIAN_REGEX !== null && Object.keys(settings.value.PERSIAN_REGEX).length === 0) {
         settings.value.PERSIAN_REGEX = CONFIG.PERSIAN_REGEX;
-        console.log('[Import Settings] Corrected PERSIAN_REGEX to default.');
+        logger.debug('[Import Settings] Corrected PERSIAN_REGEX to default.');
       }
-      console.log('[Import Settings] Settings before saving all:', settings.value);
+      logger.debug('[Import Settings] Settings before saving all:', settings.value);
 
       await saveAllSettings()
-      console.log('[Import Settings] saveAllSettings completed.');
+      logger.debug('[Import Settings] saveAllSettings completed.');
       
       // Reload the page to ensure UI reflects new settings
       window.location.reload();
       
       return true
     } catch (error) {
-      console.error('[Import Settings] Failed to import settings:', error)
+      logger.error('[Import Settings] Failed to import settings:', error)
       throw error
     }
   }
@@ -360,10 +363,10 @@ export const useSettingsStore = defineStore('settings', () => {
       
       await saveAllSettings()
       
-      console.log('Migration status updated:', migrationData)
+      logger.debug('Migration status updated:', migrationData)
       return true
     } catch (error) {
-      console.error('Failed to mark migration complete:', error)
+      logger.error('Failed to mark migration complete:', error)
       throw error
     }
   }
@@ -380,7 +383,7 @@ export const useSettingsStore = defineStore('settings', () => {
           // Update the reactive settings ref
           if (settings.value[key] !== newValue) {
             settings.value[key] = newValue
-            console.log(`[SettingsStore] Setting '${key}' updated from storage:`, newValue)
+            logger.debug(`[SettingsStore] Setting '${key}' updated from storage:`, newValue)
           }
         }
       }
@@ -392,9 +395,9 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       storageListener = handleStorageChange
       storageManager.on('change', storageListener)
-      console.log('[SettingsStore] Storage listener setup successfully with StorageManager')
+      logger.debug('[SettingsStore] Storage listener setup successfully with StorageManager')
     } catch (error) {
-      console.warn('[SettingsStore] Unable to setup storage listener:', error.message)
+      logger.warn('[SettingsStore] Unable to setup storage listener:', error.message)
     }
   }
 
@@ -404,9 +407,9 @@ export const useSettingsStore = defineStore('settings', () => {
       try {
         storageManager.off('change', storageListener)
         storageListener = null
-        console.log('[SettingsStore] Storage listener cleaned up from StorageManager')
+        logger.debug('[SettingsStore] Storage listener cleaned up from StorageManager')
       } catch (error) {
-        console.error('[SettingsStore] Error cleaning up storage listener:', error)
+        logger.error('[SettingsStore] Error cleaning up storage listener:', error)
       }
     }
   }
@@ -415,7 +418,7 @@ export const useSettingsStore = defineStore('settings', () => {
   loadSettings().then(() => {
     setupStorageListener()
   }).catch(error => {
-    console.error('Failed to initialize settings store:', error)
+    logger.error('Failed to initialize settings store:', error)
   })
 
   // Cleanup listener on store destruction

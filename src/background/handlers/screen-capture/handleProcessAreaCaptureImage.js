@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleProcessAreaCaptureImage.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleProcessAreaCaptureImage');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleProcessAreaCaptureImage(message, sender, sendResponse) {
-  console.log('[Handler:processAreaCaptureImage] Processing captured image:', message.data);
+  logger.debug('[Handler:processAreaCaptureImage] Processing captured image:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -38,7 +41,7 @@ export async function handleProcessAreaCaptureImage(message, sender, sendRespons
       sender
     });
     
-    console.log(`✅ [processAreaCaptureImage] Image processed successfully for tab ${targetTabId}`);
+    logger.debug(`✅ [processAreaCaptureImage] Image processed successfully for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

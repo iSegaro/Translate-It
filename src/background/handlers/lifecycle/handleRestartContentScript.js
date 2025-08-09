@@ -2,6 +2,9 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleRestartContentScript');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,7 +17,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleRestartContentScript(message, sender, sendResponse) {
-  console.log('[Handler:restart_content_script] Processing content script restart:', message);
+  logger.debug('[Handler:restart_content_script] Processing content script restart:', message);
   
   try {
     const tabId = message.tabId || sender.tab?.id;
@@ -23,7 +26,7 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
       throw new Error('No tab ID provided for content script restart');
     }
     
-    console.log(`🔄 [restart_content_script] Restarting content script for tab ${tabId}`);
+    logger.debug(`🔄 [restart_content_script] Restarting content script for tab ${tabId}`);
     
     // Execute content script reinjection
     await browser.scripting.executeScript({
@@ -37,7 +40,7 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
       files: ['/styles/content.css']
     });
     
-    console.log(`✅ [restart_content_script] Content script restarted successfully for tab ${tabId}`);
+    logger.debug(`✅ [restart_content_script] Content script restarted successfully for tab ${tabId}`);
     
     sendResponse({ 
       success: true, 

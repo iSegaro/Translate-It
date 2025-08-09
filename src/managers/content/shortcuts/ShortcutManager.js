@@ -3,6 +3,8 @@
  * Handles ESC, Ctrl+/, and other shortcuts in an organized manner
  */
 
+import { createLogger } from '../../../utils/core/logger.js';
+
 export class ShortcutManager {
   constructor() {
     this.shortcuts = new Map();
@@ -11,6 +13,7 @@ export class ShortcutManager {
     this.globalListener = null;
     this.keyboardStateManager = null;
     this.ctrlSlashShortcut = null;
+    this.logger = createLogger('Content', 'ShortcutManager');
   }
 
   /**
@@ -19,11 +22,9 @@ export class ShortcutManager {
    */
   async initialize(dependencies = {}) {
     if (this.initialized) {
-      console.warn('[ShortcutManager] Already initialized');
+      this.logger.warn('Already initialized');
       return;
     }
-
-    console.log('[ShortcutManager] Initializing shortcut manager');
 
     // Initialize KeyboardStateManager
     const { KeyboardStateManager } = await import('../KeyboardStateManager.js');
@@ -42,7 +43,7 @@ export class ShortcutManager {
     }
     
     this.initialized = true;
-    console.log('[ShortcutManager] ✅ Initialized successfully');
+    this.logger.init('Shortcut manager initialized');
   }
 
   /**
@@ -57,7 +58,7 @@ export class ShortcutManager {
       passive: false
     });
     
-    console.log('[ShortcutManager] Global keyboard listener setup');
+    this.logger.debug('Global keyboard listener setup');
   }
 
   /**
@@ -78,7 +79,7 @@ export class ShortcutManager {
     // Store reference for initialization later
     this.ctrlSlashShortcut = ctrlSlashShortcut;
     
-    console.log('[ShortcutManager] Default shortcuts registered');
+    this.logger.debug('Default shortcuts registered');
   }
 
   /**
@@ -92,11 +93,11 @@ export class ShortcutManager {
         translationHandler: dependencies.translationHandler,
         featureManager: dependencies.featureManager
       });
-      console.log('[ShortcutManager] CtrlSlashShortcut initialized with dependencies');
+      this.logger.debug('CtrlSlashShortcut initialized with dependencies');
     }
 
     // Future: Initialize other shortcuts that need dependencies
-    console.log('[ShortcutManager] All shortcuts initialized with dependencies');
+    this.logger.debug('All shortcuts initialized with dependencies');
   }
 
   /**
@@ -106,11 +107,11 @@ export class ShortcutManager {
    */
   registerShortcut(key, handler) {
     if (this.shortcuts.has(key)) {
-      console.warn(`[ShortcutManager] Overwriting shortcut for key: ${key}`);
+      this.logger.warn(`Overwriting shortcut for key: ${key}`);
     }
     
     this.shortcuts.set(key, handler);
-    console.log(`[ShortcutManager] ✅ Registered shortcut for: ${key}`);
+    this.logger.debug(`Registered shortcut for: ${key}`);
   }
 
   /**
@@ -120,7 +121,7 @@ export class ShortcutManager {
   unregisterShortcut(key) {
     if (this.shortcuts.has(key)) {
       this.shortcuts.delete(key);
-      console.log(`[ShortcutManager] Unregistered shortcut for: ${key}`);
+      this.logger.debug(`Unregistered shortcut for: ${key}`);
     }
   }
 
@@ -138,13 +139,13 @@ export class ShortcutManager {
     const handler = this.shortcuts.get(keyCombo);
     if (!handler) return;
 
-    console.log(`[ShortcutManager] Processing shortcut: ${keyCombo}`);
+    this.logger.debug(`Processing shortcut: ${keyCombo}`);
 
     try {
       // Check if shortcut should be executed (conditions)
       const shouldExecute = await handler.shouldExecute(event);
       if (!shouldExecute) {
-        console.log(`[ShortcutManager] Shortcut ${keyCombo} conditions not met`);
+        this.logger.debug(`Shortcut ${keyCombo} conditions not met`);
         return;
       }
 
@@ -156,10 +157,10 @@ export class ShortcutManager {
       // Execute shortcut
       const result = await handler.execute(event);
       
-      console.log(`[ShortcutManager] Shortcut ${keyCombo} executed:`, result);
+      this.logger.debug(`Shortcut ${keyCombo} executed`, result);
       
     } catch (error) {
-      console.error(`[ShortcutManager] Error executing shortcut ${keyCombo}:`, error);
+      this.logger.error(`Error executing shortcut ${keyCombo}`, error);
     }
   }
 
@@ -233,7 +234,7 @@ export class ShortcutManager {
     this.listeners.clear();
     this.initialized = false;
     
-    console.log('[ShortcutManager] Cleaned up');
+    this.logger.operation('Cleaned up');
   }
 }
 

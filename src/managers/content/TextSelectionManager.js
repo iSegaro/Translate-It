@@ -4,6 +4,7 @@
  */
 
 import { logME } from "../../utils/core/helpers.js";
+import { createLogger } from "../../utils/core/logger.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
@@ -13,6 +14,7 @@ export class TextSelectionManager {
     this.selectionWindows = options.selectionWindows;
     this.messenger = options.messenger;
     this.notifier = options.notifier;
+    this.logger = createLogger('Content', 'TextSelectionManager');
     
     // Selection state management
     this.selectionTimeoutId = null;
@@ -24,7 +26,7 @@ export class TextSelectionManager {
     this.cancelSelectionTranslation = this.cancelSelectionTranslation.bind(this);
     this._onOutsideClick = this._onOutsideClick.bind(this);
     
-    logME('[TextSelectionManager] Initialized');
+    this.logger.init('TextSelectionManager initialized');
   }
 
   /**
@@ -32,7 +34,7 @@ export class TextSelectionManager {
    * @param {MouseEvent} event - Mouse up event
    */
   async handleTextSelection(event) {
-    logME('[TextSelectionManager] handleTextSelection called');
+    this.logger.debug('handleTextSelection called');
     
     const selectedText = getSelectedTextWithDash();
     const path = getEventPath(event);
@@ -54,7 +56,7 @@ export class TextSelectionManager {
       }
     } catch (error) {
       // If check fails, continue with normal flow
-      console.warn("[TextSelectionManager] Failed to check local select element state:", error);
+      logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
     }
 
     if (selectedText) {
@@ -95,7 +97,7 @@ export class TextSelectionManager {
 
       // همچنین اگر پاپ‌آپ ترجمه متن انتخاب شده باز است آن را ببندید.
       if (this.selectionWindows?.isVisible) {
-        logME("[TextSelectionManager] Dismiss SelectionWindows - no text selected");
+        this.logger.debug('Dismiss SelectionWindows - no text selected');
         this.selectionWindows.dismiss();
       }
     }
@@ -108,7 +110,7 @@ export class TextSelectionManager {
    * @param {MouseEvent} event - Original mouse event (optional)
    */
   async processSelectedText(selectedText, event) {
-    logME('[TextSelectionManager] processSelectedText called with:', selectedText);
+    this.logger.debug('processSelectedText called', { text: selectedText.substring(0, 50) + '...' });
     
     const selection = window.getSelection();
     let position = { x: 0, y: 0 };
@@ -140,7 +142,7 @@ export class TextSelectionManager {
     if (this.selectionWindows) {
       this.selectionWindows.show(selectedText, position);
     } else {
-      logME('[TextSelectionManager] SelectionWindows not available');
+      this.logger.warn('SelectionWindows not available');
     }
     
     // حذف listener بعد از نمایش پاپ‌آپ
@@ -155,7 +157,7 @@ export class TextSelectionManager {
     if (this.selectionTimeoutId) {
       clearTimeout(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
-      logME("[TextSelectionManager] Selection translation cancelled");
+      this.logger.debug('Selection translation cancelled');
       
       try {
         document.removeEventListener("mousedown", this.cancelSelectionTranslation);
@@ -202,7 +204,7 @@ export class TextSelectionManager {
    */
   _onOutsideClick(event) {
     // This will be used for more advanced selection window integration
-    logME('[TextSelectionManager] Outside click detected');
+    this.logger.debug('Outside click detected');
   }
 
   /**
@@ -233,7 +235,7 @@ export class TextSelectionManager {
       // Listener may not have been added
     }
     
-    logME('[TextSelectionManager] Cleaned up');
+    this.logger.debug('Cleaned up');
   }
 
   /**

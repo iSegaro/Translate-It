@@ -6,6 +6,9 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'options');
 
 // Import route components (lazy loaded)
 const LanguagesTab = () => import('@/views/options/tabs/LanguagesTab.vue')
@@ -20,12 +23,12 @@ const About = () => import('@/views/options/About.vue')
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
-    console.log('🚀 Starting options app initialization...')
+    logger.debug('🚀 Starting options app initialization...')
     
     // Wait for browser API to be ready
-    console.log('⏳ Waiting for browser API to be ready...')
+    logger.debug('⏳ Waiting for browser API to be ready...')
     
-    console.log('✅ browser API is ready')
+    logger.debug('✅ browser API is ready')
 
     // Ensure browser API is globally available for i18n plugin
     if (typeof window !== 'undefined') {
@@ -33,7 +36,7 @@ async function initializeApp() {
       window.chrome = browser; // Some plugins expect chrome object
       
       // Debug: Check if i18n is available
-      console.log('🔍 Checking i18n availability:', {
+      logger.debug('🔍 Checking i18n availability:', {
         'browserAPI.i18n': !!browser.i18n,
         'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
         'window.browser.i18n': !!window.browser.i18n,
@@ -42,12 +45,12 @@ async function initializeApp() {
     }
 
     // Import i18n plugin after browser API is ready and globally available
-    console.log('📦 Importing i18n plugin...')
+    logger.debug('📦 Importing i18n plugin...')
     const { default: i18n } = await import('vue-plugin-webextension-i18n')
-    console.log('✅ i18n plugin imported successfully')
+    logger.debug('✅ i18n plugin imported successfully')
 
     // Create router
-    console.log('🛣️ Creating Vue router...')
+    logger.debug('🛣️ Creating Vue router...')
     const router = createRouter({
       history: createWebHashHistory(),
       routes: [
@@ -62,49 +65,49 @@ async function initializeApp() {
         { path: '/about', component: About, name: 'about' }
       ]
     })
-    console.log('✅ Router created successfully')
+    logger.debug('✅ Router created successfully')
 
     // Create Vue app
-    console.log('🎨 Creating Vue app...')
+    logger.debug('🎨 Creating Vue app...')
     const app = createApp(OptionsApp)
-    console.log('✅ Vue app created successfully')
+    logger.debug('✅ Vue app created successfully')
     
     // Add detailed debugging
     app.config.performance = true
-    console.log('🔍 Vue performance tracking enabled')
+    logger.debug('🔍 Vue performance tracking enabled')
 
     // Use plugins (order matters: i18n before router)
-    console.log('🔌 Installing Pinia...')
+    logger.debug('🔌 Installing Pinia...')
     app.use(pinia)
-    console.log('✅ Pinia installed')
+    logger.debug('✅ Pinia installed')
     
-    console.log('🔌 Installing i18n...')
+    logger.debug('🔌 Installing i18n...')
     app.use(i18n)
-    console.log('✅ i18n installed')
+    logger.debug('✅ i18n installed')
     
-    console.log('🔌 Installing Router...')
+    logger.debug('🔌 Installing Router...')
     app.use(router)
-    console.log('✅ Router installed')
+    logger.debug('✅ Router installed')
 
     // Global properties for extension context
-    console.log('⚙️ Setting global properties...')
+    logger.debug('⚙️ Setting global properties...')
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = 'options'
     
     // $i18n is automatically provided by the plugin, no manual setup needed
-    console.log('✅ i18n global property will be available after plugin installation')
+    logger.debug('✅ i18n global property will be available after plugin installation')
 
     // Setup unified error handling
-    console.log('🛡️ Setting up unified error handler...')
+    logger.debug('🛡️ Setting up unified error handler...')
     setupGlobalErrorHandler(app, 'options')
 
     // Mount the app
-    console.log('🎯 Mounting Vue app to #app...')
+    logger.debug('🎯 Mounting Vue app to #app...')
     app.mount('#app')
-    console.log('🎉 Options app mounted successfully!')
+    logger.debug('🎉 Options app mounted successfully!')
   } catch (error) {
-    console.error('Failed to initialize options app:', error)
-    console.error('Error stack:', error.stack)
+    logger.error('Failed to initialize options app:', error)
+    logger.error('Error stack:', error.stack)
     
     // Show detailed error UI
     document.getElementById('app').innerHTML = DOMPurify.sanitize(`
@@ -132,19 +135,19 @@ initializeApp()
 setTimeout(() => {
   const appElement = document.getElementById('app')
   if (appElement && appElement.innerHTML.includes('Failed to load extension options')) {
-    console.log('⚠️ App failed to initialize, checking potential issues...')
+    logger.debug('⚠️ App failed to initialize, checking potential issues...')
     
     // Check if required APIs are available
-    console.log('🔍 browser API check:')
-    console.log('- typeof chrome:', typeof chrome)
-    console.log('- typeof browser:', typeof browser)
-    console.log('- chrome.runtime:', chrome?.runtime)
-    console.log('- chrome.storage:', chrome?.storage)
+    logger.debug('🔍 browser API check:')
+    logger.debug('- typeof chrome:', typeof chrome)
+    logger.debug('- typeof browser:', typeof browser)
+    logger.debug('- chrome.runtime:', chrome?.runtime)
+    logger.debug('- chrome.storage:', chrome?.storage)
     
     // Check if DOM is ready
-    console.log('🔍 DOM check:')
-    console.log('- document.readyState:', document.readyState)
-    console.log('- #app element:', document.getElementById('app'))
+    logger.debug('🔍 DOM check:')
+    logger.debug('- document.readyState:', document.readyState)
+    logger.debug('- #app element:', document.getElementById('app'))
     
     // Show simple recovery UI
     appElement.innerHTML = DOMPurify.sanitize(`

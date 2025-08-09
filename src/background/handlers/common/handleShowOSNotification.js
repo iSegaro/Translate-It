@@ -2,6 +2,9 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleShowOSNotification');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,7 +17,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleShowOSNotification(message, sender, sendResponse) {
-  console.log('[Handler:show_os_notification] Processing notification request:', message);
+  logger.debug('[Handler:show_os_notification] Processing notification request:', message);
   
   try {
     const { title, message: notificationMessage, type = 'basic', iconUrl, buttons } = message.data || {};
@@ -39,7 +42,7 @@ export async function handleShowOSNotification(message, sender, sendResponse) {
     // Create the notification
     const notificationId = await browser.notifications.create(notificationOptions);
     
-    console.log(`✅ [show_os_notification] Notification created with ID: ${notificationId}`);
+    logger.debug(`✅ [show_os_notification] Notification created with ID: ${notificationId}`);
     
     sendResponse({ 
       success: true, 

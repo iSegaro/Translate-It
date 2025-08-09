@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Content', 'RevertShortcut');
 /**
  * Revert Shortcut - ESC key handler for reverting translations
  * Modular shortcut handler that integrates with RevertHandler
@@ -25,11 +28,11 @@ export class RevertShortcut {
     const hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
     
     if (!hasVueTranslations && !hasLegacyTranslations) {
-      console.log('[RevertShortcut] No translations found to revert');
+      logger.debug('[RevertShortcut] No translations found to revert');
       return false;
     }
 
-    console.log('[RevertShortcut] Found translations to revert via ESC');
+    logger.debug('[RevertShortcut] Found translations to revert via ESC');
     return true;
   }
 
@@ -39,7 +42,7 @@ export class RevertShortcut {
    * @returns {Promise<Object>} Execution result
    */
   async execute(event) {
-    console.log('[RevertShortcut] Executing ESC revert shortcut');
+    logger.debug('[RevertShortcut] Executing ESC revert shortcut');
     
     try {
       // Import and use RevertHandler
@@ -49,15 +52,15 @@ export class RevertShortcut {
       const result = await revertHandler.executeRevert();
       
       if (result.success) {
-        console.log(`[RevertShortcut] ✅ Successfully reverted ${result.revertedCount} translations`);
+        logger.debug(`[RevertShortcut] ✅ Successfully reverted ${result.revertedCount} translations`);
       } else {
-        console.error('[RevertShortcut] ❌ Revert failed:', result.error);
+        logger.error('[RevertShortcut] ❌ Revert failed:', result.error);
       }
       
       return result;
       
     } catch (error) {
-      console.error('[RevertShortcut] Error executing revert shortcut:', error);
+      logger.error('[RevertShortcut] Error executing revert shortcut:', error);
       return {
         success: false,
         error: error.message || 'Shortcut execution failed'

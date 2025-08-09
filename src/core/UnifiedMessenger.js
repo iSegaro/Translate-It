@@ -11,6 +11,9 @@ import browser from "webextension-polyfill";
 import { isFirefox } from "../utils/browser/compatibility.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateMessageId } from "../utils/messaging/messageId.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'UnifiedMessenger');
 
 export class UnifiedMessenger {
   constructor(context = "unknown") {
@@ -86,7 +89,7 @@ export class UnifiedMessenger {
                   }
                   // This should not happen anymore for TRANSLATE messages
                   if (messageToSend.action === MessageActions.TRANSLATE) {
-                    console.warn("[UnifiedMessenger] TRANSLATE got undefined response after TRANSLATION_RESULT_UPDATE implementation");
+                    logger.warn("[UnifiedMessenger] TRANSLATE got undefined response after TRANSLATION_RESULT_UPDATE implementation");
                     resolve({ success: false, error: "Unexpected undefined response for TRANSLATE" });
                     return;
                   }

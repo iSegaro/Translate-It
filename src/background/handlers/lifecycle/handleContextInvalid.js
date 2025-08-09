@@ -1,6 +1,9 @@
 // src/background/handlers/lifecycle/handleContextInvalid.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleContextInvalid');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,11 +16,11 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleContextInvalid(message, sender, sendResponse) {
-  console.log('[Handler:CONTEXT_INVALID] Processing context invalid notification:', message);
+  logger.debug('[Handler:CONTEXT_INVALID] Processing context invalid notification:', message);
   
   try {
     // Log the context invalidation
-    console.warn('🔄 [CONTEXT_INVALID] Content script context became invalid, cleanup may be needed');
+    logger.warn('🔄 [CONTEXT_INVALID] Content script context became invalid, cleanup may be needed');
     
     // Notify that context is invalid and cleanup should occur
     const backgroundService = globalThis.backgroundService;

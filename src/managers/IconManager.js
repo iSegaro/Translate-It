@@ -2,13 +2,14 @@
 
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { logME } from "../utils/core/helpers.js";
+import { createLogger } from "../utils/core/logger.js";
 
 export default class IconManager {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
     this.container = null;
     this.canShowIcons = false;
+    this.logger = createLogger('UI', 'IconManager');
   }
 
   _ensureContainerExists() {
@@ -22,7 +23,7 @@ export default class IconManager {
       !document.body ||
       typeof document.createElement !== "function"
     ) {
-      logME("[IconManager] DOM not ready for icon container.");
+      this.logger.warn('DOM not ready for icon container.');
       this.canShowIcons = false;
       return;
     }
@@ -33,7 +34,7 @@ export default class IconManager {
       if (el) {
         this.container = el;
         this.canShowIcons = true;
-        logME("[IconManager] Re-attached to existing icon container.");
+        this.logger.debug('Re-attached to existing icon container.');
         return;
       }
 
@@ -43,12 +44,9 @@ export default class IconManager {
 
       this.container = el;
       this.canShowIcons = true;
-      logME("[IconManager] Icon container created and appended successfully.");
+      this.logger.info('Icon container created and appended successfully.');
     } catch (error) {
-      logME(
-        "[IconManager] Environment not compatible for icons due to error:",
-        error.message,
-      );
+      this.logger.error('Environment not compatible for icons due to error:', error.message);
       this.canShowIcons = false;
       if (this.container) {
         try {

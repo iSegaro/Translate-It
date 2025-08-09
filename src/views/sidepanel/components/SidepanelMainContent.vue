@@ -176,6 +176,9 @@ import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.j
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
 const tts = useTTSSmart();
@@ -226,13 +229,13 @@ const isSelectElementActivating = computed(
 
 const targetLanguageValue = computed(() => {
   const val = targetLanguageInputRef.value?.value || "Persian";
-  console.log('[Debug] targetLanguageValue computed:', val);
+  logger.debug('[Debug] targetLanguageValue computed:', val);
   return val;
 });
 
 const sourceLanguageValue = computed(() => {
   const val = sourceLanguageInputRef.value?.value || AUTO_DETECT_VALUE;
-  console.log('[Debug] sourceLanguageValue computed:', val);
+  logger.debug('[Debug] sourceLanguageValue computed:', val);
   return val;
 });
 
@@ -241,7 +244,7 @@ watch(
   () => historyComposable.sortedHistoryItems,
   (newHistory) => {
     if (import.meta.env.DEV) {
-      console.debug(
+      logger.debug(
         "[SidepanelMainContent] History watcher triggered. newHistory:",
         newHistory,
       );
@@ -249,12 +252,12 @@ watch(
     if (newHistory && newHistory.length > 0) {
       const lastItem = newHistory[0];
       if (import.meta.env.DEV) {
-        console.debug("[SidepanelMainContent] Last history item:", lastItem);
-        console.debug(
+        logger.debug("[SidepanelMainContent] Last history item:", lastItem);
+        logger.debug(
           "[SidepanelMainContent] Current sourceText.value:",
           sourceText.value,
       );
-        console.debug(
+        logger.debug(
           "[SidepanelMainContent] Current translatedText.value:",
           translatedText.value,
         );
@@ -266,14 +269,14 @@ watch(
         (translatedText.value === "" || translatedText.value === null)
       ) {
         if (import.meta.env.DEV) {
-          console.debug(
+          logger.debug(
             "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
           );
         }
         if (import.meta.env.DEV) {
-          console.debug("  lastItem.sourceText:", lastItem.sourceText);
-          console.debug("  sourceText.value:", sourceText.value);
-          console.debug(
+          logger.debug("  lastItem.sourceText:", lastItem.sourceText);
+          logger.debug("  sourceText.value:", sourceText.value);
+          logger.debug(
             "  translatedText.value (before update):",
             translatedText.value,
           );
@@ -284,29 +287,29 @@ watch(
         isTranslating.value = false;
         
         if (import.meta.env.DEV) {
-          console.debug(
+          logger.debug(
             "  [History Watcher] translatedText.value (after update):",
             translatedText.value,
           );
-          console.debug(
+          logger.debug(
             "  [History Watcher] translationError.value (after update):",
             translationError.value,
           );
-          console.debug(
+          logger.debug(
             "  [History Watcher] isTranslating.value (after update):",
             isTranslating.value,
           );
         }
       } else if (import.meta.env.DEV) {
-        console.debug("[SidepanelMainContent] Watcher condition NOT met.");
-        console.debug("  lastItem.sourceText:", lastItem.sourceText);
-        console.debug("  sourceText.value:", sourceText.value);
-        console.debug(
+        logger.debug("[SidepanelMainContent] Watcher condition NOT met.");
+        logger.debug("  lastItem.sourceText:", lastItem.sourceText);
+        logger.debug("  sourceText.value:", sourceText.value);
+        logger.debug(
           "  lastItem.sourceText === sourceText.value:",
           lastItem.sourceText === sourceText.value,
         );
-        console.debug("  translatedText.value:", translatedText.value);
-        console.debug(
+        logger.debug("  translatedText.value:", translatedText.value);
+        logger.debug(
           "  (translatedText.value === '' || translatedText.value === null):",
           translatedText.value === "" || translatedText.value === null,
         );
@@ -318,29 +321,29 @@ watch(
 
 // Handle form submission using composable - SAME AS POPUP
 const handleTranslationSubmit = async () => {
-  console.log("[SidepanelMainContent] Translation submit started");
+  logger.debug("[SidepanelMainContent] Translation submit started");
 
   if (!canTranslate.value) {
-    console.warn("[SidepanelMainContent] Cannot translate - conditions not met");
+    logger.warn("[SidepanelMainContent] Cannot translate - conditions not met");
     return;
   }
 
   try {
     // Cancel previous request if exists
     if (currentAbortController.value) {
-      console.log("[SidepanelMainContent] Cancelling previous translation request");
+      logger.debug("[SidepanelMainContent] Cancelling previous translation request");
       currentAbortController.value.abort();
     }
 
     // Ensure background is ready
-    console.log("[SidepanelMainContent] Ensuring background script is ready...");
+    logger.debug("[SidepanelMainContent] Ensuring background script is ready...");
     await backgroundWarmup.ensureWarmedUp();
 
     // Debug: Check DOM values directly before translation
     const domSourceVal = sourceLanguageInputRef.value?.value;
     const domTargetVal = targetLanguageInputRef.value?.value;
-    console.log("[DEBUG] DOM values:", { domSource: domSourceVal, domTarget: domTargetVal });
-    console.log("[DEBUG] Computed values:", { computedSource: sourceLanguageValue.value, computedTarget: targetLanguageValue.value });
+    logger.debug("[DEBUG] DOM values:", { domSource: domSourceVal, domTarget: domTargetVal });
+    logger.debug("[DEBUG] Computed values:", { computedSource: sourceLanguageValue.value, computedTarget: targetLanguageValue.value });
     
     // Quick Fix: Use DOM values directly if computed values don't match
     let finalSourceLang = sourceLanguageValue.value;
@@ -348,16 +351,16 @@ const handleTranslationSubmit = async () => {
     
     // If computed values don't match DOM, use DOM values directly
     if (finalSourceLang !== domSourceVal || finalTargetLang !== domTargetVal) {
-      console.log("[QUICK_FIX] Computed values don't match DOM, using DOM values directly");
+      logger.debug("[QUICK_FIX] Computed values don't match DOM, using DOM values directly");
       finalSourceLang = domSourceVal || AUTO_DETECT_VALUE;
       finalTargetLang = domTargetVal || "Persian";
     }
     
     // Use composable translation function with corrected language values  
-    console.log("[SidepanelMainContent] Triggering translation via composable with languages:", { source: finalSourceLang, target: finalTargetLang });
+    logger.debug("[SidepanelMainContent] Triggering translation via composable with languages:", { source: finalSourceLang, target: finalTargetLang });
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
     
-    console.log("[SidepanelMainContent] Translation completed:", success);
+    logger.debug("[SidepanelMainContent] Translation completed:", success);
     
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-translation');
@@ -368,7 +371,7 @@ const handleTranslationSubmit = async () => {
 const copySourceText = async () => {
   try {
     await navigator.clipboard.writeText(sourceText.value);
-    console.log("[SidepanelMainContent] Source text copied to clipboard");
+    logger.debug("[SidepanelMainContent] Source text copied to clipboard");
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-copySource');
   }
@@ -378,7 +381,7 @@ const copySourceText = async () => {
 const copyTranslationText = async () => {
   try {
     await navigator.clipboard.writeText(translatedText.value);
-    console.log("[SidepanelMainContent] Translation copied to clipboard");
+    logger.debug("[SidepanelMainContent] Translation copied to clipboard");
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-copyTranslation');
   }
@@ -391,7 +394,7 @@ const pasteSourceText = async () => {
     sourceText.value = text;
     // Trigger input event to update reactive properties
     handleSourceTextInput();
-    console.log("[SidepanelMainContent] Text pasted from clipboard");
+    logger.debug("[SidepanelMainContent] Text pasted from clipboard");
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-paste');
   }
@@ -406,13 +409,13 @@ const handleSourceTextInput = () => {
 // Check clipboard for paste button visibility
 const checkClipboard = async () => {
   try {
-    console.log("[SidepanelMainContent] Checking clipboard...");
+    logger.debug("[SidepanelMainContent] Checking clipboard...");
     const text = await navigator.clipboard.readText();
     const hasContent = text.trim().length > 0;
 
     showPasteButton.value = hasContent;
   } catch (error) {
-    console.log(
+    logger.debug(
       "[SidepanelMainContent] Clipboard check failed:",
       error.message,
     );
@@ -455,7 +458,7 @@ const speakSourceText = async () => {
   const sourceLanguage = sourceLanguageValue.value || AUTO_DETECT_VALUE;
   const langCode = getLanguageCode(sourceLanguage);
   await tts.speak(sourceText.value, langCode);
-  console.log(
+  logger.debug(
     "[SidepanelMainContent] Source text TTS started with language:",
     langCode,
   );
@@ -466,7 +469,7 @@ const speakTranslationText = async () => {
   const targetLanguage = targetLanguageValue.value || AUTO_DETECT_VALUE;
   const langCode = getLanguageCode(targetLanguage);
   await tts.speak(translatedText.value, langCode);
-  console.log(
+  logger.debug(
     "[SidepanelMainContent] Translation TTS started with language:",
     langCode,
   );
@@ -486,7 +489,7 @@ const handleSwapLanguages = async () => {
     let sourceVal = sourceSelect.value;
     let targetVal = targetSelect.value;
     
-    console.log("[SidepanelMainContent] Current languages before swap:", { sourceVal, targetVal });
+    logger.debug("[SidepanelMainContent] Current languages before swap:", { sourceVal, targetVal });
 
     // Note: We only swap languages, not text content
     // Text content should remain in their respective fields
@@ -504,7 +507,7 @@ const handleSwapLanguages = async () => {
       if (lastTranslation.value && lastTranslation.value.sourceLanguage) {
         const detectedLang = lastTranslation.value.sourceLanguage;
         resolvedSourceCode = getLanguageCode(detectedLang);
-        console.log(
+        logger.debug(
           "[SidepanelMainContent] Using detected source language from last translation:",
           detectedLang,
         );
@@ -512,7 +515,7 @@ const handleSwapLanguages = async () => {
         // Fallback to settings
         try {
           resolvedSourceCode = await getSourceLanguageAsync();
-          console.log(
+          logger.debug(
             "[SidepanelMainContent] Resolved source language from settings:",
             resolvedSourceCode,
           );
@@ -527,7 +530,7 @@ const handleSwapLanguages = async () => {
     if (targetCode === AUTO_DETECT_VALUE || targetVal === AUTO_DETECT_VALUE) {
       try {
         resolvedTargetCode = await getTargetLanguageAsync();
-        console.log(
+        logger.debug(
           "[SidepanelMainContent] Resolved target language from settings:",
           resolvedTargetCode,
         );
@@ -547,24 +550,24 @@ const handleSwapLanguages = async () => {
       sourceSelect.value = newSourceDisplay || targetVal;
       targetSelect.value = newTargetDisplay || sourceVal;
 
-      console.log("[SidepanelMainContent] Languages swapped successfully:", { 
+      logger.debug("[SidepanelMainContent] Languages swapped successfully:", { 
         from: `${sourceVal} → ${targetVal}`, 
         to: `${newSourceDisplay} → ${newTargetDisplay}` 
       });
       
       // Debug: Check DOM values immediately after swap
-      console.log("[DEBUG] DOM after swap:", { 
+      logger.debug("[DEBUG] DOM after swap:", { 
         domSource: sourceSelect.value, 
         domTarget: targetSelect.value 
       });
-      console.log("[DEBUG] Computed after swap (immediate):", { 
+      logger.debug("[DEBUG] Computed after swap (immediate):", { 
         computedSource: sourceLanguageValue.value, 
         computedTarget: targetLanguageValue.value 
       });
       
       // Wait for Vue reactivity to update
       await nextTick();
-      console.log("[DEBUG] Computed after swap (nextTick):", { 
+      logger.debug("[DEBUG] Computed after swap (nextTick):", { 
         computedSource: sourceLanguageValue.value, 
         computedTarget: targetLanguageValue.value 
       });
@@ -573,30 +576,30 @@ const handleSwapLanguages = async () => {
       sourceSelect.value = targetVal;
       targetSelect.value = AUTO_DETECT_VALUE;
       
-      console.log("[SidepanelMainContent] Auto-detect swap:", { 
+      logger.debug("[SidepanelMainContent] Auto-detect swap:", { 
         from: `${AUTO_DETECT_VALUE} → ${targetVal}`, 
         to: `${targetVal} → ${AUTO_DETECT_VALUE}` 
       });
       
       // Debug: Check DOM values immediately after auto swap
-      console.log("[DEBUG] DOM after auto swap:", { 
+      logger.debug("[DEBUG] DOM after auto swap:", { 
         domSource: sourceSelect.value, 
         domTarget: targetSelect.value 
       });
-      console.log("[DEBUG] Computed after auto swap (immediate):", { 
+      logger.debug("[DEBUG] Computed after auto swap (immediate):", { 
         computedSource: sourceLanguageValue.value, 
         computedTarget: targetLanguageValue.value 
       });
       
       // Wait for Vue reactivity to update
       await nextTick();
-      console.log("[DEBUG] Computed after auto swap (nextTick):", { 
+      logger.debug("[DEBUG] Computed after auto swap (nextTick):", { 
         computedSource: sourceLanguageValue.value, 
         computedTarget: targetLanguageValue.value 
       });
     } else {
       // Cannot swap - provide feedback
-      console.log(
+      logger.debug(
         "[SidepanelMainContent] Cannot swap - invalid language selection",
         {
           resolvedSourceCode,
@@ -639,7 +642,7 @@ const getLanguageDisplayName = (langCode) => {
 onMounted(async () => {
   // Suppress no-unused-vars warnings for template-used variables/functions
   // These are used in the template but not directly in the script setup block
-  console.log(historyComposable); // Explicitly use historyComposable to satisfy linter
+  logger.debug(historyComposable); // Explicitly use historyComposable to satisfy linter
   hasTranslationContent.value;
   isSelectElementActivating.value;
   // Remove automatic clipboard/TTS operations on mount to prevent errors
@@ -658,7 +661,7 @@ onMounted(async () => {
   // Initialize translation data - SAME AS POPUP
   await loadLastTranslation();
 
-  console.log(
+  logger.debug(
     "[SidepanelMainContent] Component mounted with Select Element integration",
   );
 });
@@ -673,8 +676,7 @@ onUnmounted(() => {
     currentAbortController.value.abort();
     currentAbortController.value = null;
   }
-});
-</script>
+});</script>
 
 <style scoped>
 .main-content {

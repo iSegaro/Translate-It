@@ -2,10 +2,12 @@ import { MessagingCore, MessageContexts } from "../messaging/core/MessagingCore.
 import { TranslationMode, getSettingsAsync } from "@/config.js";
 import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
+import { createLogger } from "../utils/core/logger.js";
 
 export class TranslationService {
   constructor(context) {
     this.messenger = MessagingCore.getMessenger(context || MessageContexts.TRANSLATION_SERVICE);
+    this.logger = createLogger('Translation', 'Service');
   }
 
   async translate(mode, payload) {
@@ -20,10 +22,10 @@ export class TranslationService {
         provider: currentProvider
       };
       
-      logME(`[TranslationService] Sending translation request for mode: ${mode}, provider: ${currentProvider}, messageId: ${options.messageId}`);
+      this.logger.debug(`Sending translation request for mode: ${mode}, provider: ${currentProvider}, messageId: ${options.messageId}`);
       return await this.messenger.specialized.translation.translate(payload.promptText, options);
     } catch (error) {
-      logME(`[TranslationService] Translation error for mode ${mode}:`, error);
+      this.logger.error(`Translation error for mode ${mode}`, error);
       throw error;
     }
   }
@@ -44,7 +46,7 @@ export class TranslationService {
         await this.messenger.specialized.selection.deactivateMode();
       }
     } catch (error) {
-      logME("[TranslationService] Error toggling select element mode:", error);
+      this.logger.error("Error toggling select element mode", error);
       throw error;
     }
   }
@@ -53,7 +55,7 @@ export class TranslationService {
     try {
       await this.messenger.sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
     } catch (error) {
-      logME("[TranslationService] Error reverting translation:", error);
+      this.logger.error("Error reverting translation", error);
       throw error;
     }
   }
@@ -62,7 +64,7 @@ export class TranslationService {
     try {
       await this.messenger.specialized.tts.stop();
     } catch (error) {
-      logME("[TranslationService] TTS stop request failed (might not be active):", error);
+      this.logger.warn("TTS stop request failed (might not be active)", error);
     }
   }
 

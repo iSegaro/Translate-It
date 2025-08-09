@@ -1,3 +1,6 @@
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'ProviderRegistry');
 class ProviderRegistry {
   constructor() {
     this.providers = new Map();
@@ -5,7 +8,7 @@ class ProviderRegistry {
 
   register(id, providerClass) {
     if (this.providers.has(id)) {
-      console.warn(`Provider with ID '${id}' already registered. Overwriting.`);
+      logger.warn(`Provider with ID '${id}' already registered. Overwriting.`);
     }
     this.providers.set(id, providerClass);
   }

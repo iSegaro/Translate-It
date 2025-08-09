@@ -3,7 +3,7 @@
  * Extracted from EventHandler for modular keyboard shortcut management
  */
 
-import { logME } from "../../../utils/core/helpers.js";
+import { createLogger } from "../../../utils/core/logger.js";
 import { isEditable } from "../../../utils/core/helpers.js";
 import { ErrorHandler } from "../../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
@@ -16,7 +16,9 @@ export class CtrlSlashShortcut {
     this.featureManager = null;
     this.initialized = false;
     
-    logME('[CtrlSlashShortcut] Initialized');
+    // Initialize logger
+    this.logger = createLogger('Content', 'CtrlSlashShortcut');
+    this.logger.init('CtrlSlashShortcut initialized');
   }
 
   /**
@@ -28,7 +30,7 @@ export class CtrlSlashShortcut {
     this.featureManager = dependencies.featureManager;
     this.initialized = true;
     
-    logME('[CtrlSlashShortcut] Initialized with dependencies');
+    this.logger.debug('Initialized with dependencies');
   }
 
   /**
@@ -44,37 +46,37 @@ export class CtrlSlashShortcut {
 
     // Check if required dependencies are available
     if (!this.initialized || !this.translationHandler) {
-      logME('[CtrlSlashShortcut] Not initialized or missing translationHandler');
+      this.logger.debug('Not initialized or missing translationHandler');
       return false;
     }
 
     // Check if feature is enabled (SHORTCUT_TEXT_FIELDS)
     if (!this.featureManager?.isOn("SHORTCUT_TEXT_FIELDS")) {
-      logME('[CtrlSlashShortcut] SHORTCUT_TEXT_FIELDS feature is disabled');
+      this.logger.debug('SHORTCUT_TEXT_FIELDS feature is disabled');
       return false;
     }
 
     // Check if translation is already in progress
     if (this.translationHandler.isProcessing) {
-      logME('[CtrlSlashShortcut] Translation already in progress');
+      this.logger.debug('Translation already in progress');
       return false;
     }
 
     // Check if active element is editable
     const { activeElement } = this.translationHandler.getSelectElementContext();
     if (!isEditable(activeElement)) {
-      logME('[CtrlSlashShortcut] Active element is not editable');
+      this.logger.debug('Active element is not editable');
       return false;
     }
 
     // Extract text from active element
     const text = this.translationHandler.extractFromActiveElement(activeElement);
     if (!text) {
-      logME('[CtrlSlashShortcut] No text found in active element');
+      this.logger.debug('No text found in active element');
       return false;
     }
 
-    logME('[CtrlSlashShortcut] All conditions met, ready to execute');
+    this.logger.debug('All conditions met, ready to execute');
     return true;
   }
 
@@ -84,7 +86,7 @@ export class CtrlSlashShortcut {
    * @returns {Promise<Object>} Execution result
    */
   async execute(event) {
-    logME('[CtrlSlashShortcut] Executing Ctrl+/ shortcut');
+    this.logger.debug('Executing Ctrl+/ shortcut');
 
     try {
       // Set processing flag
@@ -96,7 +98,7 @@ export class CtrlSlashShortcut {
       // Extract text from active element
       const text = this.translationHandler.extractFromActiveElement(activeElement);
 
-      logME(`[CtrlSlashShortcut] Processing translation for text: "${text.substring(0, 50)}..."`);
+      this.logger.debug(`Processing translation for text: "${text.substring(0, 50)}..."`);
 
       // Process translation using TranslationHandler
       // Note: Future enhancement could support selected text within field
@@ -107,7 +109,7 @@ export class CtrlSlashShortcut {
         selectionRange: null, // Currently not supporting selection within field
       });
 
-      logME('[CtrlSlashShortcut] ✅ Translation completed successfully');
+      this.logger.debug('Translation completed successfully');
 
       return {
         success: true,
@@ -117,7 +119,7 @@ export class CtrlSlashShortcut {
       };
 
     } catch (error) {
-      logME('[CtrlSlashShortcut] ❌ Error during translation:', error);
+      this.logger.error('Error during translation:', error);
 
       // Process error using ErrorHandler
       const errorHandle = await ErrorHandler.processError(error);
@@ -200,6 +202,6 @@ export class CtrlSlashShortcut {
     this.featureManager = null;
     this.initialized = false;
     
-    logME('[CtrlSlashShortcut] Cleaned up');
+    this.logger.debug('Cleaned up');
   }
 }

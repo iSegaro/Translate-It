@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleResultClosed.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleResultClosed');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleResultClosed(message, sender, sendResponse) {
-  console.log('[Handler:resultClosed] Processing result close:', message.data);
+  logger.debug('[Handler:resultClosed] Processing result close:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -32,7 +35,7 @@ export async function handleResultClosed(message, sender, sendResponse) {
       sender
     });
     
-    console.log(`✅ [resultClosed] Capture result closed and cleaned up for tab ${targetTabId}`);
+    logger.debug(`✅ [resultClosed] Capture result closed and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

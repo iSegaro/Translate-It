@@ -2,7 +2,8 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay } from "../utils/core/helpers.js";
+import { createLogger } from "../utils/core/logger.js";
 import { filterXSS } from "xss";
 import {
   smartTextReplacement,
@@ -13,6 +14,7 @@ export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
     this.errorHandler = errorHandler;
+    this.logger = createLogger('Translation', 'DefaultStrategy');
   }
 
   /**
@@ -21,11 +23,11 @@ export default class DefaultStrategy extends PlatformStrategy {
   extractText(target) {
     try {
       if (!target || !(target instanceof Element)) {
-        logME("[DefaultStrategy] extractText: Invalid target", target);
+        this.logger.warn('extractText: Invalid target', { target });
         return "";
       }
 
-      logME("[DefaultStrategy] extractText target info:", {
+      this.logger.debug('extractText target info', {
         tagName: target.tagName,
         isContentEditable: target.isContentEditable,
         className: target.className,
@@ -43,17 +45,11 @@ export default class DefaultStrategy extends PlatformStrategy {
           selection.toString().trim().length > 0
         ) {
           const selectedText = selection.toString().trim();
-          logME(
-            "[DefaultStrategy] extractText: Selected text from contentEditable:",
-            selectedText.substring(0, 50),
-          );
+          this.logger.debug('extractText: Selected text from contentEditable', { text: selectedText.substring(0, 50) });
           return selectedText;
         }
         const fullText = target.innerText?.trim?.() || "";
-        logME(
-          "[DefaultStrategy] extractText: Full text from contentEditable:",
-          fullText.substring(0, 50),
-        );
+        this.logger.debug('extractText: Full text from contentEditable', { text: fullText.substring(0, 50) });
         return fullText;
       }
 
@@ -63,17 +59,11 @@ export default class DefaultStrategy extends PlatformStrategy {
           const selectedText = target.value
             .substring(target.selectionStart, target.selectionEnd)
             .trim();
-          logME(
-            "[DefaultStrategy] extractText: Selected text from input/textarea:",
-            selectedText.substring(0, 50),
-          );
+          this.logger.debug('extractText: Selected text from input/textarea', { text: selectedText.substring(0, 50) });
           return selectedText;
         }
         const fullValue = target.value?.trim?.() || "";
-        logME(
-          "[DefaultStrategy] extractText: Full value from input/textarea:",
-          fullValue.substring(0, 50),
-        );
+        this.logger.debug('extractText: Full value from input/textarea', { text: fullValue.substring(0, 50) });
         return fullValue;
       }
 
@@ -83,10 +73,7 @@ export default class DefaultStrategy extends PlatformStrategy {
       // اگر textContent خالی است، سعی کن از innerText استفاده کنی
       if (!fallbackText && target.innerText) {
         fallbackText = target.innerText.trim();
-        logME(
-          "[DefaultStrategy] extractText: Using innerText as fallback:",
-          fallbackText.substring(0, 50),
-        );
+        this.logger.debug('extractText: Using innerText as fallback', { text: fallbackText.substring(0, 50) });
       }
 
       // اگر هنوز خالی است، بررسی کن آیا دارای فرزندان متنی است
@@ -98,10 +85,7 @@ export default class DefaultStrategy extends PlatformStrategy {
 
         if (textNodes.length > 0) {
           fallbackText = textNodes.join(" ");
-          logME(
-            "[DefaultStrategy] extractText: Using child text nodes:",
-            fallbackText.substring(0, 50),
-          );
+          this.logger.debug('extractText: Using child text nodes', { text: fallbackText.substring(0, 50) });
         }
       }
 
@@ -113,27 +97,18 @@ export default class DefaultStrategy extends PlatformStrategy {
         if (editableChild) {
           if (editableChild.value) {
             fallbackText = editableChild.value.trim();
-            logME(
-              "[DefaultStrategy] extractText: Using editable child value:",
-              fallbackText.substring(0, 50),
-            );
+            this.logger.debug('extractText: Using editable child value', { text: fallbackText.substring(0, 50) });
           } else if (editableChild.textContent) {
             fallbackText = editableChild.textContent.trim();
-            logME(
-              "[DefaultStrategy] extractText: Using editable child textContent:",
-              fallbackText.substring(0, 50),
-            );
+            this.logger.debug('extractText: Using editable child textContent', { text: fallbackText.substring(0, 50) });
           }
         }
       }
 
-      logME(
-        "[DefaultStrategy] extractText: Final fallback result:",
-        fallbackText.substring(0, 50),
-      );
+      this.logger.debug('extractText: Final fallback result', { text: fallbackText.substring(0, 50) });
       return fallbackText;
     } catch (error) {
-      logME("[DefaultStrategy] extractText error:", error);
+      this.logger.error('extractText error', error);
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "default-strategy-extractText",
@@ -145,7 +120,7 @@ export default class DefaultStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (translatedText !== undefined && translatedText !== null) {
-        logME("[DefaultStrategy] Starting updateElement for:", {
+        this.logger.debug('Starting updateElement', {
           tagName: element?.tagName,
           isContentEditable: element?.isContentEditable,
           textLength: translatedText.length,
@@ -187,12 +162,12 @@ export default class DefaultStrategy extends PlatformStrategy {
           selectionStart,
           selectionEnd,
         );
-        logME("[DefaultStrategy] Smart replacement result:", success);
+        this.logger.debug('Smart replacement completed', { success });
 
         if (success) {
           this.applyTextDirection(element, translatedText);
           await smartDelay(200);
-          logME("[DefaultStrategy] Update completed successfully");
+          this.logger.info('Update completed successfully');
           return true;
         } else {
           // fallback به روش قدیمی

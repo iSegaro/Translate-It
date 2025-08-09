@@ -8,6 +8,9 @@ import { useI18n } from "./useI18n.js";
 import SelectionWindows from "@/managers/content/WindowsManager.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useSelectionWindows');
 
 export function useSelectionWindows() {
   const { t } = useI18n();
@@ -33,7 +36,7 @@ export function useSelectionWindows() {
     // but needs them for constructor compatibility
     errorHandler: {
       handle: (error, context) => {
-        console.error("[useSelectionWindows] Mock error handler:", error, context);
+        logger.error("[useSelectionWindows] Mock error handler:", error, context);
         state.error = error.message || String(error);
       }
     }
@@ -42,11 +45,11 @@ export function useSelectionWindows() {
   // Mock notifier for SelectionWindows compatibility
   const mockNotifier = {
     show: (message, type, autoHide, duration) => {
-      console.log(`[useSelectionWindows] Mock notification [${type}]: ${message}`);
+      logger.debug(`[useSelectionWindows] Mock notification [${type}]: ${message}`);
       // In a full implementation, this could integrate with Vue toast system
     },
     dismiss: (id) => {
-      console.log(`[useSelectionWindows] Mock notification dismissed: ${id}`);
+      logger.debug(`[useSelectionWindows] Mock notification dismissed: ${id}`);
     }
   };
 
@@ -74,7 +77,7 @@ export function useSelectionWindows() {
         state.isVisible = true;
         state.error = null;
         
-        console.log("[useSelectionWindows] Showing selection window:", selectedText);
+        logger.debug("[useSelectionWindows] Showing selection window:", selectedText);
         
         // Call original show method
         await originalShow(selectedText, position);
@@ -91,16 +94,16 @@ export function useSelectionWindows() {
         state.translatedText = "";
         state.error = null;
         
-        console.log("[useSelectionWindows] Dismissing selection window");
+        logger.debug("[useSelectionWindows] Dismissing selection window");
         
         // Call original dismiss method
         originalDismiss(immediate);
       };
 
-      console.log("[useSelectionWindows] SelectionWindows instance initialized");
+      logger.debug("[useSelectionWindows] SelectionWindows instance initialized");
       return selectionWindowsInstance;
     } catch (error) {
-      console.error("[useSelectionWindows] Failed to initialize SelectionWindows:", error);
+      logger.error("[useSelectionWindows] Failed to initialize SelectionWindows:", error);
       state.error = error.message;
       return null;
     }
@@ -112,7 +115,7 @@ export function useSelectionWindows() {
   const showSelectionWindow = async (selectedText, position) => {
     const instance = initializeSelectionWindows();
     if (!instance) {
-      console.error("[useSelectionWindows] Cannot show - instance not available");
+      logger.error("[useSelectionWindows] Cannot show - instance not available");
       return false;
     }
 
@@ -120,7 +123,7 @@ export function useSelectionWindows() {
       await instance.show(selectedText, position);
       return true;
     } catch (error) {
-      console.error("[useSelectionWindows] Error showing selection window:", error);
+      logger.error("[useSelectionWindows] Error showing selection window:", error);
       state.error = error.message;
       return false;
     }
@@ -132,14 +135,14 @@ export function useSelectionWindows() {
   const dismissSelectionWindow = (immediate = true) => {
     const instance = selectionWindowsInstance;
     if (!instance) {
-      console.log("[useSelectionWindows] Cannot dismiss - no instance");
+      logger.debug("[useSelectionWindows] Cannot dismiss - no instance");
       return;
     }
 
     try {
       instance.dismiss(immediate);
     } catch (error) {
-      console.error("[useSelectionWindows] Error dismissing selection window:", error);
+      logger.error("[useSelectionWindows] Error dismissing selection window:", error);
       state.error = error.message;
     }
   };
@@ -150,7 +153,7 @@ export function useSelectionWindows() {
   const cancelCurrentTranslation = () => {
     const instance = selectionWindowsInstance;
     if (!instance) {
-      console.log("[useSelectionWindows] Cannot cancel - no instance");
+      logger.debug("[useSelectionWindows] Cannot cancel - no instance");
       return;
     }
 
@@ -159,7 +162,7 @@ export function useSelectionWindows() {
       state.isTranslating = false;
       state.error = null;
     } catch (error) {
-      console.error("[useSelectionWindows] Error canceling translation:", error);
+      logger.error("[useSelectionWindows] Error canceling translation:", error);
       state.error = error.message;
     }
   };
@@ -177,10 +180,10 @@ export function useSelectionWindows() {
     if (response.success) {
       state.translatedText = response.data?.translatedText || "";
       state.error = null;
-      console.log("[useSelectionWindows] Translation received:", state.translatedText.substring(0, 100) + "...");
+      logger.debug("[useSelectionWindows] Translation received:", state.translatedText.substring(0, 100) + "...");
     } else {
       state.error = response.error || "Translation failed";
-      console.error("[useSelectionWindows] Translation error:", state.error);
+      logger.error("[useSelectionWindows] Translation error:", state.error);
     }
     
     state.isTranslating = false;
@@ -218,7 +221,7 @@ export function useSelectionWindows() {
              (settings.selectionTranslationMode === "immediate" || 
               settings.selectionTranslationMode === "onClick");
     } catch (error) {
-      console.warn("[useSelectionWindows] Failed to check settings:", error);
+      logger.warn("[useSelectionWindows] Failed to check settings:", error);
       return false;
     }
   };
@@ -228,7 +231,7 @@ export function useSelectionWindows() {
 
   // Setup on mount
   onMounted(() => {
-    console.log("[useSelectionWindows] Component mounted, setting up...");
+    logger.debug("[useSelectionWindows] Component mounted, setting up...");
     
     // Setup message listener
     messageListenerCleanup = setupMessageListener();
@@ -239,7 +242,7 @@ export function useSelectionWindows() {
 
   // Cleanup on unmount
   onUnmounted(() => {
-    console.log("[useSelectionWindows] Component unmounted, cleaning up...");
+    logger.debug("[useSelectionWindows] Component unmounted, cleaning up...");
     
     // Cleanup message listener
     if (messageListenerCleanup) {
@@ -252,7 +255,7 @@ export function useSelectionWindows() {
       try {
         selectionWindowsInstance.dismiss(true);
       } catch (error) {
-        console.warn("[useSelectionWindows] Error during cleanup dismiss:", error);
+        logger.warn("[useSelectionWindows] Error during cleanup dismiss:", error);
       }
       selectionWindowsInstance = null;
     }

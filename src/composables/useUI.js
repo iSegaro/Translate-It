@@ -1,6 +1,9 @@
 // src/composables/useUI.js
 // Vue composable for UI state management in sidepanel
 import { ref, nextTick } from "vue";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useUI');
 
 export function useUI() {
   // State
@@ -138,7 +141,7 @@ export function useUI() {
       element.focus();
       return true;
     } catch (error) {
-      console.warn("Could not focus element:", error);
+      logger.warn("Could not focus element:", error);
       return false;
     }
   };
@@ -151,7 +154,7 @@ export function useUI() {
       element.scrollIntoView({ behavior, block: "nearest" });
       return true;
     } catch (error) {
-      console.warn("Could not scroll to element:", error);
+      logger.warn("Could not scroll to element:", error);
       return false;
     }
   };

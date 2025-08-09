@@ -7,6 +7,9 @@ import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import browser from "webextension-polyfill";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useSidepanelTranslation');
 
 export function useSidepanelTranslation() {
   // State
@@ -41,16 +44,16 @@ export function useSidepanelTranslation() {
       const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
       const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
       
-      console.log("[useSidepanelTranslation] Translation with languages (received params):", { sourceLang, targetLang });
-      console.log("[useSidepanelTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
+      logger.debug("[useSidepanelTranslation] Translation with languages (received params):", { sourceLang, targetLang });
+      logger.debug("[useSidepanelTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
       
       // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
       await translationService.sidepanelTranslate(sourceText.value, sourceLanguage, targetLanguage);
 
-      console.log("[useSidepanelTranslation] Translation request sent. Waiting for result...");
+      logger.debug("[useSidepanelTranslation] Translation request sent. Waiting for result...");
 
     } catch (error) {
-      console.error("[useSidepanelTranslation] Translation error:", error);
+      logger.error("[useSidepanelTranslation] Translation error:", error);
       translationError.value = error.message || "Translation failed";
       isTranslating.value = false; // Ensure loading state is reset on immediate error
     }
@@ -73,12 +76,12 @@ export function useSidepanelTranslation() {
   // Listen for translation result updates from background script
   onMounted(() => {
     browser.runtime.onMessage.addListener((message) => {
-      console.log("[useSidepanelTranslation] Raw message received by listener:", message);
+      logger.debug("[useSidepanelTranslation] Raw message received by listener:", message);
       if (
         message.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
         message.context === MessagingContexts.SIDEPANEL
       ) {
-        console.log(
+        logger.debug(
           "[useSidepanelTranslation] Received TRANSLATION_RESULT_UPDATE:",
           message,
         );
@@ -88,14 +91,14 @@ export function useSidepanelTranslation() {
         
         if (message.data.success === false && message.data.error) {
           // ERROR case - display error message and clear translation
-          console.log("[useSidepanelTranslation] Translation error received:", message.data.error);
+          logger.debug("[useSidepanelTranslation] Translation error received:", message.data.error);
           translationError.value = message.data.error.message || "Translation failed";
           translatedText.value = ""; // Clear any previous translation
           lastTranslation.value = null; // Clear last translation on error
-          console.log("[useSidepanelTranslation] Error state updated:", translationError.value);
+          logger.debug("[useSidepanelTranslation] Error state updated:", translationError.value);
         } else if (message.data.success !== false && message.data.translatedText) {
           // SUCCESS case - display translation and clear error
-          console.log("[useSidepanelTranslation] Translation success received");
+          logger.debug("[useSidepanelTranslation] Translation success received");
           translatedText.value = message.data.translatedText;
           translationError.value = ""; // Clear any previous error
           lastTranslation.value = {
@@ -104,15 +107,15 @@ export function useSidepanelTranslation() {
             provider: message.data.provider,
             timestamp: message.data.timestamp,
           };
-          console.log("[useSidepanelTranslation] Translation updated successfully");
+          logger.debug("[useSidepanelTranslation] Translation updated successfully");
         } else {
           // UNEXPECTED case - handle gracefully
-          console.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
+          logger.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
           translationError.value = "Unexpected response format";
           translatedText.value = "";
         }
       } else {
-        console.log("[useSidepanelTranslation] Message filtered out. Action:", message.action, "Context:", message.context);
+        logger.debug("[useSidepanelTranslation] Message filtered out. Action:", message.action, "Context:", message.context);
       }
     });
   });

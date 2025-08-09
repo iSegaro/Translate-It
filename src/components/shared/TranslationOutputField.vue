@@ -53,6 +53,9 @@ import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import IconButton from '@/components/shared/IconButton.vue'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationOutputField');
 
 // Props
 const props = defineProps({
@@ -137,7 +140,7 @@ const renderedContent = computed(() => {
       const markdownElement = SimpleMarkdown.render(props.content)
       return markdownElement ? markdownElement.innerHTML : props.content.replace(/\n/g, '<br>')
     } catch (error) {
-      console.warn('[TranslationOutputField] Markdown rendering failed:', error)
+      logger.warn('[TranslationOutputField] Markdown rendering failed:', error)
       return props.content.replace(/\n/g, '<br>')
     }
   } else {
@@ -155,7 +158,7 @@ const handleCopy = async () => {
     const textToCopy = resultRef.value?.dataset?.originalMarkdown || props.content
     const success = await clipboard.copyToClipboard(textToCopy)
     if (success) {
-      console.log('[TranslationOutputField] Result copied to clipboard')
+      logger.debug('[TranslationOutputField] Result copied to clipboard')
     }
   } catch (error) {
     await handleError(error, 'TranslationOutputField-copy')
@@ -170,7 +173,7 @@ const handleTTS = async () => {
     const textForTTS = props.content.replace(/<[^>]*>/g, '')
     const langCode = getLanguageCodeForTTS(props.language)
     await tts.speak(textForTTS, langCode)
-    console.log('[TranslationOutputField] Playing TTS for result')
+    logger.debug('[TranslationOutputField] Playing TTS for result')
   } catch (error) {
     await handleError(error, 'TranslationOutputField-tts')
   }
@@ -201,8 +204,7 @@ watch(() => props.error, (newError) => {
       correctTextDirection(resultRef.value, newError)
     }
   })
-})
-</script>
+})</script>
 
 <style scoped>
 .textarea-container {

@@ -3,13 +3,16 @@
  * Manages key press states for better keyboard shortcut handling
  */
 
-import { logME } from "../../utils/core/helpers.js";
+import { createLogger } from "../../utils/core/logger.js";
 
 export class KeyboardStateManager {
   constructor() {
     this.keyStates = new Map();
     this.listeners = new Map();
     this.initialized = false;
+    
+    // Initialize logger
+    this.logger = createLogger('Content', 'KeyboardStateManager');
     
     // Commonly tracked keys
     this.TRACKED_KEYS = {
@@ -23,7 +26,7 @@ export class KeyboardStateManager {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
     
-    logME('[KeyboardStateManager] Initialized');
+    this.logger.init('KeyboardStateManager initialized');
   }
 
   /**
@@ -31,7 +34,7 @@ export class KeyboardStateManager {
    */
   initialize() {
     if (this.initialized) {
-      logME('[KeyboardStateManager] Already initialized');
+      this.logger.debug('Already initialized, skipping');
       return;
     }
 
@@ -43,7 +46,7 @@ export class KeyboardStateManager {
     this.resetAllStates();
     
     this.initialized = true;
-    logME('[KeyboardStateManager] ✅ Initialized successfully');
+    this.logger.debug('Initialized successfully');
   }
 
   /**
@@ -193,7 +196,7 @@ export class KeyboardStateManager {
    */
   setKeyState(key, state) {
     this.keyStates.set(key, state);
-    logME(`[KeyboardStateManager] Manual key state update: ${key} = ${state}`);
+    this.logger.debug(`Manual key state update: ${key} = ${state}`);
   }
 
   /**
@@ -211,7 +214,8 @@ export class KeyboardStateManager {
     this.keyStates.set('shiftPressed', false);
     this.keyStates.set('ctrlKeyPressed', false);
     
-    logME('[KeyboardStateManager] All key states reset');
+    // Remove verbose log - this is called frequently
+    this.logger.debug('All key states reset');
   }
 
   /**
@@ -257,7 +261,7 @@ export class KeyboardStateManager {
         try {
           callback(data);
         } catch (error) {
-          logME(`[KeyboardStateManager] Error in listener callback:`, error);
+          this.logger.error('Error in listener callback:', error);
         }
       });
     }
@@ -306,6 +310,6 @@ export class KeyboardStateManager {
     this.listeners.clear();
     this.initialized = false;
     
-    logME('[KeyboardStateManager] Cleaned up');
+    this.logger.debug('Cleaned up');
   }
 }

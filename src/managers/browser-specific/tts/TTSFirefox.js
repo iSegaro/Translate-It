@@ -3,6 +3,9 @@
 
 import browser from "webextension-polyfill";
 import { MessagingCore, MessageContexts } from "../../../messaging/core/MessagingCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'TTSFirefox');
 
 /**
  * Background TTS Manager for Firefox and fallback scenarios
@@ -30,7 +33,7 @@ export class BackgroundTTSManager {
     try {
       this.browser = browser;
 
-      console.log("🔊 Initializing background TTS manager");
+      logger.debug("🔊 Initializing background TTS manager");
 
       // Detect available TTS methods
       await this.detectAvailableMethods();
@@ -40,12 +43,12 @@ export class BackgroundTTSManager {
       }
 
       this.initialized = true;
-      console.log(
+      logger.debug(
         "✅ Background TTS manager initialized with methods:",
         this.availableMethods,
       );
     } catch (error) {
-      console.error("❌ Failed to initialize background TTS manager:", error);
+      logger.error("❌ Failed to initialize background TTS manager:", error);
       throw error;
     }
   }
@@ -60,13 +63,13 @@ export class BackgroundTTSManager {
     // Method 1: browser TTS API (Chrome/Firefox native)
     if (browser.tts && typeof browser.tts.speak === "function") {
       this.availableMethods.push("browser-tts");
-      console.log("✅ browser TTS API available");
+      logger.debug("✅ browser TTS API available");
     }
 
     // Method 2: Speech Synthesis API (if available in background context)
     if (typeof window !== "undefined" && window.speechSynthesis) {
       this.availableMethods.push("speech-synthesis");
-      console.log("✅ Speech Synthesis API available");
+      logger.debug("✅ Speech Synthesis API available");
     }
 
     // Method 3: Web Audio API for generated speech
@@ -75,12 +78,12 @@ export class BackgroundTTSManager {
       (window.AudioContext || window.webkitAudioContext)
     ) {
       this.availableMethods.push("web-audio");
-      console.log("✅ Web Audio API available");
+      logger.debug("✅ Web Audio API available");
     }
 
     // Method 4: Content script delegation
     this.availableMethods.push("content-script");
-    console.log("✅ Content script delegation available (fallback)");
+    logger.debug("✅ Content script delegation available (fallback)");
   }
 
   /**
@@ -110,16 +113,16 @@ export class BackgroundTTSManager {
       lang: options.lang || "en-US",
     };
 
-    console.log("🔊 Speaking text via background:", text.substring(0, 50));
+    logger.debug("🔊 Speaking text via background:", text.substring(0, 50));
 
     // Try methods in order of preference
     for (const method of this.availableMethods) {
       try {
         await this.speakWithMethod(method, ttsOptions);
-        console.log(`✅ TTS successful with method: ${method}`);
+        logger.debug(`✅ TTS successful with method: ${method}`);
         return;
       } catch (error) {
-        console.warn(`⚠️ TTS method ${method} failed:`, error.message);
+        logger.warn(`⚠️ TTS method ${method} failed:`, error.message);
         continue;
       }
     }
@@ -259,7 +262,7 @@ export class BackgroundTTSManager {
           resolve();
         };
 
-        console.log(
+        logger.debug(
           `🎵 Generated audio tone for ${duration}s (Web Audio fallback)`,
         );
       } catch (error) {
@@ -294,7 +297,7 @@ export class BackgroundTTSManager {
         throw new Error(response?.error || "Content script TTS failed");
       }
 
-      console.log("🔗 TTS delegated to content script");
+      logger.debug("🔗 TTS delegated to content script");
     } catch (error) {
       throw new Error(`Content script TTS failed: ${error.message}`);
     }
@@ -321,9 +324,9 @@ export class BackgroundTTSManager {
         await this.audioContext.suspend();
       }
 
-      console.log("🛑 Background TTS stopped");
+      logger.debug("🛑 Background TTS stopped");
     } catch (error) {
-      console.error("❌ Failed to stop background TTS:", error);
+      logger.error("❌ Failed to stop background TTS:", error);
     }
   }
 
@@ -362,7 +365,7 @@ export class BackgroundTTSManager {
         );
       }
     } catch (error) {
-      console.error("❌ Failed to get voices:", error);
+      logger.error("❌ Failed to get voices:", error);
     }
 
     return voices;
@@ -397,7 +400,7 @@ export class BackgroundTTSManager {
    * Cleanup resources
    */
   async cleanup() {
-    console.log("🧹 Cleaning up background TTS manager");
+    logger.debug("🧹 Cleaning up background TTS manager");
 
     await this.stop();
 

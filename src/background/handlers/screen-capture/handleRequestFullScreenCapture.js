@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleRequestFullScreenCapture.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleRequestFullScreenCapture');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleRequestFullScreenCapture(message, sender, sendResponse) {
-  console.log('[Handler:requestFullScreenCapture] Processing full screen capture request:', message.data);
+  logger.debug('[Handler:requestFullScreenCapture] Processing full screen capture request:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -50,7 +53,7 @@ export async function handleRequestFullScreenCapture(message, sender, sendRespon
     // Clean up the stream
     stream.getTracks().forEach(track => track.stop());
     
-    console.log(`✅ [requestFullScreenCapture] Screen capture completed for tab ${targetTabId}`);
+    logger.debug(`✅ [requestFullScreenCapture] Screen capture completed for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

@@ -2,6 +2,9 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleOpenSidePanel');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,7 +17,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleOpenSidePanel(message, sender, sendResponse) {
-  console.log('[Handler:OPEN_SIDE_PANEL] Processing side panel open request:', message.data);
+  logger.debug('[Handler:OPEN_SIDE_PANEL] Processing side panel open request:', message.data);
   
   try {
     const { tabId, windowId } = message.data || {};
@@ -42,7 +45,7 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
       });
     }
     
-    console.log(`✅ [OPEN_SIDE_PANEL] Side panel opened successfully`);
+    logger.debug(`✅ [OPEN_SIDE_PANEL] Side panel opened successfully`);
     
     sendResponse({ 
       success: true, 
@@ -52,7 +55,7 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
     });
     return true;
   } catch (error) {
-    console.error('[Handler:OPEN_SIDE_PANEL] Side panel opening failed:', error);
+    logger.error('[Handler:OPEN_SIDE_PANEL] Side panel opening failed:', error);
     errorHandler.handle(error, {
       type: ErrorTypes.UI,
       context: "handleOpenSidePanel",

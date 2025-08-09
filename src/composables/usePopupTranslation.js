@@ -6,6 +6,9 @@ import { TranslationService } from "../core/TranslationService.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'usePopupTranslation');
 
 export function usePopupTranslation() {
   // State
@@ -43,8 +46,8 @@ export function usePopupTranslation() {
       const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
       const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
       
-      console.log("[usePopupTranslation] Translation with languages (received params):", { sourceLang, targetLang });
-      console.log("[usePopupTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
+      logger.debug("Translation with languages (received params):", { sourceLang, targetLang });
+      logger.debug("Translation with languages (final):", { sourceLanguage, targetLanguage });
       
       // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
       await translationService.popupTranslate(
@@ -53,13 +56,11 @@ export function usePopupTranslation() {
         targetLanguage
       );
 
-      console.log(
-        "[usePopupTranslation] Translation request sent. Waiting for result..."
-      );
+      logger.operation('Translation request sent. Waiting for result...');
       
       return true; // Indicate successful initiation
     } catch (error) {
-      console.error("[usePopupTranslation] Translation error:", error);
+      logger.error('Translation error', error);
       translationError.value = error.message || "Translation failed";
       isTranslating.value = false; // Ensure loading state is reset on immediate error
       return false; // Indicate failure
@@ -83,29 +84,26 @@ export function usePopupTranslation() {
   // Listen for translation result updates from background script
   onMounted(() => {
     browserAPI.onMessage.addListener((message) => {
-      console.log("[usePopupTranslation] Raw message received by listener:", message);
+      logger.debug('Raw message received by listener:', message);
       if (
         message.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
         message.context === MessagingContexts.POPUP
       ) {
-        console.log(
-          "[usePopupTranslation] Received TRANSLATION_RESULT_UPDATE:",
-          message
-        );
+        logger.debug('Received TRANSLATION_RESULT_UPDATE:', message);
         
         // Always reset loading state when receiving any result
         isTranslating.value = false;
         
         if (message.data.success === false && message.data.error) {
           // ERROR case - display error message and clear translation
-          console.log("[usePopupTranslation] Translation error received:", message.data.error);
+          logger.error('Translation error received', message.data.error);
           translationError.value = message.data.error.message || "Translation failed";
           translatedText.value = ""; // Clear any previous translation
           lastTranslation.value = null; // Clear last translation on error
-          console.log("[usePopupTranslation] Error state updated:", translationError.value);
+          logger.debug('Error state updated:', translationError.value);
         } else if (message.data.success !== false && message.data.translatedText) {
           // SUCCESS case - display translation and clear error
-          console.log("[usePopupTranslation] Translation success received");
+          logger.info('Translation success received');
           translatedText.value = message.data.translatedText;
           translationError.value = ""; // Clear any previous error
           lastTranslation.value = {
@@ -114,15 +112,15 @@ export function usePopupTranslation() {
             provider: message.data.provider,
             timestamp: message.data.timestamp,
           };
-          console.log("[usePopupTranslation] Translation updated successfully");
+          logger.info('Translation updated successfully');
         } else {
           // UNEXPECTED case - handle gracefully
-          console.warn("[usePopupTranslation] Unexpected message data structure:", message.data);
+          logger.warn('Unexpected message data structure:', message.data);
           translationError.value = "Unexpected response format";
           translatedText.value = "";
         }
       } else {
-        console.log("[usePopupTranslation] Message filtered out. Action:", message.action, "Context:", message.context);
+        logger.debug('Message filtered out. Action:', message.action, 'Context:', message.context);
       }
     });
   });

@@ -7,6 +7,9 @@ import { ProviderFactory } from "@/providers/core/ProviderFactory.js";
 import { providerRegistry } from "@/providers/core/ProviderRegistry.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'translation-engine');
 
 export class TranslationEngine {
   constructor() {
@@ -22,7 +25,7 @@ export class TranslationEngine {
   async setupMessageListener() {
     // NOTE: Message handling is now managed by MessageRouter in BackgroundService
     // This method is kept for compatibility but disabled
-    console.log(
+    logger.debug(
       "[TranslationEngine] Message listener setup skipped - handled by MessageRouter",
     );
     return;
@@ -37,7 +40,7 @@ export class TranslationEngine {
         const result = await this.handleTranslateMessage(request, sender);
         return result;
       } catch (error) {
-        console.error("[TranslationEngine] Error handling message:", error);
+        logger.error("[TranslationEngine] Error handling message:", error);
         return this.formatError(error, request.context);
       }
     }
@@ -50,11 +53,11 @@ export class TranslationEngine {
    * Handle translation request messages
    */
   async handleTranslateMessage(request, sender) {
-    console.log(
+    logger.debug(
       "[TranslationEngine] Processing request:",
       JSON.stringify(request, null, 2),
     );
-    console.log("[TranslationEngine] Sender:", sender);
+    logger.debug("[TranslationEngine] Sender:", sender);
 
     // Input validation and normalization
     if (!request || typeof request !== "object") {
@@ -71,7 +74,7 @@ export class TranslationEngine {
     if (!context || !data) {
       // Legacy format: request contains translation data directly
       if (request.text && request.provider) {
-        console.log(
+        logger.debug(
           "[TranslationEngine] Legacy format detected, normalizing...",
         );
         context = request.context || "unknown";
@@ -111,8 +114,8 @@ export class TranslationEngine {
       );
     }
 
-    console.log("[TranslationEngine] Normalized context:", context);
-    console.log(
+    logger.debug("[TranslationEngine] Normalized context:", context);
+    logger.debug(
       "[TranslationEngine] Normalized data:",
       JSON.stringify(data, null, 2),
     );
@@ -123,23 +126,23 @@ export class TranslationEngine {
       // Context-specific optimizations
       if (context === "popup") {
         // Fast response priority for popup
-        console.log("[TranslationEngine] Using popup priority strategy");
+        logger.debug("[TranslationEngine] Using popup priority strategy");
         result = await this.translateWithPriority(data);
       } else if (context === "selection") {
         // Background processing OK for selection
-        console.log("[TranslationEngine] Using selection cache strategy");
+        logger.debug("[TranslationEngine] Using selection cache strategy");
         result = await this.translateWithCache(data);
       } else if (context === "sidepanel") {
         // Enhanced features for sidepanel
-        console.log("[TranslationEngine] Using sidepanel history strategy");
+        logger.debug("[TranslationEngine] Using sidepanel history strategy");
         result = await this.translateWithHistory(data);
       } else {
         // Default strategy
-        console.log("[TranslationEngine] Using default translation strategy");
+        logger.debug("[TranslationEngine] Using default translation strategy");
         result = await this.executeTranslation(data);
       }
 
-      console.log(
+      logger.debug(
         "[TranslationEngine] Translation result:",
         JSON.stringify(result, null, 2),
       );
@@ -159,8 +162,8 @@ export class TranslationEngine {
 
       return result;
     } catch (error) {
-      console.error("[TranslationEngine] Translation error:", error);
-      console.error("[TranslationEngine] Error stack:", error.stack);
+      logger.error("[TranslationEngine] Translation error:", error);
+      logger.error("[TranslationEngine] Error stack:", error.stack);
       return this.formatError(error, context);
     }
   }
@@ -242,7 +245,7 @@ export class TranslationEngine {
 
     // For unreliable providers in JSON mode, use optimized strategy directly
     if (isSelectJson && !providerReliableJson) {
-      console.log('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
+      logger.debug('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
       return await this.executeOptimizedJsonTranslation(data, providerInstance);
     }
 
@@ -258,7 +261,7 @@ export class TranslationEngine {
     } catch (initialError) {
       // Final fallback for SelectElement JSON
       if (isSelectJson && !providerReliableJson) {
-        console.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
+        logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
         return await this.executeOptimizedJsonTranslation(data, providerInstance);
       }
       throw initialError;
@@ -320,7 +323,7 @@ export class TranslationEngine {
       }
     }
 
-    console.log(`[TranslationEngine] Cache hits: ${cacheHits}/${segments.length}`);
+    logger.debug(`[TranslationEngine] Cache hits: ${cacheHits}/${segments.length}`);
 
     // Only translate uncached segments
     if (uncachedIndices.length > 0) {
@@ -429,7 +432,7 @@ export class TranslationEngine {
         }
       }
     } catch (batchError) {
-      console.log(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
+      logger.debug(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
     }
     
     // Fallback to individual translations (with minimal retry)
@@ -485,7 +488,7 @@ export class TranslationEngine {
         return provider;
       }
     } catch (error) {
-      console.error(
+      logger.error(
         `[TranslationEngine] Failed to create provider '${providerId}':`,
         error,
       );
@@ -554,7 +557,7 @@ export class TranslationEngine {
         translationHistory: this.history,
       });
     } catch (error) {
-      console.error("[TranslationEngine] Failed to save history:", error);
+      logger.error("[TranslationEngine] Failed to save history:", error);
     }
   }
 
@@ -570,7 +573,7 @@ export class TranslationEngine {
         this.history = []; // Ensure it's always an array
       }
     } catch (error) {
-      console.error("[TranslationEngine] Failed to load history:", error);
+      logger.error("[TranslationEngine] Failed to load history:", error);
     }
   }
 
@@ -596,7 +599,7 @@ export class TranslationEngine {
     try {
       return providerRegistry.getAll().map(p => ({ id: p.id, name: p.name }));
     } catch (error) {
-      console.error("[TranslationEngine] Failed to get providers:", error);
+      logger.error("[TranslationEngine] Failed to get providers:", error);
       return [];
     }
   }
@@ -632,9 +635,9 @@ export class TranslationEngine {
   async initialize() {
     try {
       await this.loadHistoryFromStorage();
-      console.log("[TranslationEngine] Initialized successfully");
+      logger.debug("[TranslationEngine] Initialized successfully");
     } catch (error) {
-      console.error("[TranslationEngine] Initialization failed:", error);
+      logger.error("[TranslationEngine] Initialization failed:", error);
     }
   }
 }

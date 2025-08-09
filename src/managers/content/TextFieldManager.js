@@ -3,7 +3,7 @@
  * Extracted from EventHandler for better separation of concerns
  */
 
-import { logME } from "../../utils/core/helpers.js";
+import { createLogger } from "../../utils/core/logger.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../../utils/ui/exclusion.js";
 import { detectPlatform, Platform } from "../../utils/browser/platform.js";
 import setupIconBehavior from "../IconBehavior.js";
@@ -17,12 +17,20 @@ export class TextFieldManager {
     this.strategies = options.strategies;
     this.featureManager = options.featureManager;
     this.initialized = false;
+    this.loggedInit = false; // Flag to prevent duplicate logging
+    
+    // Initialize logger
+    this.logger = createLogger('Content', 'TextFieldManager');
     
     // Track active icons and timeouts
     this.activeIcons = new Map();
     this.cleanupTimeouts = new Map();
     
-    logME('[TextFieldManager] Initialized');
+    // Only log once during first initialization
+    if (!this.loggedInit) {
+      this.logger.init('TextFieldManager initialized');
+      this.loggedInit = true;
+    }
   }
 
   /**
@@ -31,7 +39,7 @@ export class TextFieldManager {
    */
   initialize(dependencies = {}) {
     if (this.initialized) {
-      logME('[TextFieldManager] Already initialized');
+      this.logger.debug('Already initialized, skipping');
       return;
     }
 
@@ -43,7 +51,7 @@ export class TextFieldManager {
     if (dependencies.featureManager) this.featureManager = dependencies.featureManager;
 
     this.initialized = true;
-    logME('[TextFieldManager] ✅ Initialized with dependencies');
+    this.logger.debug('Initialized with dependencies');
   }
 
   /**
@@ -117,7 +125,7 @@ export class TextFieldManager {
       // Skip processing for recognized special fields on YouTube (search query, etc.)
       // This is a temporary implementation - may need more robust handling in the future
       if (youtubeStrategy?.isYoutube_ExtraField?.(element)) {
-        logME('[TextFieldManager] Skipping YouTube special field:', element);
+        this.logger.debug('Skipping YouTube special field:', element);
         return false;
       }
     }
@@ -141,7 +149,7 @@ export class TextFieldManager {
       return null;
     }
 
-    logME('[TextFieldManager] Processing editable element:', element);
+    this.logger.debug('Processing editable element:', element.tagName);
 
     // Clean up any existing icons first
     this.cleanup();
@@ -154,7 +162,7 @@ export class TextFieldManager {
     // Create the translate icon
     const icon = this.iconManager.createTranslateIcon(element);
     if (!icon) {
-      logME('[TextFieldManager] Failed to create translate icon');
+      this.logger.warn('Failed to create translate icon');
       return null;
     }
 
@@ -171,11 +179,11 @@ export class TextFieldManager {
       // Track the created icon
       this.trackIcon(icon, element);
 
-      logME('[TextFieldManager] ✅ Icon created and configured successfully');
+      this.logger.debug('Icon created and configured successfully');
       return icon;
 
     } catch (error) {
-      logME('[TextFieldManager] ❌ Error setting up icon behavior:', error);
+      this.logger.error('Error setting up icon behavior:', error);
       
       // Cleanup failed icon
       if (icon && icon.parentNode) {
@@ -193,7 +201,7 @@ export class TextFieldManager {
    */
   handleEditableFocus(element) {
     if (state.activeTranslateIcon) {
-      logME('[TextFieldManager] Icon already active, skipping focus handling');
+      this.logger.debug('Icon already active, skipping focus handling');
       return null;
     }
 
@@ -201,7 +209,7 @@ export class TextFieldManager {
       return null;
     }
 
-    logME('[TextFieldManager] Handling editable focus for:', element);
+    this.logger.debug('Handling editable focus for:', element.tagName);
     return this.processEditableElement(element);
   }
 
@@ -210,7 +218,7 @@ export class TextFieldManager {
    * @param {Element} element - Blurred element
    */
   handleEditableBlur(element) {
-    logME('[TextFieldManager] Handling editable blur for:', element);
+    this.logger.debug('Handling editable blur for:', element.tagName);
 
     // Delay cleanup to allow user to interact with icon
     const cleanupTimeout = setTimeout(() => {
@@ -222,7 +230,7 @@ export class TextFieldManager {
         (activeElement === state.activeTranslateIcon ||
          activeElement.closest(".AIWritingCompanion-translation-icon-extension"))
       ) {
-        logME('[TextFieldManager] Focus moved to translate icon, keeping active');
+        this.logger.debug('Focus moved to translate icon, keeping active');
         return;
       }
 
@@ -231,7 +239,7 @@ export class TextFieldManager {
         !activeElement?.isConnected ||
         !activeElement.closest(".AIWritingCompanion-translation-icon-extension")
       ) {
-        logME('[TextFieldManager] Cleaning up after blur');
+        this.logger.debug('Cleaning up after blur');
         this.cleanup();
       }
     }, 100);
@@ -252,7 +260,7 @@ export class TextFieldManager {
       targetElement
     });
 
-    logME('[TextFieldManager] Tracking new icon:', {
+    this.logger.debug('Tracking new icon', {
       targetTag: targetElement.tagName,
       iconId: icon.id || 'no-id',
       totalTracked: this.activeIcons.size
@@ -263,7 +271,7 @@ export class TextFieldManager {
    * Cleanup all icons and timeouts
    */
   cleanup() {
-    logME('[TextFieldManager] Starting cleanup');
+    this.logger.debug('Starting cleanup');
 
     // Clear all cleanup timeouts
     for (const timeout of this.cleanupTimeouts.values()) {
@@ -279,7 +287,7 @@ export class TextFieldManager {
     // Clear tracked icons
     this.activeIcons.clear();
 
-    logME('[TextFieldManager] ✅ Cleanup completed');
+    this.logger.debug('Cleanup completed');
   }
 
   /**
@@ -298,7 +306,7 @@ export class TextFieldManager {
     const iconData = this.activeIcons.get(element);
     if (iconData) {
       this.activeIcons.delete(element);
-      logME('[TextFieldManager] Cleaned up element:', element.tagName);
+      this.logger.debug('Cleaned up element:', element.tagName);
     }
   }
 

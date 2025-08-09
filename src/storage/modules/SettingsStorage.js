@@ -4,6 +4,9 @@
  */
 
 import { storageCore } from '../core/StorageCore.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Storage', 'SettingsStorage');
 
 export class SettingsStorage {
   constructor() {
@@ -30,7 +33,7 @@ export class SettingsStorage {
       
       return settings;
     } catch (error) {
-      console.error('[SettingsStorage] Get settings failed:', error);
+      logger.error('[SettingsStorage] Get settings failed:', error);
       return defaults;
     }
   }
@@ -48,9 +51,9 @@ export class SettingsStorage {
       }
       
       await this.storage.set(data);
-      console.log(`[SettingsStorage] Saved ${Object.keys(settings).length} setting(s)`);
+      logger.debug(`[SettingsStorage] Saved ${Object.keys(settings).length} setting(s)`);
     } catch (error) {
-      console.error('[SettingsStorage] Save settings failed:', error);
+      logger.error('[SettingsStorage] Save settings failed:', error);
       throw error;
     }
   }
@@ -66,7 +69,7 @@ export class SettingsStorage {
       const result = await this.storage.get({ [`${this.prefix}${key}`]: defaultValue });
       return result[`${this.prefix}${key}`];
     } catch (error) {
-      console.error(`[SettingsStorage] Get setting '${key}' failed:`, error);
+      logger.error(`[SettingsStorage] Get setting '${key}' failed:`, error);
       return defaultValue;
     }
   }
@@ -80,9 +83,9 @@ export class SettingsStorage {
   async saveSetting(key, value) {
     try {
       await this.storage.set({ [`${this.prefix}${key}`]: value });
-      console.log(`[SettingsStorage] Saved setting '${key}'`);
+      logger.debug(`[SettingsStorage] Saved setting '${key}'`);
     } catch (error) {
-      console.error(`[SettingsStorage] Save setting '${key}' failed:`, error);
+      logger.error(`[SettingsStorage] Save setting '${key}' failed:`, error);
       throw error;
     }
   }
@@ -98,9 +101,9 @@ export class SettingsStorage {
       const storageKeys = keyList.map(key => `${this.prefix}${key}`);
       
       await this.storage.remove(storageKeys);
-      console.log(`[SettingsStorage] Removed ${keyList.length} setting(s)`);
+      logger.debug(`[SettingsStorage] Removed ${keyList.length} setting(s)`);
     } catch (error) {
-      console.error('[SettingsStorage] Remove settings failed:', error);
+      logger.error('[SettingsStorage] Remove settings failed:', error);
       throw error;
     }
   }
@@ -117,10 +120,10 @@ export class SettingsStorage {
       
       if (settingsKeys.length > 0) {
         await this.storage.remove(settingsKeys);
-        console.log(`[SettingsStorage] Cleared ${settingsKeys.length} setting(s)`);
+        logger.debug(`[SettingsStorage] Cleared ${settingsKeys.length} setting(s)`);
       }
     } catch (error) {
-      console.error('[SettingsStorage] Clear settings failed:', error);
+      logger.error('[SettingsStorage] Clear settings failed:', error);
       throw error;
     }
   }

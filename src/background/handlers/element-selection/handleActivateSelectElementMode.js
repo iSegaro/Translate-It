@@ -4,6 +4,9 @@ import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat, MessagingContexts, MessagingCore } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleActivateSelectElementMode');
 
 const errorHandler = new ErrorHandler();
 // Create messenger instance for centralized tab messaging
@@ -17,7 +20,7 @@ const messenger = MessagingCore.getMessenger(MessagingContexts.BACKGROUND);
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
 export async function handleActivateSelectElementMode(message, sender) {
-  console.log('[Handler:activateSelectElementMode] Processing element selection activation:', message.data);
+  logger.debug('[Handler:activateSelectElementMode] Processing element selection activation:', message.data);
   
   try {
     const { tabId } = message.data || {};
@@ -25,11 +28,11 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     // If no tabId available (e.g., from sidepanel), get current active tab
     if (!targetTabId) {
-      console.log('[Handler:activateSelectElementMode] No tab ID from sender, finding active tab...');
+      logger.debug('[Handler:activateSelectElementMode] No tab ID from sender, finding active tab...');
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       if (tabs.length > 0) {
         targetTabId = tabs[0].id;
-        console.log(`[Handler:activateSelectElementMode] Found active tab: ${targetTabId}`);
+        logger.debug(`[Handler:activateSelectElementMode] Found active tab: ${targetTabId}`);
       }
     }
     
@@ -42,7 +45,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     let isActivating;
     let modeForContentScript = 'normal';
 
-    console.log(`[Handler:activateSelectElementMode] Message data: ${JSON.stringify(message, null, 2)}`);
+    logger.debug(`[Handler:activateSelectElementMode] Message data: ${JSON.stringify(message, null, 2)}`);
 
     if (typeof message.data === 'boolean') {
       isActivating = message.data;
@@ -65,7 +68,7 @@ export async function handleActivateSelectElementMode(message, sender) {
 
     const action = isActivating ? MessageActions.ACTIVATE_SELECT_ELEMENT_MODE : MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE;
     
-    console.log(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
+    logger.debug(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
     
     const contentMessage = MessageFormat.create(
       action,
@@ -80,7 +83,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     const response = await messenger.sendToTab(targetTabId, contentMessage);
     
     const statusText = isActivating ? 'activated' : 'deactivated';
-    console.log(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
+    logger.debug(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
     
     return { 
       success: true, 

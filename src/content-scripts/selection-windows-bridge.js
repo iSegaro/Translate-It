@@ -3,6 +3,9 @@
 // This file can be imported in content scripts that need SelectionWindows
 
 import { useSelectionWindows } from '@/composables/useSelectionWindows.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'selection-windows-bridge');
 
 let selectionWindowsComposable = null;
 
@@ -12,11 +15,11 @@ let selectionWindowsComposable = null;
  */
 export function initializeSelectionWindowsBridge() {
   if (selectionWindowsComposable) {
-    console.log('[SelectionWindowsBridge] Already initialized');
+    logger.debug('[SelectionWindowsBridge] Already initialized');
     return selectionWindowsComposable;
   }
 
-  console.log('[SelectionWindowsBridge] Initializing Vue SelectionWindows bridge...');
+  logger.debug('[SelectionWindowsBridge] Initializing Vue SelectionWindows bridge...');
   
   try {
     // Create the composable instance
@@ -24,10 +27,10 @@ export function initializeSelectionWindowsBridge() {
     // But it works for bridging with OLD system
     selectionWindowsComposable = useSelectionWindows();
     
-    console.log('[SelectionWindowsBridge] Vue SelectionWindows bridge initialized successfully');
+    logger.debug('[SelectionWindowsBridge] Vue SelectionWindows bridge initialized successfully');
     return selectionWindowsComposable;
   } catch (error) {
-    console.error('[SelectionWindowsBridge] Failed to initialize:', error);
+    logger.error('[SelectionWindowsBridge] Failed to initialize:', error);
     return null;
   }
 }
@@ -46,7 +49,7 @@ export function getSelectionWindowsComposable() {
 export async function showSelectionWindow(selectedText, position) {
   const composable = selectionWindowsComposable || initializeSelectionWindowsBridge();
   if (!composable) {
-    console.error('[SelectionWindowsBridge] Cannot show - bridge not available');
+    logger.error('[SelectionWindowsBridge] Cannot show - bridge not available');
     return false;
   }
 
@@ -58,7 +61,7 @@ export async function showSelectionWindow(selectedText, position) {
  */
 export function dismissSelectionWindow(immediate = true) {
   if (!selectionWindowsComposable) {
-    console.log('[SelectionWindowsBridge] Cannot dismiss - bridge not initialized');
+    logger.debug('[SelectionWindowsBridge] Cannot dismiss - bridge not initialized');
     return;
   }
 
@@ -71,7 +74,7 @@ export function dismissSelectionWindow(immediate = true) {
 export async function shouldShowSelectionWindow() {
   const composable = selectionWindowsComposable || initializeSelectionWindowsBridge();
   if (!composable) {
-    console.error('[SelectionWindowsBridge] Cannot check settings - bridge not available');
+    logger.error('[SelectionWindowsBridge] Cannot check settings - bridge not available');
     return false;
   }
 
@@ -83,7 +86,7 @@ export async function shouldShowSelectionWindow() {
  */
 export function cancelCurrentTranslation() {
   if (!selectionWindowsComposable) {
-    console.log('[SelectionWindowsBridge] Cannot cancel - bridge not initialized');
+    logger.debug('[SelectionWindowsBridge] Cannot cancel - bridge not initialized');
     return;
   }
 
@@ -95,7 +98,7 @@ export function cancelCurrentTranslation() {
  */
 export function cleanupSelectionWindowsBridge() {
   if (selectionWindowsComposable) {
-    console.log('[SelectionWindowsBridge] Cleaning up...');
+    logger.debug('[SelectionWindowsBridge] Cleaning up...');
     
     try {
       // If there's a cleanup method in the composable, call it
@@ -106,7 +109,7 @@ export function cleanupSelectionWindowsBridge() {
       // Dismiss any visible windows
       selectionWindowsComposable.dismissSelectionWindow(true);
     } catch (error) {
-      console.warn('[SelectionWindowsBridge] Error during cleanup:', error);
+      logger.warn('[SelectionWindowsBridge] Error during cleanup:', error);
     }
     
     selectionWindowsComposable = null;

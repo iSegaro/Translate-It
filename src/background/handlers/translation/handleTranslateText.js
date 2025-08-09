@@ -1,6 +1,9 @@
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageActions } from '../../../messaging/core/MessageActions.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleTranslateText');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,7 +17,7 @@ const errorHandler = new ErrorHandler();
  */
 export async function handleTranslateText(message, sender) {
   try {
-    console.log('[Handler:TRANSLATE_TEXT] Processing Vue translation request:', message.data);
+    logger.debug('[Handler:TRANSLATE_TEXT] Processing Vue translation request:', message.data);
     
     const backgroundService = globalThis.backgroundService;
     if (!backgroundService || !backgroundService.translationEngine) {
@@ -44,7 +47,7 @@ export async function handleTranslateText(message, sender) {
     // Use the translation engine's handleTranslateMessage method
     const result = await backgroundService.translationEngine.handleTranslateMessage(translationRequest, sender);
     
-    console.log(`✅ [TRANSLATE_TEXT] Translation result:`, result);
+    logger.debug(`✅ [TRANSLATE_TEXT] Translation result:`, result);
     
     if (result.success) {
       const response = {
@@ -54,19 +57,19 @@ export async function handleTranslateText(message, sender) {
         sourceLanguage: result.sourceLanguage,
         targetLanguage: result.targetLanguage
       };
-      console.log(`🚀 [TRANSLATE_TEXT] Returning successful response:`, response);
+      logger.debug(`🚀 [TRANSLATE_TEXT] Returning successful response:`, response);
       return response;
     } else {
       const response = {
         success: false,
         error: result.error?.message || 'Translation failed'
       };
-      console.log(`🚀 [TRANSLATE_TEXT] Returning error response:`, response);
+      logger.debug(`🚀 [TRANSLATE_TEXT] Returning error response:`, response);
       return response;
     }
     
   } catch (error) {
-    console.error('[Handler:TRANSLATE_TEXT] Error:', error);
+    logger.error('[Handler:TRANSLATE_TEXT] Error:', error);
     errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,
       context: "handleTranslateText",
@@ -77,7 +80,7 @@ export async function handleTranslateText(message, sender) {
       success: false,
       error: error.message || 'Translation failed'
     };
-    console.log(`🚀 [TRANSLATE_TEXT] Returning catch error response:`, errorResponse);
+    logger.debug(`🚀 [TRANSLATE_TEXT] Returning catch error response:`, errorResponse);
     return errorResponse;
   }
 }

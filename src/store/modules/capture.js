@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'capture');
 
 export const useCaptureStore = defineStore('capture', () => {
   // State
@@ -12,7 +15,7 @@ export const useCaptureStore = defineStore('capture', () => {
     isCapturing.value = true
     try {
       // Mock screen capture functionality
-      console.log('Starting screen capture...')
+      logger.debug('Starting screen capture...')
       
       // Simulate capture delay
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -26,7 +29,7 @@ export const useCaptureStore = defineStore('capture', () => {
       
       return { success: true, image: capturedImage.value }
     } catch (error) {
-      console.error('Capture error:', error)
+      logger.error('Capture error:', error)
       throw error
     } finally {
       isCapturing.value = false
@@ -36,7 +39,7 @@ export const useCaptureStore = defineStore('capture', () => {
   const translateImage = async (imageData, options = {}) => {
     try {
       // Mock image translation functionality
-      console.log('Translating image...', imageData, options)
+      logger.debug('Translating image...', imageData, options)
       
       // Simulate translation delay
       await new Promise(resolve => setTimeout(resolve, 1500))
@@ -50,7 +53,7 @@ export const useCaptureStore = defineStore('capture', () => {
       
       return { success: true, result: translationResult.value }
     } catch (error) {
-      console.error('Image translation error:', error)
+      logger.error('Image translation error:', error)
       throw error
     }
   }

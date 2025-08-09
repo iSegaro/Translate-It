@@ -1,5 +1,8 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useExtensionAPI } from "./useExtensionAPI.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useScreenCapture');
 
 export function useScreenCapture() {
   const { startScreenCapture, captureScreenArea } = useExtensionAPI();
@@ -125,7 +128,7 @@ export function useScreenCapture() {
         throw new Error(response.error || "Failed to capture screen area");
       }
     } catch (err) {
-      console.error("Screen capture error:", err);
+      logger.error("Screen capture error:", err);
       error.value = err.message || "Failed to capture screen area";
       throw err;
     } finally {
@@ -222,7 +225,7 @@ export function useScreenCapture() {
         throw new Error(response.error || "Failed to capture full screen");
       }
     } catch (err) {
-      console.error("Full screen capture error:", err);
+      logger.error("Full screen capture error:", err);
       error.value = err.message || "Failed to capture full screen";
       throw err;
     } finally {
@@ -236,7 +239,7 @@ export function useScreenCapture() {
       await startScreenCapture();
       return true;
     } catch (err) {
-      console.error("Failed to initialize screen capture:", err);
+      logger.error("Failed to initialize screen capture:", err);
       error.value = err.message || "Failed to initialize screen capture";
       return false;
     }

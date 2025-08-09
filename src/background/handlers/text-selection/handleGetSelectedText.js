@@ -2,6 +2,9 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleGetSelectedText');
 
 const errorHandler = new ErrorHandler();
 
@@ -14,7 +17,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleGetSelectedText(message, sender, sendResponse) {
-  console.log('[Handler:getSelectedText] Processing text selection request:', message.data);
+  logger.debug('[Handler:getSelectedText] Processing text selection request:', message.data);
   
   try {
     const { tabId } = message.data || {};
@@ -34,7 +37,7 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
     
     const selectedText = response?.selectedText || '';
     
-    console.log(`✅ [getSelectedText] Selected text retrieved from tab ${targetTabId}: "${selectedText.substring(0, 50)}..."`);
+    logger.debug(`✅ [getSelectedText] Selected text retrieved from tab ${targetTabId}: "${selectedText.substring(0, 50)}..."`);
     
     sendResponse({ 
       success: true, 

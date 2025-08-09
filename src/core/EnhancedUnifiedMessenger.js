@@ -19,6 +19,9 @@ import { TranslationMessenger } from '../messaging/specialized/TranslationMessen
 import { ProviderMessenger } from '../messaging/specialized/ProviderMessenger.js';
 import { ServiceMessenger } from '../messaging/specialized/ServiceMessenger.js';
 import { BackgroundMessenger } from '../messaging/specialized/BackgroundMessenger.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'EnhancedUnifiedMessenger');
 
 // Specialized messengers are now imported from dedicated files
 
@@ -60,10 +63,10 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       this.firefoxCompatibilityMode = this.isFirefox && this.isMV3;
       
       if (this.firefoxCompatibilityMode) {
-        console.log(`[EnhancedMessenger:${this.context}] Firefox MV3 compatibility mode enabled`);
+        logger.debug(`[EnhancedMessenger:${this.context}] Firefox MV3 compatibility mode enabled`);
       }
     } catch (error) {
-      console.warn(`[EnhancedMessenger:${this.context}] Firefox detection failed:`, error);
+      logger.warn(`[EnhancedMessenger:${this.context}] Firefox detection failed:`, error);
       // Default to assuming Chrome for compatibility
       this.isFirefox = false;
       this.firefoxCompatibilityMode = false;
@@ -100,7 +103,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
 
       // Log message for debugging (only in development)
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[EnhancedMessenger:${this.context}] Sending:`, enhancedMessage.action, enhancedMessage.data);
+        logger.debug(`[EnhancedMessenger:${this.context}] Sending:`, enhancedMessage.action, enhancedMessage.data);
       }
 
       // Firefox MV3 specific handling
@@ -113,7 +116,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
 
       // Log response for debugging (only in development)
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[EnhancedMessenger:${this.context}] Response:`, response);
+        logger.debug(`[EnhancedMessenger:${this.context}] Response:`, response);
       }
 
       return response;
@@ -155,7 +158,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
    * @private
    */
   async handleFirefoxMV3Message(message, timeout) {
-    console.log(`[EnhancedMessenger:${this.context}] Using Firefox MV3 enhanced handling for:`, message.action);
+    logger.debug(`[EnhancedMessenger:${this.context}] Using Firefox MV3 enhanced handling for:`, message.action);
 
     // Enhanced Firefox MV3 workarounds based on action type
     switch (message.action) {
@@ -216,7 +219,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
     try {
       await super.sendMessage(message, 5000); // Shorter timeout for initial send
     } catch (initialError) {
-      console.warn(`[EnhancedMessenger:${this.context}] Firefox initial send warning:`, initialError.message);
+      logger.warn(`[EnhancedMessenger:${this.context}] Firefox initial send warning:`, initialError.message);
       // Continue to wait for actual result even if initial send fails
     }
 
@@ -249,7 +252,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
     } catch (error) {
       // Enhanced error handling for Firefox TTS issues
       if (error.message.includes('Could not establish connection')) {
-        console.warn(`[EnhancedMessenger:${this.context}] Firefox TTS connection issue, providing fallback response`);
+        logger.warn(`[EnhancedMessenger:${this.context}] Firefox TTS connection issue, providing fallback response`);
         return {
           success: false,
           error: 'Firefox TTS connection issue - consider page refresh',
@@ -283,7 +286,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       
       return response;
     } catch (error) {
-      console.warn(`[EnhancedMessenger:${this.context}] Firefox capture error:`, error.message);
+      logger.warn(`[EnhancedMessenger:${this.context}] Firefox capture error:`, error.message);
       throw error;
     }
   }
@@ -310,7 +313,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
       
       return response;
     } catch (error) {
-      console.warn(`[EnhancedMessenger:${this.context}] Firefox selection error:`, error.message);
+      logger.warn(`[EnhancedMessenger:${this.context}] Firefox selection error:`, error.message);
       throw error;
     }
   }
@@ -401,7 +404,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
         version: "2.0"
       };
 
-      console.log(`[EnhancedMessenger:${this.context}] 📤 Sending to tab ${tabId}:`, {
+      logger.debug(`[EnhancedMessenger:${this.context}] 📤 Sending to tab ${tabId}:`, {
         action: enhancedMessage.action,
         messageId: enhancedMessage.messageId
       });
@@ -419,7 +422,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
         )
       ]);
 
-      console.log(`[EnhancedMessenger:${this.context}] ✅ Tab ${tabId} response received:`, {
+      logger.debug(`[EnhancedMessenger:${this.context}] ✅ Tab ${tabId} response received:`, {
         success: response?.success !== false,
         messageId: enhancedMessage.messageId
       });
@@ -487,7 +490,7 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
         } catch (error) {
           lastError = error;
           if (attempt === 1 && error.message.includes('Could not establish connection')) {
-            console.warn(`[EnhancedMessenger:${this.context}] Firefox connection retry for tab ${tabId}, attempt ${attempt + 1}`);
+            logger.warn(`[EnhancedMessenger:${this.context}] Firefox connection retry for tab ${tabId}, attempt ${attempt + 1}`);
             await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay before retry
             continue;
           }

@@ -9,6 +9,7 @@
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
+import { createLogger } from '../../utils/core/logger.js';
 
 class StorageCore {
   constructor() {
@@ -17,6 +18,7 @@ class StorageCore {
     this._isReady = false;
     this._readyPromise = null;
     this._changeListener = null;
+    this.logger = createLogger('Storage', 'Core');
     this._initializeAsync();
   }
 
@@ -46,9 +48,9 @@ class StorageCore {
       this._setupChangeListener();
 
       this._isReady = true;
-      console.log("✅ [StorageCore] Initialized successfully");
+      this.logger.init('Storage core initialized successfully');
     } catch (error) {
-      console.error("❌ [StorageCore] Initialization failed:", error);
+      this.logger.error('Initialization failed', error);
       throw error;
     }
   }
@@ -58,7 +60,7 @@ class StorageCore {
    */
   _setupChangeListener() {
     if (!browser?.storage?.onChanged) {
-      console.warn("[StorageCore] storage.onChanged not available");
+      this.logger.warn('storage.onChanged not available');
       return;
     }
 
@@ -86,7 +88,7 @@ class StorageCore {
         this._changeListener
       );
     } catch (error) {
-      console.warn("[StorageCore] Failed to setup change listener:", error);
+      this.logger.warn('Failed to setup change listener', error);
     }
   }
 
@@ -235,9 +237,9 @@ class StorageCore {
         this._emit(`set:${key}`, { value: plainData[key] });
       }
 
-      console.log(`[StorageCore] Set ${Object.keys(plainData).length} key(s)`);
+      this.logger.debug(`Set ${Object.keys(plainData).length} key(s)`);
     } catch (error) {
-      console.error("[StorageCore] Set operation failed:", error);
+      this.logger.error('Set operation failed', error);
       throw error;
     }
   }
@@ -269,9 +271,9 @@ class StorageCore {
         this._emit(`remove:${key}`, {});
       }
 
-      console.log(`[StorageCore] Removed ${keyList.length} key(s)`);
+      this.logger.debug(`Removed ${keyList.length} key(s)`);
     } catch (error) {
-      console.error("[StorageCore] Remove operation failed:", error);
+      this.logger.error('Remove operation failed', error);
       throw error;
     }
   }
@@ -292,9 +294,9 @@ class StorageCore {
       }
 
       this._emit("clear", {});
-      console.log("[StorageCore] Storage cleared");
+      this.logger.debug('Storage cleared');
     } catch (error) {
-      console.error("[StorageCore] Clear operation failed:", error);
+      this.logger.error('Clear operation failed', error);
       throw error;
     }
   }
@@ -329,7 +331,7 @@ class StorageCore {
       this.cache.delete(key);
     }
 
-    console.log(`[StorageCore] Invalidated cache for ${keyList.length} key(s)`);
+    this.logger.debug(`Invalidated cache for ${keyList.length} key(s)`);
   }
 
   /**
@@ -337,7 +339,7 @@ class StorageCore {
    */
   clearCache() {
     this.cache.clear();
-    console.log("[StorageCore] Cache cleared");
+    this.logger.debug('Cache cleared');
   }
 
   /**
@@ -391,7 +393,7 @@ class StorageCore {
         try {
           callback(data);
         } catch (error) {
-          console.error(`[StorageCore] Event listener error for '${event}':`, error);
+          this.logger.error(`Event listener error for '${event}'`, error);
         }
       }
     }
@@ -412,9 +414,9 @@ class StorageCore {
       this.listeners.clear();
 
       this._isReady = false;
-      console.log("[StorageCore] Cleanup completed");
+      this.logger.operation('Cleanup completed');
     } catch (error) {
-      console.warn("[StorageCore] Cleanup error:", error);
+      this.logger.warn('Cleanup error', error);
     }
   }
 }

@@ -1,7 +1,8 @@
 // src/managers/NotificationManager.js
 
 import browser from "webextension-polyfill";
-import { isExtensionContextValid, logME } from "../../utils/core/helpers.js";
+import { isExtensionContextValid } from "../../utils/core/helpers.js";
+import { createLogger } from "../../utils/core/logger.js";
 import { parseBoolean, getTranslationString } from "../../utils/i18n/i18n.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 
@@ -24,6 +25,7 @@ export default class NotificationManager {
     }
 
     this.errorHandler = errorHandler || { handle: () => {} };
+    this.logger = createLogger('UI', 'NotificationManager');
     this.map = {
       error: {
         title: "Translate It! - Error",
@@ -99,9 +101,7 @@ export default class NotificationManager {
       !document.body ||
       typeof document.createElement !== "function"
     ) {
-      logME(
-        "[NotificationManager] DOM not ready or capable for in-page notifications.",
-      );
+      this.logger.warn('DOM not ready for in-page notifications');
       this.canShowInPage = false;
       return;
     }
@@ -113,7 +113,7 @@ export default class NotificationManager {
         this.container = el;
         this.canShowInPage = true;
         this._applyAlignment(); // Ensure alignment is correct if re-attaching
-        logME("[NotificationManager] Re-attached to existing container.");
+        this.logger.debug('Re-attached to existing notification container');
         return;
       }
 
@@ -139,14 +139,9 @@ export default class NotificationManager {
       this.container = el;
       this.canShowInPage = true; // Set capability flag upon success
       this._applyAlignment(); // Apply alignment styles immediately after creation
-      logME(
-        "[NotificationManager] Container created and appended successfully.",
-      );
+      this.logger.info('Notification container created and appended successfully');
     } catch (error) {
-      logME(
-        "[NotificationManager] Environment not compatible for in-page notifications due to error:",
-        error.message,
-      );
+      this.logger.error('Environment not compatible for in-page notifications', error.message);
       this.canShowInPage = false;
       if (this.container) {
         try {
@@ -160,12 +155,18 @@ export default class NotificationManager {
   }
 
   async _setupLocaleListener() {
-    storageManager.on('change:APPLICATION_LOCALIZE', () => {
-      // Only apply alignment if the container has already been created  
-      if (this.container) {
-        this._applyAlignment();
+    try {
+      if (storageManager && typeof storageManager.on === 'function') {
+        storageManager.on('change:APPLICATION_LOCALIZE', () => {
+          // Only apply alignment if the container has already been created  
+          if (this.container) {
+            this._applyAlignment();
+          }
+        });
       }
-    });
+    } catch (error) {
+      this.logger.warn('Could not register locale listener (storage not available yet)', error);
+    }
   }
 
   async _applyAlignment() {
@@ -185,10 +186,7 @@ export default class NotificationManager {
       this.container.style.left = "auto";
       this.container.style.direction = "ltr";
       this.container.style.textAlign = "left";
-      logME(
-        "[NotificationManager] Alignment application failed, using defaults:",
-        error,
-      );
+      this.logger.warn('Alignment application failed, using defaults', error);
     }
   }
 
@@ -207,17 +205,12 @@ export default class NotificationManager {
       try {
         return this._toastInPage(msg, cfg, auto, finalDur, onClick);
       } catch (err) {
-        logME(
-          "[NotificationManager] In-page notification failed, will fallback.",
-          err,
-        );
+        this.logger.warn('In-page notification failed, using fallback', err);
       }
     }
 
     // Step 3: Fallback to a background script notification if in-page is not available or failed.
-    logME(
-      `[NotificationManager] In-page not available. Sending notification request to background for: "${msg}"`,
-    );
+    this.logger.debug('In-page notification not available, using background fallback', { message: msg });
     if (await isExtensionContextValid()) {
       browser.runtime
         .sendMessage({
@@ -225,10 +218,7 @@ export default class NotificationManager {
           payload: { message: msg, title: cfg.title, type: type },
         })
         .catch((error) => {
-          logME(
-            "[NotificationManager] Could not send message to background script.",
-            error,
-          );
+          this.logger.error('Could not send notification to background script', error);
         });
     }
 
@@ -236,7 +226,7 @@ export default class NotificationManager {
   }
 
   dismiss(node) {
-    logME("[NotificationManager] Attempting to dismiss node:", {
+    this.logger.debug('Attempting to dismiss notification node', {
       hasNode: !!node,
       hasRemoveFunction: typeof node?.remove === "function",
       hasParentNode: !!node?.parentNode,
@@ -246,28 +236,28 @@ export default class NotificationManager {
     });
     
     if (!node || typeof node.remove !== "function" || !node.parentNode) {
-      logME("[NotificationManager] Cannot dismiss - node invalid or not in DOM");
+      this.logger.warn('Cannot dismiss notification - node invalid or not in DOM');
       return;
     }
 
     try {
-      logME("[NotificationManager] Setting opacity to 0");
+      this.logger.debug('Setting notification opacity to 0');
       node.style.opacity = "0";
       setTimeout(() => {
         try {
           if (node.parentNode) {
-            logME("[NotificationManager] Removing node from DOM");
+            this.logger.debug('Removing notification node from DOM');
             node.remove();
-            logME("[NotificationManager] Node successfully removed");
+            this.logger.debug('Notification node successfully removed');
           } else {
-            logME("[NotificationManager] Node no longer has parentNode");
+            this.logger.debug('Notification node no longer has parentNode');
           }
         } catch (removeError) {
-          logME("[NotificationManager] Error removing node:", removeError);
+          this.logger.error('Error removing notification node', removeError);
         }
       }, 500);
     } catch (error) {
-      logME("[NotificationManager] Error dismissing notification:", error);
+      this.logger.error('Error dismissing notification', error);
     }
   }
 
@@ -306,7 +296,7 @@ export default class NotificationManager {
           try {
             onClick();
           } catch (e) {
-            logME("[NotificationManager] onClick error:", e);
+            this.logger.error('Error in notification onClick handler', e);
           }
           this.dismiss(n);
         },

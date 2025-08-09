@@ -5,6 +5,9 @@
 
 import { ref, reactive, onMounted, onUnmounted, watch } from "vue";
 import { storageCore } from "../core/StorageCore.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Storage', 'useStorage');
 
 /**
  * Vue composable for storage operations
@@ -46,10 +49,10 @@ export function useStorage(keys = null, options = {}) {
         data.value = result;
       }
 
-      console.log(`[useStorage] Loaded ${Object.keys(result).length} key(s)`);
+      logger.debug(`[useStorage] Loaded ${Object.keys(result).length} key(s)`);
     } catch (err) {
       error.value = err.message;
-      console.error("[useStorage] Load failed:", err);
+      logger.error("[useStorage] Load failed:", err);
     } finally {
       isLoading.value = false;
     }
@@ -76,10 +79,10 @@ export function useStorage(keys = null, options = {}) {
         data.value = { ...data.value, ...dataToSave };
       }
 
-      console.log(`[useStorage] Saved ${Object.keys(dataToSave).length} key(s)`);
+      logger.debug(`[useStorage] Saved ${Object.keys(dataToSave).length} key(s)`);
     } catch (err) {
       error.value = err.message;
-      console.error("[useStorage] Save failed:", err);
+      logger.error("[useStorage] Save failed:", err);
       throw err;
     } finally {
       isLoading.value = false;
@@ -109,10 +112,10 @@ export function useStorage(keys = null, options = {}) {
         }
       }
 
-      console.log(`[useStorage] Removed ${keyList.length} key(s)`);
+      logger.debug(`[useStorage] Removed ${keyList.length} key(s)`);
     } catch (err) {
       error.value = err.message;
-      console.error("[useStorage] Remove failed:", err);
+      logger.error("[useStorage] Remove failed:", err);
       throw err;
     } finally {
       isLoading.value = false;
@@ -232,7 +235,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = result[key];
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
     } finally {
       isLoading.value = false;
     }
@@ -250,7 +253,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = newValue;
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
       throw err;
     } finally {
       isLoading.value = false;
@@ -269,7 +272,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       value.value = defaultValue;
     } catch (err) {
       error.value = err.message;
-      console.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
       throw err;
     } finally {
       isLoading.value = false;

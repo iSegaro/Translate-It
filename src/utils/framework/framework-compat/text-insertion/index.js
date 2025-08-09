@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/index.js
 
-import { logME } from "../../../core/helpers.js";
+import { createLogger } from "../../../core/logger.js";
 import { checkTextSelection } from "../selectionUtils.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {
@@ -17,6 +17,8 @@ import {
   tryOptimizedPasteInsertion,
   tryPasteInsertion,
 } from "./strategies/index.js";
+
+const logger = createLogger('Translation', 'TextInsertion');
 
 /**
  * جایگذاری بهینه‌شده متن با تشخیص هوشمند استراتژی
@@ -36,12 +38,7 @@ export async function optimizedTextInsertion(
   const strategy = detectOptimalStrategy(element);
   const hasSelection = checkTextSelection(element);
 
-  logME(
-    "[optimizedTextInsertion] Using strategy:",
-    strategy,
-    "for",
-    window.location.hostname
-  );
+  logger.debug('Using optimized insertion strategy', { strategy, hostname: window.location.hostname });
 
   // تنظیم انتخاب در صورت نیاز
   if (start !== null && end !== null) {
@@ -64,7 +61,7 @@ export async function optimizedTextInsertion(
     case "google-docs": {
       const googleDocsSuccess = await tryGoogleDocsInsertion(element, text);
       if (googleDocsSuccess) {
-        logME("[optimizedTextInsertion] ✅ Google Docs method succeeded");
+        logger.debug('Google Docs insertion method succeeded');
         return true;
       }
       break;
@@ -75,7 +72,7 @@ export async function optimizedTextInsertion(
         (await tryOptimizedPasteInsertion(element, text, hasSelection)) ||
         (await tryExecCommandInsertion(element, text, hasSelection));
       if (pasteFirstSuccess) {
-        logME("[optimizedTextInsertion] ✅ Paste-first strategy succeeded");
+        logger.debug('Paste-first insertion strategy succeeded');
         return true;
       }
       break;
@@ -86,7 +83,7 @@ export async function optimizedTextInsertion(
         (await tryExecCommandInsertion(element, text, hasSelection)) ||
         (await tryOptimizedPasteInsertion(element, text, hasSelection));
       if (execFirstSuccess) {
-        logME("[optimizedTextInsertion] ✅ Exec-first strategy succeeded");
+        logger.debug('Exec-first insertion strategy succeeded');
         return true;
       }
       break;
@@ -94,7 +91,7 @@ export async function optimizedTextInsertion(
   }
 
   // اگر استراتژی بهینه موفق نشد، از روش عمومی استفاده کن
-  logME("[optimizedTextInsertion] Falling back to universal method");
+  logger.debug('Falling back to universal insertion method');
   return await universalTextInsertion(element, text, start, end);
 }
 
@@ -151,7 +148,7 @@ export async function universalTextInsertion(
 
     // بررسی انتخاب موجود
     const hasSelection = checkTextSelection(element);
-    logME("[universalTextInsertion] Initial state:", {
+    logger.debug('Universal insertion initial state', {
       hasSelection,
       isContentEditable: element.isContentEditable,
       tagName: element.tagName,
@@ -168,7 +165,7 @@ export async function universalTextInsertion(
       execSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
     ) {
-      logME("[universalTextInsertion] ✅ execCommand succeeded and verified");
+      logger.debug('execCommand insertion succeeded and verified');
       return true;
     }
 
@@ -178,7 +175,7 @@ export async function universalTextInsertion(
       pasteSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
     ) {
-      logME("[universalTextInsertion] ✅ Paste event succeeded and verified");
+      logger.debug('Paste event insertion succeeded and verified');
       return true;
     }
 
@@ -192,9 +189,7 @@ export async function universalTextInsertion(
       beforeInputSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
     ) {
-      logME(
-        "[universalTextInsertion] ✅ beforeinput event succeeded and verified"
-      );
+      logger.debug('beforeinput event insertion succeeded and verified');
       return true;
     }
 
@@ -210,9 +205,7 @@ export async function universalTextInsertion(
         contentEditableSuccess &&
         (await verifyTextInsertion(element, text, initialContent))
       ) {
-        logME(
-          "[universalTextInsertion] ✅ ContentEditable method succeeded and verified"
-        );
+        logger.debug('ContentEditable insertion method succeeded and verified');
         return true;
       }
     } else {
@@ -228,17 +221,15 @@ export async function universalTextInsertion(
         inputSuccess &&
         (await verifyTextInsertion(element, text, initialContent))
       ) {
-        logME(
-          "[universalTextInsertion] ✅ Input method succeeded and verified"
-        );
+        logger.debug('Input insertion method succeeded and verified');
         return true;
       }
     }
 
-    logME("[universalTextInsertion] ❌ All methods failed verification");
+    logger.warn('All universal insertion methods failed verification');
     return false;
   } catch (error) {
-    logME("[universalTextInsertion] Error:", error);
+    logger.error('Universal text insertion error', error);
     return false;
   }
 }

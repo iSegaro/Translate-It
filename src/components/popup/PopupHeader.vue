@@ -72,6 +72,9 @@ import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 import { MessageContexts } from '../../messaging/core/MessagingCore.js'
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = createLogger(LOG_COMPONENTS.UI, 'PopupHeader');
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -114,7 +117,7 @@ const handleOpenSidePanel = async () => {
       currentWindow: true,
     })
     
-    console.log('[PopupHeader] Opening side panel for tab:', activeTab?.id)
+    logger.debug('[PopupHeader] Opening side panel for tab:', activeTab?.id)
     
     await sendMessage({ 
       action: MessageActions.OPEN_SIDE_PANEL,
@@ -124,7 +127,7 @@ const handleOpenSidePanel = async () => {
       }
     })
     
-    console.log('[PopupHeader] Side panel open request sent successfully')
+    logger.debug('[PopupHeader] Side panel open request sent successfully')
     window.close()
   } catch (error) {
     await handleError(error, 'PopupHeader-sidePanel')
@@ -133,9 +136,9 @@ const handleOpenSidePanel = async () => {
 
 const handleSelectElement = async () => {
   try {
-    console.log('[PopupHeader] Select element button clicked')
+    logger.debug('[PopupHeader] Select element button clicked')
     await toggleSelectElement()
-    console.log('[PopupHeader] Select element mode toggled successfully')
+    logger.debug('[PopupHeader] Select element mode toggled successfully')
     window.close()
   } catch (error) {
     await handleError(error, 'PopupHeader-selectElement')
@@ -149,7 +152,7 @@ const handleClearStorage = () => {
 
 const handleRevert = async () => {
   try {
-    console.log('[PopupHeader] Executing revert action')
+    logger.debug('[PopupHeader] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -165,7 +168,7 @@ const handleRevert = async () => {
     })
     
     if (response?.success) {
-      console.log(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      logger.debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
       await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
@@ -231,8 +234,7 @@ onMounted(async () => {
   } catch (error) {
     await handleError(error, 'PopupHeader-getExcludeStatus')
   }
-})
-</script>
+})</script>
 
 <style scoped>
 .header-toolbar {

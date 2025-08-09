@@ -1,6 +1,9 @@
 import { featureLoader } from '../../feature-loader.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleSpeak');
 
 let errorHandlerInstance = null;
 
@@ -10,17 +13,17 @@ export const initializeSpeakHandler = (handler) => {
 
 export const handleSpeak = async (request) => {
   try {
-    console.log('[TTSHandler] Processing speak request:', request);
+    logger.debug('[TTSHandler] Processing speak request:', request);
     
     // Skip processing if this message was forwarded from offscreen to avoid duplicates
     if (request.forwardedFromOffscreen) {
-      console.log('[TTSHandler] Skipping forwarded message to avoid duplicate processing');
+      logger.debug('[TTSHandler] Skipping forwarded message to avoid duplicate processing');
       return { success: true, skipped: true };
     }
 
     // If message is from TTS manager (no target) or targeted for offscreen, ensure offscreen document is ready first
     if (request.target === 'offscreen' || !request.target) {
-      console.log('[TTSHandler] Message targeted for offscreen, ensuring offscreen document is ready...');
+      logger.debug('[TTSHandler] Message targeted for offscreen, ensuring offscreen document is ready...');
       
       try {
         // Load TTS manager for offscreen document management
@@ -41,7 +44,7 @@ export const handleSpeak = async (request) => {
           throw new Error('No text provided for TTS');
         }
         
-        console.log('[TTSHandler] Processing offscreen TTS:', text.substring(0, 50), 'with options:', options);
+        logger.debug('[TTSHandler] Processing offscreen TTS:', text.substring(0, 50), 'with options:', options);
         
         // Check if offscreen document actually exists before sending
         const existingContexts = await browser.runtime.getContexts({
@@ -49,21 +52,21 @@ export const handleSpeak = async (request) => {
         });
 
         if (existingContexts.length === 0) {
-          console.log('[TTSHandler] No offscreen document found, recreating...');
+          logger.debug('[TTSHandler] No offscreen document found, recreating...');
           // Only try to create offscreen document if we have OffscreenTTSManager
           if (typeof ttsManager.createOffscreenDocument === 'function') {
             await ttsManager.createOffscreenDocument();
             // Small delay for initialization
             await new Promise(resolve => setTimeout(resolve, 200));
           } else {
-            console.log('[TTSHandler] TTS manager does not support offscreen documents');
+            logger.debug('[TTSHandler] TTS manager does not support offscreen documents');
           }
         }
 
         // Check if we should use offscreen or direct TTS manager
         if (typeof ttsManager.createOffscreenDocument === 'function') {
           // OffscreenTTSManager: forward to offscreen document
-          console.log('[TTSHandler] Sending TTS message to offscreen document...');
+          logger.debug('[TTSHandler] Sending TTS message to offscreen document...');
           const response = await browser.runtime.sendMessage({
             action: 'TTS_SPEAK',
             target: 'offscreen',
@@ -77,25 +80,25 @@ export const handleSpeak = async (request) => {
             timestamp: Date.now()
           });
           
-          console.log('[TTSHandler] Response from offscreen:', response);
+          logger.debug('[TTSHandler] Response from offscreen:', response);
           return response || { success: true, processedVia: 'offscreen' };
         } else {
           // BackgroundTTSManager: use directly
-          console.log('[TTSHandler] Using background TTS manager directly...');
+          logger.debug('[TTSHandler] Using background TTS manager directly...');
           await ttsManager.speak(text, options);
           return { success: true, processedVia: 'background' };
         }
       } catch (error) {
-        console.error('[TTSHandler] Failed to ensure offscreen readiness:', error);
+        logger.error('[TTSHandler] Failed to ensure offscreen readiness:', error);
         throw error; // Let error handling below handle this
       }
     }
     
     // If not targeted for offscreen, this shouldn't happen with current architecture
-    console.warn('[TTSHandler] Unexpected: TTS message not targeted for offscreen');
+    logger.warn('[TTSHandler] Unexpected: TTS message not targeted for offscreen');
     throw new Error('TTS messages should be targeted for offscreen processing');
   } catch (error) {
-    console.error('[TTSHandler] Error handling speak message:', error);
+    logger.error('[TTSHandler] Error handling speak message:', error);
     
     // Handle case when errorHandlerInstance is not initialized
     if (errorHandlerInstance) {

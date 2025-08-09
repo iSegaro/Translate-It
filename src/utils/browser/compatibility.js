@@ -4,6 +4,9 @@
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'compatibility');
 
 /**
  * Modern browser detection without deprecated APIs
@@ -18,7 +21,7 @@ export async function isFirefox() {
         return browserInfo.name.toLowerCase() === "firefox";
       } catch (error) {
         // getBrowserInfo might not be available in all contexts
-        console.debug('[browserCompat] getBrowserInfo not available:', error);
+        logger.debug('[browserCompat] getBrowserInfo not available:', error);
       }
     }
     
@@ -82,7 +85,7 @@ export async function getTTSManager() {
       return module;
     }
   } catch (error) {
-    console.error("[browserCompat] Error loading TTS manager:", error);
+    logger.error("[browserCompat] Error loading TTS manager:", error);
     // No fallback available - TTS functionality will not be available
     throw new Error("TTS functionality is not available in this browser context");
   }
@@ -94,6 +97,6 @@ export async function getTTSManager() {
  * This function is kept for backward compatibility
  */
 export async function getTTSUtils() {
-  console.warn("[browserCompat] getTTSUtils is deprecated. Use getTTSManager instead.");
+  logger.warn("[browserCompat] getTTSUtils is deprecated. Use getTTSManager instead.");
   return await getTTSManager();
 }

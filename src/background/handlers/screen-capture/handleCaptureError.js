@@ -1,6 +1,9 @@
 // src/background/handlers/screen-capture/handleCaptureError.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'handleCaptureError');
 
 const errorHandler = new ErrorHandler();
 
@@ -13,7 +16,7 @@ const errorHandler = new ErrorHandler();
  * @returns {boolean} - True if sendResponse will be called asynchronously.
  */
 export async function handleCaptureError(message, sender, sendResponse) {
-  console.log('[Handler:captureError] Processing capture error:', message.data);
+  logger.debug('[Handler:captureError] Processing capture error:', message.data);
   
   try {
     const backgroundService = globalThis.backgroundService;
@@ -42,7 +45,7 @@ export async function handleCaptureError(message, sender, sendResponse) {
       });
     }
     
-    console.log(`✅ [captureError] Capture error handled and cleaned up for tab ${targetTabId}`);
+    logger.debug(`✅ [captureError] Capture error handled and cleaned up for tab ${targetTabId}`);
     
     sendResponse({ 
       success: true, 

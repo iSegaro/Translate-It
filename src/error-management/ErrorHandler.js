@@ -6,6 +6,9 @@ import { openOptionsPage } from "../utils/core/helpers.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'ErrorHandler');
 
 const SILENT = new Set([
   ErrorTypes.CONTEXT,
@@ -67,7 +70,7 @@ export class ErrorHandler {
       const msg = await getErrorMessage(type);
       const debug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
       if (debug && !SUPPRESS_CONSOLE.has(type)) {
-        console.error(`[${type}] ${raw}`, err.stack);
+        logger.error(`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
 
@@ -83,7 +86,7 @@ export class ErrorHandler {
   }
 
   _logError(error, meta) {
-    console.error(
+    logger.error(
       `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
     );
   }
