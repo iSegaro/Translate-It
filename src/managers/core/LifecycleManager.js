@@ -72,7 +72,7 @@ class LifecycleManager {
     console.log('🎯 Registering message handlers...');
     console.log('Available handlers:', Object.keys(Handlers));
     
-    // Manual registration for all needed actions to ensure correct mapping
+    // Hybrid approach: explicit mapping with validation
     const handlerMappings = {
       // Common handlers
       'ping': Handlers.handlePing,
@@ -137,17 +137,64 @@ class LifecycleManager {
       'logError': Handlers.handleLogError
     };
     
+    // Validate handler mappings
+    this.validateHandlerMappings(handlerMappings);
+    
     // Register all handlers with proper action names
+    const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
+    
+    console.log(`📊 Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
+    console.log('📊 Handler registration stats:', this.messageHandler.getStats());
+  }
+
+  /**
+   * Validate handler mappings to detect unmapped handlers
+   * @private
+   * @param {Object} handlerMappings - Handler mappings object
+   */
+  validateHandlerMappings(handlerMappings) {
+    const mappedHandlers = new Set(Object.values(handlerMappings));
+    const availableHandlers = Object.values(Handlers);
+    const unmappedHandlers = availableHandlers.filter(handler => !mappedHandlers.has(handler));
+    
+    if (unmappedHandlers.length > 0) {
+      console.warn('⚠️ Unmapped handlers detected (consider adding to handlerMappings):', 
+                   unmappedHandlers.map(h => h.name || 'anonymous'));
+    } else {
+      console.log('✅ All available handlers are properly mapped');
+    }
+    
+    // Log mapping statistics
+    console.log(`📊 Handler mapping validation: ${Object.keys(handlerMappings).length} mapped, ${unmappedHandlers.length} unmapped`);
+  }
+
+  /**
+   * Perform actual handler registration with error tracking
+   * @private
+   * @param {Object} handlerMappings - Handler mappings object
+   * @returns {Object} Registration results with counts
+   */
+  performHandlerRegistration(handlerMappings) {
+    let registeredCount = 0;
+    let failedCount = 0;
+    
     for (const [actionName, handlerFunction] of Object.entries(handlerMappings)) {
       if (handlerFunction) {
-        this.messageHandler.registerHandler(actionName, handlerFunction);
-        console.log(`✅ Registered handler: ${actionName}`);
+        try {
+          this.messageHandler.registerHandler(actionName, handlerFunction);
+          console.log(`✅ Registered handler: ${actionName}`);
+          registeredCount++;
+        } catch (error) {
+          console.error(`❌ Failed to register handler for action: ${actionName}`, error);
+          failedCount++;
+        }
       } else {
         console.warn(`⚠️ Handler function not found for action: ${actionName}`);
+        failedCount++;
       }
     }
     
-    console.log('📊 Handler registration stats:', this.messageHandler.getStats());
+    return { registeredCount, failedCount };
   }
 
   /**
