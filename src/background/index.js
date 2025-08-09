@@ -8,6 +8,11 @@ registerAllProviders();
 
 const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
-backgroundService.initialize();
+
+backgroundService.initialize().then(() => {
+  console.log("✅ [Background] Background service initialization completed!");
+}).catch((error) => {
+  console.error("❌ [Background] Background service initialization failed:", error);
+});
 
 export { backgroundService };
