@@ -181,7 +181,7 @@ const handleHistoryClick = () => {
 
 const handleSettingsClick = async () => {
   try {
-    await sendMessage({ action: MessageActions.openOptionsPage })
+    await browser.runtime.openOptionsPage();
     showVisualFeedback(document.getElementById('settingsBtn'), 'success')
   } catch (error) {
     console.error('[SidepanelToolbar] Error opening settings:', error)
