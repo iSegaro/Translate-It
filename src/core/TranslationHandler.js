@@ -167,9 +167,11 @@ export default class TranslationHandler {
         ? TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      // Store notification for dismissal after translation completes
-      window.pendingTranslationStatusNode = statusNotification;
-      window.pendingTranslationNotifier = this.notifier;
+      // Store notification for dismissal after translation completes (only in window context)
+      if (typeof window !== 'undefined') {
+        window.pendingTranslationStatusNode = statusNotification;
+        window.pendingTranslationNotifier = this.notifier;
+      }
       
       //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
@@ -256,9 +258,17 @@ export default class TranslationHandler {
   }
 
   getSelectElementContext() {
+    // Only available in window context (content scripts/web pages)
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      return {
+        select_element: window.getSelection(),
+        activeElement: document.activeElement,
+      };
+    }
+    // Fallback for service worker context
     return {
-      select_element: window.getSelection(),
-      activeElement: document.activeElement,
+      select_element: null,
+      activeElement: null,
     };
   }
 
