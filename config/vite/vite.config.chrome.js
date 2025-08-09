@@ -9,6 +9,10 @@ import pkg from '../../package.json' with { type: 'json' };
 // Plugin to copy static files and fix HTML paths for extension structure
 function fixExtensionPaths() {
   const copyStaticFiles = async (outDir) => {
+    // Ensure output directory exists
+    await fs.ensureDir(outDir);
+    await fs.ensureDir(resolve(outDir, 'html'));
+    
     // Copy offscreen files
     const publicOffscreenJs = resolve(process.cwd(), 'public/offscreen.js');
     const htmlOffscreenHtml = resolve(process.cwd(), 'html/offscreen.html');
@@ -21,6 +25,8 @@ function fixExtensionPaths() {
     if (await fs.pathExists(htmlOffscreenHtml)) {
       await fs.copy(htmlOffscreenHtml, resolve(outDir, 'html/offscreen.html'));
       console.log('📄 Copied offscreen.html');
+    } else {
+      console.log('⚠️ offscreen.html not found at:', htmlOffscreenHtml);
     }
 
     // Copy CSS files for content scripts (CRITICAL FIX)
@@ -70,6 +76,7 @@ function fixExtensionPaths() {
     writeBundle: {
       order: 'pre',
       handler: async (options) => {
+        console.log('🔧 writeBundle started with dir:', options.dir);
         await copyStaticFiles(options.dir);
         await fixHtmlPaths(options.dir);
       }
