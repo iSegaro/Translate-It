@@ -70,6 +70,7 @@ import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { MessageContexts } from '../../messaging/core/MessagingCore.js'
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -144,9 +145,33 @@ const handleClearStorage = () => {
   document.dispatchEvent(event)
 }
 
-const handleRevert = () => {
-  const event = new CustomEvent('revert-translation')
-  document.dispatchEvent(event)
+const handleRevert = async () => {
+  try {
+    console.log('[PopupHeader] Executing revert action')
+    
+    // Send revert message directly to content script (bypass background)
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) {
+      throw new Error('No active tab found')
+    }
+    
+    const response = await browser.tabs.sendMessage(tab.id, {
+      action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+      context: MessageContexts.POPUP,
+      messageId: `popup-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+      timestamp: Date.now()
+    })
+    
+    if (response?.success) {
+      console.log(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+    } else {
+      const errorMsg = response?.error || response?.message || 'Unknown error'
+      console.error('[PopupHeader] ❌ Revert failed:', errorMsg)
+    }
+    
+  } catch (error) {
+    console.error('[PopupHeader] Error in revert action:', error)
+  }
 }
 
 const handleOpenSettings = async () => {

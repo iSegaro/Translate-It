@@ -82,9 +82,11 @@ import { useMessaging } from '@/messaging/composables/useMessaging.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useUI } from '@/composables/useUI.js';
 import { computed, ref } from 'vue';
+import browser from 'webextension-polyfill';
 
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { MessageActions } from '../../../messaging/core/MessageActions';
+import { MessageContexts } from '../../../messaging/core/MessagingCore.js';
 
 const props = defineProps({
   isHistoryVisible: {
@@ -131,8 +133,32 @@ const handleSelectElement = async () => {
 
 const handleRevertAction = async () => {
   try {
-    await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE })
-    showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
+    console.log('[SidepanelToolbar] Executing revert action')
+    
+    // Send revert message directly to content script (bypass background)
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) {
+      throw new Error('No active tab found')
+    }
+    
+    const response = await browser.tabs.sendMessage(tab.id, {
+      action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+      context: MessageContexts.SIDEPANEL,
+      messageId: `sidepanel-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+      timestamp: Date.now()
+    })
+    
+    console.log('[SidepanelToolbar] Revert response:', response)
+    
+    if (response?.success) {
+      console.log(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
+    } else {
+      const errorMsg = response?.error || response?.message || 'Unknown error'
+      console.error('[SidepanelToolbar] ❌ Revert failed:', errorMsg)
+      showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
+    }
+    
   } catch (error) {
     console.error('[SidepanelToolbar] Error reverting action:', error)
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
