@@ -23,7 +23,7 @@ class SimpleMessageHandler {
       return;
     }
 
-    console.log("🎧 Initializing Simple Message Handler...");
+    console.log("🎧 [SimpleMessageHandler] Initializing Simple Message Handler...");
 
     // Use callback pattern for Firefox MV3 compatibility
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -31,7 +31,7 @@ class SimpleMessageHandler {
         "[SimpleMessageHandler] 🎯 Received message:",
         message,
         "from:",
-        sender,
+        sender?.tab?.id || 'unknown',
       );
 
       // Enhanced context-aware routing
