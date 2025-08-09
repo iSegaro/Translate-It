@@ -141,7 +141,7 @@ export async function handleTranslate(message, sender) {
           sourceLanguage: result.sourceLanguage,
           targetLanguage: result.targetLanguage,
           timestamp: result.timestamp,
-          mode: result.mode
+          translationMode: result.mode || normalizedMessage.data.mode || normalizedMessage.data.translationMode
         },
         message.context, // Use original message context
         { messageId: message.messageId } // Use original messageId for correlation
@@ -160,7 +160,7 @@ export async function handleTranslate(message, sender) {
           sourceLanguage: normalizedMessage.data.sourceLanguage,
           targetLanguage: normalizedMessage.data.targetLanguage,
           timestamp: Date.now(),
-          mode: normalizedMessage.data.mode || normalizedMessage.data.translationMode
+          translationMode: normalizedMessage.data.mode || normalizedMessage.data.translationMode
         },
         message.context, // Use original message context
         { messageId: message.messageId } // Use original messageId for correlation

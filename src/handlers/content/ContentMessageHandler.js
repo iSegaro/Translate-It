@@ -1,11 +1,12 @@
 /**
  * Content Script Message Handler
- * Modular handler for content script messages using existing messaging architecture
- * Integrates with SimpleMessageHandler system
+ * Handles content script messages with simple translation mode routing
+ * Routes different translation types appropriately without over-engineering
  */
 
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
+import { TranslationMode } from '../../config.js';
 
 export class ContentMessageHandler {
   constructor() {
@@ -134,40 +135,171 @@ export class ContentMessageHandler {
   }
 
   /**
-   * Handle translation result message for text field translation
+   * Handle translation result message with simple mode-based routing
+   * Routes different translation types to appropriate handlers
    * @param {Object} message - Message object with translation result
    * @param {Object} sender - Sender object
    * @returns {Promise<Object>} Handler result
    */
   async handleTranslationResult(message, sender) {
-    console.log('[ContentMessageHandler] Processing translation result:', message.data);
+    const { translationMode } = message.data;
+    const messageId = message.messageId;
+    
+    console.log('[ContentMessageHandler] Processing translation result:', {
+      mode: translationMode,
+      messageId,
+      hasTranslatedText: !!message.data.translatedText
+    });
     
     try {
-      const { translatedText, originalText, translationMode } = message.data;
-      
-      if (!translatedText) {
+      // Validate message data
+      if (!message.data.translatedText) {
         throw new Error('No translated text received');
       }
+
+      // Route based on translation mode
+      if (this.shouldDelegate(translationMode, messageId)) {
+        return this.createDelegatedResponse(translationMode, messageId);
+      }
       
-      // Import the text field translation handler
-      const { applyTranslationToTextField } = await import('../smartTranslationIntegration.js');
+      if (this.isFieldTranslation(translationMode)) {
+        return await this.handleFieldTranslation(message);
+      }
       
-      // Apply translation to the active element
-      const result = await applyTranslationToTextField(translatedText, originalText, translationMode);
+      return this.createNoActionResponse(translationMode);
+      
+    } catch (error) {
+      console.error('[ContentMessageHandler] Error in translation result handling:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to handle translation result',
+        context: 'ContentMessageHandler'
+      };
+    }
+  }
+
+  /**
+   * Check if translation mode should be delegated to specialized handlers
+   * @param {string} translationMode - Translation mode
+   * @param {string} messageId - Message ID
+   * @returns {boolean} Whether should delegate
+   */
+  shouldDelegate(translationMode, messageId) {
+    // Modes that have specialized handlers and use messageId for coordination
+    const delegatedModes = [
+      TranslationMode.Dictionary_Translation,
+      'dictionary',
+      TranslationMode.Select_Element, 
+      'SelectElement'
+    ];
+    
+    return delegatedModes.includes(translationMode) && messageId;
+  }
+
+  /**
+   * Check if translation mode should be handled as field translation
+   * @param {string} translationMode - Translation mode
+   * @returns {boolean} Whether is field translation
+   */
+  isFieldTranslation(translationMode) {
+    const fieldModes = [
+      TranslationMode.Field,
+      'field',
+      'normal' // Legacy fallback
+    ];
+    
+    return fieldModes.includes(translationMode);
+  }
+
+  /**
+   * Handle field translation - apply to text fields
+   * @param {Object} message - Translation message
+   * @returns {Promise<Object>} Handler result
+   */
+  async handleFieldTranslation(message) {
+    const { translatedText, originalText, translationMode } = message.data;
+    
+    console.log('[ContentMessageHandler] Handling field translation');
+    
+    // Import and apply to text field
+    const { applyTranslationToTextField } = await import('../smartTranslationIntegration.js');
+    const result = await applyTranslationToTextField(translatedText, originalText, translationMode);
+    
+    return {
+      success: true,
+      message: 'Translation applied to field successfully',
+      applied: result.applied || false,
+      mode: 'field'
+    };
+  }
+
+  /**
+   * Create response for delegated translations
+   * @param {string} translationMode - Translation mode
+   * @param {string} messageId - Message ID
+   * @returns {Object} Response object
+   */
+  createDelegatedResponse(translationMode, messageId) {
+    const delegateMapping = {
+      [TranslationMode.Dictionary_Translation]: 'SelectionWindows',
+      'dictionary': 'SelectionWindows',
+      [TranslationMode.Select_Element]: 'SelectElementManager',
+      'SelectElement': 'SelectElementManager'
+    };
+    
+    const delegatedTo = delegateMapping[translationMode] || 'SpecializedHandler';
+    
+    console.log(`[ContentMessageHandler] Delegating ${translationMode} to ${delegatedTo}`);
+    
+    return {
+      success: true,
+      message: `Translation delegated to ${delegatedTo}`,
+      applied: true,
+      mode: translationMode,
+      delegatedTo,
+      messageId
+    };
+  }
+
+  /**
+   * Create response for modes that don't require content script action
+   * @param {string} translationMode - Translation mode
+   * @returns {Object} Response object
+   */
+  createNoActionResponse(translationMode) {
+    const noActionModes = [
+      TranslationMode.Popup_Translate,
+      TranslationMode.Sidepanel_Translate,
+      TranslationMode.Subtitle,
+      TranslationMode.ScreenCapture,
+      'popup',
+      'sidepanel',
+      'subtitle', 
+      'screen_capture'
+    ];
+    
+    if (noActionModes.includes(translationMode)) {
+      console.log(`[ContentMessageHandler] No action needed for ${translationMode}`);
       
       return {
         success: true,
-        message: 'Translation applied successfully',
-        applied: result.applied || false
-      };
-      
-    } catch (error) {
-      console.error('[ContentMessageHandler] Error in translation result handler:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to apply translation result'
+        message: `Translation for ${translationMode} handled by interface`,
+        applied: false,
+        mode: translationMode,
+        note: 'Handled by specialized interface'
       };
     }
+    
+    // Unknown mode - log warning but don't fail
+    console.warn(`[ContentMessageHandler] Unknown translation mode: ${translationMode}`);
+    
+    return {
+      success: true,
+      message: 'Unknown translation mode - no action taken',
+      applied: false,
+      mode: translationMode,
+      note: 'Unknown mode'
+    };
   }
 
   /**

@@ -28,7 +28,7 @@ export class TranslationMessenger {
       provider: options.provider || 'google',
       sourceLanguage: options.from || 'auto',
       targetLanguage: options.to || 'fa',
-      mode: options.mode || 'normal',
+      mode: options.mode || options.translationMode || 'normal',
       options: options.options || {},
       ...options
     };
