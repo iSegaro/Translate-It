@@ -98,7 +98,8 @@ export default class IconManager {
       if (!target?.isConnected) {
         return null;
       }
-      injectIconStyle("styles/icon.css");
+      // CSS is automatically loaded via content_scripts in manifest
+      // No manual injection needed
 
       const icon = document.createElement("button");
       icon.className = "AIWritingCompanion-translation-icon-extension";
