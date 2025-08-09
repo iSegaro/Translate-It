@@ -59,17 +59,23 @@ export default function setupIconBehavior(
       const platform = detectPlatform(target);
       const text = strategies[platform].extractText(target);
       if (!text) return;
-      statusNode = notifier.show(
+      statusNode = await notifier.show(
         (await getTranslationString("STATUS_TRANSLATING_ICON")) ||
           "Translating...",
         "status",
         false,
       );
-      await translateFieldViaSmartHandler({ text, target, translationHandler });
+      
+      // Store statusNode and notifier globally so it can be dismissed after translation completes
+      window.pendingTranslationStatusNode = statusNode;
+      window.pendingTranslationNotifier = notifier;
+      
+      await translateFieldViaSmartHandler({ text, target, tabId: null });
     } catch (err) {
       logME("[IconBehavior] ", err);
-    } finally {
+      // Dismiss notification on error
       if (statusNode) notifier.dismiss(statusNode);
+    } finally {
       cleanupIcon();
     }
   };

@@ -40,6 +40,9 @@ export class ContentMessageHandler {
     // Register handler for revert action from background/sidepanel
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslations.bind(this));
     
+    // Register handler for text field translation results
+    this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
+    
     // Future handlers can be added here
     // this.registerHandler('SOME_OTHER_ACTION', this.handleSomeOtherAction.bind(this));
   }
@@ -126,6 +129,43 @@ export class ContentMessageHandler {
       return {
         success: false,
         error: error.message || 'Failed to revert translations'
+      };
+    }
+  }
+
+  /**
+   * Handle translation result message for text field translation
+   * @param {Object} message - Message object with translation result
+   * @param {Object} sender - Sender object
+   * @returns {Promise<Object>} Handler result
+   */
+  async handleTranslationResult(message, sender) {
+    console.log('[ContentMessageHandler] Processing translation result:', message.data);
+    
+    try {
+      const { translatedText, originalText, translationMode } = message.data;
+      
+      if (!translatedText) {
+        throw new Error('No translated text received');
+      }
+      
+      // Import the text field translation handler
+      const { applyTranslationToTextField } = await import('../smartTranslationIntegration.js');
+      
+      // Apply translation to the active element
+      const result = await applyTranslationToTextField(translatedText, originalText, translationMode);
+      
+      return {
+        success: true,
+        message: 'Translation applied successfully',
+        applied: result.applied || false
+      };
+      
+    } catch (error) {
+      console.error('[ContentMessageHandler] Error in translation result handler:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to apply translation result'
       };
     }
   }
