@@ -181,12 +181,25 @@ export class SelectElementManager {
       console.log('[SelectElementManager] Message ID from result:', message.messageId);
       console.log('[SelectElementManager] Pending translation:', this.pendingTranslation);
       
+      const translationData = message.data;
+      const messageId = message.messageId;
+      
+      // Always try to cache successful translation results, even if cancelled
+      if (translationData?.success && translationData?.translatedText) {
+        try {
+          console.log('[SelectElementManager] Caching translation result for future use (even if cancelled)');
+          await this.cacheTranslationResult(translationData);
+        } catch (cacheError) {
+          console.warn('[SelectElementManager] Failed to cache translation result:', cacheError);
+        }
+      }
+      
       if (this.pendingTranslation) {
         // TRANSLATION_RESULT_UPDATE uses the same messageId as the original TRANSLATE request
-        if (this.pendingTranslation.originalMessageId === message.messageId) {
+        if (this.pendingTranslation.originalMessageId === messageId) {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
           console.log('[SelectElementManager] Message ID matched, resolving translation after', elapsed + 'ms');
-          this.logLifecycle(message.messageId, 'RESULT_RECEIVED', { elapsed });
+          this.logLifecycle(messageId, 'RESULT_RECEIVED', { elapsed });
           
           // Cancel timeout since we got the result
           if (this.pendingTranslation.timeoutId) {
@@ -194,20 +207,20 @@ export class SelectElementManager {
           }
           
           this.pendingTranslation.resolve({
-            success: message.data?.success !== false,
-            translatedText: message.data?.translatedText,
-            error: message.data?.error,
+            success: translationData?.success !== false,
+            translatedText: translationData?.translatedText,
+            error: translationData?.error,
             elapsed: elapsed
           });
           this.pendingTranslation = null;
         } else {
           console.log('[SelectElementManager] Message ID mismatch:', {
             expected: this.pendingTranslation.originalMessageId,
-            received: message.messageId
+            received: messageId
           });
         }
       } else {
-        console.log('[SelectElementManager] No pending translation found');
+        console.log('[SelectElementManager] No pending translation found - likely cancelled, but result cached if successful');
       }
     } catch (error) {
       console.error('[SelectElementManager] Error handling translation result:', error);
@@ -215,6 +228,54 @@ export class SelectElementManager {
         this.pendingTranslation.reject(error);
         this.pendingTranslation = null;
       }
+    }
+  }
+
+  /**
+   * Cache translation result using existing cache system
+   * @param {Object} translationData - Translation result data
+   */
+  async cacheTranslationResult(translationData) {
+    try {
+      const { translatedText, originalText } = translationData;
+      
+      if (!translatedText || !originalText) {
+        console.log('[SelectElementManager] Cannot cache: missing translated or original text');
+        return;
+      }
+
+      // Import the existing translation cache system
+      const { getTranslationCache } = await import("../../utils/text/extraction.js");
+      const translationCache = getTranslationCache();
+
+      // Parse JSON responses for SelectElement mode
+      let translatedData, originalData;
+      try {
+        translatedData = JSON.parse(translatedText);
+        originalData = JSON.parse(originalText);
+      } catch (e) {
+        // Not JSON format, cache as-is
+        translationCache.set(originalText.trim(), translatedText.trim());
+        console.log('[SelectElementManager] Cached simple text translation');
+        return;
+      }
+
+      // For JSON format (SelectElement), cache individual segments
+      if (Array.isArray(translatedData) && Array.isArray(originalData)) {
+        let cachedCount = 0;
+        for (let i = 0; i < Math.min(translatedData.length, originalData.length); i++) {
+          const origText = originalData[i]?.text;
+          const transText = translatedData[i]?.text;
+          
+          if (origText && transText && origText.trim() && transText.trim()) {
+            translationCache.set(origText.trim(), transText.trim());
+            cachedCount++;
+          }
+        }
+        console.log(`[SelectElementManager] Cached ${cachedCount} JSON segments for future use`);
+      }
+    } catch (error) {
+      console.error('[SelectElementManager] Error caching translation result:', error);
     }
   }
 

@@ -9,6 +9,14 @@ import { getTranslationString } from "../i18n/i18n.js";
 const translationCache = new Map();
 
 /**
+ * Get the global translation cache for external access
+ * @returns {Map} The translation cache map
+ */
+export function getTranslationCache() {
+  return translationCache;
+}
+
+/**
  * پاکسازی تمام حافظه‌های کش مورد استفاده در این ماژول.
  * این شامل کش ترجمه‌ها و متن‌های اصلی ذخیره شده در state می‌شود.
  *
