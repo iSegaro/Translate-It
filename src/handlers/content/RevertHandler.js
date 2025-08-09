@@ -14,31 +14,37 @@ export class RevertHandler {
    * @returns {Promise<Object>} Revert result
    */
   async executeRevert() {
-    console.log('[RevertHandler] Starting revert process');
+    console.log('[RevertHandler] Starting unified revert process');
     
     try {
-      // Check which translation system is active and has translated elements
-      const hasVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
-      const hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
-      
-      let revertedCount = 0;
-      let system = 'none';
-      
-      if (hasVueTranslations) {
-        // Use Vue-based revert system
-        console.log('[RevertHandler] Using Vue revert system');
-        system = 'vue';
-        revertedCount = await this.revertVueTranslations();
-        
-      } else if (hasLegacyTranslations) {
-        // Use legacy revert system  
-        console.log('[RevertHandler] Using legacy revert system');
-        system = 'legacy';
-        revertedCount = await this.revertLegacyTranslations();
+      let totalRevertedCount = 0;
+      let systemsUsed = [];
+
+      // Attempt to revert Vue / SelectElementManager translations
+      try {
+        const vueRevertedCount = await this.revertVueTranslations();
+        if (vueRevertedCount > 0) {
+          totalRevertedCount += vueRevertedCount;
+          systemsUsed.push('vue');
+        }
+      } catch (error) {
+        console.error('[RevertHandler] Error during Vue revert portion:', error);
+      }
+
+      // Attempt to revert legacy translations
+      try {
+        const legacyRevertedCount = await this.revertLegacyTranslations();
+        if (legacyRevertedCount > 0) {
+          totalRevertedCount += legacyRevertedCount;
+          systemsUsed.push('legacy');
+        }
+      } catch (error) {
+        console.error('[RevertHandler] Error during legacy revert portion:', error);
       }
       
-      console.log(`[RevertHandler] Revert completed: ${revertedCount} items reverted using ${system} system`);
-      return { success: true, revertedCount, system };
+      const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
+      console.log(`[RevertHandler] Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
+      return { success: true, revertedCount: totalRevertedCount, system: finalSystem };
       
     } catch (error) {
       console.error('[RevertHandler] Error in executeRevert:', error);

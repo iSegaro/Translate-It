@@ -60,17 +60,19 @@ document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true,
 console.log('✅ DOM event listeners setup for EventCoordinator (modern event routing)');
 
 // Setup message listener integration with existing system
-browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[ContentScript] Received message:', message);
-  
-  // Try content message handler first
-  const handled = await contentMessageHandler.handleMessage(message, sender, sendResponse);
-  
-  if (handled !== false) {
-    return handled;
+
+  // handleMessage returns false if no handler is found, or a promise if a handler is found.
+  const wasHandled = contentMessageHandler.handleMessage(message, sender, sendResponse);
+
+  // If a handler was found, wasHandled is a promise. We should return true
+  // to indicate that we will send a response asynchronously.
+  if (wasHandled !== false) {
+    return true;
   }
-  
-  // Let other handlers process the message
+
+  // No handler was found.
   return false;
 });
 

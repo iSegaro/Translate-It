@@ -38,9 +38,6 @@ export class ContentMessageHandler {
    * Register content-specific message handlers
    */
   registerHandlers() {
-    // Register handler for revert action from background/sidepanel
-    this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslations.bind(this));
-    
     // Register handler for text field translation results
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     
@@ -102,37 +99,7 @@ export class ContentMessageHandler {
     }
   }
 
-  /**
-   * Handle revert translations message
-   * @param {Object} message - Message object
-   * @param {Object} sender - Sender object
-   * @returns {Promise<Object>} Handler result
-   */
-  async handleRevertTranslations(message, sender) {
-    console.log('[ContentMessageHandler] Processing revert translations request');
-    
-    try {
-      // Import the shared revert handler
-      const { RevertHandler } = await import('./RevertHandler.js');
-      const revertHandler = new RevertHandler();
-      
-      const result = await revertHandler.executeRevert();
-      
-      return {
-        success: result.success,
-        message: result.success ? `${result.revertedCount || 0} translation(s) reverted` : result.error,
-        revertedCount: result.revertedCount || 0,
-        system: result.system || 'none'
-      };
-      
-    } catch (error) {
-      console.error('[ContentMessageHandler] Error in revert handler:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to revert translations'
-      };
-    }
-  }
+  
 
   /**
    * Handle translation result message with simple mode-based routing

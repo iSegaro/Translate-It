@@ -153,6 +153,23 @@ export class SelectElementManager {
       }
     }
 
+    if (message.action === MessageActions.REVERT_SELECT_ELEMENT_MODE) {
+      try {
+        const revertedCount = await this.revertTranslations();
+        const response = { success: true, revertedCount };
+        if (sendResponse) {
+          sendResponse(response);
+        }
+        return response;
+      } catch (error) {
+        const errorResponse = { success: false, error: error.message };
+        if (sendResponse) {
+          sendResponse(errorResponse);
+        }
+        return errorResponse;
+      }
+    }
+
     // Handle TRANSLATION_RESULT_UPDATE messages - check context like OLD system
     if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
       console.log('[SelectElementManager] Received TRANSLATION_RESULT_UPDATE:', message);
@@ -1403,17 +1420,18 @@ export class SelectElementManager {
     try {
       console.log("[SelectElementManager] Starting translation revert process");
 
-      // Use advanced text extraction revert system
-      const { revertAllTranslations } = await import(
+      const { revertTranslations } = await import(
         "../../utils/text/extraction.js"
       );
 
       const context = {
-        translatedElements: this.translatedElements,
-        originalTexts: this.state.originalTexts,  // Use proper state structure
+        state: this.state,
+        errorHandler: this.errorHandler,
+        notifier: this.notificationManager,
+        IconManager: null, // This manager does not have an IconManager instance
       };
 
-      const successfulReverts = revertAllTranslations(context);
+      const successfulReverts = await revertTranslations(context);
 
       // Also handle simple input/textarea reverts from tracking
       let inputReverts = 0;
