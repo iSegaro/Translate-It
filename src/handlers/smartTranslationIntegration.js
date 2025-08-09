@@ -51,6 +51,16 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
     // Send translation request - response will be handled by ContentMessageHandler
     logME('[translateFieldViaSmartHandler] Sending translation request...');
+    
+    // Test connection first
+    try {
+      const pingResult = await messenger.sendMessage({ action: 'ping', data: { test: true } }, 3000);
+      logME('[translateFieldViaSmartHandler] Background connection test:', pingResult);
+    } catch (pingError) {
+      logME('[translateFieldViaSmartHandler] Background connection FAILED:', pingError);
+      throw new Error('Background script not responding - extension may need reload');
+    }
+    
     const result = await messenger.specialized.translation.translate(text, { 
       translationMode: mode,
       originalText: text 
