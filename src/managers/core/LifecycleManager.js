@@ -97,7 +97,7 @@ class LifecycleManager {
       'revertTranslation': Handlers.handleRevertTranslation,
       
       // TTS handlers
-      'TTS_SPEAK': Handlers.handleSpeak,
+      'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
@@ -213,11 +213,7 @@ class LifecycleManager {
       );
       const errorHandler = new ErrorHandler();
 
-      const speakModule = await import("../../background/handlers/tts/handleSpeak.js");
-      if (speakModule.initializeSpeakHandler) {
-        speakModule.initializeSpeakHandler(errorHandler);
-        logger.debug("✅ TTS handleSpeak error handler initialized");
-      }
+      // TTS error handling now integrated into handleGoogleTTS directly
 
       logger.debug("✅ Error handlers initialization completed");
     } catch (error) {

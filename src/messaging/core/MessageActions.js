@@ -37,14 +37,7 @@ export class MessageActions {
   static IS_Current_Page_Excluded = 'isCurrentPageExcluded';
   
   // TTS actions
-  static TTS_SPEAK = 'TTS_SPEAK';
-  static TTS_STOP = 'TTS_STOP';
-  static TTS_PAUSE = 'TTS_PAUSE';
-  static TTS_RESUME = 'TTS_RESUME';
-  static TTS_GET_VOICES = 'TTS_GET_VOICES';
-  static TTS_PLAY_CACHED_AUDIO = 'TTS_PLAY_CACHED_AUDIO';
-  static TTS_TEST = 'TTS_TEST';
-  static TTS_SPEAK_CONTENT = 'TTS_SPEAK_CONTENT';
+  // Legacy TTS actions - removed, using GOOGLE_TTS_SPEAK instead
   static PLAY_OFFSCREEN_AUDIO = 'playOffscreenAudio';
   
   // Capture actions

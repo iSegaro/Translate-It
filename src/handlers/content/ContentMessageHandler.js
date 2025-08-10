@@ -41,6 +41,9 @@ export class ContentMessageHandler {
     // Register handler for text field translation results
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     
+    // Register handler for TTS content script requests
+    this.registerHandler(MessageActions.TTS_SPEAK_CONTENT, this.handleTTSSpeak.bind(this));
+    
     // Future handlers can be added here
     // this.registerHandler('SOME_OTHER_ACTION', this.handleSomeOtherAction.bind(this));
   }
@@ -96,6 +99,113 @@ export class ContentMessageHandler {
       }
       
       return errorResponse;
+    }
+  }
+
+  /**
+   * Handle TTS speak request from background script
+   * @param {Object} message - TTS message object
+   * @param {Object} sender - Sender object
+   * @returns {Promise<Object>} Handler result
+   */
+  async handleTTSSpeak(message, sender) {
+    this.logger.debug('Processing TTS speak request:', message);
+
+    try {
+      // Check if Web Speech API is available
+      if (!window.speechSynthesis) {
+        throw new Error('Web Speech API not available in this context');
+      }
+
+      const { data } = message;
+      
+      if (!data || !data.text || !data.text.trim()) {
+        throw new Error('Text to speak cannot be empty');
+      }
+
+      // Stop any current speech
+      window.speechSynthesis.cancel();
+
+      // Create utterance
+      const utterance = new SpeechSynthesisUtterance(data.text.trim());
+
+      // Set voice options with safety checks
+      if (data.lang) {
+        utterance.lang = data.lang;
+      }
+      if (data.rate && data.rate >= 0.1 && data.rate <= 10) {
+        utterance.rate = data.rate;
+      }
+      if (data.pitch && data.pitch >= 0 && data.pitch <= 2) {
+        utterance.pitch = data.pitch;
+      }
+      if (data.volume && data.volume >= 0 && data.volume <= 1) {
+        utterance.volume = data.volume;
+      }
+
+      // Return promise that resolves when speech is complete
+      return new Promise((resolve, reject) => {
+        let resolved = false;
+
+        const resolveOnce = (result) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(result);
+          }
+        };
+
+        const rejectOnce = (error) => {
+          if (!resolved) {
+            resolved = true;
+            reject(error);
+          }
+        };
+
+        // Setup event handlers
+        utterance.onstart = () => {
+          this.logger.debug('TTS speech started');
+        };
+
+        utterance.onend = () => {
+          this.logger.debug('TTS speech ended successfully');
+          resolveOnce({ success: true });
+        };
+
+        utterance.onerror = (error) => {
+          this.logger.error('TTS speech error:', error);
+          rejectOnce(new Error(`Content script TTS failed: ${error.error || error.message}`));
+        };
+
+        // Add timeout as safety measure
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            this.logger.warn('TTS timeout, cancelling speech');
+            window.speechSynthesis.cancel();
+            rejectOnce(new Error('Content script TTS timeout'));
+          }
+        }, 15000); // 15 second timeout
+
+        // Clear timeout when speech ends or errors
+        utterance.onend = (event) => {
+          clearTimeout(timeout);
+          this.logger.debug('TTS speech ended successfully');
+          resolveOnce({ success: true });
+        };
+
+        utterance.onerror = (error) => {
+          clearTimeout(timeout);
+          this.logger.error('TTS speech error:', error);
+          rejectOnce(new Error(`Content script TTS failed: ${error.error || error.message}`));
+        };
+
+        // Start speech synthesis
+        window.speechSynthesis.speak(utterance);
+        this.logger.debug('TTS speech started via Web Speech API');
+      });
+
+    } catch (error) {
+      this.logger.error('Failed to handle TTS speak request:', error);
+      throw error;
     }
   }
 

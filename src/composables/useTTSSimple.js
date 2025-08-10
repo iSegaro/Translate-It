@@ -4,7 +4,6 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('UI', 'useTTSSimple');
@@ -14,7 +13,7 @@ export function useTTSSimple() {
   const isPlaying = ref(false);
 
   /**
-   * Speak text using simple message to background
+   * Speak text using unified GOOGLE_TTS_SPEAK message
    * @param {string} text - Text to speak
    * @param {string} lang - Language code (optional)
    */
@@ -26,21 +25,24 @@ export function useTTSSimple() {
 
     try {
       isPlaying.value = true;
-      logger.debug("[useTTSSimple] Speaking:", text.substring(0, 50) + "...");
+      
+      const language = getLanguageCodeForTTS(lang) || "en";
+      logger.debug("[useTTSSimple] Speaking via GOOGLE_TTS_SPEAK:", text.substring(0, 50) + "...");
 
-      // Use TTS_SPEAK action from MessageActions
-      await browserAPI.sendMessage({
-        action: MessageActions.TTS_SPEAK,
+      // Send to background handler
+      const response = await browserAPI.sendMessage({
+        action: "GOOGLE_TTS_SPEAK",
         data: {
           text: text.trim(),
-          language: getLanguageCodeForTTS(lang) || "en",
-          rate: 1,
-          pitch: 1,
-          volume: 1,
-        },
+          language: language
+        }
       });
 
-      logger.debug("[useTTSSimple] TTS message sent successfully");
+      if (!response?.success) {
+        throw new Error(response?.error || 'TTS failed');
+      }
+
+      logger.debug("[useTTSSimple] TTS completed successfully");
     } catch (error) {
       logger.error("[useTTSSimple] TTS failed:", error);
     } finally {
@@ -51,16 +53,15 @@ export function useTTSSimple() {
     }
   };
 
+
   /**
    * Stop TTS playback
    */
   const stop = async () => {
     try {
-      await browserAPI.safeSendMessage({
-        action: MessageActions.TTS_STOP,
-      });
+      // Reset state - background TTS doesn't support stop
       isPlaying.value = false;
-      logger.debug("[useTTSSimple] TTS stopped");
+      logger.debug("[useTTSSimple] TTS state reset");
     } catch (error) {
       logger.error("[useTTSSimple] Failed to stop TTS:", error);
     }

@@ -596,14 +596,17 @@ export default class SelectionWindows {
   }
 
   stoptts_playing() {
-    // Use unified TTS system for stopping
-    if (isExtensionContextValid()) {
-      browser.runtime.sendMessage({
-        action: MessageActions.TTS_STOP,
-        context: MessageContexts.TTS_SMART
-      }).catch((error) => {
-        this.logger.warn("Error stopping TTS", error);
+    try {
+      // Stop any playing audio elements (Google TTS)
+      const audioElements = document.querySelectorAll('audio');
+      audioElements.forEach(audio => {
+        audio.pause();
+        audio.src = "";
       });
+      
+      this.logger.debug("TTS stopped");
+    } catch (error) {
+      this.logger.warn("Error stopping TTS", error);
     }
   }
 
@@ -618,29 +621,69 @@ export default class SelectionWindows {
     }
 
     try {
-      this.logger.debug("Speaking via unified TTS:", text.substring(0, 50) + "...");
+      this.logger.debug("Speaking via background Google TTS:", text.substring(0, 50) + "...");
 
-      // Use exact same format as useTTSSimple
+      // For content scripts, delegate to background to avoid CSP issues
+      const language = this.detectSimpleLanguage(text) || "en";
+      
       await browser.runtime.sendMessage({
-        action: MessageActions.TTS_SPEAK,
+        action: "GOOGLE_TTS_SPEAK",
         data: {
           text: text.trim(),
-          language: this.detectSimpleLanguage(text) || "en",
-          rate: 1,
-          pitch: 1,
-          volume: 1,
-        },
-        context: MessageContexts.TTS_SMART,
-        timestamp: Date.now(),
-        version: "2.0",
-        messageId: `selection-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+          language: language
+        }
       });
 
-      this.logger.debug("TTS message sent successfully via unified system");
+      this.logger.debug("Background Google TTS request sent successfully");
     } catch (error) {
-      this.logger.error("Failed to send TTS message:", error);
+      this.logger.error("Background Google TTS failed:", error);
       throw error;
     }
+  }
+
+  /**
+   * Direct Google TTS API - same as useTTSSmart
+   * @param {string} text - Text to speak
+   * @param {string} language - Language code
+   * @returns {Promise}
+   */
+  speakWithGoogleTTS(text, language) {
+    return new Promise((resolve, reject) => {
+      try {
+        const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${language}`;
+        
+        const audio = new Audio(ttsUrl);
+        
+        // Add timeout
+        const timeout = setTimeout(() => {
+          audio.pause();
+          audio.src = "";
+          reject(new Error('Google TTS timeout'));
+        }, 15000);
+        
+        audio.onended = () => {
+          clearTimeout(timeout);
+          this.logger.debug("Google TTS audio completed");
+          resolve();
+        };
+        
+        audio.onerror = (error) => {
+          clearTimeout(timeout);
+          this.logger.error("Google TTS audio error:", error);
+          reject(new Error(`Google TTS failed: ${error.message}`));
+        };
+        
+        audio.play().catch((playError) => {
+          clearTimeout(timeout);
+          reject(new Error(`Google TTS play failed: ${playError.message}`));
+        });
+        
+        this.logger.debug("Google TTS audio started");
+        
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   /**

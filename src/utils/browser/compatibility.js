@@ -66,37 +66,4 @@ export async function isChrome() {
   return !(await isFirefox());
 }
 
-/**
- * Get the appropriate TTS manager for the current browser
- */
-export async function getTTSManager() {
-  try {
-    if (await isFirefox()) {
-      // Use Firefox-compatible TTS manager
-      const module = await import(
-        /* webpackChunkName: "tts-firefox" */ "@/managers/browser-specific/tts/TTSFirefox.js"
-      );
-      return module;
-    } else {
-      // Use Chrome TTS manager with offscreen support
-      const module = await import(
-        /* webpackChunkName: "tts-chrome" */ "@/managers/browser-specific/tts/TTSChrome.js"
-      );
-      return module;
-    }
-  } catch (error) {
-    logger.error("[browserCompat] Error loading TTS manager:", error);
-    // No fallback available - TTS functionality will not be available
-    throw new Error("TTS functionality is not available in this browser context");
-  }
-}
-
-/**
- * Get browser-specific TTS utilities
- * Note: TTS utilities are now integrated into TTS managers
- * This function is kept for backward compatibility
- */
-export async function getTTSUtils() {
-  logger.warn("[browserCompat] getTTSUtils is deprecated. Use getTTSManager instead.");
-  return await getTTSManager();
-}
+// Legacy TTS manager functions removed - using unified GOOGLE_TTS_SPEAK system

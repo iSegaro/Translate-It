@@ -17,86 +17,7 @@ export class FeatureLoader {
     this.loadingPromises = new Map();
   }
 
-  /**
-   * Load TTS manager based on browser capabilities
-   * @returns {Promise<Object>} TTS manager instance
-   */
-  async loadTTSManager() {
-    const cacheKey = "tts-manager";
-
-    if (this.loadedFeatures.has(cacheKey)) {
-      return this.loadedFeatures.get(cacheKey);
-    }
-
-    if (this.loadingPromises.has(cacheKey)) {
-      return this.loadingPromises.get(cacheKey);
-    }
-
-    const loadingPromise = this._loadTTSManagerImpl();
-    this.loadingPromises.set(cacheKey, loadingPromise);
-
-    try {
-      const manager = await loadingPromise;
-      this.loadedFeatures.set(cacheKey, manager);
-      this.loadingPromises.delete(cacheKey);
-      return manager;
-    } catch (error) {
-      this.loadingPromises.delete(cacheKey);
-      throw error;
-    }
-  }
-
-  /**
-   * Internal TTS manager loading implementation
-   * @private
-   */
-  async _loadTTSManagerImpl() {
-    // Use the official browser.offscreen API for capability detection
-    const hasOffscreen = typeof browser.offscreen?.hasDocument === "function";
-    logger.debug(`🔊 Checking for Offscreen API. Available: ${hasOffscreen}`);
-
-    if (hasOffscreen) {
-      try {
-        logger.debug("Attempting to load OffscreenTTSManager...");
-        const { OffscreenTTSManager } = await import(
-          "../managers/browser-specific/tts/TTSChrome.js"
-        );
-        const manager = new OffscreenTTSManager();
-        await manager.initialize();
-        logger.debug("✅ OffscreenTTSManager initialized successfully.");
-        return manager;
-      } catch (error) {
-        logger.warn(
-          "Offscreen TTS initialization failed, falling back to background page TTS:",
-          error,
-        );
-        // Fallback to background if offscreen fails for any reason
-      }
-    } else {
-      logger.debug(
-        "Offscreen API not available, proceeding with background page TTS.",
-      );
-    }
-
-    // Fallback for Firefox or if offscreen fails
-    try {
-      logger.debug("Attempting to load BackgroundTTSManager...");
-      const { BackgroundTTSManager } = await import(
-        "../managers/browser-specific/tts/TTSFirefox.js"
-      );
-      const manager = new BackgroundTTSManager();
-      await manager.initialize();
-      logger.debug("✅ BackgroundTTSManager initialized successfully.");
-      return manager;
-    } catch (error) {
-      logger.error(
-        "❌ Failed to load BackgroundTTSManager:",
-        error,
-      );
-      // No fallback - TTS will not be available
-      throw new Error("TTS system could not be initialized");
-    }
-  }
+  // Legacy TTS manager loading removed - using unified GOOGLE_TTS_SPEAK system
 
   /**
    * Load side panel/sidebar manager based on browser capabilities
@@ -264,7 +185,7 @@ export class FeatureLoader {
     logger.debug("🚀 Pre-loading essential features...");
 
     const results = await Promise.allSettled([
-      this.loadTTSManager(),
+      // TTS preloading removed - using unified GOOGLE_TTS_SPEAK system
       this.loadPanelManager(),
       this.loadScreenCaptureManager(),
       this.loadContextMenuManager(),

@@ -21,7 +21,7 @@ export * from "./translation/handleTranslateText.js";
 export * from "./translation/handleRevertTranslation.js";
 
 // TTS handlers
-export * from "./tts/handleSpeak.js";
+export * from "./tts/handleGoogleTTS.js";
 
 // Element selection handlers
 export * from "./element-selection/handleActivateSelectElementMode.js";
