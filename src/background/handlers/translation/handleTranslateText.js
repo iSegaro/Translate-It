@@ -39,7 +39,7 @@ export async function handleTranslateText(message, sender) {
         provider: provider || 'google',
         sourceLanguage: from || 'auto',
         targetLanguage: to || 'fa',
-        mode: 'simple',
+        mode: message.data.mode || 'simple',
         options: {}
       }
     };

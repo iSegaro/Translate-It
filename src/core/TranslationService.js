@@ -3,6 +3,7 @@ import { TranslationMode, getSettingsAsync } from "@/config.js";
 import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 import { createLogger } from "../utils/core/logger.js";
+import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 
 export class TranslationService {
   constructor(context) {
@@ -31,11 +32,27 @@ export class TranslationService {
   }
 
   async sidepanelTranslate(text, sourceLang, targetLang) {
-    return this.translate(TranslationMode.Sidepanel_Translate, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
+    const settings = await getSettingsAsync();
+    let mode = TranslationMode.Sidepanel_Translate;
+    const isDictionaryCandidate = isSingleWordOrShortPhrase(text);
+    this.logger.debug(`[sidepanelTranslate] ENABLE_DICTIONARY: ${settings.ENABLE_DICTIONARY}, isDictionaryCandidate: ${isDictionaryCandidate}, text: "${text}"`);
+    if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+      mode = TranslationMode.Dictionary_Translation;
+    }
+    this.logger.debug(`[sidepanelTranslate] Final mode determined: ${mode}`);
+    return this.translate(mode, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
   }
 
   async popupTranslate(text, sourceLang, targetLang) {
-    return this.translate(TranslationMode.Popup_Translate, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
+    const settings = await getSettingsAsync();
+    let mode = TranslationMode.Popup_Translate;
+    const isDictionaryCandidate = isSingleWordOrShortPhrase(text);
+    this.logger.debug(`[popupTranslate] ENABLE_DICTIONARY: ${settings.ENABLE_DICTIONARY}, isDictionaryCandidate: ${isDictionaryCandidate}, text: "${text}"`);
+    if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+      mode = TranslationMode.Dictionary_Translation;
+    }
+    this.logger.debug(`[popupTranslate] Final mode determined: ${mode}`);
+    return this.translate(mode, { promptText: text, sourceLanguage: sourceLang, targetLanguage: targetLang });
   }
 
   async activateSelectElementMode(active = true) {

@@ -474,3 +474,21 @@ export function clearTrackingData(context = {}) {
   }
   logger.debug('[AdvancedTextExtraction] Tracking data cleared');
 }
+
+export function isSingleWordOrShortPhrase(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  const trimmedText = text.trim();
+  if (trimmedText.length === 0) {
+    return false;
+  }
+
+  // Define thresholds
+  const MAX_WORDS = 3;
+  const MAX_CHARS = 30;
+
+  const words = trimmedText.split(/\s+/); // Split by one or more whitespace characters
+
+  return words.length <= MAX_WORDS && trimmedText.length <= MAX_CHARS;
+}
