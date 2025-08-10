@@ -19,10 +19,7 @@ const errorHandler = new ErrorHandler();
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
 export async function handleTranslate(message, sender) {
-  logger.debug('[Handler:TRANSLATE] Raw message received:', JSON.stringify(message, null, 2));
-  logger.debug('[Handler:TRANSLATE] Sender info:', sender);
-  logger.debug('[Handler:TRANSLATE] Sender.tab:', sender.tab);
-  logger.debug('[Handler:TRANSLATE] Sender.tab.id:', sender.tab?.id);
+  logger.info(`[Handler:TRANSLATE] 🔄 Starting: "${message.data?.text?.slice(0, 30)}..." → ${message.data?.provider} → ${message.data?.targetLanguage}`);
 
   try {
     const backgroundService = globalThis.backgroundService;
@@ -51,20 +48,17 @@ export async function handleTranslate(message, sender) {
       logger.debug('[Handler:TRANSLATE] SelectElement rawJsonPayload detected - leaving data.text as-is for provider handling');
     }
 
-    logger.debug('[Handler:TRANSLATE] Normalized message:', JSON.stringify(normalizedMessage, null, 2));
-
-    // Call the translation engine with the normalized message (ASYNC OPERATION)
-    logger.debug('[Handler:TRANSLATE] Starting async translation...');
-
     const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
-
-    logger.debug('[Handler:TRANSLATE] Translation engine result:', JSON.stringify(result, null, 2));
 
     if (!result || typeof result !== 'object' || !Object.prototype.hasOwnProperty.call(result, 'success')) {
       throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
     }
 
-    logger.debug('[Handler:TRANSLATE] Translation result:', JSON.stringify(result, null, 2));
+    if (result.success) {
+      logger.info(`[Handler:TRANSLATE] ✅ Success: "${result.translatedText?.slice(0, 50)}..."`);
+    } else {
+      logger.error(`[Handler:TRANSLATE] ❌ Failed: ${result.error || 'Unknown error'}`);
+    }
 
     // Send TRANSLATION_RESULT_UPDATE for ALL cases (success AND error) due to Firefox MV3 issues
     const targetTabId = sender.tab?.id;

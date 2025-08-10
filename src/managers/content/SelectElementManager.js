@@ -125,10 +125,9 @@ export class SelectElementManager {
         } else {
           await this.deactivate();
         }
-
         // Send success response to background
         const response = { success: true, isActive: this.isActive };
-        logger.debug(
+        this.logger.debug(
           `[SelectElementManager] Mode ${shouldActivate ? "activated" : "deactivated"} successfully`,
           response
         );
@@ -696,7 +695,7 @@ export class SelectElementManager {
         return;
       }
 
-      logger.debug(
+      this.logger.debug(
         "[SelectElementManager] Text found:",
         quickText.substring(0, 100) + "..."
       );
@@ -742,7 +741,7 @@ export class SelectElementManager {
       arr.push(entry);
       this.messageLifecycle.set(messageId, arr);
       if (this.tracing) {
-        logger.debug('[SelectElementManager][lifecycle]', entry);
+        this.logger.debug('[SelectElementManager][lifecycle]', entry);
       }
     } catch (err) {
       // swallow any tracing errors
@@ -793,7 +792,7 @@ export class SelectElementManager {
 
       // If there are translated elements, revert them
       if (this.translatedElements.size > 0) {
-        logger.debug(
+        this.logger.debug(
           "[SelectElementManager] Reverting translations before deactivation"
         );
         try {
@@ -849,7 +848,7 @@ export class SelectElementManager {
    * Highlight element - uses OLD system CSS only (no extra classes)
    */
   highlightElement(element) {
-    logger.debug(
+    this.logger.debug(
       "[SelectElementManager] Highlighting element:",
       element.tagName,
       element.className
@@ -927,7 +926,7 @@ export class SelectElementManager {
    * Follows the exact same process as OLD handleSelect_ElementClick method
    */
   async processSelectedElement(element) {
-    logger.debug(
+    this.logger.debug(
       "[SelectElementManager] Starting advanced text extraction process"
     );
 
@@ -947,7 +946,7 @@ export class SelectElementManager {
 
       // Handle input/textarea elements with simple processing first
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-        logger.debug(
+        this.logger.debug(
           "[SelectElementManager] Processing input/textarea with simple translation"
         );
 
@@ -1046,7 +1045,7 @@ export class SelectElementManager {
         return { status: "error", reason: "payload_large", message };
       }
 
-      logger.debug(
+      this.logger.debug(
         "[SelectElementManager] Sending translation request to background"
       );
 
@@ -1093,7 +1092,7 @@ export class SelectElementManager {
       // for the final TRANSLATION_RESULT_UPDATE.
       if (response && (response.success === false || response.error)) {
         const msg = (response.error || response.message) || "Translation request failed";
-        logger.error(
+        this.logger.error(
           "[SelectElementManager] Translation request failed:",
           msg
         );
@@ -1162,7 +1161,7 @@ export class SelectElementManager {
 
       if (typeof translatedJsonString !== "string" || !translatedJsonString.trim()) {
         const message = "(⚠️ ترجمه‌ای دریافت نشد.)"; // Persian like OLD system
-        logger.error(
+        this.logger.error(
           "[SelectElementManager] Empty translation response:",
           translationResult
         );
@@ -1170,7 +1169,7 @@ export class SelectElementManager {
         return { status: "error", reason: "empty_translation", message };
       }
 
-      logger.debug(
+      this.logger.debug(
         "[SelectElementManager] Received translation response, parsing JSON"
       );
 
@@ -1249,7 +1248,7 @@ export class SelectElementManager {
       // Dismiss status notification on success (like OLD system)
       await this.dismissStatusNotification();
 
-      logger.debug(
+      this.logger.debug(
         "[SelectElementManager] Advanced text extraction process completed successfully"
       );
       await this.showSuccessNotification("Translation completed successfully!");
@@ -1264,7 +1263,7 @@ export class SelectElementManager {
       // Dismiss status notification on error (like OLD system)
       await this.dismissStatusNotification();
 
-      logger.error(
+      this.logger.error(
         "[SelectElementManager] Advanced text extraction process failed:",
         error
       );
@@ -1313,7 +1312,7 @@ export class SelectElementManager {
     this.logger.debug("CSS class applied", hasClass);
 
     if (!hasClass) {
-      logger.warn(
+      this.logger.warn(
         "[SelectElementManager] CSS class failed to apply - trying manual application"
       );
       document.documentElement.classList.add(
@@ -1366,7 +1365,7 @@ export class SelectElementManager {
         3000
       );
     } catch (error) {
-      logger.debug(
+      this.logger.debug(
         "[SelectElementManager] Select element mode activated - hover over elements to highlight"
       );
     }
@@ -1446,11 +1445,11 @@ export class SelectElementManager {
           try {
             element.value = originalText;
             inputReverts++;
-            logger.debug(
+            this.logger.debug(
               "[SelectElementManager] Reverted input/textarea element"
             );
           } catch (error) {
-            logger.error(
+            this.logger.error(
               "[SelectElementManager] Failed to revert input element:",
               error
             );
@@ -1469,7 +1468,7 @@ export class SelectElementManager {
         await this.showSuccessNotification(
           `${totalReverts} translation(s) reverted successfully`
         );
-        logger.debug(
+        this.logger.debug(
           `[SelectElementManager] Successfully reverted ${totalReverts} translations (${successfulReverts} DOM + ${inputReverts} inputs)`
         );
       } else {

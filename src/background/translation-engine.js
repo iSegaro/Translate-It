@@ -53,11 +53,7 @@ export class TranslationEngine {
    * Handle translation request messages
    */
   async handleTranslateMessage(request, sender) {
-    logger.debug(
-      "[TranslationEngine] Processing request:",
-      JSON.stringify(request, null, 2),
-    );
-    logger.debug("[TranslationEngine] Sender:", sender);
+    // Input validation and normalization only - main logging is handled by handleTranslate
 
     // Input validation and normalization
     if (!request || typeof request !== "object") {
@@ -114,38 +110,23 @@ export class TranslationEngine {
       );
     }
 
-    logger.debug("[TranslationEngine] Normalized context:", context);
-    logger.debug(
-      "[TranslationEngine] Normalized data:",
-      JSON.stringify(data, null, 2),
-    );
+    // Data normalized successfully
 
     try {
       let result;
 
       // Context-specific optimizations
       if (context === "popup") {
-        // Fast response priority for popup
-        logger.debug("[TranslationEngine] Using popup priority strategy");
         result = await this.translateWithPriority(data);
       } else if (context === "selection") {
-        // Background processing OK for selection
-        logger.debug("[TranslationEngine] Using selection cache strategy");
         result = await this.translateWithCache(data);
       } else if (context === "sidepanel") {
-        // Enhanced features for sidepanel
-        logger.debug("[TranslationEngine] Using sidepanel history strategy");
         result = await this.translateWithHistory(data);
       } else {
-        // Default strategy
-        logger.debug("[TranslationEngine] Using default translation strategy");
         result = await this.executeTranslation(data);
       }
 
-      logger.debug(
-        "[TranslationEngine] Translation result:",
-        JSON.stringify(result, null, 2),
-      );
+      // Result logging is handled by handleTranslate
 
       // Validate result format
       if (!result || typeof result !== "object") {

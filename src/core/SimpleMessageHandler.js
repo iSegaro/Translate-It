@@ -43,25 +43,16 @@ class SimpleMessageHandler {
       const handler = this.getHandlerForMessage(action, context);
       
       if (handler) {
-        // Log context-aware routing info
-        if (context) {
-          logger.debug(`[SimpleMessageHandler] Context-aware routing: ${context} -> ${action}`);
-        }
-
         // Check if handler uses callback pattern (3+ parameters)
         if (handler.length >= 3) {
-          logger.debug(`[SimpleMessageHandler] Using callback pattern for: ${action}`);
           // Call handler directly with callback - it will handle sendResponse
           handler(message, sender, sendResponse);
           return true; // Keep message channel open
         } else {
-          logger.debug(`[SimpleMessageHandler] Using Promise pattern for: ${action}`);
           // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
           handler(message, sender).then((result) => {
-            logger.debug(`[SimpleMessageHandler] Promise resolved for ${action}:`, result);
             try {
               sendResponse(result);
-              logger.debug(`[SimpleMessageHandler] sendResponse called successfully for ${action}`);
             } catch (sendError) {
               logger.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
             }
