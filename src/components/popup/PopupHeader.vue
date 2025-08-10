@@ -234,7 +234,8 @@ onMounted(async () => {
   } catch (error) {
     await handleError(error, 'PopupHeader-getExcludeStatus')
   }
-})</script>
+});
+</script>
 
 <style scoped>
 .header-toolbar {
@@ -244,7 +245,7 @@ onMounted(async () => {
   padding: 8px 12px;
   background-color: var(--header-bg-color);
   border-bottom: 1px solid var(--header-border-color);
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 .toolbar-right-group {
@@ -257,6 +258,23 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
 }
+
+/* Left group (Translate link) should stay on the left side */
+.toolbar-left-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 1;
+}
+
+/* Right group (icon buttons + switch) should stay on the right side */
+.toolbar-right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 2;
+}
+
 
 .toolbar-icon {
   width: 20px;
