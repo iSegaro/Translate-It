@@ -1,17 +1,14 @@
 <template>
   <div class="language-controls">
-    <!-- Source Language Dropdown -->
+    <!-- Target Language Dropdown -->
     <select
-      v-model="sourceLanguage"
+      v-model="targetLanguage"
       class="language-select"
-      :title="sourceTitle"
+      :title="targetTitle"
       :disabled="disabled"
     >
-      <option value="Auto-Detect">
-        {{ autoDetectLabel }}
-      </option>
       <option
-        v-for="language in availableLanguages"
+        v-for="language in targetLanguages"
         :key="language.code"
         :value="language.name"
       >
@@ -24,7 +21,6 @@
       type="button"
       class="swap-button"
       :title="swapTitle"
-      :disabled="disabled || !canSwapLanguages"
       @click="handleSwapLanguages"
     >
       <img
@@ -33,15 +29,18 @@
       >
     </button>
 
-    <!-- Target Language Dropdown -->
+    <!-- Source Language Dropdown -->
     <select
-      v-model="targetLanguage"
+      v-model="sourceLanguage"
       class="language-select"
-      :title="targetTitle"
+      :title="sourceTitle"
       :disabled="disabled"
     >
+      <option value="Auto-Detect">
+        {{ autoDetectLabel }}
+      </option>
       <option
-        v-for="language in targetLanguages"
+        v-for="language in availableLanguages"
         :key="language.code"
         :value="language.name"
       >
@@ -143,19 +142,18 @@ const canSwapLanguages = computed(() => {
 
 // Methods
 const handleSwapLanguages = () => {
-  if (canSwapLanguages.value && !props.disabled) {
-    logger.debug('[LanguageSelector] Swapping languages:', {
-      source: sourceLanguage.value,
-      target: targetLanguage.value
-    })
-    
-    emit('swap-languages', {
-      oldSource: sourceLanguage.value,
-      oldTarget: targetLanguage.value,
-      newSource: targetLanguage.value,
-      newTarget: sourceLanguage.value
-    })
-  }
+  // Always allow swapping from the UI; parent can handle validity (e.g. auto-detect behavior)
+  logger.debug('[LanguageSelector] Swap requested (always allowed):', {
+    source: sourceLanguage.value,
+    target: targetLanguage.value
+  })
+
+  emit('swap-languages', {
+    oldSource: sourceLanguage.value,
+    oldTarget: targetLanguage.value,
+    newSource: targetLanguage.value,
+    newTarget: sourceLanguage.value
+  })
 }
 
 // Initialize languages
@@ -168,7 +166,7 @@ onMounted(async () => {
     const settings = settingsStore.settings
     
     if (!props.sourceLanguage || props.sourceLanguage === 'Auto-Detect') {
-      sourceLanguage.value = AUTO_DETECT_VALUE
+      sourceLanguage.value = languages.getLanguageDisplayValue(AUTO_DETECT_VALUE) || 'Auto-Detect'
     }
     
     if (!props.targetLanguage) {
@@ -178,7 +176,8 @@ onMounted(async () => {
   } catch (error) {
     await handleError(error, 'language-selector-init')
   }
-})</script>
+});
+</script>
 
 <style scoped>
 .language-controls {
