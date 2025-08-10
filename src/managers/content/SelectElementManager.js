@@ -971,27 +971,48 @@ export class SelectElementManager {
         const { TranslationMode } = await import("../../config.js");
         
         // Use UnifiedMessenger translate method
-        const response = await this.messenger.translate({
+        this.logger.debug("[SelectElementManager] Sending translation request:", {
+          text: inputText.substring(0, 50) + (inputText.length > 50 ? '...' : ''),
+          provider,
+          from: sourceLanguage,
+          to: targetLanguage,
+          mode: TranslationMode.Field
+        });
+
+        // For field translation, let the existing ContentMessageHandler system handle it
+        // We send the translation request and the TRANSLATION_RESULT_UPDATE will be processed by SmartTranslation
+        this.logger.debug("[SelectElementManager] Sending field translation request (will be handled by ContentMessageHandler)");
+        
+        // Add unique messageId to avoid conflicts
+        const messageId = `field-translation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        const translationRequest = {
           text: inputText,
           provider: provider,
           from: sourceLanguage,
           to: targetLanguage,
           mode: TranslationMode.Field,
-        });
-
-        if (response && (response.success || response.translatedText)) {
-          const translatedText =
-            response.translatedText || response.data?.translatedText;
-          if (translatedText) {
-            const originalText = element.value;
-            // Store in proper state structure for input elements
-            this.state.originalTexts.set(element, originalText);
-            this.translatedElements.add(element);
-            element.value = translatedText;
-            await this.showSuccessNotification("Translation successful!");
-          }
-        } else {
-          throw new Error(response?.error || "Translation failed");
+          messageId: messageId
+        };
+        
+        // Send translation request - don't wait for direct response
+        // The ContentMessageHandler will process TRANSLATION_RESULT_UPDATE and apply SmartTranslation
+        try {
+          // Fire and forget - let SmartTranslation system handle the result
+          this.messenger.translate(translationRequest);
+          
+          this.logger.debug("[SelectElementManager] Field translation request sent, letting ContentMessageHandler process result");
+          
+          // Store the element so SmartTranslation can find it
+          this.state.originalTexts.set(element, element.value);
+          this.translatedElements.add(element);
+          
+          // Show a temporary notification that translation is in progress
+          await this.showSuccessNotification("Translation request sent...", 2000);
+          
+        } catch (error) {
+          this.logger.error("[SelectElementManager] Failed to send field translation request:", error);
+          throw new Error("Failed to send translation request");
         }
         return;
       }
