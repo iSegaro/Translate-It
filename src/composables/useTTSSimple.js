@@ -4,6 +4,7 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('UI', 'useTTSSimple');
@@ -27,12 +28,12 @@ export function useTTSSimple() {
       isPlaying.value = true;
       logger.debug("[useTTSSimple] Speaking:", text.substring(0, 50) + "...");
 
-      // Unified message format for consistency with popup
+      // Use TTS_SPEAK action from MessageActions
       await browserAPI.sendMessage({
-        action: "speak",
+        action: MessageActions.TTS_SPEAK,
         data: {
           text: text.trim(),
-          lang: getLanguageCodeForTTS(lang) || "en",
+          language: getLanguageCodeForTTS(lang) || "en",
           rate: 1,
           pitch: 1,
           volume: 1,
@@ -56,7 +57,7 @@ export function useTTSSimple() {
   const stop = async () => {
     try {
       await browserAPI.safeSendMessage({
-        action: "stopTTS",
+        action: MessageActions.TTS_STOP,
       });
       isPlaying.value = false;
       logger.debug("[useTTSSimple] TTS stopped");
