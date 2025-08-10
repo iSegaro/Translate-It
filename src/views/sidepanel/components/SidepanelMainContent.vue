@@ -10,7 +10,6 @@
         :target-title="'Target Language'"
         :swap-title="'Swap Languages'"
         :swap-alt="'Swap'"
-        @swap-languages="handleSwapLanguages"
       />
 
       <!-- Select Element Status -->
@@ -103,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
 import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
 import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
@@ -112,7 +111,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useHistory } from "@/composables/useHistory.js";
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
-import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode, languageList } from "@/utils/i18n/languages.js";
+import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
@@ -382,75 +381,6 @@ const speakTranslationText = async () => {
   );
 };
 
-// Handle language swap functionality
-const handleSwapLanguages = async () => {
-  try {
-    // Use display names from LanguageSelector and convert to codes
-    let sourceVal = sourceLang.value;
-    let targetVal = targetLang.value;
-
-    logger.debug("[SidepanelMainContent] Current languages before swap:", { source: sourceVal, target: targetVal });
-
-    let sourceCode = getLanguageCode(sourceVal);
-    let targetCode = getLanguageCode(targetVal);
-
-    let resolvedSourceCode = sourceCode;
-    let resolvedTargetCode = targetCode;
-
-    // If source is auto, try to use detected language from lastTranslation or settings
-    if (sourceCode === AUTO_DETECT_VALUE) {
-      if (lastTranslation.value && lastTranslation.value.sourceLanguage) {
-        resolvedSourceCode = getLanguageCode(lastTranslation.value.sourceLanguage);
-        logger.debug("[SidepanelMainContent] Using detected source language from last translation:", lastTranslation.value.sourceLanguage);
-      } else {
-        try {
-          resolvedSourceCode = await getSourceLanguageAsync();
-          logger.debug("[SidepanelMainContent] Resolved source language from settings:", resolvedSourceCode);
-        } catch (err) {
-          await handleError(err, 'SidepanelMainContent-loadSourceLanguage');
-          resolvedSourceCode = null;
-        }
-      }
-    }
-
-    if (targetCode === AUTO_DETECT_VALUE) {
-      try {
-        resolvedTargetCode = await getTargetLanguageAsync();
-        logger.debug("[SidepanelMainContent] Resolved target language from settings:", resolvedTargetCode);
-      } catch (err) {
-        await handleError(err, 'SidepanelMainContent-loadTargetLanguage');
-        resolvedTargetCode = null;
-      }
-    }
-
-    if (resolvedSourceCode && resolvedTargetCode && resolvedSourceCode !== AUTO_DETECT_VALUE) {
-      // Use languages composable to get canonical display values where possible
-      const newSourceDisplay = languages.getLanguageDisplayValue(resolvedTargetCode) || getLanguageDisplayName(resolvedTargetCode) || targetVal;
-      const newTargetDisplay = languages.getLanguageDisplayValue(resolvedSourceCode) || getLanguageDisplayName(resolvedSourceCode) || sourceVal;
-
-      sourceLang.value = newSourceDisplay;
-      targetLang.value = newTargetDisplay;
-
-      logger.debug("[SidepanelMainContent] Languages swapped successfully:", { from: `${sourceVal} → ${targetVal}`, to: `${newSourceDisplay} → ${newTargetDisplay}` });
-
-      await nextTick();
-      logger.debug("[DEBUG] Computed after swap (nextTick):", { computedSource: sourceLang.value, computedTarget: targetLang.value });
-    } else if (resolvedSourceCode === AUTO_DETECT_VALUE) {
-      // When source is auto, just swap target to auto and source to current target
-      sourceLang.value = targetVal;
-      targetLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
-
-      logger.debug("[SidepanelMainContent] Auto-detect swap:", { from: `${AUTO_DETECT_VALUE} → ${targetVal}`, to: `${targetVal} → ${AUTO_DETECT_VALUE}` });
-
-      await nextTick();
-      logger.debug("[DEBUG] Computed after auto swap (nextTick):", { computedSource: sourceLang.value, computedTarget: targetLang.value });
-    } else {
-      logger.debug("[SidepanelMainContent] Cannot swap - invalid language selection", { resolvedSourceCode, resolvedTargetCode });
-    }
-  } catch (error) {
-    await handleError(error, 'SidepanelMainContent-swapLanguages');
-  }
-};
 
 // Remove local function
 
