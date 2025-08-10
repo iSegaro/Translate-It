@@ -30,11 +30,14 @@ export function logMethod(target, propertyKey, descriptor) {
 }
 
 export const logME = (...args) => {
-  // IsDebug().then((IsDebug) => {
-  //   if (IsDebug) {
-  logger.debug(...args);
-  //   }
-  // });
+  // Only log if first argument contains specific debugging keywords
+  const debugKeywords = ['_executeApiCall', 'API call failed', 'Error:', 'Failed to'];
+  const firstArg = String(args[0] || '');
+  
+  if (debugKeywords.some(keyword => firstArg.includes(keyword))) {
+    logger.debug(...args);
+  }
+  // Suppress verbose logging for common operations
 };
 
 
