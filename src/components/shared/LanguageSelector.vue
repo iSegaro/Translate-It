@@ -51,11 +51,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { CONFIG } from '@/config.js'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'LanguageSelector');
@@ -131,28 +132,60 @@ const targetLanguages = computed(() => {
   )
 })
 
-const canSwapLanguages = computed(() => {
-  return sourceLanguage.value !== 'Auto-Detect' && 
-         sourceLanguage.value !== AUTO_DETECT_VALUE && 
-         targetLanguage.value !== 'Auto-Detect' && 
-         targetLanguage.value !== AUTO_DETECT_VALUE &&
-         sourceLanguage.value.trim() !== '' &&
-         targetLanguage.value.trim() !== ''
-})
-
 // Methods
 const handleSwapLanguages = () => {
-  // Always allow swapping from the UI; parent can handle validity (e.g. auto-detect behavior)
-  logger.debug('[LanguageSelector] Swap requested (always allowed):', {
+  logger.debug('[LanguageSelector] Swap requested:', {
     source: sourceLanguage.value,
     target: targetLanguage.value
   })
 
+  let currentSource = sourceLanguage.value
+  const currentTarget = targetLanguage.value
+  
+  // FIRST: Resolve auto-detect before swapping
+  if (currentSource === AUTO_DETECT_VALUE || currentSource === 'Auto-Detect') {
+    // Get the actual source language from CONFIG (not settings, as settings might also be Auto-Detect)
+    let sourceLangFromConfig = CONFIG.SOURCE_LANGUAGE || 'English'
+    
+    // If settings has a real language (not Auto-Detect), use it instead
+    if (settingsStore.settings.SOURCE_LANGUAGE && 
+        settingsStore.settings.SOURCE_LANGUAGE !== 'Auto-Detect' &&
+        settingsStore.settings.SOURCE_LANGUAGE !== AUTO_DETECT_VALUE) {
+      sourceLangFromConfig = settingsStore.settings.SOURCE_LANGUAGE
+    }
+    
+    logger.debug('[LanguageSelector] Resolving auto-detect to actual source language:', sourceLangFromConfig)
+    
+    // Convert to display name if it's a code
+    if (sourceLangFromConfig.length <= 3) {
+      currentSource = languages.getLanguageDisplayValue(sourceLangFromConfig) || 'English'
+    } else {
+      currentSource = sourceLangFromConfig // Already a display name
+    }
+    
+    logger.debug('[LanguageSelector] Auto-detect resolved to:', currentSource)
+  }
+  
+  // NOW: Perform normal swap with resolved values
+  const newSourceValue = currentTarget
+  const newTargetValue = currentSource
+  
+  // Update values
+  sourceLanguage.value = newSourceValue
+  targetLanguage.value = newTargetValue
+  
+  logger.debug('[LanguageSelector] Languages swapped:', {
+    to: `source="${newSourceValue}", target="${newTargetValue}"`,
+    hadAutoDetect: (sourceLanguage.value === 'Auto-Detect' || currentSource !== sourceLanguage.value),
+    resolvedValue: currentSource
+  })
+  
+  // Emit event for parent components that might need to know about the swap
   emit('swap-languages', {
     oldSource: sourceLanguage.value,
-    oldTarget: targetLanguage.value,
-    newSource: targetLanguage.value,
-    newTarget: sourceLanguage.value
+    oldTarget: currentTarget,
+    newSource: newSourceValue,
+    newTarget: newTargetValue
   })
 }
 
@@ -165,13 +198,31 @@ onMounted(async () => {
     await settingsStore.loadSettings()
     const settings = settingsStore.settings
     
-    if (!props.sourceLanguage || props.sourceLanguage === 'Auto-Detect') {
-      sourceLanguage.value = languages.getLanguageDisplayValue(AUTO_DETECT_VALUE) || 'Auto-Detect'
+    // Only set if current values are empty or default
+    if (!sourceLanguage.value || sourceLanguage.value === 'Auto-Detect') {
+      // SOURCE_LANGUAGE might be a name like "English" or code like "en"
+      const sourceLang = settings.SOURCE_LANGUAGE || 'English'
+      let sourceDisplay
+      if (sourceLang.length <= 3) {
+        sourceDisplay = languages.getLanguageDisplayValue(sourceLang) || 'Auto-Detect'
+      } else {
+        sourceDisplay = sourceLang // Already a display name
+      }
+      sourceLanguage.value = sourceDisplay
+      logger.debug('[LanguageSelector] Set source language from settings:', sourceDisplay)
     }
     
-    if (!props.targetLanguage) {
-      const targetLangDisplay = languages.getLanguageDisplayValue(settings.TARGET_LANGUAGE)
-      targetLanguage.value = targetLangDisplay || 'English'
+    if (!targetLanguage.value || targetLanguage.value === 'English') {
+      // TARGET_LANGUAGE might be a name like "Farsi" or code like "fa"
+      const targetLang = settings.TARGET_LANGUAGE || 'Farsi'
+      let targetDisplay
+      if (targetLang.length <= 3) {
+        targetDisplay = languages.getLanguageDisplayValue(targetLang) || 'Farsi'
+      } else {
+        targetDisplay = targetLang // Already a display name
+      }
+      targetLanguage.value = targetDisplay
+      logger.debug('[LanguageSelector] Set target language from settings:', targetDisplay)
     }
   } catch (error) {
     await handleError(error, 'language-selector-init')
