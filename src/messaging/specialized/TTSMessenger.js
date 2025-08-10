@@ -33,6 +33,12 @@ export class TTSMessenger {
       ...options
     };
 
+    console.debug('[TTSMessenger] Sending TTS request:', {
+      text: text.substring(0, 50) + '...',
+      language: ttsOptions.language,
+      context: this.context
+    });
+
     return this.messenger.sendMessage({
       action: MessageActions.TTS_SPEAK,
       data: ttsOptions,

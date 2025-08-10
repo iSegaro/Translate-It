@@ -56,7 +56,7 @@ export function useLanguages() {
    */
   const getSourceLanguages = () => {
     return [
-      { code: "auto", name: "Auto Detect", promptName: "Auto Detect" },
+      { code: "auto", name: "Auto-Detect", promptName: "Auto Detect" },
       ...getTranslationLanguages(),
     ];
   };
@@ -87,7 +87,7 @@ export function useLanguages() {
    */
   const findLanguageByCode = (code) => {
     if (code === "auto") {
-      return { code: "auto", name: "Auto Detect", promptName: "Auto Detect" };
+      return { code: "auto", name: "Auto-Detect", promptName: "Auto Detect" };
     }
     const langList = languages.value || languageList || [];
     return langList.find((lang) => lang.code === code) || null;

@@ -8,20 +8,118 @@
 
 /**
  * Convert language name to language code for TTS
- * @param {string} languageName - Language name like "English", "Farsi"
+ * @param {string} languageName - Language name like "English", "Farsi", "Persian"
  * @returns {string} Language code like "en", "fa"
+ */
+/**
+ * Enhanced language code converter with comprehensive alias support
+ * @param {string} languageName - Language name, display name, or code
+ * @returns {string} Language code for TTS (like "en", "fa", "de")
  */
 export function getLanguageCodeForTTS(languageName) {
   if (!languageName) return "en";
 
   // If it's already a code (like "en", "fa"), return as is
-  if (languageName.length <= 3) {
+  if (languageName.length <= 3 && languageList.find(lang => lang.code === languageName)) {
     return languageName;
   }
 
-  // Find the language in the list
-  const language = languageList.find((lang) => lang.name === languageName);
+  // Comprehensive aliases for language name variations
+  const languageAliases = {
+    // Persian/Farsi variations
+    "Persian": "Farsi",
+    "persian": "Farsi", 
+    "fa": "Farsi",
+    "FA": "Farsi",
+    
+    // Auto-detect variations
+    "auto": "English",
+    "Auto": "English", 
+    "AUTO": "English",
+    "Auto-Detect": "English",
+    "auto-detect": "English",
+    "Auto Detect": "English",
+    
+    // Common variations
+    "German": "German",
+    "german": "German",
+    "de": "German",
+    "DE": "German",
+    
+    "French": "French", 
+    "french": "French",
+    "fr": "French",
+    "FR": "French",
+    
+    "Spanish": "Spanish",
+    "spanish": "Spanish", 
+    "es": "Spanish",
+    "ES": "Spanish",
+    
+    "Arabic": "Arabic",
+    "arabic": "Arabic",
+    "ar": "Arabic", 
+    "AR": "Arabic",
+    
+    "English": "English",
+    "english": "English",
+    "en": "English",
+    "EN": "English"
+  };
+
+  // Use alias if available, otherwise use original name
+  const searchName = languageAliases[languageName] || languageName;
+
+  // Find the language in the list (case insensitive)
+  const language = languageList.find((lang) => 
+    lang.name.toLowerCase() === searchName.toLowerCase() ||
+    lang.code.toLowerCase() === searchName.toLowerCase()
+  );
+  
   return language ? language.code : "en"; // Default to English
+}
+
+/**
+ * Get language display name from code or name
+ * @param {string} identifier - Language code or name
+ * @returns {string} Standardized display name
+ */
+export function getLanguageDisplayName(identifier) {
+  if (!identifier) return "English";
+  
+  // Handle auto-detect variations
+  if (["auto", "Auto", "Auto-Detect", "auto-detect", "Auto Detect"].includes(identifier)) {
+    return "Auto-Detect";
+  }
+  
+  const language = languageList.find((lang) => 
+    lang.code === identifier || 
+    lang.name.toLowerCase() === identifier.toLowerCase()
+  );
+  
+  return language ? language.name : identifier;
+}
+
+/**
+ * Get language code from display name or code
+ * @param {string} identifier - Language display name or code
+ * @returns {string} Language code
+ */
+export function getLanguageCode(identifier) {
+  if (!identifier) return "en";
+  
+  // Handle auto-detect variations
+  if (["Auto-Detect", "auto-detect", "Auto Detect", "auto", "Auto"].includes(identifier)) {
+    return "auto";
+  }
+  
+  const language = languageList.find((lang) => 
+    lang.name === identifier || 
+    lang.code === identifier ||
+    lang.name.toLowerCase() === identifier.toLowerCase()
+  );
+  
+  return language ? language.code : identifier;
 }
 
 export const languageList = [

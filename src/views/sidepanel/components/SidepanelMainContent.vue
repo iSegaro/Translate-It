@@ -8,26 +8,13 @@
           class="language-select"
           title="Target Language"
         >
-          <option value="English">
-            English
-          </option>
           <option
-            value="Persian"
-            selected
+            v-for="language in targetLanguages"
+            :key="language.code"
+            :value="language.name"
+            :selected="language.name === 'Persian'"
           >
-            Persian
-          </option>
-          <option value="Arabic">
-            Arabic
-          </option>
-          <option value="French">
-            French
-          </option>
-          <option value="German">
-            German
-          </option>
-          <option value="Spanish">
-            Spanish
+            {{ language.name }}
           </option>
         </select>
 
@@ -50,26 +37,15 @@
           class="language-select"
           title="Source Language"
         >
-          <option value="auto">
+          <option value="Auto-Detect">
             Auto-Detect
           </option>
-          <option value="English">
-            English
-          </option>
-          <option value="Persian">
-            Persian
-          </option>
-          <option value="Arabic">
-            Arabic
-          </option>
-          <option value="French">
-            French
-          </option>
-          <option value="German">
-            German
-          </option>
-          <option value="Spanish">
-            Spanish
+          <option
+            v-for="language in sourceLanguagesFiltered"
+            :key="language.code"
+            :value="language.name"
+          >
+            {{ language.name }}
           </option>
         </select>
       </div>
@@ -164,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
 import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
 import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
@@ -173,6 +149,8 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useHistory } from "@/composables/useHistory.js";
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
+import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode, languageList } from "@/utils/i18n/languages.js";
+import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
@@ -186,6 +164,9 @@ const backgroundWarmup = useBackgroundWarmup();
 const selectElement = useSelectElementTranslation();
 const { handleError } = useErrorHandler();
 const { t } = useI18n();
+
+// Languages composable
+const languages = useLanguages();
 
 // Translation Composable - SAME AS POPUP
 const translation = useSidepanelTranslation();
@@ -209,6 +190,13 @@ const targetLanguageInputRef = ref(null);
 const sourceLanguageInputRef = ref(null);
 
 const historyComposable = useHistory();
+
+// Language lists - get from useLanguages composable 
+const targetLanguages = computed(() => languages.targetLanguages.value || []);
+const sourceLanguagesFiltered = computed(() => {
+  // Get all languages except auto-detect (since we handle it separately)
+  return (languages.allLanguages.value || []).filter(lang => lang.code !== 'auto');
+});
 
 // Computed properties for UI state
 const hasSourceContent = computed(() => {
@@ -429,49 +417,45 @@ const handleFocus = () => {
   checkClipboard();
 };
 
-// Helper function to convert language name to simple language code for Google TTS
-const getLanguageCode = (languageName) => {
-  const languageMap = {
-    English: "en",
-    Persian: "fa",
-    Arabic: "ar",
-    French: "fr",
-    German: "de",
-    Spanish: "es",
-    Chinese: "zh",
-    Hindi: "hi",
-    Portuguese: "pt",
-    Russian: "ru",
-    Japanese: "ja",
-    Korean: "ko",
-    Italian: "it",
-    Dutch: "nl",
-    Turkish: "tr",
-    [AUTO_DETECT_VALUE]: "en",
-  };
-
-  return languageMap[languageName] || "en";
-};
+// Remove local function - use centralized getLanguageCodeForTTS instead
 
 // Speak source text using TTS
 const speakSourceText = async () => {
-  const sourceLanguage = sourceLanguageValue.value || AUTO_DETECT_VALUE;
-  const langCode = getLanguageCode(sourceLanguage);
+  // Get DOM value directly to avoid computed issues
+  const domSourceVal = sourceLanguageInputRef.value?.value;
+  const sourceLanguage = domSourceVal || AUTO_DETECT_VALUE;
+  
+  console.debug('[SidepanelMainContent] TTS Debug:', {
+    domSourceVal,
+    sourceLanguageValue: sourceLanguageValue.value,
+    sourceLanguage,
+    AUTO_DETECT_VALUE,
+    getLanguageCodeForTTSExists: typeof getLanguageCodeForTTS !== 'undefined'
+  });
+  
+  // Use the imported getLanguageCodeForTTS function (it works fine)
+  const langCode = getLanguageCodeForTTS(sourceLanguage);
+    
+  console.debug('[SidepanelMainContent] Language conversion:', {
+    input: sourceLanguage,
+    output: langCode,
+    usedFunction: 'getLanguageCodeForTTS'
+  });
   await tts.speak(sourceText.value, langCode);
   logger.debug(
     "[SidepanelMainContent] Source text TTS started with language:",
-    langCode,
+    { sourceLanguage, langCode }
   );
 };
 
 // Speak translation text using TTS
 const speakTranslationText = async () => {
   const targetLanguage = targetLanguageValue.value || AUTO_DETECT_VALUE;
-  const langCode = getLanguageCode(targetLanguage);
+  const langCode = getLanguageCodeForTTS(targetLanguage);
   await tts.speak(translatedText.value, langCode);
   logger.debug(
     "[SidepanelMainContent] Translation TTS started with language:",
-    langCode,
+    { targetLanguage, langCode }
   );
 };
 
@@ -612,34 +596,15 @@ const handleSwapLanguages = async () => {
   }
 };
 
-// Helper function to get display name for language code
-const getLanguageDisplayName = (langCode) => {
-  const languageMap = {
-    en: "English",
-    fa: "Persian",
-    ar: "Arabic",
-    fr: "French",
-    de: "German",
-    es: "Spanish",
-    zh: "Chinese",
-    hi: "Hindi",
-    pt: "Portuguese",
-    ru: "Russian",
-    ja: "Japanese",
-    ko: "Korean",
-    it: "Italian",
-    nl: "Dutch",
-    tr: "Turkish",
-    [AUTO_DETECT_VALUE]: AUTO_DETECT_VALUE,
-  };
-
-  return languageMap[langCode] || langCode;
-};
+// Remove local function - use centralized getLanguageDisplayName instead
 
 
 
 // Lifecycle - setup event listeners
 onMounted(async () => {
+  // Load languages first
+  await languages.loadLanguages();
+  
   // Suppress no-unused-vars warnings for template-used variables/functions
   // These are used in the template but not directly in the script setup block
   logger.debug(historyComposable); // Explicitly use historyComposable to satisfy linter
@@ -653,8 +618,6 @@ onMounted(async () => {
   // Add focus listener for clipboard updates
   document.addEventListener("focus", handleFocus, true);
   window.addEventListener("focus", handleFocus);
-
-  
 
   // Message listener is now handled by useSidepanelTranslation composable - SAME AS POPUP
 

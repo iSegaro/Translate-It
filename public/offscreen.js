@@ -116,10 +116,17 @@ function handleTTSSpeak(data, sendResponse) {
     }
 
     // Convert language code to simple format for Google TTS
-    let langCode = data.lang || "en";
+    let langCode = data.language || data.lang || "en"; // Support both 'language' and 'lang' parameters
     if (langCode.includes("-")) {
       langCode = langCode.split("-")[0]; // Convert 'en-US' to 'en'
     }
+    
+    console.log("[Offscreen] Language parameter debug:", {
+      dataLanguage: data.language,
+      dataLang: data.lang,
+      finalLangCode: langCode,
+      originalData: data
+    });
 
     // Try Google TTS first, then fallback to Web Speech API
     console.log("[Offscreen] Trying Google TTS with language:", langCode);
@@ -439,8 +446,9 @@ function handleWebSpeechFallback(data, sendResponse) {
       function startWebSpeech() {
         currentUtterance = new SpeechSynthesisUtterance(data.text);
 
-        // Set voice options
-        if (data.lang) currentUtterance.lang = data.lang;
+        // Set voice options - support both 'language' and 'lang' parameters
+        const voiceLang = data.language || data.lang;
+        if (voiceLang) currentUtterance.lang = voiceLang;
         if (data.rate) currentUtterance.rate = Math.max(0.1, Math.min(10, data.rate)); // Clamp rate
         if (data.pitch) currentUtterance.pitch = Math.max(0, Math.min(2, data.pitch)); // Clamp pitch
         if (data.volume) currentUtterance.volume = Math.max(0, Math.min(1, data.volume)); // Clamp volume
@@ -472,7 +480,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                 if (!responseAlreadySent) {
                   speechSynthesis.cancel();
                   const retryUtterance = new SpeechSynthesisUtterance(data.text);
-                  retryUtterance.lang = data.lang || 'en-US';
+                  retryUtterance.lang = data.language || data.lang || 'en-US';
                   retryUtterance.rate = 1; // Use default rate for retry
                   retryUtterance.pitch = 1; // Use default pitch for retry
                   retryUtterance.volume = 1; // Use default volume for retry
