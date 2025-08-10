@@ -82,8 +82,7 @@ const settingsStore = useSettingsStore()
 // Composables
 const {
   isSelectModeActive,
-  toggleSelectElement,
-  error: selectElementError
+  toggleSelectElement
 } = useSelectElementTranslation()
 const { handleError, handleConnectionError } = useErrorHandler()
 const { sendMessage } = useMessaging('popup')
@@ -235,6 +234,8 @@ onMounted(async () => {
     await handleError(error, 'PopupHeader-getExcludeStatus')
   }
 });
+
+
 </script>
 
 <style scoped>
