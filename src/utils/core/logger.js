@@ -16,7 +16,7 @@ import { LOG_LEVELS, LOG_COMPONENTS } from './logConstants.js';
 const isDevelopment = process.env.NODE_ENV === 'development'
 
 // Global log level - can be overridden per component
-const globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
+let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
 
 // Component-specific log levels
 const componentLogLevels = {
