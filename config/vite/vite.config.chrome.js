@@ -121,6 +121,34 @@ function fixExtensionPaths() {
         }
         next();
       });
+      
+      // Handle offscreen files specifically for serve mode
+      server.middlewares.use('/html/offscreen.html', (req, res, next) => {
+        const offscreenPath = resolve(process.cwd(), 'html/offscreen.html');
+        
+        if (fs.existsSync(offscreenPath)) {
+          let content = fs.readFileSync(offscreenPath, 'utf-8');
+          res.setHeader('Content-Type', 'text/html');
+          res.end(content);
+          return;
+        }
+        
+        res.status(404).send('offscreen.html not found');
+      });
+      
+      // Handle offscreen.js for serve mode
+      server.middlewares.use('/offscreen.js', (req, res, next) => {
+        const offscreenJsPath = resolve(process.cwd(), 'public/offscreen.js');
+        
+        if (fs.existsSync(offscreenJsPath)) {
+          let content = fs.readFileSync(offscreenJsPath, 'utf-8');
+          res.setHeader('Content-Type', 'application/javascript');
+          res.end(content);
+          return;
+        }
+        
+        res.status(404).send('offscreen.js not found');
+      });
     },
     // Handle hot updates in watch mode
     handleHotUpdate: {
