@@ -273,6 +273,8 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   order: 2;
+  /* Render items from right to left so rightmost is side-panel, then select, ..., and checkbox becomes leftmost */
+  flex-direction: row-reverse;
 }
 
 
