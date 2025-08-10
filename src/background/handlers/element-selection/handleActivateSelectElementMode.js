@@ -5,6 +5,7 @@ import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat, MessagingContexts, MessagingCore } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { createLogger } from '@/utils/core/logger.js';
+import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
 
 const logger = createLogger('Core', 'handleActivateSelectElementMode');
 
@@ -39,8 +40,21 @@ export async function handleActivateSelectElementMode(message, sender) {
     if (!targetTabId) {
       throw new Error('Could not determine target tab for element selection');
     }
+
+    // Check tab permissions before proceeding
+    const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    if (!access.isAccessible) {
+      logger.warn(`[Handler:activateSelectElementMode] Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
+      return {
+        success: false,
+        message: access.errorMessage,
+        tabId: targetTabId,
+        activated: false,
+        isRestrictedPage: true,
+        tabUrl: access.fullUrl,
+      };
+    }
     
-    // Send message to content script to activate/deactivate selection mode
     // Determine if activating or deactivating based on message.data
     let isActivating;
     let modeForContentScript = 'normal';
@@ -56,12 +70,6 @@ export async function handleActivateSelectElementMode(message, sender) {
     } else if (typeof message === 'object' && message.action === MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE) {
       isActivating = false;
       modeForContentScript = 'normal';
-    // } else if (typeof message.data === 'string') {
-    //   isActivating = (message.data !== 'deactivate' && message.data !== 'normal');
-    //   modeForContentScript = message.data; // Use the string as mode (e.g., 'translate')
-    // } else if (typeof message.data === 'object' && message.data !== null) {
-    //   isActivating = message.data.activate === true || message.data.mode === 'select' || message.data.mode === MessageActions.TRANSLATE;
-    //   modeForContentScript = message.data.mode || (isActivating ? 'select' : 'normal');
     } else {
       isActivating = false; // Default to deactivating if data is unclear
     }
@@ -82,8 +90,31 @@ export async function handleActivateSelectElementMode(message, sender) {
     // Use centralized sendToTab method for enhanced cross-browser compatibility
     const response = await messenger.sendToTab(targetTabId, contentMessage);
     
+    // Check if tab communication actually succeeded
     const statusText = isActivating ? 'activated' : 'deactivated';
-    logger.debug(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
+    const wasSuccessful = response && !response.tabUnavailable && !response.gracefulFailure;
+    
+    if (!wasSuccessful) {
+      // This case should now be rare, but kept as a fallback.
+      // The permission check above should catch most issues.
+      logger.warn(`⚠️ [activateSelectElementMode] Element selection mode communication FAILED for tab ${targetTabId}`, {
+        tabId: targetTabId,
+        url: access.fullUrl.substring(0, 50) + (access.fullUrl.length > 50 ? '...' : ''),
+        response
+      });
+      
+      return { 
+        success: false, 
+        message: 'Tab is not accessible - try refreshing the page',
+        tabId: targetTabId,
+        activated: false,
+        isRestrictedPage: access.isRestricted,
+        tabUrl: access.fullUrl,
+        response
+      };
+    }
+    
+    logger.info(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
     
     return { 
       success: true, 

@@ -231,7 +231,18 @@ export function useSelectElementTranslation() {
 
     try {
       logME("[useSelectElementTranslation] Activating select element mode");
-      await translationService.activateSelectElementMode(true);
+      const result = await translationService.activateSelectElementMode(true);
+      
+      // Check if activation actually succeeded
+      if (result && result.success === false) {
+        // Handle graceful failures (e.g., restricted pages).
+        // The background script now provides a user-friendly message.
+        const errorMsg = result.message || "Failed to activate select element mode";
+        error.value = errorMsg;
+        logME("[useSelectElementTranslation] Select mode activation failed:", { errorMsg, result });
+        return false;
+      }
+      
       logME("[useSelectElementTranslation] Select element mode activated");
       return true;
     } catch (err) {
