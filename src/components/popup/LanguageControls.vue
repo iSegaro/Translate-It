@@ -9,7 +9,6 @@
       :swap-title="$i18n('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
       :swap-alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
       :auto-detect-label="'Auto-Detect'"
-      @swap-languages="handleSwapLanguages"
     />
     
     <ProviderSelector 
@@ -57,31 +56,6 @@ const targetLanguage = computed({
 
 // Methods
 
-const handleSwapLanguages = async () => {
-  try {
-    const tempSource = sourceLanguage.value
-    const tempTarget = targetLanguage.value
-    
-    // Check if swap is possible (source is not auto-detect and languages are different)
-    if (tempSource === AUTO_DETECT_VALUE || tempSource === tempTarget) {
-      return
-    }
-    
-    sourceLanguage.value = tempTarget
-    targetLanguage.value = tempSource
-    
-    // Emit event to notify other components (but NOT to swap text content)
-    const event = new CustomEvent('languages-swapped', {
-      detail: {
-        source: sourceLanguage.value,
-        target: targetLanguage.value
-      }
-    })
-    document.dispatchEvent(event)
-  } catch (error) {
-    await handleError(error, 'language-controls-swap')
-  }
-}
 
 const handleTranslate = (data) => {
   // Emit to parent component
