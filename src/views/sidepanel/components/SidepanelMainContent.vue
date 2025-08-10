@@ -1,54 +1,17 @@
 <template>
   <div class="main-content">
     <form @submit.prevent="handleTranslationSubmit">
-      <div class="language-controls">
-        <select
-          id="targetLanguageInput"
-          ref="targetLanguageInputRef"
-          class="language-select"
-          title="Target Language"
-        >
-          <option
-            v-for="language in targetLanguages"
-            :key="language.code"
-            :value="language.name"
-            :selected="language.name === 'Persian'"
-          >
-            {{ language.name }}
-          </option>
-        </select>
-
-        <button
-          id="swapLanguagesBtn"
-          type="button"
-          class="swap-button"
-          title="Swap Languages"
-          @click="handleSwapLanguages"
-        >
-          <img
-            src="@/assets/icons/swap.png"
-            alt="Swap"
-          >
-        </button>
-
-        <select
-          id="sourceLanguageInput"
-          ref="sourceLanguageInputRef"
-          class="language-select"
-          title="Source Language"
-        >
-          <option value="Auto-Detect">
-            Auto-Detect
-          </option>
-          <option
-            v-for="language in sourceLanguagesFiltered"
-            :key="language.code"
-            :value="language.name"
-          >
-            {{ language.name }}
-          </option>
-        </select>
-      </div>
+            <LanguageSelector
+        v-model:sourceLanguage="sourceLang"
+        v-model:targetLanguage="targetLang"
+        :disabled="isTranslating"
+        :auto-detect-label="'Auto-Detect'"
+        :source-title="'Source Language'"
+        :target-title="'Target Language'"
+        :swap-title="'Swap Languages'"
+        :swap-alt="'Swap'"
+        @swap-languages="handleSwapLanguages"
+      />
 
       <!-- Select Element Status -->
       <div
@@ -154,6 +117,7 @@ import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
+import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
@@ -186,8 +150,9 @@ const {
 // Local UI state (not related to translation)
 const showPasteButton = ref(true);
 const currentAbortController = ref(null);
-const targetLanguageInputRef = ref(null);
-const sourceLanguageInputRef = ref(null);
+// Bindings for LanguageSelector component (display names)
+const sourceLang = ref('Auto-Detect');
+const targetLang = ref('Persian');
 
 const historyComposable = useHistory();
 
@@ -215,17 +180,9 @@ const isSelectElementActivating = computed(
   () => selectElement.isActivating.value,
 );
 
-const targetLanguageValue = computed(() => {
-  const val = targetLanguageInputRef.value?.value || "Persian";
-  logger.debug('[Debug] targetLanguageValue computed:', val);
-  return val;
-});
+const targetLanguageValue = computed(() => targetLang.value || 'Persian');
 
-const sourceLanguageValue = computed(() => {
-  const val = sourceLanguageInputRef.value?.value || AUTO_DETECT_VALUE;
-  logger.debug('[Debug] sourceLanguageValue computed:', val);
-  return val;
-});
+const sourceLanguageValue = computed(() => sourceLang.value || AUTO_DETECT_VALUE);
 
 // Watch for history changes to handle Firefox MV3 bug
 watch(
@@ -327,27 +284,11 @@ const handleTranslationSubmit = async () => {
     logger.debug("[SidepanelMainContent] Ensuring background script is ready...");
     await backgroundWarmup.ensureWarmedUp();
 
-    // Debug: Check DOM values directly before translation
-    const domSourceVal = sourceLanguageInputRef.value?.value;
-    const domTargetVal = targetLanguageInputRef.value?.value;
-    logger.debug("[DEBUG] DOM values:", { domSource: domSourceVal, domTarget: domTargetVal });
-    logger.debug("[DEBUG] Computed values:", { computedSource: sourceLanguageValue.value, computedTarget: targetLanguageValue.value });
-    
-    // Quick Fix: Use DOM values directly if computed values don't match
-    let finalSourceLang = sourceLanguageValue.value;
-    let finalTargetLang = targetLanguageValue.value;
-    
-    // If computed values don't match DOM, use DOM values directly
-    if (finalSourceLang !== domSourceVal || finalTargetLang !== domTargetVal) {
-      logger.debug("[QUICK_FIX] Computed values don't match DOM, using DOM values directly");
-      finalSourceLang = domSourceVal || AUTO_DETECT_VALUE;
-      finalTargetLang = domTargetVal || "Persian";
-    }
-    
-    // Use composable translation function with corrected language values  
+    // Resolve display names to codes for translation
+    const finalSourceLang = getLanguageCode(sourceLang.value) || await getSourceLanguageAsync();
+    const finalTargetLang = getLanguageCode(targetLang.value) || await getTargetLanguageAsync();
     logger.debug("[SidepanelMainContent] Triggering translation via composable with languages:", { source: finalSourceLang, target: finalTargetLang });
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
-    
     logger.debug("[SidepanelMainContent] Translation completed:", success);
     
   } catch (error) {
@@ -421,26 +362,8 @@ const handleFocus = () => {
 
 // Speak source text using TTS
 const speakSourceText = async () => {
-  // Get DOM value directly to avoid computed issues
-  const domSourceVal = sourceLanguageInputRef.value?.value;
-  const sourceLanguage = domSourceVal || AUTO_DETECT_VALUE;
-  
-  console.debug('[SidepanelMainContent] TTS Debug:', {
-    domSourceVal,
-    sourceLanguageValue: sourceLanguageValue.value,
-    sourceLanguage,
-    AUTO_DETECT_VALUE,
-    getLanguageCodeForTTSExists: typeof getLanguageCodeForTTS !== 'undefined'
-  });
-  
-  // Use the imported getLanguageCodeForTTS function (it works fine)
-  const langCode = getLanguageCodeForTTS(sourceLanguage);
-    
-  console.debug('[SidepanelMainContent] Language conversion:', {
-    input: sourceLanguage,
-    output: langCode,
-    usedFunction: 'getLanguageCodeForTTS'
-  });
+  const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
+  const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
   await tts.speak(sourceText.value, langCode);
   logger.debug(
     "[SidepanelMainContent] Source text TTS started with language:",
@@ -450,59 +373,39 @@ const speakSourceText = async () => {
 
 // Speak translation text using TTS
 const speakTranslationText = async () => {
-  const targetLanguage = targetLanguageValue.value || AUTO_DETECT_VALUE;
-  const langCode = getLanguageCodeForTTS(targetLanguage);
+    const targetLanguageCode = getLanguageCode(targetLang.value) || AUTO_DETECT_VALUE;
+  const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
   await tts.speak(translatedText.value, langCode);
   logger.debug(
     "[SidepanelMainContent] Translation TTS started with language:",
-    { targetLanguage, langCode }
+    { targetLanguage: targetLang.value, langCode }
   );
 };
 
 // Handle language swap functionality
 const handleSwapLanguages = async () => {
   try {
-    const sourceSelect = sourceLanguageInputRef.value;
-    const targetSelect = targetLanguageInputRef.value;
+    // Use display names from LanguageSelector and convert to codes
+    let sourceVal = sourceLang.value;
+    let targetVal = targetLang.value;
 
-    if (!sourceSelect || !targetSelect) {
-      await handleError(new Error('Language select elements not found'), 'SidepanelMainContent-languageElements');
-      return;
-    }
+    logger.debug("[SidepanelMainContent] Current languages before swap:", { source: sourceVal, target: targetVal });
 
-    let sourceVal = sourceSelect.value;
-    let targetVal = targetSelect.value;
-    
-    logger.debug("[SidepanelMainContent] Current languages before swap:", { sourceVal, targetVal });
-
-    // Note: We only swap languages, not text content
-    // Text content should remain in their respective fields
-
-    // Get language codes
     let sourceCode = getLanguageCode(sourceVal);
     let targetCode = getLanguageCode(targetVal);
 
     let resolvedSourceCode = sourceCode;
     let resolvedTargetCode = targetCode;
 
-    // If source is "auto-detect", try to get actual source language from last translation
-    if (sourceCode === AUTO_DETECT_VALUE || sourceVal === AUTO_DETECT_VALUE) {
-      // If we have a translation, use the detected source language
+    // If source is auto, try to use detected language from lastTranslation or settings
+    if (sourceCode === AUTO_DETECT_VALUE) {
       if (lastTranslation.value && lastTranslation.value.sourceLanguage) {
-        const detectedLang = lastTranslation.value.sourceLanguage;
-        resolvedSourceCode = getLanguageCode(detectedLang);
-        logger.debug(
-          "[SidepanelMainContent] Using detected source language from last translation:",
-          detectedLang,
-        );
+        resolvedSourceCode = getLanguageCode(lastTranslation.value.sourceLanguage);
+        logger.debug("[SidepanelMainContent] Using detected source language from last translation:", lastTranslation.value.sourceLanguage);
       } else {
-        // Fallback to settings
         try {
           resolvedSourceCode = await getSourceLanguageAsync();
-          logger.debug(
-            "[SidepanelMainContent] Resolved source language from settings:",
-            resolvedSourceCode,
-          );
+          logger.debug("[SidepanelMainContent] Resolved source language from settings:", resolvedSourceCode);
         } catch (err) {
           await handleError(err, 'SidepanelMainContent-loadSourceLanguage');
           resolvedSourceCode = null;
@@ -510,91 +413,46 @@ const handleSwapLanguages = async () => {
       }
     }
 
-    // In case target is somehow auto (shouldn't happen but for robustness)
-    if (targetCode === AUTO_DETECT_VALUE || targetVal === AUTO_DETECT_VALUE) {
+    if (targetCode === AUTO_DETECT_VALUE) {
       try {
         resolvedTargetCode = await getTargetLanguageAsync();
-        logger.debug(
-          "[SidepanelMainContent] Resolved target language from settings:",
-          resolvedTargetCode,
-        );
+        logger.debug("[SidepanelMainContent] Resolved target language from settings:", resolvedTargetCode);
       } catch (err) {
         await handleError(err, 'SidepanelMainContent-loadTargetLanguage');
         resolvedTargetCode = null;
       }
     }
 
-    // Swap languages if both are valid
     if (resolvedSourceCode && resolvedTargetCode && resolvedSourceCode !== AUTO_DETECT_VALUE) {
-      // Get display names for the resolved languages
-      const newSourceDisplay = getLanguageDisplayName(resolvedTargetCode);
-      const newTargetDisplay = getLanguageDisplayName(resolvedSourceCode);
+      // Use languages composable to get canonical display values where possible
+      const newSourceDisplay = languages.getLanguageDisplayValue(resolvedTargetCode) || getLanguageDisplayName(resolvedTargetCode) || targetVal;
+      const newTargetDisplay = languages.getLanguageDisplayValue(resolvedSourceCode) || getLanguageDisplayName(resolvedSourceCode) || sourceVal;
 
-      // Swap the language values
-      sourceSelect.value = newSourceDisplay || targetVal;
-      targetSelect.value = newTargetDisplay || sourceVal;
+      sourceLang.value = newSourceDisplay;
+      targetLang.value = newTargetDisplay;
 
-      logger.debug("[SidepanelMainContent] Languages swapped successfully:", { 
-        from: `${sourceVal} → ${targetVal}`, 
-        to: `${newSourceDisplay} → ${newTargetDisplay}` 
-      });
-      
-      // Debug: Check DOM values immediately after swap
-      logger.debug("[DEBUG] DOM after swap:", { 
-        domSource: sourceSelect.value, 
-        domTarget: targetSelect.value 
-      });
-      logger.debug("[DEBUG] Computed after swap (immediate):", { 
-        computedSource: sourceLanguageValue.value, 
-        computedTarget: targetLanguageValue.value 
-      });
-      
-      // Wait for Vue reactivity to update
+      logger.debug("[SidepanelMainContent] Languages swapped successfully:", { from: `${sourceVal} → ${targetVal}`, to: `${newSourceDisplay} → ${newTargetDisplay}` });
+
       await nextTick();
-      logger.debug("[DEBUG] Computed after swap (nextTick):", { 
-        computedSource: sourceLanguageValue.value, 
-        computedTarget: targetLanguageValue.value 
-      });
+      logger.debug("[DEBUG] Computed after swap (nextTick):", { computedSource: sourceLang.value, computedTarget: targetLang.value });
     } else if (resolvedSourceCode === AUTO_DETECT_VALUE) {
-      // When source is auto, just swap the target to auto and source to current target
-      sourceSelect.value = targetVal;
-      targetSelect.value = AUTO_DETECT_VALUE;
-      
-      logger.debug("[SidepanelMainContent] Auto-detect swap:", { 
-        from: `${AUTO_DETECT_VALUE} → ${targetVal}`, 
-        to: `${targetVal} → ${AUTO_DETECT_VALUE}` 
-      });
-      
-      // Debug: Check DOM values immediately after auto swap
-      logger.debug("[DEBUG] DOM after auto swap:", { 
-        domSource: sourceSelect.value, 
-        domTarget: targetSelect.value 
-      });
-      logger.debug("[DEBUG] Computed after auto swap (immediate):", { 
-        computedSource: sourceLanguageValue.value, 
-        computedTarget: targetLanguageValue.value 
-      });
-      
-      // Wait for Vue reactivity to update
+      // When source is auto, just swap target to auto and source to current target
+      sourceLang.value = targetVal;
+      targetLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
+
+      logger.debug("[SidepanelMainContent] Auto-detect swap:", { from: `${AUTO_DETECT_VALUE} → ${targetVal}`, to: `${targetVal} → ${AUTO_DETECT_VALUE}` });
+
       await nextTick();
-      logger.debug("[DEBUG] Computed after auto swap (nextTick):", { 
-        computedSource: sourceLanguageValue.value, 
-        computedTarget: targetLanguageValue.value 
-      });
+      logger.debug("[DEBUG] Computed after auto swap (nextTick):", { computedSource: sourceLang.value, computedTarget: targetLang.value });
     } else {
-      // Cannot swap - provide feedback
-      logger.debug(
-        "[SidepanelMainContent] Cannot swap - invalid language selection",
-        {
-          resolvedSourceCode,
-          resolvedTargetCode,
-        },
-      );
+      logger.debug("[SidepanelMainContent] Cannot swap - invalid language selection", { resolvedSourceCode, resolvedTargetCode });
     }
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-swapLanguages');
   }
 };
+
+// Remove local function
 
 // Remove local function - use centralized getLanguageDisplayName instead
 
@@ -605,6 +463,17 @@ onMounted(async () => {
   // Load languages first
   await languages.loadLanguages();
   
+  // Initialize language selector display values from settings
+  try {
+    const savedSource = await getSourceLanguageAsync();
+    const savedTarget = await getTargetLanguageAsync();
+    sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
+    targetLang.value = getLanguageDisplayName(savedTarget) || 'Persian';
+  } catch (err) {
+    sourceLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
+    targetLang.value = targetLang.value || 'Persian';
+  }
+
   // Suppress no-unused-vars warnings for template-used variables/functions
   // These are used in the template but not directly in the script setup block
   logger.debug(historyComposable); // Explicitly use historyComposable to satisfy linter
