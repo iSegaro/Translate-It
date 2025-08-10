@@ -9,6 +9,9 @@ console.log("[Offscreen] TTS script loaded");
 // Signal readiness immediately to parent
 if (chrome.runtime) {
   chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {});
+  // Try multiple times to ensure readiness is sent
+  setTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 100);
+  setTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 500);
 }
 
 /**
@@ -357,6 +360,15 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     
     let responseSent = false;
     
+    // Timeout for Google TTS fetch
+    const fetchTimeout = setTimeout(() => {
+      if (!responseSent) {
+        console.warn("[Offscreen] Google TTS fetch timeout, falling back to Web Speech");
+        responseSent = true;
+        handleWebSpeechFallback(ttsData, sendResponse);
+      }
+    }, 3000); // 3 second timeout for fetch
+    
     // Try Google TTS with fetch
     fetch(url, {
       method: 'GET',
@@ -368,6 +380,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       }
     })
     .then(response => {
+      clearTimeout(fetchTimeout); // Clear the timeout on successful response
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -409,6 +422,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       console.log("[Offscreen] Google TTS playback started successfully");
     })
     .catch((err) => {
+      clearTimeout(fetchTimeout); // Clear the timeout on error too
       console.error("[Offscreen] Google TTS failed:", err);
       currentAudio = null;
       if (!responseSent) {
@@ -523,7 +537,7 @@ function handleWebSpeechFallback(data, sendResponse) {
             responseAlreadySent = true;
             sendResponse({ success: false, error: "Web Speech API timeout" });
           }
-        }, 10000); // 10 second timeout
+        }, 5000); // 5 second timeout
 
         // Clear timeout when speech ends
         const originalOnEnd = currentUtterance.onend;

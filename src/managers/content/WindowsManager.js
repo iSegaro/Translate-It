@@ -596,12 +596,77 @@ export default class SelectionWindows {
   }
 
   stoptts_playing() {
+    // Use unified TTS system for stopping
     if (isExtensionContextValid()) {
-      // Use specialized TTS messenger for stopping TTS
-      this.messenger.specialized.tts.stop().catch((error) => {
+      browser.runtime.sendMessage({
+        action: MessageActions.TTS_STOP,
+        context: MessageContexts.TTS_SMART
+      }).catch((error) => {
         this.logger.warn("Error stopping TTS", error);
       });
     }
+  }
+
+  /**
+   * Unified TTS method - same pattern as useTTSSimple
+   * @param {string} text - Text to speak
+   */
+  async speakTextUnified(text) {
+    if (!text || !text.trim()) {
+      this.logger.warn("No text provided for TTS");
+      return;
+    }
+
+    try {
+      this.logger.debug("Speaking via unified TTS:", text.substring(0, 50) + "...");
+
+      // Use exact same format as useTTSSimple
+      await browser.runtime.sendMessage({
+        action: MessageActions.TTS_SPEAK,
+        data: {
+          text: text.trim(),
+          language: this.detectSimpleLanguage(text) || "en",
+          rate: 1,
+          pitch: 1,
+          volume: 1,
+        },
+        context: MessageContexts.TTS_SMART,
+        timestamp: Date.now(),
+        version: "2.0",
+        messageId: `selection-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+      });
+
+      this.logger.debug("TTS message sent successfully via unified system");
+    } catch (error) {
+      this.logger.error("Failed to send TTS message:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simple language detection for TTS
+   * @param {string} text - Text to analyze
+   * @returns {string} Language code
+   */
+  detectSimpleLanguage(text) {
+    // Simple patterns for major languages
+    const patterns = {
+      'fa': /[\u06A9\u06AF\u06C0-\u06D3]/,  // Persian specific chars
+      'ar': /[\u0600-\u06FF]/,              // Arabic/Persian range
+      'zh': /[\u4E00-\u9FFF]/,              // Chinese
+      'ja': /[\u3040-\u309F\u30A0-\u30FF]/, // Japanese  
+      'ko': /[\uAC00-\uD7AF]/,              // Korean
+      'ru': /[\u0400-\u04FF]/,              // Russian
+    };
+
+    // Check patterns in priority order
+    for (const [lang, pattern] of Object.entries(patterns)) {
+      if (pattern.test(text)) {
+        return lang;
+      }
+    }
+    
+    return 'en'; // Default to English
   }
 
   applyInitialStyles(position) {
@@ -1031,15 +1096,16 @@ export default class SelectionWindows {
     icon.alt = title;
     icon.title = title;
     icon.classList.add("tts-icon");
-    icon.addEventListener("click", (e) => {
+    icon.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (isExtensionContextValid()) {
-        // Use specialized TTS messenger for speaking
-        this.messenger.specialized.tts
-          .speak(textToSpeak, AUTO_DETECT_VALUE)
-          .catch((error) => {
-            this.logger.warn("Error speaking text", error);
-          });
+        try {
+          // Use unified TTS system - same as Vue components
+          await this.speakTextUnified(textToSpeak.trim());
+          this.logger.debug("TTS started via unified system");
+        } catch (error) {
+          this.logger.warn("Error speaking text", error);
+        }
       }
     });
     return icon;

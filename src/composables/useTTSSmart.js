@@ -1,26 +1,42 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'useTTSSmart');
 
 export function useTTSSmart() {
-  const { messenger } = useBrowserAPI('tts-smart'); // This context is now properly defined
+  const browserAPI = useBrowserAPI('tts-smart');
   const isPlaying = ref(false);
   const isLoading = ref(false);
 
   const speak = async (text, lang = "auto", options = {}) => {
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim()) {
+      logger.warn("[useTTSSmart] No text provided for TTS");
+      return;
+    }
 
     try {
       isLoading.value = true;
       isPlaying.value = true;
+      logger.debug("[useTTSSmart] Speaking:", text.substring(0, 50) + "...");
 
-      await messenger.specialized.tts.speak(
-        text.trim(),
-        getLanguageCodeForTTS(lang) || "en",
-        options
-      );
+      // Use unified message format - same as useTTSSimple
+      await browserAPI.sendMessage({
+        action: MessageActions.TTS_SPEAK,
+        data: {
+          text: text.trim(),
+          language: getLanguageCodeForTTS(lang) || "en",
+          rate: options.rate || 1,
+          pitch: options.pitch || 1,
+          volume: options.volume || 1,
+        },
+      });
 
+      logger.debug("[useTTSSmart] TTS message sent successfully");
     } catch (error) {
+      logger.error("[useTTSSmart] TTS failed:", error);
       throw error;
     } finally {
       isLoading.value = false;
@@ -30,10 +46,14 @@ export function useTTSSmart() {
 
   const stop = async () => {
     try {
-      await messenger.specialized.tts.stop();
+      await browserAPI.sendMessage({
+        action: MessageActions.TTS_STOP,
+      });
       isPlaying.value = false;
       isLoading.value = false;
+      logger.debug("[useTTSSmart] TTS stopped");
     } catch (error) {
+      logger.error("[useTTSSmart] Failed to stop TTS:", error);
       isPlaying.value = false;
       isLoading.value = false;
     }
