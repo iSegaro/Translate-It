@@ -4,6 +4,7 @@
 
 import { useSelectionWindows } from '@/composables/useSelectionWindows.js';
 import { createLogger } from '@/utils/core/logger.js';
+import { checkContentScriptAccess } from '@/utils/core/tabPermissions.js';
 
 const logger = createLogger('Core', 'selection-windows-bridge');
 
@@ -14,6 +15,12 @@ let selectionWindowsComposable = null;
  * Call this in content scripts that need SelectionWindows functionality
  */
 export function initializeSelectionWindowsBridge() {
+  const access = checkContentScriptAccess();
+  if (!access.isAccessible) {
+    logger.warn('[SelectionWindowsBridge] Cannot initialize on a restricted page.');
+    return null;
+  }
+
   if (selectionWindowsComposable) {
     logger.debug('[SelectionWindowsBridge] Already initialized');
     return selectionWindowsComposable;
@@ -118,5 +125,8 @@ export function cleanupSelectionWindowsBridge() {
 
 // Auto-cleanup on page unload
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', cleanupSelectionWindowsBridge);
+  const access = checkContentScriptAccess();
+  if (access.isAccessible) {
+    window.addEventListener('beforeunload', cleanupSelectionWindowsBridge);
+  }
 }
