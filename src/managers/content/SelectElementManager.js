@@ -967,13 +967,16 @@ export class SelectElementManager {
         const sourceLanguage = await getSourceLanguageAsync();
         const targetLanguage = await getTargetLanguageAsync();
 
+        // Import TranslationMode to use proper constant
+        const { TranslationMode } = await import("../../config.js");
+        
         // Use UnifiedMessenger translate method
         const response = await this.messenger.translate({
           text: inputText,
           provider: provider,
           from: sourceLanguage,
           to: targetLanguage,
-          mode: "selection",
+          mode: TranslationMode.Field,
         });
 
         if (response && (response.success || response.translatedText)) {
