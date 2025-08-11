@@ -1,6 +1,13 @@
 <template>
   <div class="language-controls">
-    <!-- Unified Language Selector with swap functionality -->
+    <!-- Provider Selector -->
+    <ProviderSelector 
+      mode="split"
+      @translate="handleTranslate"
+      @provider-change="handleProviderChange"
+    />
+
+    <!-- Language Selector -->
     <LanguageSelector
       v-model:source-language="sourceLanguage"
       v-model:target-language="targetLanguage"
@@ -11,11 +18,6 @@
       :auto-detect-label="'Auto-Detect'"
     />
     
-    <ProviderSelector 
-      mode="split"
-      @translate="handleTranslate"
-      @provider-change="handleProviderChange"
-    />
   </div>
 </template>
 
