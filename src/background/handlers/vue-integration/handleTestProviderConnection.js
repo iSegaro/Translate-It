@@ -1,5 +1,4 @@
 // Handler for testing provider connection from Vue apps
-import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 
 export async function handleTestProviderConnection(message) {
   const { provider, config } = message.data;

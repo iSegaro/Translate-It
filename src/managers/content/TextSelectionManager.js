@@ -3,9 +3,7 @@
  * Extracted from EventHandler for better maintainability and separation of concerns
  */
 
-import { logME } from "../../utils/core/helpers.js";
 import { createLogger } from "../../utils/core/logger.js";
-import { storageManager } from "@/storage/core/StorageCore.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 
@@ -54,9 +52,9 @@ export class TextSelectionManager {
       if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
         return;
       }
-    } catch (error) {
+    } catch {
       // If check fails, continue with normal flow
-      logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
+      this.logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
     }
 
     if (selectedText) {
@@ -109,7 +107,7 @@ export class TextSelectionManager {
    * @param {string} selectedText - Selected text to translate
    * @param {MouseEvent} event - Original mouse event (optional)
    */
-  async processSelectedText(selectedText, event) {
+  async processSelectedText(selectedText) {
     this.logger.debug('processSelectedText called', { text: selectedText.substring(0, 50) + '...' });
     
     const selection = window.getSelection();
@@ -202,7 +200,7 @@ export class TextSelectionManager {
    * Handle outside click events (placeholder for future integration)
    * @param {MouseEvent} event - Click event
    */
-  _onOutsideClick(event) {
+  _onOutsideClick() {
     // This will be used for more advanced selection window integration
     this.logger.debug('Outside click detected');
   }
@@ -231,7 +229,7 @@ export class TextSelectionManager {
     // Remove event listeners
     try {
       document.removeEventListener("mousedown", this.cancelSelectionTranslation);
-    } catch (error) {
+    } catch {
       // Listener may not have been added
     }
     

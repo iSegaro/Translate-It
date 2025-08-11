@@ -132,7 +132,6 @@ class SimpleMessageHandler {
    * @returns {Promise} Handler result
    */
   async routeMessage(message, sender) {
-    const action = message?.action || message?.type;
     const context = message?.context;
 
     // Enhanced routing logic for specific contexts

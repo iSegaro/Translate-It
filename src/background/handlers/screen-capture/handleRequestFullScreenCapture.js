@@ -39,7 +39,7 @@ export async function handleRequestFullScreenCapture(message, sender, sendRespon
         video: { mediaSource: 'screen' },
         audio: false
       });
-    } catch (_permissionError) {
+    } catch {
       throw new Error('Screen capture permission denied by user');
     }
     

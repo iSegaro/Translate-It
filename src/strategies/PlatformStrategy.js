@@ -73,7 +73,7 @@ export default class PlatformStrategy {
     }
   }
 
-  applyTextDirection(_element, _translatedText) {
+  applyTextDirection() {
     // غیرفعال شده - جهت متن تغییر نمی‌کند
     // در استراتژی‌های خاص در صورت نیاز فعال خواهد شد
     return;

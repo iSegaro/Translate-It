@@ -132,7 +132,7 @@ export default class TranslationHandler {
     this.eventCoordinator.handleEscape(event);
   }
 
-  async handleCtrlSlash(event) {
+  async handleCtrlSlash() {
     // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
     logME('[TranslationHandler] Ctrl+/ handling delegated to ShortcutManager');
   }

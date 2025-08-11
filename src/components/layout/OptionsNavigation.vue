@@ -30,7 +30,6 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
-import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/store/core/settings'
 
 // Access i18n function through current instance
@@ -72,7 +71,7 @@ const saveAllSettings = async () => {
       statusMessage.value = ''
       statusType.value = ''
     }, 2000)
-  } catch (_error) {
+  } catch {
     statusType.value = 'error'
     statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
     

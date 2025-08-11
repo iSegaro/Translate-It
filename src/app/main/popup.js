@@ -3,7 +3,6 @@ import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 import { createLogger } from '@/utils/core/logger.js';
 

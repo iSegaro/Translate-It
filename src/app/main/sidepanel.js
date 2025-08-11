@@ -3,7 +3,6 @@ import { pinia } from '@/store'
 import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessagingCore } from '@/messaging/core/MessagingCore.js'
 import { MessageContexts } from '../../messaging/core/MessagingCore'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 import { createLogger } from '@/utils/core/logger.js';

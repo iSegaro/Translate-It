@@ -160,7 +160,7 @@ const handleSourceTextInput = () => {
   // Handled by TranslationInputField component
 }
 
-const handleKeydown = (event) => {
+const handleKeydown = () => {
   // Handled by TranslationInputField component
 }
 </script>

@@ -25,7 +25,7 @@ export default class BaseSubtitleHandler {
     throw new Error("getSelectors must be implemented");
   }
 
-  extractSubtitleText(_element) {
+  extractSubtitleText() {
     throw new Error("extractSubtitleText must be implemented");
   }
 
@@ -94,7 +94,7 @@ export default class BaseSubtitleHandler {
     const checkInterval = 500;
     let elapsed = 0;
 
-    return new Promise((resolve, _reject) => {
+    return new Promise((resolve) => {
       const check = () => {
         const container = document.querySelector(selectors.container);
         if (container) {

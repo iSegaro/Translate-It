@@ -244,7 +244,7 @@ export const validationRules = {
 };
 
 // Validate a single field with multiple rules
-export async function validateField(value, rules, fieldName = "Field") {
+export async function validateField(value, rules) {
   const errors = [];
 
   for (const rule of rules) {

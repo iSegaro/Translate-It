@@ -107,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'

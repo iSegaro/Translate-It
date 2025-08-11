@@ -20,7 +20,7 @@ function setStateForTab(tabId, active) {
       messageId: generateBackgroundMessageId('selectElementStateChanged'),
       timestamp: Date.now()
     }).catch(() => {});
-  } catch (e) {
+  } catch {
     // ignore
   }
 }
@@ -72,7 +72,7 @@ try {
               setStateForTab(_lastActiveTabId, false);
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         } finally {
           _lastActiveTabId = activeInfo.tabId;
@@ -95,20 +95,20 @@ try {
                     context: MessagingContexts.BACKGROUND,
                     messageId: generateBackgroundMessageId('deactivateSelectElement_onFocus')
                   });
-                } catch (e) {
+                } catch {
                   // ignore
                 }
                 setStateForTab(Number(tabId), false);
               }
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       });
     }
   }
-} catch (e) {
+} catch {
   // ignore in environments without tabs/windows
 }
 

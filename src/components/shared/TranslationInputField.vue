@@ -228,7 +228,7 @@ const checkClipboardPermissions = async () => {
   try {
     const text = await navigator.clipboard.readText()
     canPaste.value = text && text.trim().length > 0
-  } catch (error) {
+  } catch {
     canPaste.value = false
   }
 }

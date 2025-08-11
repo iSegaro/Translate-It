@@ -82,7 +82,7 @@ export async function handleTranslate(message, sender) {
           let parsedProviderJson = null;
           try {
             parsedProviderJson = JSON.parse(result.translatedText);
-          } catch (e) {
+          } catch {
             parsedProviderJson = null;
           }
 

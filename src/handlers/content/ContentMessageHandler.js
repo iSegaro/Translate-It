@@ -215,10 +215,9 @@ export class ContentMessageHandler {
    * Handle translation result message with simple mode-based routing
    * Routes different translation types to appropriate handlers
    * @param {Object} message - Message object with translation result
-   * @param {Object} sender - Sender object
    * @returns {Promise<Object>} Handler result
    */
-  async handleTranslationResult(message, sender) {
+  async handleTranslationResult(message) {
     const { translationMode } = message.data;
     const messageId = message.messageId;
     

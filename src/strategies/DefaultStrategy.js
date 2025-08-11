@@ -190,7 +190,7 @@ export default class DefaultStrategy extends PlatformStrategy {
                 },
                 stripIgnoreTag: true,
                 stripIgnoreTagBody: ["script", "style"],
-                onIgnoreTagAttr: function (tag, name, value, _isWhiteAttr) {
+                onIgnoreTagAttr: function (name, value) {
                   // Block javascript: and data: URLs
                   if (name === "href" || name === "src") {
                     if (value.match(/^(javascript|data|vbscript):/i)) {

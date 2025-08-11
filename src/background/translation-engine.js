@@ -52,7 +52,7 @@ export class TranslationEngine {
   /**
    * Handle translation request messages
    */
-  async handleTranslateMessage(request, sender) {
+  async handleTranslateMessage(request) {
     // Input validation and normalization only - main logging is handled by handleTranslate
 
     // Input validation and normalization
@@ -271,7 +271,7 @@ export class TranslationEngine {
     let originalJson;
     try {
       originalJson = JSON.parse(text);
-    } catch (e) {
+    } catch {
       throw new Error('Invalid JSON format for SelectElement mode');
     }
 
@@ -432,7 +432,7 @@ export class TranslationEngine {
           this.cache.set(cacheKey, { translatedText, cachedAt: Date.now() });
           
           return { idx, result: translatedText };
-        } catch (err) {
+        } catch {
           attempt++;
           if (attempt < INDIVIDUAL_RETRY) {
             await new Promise(resolve => setTimeout(resolve, 100 * attempt));

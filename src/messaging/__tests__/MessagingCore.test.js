@@ -1,8 +1,7 @@
 // src/components/core/__tests__/MessagingCore.test.js
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { 
-  MessagingCore, 
-  MessageContexts, 
+  MessagingCore,  
   MessageFormat 
 } from '../core/MessagingCore.js';
 import { MessageActions } from '../core/MessageActions.js';

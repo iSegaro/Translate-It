@@ -1,7 +1,7 @@
 // src/composables/useI18n.js
 // Safe i18n composable with fallback support
 
-import { ref, computed, getCurrentInstance } from "vue";
+import { computed, getCurrentInstance } from "vue";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('UI', 'useI18n');

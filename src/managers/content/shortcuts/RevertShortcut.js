@@ -41,7 +41,7 @@ export class RevertShortcut {
    * @param {KeyboardEvent} event - Keyboard event
    * @returns {Promise<Object>} Execution result
    */
-  async execute(event) {
+  async execute() {
     logger.debug('[RevertShortcut] Executing ESC revert shortcut');
     
     try {

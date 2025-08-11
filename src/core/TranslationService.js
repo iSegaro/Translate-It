@@ -1,6 +1,5 @@
 import { MessagingCore, MessageContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getSettingsAsync } from "@/config.js";
-import { logME } from "@/utils/core/helpers.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 import { createLogger } from "../utils/core/logger.js";
 import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";

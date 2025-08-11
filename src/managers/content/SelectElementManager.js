@@ -3,7 +3,7 @@
 // Integrated with existing services and error handling
 
 import browser from "webextension-polyfill";
-import { logME, taggleLinks } from "@/utils/core/helpers.js";
+import { taggleLinks } from "@/utils/core/helpers.js";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { createLogger } from "../../utils/core/logger.js";
@@ -388,7 +388,7 @@ export class SelectElementManager {
 
       // Clear timeout if present
       if (this.pendingTranslation.timeoutId) {
-        try { clearTimeout(this.pendingTranslation.timeoutId); } catch (e) { /* ignore */ }
+        try { clearTimeout(this.pendingTranslation.timeoutId); } catch { /* ignore */ }
       }
 
       // Resolve the pending promise with a cancel result instead of rejecting it.
@@ -533,12 +533,12 @@ export class SelectElementManager {
       } catch (err) {
         this.logger.warn('Error while cancelling pending translation on deactivate', err);
       }
-      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+      try { await this.dismissStatusNotification(); } catch { /* ignore */ }
     } else if (this.selectionProcessing) {
       // mark requestedCancel so pendingTranslation created shortly will be auto-cancelled
       this.logger.debug('Full deactivate requested while processing selection - marking requestedCancel');
       this.requestedCancel = true;
-      try { await this.dismissStatusNotification(); } catch (e) { /* ignore */ }
+      try { await this.dismissStatusNotification(); } catch { /* ignore */ }
     }
 
     // Use the common UI deactivation logic if still active
@@ -677,7 +677,7 @@ export class SelectElementManager {
         enumerable: false,
         get: () => this.messageLifecycle,
       });
-    } catch (e) {
+    } catch {
       // ignore if window not writable in some contexts
     }
       return;
@@ -743,7 +743,7 @@ export class SelectElementManager {
       if (this.tracing) {
         this.logger.debug('[SelectElementManager][lifecycle]', entry);
       }
-    } catch (err) {
+    } catch {
       // swallow any tracing errors
     }
   }
@@ -805,7 +805,7 @@ export class SelectElementManager {
       // Clean up status notification
       try { 
         await this.dismissStatusNotification(); 
-      } catch (e) { 
+      } catch { 
         /* ignore */ 
       }
 
@@ -1126,7 +1126,7 @@ export class SelectElementManager {
         this.cancelPendingTranslation(messageId);
         try {
           await translationPromise.catch(() => {});
-        } catch (e) {
+        } catch {
           // swallow - handled above
         }
         return { status: "error", reason: "backend_error", message: msg };
@@ -1163,7 +1163,7 @@ export class SelectElementManager {
               msg = JSON.stringify(rawError);
             }
           }
-        } catch (err) {
+        } catch {
           // fallback to default message
           msg = "(⚠️ خطایی در ترجمه رخ داد.)";
         }
@@ -1206,7 +1206,7 @@ export class SelectElementManager {
           translatedJsonString,
           this // Pass context like OLD system
         );
-      } catch (error) {
+      } catch {
         this.logger.debug("JSON parsing failed, treating as string response");
         translatedData = null;
       }
@@ -1388,7 +1388,7 @@ export class SelectElementManager {
         true,
         3000
       );
-    } catch (error) {
+    } catch {
       this.logger.debug(
         "[SelectElementManager] Select element mode activated - hover over elements to highlight"
       );
@@ -1406,7 +1406,7 @@ export class SelectElementManager {
         true,
         4000
       );
-    } catch (error) {
+    } catch {
       this.logger.error("Error", message);
     }
   }
@@ -1422,7 +1422,7 @@ export class SelectElementManager {
         true,
         3000
       );
-    } catch (error) {
+    } catch {
       this.logger.debug("No text found in selected element");
     }
   }
@@ -1433,7 +1433,7 @@ export class SelectElementManager {
   async showSuccessNotification(message) {
     try {
       await this.notificationManager.show(message, "success", true, 2000);
-    } catch (error) {
+    } catch {
       this.logger.debug("Success", message);
     }
   }
@@ -1519,7 +1519,7 @@ export class SelectElementManager {
   async showWarningNotification(message) {
     try {
       await this.notificationManager.show(message, "warning", true, 4000);
-    } catch (error) {
+    } catch {
       this.logger.warn("Warning", message);
     }
   }
@@ -1538,7 +1538,7 @@ export class SelectElementManager {
       this.statusNotification = await this.notificationManager.show(statusMessage, "status", false);
       this.logger.debug("Status notification created", statusMessage);
       return this.statusNotification;
-    } catch (error) {
+    } catch {
       this.logger.debug("Status", message);
       return null;
     }

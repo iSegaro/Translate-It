@@ -3,7 +3,6 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { TranslationService } from "../core/TranslationService.js";
-import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import browser from "webextension-polyfill";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";

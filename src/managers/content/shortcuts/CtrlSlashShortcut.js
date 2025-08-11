@@ -85,7 +85,7 @@ export class CtrlSlashShortcut {
    * @param {KeyboardEvent} event - Keyboard event
    * @returns {Promise<Object>} Execution result
    */
-  async execute(event) {
+  async execute() {
     this.logger.debug('Executing Ctrl+/ shortcut');
 
     try {

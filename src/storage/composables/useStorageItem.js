@@ -191,7 +191,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
     debounceTimer = setTimeout(async () => {
       try {
         await save(newValue);
-      } catch (err) {
+      } catch {
         // Error already handled in save method
       }
     }, debounceMs);

@@ -1,7 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { ErrorTypes } from '@/error-management/ErrorTypes.js'
-import { TranslationService } from "@/core/TranslationService.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('Core', 'translation');
@@ -32,7 +30,7 @@ export const useTranslationStore = defineStore('translation', () => {
   })
 
   // Actions
-  const translateText = async (text, options = {}) => {
+  const translateText = async () => {
     // This store is currently not directly handling translation requests.
     // Translation logic is handled by composables (e.g., useSidepanelTranslation, usePopupTranslation)
     // which use TranslationService.
@@ -121,12 +119,12 @@ export const useTranslationStore = defineStore('translation', () => {
     selectedProvider.value = provider; // Still update local state
   }
 
-  const resetProviders = async (apiType = null) => {
+  const resetProviders = async () => {
     // This store is currently not directly resetting providers.
     logger.warn("TranslationStore: resetProviders is a placeholder.");
   }
 
-  const isProviderSupported = async (provider) => {
+  const isProviderSupported = async () => {
     // This store is currently not directly checking provider support.
     logger.warn("TranslationStore: isProviderSupported is a placeholder.");
     return false;

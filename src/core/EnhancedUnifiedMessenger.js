@@ -463,11 +463,10 @@ export class EnhancedUnifiedMessenger extends UnifiedMessenger {
    * Firefox-specific tab messaging with enhanced compatibility
    * @param {number} tabId - Target tab ID
    * @param {Object} message - Enhanced message object
-   * @param {number} timeout - Timeout in milliseconds
    * @returns {Promise<Object>} Tab message response
    * @private
    */
-  async sendToTabFirefox(tabId, message, timeout) {
+  async sendToTabFirefox(tabId, message) {
     try {
       // Firefox sometimes has connection issues, so we add retry logic
       let lastError;

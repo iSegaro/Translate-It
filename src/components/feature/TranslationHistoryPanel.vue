@@ -764,7 +764,7 @@ const bulkCopy = async () => {
     await navigator.clipboard.writeText(text)
     showFeedback(`Copied ${items.length} translations`)
     clearSelection()
-  } catch (err) {
+  } catch {
     showFeedback('Copy failed', 'error')
   }
 }
@@ -828,7 +828,8 @@ watch(filters, () => {
 onMounted(() => {
   // Load history if needed
   isLoading.value = false
-})</script>
+});
+</script>
 
 <style scoped>
 .history-panel {

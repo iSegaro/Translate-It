@@ -8,6 +8,7 @@ import {
   optimizedTextInsertion,
 } from "./text-insertion/index.js";
 import { handleSimpleReplacement } from "./simpleReplacement.js";
+import { logME } from "../../core/helpers.js";
 
 const logger = createLogger('Translation', 'TextReplacement');
 

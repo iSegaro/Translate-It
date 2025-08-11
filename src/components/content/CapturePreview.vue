@@ -292,6 +292,7 @@ import { useTranslationStore } from '@/store/modules/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseModal from '@/components/base/BaseModal.vue'
+import { computed } from 'vue'
 
 const { handleError } = useErrorHandler()
 

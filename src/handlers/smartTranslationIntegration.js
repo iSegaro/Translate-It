@@ -36,7 +36,7 @@ function hasActiveElementTextSelection() {
       return activeElement.selectionStart !== activeElement.selectionEnd;
     }
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

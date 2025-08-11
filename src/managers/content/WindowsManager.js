@@ -89,9 +89,9 @@ export default class SelectionWindows {
           break;
         }
       }
-    } catch (e) {
+    } catch {
       // If anything fails, use current document
-      logger.warn(
+      this.logger.warn(
         "Could not access top document, using current:",
         e
       );
@@ -499,7 +499,7 @@ export default class SelectionWindows {
       if (messageListener) {
         try {
           browser.runtime.onMessage.removeListener(messageListener);
-        } catch (e) {
+        } catch {
           // Ignore cleanup errors
         }
       }
@@ -945,7 +945,7 @@ export default class SelectionWindows {
     this.displayElement.style.top = `${constrainedY}px`;
   }
 
-  _onMouseUp(_e) {
+  _onMouseUp() {
     if (!this.isDragging) return;
 
     this.isDragging = false;

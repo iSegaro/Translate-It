@@ -305,7 +305,7 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
     if (!isLoading.value) { // Avoid infinite loops during load
       try {
         await save(newValue);
-      } catch (err) {
+      } catch {
         // Error already handled in save method
       }
     }

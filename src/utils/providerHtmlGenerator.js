@@ -232,28 +232,28 @@ export class ProviderHtmlGenerator {
    * Generate other provider settings HTML (keeping existing structure)
    * @private
    */
-  static _generateGeminiSettingsHtml(_provider) {
+  static _generateGeminiSettingsHtml() {
     // Return existing Gemini settings HTML structure
     return `<div id="geminiApiSettings"><!-- Existing Gemini HTML --></div>`;
   }
 
-  static _generateOpenAISettingsHtml(_provider) {
+  static _generateOpenAISettingsHtml() {
     return `<div id="openAIApiSettings"><!-- Existing OpenAI HTML --></div>`;
   }
 
-  static _generateOpenRouterSettingsHtml(_provider) {
+  static _generateOpenRouterSettingsHtml() {
     return `<div id="openRouterApiSettings"><!-- Existing OpenRouter HTML --></div>`;
   }
 
-  static _generateDeepSeekSettingsHtml(_provider) {
+  static _generateDeepSeekSettingsHtml() {
     return `<div id="deepseekApiSettings"><!-- Existing DeepSeek HTML --></div>`;
   }
 
-  static _generateWebAISettingsHtml(_provider) {
+  static _generateWebAISettingsHtml() {
     return `<div id="webAIApiSettings"><!-- Existing WebAI HTML --></div>`;
   }
 
-  static _generateCustomSettingsHtml(_provider) {
+  static _generateCustomSettingsHtml() {
     return `<div id="customApiSettings"><!-- Existing Custom HTML --></div>`;
   }
 

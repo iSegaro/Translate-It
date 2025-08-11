@@ -27,7 +27,7 @@ export function useBackgroundWarmup() {
             resolveOuter(true);
             return;
           }
-        } catch (error) {
+        } catch {
           // Ignore errors and retry
         }
         await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));

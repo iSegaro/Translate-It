@@ -226,7 +226,7 @@ async function handleTTSNotification() {
         await browser.action.openPopup();
         logME("[NotificationHandler] Opened popup for TTS");
       }
-    } catch (panelError) {
+    } catch {
       // If sidepanel/popup fails, open options page
       const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });

@@ -1,7 +1,7 @@
 <template>
   <div class="language-controls">
     <!-- Provider Selector -->
-    <ProviderSelector 
+    <ProviderSelector
       mode="split"
       @translate="handleTranslate"
       @provider-change="handleProviderChange"
@@ -17,7 +17,6 @@
       :swap-alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
       :auto-detect-label="'Auto-Detect'"
     />
-    
   </div>
 </template>
 

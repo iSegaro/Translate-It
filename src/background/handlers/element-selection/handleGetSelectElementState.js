@@ -18,7 +18,7 @@ export async function handleGetSelectElementState(message, sender) {
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       if (tabs && tabs.length) tabId = tabs[0].id;
-    } catch (e) {
+    } catch {
       // ignore
     }
   }

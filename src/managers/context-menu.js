@@ -306,7 +306,7 @@ export class ContextMenuManager {
    * Handle open options
    * @private
    */
-  async handleOpenOptions(info, tab) {
+  async handleOpenOptions() {
     try {
       const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });

@@ -27,7 +27,7 @@ function isPageExcluded(url) {
     // For now, return false for all other pages
     // This can be enhanced to check user's exclusion settings
     return false
-  } catch (_error) {
+  } catch {
     // If URL parsing fails, exclude for safety
     return true
   }

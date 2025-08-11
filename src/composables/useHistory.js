@@ -3,7 +3,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { SimpleMarkdown } from "@/utils/text/markdown.js";
-import { correctTextDirection } from "@/utils/text/textDetection.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { createLogger } from '@/utils/core/logger.js';
 

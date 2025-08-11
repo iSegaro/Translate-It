@@ -1,7 +1,6 @@
 // src/config.js
 import { ErrorHandler } from './error-management/ErrorService.js';
 import { ErrorTypes } from './error-management/ErrorTypes.js';
-import browser from 'webextension-polyfill';
 import { storageManager } from '@/storage/core/StorageCore.js';
 import { createLogger } from '@/utils/core/logger.js';
 

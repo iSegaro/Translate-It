@@ -2,7 +2,6 @@
 import browser from "webextension-polyfill";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
-import { IsDebug } from "../../config.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('Core', 'helpers');

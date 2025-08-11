@@ -11,7 +11,7 @@ export function useTTSSmart() {
   const isPlaying = ref(false);
   const isLoading = ref(false);
 
-  const speak = async (text, lang = "auto", options = {}) => {
+  const speak = async (text, lang = "auto") => {
     if (!text || !text.trim()) {
       logger.warn("[useTTSSmart] No text provided for TTS");
       return;

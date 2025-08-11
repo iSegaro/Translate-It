@@ -30,8 +30,7 @@ export class UnifiedMessenger {
 
     try {
       // Detect browser environment for Firefox workaround (before Promise creation)
-      const firefoxDetection = await isFirefox();
-
+      
       // Manual Promise wrapper to fix webextension-polyfill Firefox bug
       const response = await new Promise(async (resolve, reject) => { // Make the Promise callback async
         const timeoutId = setTimeout(() => {

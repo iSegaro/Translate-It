@@ -160,8 +160,7 @@ export async function handleStartFullScreenCapture(
   sender,
   sendResponse,
   safeSendMessage,
-  errorHandler,
-  _injectionState,
+  errorHandler
 ) {
   logME("[Handler:ScreenCapture] Starting full screen capture request");
 

@@ -24,7 +24,7 @@ const _registerSelectStateListener = async () => {
 
   // Initialize from background via messaging
   try {
-    const { sendMessage, selection } = useMessaging('sidepanel');
+    const { selection } = useMessaging('sidepanel');
     const response = await selection.getSelectionState();
     if (response && response.success) {
       sharedIsSelectModeActive.value = !!response.active;
@@ -35,7 +35,7 @@ const _registerSelectStateListener = async () => {
   }
 
   // Register runtime message listener for background broadcasts
-  _selectStateHandler = async (message, sender) => {
+  _selectStateHandler = async (message) => {
     try {
       if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
         const { tabId, active } = message.data || {};
@@ -45,7 +45,7 @@ const _registerSelectStateListener = async () => {
             const tabs = await browser.tabs.query({ active: true, currentWindow: true });
             if (tabs && tabs.length) _currentTabId = tabs[0].id;
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
 
@@ -71,7 +71,7 @@ const _unregisterSelectStateListener = () => {
   if (_selectStateHandler) {
     try {
       browser.runtime.onMessage.removeListener(_selectStateHandler);
-    } catch (e) {
+    } catch {
       // ignore
     }
     _selectStateHandler = null;
@@ -177,12 +177,12 @@ export function useSelectElementTranslation() {
           if (response && response.success) {
             sharedIsSelectModeActive.value = !!response.active;
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       };
       browser.tabs.onActivated.addListener(_tabsActivatedHandler);
-    } catch (e) {
+    } catch {
       // ignore if tabs API not available
     }
   });
@@ -200,14 +200,14 @@ export function useSelectElementTranslation() {
           // Always attempt to deactivate select mode when ESC pressed in sidepanel
           // This ensures content script is instructed even if shared state is out-of-sync.
           deactivateSelectMode().catch(() => {});
-        } catch (e) {}
+        } catch {}
       }
     };
-    try { window.addEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch(e){}
+    try { window.addEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch {}
   });
 
   onUnmounted(() => {
-    try { window.removeEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch(e){}
+    try { window.removeEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch {}
   });
 
   onUnmounted(() => {
@@ -220,7 +220,7 @@ export function useSelectElementTranslation() {
         browser.tabs.onActivated.removeListener(_tabsActivatedHandler);
         _tabsActivatedHandler = null;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   });

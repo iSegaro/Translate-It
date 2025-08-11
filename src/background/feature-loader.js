@@ -1,11 +1,9 @@
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'feature-loader');
 // src/background/feature-loader.js
 // Dynamic feature loading based on browser capabilities
 
-// Legacy listeners removed - now managed by UnifiedListenerManager
-const listenerModules = {};
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('Core', 'feature-loader');
 
 /**
  * Feature loader class
@@ -225,7 +223,7 @@ export class FeatureLoader {
   /**
    * @deprecated Legacy method - listeners are now managed by UnifiedListenerManager
    */
-  async loadListener(listenerName, browser) {
+  async loadListener(listenerName) {
     logger.warn(
       `[FeatureLoader] loadListener(${listenerName}) is deprecated - listeners are now managed by UnifiedListenerManager`,
     );

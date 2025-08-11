@@ -22,7 +22,7 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-import { StorageCore, StorageManager } from '../core/StorageCore.js';
+import { StorageCore } from '../core/StorageCore.js';
 
 describe('StorageCore', () => {
   let storageManager;

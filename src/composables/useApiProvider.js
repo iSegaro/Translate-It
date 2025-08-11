@@ -11,7 +11,7 @@ export function useApiProvider() {
   const isLoading = ref(false);
   const providerError = ref("");
 
-  const { messenger, safeStorageSet, setupStorageListener, removeStorageListener } = useBrowserAPI('api-provider');
+  const { safeStorageSet, setupStorageListener, removeStorageListener } = useBrowserAPI('api-provider');
   const settingsStore = useSettingsStore();
 
   const currentProviderData = computed(() => getProviderById(currentProvider.value));
@@ -21,7 +21,7 @@ export function useApiProvider() {
   const loadAvailableProviders = () => {
     try {
       availableProviders.value = getProvidersForDropdown().map(p => ({ ...p, id: p.value }));
-    } catch (error) {
+    } catch {
       providerError.value = "Failed to load providers";
     }
   };
@@ -39,7 +39,7 @@ export function useApiProvider() {
         currentProvider.value = "google";
         await settingsStore.updateSettingAndPersist("TRANSLATION_API", "google");
       }
-    } catch (error) {
+    } catch {
       currentProvider.value = "google";
     }
   };
@@ -53,7 +53,7 @@ export function useApiProvider() {
       currentProvider.value = providerId;
       isDropdownOpen.value = false;
       return true;
-    } catch (error) {
+    } catch {
       providerError.value = "Failed to change provider";
       return false;
     } finally {

@@ -2,9 +2,8 @@
 // Vue composable for SelectionWindows integration
 // Bridges OLD SelectionWindows with Vue architecture
 
-import { ref, reactive, onMounted, onUnmounted, readonly, computed } from "vue";
+import { reactive, onMounted, onUnmounted, computed } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
-import { useI18n } from "./useI18n.js";
 import SelectionWindows from "@/managers/content/WindowsManager.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
@@ -13,7 +12,6 @@ import { createLogger } from '@/utils/core/logger.js';
 const logger = createLogger('UI', 'useSelectionWindows');
 
 export function useSelectionWindows() {
-  const { t } = useI18n();
   const browserAPI = useBrowserAPI();
 
   // Reactive state
@@ -44,7 +42,7 @@ export function useSelectionWindows() {
 
   // Mock notifier for SelectionWindows compatibility
   const mockNotifier = {
-    show: (message, type, autoHide, duration) => {
+    show: (message, type) => {
       logger.debug(`[useSelectionWindows] Mock notification [${type}]: ${message}`);
       // In a full implementation, this could integrate with Vue toast system
     },
@@ -193,7 +191,7 @@ export function useSelectionWindows() {
    * Setup message listener for translation responses
    */
   const setupMessageListener = () => {
-    const messageListener = (message, sender) => {
+    const messageListener = (message) => {
       // Only handle translation response messages
       if (message.action === MessageActions.TRANSLATION_COMPLETE && message.context === MessagingContexts.SELECTION_MANAGER) {
         handleTranslationResponse(message);

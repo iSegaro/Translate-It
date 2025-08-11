@@ -37,7 +37,7 @@ export async function handleSetSelectElementState(message, sender) {
         // Skip sending to originating tab to avoid echoing the request back
         logger.debug('[handleSetSelectElementState] Skipping tabs.sendMessage to originating tab to prevent echo', tabId);
       }
-    } catch (e) {
+    } catch {
       // ignore send errors (tab may not have listener)
     }
 

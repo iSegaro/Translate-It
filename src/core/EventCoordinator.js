@@ -19,7 +19,7 @@ import {
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createLogger } from "../utils/core/logger.js";
-import { logMethod, taggleLinks } from "../utils/core/helpers.js";
+import { logMethod } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
 import SelectionWindows from "../managers/content/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
