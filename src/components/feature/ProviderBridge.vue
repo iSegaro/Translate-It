@@ -144,81 +144,38 @@ const testResult = ref(null)
 
 const selectedProvider = computed(() => translationStore.selectedProvider)
 
-// Provider information mapping
-const providerDetails = {
-  google: {
-    name: 'Google Translate',
-    description: 'Google Translate API for fast and accurate translations.',
-    requiresKey: false,
-    requiresUrl: false,
-    requiresModel: false
-  },
-  bing: {
-    name: 'Bing Translator',
-    description: 'Microsoft Bing Translator API.',
-    requiresKey: false,
-    requiresUrl: false,
-    requiresModel: false
-  },
-  gemini: {
-    name: 'Google Gemini',
-    description: 'Google Gemini AI for intelligent translations.',
-    requiresKey: true,
-    requiresUrl: false,
-    requiresModel: false,
-    keyHint: 'Get your API key from Google AI Studio',
-    docsUrl: 'https://makersuite.google.com/app/apikey'
-  },
-  openai: {
-    name: 'OpenAI',
-    description: 'OpenAI GPT models for context-aware translations.',
-    requiresKey: true,
-    requiresUrl: false,
-    requiresModel: true,
-    keyHint: 'Get your API key from OpenAI dashboard',
-    modelHint: 'e.g., gpt-3.5-turbo, gpt-4',
-    docsUrl: 'https://platform.openai.com/api-keys'
-  },
-  openrouter: {
-    name: 'OpenRouter',
-    description: 'Access multiple AI models through OpenRouter.',
-    requiresKey: true,
-    requiresUrl: false,
-    requiresModel: true,
-    keyHint: 'Get your API key from OpenRouter dashboard',
-    modelHint: 'e.g., anthropic/claude-3-sonnet',
-    docsUrl: 'https://openrouter.ai/keys'
-  },
-  deepseek: {
-    name: 'DeepSeek',
-    description: 'DeepSeek AI models for translation.',
-    requiresKey: true,
-    requiresUrl: false,
-    requiresModel: true,
-    keyHint: 'Get your API key from DeepSeek platform',
-    modelHint: 'e.g., deepseek-chat',
-    docsUrl: 'https://platform.deepseek.com/api_keys'
-  },
-  webai: {
-    name: 'Web AI',
-    description: 'browser-based AI translation using local models.',
-    requiresKey: false,
-    requiresUrl: false,
-    requiresModel: false
-  },
-  custom: {
-    name: 'Custom Provider',
-    description: 'Configure a custom translation API endpoint.',
-    requiresKey: true,
-    requiresUrl: true,
-    requiresModel: false,
-    keyHint: 'API key for your custom endpoint',
-    urlHint: 'Full URL to your translation API'
+// Get provider information from central registry
+const getProviderDetails = (providerId) => {
+  const provider = getProviderById(providerId)
+  if (!provider) return null
+  
+  return {
+    name: provider.name,
+    description: provider.description,
+    requiresKey: provider.needsApiKey,
+    requiresUrl: provider.category === 'custom',
+    requiresModel: provider.models && provider.models.length > 0,
+    keyHint: `Get your API key from ${provider.name} dashboard`,
+    modelHint: provider.models ? `e.g., ${provider.models[0]}` : undefined,
+    docsUrl: getProviderDocsUrl(providerId)
   }
 }
 
-const providerInfo = computed(() => providerDetails[selectedProvider.value])
-const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'deepseek', 'custom'].includes(selectedProvider.value))
+const getProviderDocsUrl = (providerId) => {
+  const docsUrls = {
+    gemini: 'https://makersuite.google.com/app/apikey',
+    openai: 'https://platform.openai.com/api-keys',
+    openrouter: 'https://openrouter.ai/keys',
+    deepseek: 'https://platform.deepseek.com/api_keys'
+  }
+  return docsUrls[providerId] || null
+}
+
+const providerInfo = computed(() => getProviderDetails(selectedProvider.value))
+const isAIProvider = computed(() => {
+  const provider = getProviderById(selectedProvider.value)
+  return provider?.category === 'ai' || provider?.category === 'custom'
+})
 const needsConfiguration = computed(() => providerInfo.value?.requiresKey || providerInfo.value?.requiresUrl)
 const needsCustomUrl = computed(() => providerInfo.value?.requiresUrl)
 const needsModel = computed(() => providerInfo.value?.requiresModel)

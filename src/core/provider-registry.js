@@ -135,8 +135,8 @@ export const PROVIDER_REGISTRY = [
     models: ["deepseek-chat", "deepseek-reasoner"],
   },
   {
-    id: "webai-to-api",
-    name: "WebAI to API",
+    id: "webai",
+    name: "WebAI Local Server",
     description: "Local server for AI model access",
     icon: "webai.svg",
     category: PROVIDER_CATEGORIES.LOCAL,

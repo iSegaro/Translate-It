@@ -25,14 +25,14 @@
     </div>
     <div class="setting-group">
       <label>{{ $i18n('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
-      <BaseDropdown
+      <BaseSelect
         v-model="openrouterApiModel"
         :options="openrouterApiModelOptions"
         class="model-select"
       />
     </div>
     <div
-      v-if="openrouterApiModel === 'custom'"
+      v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
       <label>{{ $i18n('openrouter_custom_model_label') || 'Custom Model Name' }}</label>
@@ -45,10 +45,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
-import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -57,20 +57,30 @@ const openrouterApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('OPENROUTER_API_KEY', value)
 })
 
+// Track dropdown selection separately from stored value
+const selectedModelOption = ref('openai/gpt-4o')
+
+// Initialize selectedModelOption based on current stored value
+const initializeModelSelection = () => {
+  const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o';
+  const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  selectedModelOption.value = isPredefined ? currentModel : 'custom';
+}
+
 const openrouterApiModel = computed({
-  get: () => settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o',
+  get: () => selectedModelOption.value,
   set: (value) => {
-    if (value === 'custom') {
-      // Handled by openrouterCustomModel's setter
-    } else {
+    selectedModelOption.value = value;
+    if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
     }
+    // If 'custom' is selected, wait for user input in custom field
   }
 })
 
 const openrouterCustomModel = computed({
   get: () => {
-    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL;
+    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o';
     const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
     return isPredefined ? '' : currentModel;
   },
@@ -80,6 +90,9 @@ const openrouterCustomModel = computed({
 })
 
 const openrouterApiModelOptions = ref([
+  { value: 'openai/gpt-5', label: 'GPT-5' },
+  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
+  { value: 'openai/gpt-5-nano', label: 'GPT-5 Nano' },
   { value: 'openai/gpt-4o', label: 'OpenAI GPT-4o' },
   { value: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o Mini' },
   { value: 'openai/gpt-4.1', label: 'OpenAI GPT-4.1' },
@@ -92,6 +105,11 @@ const openrouterApiModelOptions = ref([
   { value: 'mistralai/mistral-large', label: 'Mistral Large' },
   { value: 'custom', label: 'Custom Model' }
 ])
+
+// Initialize model selection on mount
+onMounted(() => {
+  initializeModelSelection()
+})
 </script>
 
 <style lang="scss" scoped>

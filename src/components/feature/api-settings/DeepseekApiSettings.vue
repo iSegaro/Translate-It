@@ -25,14 +25,14 @@
     </div>
     <div class="setting-group">
       <label>{{ $i18n('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
-      <BaseDropdown
+      <BaseSelect
         v-model="deepseekApiModel"
         :options="deepseekApiModelOptions"
         class="model-select"
       />
     </div>
     <div
-      v-if="deepseekApiModel === 'custom'"
+      v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
       <label>{{ $i18n('deepseek_custom_model_label') || 'Custom Model Name' }}</label>
@@ -45,10 +45,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
-import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -57,20 +57,30 @@ const deepseekApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('DEEPSEEK_API_KEY', value)
 })
 
+// Track dropdown selection separately from stored value
+const selectedModelOption = ref('deepseek-chat')
+
+// Initialize selectedModelOption based on current stored value
+const initializeModelSelection = () => {
+  const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat';
+  const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  selectedModelOption.value = isPredefined ? currentModel : 'custom';
+}
+
 const deepseekApiModel = computed({
-  get: () => settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat',
+  get: () => selectedModelOption.value,
   set: (value) => {
-    if (value === 'custom') {
-      // Handled by deepseekCustomModel's setter
-    } else {
+    selectedModelOption.value = value;
+    if (value !== 'custom') {
       settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
     }
+    // If 'custom' is selected, wait for user input in custom field
   }
 })
 
 const deepseekCustomModel = computed({
   get: () => {
-    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL;
+    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || 'deepseek-chat';
     const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
     return isPredefined ? '' : currentModel;
   },
@@ -84,6 +94,11 @@ const deepseekApiModelOptions = ref([
   { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner (R1)' },
   { value: 'custom', label: 'Custom Model' }
 ])
+
+// Initialize model selection on mount
+onMounted(() => {
+  initializeModelSelection()
+})
 </script>
 
 <style lang="scss" scoped>

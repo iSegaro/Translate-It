@@ -27,7 +27,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { getProvidersForDropdown } from '@/core/provider-registry.js'
 
 defineProps({
   modelValue: {
@@ -43,15 +44,15 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue', 'change'])
 
-// Mock providers - will be replaced with real provider registry
-const availableProviders = ref([
-  { id: 'google', name: 'Google Translate' },
-  { id: 'openai', name: 'OpenAI GPT' },
-  { id: 'gemini', name: 'Google Gemini' },
-  { id: 'deepseek', name: 'DeepSeek' },
-  { id: 'bing', name: 'Bing Translator' },
-  { id: 'yandex', name: 'Yandex Translate' }
-])
+// Available providers from central registry
+const availableProviders = ref([])
+
+onMounted(() => {
+  availableProviders.value = getProvidersForDropdown().map(provider => ({
+    id: provider.id,
+    name: provider.name
+  }))
+})
 
 const handleChange = (event) => {
   const value = event.target.value

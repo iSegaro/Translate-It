@@ -25,14 +25,14 @@
     </div>
     <div class="setting-group">
       <label>{{ $i18n('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
-      <BaseDropdown
+      <BaseSelect
         v-model="openaiApiModel"
         :options="openaiApiModelOptions"
         class="model-select"
       />
     </div>
     <div
-      v-if="openaiApiModel === 'custom'"
+      v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
       <label>{{ $i18n('openai_custom_model_label') || 'Custom Model Name' }}</label>
@@ -45,10 +45,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
-import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -57,33 +57,42 @@ const openaiApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('OPENAI_API_KEY', value)
 })
 
+// Track dropdown selection separately from stored value
+const selectedModelOption = ref('gpt-4o')
+
+// Initialize selectedModelOption based on current stored value
+const initializeModelSelection = () => {
+  const currentModel = settingsStore.settings?.OPENAI_API_MODEL || 'gpt-4o';
+  const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  selectedModelOption.value = isPredefined ? currentModel : 'custom';
+}
+
 const openaiApiModel = computed({
-  get: () => settingsStore.settings?.OPENAI_API_MODEL || 'gpt-3.5-turbo',
+  get: () => selectedModelOption.value,
   set: (value) => {
-    // If custom model is selected, update OPENAI_API_MODEL with the custom value
-    if (value === 'custom') {
-      // This will be handled by the custom model input's v-model directly updating openaiCustomModel
-      // and then openaiCustomModel's setter updating OPENAI_API_MODEL
-    } else {
+    selectedModelOption.value = value;
+    if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
     }
+    // If 'custom' is selected, wait for user input in custom field
   }
 })
 
 const openaiCustomModel = computed({
   get: () => {
-    // If the current OPENAI_API_MODEL is not in the predefined options, it's a custom model
-    const currentModel = settingsStore.settings?.OPENAI_API_MODEL;
+    const currentModel = settingsStore.settings?.OPENAI_API_MODEL || 'gpt-4o';
     const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
     return isPredefined ? '' : currentModel;
   },
   set: (value) => {
-    // When custom model input changes, update the main OPENAI_API_MODEL setting
     settingsStore.updateSettingLocally('OPENAI_API_MODEL', value);
   }
 })
 
 const openaiApiModelOptions = ref([
+  { value: 'gpt-5', label: 'GPT-5' },
+  { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+  { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
   { value: 'gpt-4.1', label: 'GPT-4.1' },
   { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
   { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano' },
@@ -93,6 +102,11 @@ const openaiApiModelOptions = ref([
   { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
   { value: 'custom', label: 'Custom Model' }
 ])
+
+// Initialize model selection on mount
+onMounted(() => {
+  initializeModelSelection()
+})
 </script>
 
 <style lang="scss" scoped>

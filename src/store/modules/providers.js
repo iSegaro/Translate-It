@@ -1,17 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { PROVIDER_REGISTRY, PROVIDER_CATEGORIES } from '@/core/provider-registry.js'
 
 export const useProvidersStore = defineStore('providers', () => {
   // State
   const selectedProvider = ref('google')
-  const availableProviders = ref([
-    { id: 'google', name: 'Google Translate', type: 'free', enabled: true },
-    { id: 'openai', name: 'OpenAI GPT', type: 'ai', enabled: false },
-    { id: 'gemini', name: 'Google Gemini', type: 'ai', enabled: false },
-    { id: 'deepseek', name: 'DeepSeek', type: 'ai', enabled: false },
-    { id: 'bing', name: 'Bing Translator', type: 'free', enabled: true },
-    { id: 'yandex', name: 'Yandex Translate', type: 'free', enabled: true }
-  ])
+  
+  // Generate available providers from central registry
+  const availableProviders = ref(
+    PROVIDER_REGISTRY.map(provider => ({
+      id: provider.id,
+      name: provider.name,
+      type: provider.category === PROVIDER_CATEGORIES.AI ? 'ai' : 'free',
+      enabled: !provider.needsApiKey // Free providers enabled by default
+    }))
+  )
   const apiKeys = ref({})
   
   // Getters

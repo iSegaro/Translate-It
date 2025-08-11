@@ -40,12 +40,12 @@ const settingsStore = useSettingsStore()
 
 const webAIApiUrl = computed({
   get: () => settingsStore.settings?.WEBAI_API_URL || '',
-  set: (value) => settingsStore.updateSetting('WEBAI_API_URL', value)
+  set: (value) => settingsStore.updateSettingLocally('WEBAI_API_URL', value)
 })
 
 const webAIApiModel = computed({
   get: () => settingsStore.settings?.WEBAI_API_MODEL || '',
-  set: (value) => settingsStore.updateSetting('WEBAI_API_MODEL', value)
+  set: (value) => settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
 })
 </script>
 
