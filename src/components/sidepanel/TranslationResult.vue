@@ -1,7 +1,7 @@
 <template>
   <div class="result-container">
-    <!-- Translation Output Field -->
-    <TranslationOutputField
+    <!-- Translation Display -->
+    <TranslationDisplay
       :content="translatedText"
       :language="targetLanguage"
       :is-loading="isLoading"
@@ -11,6 +11,7 @@
       :copy-alt="'Copy'"
       :tts-title="t('SIDEPANEL_VOICE_TARGET_TITLE_ICON', 'Play Translation')"
       :tts-alt="'Play'"
+      mode="sidepanel"
       :enable-markdown="true"
       :show-fade-in-animation="true"
     />
@@ -20,7 +21,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n.js'
-import TranslationOutputField from '@/components/shared/TranslationOutputField.vue'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 // Props
 const props = defineProps({

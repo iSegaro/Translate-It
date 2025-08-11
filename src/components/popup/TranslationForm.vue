@@ -23,8 +23,8 @@
       @keydown="handleKeydown"
     />
 
-    <!-- Translation Output Field -->
-    <TranslationOutputField
+    <!-- Translation Display -->
+    <TranslationDisplay
       ref="translationResultRef"
       :content="translatedText"
       :language="currentTargetLanguage"
@@ -35,6 +35,7 @@
       :copy-alt="$i18n('popup_copy_target_alt_icon') || 'Copy Result'"
       :tts-title="$i18n('popup_voice_target_title_icon') || 'خواندن متن مقصد'"
       :tts-alt="$i18n('popup_voice_target_alt_icon') || 'Voice Target'"
+      mode="popup"
       :enable-markdown="true"
       :show-fade-in-animation="true"
     />
@@ -48,7 +49,7 @@ import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
-import TranslationOutputField from '@/components/shared/TranslationOutputField.vue'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 // Stores
 const settingsStore = useSettingsStore()

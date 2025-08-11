@@ -297,10 +297,3 @@ export class SimpleMarkdown {
   }
 }
 
-// Export function for easier use
-export const renderMarkdown = (text) => {
-  if (!text) return "";
-
-  const rendered = SimpleMarkdown.render(text);
-  return rendered.innerHTML || text;
-};

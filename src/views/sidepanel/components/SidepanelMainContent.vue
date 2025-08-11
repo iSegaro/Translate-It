@@ -85,7 +85,7 @@
       </div>
 
       <!-- Result Area with Toolbar -->
-      <TranslationOutputField
+      <TranslationDisplay
         :content="translatedText"
         :language="targetLanguageValue"
         :is-loading="isTranslating"
@@ -95,6 +95,8 @@
         :copy-alt="'Copy Result'"
         :tts-title="'Speak Translation'"
         :tts-alt="'Voice Target'"
+        mode="sidepanel"
+        :enable-markdown="true"
         :show-fade-in-animation="true"
       />
     </form>
@@ -115,7 +117,7 @@ import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode } from "
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
-import TranslationOutputField from "@/components/shared/TranslationOutputField.vue";
+import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -740,30 +742,6 @@ html[dir="rtl"] .result:empty::before {
   opacity: 1;
 }
 
-/* Force paste button to right side with high specificity */
-.textarea-container.source-container .paste-icon-separate {
-  position: absolute !important;
-  top: 5px !important;
-  right: 8px !important;
-  left: auto !important;
-  z-index: 10;
-  opacity: 0.6;
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  filter: var(--icon-filter, none);
-  transition: opacity 0.2s ease;
-}
-
-.paste-icon-separate:hover {
-  opacity: 1;
-}
-
-/* RTL support for paste button - Match OLD implementation */
-html[dir="rtl"] .textarea-container.source-container .paste-icon-separate {
-  left: 18px !important;
-  right: auto !important;
-}
 
 /* Spinner styles - Match OLD implementation */
 .spinner-center {
