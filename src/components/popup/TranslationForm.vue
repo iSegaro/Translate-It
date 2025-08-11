@@ -115,6 +115,9 @@ const handleTranslate = async () => {
       targetLanguage
     }
     
+    // Use composable translation function with current language values
+    await triggerTranslation(sourceLanguage, targetLanguage)    
+
   } catch (error) {
     await handleError(error, 'popup-translation')
   }
