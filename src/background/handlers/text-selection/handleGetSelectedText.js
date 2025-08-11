@@ -3,6 +3,7 @@ import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { createLogger } from '@/utils/core/logger.js';
+import { MessageActions } from '../../../messaging/core/MessageActions.js';
 
 const logger = createLogger('Core', 'handleGetSelectedText');
 
@@ -29,7 +30,7 @@ export async function handleGetSelectedText(message, sender, sendResponse) {
     
     // Send message to content script to get selected text
     const response = await browser.tabs.sendMessage(targetTabId, {
-      action: 'GET_SELECTED_TEXT',
+      action: MessageActions.GET_SELECTED_TEXT,
       data: {
         timestamp: Date.now()
       }

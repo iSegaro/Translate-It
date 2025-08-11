@@ -6,6 +6,7 @@ import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { createLogger } from "../utils/core/logger.js";
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
+import { MessageActions } from "../messaging/core/MessageActions.js";
 
 const messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
 const logger = createLogger('Translation', 'SmartTranslation');
@@ -337,8 +338,8 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    messenger.sendMessage({ action: 'showNotification', data: { message: await getTranslationString("STATUS_SMART_TRANSLATE_COPIED"), type: 'success' } });
+    messenger.sendMessage({ action: MessageActions.SHOW_NOTIFICATION_SIMPLE, data: { message: await getTranslationString("STATUS_SMART_TRANSLATE_COPIED"), type: 'success' } });
   } catch (error) {
-    messenger.sendMessage({ action: 'handleError', data: { error, context: 'smartTranslation-clipboard' } });
+    messenger.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } });
   }
 }

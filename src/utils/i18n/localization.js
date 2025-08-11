@@ -3,8 +3,9 @@
 import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
-import { logME } from "./helpers.js";
+import { logME } from "../core/helpers.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
  * Initializes the language selection UI and handles dynamic localization.
@@ -73,7 +74,7 @@ async function setLanguage(locale) {
       locale,
     );
     browser.runtime
-      .sendMessage({ action: "REFRESH_CONTEXT_MENUS" })
+      .sendMessage({ action: MessageActions.REFRESH_CONTEXT_MENUS })
       .catch((err) =>
         logME("Error sending REFRESH_CONTEXT_MENUS message:", err.message),
       );

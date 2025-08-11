@@ -3,6 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { createLogger } from '@/utils/core/logger.js';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const logger = createLogger('Core', 'capture-content');
 
@@ -90,7 +91,7 @@ export class ContentScriptCaptureManager {
 
       // Inject capture UI into content script
       await browser.tabs.sendMessage(tab.id, {
-        action: "START_AREA_CAPTURE",
+        action: MessageActions.START_AREA_CAPTURE,
         source: "background",
         data: { area, options },
       });
@@ -159,7 +160,7 @@ export class ContentScriptCaptureManager {
 
       // Send image to content script for OCR processing
       const response = await browser.tabs.sendMessage(tab.id, {
-        action: "OCR_PROCESS",
+        action: MessageActions.OCR_PROCESS,
         source: "background",
         data: {
           imageData,

@@ -6,6 +6,7 @@ import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { cropImageData } from "../utils/imageProcessing.js";
 import { logME } from "../utils/core/helpers.js";
 import { MessageContexts } from "../../messaging/core/MessagingCore.js";
+import { MessageActions } from "../../messaging/core/MessageActions.js";
 
 export class ContentCaptureHandler {
   constructor() {
@@ -112,7 +113,7 @@ export class ContentCaptureHandler {
 
   _showErrorNotification(message, error) {
     this.messenger.sendMessage({
-      action: "SHOW_ERROR_NOTIFICATION",
+      action: MessageActions.SHOW_ERROR_NOTIFICATION,
       data: { message, error: error.message, type: error.type || ErrorTypes.SCREEN_CAPTURE },
     }).catch(err => logME('Error sending error notification', err));
   }

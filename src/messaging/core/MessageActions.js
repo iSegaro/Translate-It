@@ -5,14 +5,19 @@ export class MessageActions {
   // Core actions
   static PING = 'ping';
   static GET_INFO = 'getInfo';
+  static HANDLE_ERROR = 'handleError';
   
   // Translation actions
   static TRANSLATE = 'TRANSLATE';
+  static TRANSLATE_SELECTION = 'TRANSLATE_SELECTION';
+  static TRANSLATE_PAGE = 'TRANSLATE_PAGE';
   static FETCH_TRANSLATION = 'fetchTranslation';
   static BATCH_TRANSLATE = 'BATCH_TRANSLATE';
   static GET_PROVIDERS = 'GET_PROVIDERS';
   static TEST_PROVIDER = 'TEST_PROVIDER';
   static TRANSLATION_RESULT_UPDATE = 'TRANSLATION_RESULT_UPDATE';
+  static TRANSLATE_TEXT = 'TRANSLATE_TEXT';
+  static TRANSLATE_IMAGE = 'TRANSLATE_IMAGE';
 
   // Select Element
   static GET_SELECT_ELEMENT_STATE = 'getSelectElementState';
@@ -37,11 +42,17 @@ export class MessageActions {
   static IS_Current_Page_Excluded = 'isCurrentPageExcluded';
   
   // TTS actions
+  static GOOGLE_TTS_SPEAK = 'GOOGLE_TTS_SPEAK';
+  static TTS_SPEAK = 'TTS_SPEAK';
+  static TTS_STOP = 'TTS_STOP';
+  static TTS_PAUSE = 'TTS_PAUSE';
+  static TTS_RESUME = 'TTS_RESUME';
   // Legacy TTS actions - removed, using GOOGLE_TTS_SPEAK instead
   static PLAY_OFFSCREEN_AUDIO = 'playOffscreenAudio';
   
   // Capture actions
   static SCREEN_CAPTURE = 'SCREEN_CAPTURE';
+  static START_SCREEN_CAPTURE = 'START_SCREEN_CAPTURE';
   static CAPTURE_FULL_SCREEN = 'CAPTURE_FULL_SCREEN';
   static START_CAPTURE_SELECTION = 'START_CAPTURE_SELECTION';
   static PROCESS_IMAGE_OCR = 'PROCESS_IMAGE_OCR';
@@ -50,15 +61,28 @@ export class MessageActions {
   static CAPTURE_SAVE_TRANSLATION = 'CAPTURE_SAVE_TRANSLATION';
   static SCREEN_CAPTURE_CANCELLED = 'SCREEN_CAPTURE_CANCELLED';
   static PROCESS_SCREEN_CAPTURE = 'PROCESS_SCREEN_CAPTURE';
+  static START_AREA_CAPTURE = 'START_AREA_CAPTURE';
+  static OCR_PROCESS = 'OCR_PROCESS';
+  static START_SCREEN_AREA_SELECTION = 'START_SCREEN_AREA_SELECTION';
+  static SHOW_CAPTURE_PREVIEW = 'SHOW_CAPTURE_PREVIEW';
+  static SHOW_CAPTURE_RESULT = 'SHOW_CAPTURE_RESULT';
   
   // Selection actions
   static ACTIVATE_SELECT_ELEMENT_MODE = 'activateSelectElementMode';
   static DEACTIVATE_SELECT_ELEMENT_MODE = 'deactivateSelectElementMode';
   static REVERT_SELECT_ELEMENT_MODE = 'revertTranslation';
+  static GET_SELECTED_TEXT = 'GET_SELECTED_TEXT';
   
   // Notification actions
   static SHOW_NOTIFICATION = 'SHOW_NOTIFICATION';
   static DISMISS_NOTIFICATION = 'DISMISS_NOTIFICATION';
+  static SHOW_ERROR_NOTIFICATION = 'SHOW_ERROR_NOTIFICATION';
+  static SHOW_NOTIFICATION_SIMPLE = 'showNotification';
+  
+  // Context Menu actions
+  static REFRESH_CONTEXT_MENUS = 'REFRESH_CONTEXT_MENUS';
+  static CONTEXT_MENU_TRANSLATE_ELEMENT = 'CONTEXT_MENU_TRANSLATE_ELEMENT';
+  static CONTEXT_MENU_TRANSLATE_TEXT = 'CONTEXT_MENU_TRANSLATE_TEXT';
   
   // Storage actions
   static GET_SETTINGS = 'GET_SETTINGS';

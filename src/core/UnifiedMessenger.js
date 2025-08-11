@@ -168,7 +168,7 @@ export class UnifiedMessenger {
    */
   async translate(payload) {
     const message = {
-      action: "TRANSLATE",
+      action: MessageActions.TRANSLATE,
       context: this.context,
       messageId: payload.messageId, // Pass messageId from payload
       data: {
@@ -190,7 +190,7 @@ export class UnifiedMessenger {
    */
   async getProviders() {
     return this.sendMessage({
-      action: "GET_PROVIDERS",
+      action: MessageActions.GET_PROVIDERS,
     });
   }
 
@@ -199,7 +199,7 @@ export class UnifiedMessenger {
    */
   async speak(text, language, options = {}) {
     return this.sendMessage({
-      action: "TTS_SPEAK",
+      action: MessageActions.TTS_SPEAK,
       text,
       language,
       ...options,
@@ -211,7 +211,7 @@ export class UnifiedMessenger {
    */
   async stopSpeaking() {
     return this.sendMessage({
-      action: "TTS_STOP",
+      action: MessageActions.TTS_STOP,
     });
   }
 
@@ -220,7 +220,7 @@ export class UnifiedMessenger {
    */
   async getHistory() {
     return this.sendMessage({
-      action: "GET_HISTORY",
+      action: MessageActions.GET_HISTORY,
     });
   }
 
@@ -229,7 +229,7 @@ export class UnifiedMessenger {
    */
   async clearHistory() {
     return this.sendMessage({
-      action: "CLEAR_HISTORY",
+      action: MessageActions.CLEAR_HISTORY,
     });
   }
 
@@ -238,7 +238,7 @@ export class UnifiedMessenger {
    */
   async showNotification(title, message) {
     return this.sendMessage({
-      action: "SHOW_NOTIFICATION",
+      action: MessageActions.SHOW_NOTIFICATION,
       title,
       message,
     });

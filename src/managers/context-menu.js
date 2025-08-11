@@ -3,6 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { createLogger } from '@/utils/core/logger.js';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const logger = createLogger('Core', 'context-menu');
 
@@ -235,7 +236,7 @@ export class ContextMenuManager {
     try {
       // Send message to content script to handle translation
       await browser.tabs.sendMessage(tab.id, {
-        action: "TRANSLATE_SELECTION",
+        action: MessageActions.TRANSLATE_SELECTION,
         source: "context-menu",
         data: {
           text: info.selectionText,
@@ -254,7 +255,7 @@ export class ContextMenuManager {
   async handleTranslatePage(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: "TRANSLATE_PAGE",
+        action: MessageActions.TRANSLATE_PAGE,
         source: "context-menu",
         data: {
           pageUrl: info.pageUrl,
@@ -272,7 +273,7 @@ export class ContextMenuManager {
   async handleSelectElementMode(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: "ACTIVATE_SELECT_ELEMENT_MODE",
+        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         source: "context-menu",
         data: {
           pageUrl: info.pageUrl,
@@ -290,7 +291,7 @@ export class ContextMenuManager {
   async handleCaptureScreen(info, tab) {
     try {
       await browser.tabs.sendMessage(tab.id, {
-        action: "START_SCREEN_CAPTURE",
+        action: MessageActions.START_SCREEN_CAPTURE,
         source: "context-menu",
         data: {
           pageUrl: info.pageUrl,

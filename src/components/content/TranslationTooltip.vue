@@ -134,6 +134,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
+import { MessageActions } from '@/messaging/core/MessageActions.js'
 
 const { handleError } = useErrorHandler()
 
@@ -227,7 +228,7 @@ const translateText = async () => {
   try {
     // Send message to background script for translation
     const response = await browser.runtime.sendMessage({
-      action: 'TRANSLATE_TEXT',
+      action: MessageActions.TRANSLATE_TEXT,
       data: {
         text: sourceText.value,
         from: props.fromLanguage,

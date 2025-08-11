@@ -17,7 +17,7 @@ async function handleTranslateElement(info, tab) {
 
     // Send message to content script to translate selected element
     await browser.tabs.sendMessage(tab.id, {
-      action: "CONTEXT_MENU_TRANSLATE_ELEMENT",
+      action: MessageActions.CONTEXT_MENU_TRANSLATE_ELEMENT,
       info,
       timestamp: Date.now(),
     });
@@ -45,7 +45,7 @@ async function handleTranslateText(info, tab) {
 
     // Send message to content script to translate selected text
     await browser.tabs.sendMessage(tab.id, {
-      action: "CONTEXT_MENU_TRANSLATE_TEXT",
+      action: MessageActions.CONTEXT_MENU_TRANSLATE_TEXT,
       text: selectedText,
       info,
       timestamp: Date.now(),

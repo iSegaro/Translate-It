@@ -11,6 +11,7 @@ import {
 } from "../config.js";
 import { ProviderRegistry } from "../core/provider-registry.js";
 import { captureManager } from "../managers/browser-specific/capture/CaptureManager.js";
+import { MessageActions } from "../messaging/core/MessageActions.js";
 
 /**
  * Handle screen capture requests from sidepanel
@@ -79,7 +80,7 @@ export async function handleStartAreaCapture(
 
     // 5. Send area selection command to content script
     let response = await safeSendMessage(tabId, {
-      action: "START_SCREEN_AREA_SELECTION",
+      action: MessageActions.START_SCREEN_AREA_SELECTION,
       data: {
         sourceLanguage,
         targetLanguage,
@@ -103,7 +104,7 @@ export async function handleStartAreaCapture(
 
         // Retry after injection
         response = await safeSendMessage(tabId, {
-          action: "START_SCREEN_AREA_SELECTION",
+          action: MessageActions.START_SCREEN_AREA_SELECTION,
           data: {
             sourceLanguage,
             targetLanguage,

@@ -101,7 +101,7 @@ export class TranslationMessenger {
     }
 
     return this.messenger.sendMessage({
-      action: 'TEST_PROVIDER',
+      action: MessageActions.TEST_PROVIDER,
       data: { provider },
       timestamp: Date.now()
     });

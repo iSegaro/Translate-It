@@ -627,7 +627,7 @@ export default class SelectionWindows {
       const language = this.detectSimpleLanguage(text) || "en";
       
       await browser.runtime.sendMessage({
-        action: "GOOGLE_TTS_SPEAK",
+        action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
           language: language

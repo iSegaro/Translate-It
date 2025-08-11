@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 import { createLogger } from '@/utils/core/logger.js';
+import { MessageActions } from '@/messaging/core/MessageActions.js';
 
 const logger = createLogger('UI', 'useTTSSmart');
 
@@ -25,7 +26,7 @@ export function useTTSSmart() {
 
       // Send to background handler
       const response = await browserAPI.sendMessage({
-        action: "GOOGLE_TTS_SPEAK",
+        action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
           language: language

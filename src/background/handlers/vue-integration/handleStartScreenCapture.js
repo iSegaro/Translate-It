@@ -2,6 +2,7 @@
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
+import { MessageActions } from "../../../messaging/core/MessageActions.js";
 
 const errorHandler = new ErrorHandler();
 
@@ -18,7 +19,7 @@ export async function handleStartScreenCapture(message) {
 
     // Send message to content script to start capture UI
     await browser.tabs.sendMessage(tab.id, {
-      action: "START_SCREEN_CAPTURE",
+      action: MessageActions.START_SCREEN_CAPTURE,
       source: "background",
     });
 

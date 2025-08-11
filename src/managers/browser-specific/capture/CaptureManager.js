@@ -8,6 +8,7 @@ import { ProviderRegistry } from "../core/provider-registry.js";
 import { TranslationMode } from "../config.js";
 import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 /**
  * Central manager for screen capture translation functionality
@@ -188,7 +189,7 @@ export class CaptureManager {
 
       // Send preview data to content script
       await getbrowser().tabs.sendMessage(activeTab.id, {
-        action: "SHOW_CAPTURE_PREVIEW",
+        action: MessageActions.SHOW_CAPTURE_PREVIEW,
         data: {
           captureData,
           captureType,
@@ -259,7 +260,7 @@ export class CaptureManager {
 
         // Send area selection start message to content script
         await getbrowser().tabs.sendMessage(activeTab.id, {
-          action: "START_SCREEN_AREA_SELECTION",
+          action: MessageActions.START_SCREEN_AREA_SELECTION,
           data: this.captureOptions,
         });
 
@@ -373,7 +374,7 @@ export class CaptureManager {
 
       // Send result data to content script
       await getbrowser().tabs.sendMessage(targetTabId, {
-        action: "SHOW_CAPTURE_RESULT",
+        action: MessageActions.SHOW_CAPTURE_RESULT,
         data: {
           originalCapture: captureData,
           translationText: translationResult,
