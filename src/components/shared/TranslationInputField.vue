@@ -257,15 +257,15 @@ onMounted(async () => {
 <style scoped>
 .textarea-container {
   position: relative;
-  margin: 10px 12px;
+  margin: 8px 12px;
 }
 
 .translation-textarea {
   width: 100%;
-  padding: 28px 12px 12px 12px;
-  border-radius: 4px;
+  padding: 24px 10px 10px 10px;
+  border-radius: 3px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 13px;
   resize: vertical;
   box-sizing: border-box;
   direction: ltr;
@@ -273,7 +273,10 @@ onMounted(async () => {
   background-color: var(--bg-textbox-color);
   color: var(--text-color);
   border: 1px solid var(--header-border-color);
-  line-height: 1.6;
+  line-height: 1.5;
+  min-height: 50px;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .translation-textarea:focus {
@@ -307,5 +310,28 @@ onMounted(async () => {
 
 .inline-toolbar.visible {
   display: flex;
+}
+
+/* Context-specific adjustments for sidepanel */
+.sidepanel-wrapper .textarea-container {
+  margin: 8px 0;
+}
+
+.sidepanel-wrapper .inline-toolbar {
+  left: 18px;
+  gap: 12px;
+}
+
+.sidepanel-wrapper .translation-textarea {
+  height: 140px;
+  padding: 32px 14px 12px 14px;
+  font-size: 15px;
+  line-height: 1.7;
+  border-radius: 5px;
+  resize: none;
+}
+
+html[dir="rtl"] .sidepanel-wrapper .translation-textarea {
+  padding: 32px 14px 12px 14px;
 }
 </style>

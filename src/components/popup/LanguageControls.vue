@@ -78,9 +78,11 @@ const handleProviderChange = (provider) => {
 .language-controls {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
-  gap: 6px;
+  padding: 3px 12px;
+  margin: 0;
+  gap: 4px;
   background: var(--language-controls-bg-color);
-  border-bottom: 1px solid var(--language-controls-border-color);
+  min-height: 36px;
+  box-sizing: border-box;
 }
 </style>

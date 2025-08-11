@@ -207,16 +207,25 @@ watch(isTranslating, (newLoading, oldLoading) => {
   gap: 0;
 }
 
-/* Popup-specific adjustments if needed */
+/* Popup-specific adjustments */
 .translation-form :deep(.textarea-container) {
-  margin: 10px 12px;
+  margin: 6px 12px;
 }
 
 .translation-form :deep(.translation-textarea) {
-  min-height: 60px;
+  min-height: 50px;
+  max-height: 120px;
+  font-size: 13px;
+  padding: 22px 8px 8px 8px;
+}
+
+.translation-form :deep(.translation-display.popup-mode) {
+  margin: 6px 12px;
 }
 
 .translation-form :deep(.result-content) {
-  min-height: 60px;
+  min-height: 50px;
+  max-height: 150px;
+  font-size: 13px;
 }
 </style>

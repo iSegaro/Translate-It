@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content">
+  <div class="sidepanel-wrapper main-content">
     <form @submit.prevent="handleTranslationSubmit">
             <LanguageSelector
         v-model:sourceLanguage="sourceLang"
@@ -28,46 +28,23 @@
         </div>
       </div>
 
-      <!-- Source Text Area with Toolbar -->
-      <div
-        class="textarea-container source-container"
-        :class="{
-          'has-content': hasSourceContent,
-          'selection-mode': isSelecting,
-        }"
-      >
-        <div class="inline-toolbar source-toolbar">
-          <img
-            id="copySourceBtn"
-            src="@/assets/icons/copy.png"
-            class="inline-icon"
-            title="Copy Source Text"
-            @click="copySourceText"
-          >
-          <img
-            id="voiceSourceIcon"
-            src="@/assets/icons/speaker.png"
-            class="inline-icon"
-            title="Speak Source Text"
-            @click="speakSourceText"
-          >
-        </div>
-        <img
-          v-show="showPasteButton"
-          id="pasteSourceBtn"
-          src="@/assets/icons/paste.png"
-          class="inline-icon paste-icon-separate"
-          title="Paste Source Text"
-          @click="pasteSourceText"
-        >
-        <textarea
-          id="sourceText"
-          v-model="sourceText"
-          rows="6"
-          placeholder="Enter text to translate..."
-          @input="handleSourceTextInput"
-        />
-      </div>
+      <!-- Source Text Area -->
+      <TranslationInputField
+        v-model="sourceText"
+        :placeholder="'Enter text to translate...'"
+        :language="sourceLanguageValue"
+        :rows="6"
+        :tabindex="1"
+        :copy-title="'Copy source text'"
+        :copy-alt="'Copy'"
+        :tts-title="'Speak source text'"
+        :tts-alt="'Voice Source'"
+        :paste-title="'Paste from clipboard'"
+        :paste-alt="'Paste'"
+        :auto-translate-on-paste="false"
+        @translate="handleTranslationSubmit"
+        @input="handleSourceTextInput"
+      />
 
       <!-- Action Bar -->
       <div class="action-bar">
@@ -119,6 +96,7 @@ import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
+import TranslationInputField from "@/components/shared/TranslationInputField.vue";
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
@@ -521,102 +499,9 @@ form {
   width: 100%;
 }
 
-/* Language Controls */
-.language-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  width: 100%;
-  box-sizing: border-box;
-}
+/* Remove local language control styles - they will be handled by shared component context-specific styles */
 
-.language-select {
-  flex-grow: 1;
-  flex-basis: 120px;
-  min-width: 0;
-  padding: 8px 10px;
-  font-size: 14px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 4px;
-  background-color: var(--bg-secondary, #ffffff);
-  color: var(--text-color, #212529);
-  box-sizing: border-box;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-  padding-right: 30px;
-  filter: var(--icon-filter, none);
-}
-
-html[dir="rtl"] .language-select {
-  background-position: left 10px center;
-  padding-right: 10px;
-  padding-left: 30px;
-}
-
-.swap-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.swap-button:hover {
-  background-color: var(--toolbar-button-hover-bg, #dcdfe2);
-}
-
-.swap-button img {
-  width: 16px;
-  height: 16px;
-  filter: var(--icon-filter, none);
-}
-
-/* Textarea Container */
-.textarea-container {
-  position: relative;
-  display: flex;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.textarea-container.source-container {
-  margin-bottom: 10px;
-  flex-shrink: 0;
-}
-
-/* Source textarea - Match OLD implementation */
-textarea#sourceText {
-  width: 100%;
-  height: 140px;
-  resize: none;
-  box-sizing: border-box;
-  padding-top: 32px;
-  padding-bottom: 12px;
-  padding-inline-start: 14px;
-  padding-inline-end: 14px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 5px;
-  background-color: var(--bg-secondary, #ffffff);
-  color: var(--text-color, #212529);
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1.7;
-  direction: ltr;
-  text-align: left;
-  min-width: 0;
-}
+/* Remove local textarea styles - they will be handled by TranslationInputField component */
 
 /* Action Bar */
 .action-bar {
@@ -711,36 +596,7 @@ html[dir="rtl"] .result:empty::before {
   background: #ffe6e6;
 }
 
-/* Inline Toolbar Styles - Match OLD implementation */
-.inline-toolbar {
-  position: absolute;
-  top: 5px;
-  left: 18px;
-  display: none;
-  align-items: center;
-  gap: 12px;
-  z-index: 10;
-}
-
-/* Show toolbar only when container has content */
-.textarea-container.has-content .inline-toolbar {
-  display: flex;
-}
-
-.inline-icon {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition:
-    opacity 0.2s ease,
-    filter 0.2s ease;
-  filter: var(--icon-filter, none);
-}
-
-.inline-icon:hover {
-  opacity: 1;
-}
+/* Remove local inline toolbar styles - they will be handled by TranslationInputField component */
 
 
 /* Spinner styles - Match OLD implementation */

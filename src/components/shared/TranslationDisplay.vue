@@ -267,8 +267,11 @@ onMounted(() => {
 
 /* Mode-specific containers */
 .translation-display.popup-mode {
-  margin: 10px 12px;
-  min-height: 60px;
+  margin: 8px 12px;
+  min-height: 50px;
+  max-width: calc(100vw - 24px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .translation-display.sidepanel-mode {
@@ -298,23 +301,25 @@ onMounted(() => {
 /* Content container */
 .translation-content {
   width: 100%;
-  padding: 28px 12px 12px 12px;
-  border-radius: 4px;
+  padding: 26px 10px 10px 10px;
+  border-radius: 3px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 14px;
   box-sizing: border-box;
   direction: ltr;
   text-align: left;
-  min-height: 60px;
+  min-height: 50px;
   background-color: var(--bg-result-color, #ffffff);
   color: var(--text-color, #212529);
   border: 1px solid var(--header-border-color, #dee2e6);
-  line-height: 1.6;
-  white-space: normal;
+  line-height: 1.5;
+  white-space: pre-wrap;
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-width: 100%;
   transition: opacity 0.3s ease-out, max-height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
@@ -337,6 +342,16 @@ onMounted(() => {
   padding: 12px;
   min-height: auto;
   font-size: 14px;
+}
+
+/* Popup mode specific adjustments */
+.popup-mode .translation-content {
+  max-width: 100%;
+  max-height: 200px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-size: 13px;
+  padding: 24px 8px 8px 8px;
 }
 
 /* Content states */

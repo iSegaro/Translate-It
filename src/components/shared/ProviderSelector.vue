@@ -301,15 +301,17 @@ onUnmounted(() => {
 .split-translate-button {
   background: none;
   border: 1px solid var(--header-border-color);
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   padding: 0;
   transition: background-color 0.2s ease, border-color 0.2s ease;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
+  height: 100%;
+  min-width: 100px;
 }
 
 .split-translate-button:hover {
@@ -324,10 +326,12 @@ onUnmounted(() => {
 .translate-main-area {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 6px 8px;
+  gap: 4px;
+  padding: 4px 6px;
   flex: 1;
   transition: background-color 0.2s ease;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .translate-main-area:hover {
@@ -335,10 +339,10 @@ onUnmounted(() => {
 }
 
 .api-provider-icon {
-  width: 16px !important;
-  height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
+  width: 14px !important;
+  height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
   opacity: var(--icon-opacity);
   transition: opacity 0.2s ease-in-out;
   object-fit: contain;
@@ -348,14 +352,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 2px;
+  padding: 4px 3px;
   border-left: 1px solid var(--header-border-color);
   transition: background-color 0.2s ease;
   cursor: pointer;
-  min-width: 18px;
-  width: 18px;
+  width: 20px;
   flex-shrink: 0;
-  align-self: stretch;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .provider-dropdown-area:hover {
@@ -497,8 +501,11 @@ onUnmounted(() => {
 
 .translate-main-area span {
   color: var(--text-color);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Dropdown Menu */
@@ -553,5 +560,62 @@ onUnmounted(() => {
 .dropdown-item span {
   color: var(--text-color);
   font-size: 14px;
+}
+
+/* Context-specific adjustments for popup vs sidepanel */
+.popup-wrapper .split-translate-button {
+  height: 28px;
+  min-width: 100px;
+  align-self: center;
+}
+
+.popup-wrapper .translate-main-area {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+}
+
+.popup-wrapper .translate-main-area span {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.popup-wrapper .api-provider-icon {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.popup-wrapper .provider-dropdown-area {
+  width: 18px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidepanel-wrapper .split-translate-button {
+  height: auto;
+  min-width: 140px;
+  border-radius: 6px;
+}
+
+.sidepanel-wrapper .translate-main-area {
+  padding: 10px 12px;
+}
+
+.sidepanel-wrapper .translate-main-area span {
+  font-size: 14px;
+}
+
+.sidepanel-wrapper .api-provider-icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.sidepanel-wrapper .provider-dropdown-area {
+  width: 28px;
+  padding: 10px 6px;
 }
 </style>

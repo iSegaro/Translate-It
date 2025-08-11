@@ -233,23 +233,28 @@ onMounted(async () => {
 <style scoped>
 .language-controls {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 0 12px;
+  gap: 4px;
+  align-items: stretch;
+  flex: 1;
+  height: 100%;
 }
 
 .language-select {
   flex: 1;
-  padding: 8px 12px;
+  padding: 4px 8px;
   border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--bg-textbox-color, #ffffff);
   color: var(--text-color, #212529);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.4;
   box-sizing: border-box;
   min-width: 0;
+  height: 100%;
+  cursor: pointer;
+  text-align: left;
+  vertical-align: middle;
 }
 
 .language-select:focus {
@@ -266,17 +271,17 @@ onMounted(async () => {
 
 .swap-button {
   flex-shrink: 0;
-  padding: 8px;
+  padding: 4px;
   border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--bg-textbox-color, #ffffff);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  min-width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 100%;
   box-sizing: border-box;
 }
 
@@ -295,8 +300,8 @@ onMounted(async () => {
 }
 
 .swap-button img {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   filter: var(--icon-filter, none);
   transition: filter 0.2s ease;
 }
@@ -308,23 +313,77 @@ onMounted(async () => {
 /* Responsive Design */
 @media (max-width: 320px) {
   .language-controls {
-    gap: 6px;
+    gap: 4px;
   }
   
   .language-select {
-    font-size: 13px;
-    padding: 6px 8px;
+    font-size: 11px;
+    padding: 4px 6px;
   }
   
   .swap-button {
-    min-width: 32px;
-    height: 32px;
-    padding: 6px;
+    width: 28px;
+    padding: 4px;
   }
   
   .swap-button img {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
   }
+}
+
+/* Context-specific adjustments for popup vs sidepanel */
+.popup-wrapper .language-controls {
+  align-items: center;
+  height: auto;
+}
+
+.popup-wrapper .language-select {
+  padding: 0 8px;
+  font-size: 12px;
+  min-width: 80px;
+  height: 28px;
+  line-height: 2.8;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  vertical-align: middle;
+}
+
+.popup-wrapper .swap-button {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+}
+
+.popup-wrapper .swap-button img {
+  width: 16px;
+  height: 16px;
+}
+
+.sidepanel-wrapper .language-controls {
+  height: auto;
+  align-items: center;
+  padding: 12px;
+  gap: 10px;
+}
+
+.sidepanel-wrapper .language-select {
+  padding: 10px 14px;
+  font-size: 14px;
+  height: auto;
+  min-width: 120px;
+  max-width: 160px;
+}
+
+.sidepanel-wrapper .swap-button {
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+}
+
+.sidepanel-wrapper .swap-button img {
+  width: 18px;
+  height: 18px;
 }
 </style>
