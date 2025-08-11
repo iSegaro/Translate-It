@@ -596,26 +596,35 @@ onUnmounted(() => {
 }
 
 .sidepanel-wrapper .split-translate-button {
-  height: auto;
-  min-width: 140px;
-  border-radius: 6px;
+  height: 28px;
+  min-width: 100px;
+  border-radius: 3px;
+  align-self: center;
 }
 
 .sidepanel-wrapper .translate-main-area {
-  padding: 10px 12px;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
 }
 
 .sidepanel-wrapper .translate-main-area span {
-  font-size: 14px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .sidepanel-wrapper .api-provider-icon {
-  width: 18px !important;
-  height: 18px !important;
+  width: 12px !important;
+  height: 12px !important;
 }
 
 .sidepanel-wrapper .provider-dropdown-area {
-  width: 28px;
-  padding: 10px 6px;
+  width: 18px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

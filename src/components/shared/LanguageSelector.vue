@@ -362,28 +362,37 @@ onMounted(async () => {
 }
 
 .sidepanel-wrapper .language-controls {
-  height: auto;
-  align-items: center;
-  padding: 12px;
-  gap: 10px;
+  height: 36px !important;
+  align-items: center !important;
+  padding: 3px 0 !important;
+  margin: 2px 0 4px 0 !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
+  background: transparent !important;
+  flex: none !important;
 }
 
 .sidepanel-wrapper .language-select {
-  padding: 10px 14px;
-  font-size: 14px;
-  height: auto;
-  min-width: 120px;
-  max-width: 160px;
+  padding: 0 8px;
+  font-size: 12px;
+  height: 28px;
+  line-height: 2.7;
+  min-width: 80px;
+  max-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  vertical-align: middle;
 }
 
 .sidepanel-wrapper .swap-button {
-  width: 40px;
-  height: 40px;
-  padding: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
 }
 
 .sidepanel-wrapper .swap-button img {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
 }
 </style>

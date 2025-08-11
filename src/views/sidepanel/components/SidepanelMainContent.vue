@@ -424,7 +424,7 @@ onUnmounted(() => {
 .main-content {
   width: 100%;
   height: 100%;
-  padding: 12px;
+  padding: 4px 12px;
   display: flex;
   flex-direction: column;
   overflow-y: hidden;
