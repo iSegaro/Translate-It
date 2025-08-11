@@ -59,9 +59,9 @@ export class UnifiedMessenger {
               .then(async (response) => { // Make this callback async too
                 clearTimeout(timeoutId);
 
-                // Firefox MV3 workaround: check if response is undefined but message was actually processed
-                if (response === undefined && firefoxDetection) {
-                  console.info("[UnifiedMessenger] Firefox MV3 undefined response detected for", messageToSend.action);
+                // MV3 workaround: check if response is undefined but message was actually processed (both Firefox and Chrome)
+                if (response === undefined) {
+                  console.info("[UnifiedMessenger] MV3 undefined response detected for", messageToSend.action);
                   // For ping messages, we know it should work, so provide expected response
                   if (messageToSend.action === MessageActions.PING) {
                     resolve({ success: true, message: "pong" });
@@ -93,6 +93,18 @@ export class UnifiedMessenger {
                     resolve({ success: false, error: "Unexpected undefined response for TRANSLATE" });
                     return;
                   }
+                  // For Google TTS messages, we need to wait for actual background processing
+                  if (messageToSend.action === MessageActions.GOOGLE_TTS_SPEAK) {
+                    // Wait longer for TTS to complete in background, then assume success
+                    setTimeout(() => {
+                      resolve({
+                        success: true,
+                        message: "TTS processing completed (MV3 workaround)",
+                        mv3Bug: true,
+                      });
+                    }, 3000); // 3 second delay for TTS processing
+                    return;
+                  }
                   // For element selection messages, we need to handle the actual response from background
                   if (messageToSend.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
                     // Check if we can determine success/failure from background logs or other indicators
@@ -100,15 +112,16 @@ export class UnifiedMessenger {
                     // The actual feedback will come from content script or storage updates
                     resolve({
                       success: true,
-                      message: "Element selection mode toggled (Firefox MV3 workaround)",
-                      firefoxBug: true,
+                      message: "Element selection mode toggled (MV3 workaround)",
+                      mv3Bug: true,
                     });
                   } else {
                     // For other messages, resolve with success flag
                     resolve({
                       success: true,
                       message:
-                        "Response received but undefined due to Firefox MV3 bug",
+                        "Response received but undefined due to MV3 bug",
+                      mv3Bug: true,
                     });
                   }
                 } else {

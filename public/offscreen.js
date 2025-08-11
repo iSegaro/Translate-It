@@ -14,38 +14,10 @@ if (chrome.runtime) {
   setTimeout(() => chrome.runtime.sendMessage({ action: "OFFSCREEN_READY" }).catch(() => {}), 500);
 }
 
-/**
- * Check if message is TTS-related
- * @param {Object} message - The message object
- * @returns {boolean} True if TTS message
- */
-function isTTSMessage(message) {
-  const ttsActions = [
-    "TTS_SPEAK",
-    "TTS_STOP",
-    "TTS_TEST",
-    "TTS_PAUSE",
-    "TTS_RESUME",
-    "TTS_GET_VOICES",
-    "playOffscreenAudio",
-    "stopOffscreenAudio",
-    "speak",
-    "stopTTS",
-    "playCachedAudio",
-  ];
-
-  console.log("[Offscreen] Checking if TTS message:", {
-    action: message.action,
-    actionType: typeof message.action,
-    isIncluded: ttsActions.includes(message.action),
-    ttsActions: ttsActions,
-  });
-
-  return ttsActions.includes(message.action);
-}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[Offscreen] Received message:", message);
+  
 
   // Only handle messages explicitly targeted to offscreen context
   if (!message.target || message.target !== "offscreen") {
@@ -567,6 +539,15 @@ function handleWebSpeechFallback(data, sendResponse) {
  * Handle audio playback (legacy support)
  */
 function handleAudioPlayback(url, sendResponse) {
+  // Create a safe response wrapper to prevent multiple calls
+  let responseSent = false;
+  const safeResponse = (response) => {
+    if (!responseSent) {
+      responseSent = true;
+      sendResponse(response);
+    }
+  };
+  
   try {
     // Stop any current audio
     if (currentAudio) {
@@ -605,14 +586,14 @@ function handleAudioPlayback(url, sendResponse) {
           console.log("[Offscreen] Audio playback ended");
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
-          sendResponse({ success: true });
+          // Don't send response here anymore, already sent after play() starts
         });
 
         currentAudio.addEventListener("error", (e) => {
           console.error("[Offscreen] Audio playback error:", e);
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
-          sendResponse({
+          safeResponse({
             success: false,
             error: e.message || "Audio playback error",
           });
@@ -626,11 +607,13 @@ function handleAudioPlayback(url, sendResponse) {
       })
       .then(() => {
         console.log("[Offscreen] Audio playback started successfully");
+        // Send success response immediately after playback starts, don't wait for end
+        safeResponse({ success: true });
       })
       .catch((err) => {
         console.error("[Offscreen] Audio fetch/play failed:", err);
         currentAudio = null;
-        sendResponse({ success: false, error: err.message });
+        safeResponse({ success: false, error: err.message });
       });
     } else {
       // Fallback for non-Google TTS URLs
@@ -639,13 +622,13 @@ function handleAudioPlayback(url, sendResponse) {
       currentAudio.addEventListener("ended", () => {
         console.log("[Offscreen] Audio playback ended");
         currentAudio = null;
-        sendResponse({ success: true });
+        // Don't send response here anymore, already sent after play() starts
       });
 
       currentAudio.addEventListener("error", (e) => {
         console.error("[Offscreen] Audio playback error:", e);
         currentAudio = null;
-        sendResponse({
+        safeResponse({
           success: false,
           error: e.message || "Audio playback error",
         });
@@ -659,16 +642,18 @@ function handleAudioPlayback(url, sendResponse) {
         .play()
         .then(() => {
           console.log("[Offscreen] Audio playback started");
+          // Send success response immediately after playback starts
+          safeResponse({ success: true });
         })
         .catch((err) => {
           console.error("[Offscreen] Audio play failed:", err);
           currentAudio = null;
-          sendResponse({ success: false, error: err.message });
+          safeResponse({ success: false, error: err.message });
         });
     }
   } catch (error) {
     console.error("[Offscreen] Audio playback setup failed:", error);
-    sendResponse({ success: false, error: error.message });
+    safeResponse({ success: false, error: error.message });
   }
 }
 
