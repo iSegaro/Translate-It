@@ -35,7 +35,7 @@
       :copy-alt="$i18n('popup_copy_target_alt_icon') || 'Copy Result'"
       :tts-title="$i18n('popup_voice_target_title_icon') || 'خواندن متن مقصد'"
       :tts-alt="$i18n('popup_voice_target_alt_icon') || 'Voice Target'"
-      :enable-markdown="false"
+      :enable-markdown="true"
       :show-fade-in-animation="true"
     />
   </form>
