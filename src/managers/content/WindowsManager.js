@@ -15,7 +15,7 @@ import { storageManager } from "@/storage/core/StorageCore.js";
 import { getResolvedUserTheme } from "../../utils/ui/theme.js";
 import { AUTO_DETECT_VALUE } from "../../constants.js";
 import { determineTranslationMode } from "../../utils/translationModeHelper.js";
-import { SimpleMarkdown } from "../../utils/text/markdown.js";
+import { createTranslationRenderer, getTranslationDisplayStyles } from "../../utils/rendering/TranslationRenderer.js";
 import { MessageContexts, MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { TranslationService } from "../../core/TranslationService.js";
@@ -358,6 +358,9 @@ export default class SelectionWindows {
         .popup-container { background-color: var(--sw-bg-color); color: var(--sw-text-color); border: 1px solid var(--sw-border-color);
           border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); max-width: 300px; overflow-wrap: break-word;
         }
+        
+        /* Unified Translation Display Styles */
+        ${getTranslationDisplayStyles()}
         .loading-container { display: flex; justify-content: center; align-items: center; color: var(--sw-text-color); }
         @keyframes blink { 0% { opacity: var(--sw-loading-dot-opacity-start); } 50% { opacity: var(--sw-loading-dot-opacity-mid); } 100% { opacity: var(--sw-loading-dot-opacity-start); } }
         .loading-dot { font-size: 1.2em; margin: 0 2px; animation: blink 0.7s infinite; }
@@ -1050,24 +1053,22 @@ export default class SelectionWindows {
 
     const secondLine = document.createElement("div");
     secondLine.classList.add("second-line");
-    const textSpan = document.createElement("span");
-    textSpan.classList.add("text-content");
-    try {
-      // Ensure translatedText is safely rendered through SimpleMarkdown
-      // which already includes XSS protection via filterXSS
-      const markdownElement = SimpleMarkdown.render(translatedText);
-      if (markdownElement) {
-        textSpan.appendChild(markdownElement);
-      } else {
-        // Fallback to safe text content if markdown rendering fails
-        textSpan.textContent = translatedText;
-      }
-    } catch (e) {
-      logME("Error parsing markdown:", e);
-      // Always use textContent for safe text rendering
-      textSpan.textContent = translatedText;
-    }
-    secondLine.appendChild(textSpan);
+    
+    // Use unified TranslationRenderer
+    const renderer = createTranslationRenderer({
+      enableMarkdown: true,
+      enableLabelFormatting: true,
+      mode: 'selection'
+    });
+    
+    const contentElement = renderer.createContentElement({
+      content: translatedText,
+      error: null,
+      isLoading: false,
+      placeholder: ''
+    });
+    
+    secondLine.appendChild(contentElement);
     this.applyTextDirection(secondLine, translatedText);
     this.innerContainer.appendChild(secondLine);
 

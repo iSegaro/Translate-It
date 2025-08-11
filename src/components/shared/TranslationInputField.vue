@@ -251,7 +251,8 @@ onMounted(async () => {
       }
     })
   }
-})</script>
+});
+</script>
 
 <style scoped>
 .textarea-container {
