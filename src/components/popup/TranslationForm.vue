@@ -216,7 +216,7 @@ watch(isTranslating, (newLoading, oldLoading) => {
   min-height: 50px;
   max-height: 120px;
   font-size: 13px;
-  padding: 22px 8px 8px 8px;
+  padding: 30px 8px 8px 8px;
 }
 
 .translation-form :deep(.translation-display.popup-mode) {

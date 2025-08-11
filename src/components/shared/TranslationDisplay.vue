@@ -351,7 +351,7 @@ onMounted(() => {
   overflow-x: hidden;
   overflow-y: auto;
   font-size: 13px;
-  padding: 24px 8px 8px 8px;
+  padding: 40px 8px 8px 8px;
 }
 
 /* Content states */

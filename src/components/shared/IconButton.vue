@@ -103,8 +103,8 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
 
 .paste-icon-separate {
   position: absolute;
-  top: 5px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   direction: ltr; /* Force LTR to maintain consistent positioning */
   width: 16px;
   height: 16px;

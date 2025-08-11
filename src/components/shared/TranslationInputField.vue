@@ -263,7 +263,7 @@ onMounted(async () => {
 .translation-textarea {
   width: 100%;
   padding: 24px 10px 10px 10px;
-  border-radius: 3px;
+  /* border-radius: 3px; */
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
@@ -272,7 +272,7 @@ onMounted(async () => {
   text-align: left;
   background-color: var(--bg-textbox-color);
   color: var(--text-color);
-  border: 1px solid var(--header-border-color);
+  /* border: 1px solid var(--header-border-color); */
   line-height: 1.5;
   min-height: 50px;
   max-width: 100%;
@@ -293,8 +293,8 @@ onMounted(async () => {
 /* Inline Toolbar */
 .inline-toolbar {
   position: absolute;
-  top: 5px;
-  left: 8px;
+  top: 10px;
+  left: 10px;
   display: none;
   align-items: center;
   gap: 10px;

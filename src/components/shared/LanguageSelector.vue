@@ -343,7 +343,7 @@ onMounted(async () => {
   font-size: 12px;
   min-width: 80px;
   height: 28px;
-  line-height: 2.8;
+  line-height: 2.7;
   display: flex;
   align-items: center;
   justify-content: flex-start;
