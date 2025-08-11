@@ -125,6 +125,26 @@ export class SimpleMarkdown {
         currentSection.appendChild(this._parseInline(trimmed.substring(2)));
         listItems = [];
       }
+      // Label formatting (e.g., "نوع: اسم" or "Definition: Noun")
+      else if (this._isLabelLine(trimmed)) {
+        if (listItems.length > 0) {
+          // Finish any pending list
+          this._finishSection(container, currentSection, listItems);
+          currentSection = null;
+          listItems = [];
+        }
+
+        if (!currentSection || currentSection.tagName !== "P") {
+          this._finishSection(container, currentSection, []);
+          currentSection = document.createElement("p");
+          listItems = [];
+        }
+
+        if (currentSection.textContent) {
+          currentSection.appendChild(document.createTextNode(" "));
+        }
+        currentSection.appendChild(this._parseLabelLine(trimmed));
+      }
       // Regular paragraphs
       else if (trimmed) {
         if (listItems.length > 0) {
@@ -158,6 +178,37 @@ export class SimpleMarkdown {
       }
       container.appendChild(section);
     }
+  }
+
+  static _isLabelLine(text) {
+    // Pattern to match label lines like "نوع: اسم", "Definition: something", "مترادف: word, word"
+    // Look for word characters (including Arabic/Persian) followed by colon and space
+    const labelPattern = /^[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\s*:\s+.+$/;
+    return labelPattern.test(text.trim());
+  }
+
+  static _parseLabelLine(text) {
+    const span = document.createElement("span");
+    const colonIndex = text.indexOf(':');
+    
+    if (colonIndex === -1) {
+      // Fallback - shouldn't happen since _isLabelLine checked this
+      span.appendChild(this._parseInline(text));
+      return span;
+    }
+    
+    // Create bold label part
+    const label = text.substring(0, colonIndex).trim();
+    const content = text.substring(colonIndex + 1).trim();
+    
+    const labelElement = document.createElement("strong");
+    labelElement.textContent = label;
+    
+    span.appendChild(labelElement);
+    span.appendChild(document.createTextNode(": "));
+    span.appendChild(this._parseInline(content));
+    
+    return span;
   }
 
   static _parseInline(text) {
