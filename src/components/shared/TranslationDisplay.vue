@@ -268,10 +268,13 @@ onMounted(() => {
 /* Mode-specific containers */
 .translation-display.popup-mode {
   margin: 8px 12px;
-  min-height: 50px;
+  height: 100%;
   max-width: calc(100vw - 24px);
   width: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .translation-display.sidepanel-mode {
@@ -347,7 +350,8 @@ onMounted(() => {
 /* Popup mode specific adjustments */
 .popup-mode .translation-content {
   max-width: 100%;
-  max-height: 200px;
+  height: 100%;
+  flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
   font-size: 13px;

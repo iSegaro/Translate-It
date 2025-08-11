@@ -205,6 +205,8 @@ watch(isTranslating, (newLoading, oldLoading) => {
   display: flex;
   flex-direction: column;
   gap: 0;
+  height: 100%;
+  flex: 1;
 }
 
 /* Popup-specific adjustments */
@@ -221,11 +223,16 @@ watch(isTranslating, (newLoading, oldLoading) => {
 
 .translation-form :deep(.translation-display.popup-mode) {
   margin: 6px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .translation-form :deep(.result-content) {
-  min-height: 50px;
-  max-height: 150px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   font-size: 13px;
+  height: 100%;
 }
 </style>
