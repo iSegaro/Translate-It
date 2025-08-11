@@ -401,14 +401,14 @@ export default class SelectionWindows {
       }
     });
 
-    // Use TranslationService for proper background communication
+    // Use UnifiedMessenger like SelectElement for proper background communication
     let timeout;
     let messageListener;
     
     try {
       const settings = await getSettingsAsync();
       
-      // Set up result listener for Firefox MV3 compatibility
+      // Set up result listener for Firefox MV3 compatibility  
       const messageId = generateTranslationMessageId('content');
       this.logger.debug(`Generated messageId: ${messageId}`);
       
@@ -451,19 +451,42 @@ export default class SelectionWindows {
         browser.runtime.onMessage.addListener(messageListener);
       });
       
-      // Send translation request
-      this.translationService.translate(
-        translationMode, 
-        {
-          promptText: selectedText,
-          sourceLanguage: settings.SOURCE_LANGUAGE || 'auto',
-          targetLanguage: settings.TARGET_LANGUAGE || 'fa',
-          messageId: messageId
+      // Import UnifiedMessenger like SelectElement does
+      const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
+      const { MessageContexts } = await import("../../messaging/core/MessagingCore.js");
+      const unifiedMessenger = new UnifiedMessenger(MessageContexts.CONTENT);
+      
+      // Create translation payload like SelectElement
+      const payload = {
+        text: selectedText,
+        from: settings.SOURCE_LANGUAGE || 'auto',
+        to: settings.TARGET_LANGUAGE || 'fa',
+        provider: settings.TRANSLATION_API || 'google',
+        messageId: messageId,
+        mode: translationMode,
+        options: {}
+      };
+      
+      this.logger.debug("Sending translation request with payload", payload);
+      
+      // Send translation request using UnifiedMessenger  
+      const response = await unifiedMessenger.translate(payload);
+      
+      // Handle initial response (acknowledgment)
+      if (response && (response.success === false || response.error)) {
+        const msg = (response.error || response.message) || "Translation request failed";
+        this.logger.error("Translation request failed:", msg);
+        // Cancel listeners and reject
+        if (timeout) clearTimeout(timeout);
+        if (messageListener) {
+          try {
+            browser.runtime.onMessage.removeListener(messageListener);
+          } catch {}
         }
-      ).catch(error => {
-        this.logger.error("Translation request failed", error);
-        // Don't reject here, let resultPromise handle the timeout
-      });
+        throw new Error(msg);
+      }
+      
+      this.logger.operation("Translation request accepted, waiting for result...");
       
       // Wait for broadcast result only (directResult is just acknowledgment)
       const result = await resultPromise;
