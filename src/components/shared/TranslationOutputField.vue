@@ -356,6 +356,18 @@ watch(() => props.error, (newError) => {
   text-decoration: underline;
 }
 
+.result-content :deep(ul),
+.result-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+  padding-right: 8px;
+}
+
+.result-content :deep(li) {
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
 /* Inline Toolbar */
 .inline-toolbar {
   position: absolute;
