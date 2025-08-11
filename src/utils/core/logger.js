@@ -20,12 +20,16 @@ let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
 
 // Component-specific log levels
 const componentLogLevels = {
-  'Core': 2,        // INFO
-  'Content': 2,     // INFO
-  'Messaging': 1,   // WARN
-  'Translation': 2, // INFO
-  'UI': 1,          // WARN
-  'Storage': 1,     // WARN
+  // ERROR = 0
+  // WARN = 1
+  // INFO = 2
+  // DEBUG = 3
+  'Core': LOG_LEVELS.DEBUG,        // DEBUG
+  'Content': LOG_LEVELS.DEBUG,     // DEBUG
+  'Messaging': LOG_LEVELS.WARN,   // WARN
+  'Translation': LOG_LEVELS.WARN, // WARN
+  'UI': LOG_LEVELS.DEBUG,          // DEBUG
+  'Storage': LOG_LEVELS.WARN,     // WARN
 };
 
 /**
