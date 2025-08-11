@@ -4,22 +4,23 @@
     v-if="mode === 'split'"
     class="split-translate-button-container"
   >
-    <button
-      type="submit"
-      class="split-translate-button"
-      :title="$i18n('popup_translate_button_title') || 'ترجمه'"
-      :disabled="isTranslating"
-      @click="handleTranslate"
-    >
-      <div class="translate-main-area">
+    <div class="split-translate-button">
+      <button
+        type="submit"
+        class="translate-main-area"
+        :title="$i18n('popup_translate_button_title') || 'ترجمه'"
+        :disabled="isTranslating"
+        @click="handleTranslate"
+      >
         <img
           :src="currentProviderIcon"
           alt="API Provider"
           class="api-provider-icon"
         >
         <span>{{ $i18n('popup_translate_button_text') || 'ترجمه' }}</span>
-      </div>
-      <div 
+      </button>
+      <button 
+        type="button"
         class="provider-dropdown-area"
         :class="{ active: isDropdownOpen }"
         @click.stop="toggleDropdown"
@@ -30,8 +31,8 @@
           type="inline"
           class="dropdown-arrow"
         />
-      </div>
-    </button>
+      </button>
+    </div>
     
     <!-- Provider Dropdown -->
     <div 
@@ -332,6 +333,9 @@ onUnmounted(() => {
   transition: background-color 0.2s ease;
   height: 100%;
   box-sizing: border-box;
+  background: none;
+  border: none;
+  color: var(--text-color);
 }
 
 .translate-main-area:hover {
@@ -353,13 +357,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 4px 3px;
-  border-left: 1px solid var(--header-border-color);
+  border-left: 1px solid var(--primary-color, #007bff);
   transition: background-color 0.2s ease;
   cursor: pointer;
   width: 20px;
   flex-shrink: 0;
   height: 100%;
   box-sizing: border-box;
+  background: none;
 }
 
 .provider-dropdown-area:hover {
@@ -513,7 +518,7 @@ onUnmounted(() => {
   position: absolute;
   top: 100%;
   left: 0;
-  background: var(--bg-color);
+  background: var(--bg-color, white);
   border: 1px solid var(--header-border-color);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -626,5 +631,19 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sidepanel-wrapper .split-translate-button-container {
+  max-width: 150px;
+  align-self: flex-start;
+}
+
+.sidepanel-wrapper .split-translate-button {
+  background-color: var(--bg-color);
+  border: 1px solid var(--primary-color, #007bff);
+}
+
+.sidepanel-wrapper .translate-main-area span {
+  color: var(--text-color);
 }
 </style>

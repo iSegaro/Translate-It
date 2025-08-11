@@ -1,16 +1,22 @@
 <template>
   <div class="sidepanel-wrapper main-content">
     <form @submit.prevent="handleTranslationSubmit">
-            <LanguageSelector
-        v-model:sourceLanguage="sourceLang"
-        v-model:targetLanguage="targetLang"
-        :disabled="isTranslating"
-        :auto-detect-label="'Auto-Detect'"
-        :source-title="'Source Language'"
-        :target-title="'Target Language'"
-        :swap-title="'Swap Languages'"
-        :swap-alt="'Swap'"
-      />
+      <div class="controls-container">
+        <LanguageSelector
+          v-model:sourceLanguage="sourceLang"
+          v-model:targetLanguage="targetLang"
+          :disabled="isTranslating"
+          :auto-detect-label="'Auto-Detect'"
+          :source-title="'Source Language'"
+          :target-title="'Target Language'"
+          :swap-title="'Swap Languages'"
+          :swap-alt="'Swap'"
+        />
+        <ProviderSelector
+          mode="split"
+          @translate="handleTranslationSubmit"
+        />
+      </div>
 
       <!-- Select Element Status -->
       <div
@@ -45,21 +51,6 @@
         @translate="handleTranslationSubmit"
         @input="handleSourceTextInput"
       />
-
-      <!-- Action Bar -->
-      <div class="action-bar">
-        <button
-          type="submit"
-          class="translate-button-main"
-          :disabled="!sourceText.trim()"
-        >
-          <span>{{ isTranslating ? "Translating..." : "Translate" }}</span>
-          <img
-            src="@/assets/icons/translate.png"
-            alt="Translate"
-          >
-        </button>
-      </div>
 
       <!-- Result Area with Toolbar -->
       <TranslationDisplay
@@ -97,6 +88,7 @@ import { AUTO_DETECT_VALUE } from "@/constants.js";
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import TranslationInputField from "@/components/shared/TranslationInputField.vue";
+import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
@@ -503,12 +495,16 @@ form {
 
 /* Remove local textarea styles - they will be handled by TranslationInputField component */
 
-/* Action Bar */
+.controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .action-bar {
   display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
-  flex-shrink: 0;
+  justify-content: flex-start;
 }
 
 .translate-button-main {
