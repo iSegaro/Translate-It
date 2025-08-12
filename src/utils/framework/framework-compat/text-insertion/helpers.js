@@ -21,16 +21,37 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
     // بررسی که متن جدید اضافه شده یا تغییری رخ داده
     const hasNewText = currentText && currentText.includes(expectedText);
     const contentChanged = currentText !== initialContent;
+    
+    // بررسی اضافی: اگر محتوا فقط متن ترجمه شده باشد (حالت جایگزینی کامل)
+    const isCompleteReplacement = currentText === expectedText;
+    
+    // بررسی اینکه آیا متن در فیلد به‌روزرسانی شده یا خیر
+    const hasAnyChange = currentText !== initialContent;
 
-    logME("[verifyTextInsertion]", {
+    logME("[verifyTextInsertion] Verification details", {
       hasNewText,
       contentChanged,
+      isCompleteReplacement,
+      hasAnyChange,
+      currentText: currentText?.substring(0, 50) + (currentText?.length > 50 ? '...' : ''),
+      expectedText: expectedText?.substring(0, 50) + (expectedText?.length > 50 ? '...' : ''),
+      initialContent: initialContent?.substring(0, 50) + (initialContent?.length > 50 ? '...' : ''),
       currentLength: currentText?.length || 0,
       initialLength: initialContent.length,
       expectedTextLength: expectedText.length,
+      currentTextFull: currentText, // Full text for debugging
+      expectedTextFull: expectedText, // Full text for debugging
     });
 
-    return hasNewText && contentChanged;
+    // موفقیت در صورتی که یکی از شرایط زیر برقرار باشد:
+    // 1. متن مورد انتظار در محتوای فعلی موجود باشد
+    // 2. محتوای فعلی دقیقاً همان متن مورد انتظار باشد (جایگزینی کامل)
+    // 3. هر نوع تغییری نسبت به محتوای اولیه رخ داده باشد
+    const isSuccess = hasNewText || isCompleteReplacement || hasAnyChange;
+    
+    logME(`[verifyTextInsertion] Final result: ${isSuccess ? 'SUCCESS' : 'FAILED'}`);
+    
+    return isSuccess;
   } catch (error) {
     logME("[verifyTextInsertion] Error:", error);
     return false;

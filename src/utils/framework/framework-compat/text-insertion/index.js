@@ -112,9 +112,11 @@ export async function universalTextInsertion(
   if (!element || !text) return false;
 
   try {
-    // Focus کردن المان
-    element.focus();
-    await smartDelay(10);
+    // Focus کردن المان با اطمینان
+    if (document.activeElement !== element) {
+      element.focus();
+      await smartDelay(20);
+    }
 
     // ذخیره محتوای اولیه برای تأیید تغییرات
     const initialContent =
@@ -122,7 +124,7 @@ export async function universalTextInsertion(
         element.textContent || element.innerText
       : element.value;
 
-    // تنظیم انتخاب در صورت نیاز
+    // تنظیم انتخاب در صورت نیاز یا انتخاب کل محتوا برای جایگزینی
     if (start !== null && end !== null) {
       if (element.isContentEditable) {
         // برای contentEditable از selection API استفاده کن
@@ -144,7 +146,20 @@ export async function universalTextInsertion(
         // برای input/textarea
         element.setSelectionRange(start, end);
       }
+    } else {
+      // انتخاب کل محتوا برای جایگزینی کامل
+      if (element.isContentEditable) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        element.setSelectionRange(0, element.value.length);
+      }
     }
+
+    await smartDelay(10);
 
     // بررسی انتخاب موجود
     const hasSelection = checkTextSelection(element);
@@ -153,6 +168,7 @@ export async function universalTextInsertion(
       isContentEditable: element.isContentEditable,
       tagName: element.tagName,
       initialLength: initialContent.length,
+      activeElement: document.activeElement === element,
     });
 
     // استراتژی 1: execCommand insertText (بهترین حفظ undo/redo)

@@ -50,16 +50,24 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
   const mode = selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
   const platform = detectPlatform(target);
+  const timestamp = Date.now();
 
   try {
     // Store target element for later use when translation result arrives
+    // Add timestamp to track stale data
     window.pendingTranslationTarget = target;
     window.pendingTranslationMode = mode;
     window.pendingTranslationPlatform = platform;
     window.pendingTranslationTabId = tabId;
     window.pendingSelectionRange = selectionRange;
+    window.pendingTranslationTimestamp = timestamp;
     
-    logger.debug('Stored pending translation data', { target: target?.tagName, mode, platform });
+    logger.debug('Stored pending translation data', { 
+      target: target?.tagName, 
+      mode, 
+      platform, 
+      timestamp 
+    });
     
     // Get current settings from storage
     const currentProvider = await getTranslationApiAsync();
@@ -121,6 +129,21 @@ export async function applyTranslationToTextField(translatedText, originalText, 
   logger.info('Applying translation to text field', { translatedLength: translatedText?.length, originalLength: originalText?.length, translationMode });
   
   try {
+    // Check if pending data is stale (older than 30 seconds)
+    const STALE_DATA_THRESHOLD = 30000; // 30 seconds
+    const currentTime = Date.now();
+    const pendingTimestamp = window.pendingTranslationTimestamp;
+    
+    const isStaleData = pendingTimestamp && (currentTime - pendingTimestamp) > STALE_DATA_THRESHOLD;
+    
+    if (isStaleData) {
+      logger.warn('Pending translation data is stale, clearing', {
+        age: currentTime - pendingTimestamp,
+        threshold: STALE_DATA_THRESHOLD
+      });
+      clearPendingTranslationData();
+    }
+    
     // Use stored pending data or fallback to active element
     const target = window.pendingTranslationTarget || document.activeElement;
     const mode = window.pendingTranslationMode || translationMode;
@@ -133,15 +156,13 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       activeElement: document.activeElement?.tagName,
       targetElement: target?.tagName,
       targetIsEditable: isEditableElement(target),
-      translationMode: mode
+      translationMode: mode,
+      isStaleData,
+      pendingAge: pendingTimestamp ? currentTime - pendingTimestamp : 'N/A'
     });
     
-    // Clear pending data after use
-    window.pendingTranslationTarget = null;
-    window.pendingTranslationMode = null;
-    window.pendingTranslationPlatform = null;
-    window.pendingTranslationTabId = null;
-    window.pendingSelectionRange = null;
+    // Don't clear pending data immediately - keep it for potential subsequent operations
+    // Only clear after successful application or significant time gap
     
     // Dismiss the status notification if it exists
     if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
@@ -202,17 +223,41 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       logger.debug('Calling applyTranslation');
       const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target);
       logger.debug('applyTranslation completed', { success: wasApplied });
+      
+      // Clear pending data after successful application
+      if (wasApplied) {
+        clearPendingTranslationData();
+      }
+      
       return { applied: wasApplied, mode: 'replace' };
     } else {
       logger.debug('Copy mode - copying to clipboard');
       await copyToClipboard(translatedText);
+      
+      // Clear pending data after copy operation
+      clearPendingTranslationData();
+      
       return { applied: true, mode: 'copy' };
     }
     
   } catch (error) {
     logger.error('Error in applyTranslationToTextField', error);
+    // Clear pending data on error as well
+    clearPendingTranslationData();
     throw error;
   }
+}
+
+/**
+ * Clear pending translation data
+ */
+function clearPendingTranslationData() {
+  window.pendingTranslationTarget = null;
+  window.pendingTranslationMode = null;
+  window.pendingTranslationPlatform = null;
+  window.pendingTranslationTabId = null;
+  window.pendingSelectionRange = null;
+  window.pendingTranslationTimestamp = null;
 }
 
 /**
@@ -273,12 +318,29 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
     logger.debug('Target element info for translation', {
       providedTarget: !!targetElement,
       targetTag: target?.tagName,
-      isEditable: isEditableElement(target)
+      isEditable: isEditableElement(target),
+      isConnectedToDOM: target?.isConnected
     });
     
     if (!target || !isEditableElement(target)) {
       logger.warn('No valid target element found for translation');
       return false;
+    }
+    
+    // Check if target element is still connected to DOM
+    if (!target.isConnected) {
+      logger.warn('Target element is no longer connected to DOM');
+      return false;
+    }
+    
+    // Ensure element is focusable and focus it
+    try {
+      if (target.focus && typeof target.focus === 'function') {
+        target.focus();
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } catch (focusError) {
+      logger.warn('Failed to focus target element', focusError);
     }
     
     // Import the appropriate strategy based on platform
