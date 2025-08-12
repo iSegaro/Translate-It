@@ -228,14 +228,15 @@ export class ContentMessageHandler {
     });
     
     try {
-      // Validate message data
-      if (!message.data.translatedText) {
-        throw new Error('No translated text received');
+      // Route based on translation mode - delegate specialized modes first (before validation)
+      if (this.shouldDelegate(translationMode, messageId)) {
+        this.logger.debug('Delegating to specialized handler for mode:', translationMode);
+        return this.createDelegatedResponse(translationMode, messageId);
       }
 
-      // Route based on translation mode
-      if (this.shouldDelegate(translationMode, messageId)) {
-        return this.createDelegatedResponse(translationMode, messageId);
+      // Validate message data only for modes we handle directly
+      if (!message.data.translatedText) {
+        throw new Error('No translated text received');
       }
       
       if (this.isFieldTranslation(translationMode)) {

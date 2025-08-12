@@ -281,6 +281,7 @@ export class TranslationEngine {
 
     const segments = originalJson.map(item => item.text);
     const results = new Array(segments.length);
+    const translationStatus = new Array(segments.length).fill(false); // Track which segments were actually translated
     
     // Smart cache-first approach
     let cacheHits = 0;
@@ -297,8 +298,17 @@ export class TranslationEngine {
       
       if (this.cache.has(cacheKey)) {
         const cached = this.cache.get(cacheKey);
-        results[i] = cached.translatedText || segments[i];
-        cacheHits++;
+        if (cached.translatedText && cached.translatedText !== segments[i]) {
+          // Valid cached translation exists
+          results[i] = cached.translatedText;
+          translationStatus[i] = true;
+          cacheHits++;
+        } else {
+          // Cache exists but contains failed translation (null or same text)
+          results[i] = segments[i];
+          translationStatus[i] = false;
+          uncachedIndices.push(i); // Re-attempt translation
+        }
       } else {
         uncachedIndices.push(i);
       }
@@ -321,13 +331,21 @@ export class TranslationEngine {
           if (idx >= batches.length) break;
           
           const batch = batches[idx];
-          await this.processBatch(batch, segments, results, providerInstance, {
+          await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
             provider, sourceLanguage, targetLanguage, mode
           });
         }
       });
 
       await Promise.all(workers);
+    }
+
+    // Check if any translation actually succeeded
+    const anyTranslationSucceeded = translationStatus.some(status => status === true);
+    
+    if (!anyTranslationSucceeded && uncachedIndices.length > 0) {
+      // No translations succeeded and there were segments to translate
+      throw new Error(`Translation failed for all segments. Provider ${provider} is unreachable or returned errors.`);
     }
 
     // Reconstruct JSON with translated texts
@@ -384,7 +402,7 @@ export class TranslationEngine {
   /**
    * Process a single batch with fallback strategy
    */
-  async processBatch(batch, segments, results, providerInstance, config) {
+  async processBatch(batch, segments, results, translationStatus, providerInstance, config) {
     const { provider, sourceLanguage, targetLanguage, mode } = config;
     const DELIMITER = "\n\n---\n\n";
     
@@ -401,13 +419,16 @@ export class TranslationEngine {
           for (let i = 0; i < batch.length; i++) {
             const idx = batch[i];
             const translatedText = parts[i]?.trim() || segments[idx];
+            const isActuallyTranslated = translatedText !== segments[idx]; // Check if text actually changed
+            
             results[idx] = translatedText;
+            translationStatus[idx] = isActuallyTranslated;
             
             // Cache individual result
             const cacheKey = this.generateCacheKey({
               text: segments[idx], provider, sourceLanguage, targetLanguage, mode
             });
-            this.cache.set(cacheKey, { translatedText, cachedAt: Date.now() });
+            this.cache.set(cacheKey, { translatedText: isActuallyTranslated ? translatedText : null, cachedAt: Date.now() });
           }
           return;
         }
@@ -424,14 +445,15 @@ export class TranslationEngine {
         try {
           const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode);
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
+          const isActuallyTranslated = translatedText !== segments[idx]; // Check if text actually changed
           
           // Cache result
           const cacheKey = this.generateCacheKey({
             text: segments[idx], provider, sourceLanguage, targetLanguage, mode
           });
-          this.cache.set(cacheKey, { translatedText, cachedAt: Date.now() });
+          this.cache.set(cacheKey, { translatedText: isActuallyTranslated ? translatedText : null, cachedAt: Date.now() });
           
-          return { idx, result: translatedText };
+          return { idx, result: translatedText, success: isActuallyTranslated };
         } catch {
           attempt++;
           if (attempt < INDIVIDUAL_RETRY) {
@@ -440,13 +462,14 @@ export class TranslationEngine {
         }
       }
       
-      // Final fallback to original text
-      return { idx, result: segments[idx] };
+      // Final fallback to original text (mark as failed)
+      return { idx, result: segments[idx], success: false };
     });
     
     const individualResults = await Promise.all(individualPromises);
-    individualResults.forEach(({ idx, result }) => {
+    individualResults.forEach(({ idx, result, success }) => {
       results[idx] = result;
+      translationStatus[idx] = success || false;
     });
   }
 
