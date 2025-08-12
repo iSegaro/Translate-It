@@ -349,9 +349,7 @@ export default class SelectionWindows {
           --sw-original-text-color: #fff; --sw-loading-dot-opacity-start: 0.5; --sw-loading-dot-opacity-mid: 1; --sw-link-color: #58a6ff;
         }
         .popup-container { background-color: var(--sw-bg-color); color: var(--sw-text-color); border: 1px solid var(--sw-border-color);
-          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); 
-          max-width: min(300px, calc(100vw - 40px)); overflow-wrap: break-word;
-          word-break: break-word; overflow: hidden; box-sizing: border-box; min-width: 200px;
+          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); max-width: 300px; overflow-wrap: break-word;
         }
         
         /* Unified Translation Display Styles */
@@ -1049,7 +1047,7 @@ export default class SelectionWindows {
     const secondLine = document.createElement("div");
     secondLine.classList.add("second-line");
     
-    // Use unified TranslationRenderer
+    // Use unified TranslationRenderer with markdown support
     const renderer = createTranslationRenderer({
       enableMarkdown: true,
       enableLabelFormatting: true,
