@@ -401,26 +401,24 @@ export default class SelectionWindows {
       }
     });
 
-    // Use UnifiedMessenger like SelectElement for proper background communication
-    let timeout;
-    let messageListener;
-    
+    // Use same approach as SelectElement - direct messaging with manual listener
     try {
       const settings = await getSettingsAsync();
       
-      // Set up result listener for Firefox MV3 compatibility  
+      // Generate messageId for tracking  
       const messageId = generateTranslationMessageId('content');
       this.logger.debug(`Generated messageId: ${messageId}`);
       
+      // Set up direct listener like SelectElement does
       const resultPromise = new Promise((resolve, reject) => {
-        timeout = setTimeout(() => {
+        const timeout = setTimeout(() => {
           if (messageListener) {
             browser.runtime.onMessage.removeListener(messageListener);
           }
           reject(new Error('Translation timeout'));
-        }, 30000); // 30 second timeout
+        }, 30000);
         
-        messageListener = (message) => {
+        const messageListener = (message) => {
           this.logger.debug(`Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
           
           if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
@@ -429,34 +427,29 @@ export default class SelectionWindows {
             clearTimeout(timeout);
             browser.runtime.onMessage.removeListener(messageListener);
             
-            // Check for error case first
             if (message.data?.success === false && message.data?.error) {
               this.logger.error("Translation error received", message.data.error);
               const errorMessage = message.data.error.message || 'Translation failed';
               reject(new Error(errorMessage));
             } else if (message.data?.translatedText) {
-              // Success case
               this.logger.operation("Translation success received");
               resolve({ translatedText: message.data.translatedText });
             } else {
-              // Unexpected case
               this.logger.error("Unexpected message data", message.data);
               reject(new Error('No translated text in result'));
             }
-          } else if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
-            this.logger.warn(`Message ID mismatch. Expected: ${messageId}, Got: ${message.messageId}`);
           }
         };
         
         browser.runtime.onMessage.addListener(messageListener);
       });
       
-      // Import UnifiedMessenger like SelectElement does
+      // Import UnifiedMessenger but only for sending, not listening
       const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
       const { MessageContexts } = await import("../../messaging/core/MessagingCore.js");
       const unifiedMessenger = new UnifiedMessenger(MessageContexts.CONTENT);
       
-      // Create translation payload like SelectElement
+      // Send translation request
       const payload = {
         text: selectedText,
         from: settings.SOURCE_LANGUAGE || 'auto',
@@ -469,26 +462,24 @@ export default class SelectionWindows {
       
       this.logger.debug("Sending translation request with payload", payload);
       
-      // Send translation request using UnifiedMessenger  
-      const response = await unifiedMessenger.translate(payload);
-      
-      // Handle initial response (acknowledgment)
-      if (response && (response.success === false || response.error)) {
-        const msg = (response.error || response.message) || "Translation request failed";
-        this.logger.error("Translation request failed:", msg);
-        // Cancel listeners and reject
-        if (timeout) clearTimeout(timeout);
-        if (messageListener) {
-          try {
-            browser.runtime.onMessage.removeListener(messageListener);
-          } catch {}
+      // Send the message but don't wait for UnifiedMessenger result
+      unifiedMessenger.sendMessage({
+        action: MessageActions.TRANSLATE,
+        context: MessageContexts.CONTENT,
+        messageId: messageId,
+        data: {
+          text: payload.text,
+          provider: payload.provider,
+          sourceLanguage: payload.from,
+          targetLanguage: payload.to,
+          mode: payload.mode,
+          options: payload.options
         }
-        throw new Error(msg);
-      }
+      }).catch(error => {
+        this.logger.error("Failed to send translation request", error);
+      });
       
-      this.logger.operation("Translation request accepted, waiting for result...");
-      
-      // Wait for broadcast result only (directResult is just acknowledgment)
+      // Wait for the broadcast result
       const result = await resultPromise;
       
       // Check if translation was cancelled during async operation
@@ -517,16 +508,6 @@ export default class SelectionWindows {
       }
       
     } catch (error) {
-      // Cleanup listeners on error
-      if (timeout) clearTimeout(timeout);
-      if (messageListener) {
-        try {
-          browser.runtime.onMessage.removeListener(messageListener);
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-      
       if (this.isTranslationCancelled || !this.innerContainer) return;
       await this.handleTranslationError(error, loading);
     }
