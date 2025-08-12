@@ -1,6 +1,6 @@
 // Lightweight translation composable specifically for sidepanel
 // Based on usePopupTranslation but adapted for sidepanel context
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import browser from "webextension-polyfill";
 import { generateMessageId } from "../utils/messaging/messageId.js";
@@ -19,6 +19,13 @@ export function useSidepanelTranslation() {
   const isTranslating = ref(false);
   const translationError = ref("");
   const lastTranslation = ref(null);
+  
+  // Track pending requests to avoid race conditions
+  const pendingRequests = ref(new Set());
+  
+  // Track loading start time for minimum spinner duration
+  const loadingStartTime = ref(null);
+  const MINIMUM_LOADING_DURATION = 100; // Minimum 100ms to show spinner
 
   // Store
   const settingsStore = useSettingsStore();
@@ -32,23 +39,28 @@ export function useSidepanelTranslation() {
 
   // Methods
   const triggerTranslation = async (sourceLang = null, targetLang = null) => {
-    if (!canTranslate.value) return;
-
-    isTranslating.value = true;
-    translationError.value = "";
-    translatedText.value = ""; // Clear previous translation - SAME AS POPUP
+    if (!canTranslate.value) return false;
 
     try {
+      // Set loading state and clear previous results
+      isTranslating.value = true;
+      loadingStartTime.value = Date.now(); // Track when loading started
+      translationError.value = "";
+      translatedText.value = ""; // Clear previous translation - SAME AS POPUP
+
+      // Force UI update using nextTick to ensure spinner is shown
+      await nextTick();
+      
       // Use provided languages or fallback to settings
       const sourceLanguage = sourceLang || settingsStore.settings.SOURCE_LANGUAGE;
       const targetLanguage = targetLang || settingsStore.settings.TARGET_LANGUAGE;
       
-      logger.debug("[useSidepanelTranslation] Translation with languages (received params):", { sourceLang, targetLang });
-      logger.debug("[useSidepanelTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
-      
       // Get current provider from settings
       const currentProvider = settingsStore.settings.TRANSLATION_API || 'google';
       const messageId = generateMessageId('sidepanel');
+      
+      // Track this request to avoid race conditions
+      pendingRequests.value.add(messageId);
       
       // Determine translation mode (same logic as TranslationService.sidepanelTranslate)
       let mode = TranslationMode.Sidepanel_Translate;
@@ -59,7 +71,7 @@ export function useSidepanelTranslation() {
       
       // Send direct message to background using browser.runtime.sendMessage 
       // (bypassing UnifiedMessenger to avoid timeout issues)
-      browser.runtime.sendMessage({
+      const messageResult = await browser.runtime.sendMessage({
         action: MessageActions.TRANSLATE,
         messageId: messageId,
         context: 'sidepanel',
@@ -74,14 +86,22 @@ export function useSidepanelTranslation() {
         }
       }).catch(error => {
         logger.error("Failed to send translation request", error);
+        // Clean up pending request and reset loading state if message sending fails
+        pendingRequests.value.delete(messageId);
+        isTranslating.value = false;
+        loadingStartTime.value = null;
+        translationError.value = "Failed to send translation request";
+        return null;
       });
 
-      logger.debug("[useSidepanelTranslation] Translation request sent. Waiting for result...");
+      return true;
 
     } catch (error) {
       logger.error("[useSidepanelTranslation] Translation error:", error);
       translationError.value = error.message || "Translation failed";
       isTranslating.value = false; // Ensure loading state is reset on immediate error
+      loadingStartTime.value = null;
+      return false;
     }
   };
 
@@ -101,60 +121,82 @@ export function useSidepanelTranslation() {
 
   // Listen for translation result updates from background script
   onMounted(() => {
-    browser.runtime.onMessage.addListener((message) => {
-      logger.debug("[useSidepanelTranslation] Raw message received by listener:", message);
+    const messageListener = (message) => {
       if (
         message.action === MessageActions.TRANSLATION_RESULT_UPDATE
       ) {
         // Only process messages intended for sidepanel or without specific context
         if (message.context && message.context !== MessagingContexts.SIDEPANEL) {
-          logger.debug("[useSidepanelTranslation] Message filtered out. Context:", message.context, "Expected:", MessagingContexts.SIDEPANEL);
           return;
         }
         
-        logger.debug(
-          "[useSidepanelTranslation] Received TRANSLATION_RESULT_UPDATE:",
-          message,
-        );
+        // Check if this message is for a pending request
+        const messageId = message.messageId;
+        if (messageId && !pendingRequests.value.has(messageId)) {
+          return;
+        }
+        
+        // Remove from pending requests
+        if (messageId) {
+          pendingRequests.value.delete(messageId);
+        }
+        
+        // Ensure minimum loading duration for better UX
+        const ensureMinimumLoadingDuration = async () => {
+          if (loadingStartTime.value) {
+            const elapsed = Date.now() - loadingStartTime.value;
+            const remaining = MINIMUM_LOADING_DURATION - elapsed;
+            
+            if (remaining > 0) {
+              await new Promise(resolve => setTimeout(resolve, remaining));
+            }
+            
+            loadingStartTime.value = null;
+          }
+        };
         
         // Always reset loading state when receiving any result
-        isTranslating.value = false;
-        
-        if (message.data.success === false && message.data.error) {
-          // ERROR case - display error message and clear translation
-          logger.debug("[useSidepanelTranslation] Translation error received:", message.data.error);
-          translationError.value = message.data.error.message || "Translation failed";
-          translatedText.value = ""; // Clear any previous translation
-          lastTranslation.value = null; // Clear last translation on error
-          logger.debug("[useSidepanelTranslation] Error state updated:", translationError.value);
-        } else if (message.data.success !== false && message.data.translatedText) {
-          // SUCCESS case - display translation and clear error
-          logger.debug("[useSidepanelTranslation] Translation success received");
-          translatedText.value = message.data.translatedText;
-          translationError.value = ""; // Clear any previous error
-          lastTranslation.value = {
-            source: message.data.originalText,
-            target: message.data.translatedText,
-            provider: message.data.provider,
-            timestamp: message.data.timestamp,
-          };
-          logger.debug("[useSidepanelTranslation] Translation updated successfully");
-        } else {
-          // UNEXPECTED case - handle gracefully
-          logger.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
-          translationError.value = "Unexpected response format";
-          translatedText.value = "";
-        }
-      } else {
-        logger.debug("[useSidepanelTranslation] Message filtered out. Action:", message.action, "Context:", message.context);
+        // Use nextTick to ensure UI is properly updated
+        nextTick(async () => {
+          // Wait for minimum duration before hiding spinner
+          await ensureMinimumLoadingDuration();
+          
+          isTranslating.value = false;
+          
+          if (message.data.success === false && message.data.error) {
+            // ERROR case - display error message and clear translation
+            translationError.value = message.data.error.message || "Translation failed";
+            translatedText.value = ""; // Clear any previous translation
+            lastTranslation.value = null; // Clear last translation on error
+          } else if (message.data.success !== false && message.data.translatedText) {
+            // SUCCESS case - display translation and clear error
+            translatedText.value = message.data.translatedText;
+            translationError.value = ""; // Clear any previous error
+            lastTranslation.value = {
+              source: message.data.originalText,
+              target: message.data.translatedText,
+              provider: message.data.provider,
+              timestamp: message.data.timestamp,
+            };
+          } else {
+            // UNEXPECTED case - handle gracefully
+            logger.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
+            translationError.value = "Unexpected response format";
+            translatedText.value = "";
+          }
+        });
       }
-    });
-  });
-
-  // Clean up listener on unmount
-  onUnmounted(() => {
-    // No specific cleanup needed for browser.runtime.onMessage.addListener
-    // as it's managed by the browser's lifecycle for extension pages.
+    };
+    
+    browser.runtime.onMessage.addListener(messageListener);
+    
+    // Store reference for cleanup
+    const cleanupListener = () => {
+      browser.runtime.onMessage.removeListener(messageListener);
+      pendingRequests.value.clear(); // Clear any pending requests
+    };
+    
+    onUnmounted(cleanupListener);
   });
 
   return {

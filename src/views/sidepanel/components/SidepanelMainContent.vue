@@ -75,7 +75,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useTTSSmart } from "@/composables/useTTSSmart.js";
-import { useBackgroundWarmup } from "@/composables/useBackgroundWarmup.js";
 import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
 import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
@@ -96,7 +95,7 @@ const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
 const tts = useTTSSmart();
-const backgroundWarmup = useBackgroundWarmup();
+
 const selectElement = useSelectElementTranslation();
 const { handleError } = useErrorHandler();
 const { t } = useI18n();
@@ -160,76 +159,17 @@ const sourceLanguageValue = computed(() => sourceLang.value || AUTO_DETECT_VALUE
 watch(
   () => historyComposable.sortedHistoryItems,
   (newHistory) => {
-    if (import.meta.env.DEV) {
-      logger.debug(
-        "[SidepanelMainContent] History watcher triggered. newHistory:",
-        newHistory,
-      );
-    }
     if (newHistory && newHistory.length > 0) {
       const lastItem = newHistory[0];
-      if (import.meta.env.DEV) {
-        logger.debug("[SidepanelMainContent] Last history item:", lastItem);
-        logger.debug(
-          "[SidepanelMainContent] Current sourceText.value:",
-          sourceText.value,
-      );
-        logger.debug(
-          "[SidepanelMainContent] Current translatedText.value:",
-          translatedText.value,
-        );
-      }
-
+      
       // If the last history item matches the current source text, update the result
       if (
         lastItem.sourceText.trim() === sourceText.value.trim() &&
         (translatedText.value === "" || translatedText.value === null)
       ) {
-        if (import.meta.env.DEV) {
-          logger.debug(
-            "[SidepanelMainContent] Watcher condition met: Updating translation from history.",
-          );
-        }
-        if (import.meta.env.DEV) {
-          logger.debug("  lastItem.sourceText:", lastItem.sourceText);
-          logger.debug("  sourceText.value:", sourceText.value);
-          logger.debug(
-            "  translatedText.value (before update):",
-            translatedText.value,
-          );
-        }
-        
         translatedText.value = lastItem.translatedText;
         translationError.value = ""; // Clear any potential Firefox bug error message
         isTranslating.value = false;
-        
-        if (import.meta.env.DEV) {
-          logger.debug(
-            "  [History Watcher] translatedText.value (after update):",
-            translatedText.value,
-          );
-          logger.debug(
-            "  [History Watcher] translationError.value (after update):",
-            translationError.value,
-          );
-          logger.debug(
-            "  [History Watcher] isTranslating.value (after update):",
-            isTranslating.value,
-          );
-        }
-      } else if (import.meta.env.DEV) {
-        logger.debug("[SidepanelMainContent] Watcher condition NOT met.");
-        logger.debug("  lastItem.sourceText:", lastItem.sourceText);
-        logger.debug("  sourceText.value:", sourceText.value);
-        logger.debug(
-          "  lastItem.sourceText === sourceText.value:",
-          lastItem.sourceText === sourceText.value,
-        );
-        logger.debug("  translatedText.value:", translatedText.value);
-        logger.debug(
-          "  (translatedText.value === '' || translatedText.value === null):",
-          translatedText.value === "" || translatedText.value === null,
-        );
       }
     }
   },
@@ -238,8 +178,6 @@ watch(
 
 // Handle form submission using composable - SAME AS POPUP
 const handleTranslationSubmit = async () => {
-  logger.debug("[SidepanelMainContent] Translation submit started");
-
   // Early return without warning since button is now disabled when conditions not met
   if (!canTranslate.value) {
     return;
@@ -248,22 +186,18 @@ const handleTranslationSubmit = async () => {
   try {
     // Cancel previous request if exists
     if (currentAbortController.value) {
-      logger.debug("[SidepanelMainContent] Cancelling previous translation request");
       currentAbortController.value.abort();
     }
-
-    // Ensure background is ready
-    logger.debug("[SidepanelMainContent] Ensuring background script is ready...");
-    await backgroundWarmup.ensureWarmedUp();
 
     // Resolve display names to codes for translation
     const finalSourceLang = getLanguageCode(sourceLang.value) || await getSourceLanguageAsync();
     const finalTargetLang = getLanguageCode(targetLang.value) || await getTargetLanguageAsync();
-    logger.debug("[SidepanelMainContent] Triggering translation via composable with languages:", { source: finalSourceLang, target: finalTargetLang });
+    
+    // Start translation immediately - service worker will wake up when needed
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
-    logger.debug("[SidepanelMainContent] Translation completed:", success);
     
   } catch (error) {
+    logger.error("[SidepanelMainContent] Translation error caught:", error);
     await handleError(error, 'SidepanelMainContent-translation');
   }
 };

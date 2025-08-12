@@ -203,9 +203,6 @@ const handleCopy = async () => {
   try {
     const textToCopy = contentRef.value?.dataset?.originalMarkdown || props.content
     const success = await clipboard.copyToClipboard(textToCopy)
-    if (success) {
-      logger.debug('[TranslationDisplay] Content copied to clipboard')
-    }
   } catch (error) {
     await handleError(error, 'TranslationDisplay-copy')
   }
@@ -218,7 +215,6 @@ const handleTTS = async () => {
     const textForTTS = props.content.replace(/<[^>]*>/g, '')
     const langCode = getLanguageCodeForTTS(props.language)
     await tts.speak(textForTTS, langCode)
-    logger.debug('[TranslationDisplay] TTS started')
   } catch (error) {
     await handleError(error, 'TranslationDisplay-tts')
   }
