@@ -82,9 +82,19 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       throw new Error('Background script not responding - extension may need reload');
     }
     
-    const result = await messenger.specialized.translation.translate(text, { 
-      translationMode: mode,
-      originalText: text 
+    // Send direct translation message to background (bypassing specialized.translation to avoid timeout)
+    const result = await messenger.sendMessage({
+      action: MessageActions.TRANSLATE,
+      context: 'content',
+      timestamp: Date.now(),
+      data: {
+        text: text,
+        provider: 'google', // Default provider - will be overridden by background settings
+        sourceLanguage: 'auto',
+        targetLanguage: 'fa', // Will be overridden by background settings
+        mode: mode,
+        options: {}
+      }
     });
     
     logger.debug('Translation request completed', result);

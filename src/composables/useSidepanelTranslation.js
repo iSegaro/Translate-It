@@ -2,9 +2,10 @@
 // Based on usePopupTranslation but adapted for sidepanel context
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
-import { TranslationService } from "../core/TranslationService.js";
 import browser from "webextension-polyfill";
-import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { generateMessageId } from "../utils/messaging/messageId.js";
+import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
+import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -21,8 +22,6 @@ export function useSidepanelTranslation() {
   // Store
   const settingsStore = useSettingsStore();
 
-  // Translation client
-  const translationService = new TranslationService(MessagingContexts.SIDEPANEL);
 
   // Computed
   const hasTranslation = computed(() => Boolean(translatedText.value?.trim()));
@@ -46,8 +45,35 @@ export function useSidepanelTranslation() {
       logger.debug("[useSidepanelTranslation] Translation with languages (received params):", { sourceLang, targetLang });
       logger.debug("[useSidepanelTranslation] Translation with languages (final):", { sourceLanguage, targetLanguage });
       
-      // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
-      await translationService.sidepanelTranslate(sourceText.value, sourceLanguage, targetLanguage);
+      // Get current provider from settings
+      const currentProvider = settingsStore.settings.TRANSLATION_API || 'google';
+      const messageId = generateMessageId('sidepanel');
+      
+      // Determine translation mode (same logic as TranslationService.sidepanelTranslate)
+      let mode = TranslationMode.Sidepanel_Translate;
+      const isDictionaryCandidate = isSingleWordOrShortPhrase(sourceText.value);
+      if (settingsStore.settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+        mode = TranslationMode.Dictionary_Translation;
+      }
+      
+      // Send direct message to background using browser.runtime.sendMessage 
+      // (bypassing UnifiedMessenger to avoid timeout issues)
+      browser.runtime.sendMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: messageId,
+        context: 'sidepanel',
+        timestamp: Date.now(),
+        data: {
+          text: sourceText.value,
+          provider: currentProvider,
+          sourceLanguage: sourceLanguage,
+          targetLanguage: targetLanguage,
+          mode: mode,
+          options: {}
+        }
+      }).catch(error => {
+        logger.error("Failed to send translation request", error);
+      });
 
       logger.debug("[useSidepanelTranslation] Translation request sent. Waiting for result...");
 
@@ -77,8 +103,7 @@ export function useSidepanelTranslation() {
     browser.runtime.onMessage.addListener((message) => {
       logger.debug("[useSidepanelTranslation] Raw message received by listener:", message);
       if (
-        message.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
-        message.context === MessagingContexts.SIDEPANEL
+        message.action === MessageActions.TRANSLATION_RESULT_UPDATE
       ) {
         logger.debug(
           "[useSidepanelTranslation] Received TRANSLATION_RESULT_UPDATE:",

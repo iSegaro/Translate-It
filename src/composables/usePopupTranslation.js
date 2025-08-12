@@ -2,9 +2,8 @@
 // Simplified version without heavy dependencies
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
-import { TranslationService } from "../core/TranslationService.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
-import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { generateMessageId } from "../utils/messaging/messageId.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -21,8 +20,6 @@ export function usePopupTranslation() {
   // Store
   const settingsStore = useSettingsStore();
 
-  // Translation client
-  const translationService = new TranslationService(MessagingContexts.POPUP);
 
   // Browser API
   const browserAPI = useBrowserAPI();
@@ -49,12 +46,28 @@ export function usePopupTranslation() {
       logger.debug("Translation with languages (received params):", { sourceLang, targetLang });
       logger.debug("Translation with languages (final):", { sourceLanguage, targetLanguage });
       
-      // Initiate translation request. The actual result will be received via TRANSLATION_RESULT_UPDATE message.
-      await translationService.popupTranslate(
-        sourceText.value,
-        sourceLanguage,
-        targetLanguage
-      );
+      // Get current provider from settings
+      const currentProvider = settingsStore.settings.TRANSLATION_API || 'google-translate';
+      const messageId = generateMessageId('popup');
+      
+      // Send direct message to background using browser.runtime.sendMessage 
+      // (bypassing UnifiedMessenger to avoid timeout issues)
+      browserAPI.sendMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: messageId,
+        context: 'popup',
+        timestamp: Date.now(),
+        data: {
+          text: sourceText.value,
+          provider: currentProvider,
+          sourceLanguage: sourceLanguage,
+          targetLanguage: targetLanguage,
+          mode: 'popup',
+          options: {}
+        }
+      }).catch(error => {
+        logger.error("Failed to send translation request", error);
+      });
 
       logger.operation('Translation request sent. Waiting for result...');
       
@@ -86,8 +99,7 @@ export function usePopupTranslation() {
     browserAPI.onMessage.addListener((message) => {
       logger.debug('Raw message received by listener:', message);
       if (
-        message.action === MessageActions.TRANSLATION_RESULT_UPDATE &&
-        message.context === MessagingContexts.POPUP
+        message.action === MessageActions.TRANSLATION_RESULT_UPDATE
       ) {
         logger.debug('Received TRANSLATION_RESULT_UPDATE:', message);
         

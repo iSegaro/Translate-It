@@ -1080,11 +1080,7 @@ export class SelectElementManager {
       const translationPromise = this.setupTranslationWaiting(messageId);
       this.logLifecycle(messageId, 'PENDING', { startTime: Date.now() });
 
-      // 6) Send translation request using UnifiedMessenger like OLD system
-      const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
-      const { MessagingContexts } = await import("../../messaging/core/MessagingCore.js");
-      const unifiedMessenger = new UnifiedMessenger(MessagingContexts.EVENT_HANDLER); // Use same context as OLD system
-
+      // 6) Send translation request directly using browser.runtime.sendMessage
       const payload = {
         // For Select Element we send a raw JSON payload (array of {text})
         // and mark the message so the background handler knows to parse it.
@@ -1106,11 +1102,12 @@ export class SelectElementManager {
       
       this.logger.debug("Sending translation request with payload", payload);
       
-      // Send the translation request but don't wait for UnifiedMessenger result
-      unifiedMessenger.sendMessage({
+      // Send direct message to background (no UnifiedMessenger to avoid timeout)
+      browser.runtime.sendMessage({
         action: MessageActions.TRANSLATE,
-        context: MessagingContexts.EVENT_HANDLER,
         messageId: messageId,
+        context: 'event-handler',
+        timestamp: Date.now(),
         data: {
           text: payload.text,
           provider: payload.provider,

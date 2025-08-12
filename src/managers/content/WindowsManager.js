@@ -18,7 +18,6 @@ import { determineTranslationMode } from "../../utils/translationModeHelper.js";
 import { createTranslationRenderer, getTranslationDisplayStyles } from "../../utils/rendering/TranslationRenderer.js";
 import { MessageContexts, MessagingCore } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { TranslationService } from "../../core/TranslationService.js";
 import { generateTranslationMessageId } from "../../utils/messaging/messageId.js";
 import { getErrorMessage } from "../../error-management/ErrorMessages.js";
 import { matchErrorToType } from "../../error-management/ErrorMatcher.js";
@@ -42,8 +41,6 @@ export default class SelectionWindows {
     // Enhanced messaging with context-aware selection and translation
     this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
     
-    // Translation service for proper background communication
-    this.translationService = new TranslationService(MessageContexts.CONTENT);
 
     this.icon = null;
     this.iconClickContext = null;
@@ -444,12 +441,7 @@ export default class SelectionWindows {
         browser.runtime.onMessage.addListener(messageListener);
       });
       
-      // Import UnifiedMessenger but only for sending, not listening
-      const { UnifiedMessenger } = await import("../../core/UnifiedMessenger.js");
-      const { MessageContexts } = await import("../../messaging/core/MessagingCore.js");
-      const unifiedMessenger = new UnifiedMessenger(MessageContexts.CONTENT);
-      
-      // Send translation request
+      // Send translation request using browser.runtime.sendMessage directly
       const payload = {
         text: selectedText,
         from: settings.SOURCE_LANGUAGE || 'auto',
@@ -462,11 +454,12 @@ export default class SelectionWindows {
       
       this.logger.debug("Sending translation request with payload", payload);
       
-      // Send the message but don't wait for UnifiedMessenger result
-      unifiedMessenger.sendMessage({
+      // Send direct message to background (no UnifiedMessenger to avoid timeout)
+      browser.runtime.sendMessage({
         action: MessageActions.TRANSLATE,
-        context: MessageContexts.CONTENT,
         messageId: messageId,
+        context: 'content',
+        timestamp: Date.now(),
         data: {
           text: payload.text,
           provider: payload.provider,

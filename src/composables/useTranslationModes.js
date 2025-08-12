@@ -1,5 +1,7 @@
-import { ref, reactive, onMounted, onUnmounted } from "vue";
-import { TranslationService } from "../core/TranslationService.js";
+import { ref, onMounted, onUnmounted } from "vue";
+import { generateMessageId } from "../utils/messaging/messageId.js";
+import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
+import { TranslationMode, getSettingsAsync } from "@/config.js";
 import { logME } from "@/utils/core/helpers.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
@@ -83,7 +85,6 @@ export function useSidepanelTranslation() {
   const isLoading = ref(false);
   const result = ref(null);
   const error = ref(null);
-  const translationService = new TranslationService();
 
   const translateText = async (text, sourceLang, targetLang) => {
     if (!text?.trim()) {
@@ -112,11 +113,32 @@ export function useSidepanelTranslation() {
         targetLangCode,
       });
 
-      const response = await translationService.sidepanelTranslate(
-        text,
-        sourceLangCode,
-        targetLangCode,
-      );
+      // Get current provider from settings
+      const settings = await getSettingsAsync();
+      const currentProvider = settings.TRANSLATION_API || 'google';
+      const messageId = generateMessageId('sidepanel-translate');
+      
+      // Determine translation mode (same logic as TranslationService.sidepanelTranslate)
+      let mode = TranslationMode.Sidepanel_Translate;
+      const isDictionaryCandidate = isSingleWordOrShortPhrase(text);
+      if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+        mode = TranslationMode.Dictionary_Translation;
+      }
+      
+      const response = await browser.runtime.sendMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: messageId,
+        context: 'sidepanel',
+        timestamp: Date.now(),
+        data: {
+          text: text,
+          provider: currentProvider,
+          sourceLanguage: sourceLangCode,
+          targetLanguage: targetLangCode,
+          mode: mode,
+          options: {}
+        }
+      });
 
       if (response?.success) {
         result.value = response;
@@ -156,7 +178,6 @@ export function useSidepanelTranslation() {
 export function useSelectElementTranslation() {
   const isActivating = ref(false);
   const error = ref(null);
-  const translationService = new TranslationService();
 
   // Use shared reactive ref so multiple components reflect same state
   const isSelectModeActive = sharedIsSelectModeActive;
@@ -231,7 +252,12 @@ export function useSelectElementTranslation() {
 
     try {
       logME("[useSelectElementTranslation] Activating select element mode");
-      const result = await translationService.activateSelectElementMode(true);
+      const result = await browser.runtime.sendMessage({
+        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+        context: 'sidepanel',
+        timestamp: Date.now(),
+        data: { active: true }
+      });
       
       // Check if activation actually succeeded
       if (result && result.success === false) {
@@ -258,7 +284,12 @@ export function useSelectElementTranslation() {
   const deactivateSelectMode = async () => {
     try {
       logME("[useSelectElementTranslation] Deactivating select element mode");
-      await translationService.activateSelectElementMode(false);
+      await browser.runtime.sendMessage({
+        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+        context: 'sidepanel',
+        timestamp: Date.now(),
+        data: { active: false }
+      });
       logME("[useSelectElementTranslation] Select element mode deactivated");
       return true;
     } catch (err) {
@@ -298,7 +329,6 @@ export function useSelectElementTranslation() {
 export function useSidepanelActions() {
   const isProcessing = ref(false);
   const error = ref(null);
-  const translationService = new TranslationService();
 
   const revertTranslation = async () => {
     isProcessing.value = true;
@@ -306,7 +336,11 @@ export function useSidepanelActions() {
 
     try {
       logME("[useSidepanelActions] Reverting translation");
-      await translationService.revertTranslation();
+      await browser.runtime.sendMessage({
+        action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+        context: 'sidepanel',
+        timestamp: Date.now()
+      });
       logME("[useSidepanelActions] Translation reverted successfully");
       return true;
     } catch (err) {
@@ -322,7 +356,11 @@ export function useSidepanelActions() {
   const stopTTS = async () => {
     try {
       logME("[useSidepanelActions] Stopping TTS");
-      await translationService.stopTTS();
+      await browser.runtime.sendMessage({
+        action: MessageActions.TTS_STOP,
+        context: 'sidepanel',
+        timestamp: Date.now()
+      });
     } catch (err) {
       logME(
         "[useSidepanelActions] TTS stop failed (might not be active):",
