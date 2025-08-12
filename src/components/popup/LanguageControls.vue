@@ -3,6 +3,7 @@
     <!-- Provider Selector -->
     <ProviderSelector
       mode="split"
+      :disabled="disabled"
       @translate="handleTranslate"
       @provider-change="handleProviderChange"
     />
@@ -27,6 +28,14 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+
+// Props
+const props = defineProps({
+  disabled: {
+    type: Boolean,
+    default: false
+  }
+})
 
 // Stores
 const settingsStore = useSettingsStore()

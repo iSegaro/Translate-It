@@ -34,12 +34,12 @@
       <!-- Sticky Header Section -->
       <div class="sticky-header">
         <PopupHeader />
-        <LanguageControls />
+        <LanguageControls :disabled="!canTranslateFromForm" />
       </div>
       
       <!-- Scrollable Content Section -->
       <div class="scrollable-content">
-        <TranslationForm />
+        <TranslationForm @can-translate-change="canTranslateFromForm = $event" />
       </div>
     </template>
   </div>
@@ -57,7 +57,7 @@ import TranslationForm from '@/components/popup/TranslationForm.vue'
 import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
 
-// Stores
+// Stores & Composables
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')
 const { handleError } = useErrorHandler()
@@ -67,6 +67,7 @@ const isLoading = ref(true)
 const loadingText = ref('Initializing...')
 const hasError = ref(false)
 const errorMessage = ref('')
+const canTranslateFromForm = ref(false)
 
 // Lifecycle
 onMounted(async () => {

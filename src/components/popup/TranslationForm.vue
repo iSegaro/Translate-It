@@ -54,6 +54,9 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 // Stores
 const settingsStore = useSettingsStore()
 
+// Emits
+const emit = defineEmits(['can-translate-change'])
+
 // Composables (lightweight popup version)
 const translation = usePopupTranslation()
 const popupResize = usePopupResize()
@@ -79,6 +82,11 @@ const {
 
 // Local state
 const lastTranslation = ref(null)
+
+// Watch canTranslate and emit changes to parent
+watch(canTranslate, (newValue) => {
+  emit('can-translate-change', newValue)
+}, { immediate: true })
 
 // Reactive language values - these will update when settings change
 const currentSourceLanguage = computed(() => {

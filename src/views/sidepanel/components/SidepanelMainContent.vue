@@ -14,6 +14,7 @@
         />
         <ProviderSelector
           mode="split"
+          :disabled="!canTranslate"
           @translate="handleTranslationSubmit"
         />
       </div>
@@ -239,8 +240,8 @@ watch(
 const handleTranslationSubmit = async () => {
   logger.debug("[SidepanelMainContent] Translation submit started");
 
+  // Early return without warning since button is now disabled when conditions not met
   if (!canTranslate.value) {
-    logger.warn("[SidepanelMainContent] Cannot translate - conditions not met");
     return;
   }
 

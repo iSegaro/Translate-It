@@ -9,7 +9,7 @@
         type="submit"
         class="translate-main-area"
         :title="$i18n('popup_translate_button_title') || 'ترجمه'"
-        :disabled="isTranslating"
+        :disabled="isTranslating || disabled"
         @click="handleTranslate"
       >
         <img
@@ -178,6 +178,10 @@ const props = defineProps({
     type: String,
     default: 'split', // split, button, icon-only, compact
     validator: (value) => ['split', 'button', 'icon-only', 'compact'].includes(value)
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
