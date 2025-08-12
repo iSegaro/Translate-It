@@ -77,7 +77,7 @@ export default defineConfig({
           }
         }
       },
-      
+
       // Write generated manifest.json to disk for dev mode to enable extension auto-install
       transformManifest: async (manifest) => {
         const outDir = `dist/firefox/Translate-It-v${pkg.version}`;

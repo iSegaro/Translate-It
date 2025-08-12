@@ -38,7 +38,7 @@ export async function handleTranslate(message, sender) {
       throw new Error(`Unexpected action: ${message.action}. Expected ${MessageActions.TRANSLATE}`);
     }
 
-    // The message should already be normalized by EnhancedUnifiedMessenger
+    // Use the normalized message directly
     const normalizedMessage = message;
 
     // When SelectElement raw JSON payload is present, do NOT pre-parse it here.
