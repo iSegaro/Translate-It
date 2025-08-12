@@ -3,15 +3,15 @@
  * Provides consistent messageId generation across all messaging components
  */
 
-import { generateMessageId as coreGenerateMessageId } from '../../messaging/core/MessagingCore.js';
-
 /**
- * Generate a unique messageId using the centralized method
+ * Generate a unique messageId
  * @param {string} context - Context identifier (e.g., 'content', 'background', 'popup')
  * @returns {string} Unique messageId in format: context-timestamp-random
  */
 export function generateMessageId(context = 'unknown') {
-  return coreGenerateMessageId(context);
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  return `${context}-${timestamp}-${random}`;
 }
 
 /**
