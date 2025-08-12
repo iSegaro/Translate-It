@@ -1,146 +1,27 @@
-# Messaging System Documentation
+# Messaging System - Practical Guide
 
-This document outlines the **refactored messaging architecture** of the extension. The system has been **simplified and modernized**, moving away from complex `UnifiedMessenger` classes to **direct browser API usage** with **standardized message formats** and **utility functions**.
+The extension's messaging system is built on simple and standardized `browser.runtime.sendMessage()` API.
 
-## 🔄 Major Refactoring Overview
+## 🚀 Quick Start
 
-**Before**: Complex class-based system with `UnifiedMessenger` → `EnhancedUnifiedMessenger` → timeout issues  
-**After**: Direct `browser.runtime.sendMessage()` with standardized `MessageFormat` and utility functions
-
-### Key Changes:
-- ✅ **Removed**: `UnifiedMessenger`, `EnhancedUnifiedMessenger`, `MessagingStandards` classes
-- ✅ **Added**: `MessagingCore.js` with utility functions and message format standardization
-- ✅ **Fixed**: Eliminated 20-second timeout issues
-- ✅ **Simplified**: Direct browser API usage throughout codebase
-
-## 1. Core Architecture
-
-### 1.1 MessagingCore.js - The New Foundation
-
-The messaging system is now built around `MessagingCore.js` which provides:
-
-```javascript
-// Core exports from MessagingCore.js
-export const MessageFormat = {
-  create: (action, data, context) => ({ ... }),
-  validate: (message) => boolean,
-  createResponse: (success, data, error, originalMessageId) => ({ ... })
-}
-
-export const MessagingContexts = {
-  BACKGROUND: 'background',
-  CONTENT: 'content', 
-  POPUP: 'popup',
-  SIDEPANEL: 'sidepanel',
-  OPTIONS: 'options'
-}
-
-export const generateMessageId = () => string
-```
-
-### 1.2 Direct Browser API Usage
-
-Instead of wrapper classes, we now use browser APIs directly:
-
-```javascript
-import browser from 'webextension-polyfill'
-import { MessageFormat, MessagingContexts } from '@/messaging/core/MessagingCore.js'
-
-// Send a message directly
-const response = await browser.runtime.sendMessage(
-  MessageFormat.create(
-    MessageActions.TRANSLATE,
-    { text: 'Hello', targetLang: 'fa' },
-    MessagingContexts.POPUP
-  )
-)
-```
-
-## 2. Message Format Standardization
-
-### 2.1 Standard Message Structure
-
-All messages follow this standardized format:
-
-```javascript
-{
-  action: string,           // MessageActions constant
-  data: object,            // Payload data
-  context: string,         // MessagingContexts constant  
-  messageId: string,       // Unique identifier
-  timestamp: number        // Creation timestamp
-}
-```
-
-### 2.2 Creating Messages
-
-```javascript
-import { MessageFormat, MessagingContexts } from '@/messaging/core/MessagingCore.js'
-import { MessageActions } from '@/messaging/core/MessageActions.js'
-
-// Create a standardized message
-const message = MessageFormat.create(
-  MessageActions.TRANSLATE_SELECTION,
-  { 
-    text: 'Selected text',
-    sourceLang: 'en',
-    targetLang: 'fa'
-  },
-  MessagingContexts.CONTENT
-)
-
-// Send it
-const response = await browser.runtime.sendMessage(message)
-```
-
-### 2.3 Response Format
-
-```javascript
-// Success response
-{
-  success: true,
-  data: { translatedText: 'متن ترجمه شده' },
-  messageId: 'original-message-id',
-  timestamp: 1672531200000
-}
-
-// Error response  
-{
-  success: false,
-  error: { message: 'Translation failed', code: 'PROVIDER_ERROR' },
-  messageId: 'original-message-id', 
-  timestamp: 1672531200000
-}
-```
-
-## 3. Composables for Vue Components
-
-### 3.1 useMessaging Composable
-
-The primary way Vue components interact with the messaging system:
+### 1. In Vue Components
 
 ```javascript
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
+import { MessageActions } from '@/messaging/core/MessageActions.js'
 
 export default {
   setup() {
-    const { sendMessage } = useMessaging()
+    const { sendMessage, createMessage } = useMessaging('popup')
     
     const translateText = async (text) => {
-      try {
-        const response = await sendMessage({
-          action: MessageActions.TRANSLATE,
-          data: { text, targetLang: 'fa' }
-        })
-        
-        if (response.success) {
-          return response.data.translatedText
-        } else {
-          throw new Error(response.error.message)
-        }
-      } catch (error) {
-        console.error('Translation failed:', error)
-      }
+      const message = createMessage(MessageActions.TRANSLATE, {
+        text,
+        targetLang: 'fa'
+      })
+      
+      const response = await sendMessage(message)
+      return response.success ? response.data : null
     }
     
     return { translateText }
@@ -148,461 +29,206 @@ export default {
 }
 ```
 
-### 3.2 Context-Specific Composables
-
-Specialized composables for specific contexts:
+### 2. In Content Scripts
 
 ```javascript
-// usePopupTranslation.js - for popup context
-import { useMessaging } from '@/messaging/composables/useMessaging.js'
-
-export const usePopupTranslation = () => {
-  const { sendMessage } = useMessaging()
-  
-  const translateSelection = async (text) => {
-    return await sendMessage({
-      action: MessageActions.TRANSLATE_SELECTION,
-      data: { text }
-    }, MessagingContexts.POPUP)
-  }
-  
-  return { translateSelection }
-}
-
-// useSidepanelTranslation.js - for sidepanel context  
-export const useSidepanelTranslation = () => {
-  // Context filtering to prevent cross-component interference
-  const messageListener = (message) => {
-    if (message.context !== MessagingContexts.SIDEPANEL) {
-      return // Ignore messages not meant for sidepanel
-    }
-    // Handle sidepanel-specific messages
-  }
-  
-  return { messageListener }
-}
-```
-## 4. Background Message Handling
-
-### 4.1 LifecycleManager - Central Message Router
-
-The background script uses `LifecycleManager` to handle all incoming messages:
-
-```javascript
-// src/managers/core/LifecycleManager.js
-class LifecycleManager {
-  constructor() {
-    this.messageHandlers = {
-      'ping': Handlers.handlePing,
-      'TRANSLATE': Handlers.handleTranslate,
-      'translateImage': Handlers.handleTranslateImage,
-      'openSidePanel': Handlers.handleOpenSidePanel,
-      // ... more handlers
-    }
-  }
-  
-  setupMessageListener() {
-    browser.runtime.onMessage.addListener(this.handleMessage.bind(this))
-  }
-  
-  async handleMessage(message, sender, sendResponse) {
-    const handler = this.messageHandlers[message.action]
-    if (handler) {
-      return await handler(message, sender, sendResponse)
-    }
-    
-    console.warn('No handler for action:', message.action)
-    return MessageFormat.createResponse(false, null, { 
-      message: 'Unknown action',
-      code: 'UNKNOWN_ACTION' 
-    })
-  }
-}
-```
-
-### 4.2 Individual Message Handlers
-
-Each action has its own handler file:
-
-```javascript
-// src/background/handlers/translation/handleTranslate.js
-export const handleTranslate = async (message, sender, sendResponse) => {
-  try {
-    const { text, sourceLang, targetLang } = message.data
-    
-    const translationResult = await TranslationService.translate({
-      text,
-      sourceLang,
-      targetLang
-    })
-    
-    sendResponse(MessageFormat.createResponse(
-      true,
-      { translatedText: translationResult.text },
-      null,
-      message.messageId
-    ))
-  } catch (error) {
-    sendResponse(MessageFormat.createResponse(
-      false,
-      null,
-      { message: error.message, code: 'TRANSLATION_ERROR' },
-      message.messageId
-    ))
-  }
-  
-  return true // Keep message channel open
-}
-```
-
-## 5. Content Script Integration
-
-### 5.1 Direct Message Handling
-
-Content scripts handle messages directly without wrapper classes:
-
-```javascript
-// src/content-scripts/index.js
 import browser from 'webextension-polyfill'
-import { MessageFormat, MessagingContexts } from '@/messaging/core/MessagingCore.js'
+import { MessageFormat, MessageActions } from '@/messaging/core/MessagingCore.js'
 
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!MessageFormat.validate(message)) {
-    console.warn('Invalid message format:', message)
-    return false
-  }
-  
-  switch (message.action) {
-    case MessageActions.ACTIVATE_SELECT_ELEMENT_MODE:
-      activateSelectElementMode(message.data)
-      sendResponse(MessageFormat.createResponse(true, { status: 'activated' }))
-      break
-      
-    case MessageActions.TRANSLATION_RESULT_UPDATE:
-      updateTranslationDisplay(message.data)
-      sendResponse(MessageFormat.createResponse(true, { status: 'updated' }))
-      break
-      
-    default:
-      console.warn('Unknown action:', message.action)
-      return false
-  }
-  
-  return true
-})
-```
-
-### 5.2 Context Filtering
-
-Content scripts can filter messages by context to prevent interference:
-
-```javascript
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Only handle messages meant for content context
-  if (message.context && message.context !== MessagingContexts.CONTENT) {
-    return false
-  }
-  
-  // Handle content-specific messages...
-})
-```
-
-## 6. State Management Integration
-
-### 6.1 Background State Managers
-
-State managers use direct messaging for coordination:
-
-```javascript
-// src/background/state/selectElementStateManager.js
-class SelectElementStateManager {
-  async setStateForTab(tabId, isActive) {
-    // Notify content script of state change
-    await browser.tabs.sendMessage(tabId,
-      MessageFormat.create(
-        MessageActions.SELECT_ELEMENT_STATE_CHANGED,
-        { isActive },
-        MessagingContexts.BACKGROUND
-      )
-    )
-  }
-}
-```
-
-### 6.2 Cross-Component Communication
-
-Components communicate through background as message hub:
-
-```javascript
-// Popup → Background → Sidepanel
-// 1. Popup sends translation request
-await browser.runtime.sendMessage(
+// Send message
+const response = await browser.runtime.sendMessage(
   MessageFormat.create(
     MessageActions.TRANSLATE_SELECTION,
-    { text: 'Hello' },
-    MessagingContexts.POPUP
+    { text: selectedText },
+    'content'
   )
 )
 
-// 2. Background processes and sends result to sidepanel
-await browser.tabs.sendMessage(sidepanelTabId,
-  MessageFormat.create(
-    MessageActions.TRANSLATION_RESULT_UPDATE,
-    { translatedText: 'سلام' },
-    MessagingContexts.SIDEPANEL
-  )
-)
+// Receive message
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
+    // Perform action
+    sendResponse(MessageFormat.createSuccessResponse({ status: 'done' }))
+  }
+})
 ```
 
-## 7. Error Handling & Debugging
-
-### 7.1 Standardized Error Responses
+### 3. In Background Scripts
 
 ```javascript
-// Error response format
+import { MessageActions } from '@/messaging/core/MessageActions.js'
+
+browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  switch (message.action) {
+    case MessageActions.TRANSLATE:
+      const result = await handleTranslation(message.data)
+      sendResponse(MessageFormat.createSuccessResponse(result))
+      break
+      
+    case MessageActions.GET_PROVIDERS:
+      const providers = await getAvailableProviders()
+      sendResponse(MessageFormat.createSuccessResponse(providers))
+      break
+  }
+})
+```
+
+## 📋 Message Actions
+
+All available actions in `MessageActions.js`:
+
+```javascript
+// Translation
+MessageActions.TRANSLATE
+MessageActions.TRANSLATE_SELECTION  
+MessageActions.TRANSLATE_PAGE
+MessageActions.GET_PROVIDERS
+
+// Select Element
+MessageActions.ACTIVATE_SELECT_ELEMENT_MODE
+MessageActions.PROCESS_SELECTED_ELEMENT
+
+// TTS
+MessageActions.TTS_SPEAK
+MessageActions.TTS_STOP
+
+// Sidepanel
+MessageActions.OPEN_SIDEPANEL
+MessageActions.UPDATE_SIDEPANEL_STATE
+```
+
+## 🔧 Message Structure
+
+### Standard Message
+```javascript
 {
-  success: false,
-  error: {
-    message: 'Human-readable error message',
-    code: 'ERROR_CODE',
-    details: { /* additional context */ }
-  },
-  messageId: 'original-message-id',
+  action: 'TRANSLATE',           // Operation type
+  data: { text: 'Hello' },       // Required data
+  context: 'popup',              // Message source
+  messageId: 'unique-id',        // Unique identifier
+  timestamp: 1672531200000       // Creation time
+}
+```
+
+### Success Response
+```javascript
+{
+  success: true,
+  data: { translatedText: 'Hello' },
+  messageId: 'original-id',
   timestamp: 1672531200000
 }
 ```
 
-### 7.2 Logging & Debugging
+### Error Response
+```javascript
+{
+  success: false,
+  error: {
+    message: 'Translation failed',
+    type: 'PROVIDER_ERROR'
+  },
+  messageId: 'original-id',
+  timestamp: 1672531200000
+}
+```
+
+## 🎯 Context Types
+
+```javascript
+MessagingContexts.POPUP      // popup.html
+MessagingContexts.SIDEPANEL  // sidepanel.html  
+MessagingContexts.OPTIONS    // options.html
+MessagingContexts.BACKGROUND // background script
+MessagingContexts.CONTENT    // content script
+MessagingContexts.OFFSCREEN  // offscreen document
+```
+
+## 💡 Best Practices
+
+### ✅ Good Practices
+
+```javascript
+// Use MessageFormat
+const message = MessageFormat.create(action, data, context)
+
+// Validate messages
+if (!MessageFormat.validate(message)) {
+  console.warn('Invalid message format')
+  return
+}
+
+// Filter by context
+if (message.context !== 'sidepanel') {
+  return false // Not for us
+}
+```
+
+### ❌ Bad Practices
+
+```javascript
+// ❌ Manual message without MessageFormat
+const badMessage = { action: 'TRANSLATE', text: 'hello' }
+
+// ❌ Catch all messages without filtering
+browser.runtime.onMessage.addListener((message) => {
+  // All messages are processed!
+})
+
+// ❌ Forgetting sendResponse
+browser.runtime.onMessage.addListener((message) => {
+  doSomething()
+  // Forgot sendResponse or return true
+})
+```
+
+## 🔍 Debugging
+
+### Enable Logging
 
 ```javascript
 import { createLogger } from '@/utils/core/logger.js'
+const logger = createLogger('Messaging', 'debug')
 
-const logger = createLogger('Core', 'messaging')
-
-// In message handlers
-logger.debug('[Messaging] Received action:', message.action)
-logger.error('[Messaging] Failed to process:', error)
+// Log messages
+logger.debug('Sending message:', message.action)
+logger.error('Message failed:', error)
 ```
 
-## 8. Migration Guide
+### View Messages in DevTools
 
-### 8.1 Before (Old System)
-```javascript
-// Old: Complex class-based approach
-const messenger = MessagingStandards.getMessenger(MessagingContexts.POPUP)
-const response = await messenger.sendMessage({ action: 'TRANSLATE', data: {...} })
+1. Open Extension DevTools
+2. Go to Console
+3. Filter with `[Messaging]`
+
+## 🏗️ File Structure
+
+```
+src/messaging/
+├── core/
+│   ├── MessagingCore.js     # Main: MessageFormat, Contexts, utilities
+│   └── MessageActions.js    # All available actions
+├── composables/
+│   └── useMessaging.js      # Vue composable
+└── __tests__/
+    └── MessagingCore.test.js
 ```
 
-### 8.2 After (New System)
-```javascript
-// New: Direct browser API with utilities
-import { useMessaging } from '@/messaging/composables/useMessaging.js'
+## 🚨 Common Issues
 
-const { sendMessage } = useMessaging()
-const response = await sendMessage({
-  action: MessageActions.TRANSLATE,
-  data: { ... }
-})
-```
+**Message not received?**
+- Check if message listener is properly registered
+- Use correct context
+- Verify with `MessageFormat.validate()`
 
-## 9. Benefits of Refactored System
+**Cross-component interference?**
+- Use context filtering
+- Generate unique messageIds
 
-### ✅ **Performance Improvements**
-- Eliminated 20-second timeout issues
-- Reduced memory footprint (no class instances)
-- Faster message processing
-
-### ✅ **Code Simplicity**
-- Direct browser API usage
-- Fewer abstractions and indirection
-- Easier to debug and maintain
-
-### ✅ **Better Type Safety**
-- Standardized message formats
-- Clear action constants
-- Predictable response structures
-
-### ✅ **Context Isolation**
-- Components only receive relevant messages
-- Reduced cross-component interference
-- Better separation of concerns
-
-## 10. Key Files
-
-### Core Files
-- `src/messaging/core/MessagingCore.js` - Message format utilities and constants
-- `src/messaging/core/MessageActions.js` - Action constants
-- `src/messaging/composables/useMessaging.js` - Vue composable for messaging
-
-### Background Integration
-- `src/managers/core/LifecycleManager.js` - Central message router
-- `src/background/handlers/` - Individual action handlers
-- `src/background/state/` - State managers with messaging integration
-
-### Frontend Integration
-- `src/composables/usePopupTranslation.js` - Popup-specific messaging
-- `src/composables/useSidepanelTranslation.js` - Sidepanel-specific messaging
-- `src/content-scripts/index.js` - Content script message handling
-
-### Legacy Files (Removed)
-- ~~`src/core/MessagingStandards.js`~~ - Replaced by MessagingCore.js
-- ~~`src/core/UnifiedMessenger.js`~~ - Removed in favor of direct browser API
-- ~~`src/core/EnhancedUnifiedMessenger.js`~~ - Complex class removed
-import { MessagingStandards, MessagingContexts } from './core/MessagingStandards.js';
-
-const popupMessenger = MessagingStandards.getMessenger(MessagingContexts.POPUP);
-
-async function speakText(text, lang) {
-    try {
-        await popupMessenger.specialized.tts.speak(text, lang, { rate: 1.1 });
-        console.log('TTS playback started.');
-    } catch (error) {
-        console.error('TTS failed:', error);
-    }
-}
-
-// Example: Using specialized translation messenger
-async function translateContent(text, sourceLang, targetLang) {
-    try {
-        const result = await popupMessenger.specialized.translation.translate(text, {
-            sourceLanguage: sourceLang,
-            targetLanguage: targetLang
-        });
-        console.log('Translation result:', result.translatedText);
-    } catch (error) {
-        console.error('Translation failed:', error);
-    }
-}
-
-// Example: Activating element selection mode
-async function activateSelection() {
-    try {
-        await popupMessenger.specialized.selection.activateMode('translate'); // 'translate', 'capture', 'analyze'
-        console.log('Element selection mode activated.');
-    } catch (error) {
-        console.error('Failed to activate selection mode:', error);
-    }
-}
-```
-
-## 4. Listening for Messages
-
-Messages are listened for using the standard `browser.runtime.onMessage.addListener` (or `browser.tabs.onMessage.addListener` for content scripts). The `MessagingStandards` system ensures messages adhere to a common format.
-
-### Registering a Listener
-
-```javascript
-// Example: In background script (src/background/index.js or a handler)
-import browser from 'webextension-polyfill';
-import { MessagingStandards, MessageActions, MessageFormat } from './core/MessagingStandards.js';
-
-// It's crucial to validate the message format
-## 11. Testing & Validation
-
-### 11.1 Message Format Validation
-
-```javascript
-import { MessageFormat } from '@/messaging/core/MessagingCore.js'
-
-// Validate incoming messages
-if (!MessageFormat.validate(message)) {
-  console.warn('Invalid message format:', message)
-  return false
-}
-
-// Create valid test messages
-const testMessage = MessageFormat.create(
-  MessageActions.PING,
-  { test: true },
-  MessagingContexts.CONTENT
-)
-```
-
-### 11.2 Handler Testing
-
-```javascript
-// Test individual handlers
-import { handleTranslate } from '@/background/handlers/translation/handleTranslate.js'
-
-const mockMessage = MessageFormat.create(
-  MessageActions.TRANSLATE,
-  { text: 'Hello', targetLang: 'fa' },
-  MessagingContexts.POPUP
-)
-
-const response = await handleTranslate(mockMessage, mockSender, mockSendResponse)
-```
-
-## 12. Best Practices
-
-### 12.1 Message Design
-- ✅ Use `MessageActions` constants for actions
-- ✅ Include meaningful data in message payload
-- ✅ Specify appropriate context for filtering
-- ❌ Don't send large objects in messages
-- ❌ Don't assume message delivery
-
-### 12.2 Error Handling
-```javascript
-// Good: Proper error handling
-try {
-  const response = await sendMessage({...})
-  if (!response.success) {
-    throw new Error(response.error.message)
-  }
-  return response.data
-} catch (error) {
-  logger.error('Message failed:', error)
-  throw error
-}
-```
-
-### 12.3 Context Filtering
-```javascript
-// Good: Filter by context
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.context !== MessagingContexts.SIDEPANEL) {
-    return false // Not for us
-  }
-  // Handle message...
-})
-```
-
-## 13. Troubleshooting
-
-### Common Issues
-
-**Q: Messages not being received**
-- ✅ Check message format with `MessageFormat.validate()`
-- ✅ Verify action exists in `MessageActions`
-- ✅ Ensure handler is registered in `LifecycleManager`
-
-**Q: Cross-component interference**
-- ✅ Use context filtering in message listeners
-- ✅ Check `MessagingContexts` values
-- ✅ Verify message targeting
-
-**Q: Performance issues**
-- ✅ Avoid large message payloads
-- ✅ Use context filtering to reduce processing
-- ✅ Check for message loops
-
-### Debug Logging
-
-```javascript
-// Enable detailed logging
-const logger = createLogger('Core', 'messaging', { level: 'debug' })
-
-// Log all messages
-browser.runtime.onMessage.addListener((message) => {
-  logger.debug('Received message:', {
-    action: message.action,
-    context: message.context,
-    messageId: message.messageId
-  })
-})
-```
+**Performance issues?**
+- Don't send large data
+- Check for message loops
 
 ---
 
-This refactored messaging system provides a **robust, performant, and maintainable** foundation for extension communication while eliminating the complexity and timeout issues of the previous class-based approach.
+**Summary:** This system is simple, fast, and reliable. Just use `MessageFormat.create()` and `browser.runtime.sendMessage()`! 🎯

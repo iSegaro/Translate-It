@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Browser extension (MV3) with Vue. Key folders in `src/`: `core/` (SimpleMessageHandler, TranslationHandler), `messaging/` (MessagingCore + specialized messengers), `providers/` (factory/registry + implementations), `storage/` (StorageCore + composables), `background/`, `content-scripts/`, `components/`, `views/`, `managers/`, `utils/`, `store/`.
+- Browser extension (MV3) with Vue. Key folders in `src/`: `core/` (SimpleMessageHandler, TranslationHandler), `messaging/` (MessagingCore utilities), `providers/` (factory/registry + implementations), `storage/` (StorageCore + composables), `background/`, `content-scripts/`, `components/`, `views/`, `managers/`, `utils/`, `store/`.
 - Tests: unit tests colocated under `src/**/__tests__/*.test.js`; end‑to‑end tests in `tests/e2e/*.spec.js`.
 - Config: Vite and test configs in `config/`; outputs in `dist/<browser>/Translate-It-v<version>/`.
 
