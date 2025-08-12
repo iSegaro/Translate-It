@@ -183,7 +183,7 @@ export function getTranslationDisplayStyles() {
   return `
 /* Translation Content Base Styles */
 .translation-content {
-  width: 100%;
+  /* width: 100%; */
   padding: 12px;
   font-family: Vazirmatn, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
