@@ -1106,31 +1106,22 @@ export class SelectElementManager {
       
       this.logger.debug("Sending translation request with payload", payload);
       
-      // Send the translation request (this returns acknowledgment, not final result)
-      const response = await unifiedMessenger.translate(payload);
-
-      // 7) Handle initial response from background (just acknowledgment)
-      // Some messenger implementations may return `undefined`/`null` for
-      // acknowledgement; treat an explicit negative ack (success===false
-      // or presence of an error) as failure, otherwise proceed to wait
-      // for the final TRANSLATION_RESULT_UPDATE.
-      if (response && (response.success === false || response.error)) {
-        const msg = (response.error || response.message) || "Translation request failed";
-        this.logger.error(
-          "[SelectElementManager] Translation request failed:",
-          msg
-        );
-        await this.showErrorNotification(msg);
-        // Cancel pending translation and consume its rejection to avoid
-        // an unhandled promise rejection (we created the promise earlier).
-        this.cancelPendingTranslation(messageId);
-        try {
-          await translationPromise.catch(() => {});
-        } catch {
-          // swallow - handled above
+      // Send the translation request but don't wait for UnifiedMessenger result
+      unifiedMessenger.sendMessage({
+        action: MessageActions.TRANSLATE,
+        context: MessagingContexts.EVENT_HANDLER,
+        messageId: messageId,
+        data: {
+          text: payload.text,
+          provider: payload.provider,
+          sourceLanguage: payload.from,
+          targetLanguage: payload.to,
+          mode: payload.mode,
+          options: payload.options
         }
-        return { status: "error", reason: "backend_error", message: msg };
-      }
+      }).catch(error => {
+        this.logger.error("Failed to send translation request", error);
+      });
 
       this.logger.info("Translation request accepted, waiting for result...");
       this.logLifecycle(messageId, 'SENT', { provider: payload.provider });
