@@ -4,6 +4,7 @@
 import browser from "webextension-polyfill";
 import { createLogger } from "../utils/core/logger.js";
 import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
+import { MessageActions } from "../messaging/core/MessageActions.js";
 
 // Import CSS styles for content script functionality
 import "../styles/disable_links.css";
@@ -22,7 +23,23 @@ if (!access.isAccessible) {
   (async () => {
     logger.init("Content script loading...");
 
-    // Dynamically import modules only on accessible pages
+    // Check if current page is excluded before initializing
+    try {
+      const response = await browser.runtime.sendMessage({
+        action: MessageActions.IS_Current_Page_Excluded,
+        data: { url: window.location.href }
+      });
+      
+      if (response?.excluded) {
+        logger.info(`Content script stopped: page ${window.location.hostname} is excluded`);
+        return; // Stop initialization if page is excluded
+      }
+    } catch (error) {
+      logger.error('Failed to check page exclusion status:', error);
+      // Continue with initialization on error to avoid breaking functionality
+    }
+
+    // Dynamically import modules only on accessible and non-excluded pages
     const { vueBridge } = await import("../managers/content/VueBridgeManager.js");
     // TTS handler removed - using unified GOOGLE_TTS_SPEAK system
     const { getTranslationHandlerInstance } = await import("../core/InstanceManager.js");
@@ -63,6 +80,13 @@ if (!access.isAccessible) {
     // Setup message listener integration with existing system
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       logger.debug('Message received', { action: message.action, from: message.context });
+
+      // Handle exclusion updates immediately
+      if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
+        logger.info('Page excluded via popup - disabling extension functionality');
+        // Could add cleanup logic here if needed
+        return Promise.resolve({ success: true });
+      }
 
       // Handle async message processing
       const handleAsync = async () => {

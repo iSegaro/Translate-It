@@ -1,4 +1,5 @@
 import { createLogger } from '@/utils/core/logger.js';
+import { storageManager } from '@/storage/core/StorageCore.js';
 
 const logger = createLogger('Core', 'handleIsCurrentPageExcluded');
 /**
@@ -8,9 +9,9 @@ const logger = createLogger('Core', 'handleIsCurrentPageExcluded');
 /**
  * Check if a URL should be excluded
  * @param {string} url - The URL to check
- * @returns {boolean} - Whether the page is excluded
+ * @returns {Promise<boolean>} - Whether the page is excluded
  */
-function isPageExcluded(url) {
+async function isPageExcluded(url) {
   try {
     const urlObj = new URL(url)
     
@@ -24,9 +25,28 @@ function isPageExcluded(url) {
       return true
     }
     
-    // For now, return false for all other pages
-    // This can be enhanced to check user's exclusion settings
-    return false
+    // Check user's exclusion settings
+    const storage = await storageManager.get(['EXCLUDED_SITES'])
+    let excludedSites = []
+    
+    // Handle both array and string formats
+    if (Array.isArray(storage.EXCLUDED_SITES)) {
+      excludedSites = storage.EXCLUDED_SITES.filter(Boolean)
+    } else if (typeof storage.EXCLUDED_SITES === 'string') {
+      excludedSites = storage.EXCLUDED_SITES
+        .split(',')
+        .map(site => site.trim())
+        .filter(Boolean)
+    }
+    
+    const domain = urlObj.hostname
+    
+    // Check if current domain is in excluded sites list
+    const isExcluded = excludedSites.some(site => 
+      domain === site || domain.endsWith('.' + site) || site.includes(domain)
+    )
+    
+    return isExcluded
   } catch {
     // If URL parsing fails, exclude for safety
     return true
@@ -46,7 +66,7 @@ export async function handleIsCurrentPageExcluded(message) {
       return { success: false, error: 'URL is required' }
     }
 
-    const excluded = isPageExcluded(url)
+    const excluded = await isPageExcluded(url)
     
     return { success: true, excluded }
   } catch (error) {

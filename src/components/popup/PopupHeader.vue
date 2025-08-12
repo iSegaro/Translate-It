@@ -52,7 +52,7 @@
         :title="$i18n('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
       >
         <input 
-          v-model="excludeCurrentPage" 
+          v-model="isExtensionEnabled" 
           type="checkbox"
           @change="handleExcludeToggle"
         >
@@ -91,7 +91,7 @@ const { handleError, handleConnectionError } = useErrorHandler()
 const { sendMessage } = useMessaging('popup')
 
 // State
-const excludeCurrentPage = ref(false)
+const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
 
 // Methods
 const handleTranslatePage = async () => {
@@ -180,10 +180,14 @@ const handleExcludeToggle = async () => {
     })
     
     if (activeTab) {
+      // isExtensionEnabled = true یعنی exclude = false
+      // isExtensionEnabled = false یعنی exclude = true
+      const exclude = !isExtensionEnabled.value
+      
       await sendMessage({
         action: MessageActions.Set_Exclude_Current_Page,
         data: {
-          exclude: excludeCurrentPage.value,
+          exclude: exclude,
           url: activeTab.url,
         },
       })
@@ -206,7 +210,9 @@ onMounted(async () => {
         action: MessageActions.IS_Current_Page_Excluded,
         data: { url: activeTab.url },
       })
-      excludeCurrentPage.value = response?.excluded || false
+      // اگر صفحه excluded باشد، افزونه غیرفعال است
+      // اگر صفحه excluded نباشد، افزونه فعال است
+      isExtensionEnabled.value = !(response?.excluded || false)
     }
     
     // Add native event listener for sidepanel button (Firefox compatibility)
