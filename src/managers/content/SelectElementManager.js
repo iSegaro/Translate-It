@@ -1271,7 +1271,6 @@ export class SelectElementManager {
       this.logger.debug(
         "[SelectElementManager] Advanced text extraction process completed successfully"
       );
-      await this.showSuccessNotification("Translation completed successfully!");
 
       return {
         status: "success",
