@@ -1,14 +1,10 @@
 /**
- * MessagingCore - Unified messaging system core
- * Combines MessagingStandards factory with EnhancedUnifiedMessenger functionality
- * Provides context-specific messengers with standardized message formats
+ * MessagingCore - Simplified messaging utilities
+ * Provides standardized message formats and utilities for browser extension messaging
+ * Refactored to use direct browser.runtime.sendMessage pattern
  */
 
-import { EnhancedUnifiedMessenger } from '../../core/EnhancedUnifiedMessenger.js';
 import { MessageActions } from './MessageActions.js';
-import { createLogger } from '../../utils/core/logger.js';
-
-const DEFAULT_COMPONENT = 'Messaging';
 
 /**
  * Standard message format interface
@@ -43,8 +39,7 @@ export class MessageFormat {
    */
   static validate(message) {
     if (!message || typeof message !== "object") {
-      const logger = createLogger(DEFAULT_COMPONENT, 'Format');
-      logger.warn('Invalid message type or null', message);
+      console.warn('[MessageFormat] Invalid message type or null', message);
       return false;
     }
 
@@ -58,8 +53,7 @@ export class MessageFormat {
     );
 
     if (!isValid) {
-      const logger = createLogger(DEFAULT_COMPONENT, 'Format');
-      logger.warn('Validation failed for message', {
+      console.warn('[MessageFormat] Validation failed for message', {
         message,
         actionValid: message.action && typeof message.action === "string",
         contextValid: message.context && typeof message.context === "string",
@@ -174,221 +168,24 @@ export class MessageContexts {
 }
 
 /**
- * MessagingCore - Main factory and management class
- * Combines the factory pattern from MessagingStandards with unified messaging capabilities
+ * Messaging utility functions
  */
-export class MessagingCore {
-  /**
-   * Singleton instances storage
-   * @private
-   */
-  static instances = new Map();
 
-  /**
-   * Message interceptors for logging and debugging
-   * @private
-   */
-  static interceptors = {
-    request: [],
-    response: [],
-  };
-
-  /**
-   * Get or create messenger instance for specific context
-   * @param {string} context - Context identifier
-   * @returns {EnhancedUnifiedMessenger} Messenger instance
-   */
-  static getMessenger(context) {
-    // Validate context
-    if (!MessageContexts.isValidContext(context)) {
-      const logger = createLogger(DEFAULT_COMPONENT, 'Core');
-      logger.warn(`Unknown context: ${context}, using as-is`);
-    }
-
-    // Get or create instance
-    if (!this.instances.has(context)) {
-      const messenger = new EnhancedUnifiedMessenger(context);
-      this.instances.set(context, messenger);
-
-      const logger = createLogger(DEFAULT_COMPONENT, 'Core');
-      logger.debug(`Created new messenger for context: ${context}`);
-    }
-
-    return this.instances.get(context);
-  }
-
-  /**
-   * Create standardized message format
-   * @param {string} action - Message action
-   * @param {*} data - Message data
-   * @param {string} context - Sender context
-   * @param {Object} options - Additional options
-   * @returns {Object} Standardized message
-   */
-  static standardMessageFormat(action, data, context, options = {}) {
-    // Validate inputs
-    if (!action || typeof action !== "string") {
-      throw new Error("Action is required and must be a string");
-    }
-
-    if (!context || typeof context !== "string") {
-      throw new Error("Context is required and must be a string");
-    }
-
-    return MessageFormat.create(action, data, context, options);
-  }
-
-  /**
-   * Generate unique message ID
-   * @param {string} context - Context identifier
-   * @returns {string} Unique message ID
-   */
-  static generateMessageId(context) {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
-    return `${context}-${timestamp}-${random}`;
-  }
-
-  /**
-   * Add request interceptor
-   * @param {Function} interceptor - Interceptor function
-   */
-  static addRequestInterceptor(interceptor) {
-    if (typeof interceptor === "function") {
-      this.interceptors.request.push(interceptor);
-    }
-  }
-
-  /**
-   * Add response interceptor
-   * @param {Function} interceptor - Interceptor function
-   */
-  static addResponseInterceptor(interceptor) {
-    if (typeof interceptor === "function") {
-      this.interceptors.response.push(interceptor);
-    }
-  }
-
-  /**
-   * Clear all messenger instances
-   * Useful for testing and cleanup
-   */
-  static clearInstances() {
-    this.instances.clear();
-    const logger = createLogger(DEFAULT_COMPONENT, 'Core');
-    logger.operation('All messenger instances cleared');
-  }
-
-  /**
-   * Get all active messenger contexts
-   * @returns {Array<string>} Array of active contexts
-   */
-  static getActiveContexts() {
-    return Array.from(this.instances.keys());
-  }
-
-  /**
-   * Get messenger statistics
-   * @returns {Object} Statistics object
-   */
-  static getStatistics() {
-    const stats = {
-      totalInstances: this.instances.size,
-      activeContexts: this.getActiveContexts(),
-      requestInterceptors: this.interceptors.request.length,
-      responseInterceptors: this.interceptors.response.length,
-    };
-
-    // Get individual messenger info
-    stats.messengers = {};
-    for (const [context, messenger] of this.instances) {
-      stats.messengers[context] = messenger.getInfo();
-    }
-
-    return stats;
-  }
-
-  /**
-   * Test connectivity for all active messengers
-   * @returns {Promise<Object>} Test results
-   */
-  static async testAllMessengers() {
-    const results = {};
-
-    for (const [context, messenger] of this.instances) {
-      try {
-        results[context] = await messenger.testSpecializedMessengers();
-      } catch (error) {
-        results[context] = {
-          success: false,
-          error: error.message,
-          context,
-        };
-      }
-    }
-
-    return {
-      success: Object.values(results).every((r) => r.success),
-      results,
-      timestamp: Date.now(),
-    };
-  }
-
-  /**
-   * Create pre-configured messengers for common contexts
-   * @returns {Object} Object with pre-configured messengers
-   */
-  static createCommonMessengers() {
-    return {
-      popup: this.getMessenger(MessageContexts.POPUP),
-      sidepanel: this.getMessenger(MessageContexts.SIDEPANEL),
-      options: this.getMessenger(MessageContexts.OPTIONS),
-      select_element: this.getMessenger(MessageContexts.SELECT_ELEMENT),
-      content: this.getMessenger(MessageContexts.CONTENT),
-      background: this.getMessenger(MessageContexts.BACKGROUND),
-      eventHandler: this.getMessenger(MessageContexts.EVENT_HANDLER),
-    };
-  }
-
-  /**
-   * Setup development mode logging
-   * Adds request/response interceptors for debugging
-   */
-  static setupDevelopmentLogging() {
-    if (process.env.NODE_ENV !== "development") {
-      return;
-    }
-
-    // Request logging
-    this.addRequestInterceptor((message, context) => {
-      console.group(`[MessagingCore:${context}] 📤 Request`);
-      logger.debug("Action:", message.action);
-      logger.debug("Data:", message.data);
-      logger.debug("MessageId:", message.messageId);
-      console.groupEnd();
-    });
-
-    // Response logging
-    this.addResponseInterceptor((response, context, originalMessage) => {
-      console.group(`[MessagingCore:${context}] 📥 Response`);
-      logger.debug("Original Action:", originalMessage?.action);
-      logger.debug("Success:", response?.success);
-      logger.debug("Data:", response?.data);
-      logger.debug("Error:", response?.error);
-      console.groupEnd();
-    });
-
-    const logger = createLogger(DEFAULT_COMPONENT, 'Core');
-    logger.init('Development logging enabled');
-  }
+/**
+ * Generate unique message ID
+ * @param {string} context - Context identifier
+ * @returns {string} Unique message ID
+ */
+export function generateMessageId(context) {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  return `${context}-${timestamp}-${random}`;
 }
 
 // Export constants for easy access
 export { MessageContexts as Contexts };
 export { MessageActions as Actions };
+export { MessageActions };
 
 // Maintain backward compatibility
-export const MessagingStandards = MessagingCore;
 export const MessagingContexts = MessageContexts;
-
-export default MessagingCore;

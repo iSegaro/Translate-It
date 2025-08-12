@@ -1,18 +1,17 @@
 /**
  * Centralized MessageId Generation Utility
  * Provides consistent messageId generation across all messaging components
- * Leverages existing MessagingCore.generateMessageId method for consistency
  */
 
-import { MessagingCore } from '../../messaging/core/MessagingCore.js';
+import { generateMessageId as coreGenerateMessageId } from '../../messaging/core/MessagingCore.js';
 
 /**
- * Generate a unique messageId using the centralized MessagingCore method
+ * Generate a unique messageId using the centralized method
  * @param {string} context - Context identifier (e.g., 'content', 'background', 'popup')
  * @returns {string} Unique messageId in format: context-timestamp-random
  */
 export function generateMessageId(context = 'unknown') {
-  return MessagingCore.generateMessageId(context);
+  return coreGenerateMessageId(context);
 }
 
 /**

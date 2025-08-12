@@ -2,7 +2,7 @@
 // Chrome offscreen document screen capture manager
 
 import browser from "webextension-polyfill";
-import { MessagingCore } from "../../../messaging/core/MessagingCore.js";
+import { MessageFormat, MessagingContexts, MessageActions } from "../../../messaging/core/MessagingCore.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('Core', 'CaptureOffscreen');
@@ -16,9 +16,6 @@ export class OffscreenCaptureManager {
     this.browser = null;
     this.offscreenCreated = false;
     this.initialized = false;
-    
-    // Enhanced messaging with context-aware capture
-    this.messenger = MessagingCore.getMessenger('capture-manager');
   }
 
   /**
@@ -109,10 +106,13 @@ export class OffscreenCaptureManager {
 
       // Process in offscreen document if needed
       if (options.processInOffscreen) {
-        const response = await this.messenger.specialized.capture.processCapture({
-          imageData,
-          options,
-        });
+        const message = MessageFormat.create(
+          MessageActions.PROCESS_CAPTURE,
+          { imageData, options },
+          MessagingContexts.CAPTURE_MANAGER
+        );
+        
+        const response = await browser.runtime.sendMessage(message);
 
         if (!response || !response.success) {
           throw new Error(
@@ -147,11 +147,13 @@ export class OffscreenCaptureManager {
       const fullImage = await this.captureVisibleTab(options);
 
       // Process cropping in offscreen document
-      const response = await this.messenger.specialized.capture.cropImage({
-        imageData: fullImage,
-        area: area,
-        options,
-      });
+      const message = MessageFormat.create(
+        MessageActions.CROP_IMAGE,
+        { imageData: fullImage, area: area, options },
+        MessagingContexts.CAPTURE_MANAGER
+      );
+      
+      const response = await browser.runtime.sendMessage(message);
 
       if (!response || !response.success) {
         throw new Error(
@@ -181,11 +183,18 @@ export class OffscreenCaptureManager {
     try {
       logger.debug("🔍 Processing image for OCR in offscreen document");
 
-      const response = await this.messenger.specialized.capture.processImageOCR(imageData, {
-        language: options.language || "eng",
-        psm: options.psm || 6,
-        ...options,
-      });
+      const message = MessageFormat.create(
+        MessageActions.PROCESS_IMAGE_OCR,
+        { 
+          imageData,
+          language: options.language || "eng",
+          psm: options.psm || 6,
+          ...options
+        },
+        MessagingContexts.CAPTURE_MANAGER
+      );
+      
+      const response = await browser.runtime.sendMessage(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "OCR processing failed");

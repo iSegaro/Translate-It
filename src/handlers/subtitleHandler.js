@@ -1,4 +1,4 @@
-import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessagingContexts, MessageFormat, MessageActions } from "../messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { logME } from "../utils/core/helpers.js";
@@ -6,6 +6,7 @@ import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
+import browser from "webextension-polyfill";
 
 export class SubtitleHandler {
   constructor(translationHandler) {
@@ -14,7 +15,6 @@ export class SubtitleHandler {
     this.featureManager = translationHandler.featureManager;
     this.site = this.detectSite();
     this.youtubeButtonInterval = null;
-    this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
 
     if (this.site) {
       this.initialize();
@@ -99,7 +99,7 @@ export class SubtitleHandler {
       button.className = "ytp-button translate-it-yt-button";
       button.title = "Toggle Translate-It Subtitles";
       const icon = document.createElement("img");
-      icon.src = this.messenger.runtime.getURL("icons/extension_icon_48.png");
+      icon.src = browser.runtime.getURL("icons/extension_icon_48.png");
       icon.className = "translate-it-yt-icon";
       button.appendChild(icon);
       button.addEventListener("click", () => this.toggleSubtitleSetting());
@@ -160,7 +160,13 @@ export class SubtitleHandler {
       const subtitleTranslationProvider = {
         translate: async (text, mode) => {
           try {
-            const response = await this.messenger.specialized.translation.translate(text, { translationMode: mode });
+            const message = MessageFormat.create(
+              MessageActions.TRANSLATE,
+              { text, translationMode: mode },
+              MessagingContexts.CONTENT
+            );
+            
+            const response = await browser.runtime.sendMessage(message);
             return response.translatedText || text;
           } catch (error) {
             const errorType = matchErrorToType(error);

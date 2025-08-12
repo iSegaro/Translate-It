@@ -1,12 +1,13 @@
 import { ref, onUnmounted } from "vue";
-import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { useMessaging } from "../messaging/composables/useMessaging.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('UI', 'useExtensionAPI');
 
 export function useExtensionAPI() {
   // Enhanced messaging for Vue extension API - use generic Vue context
-  const messenger = MessagingCore.getMessenger(MessageContexts.VUE_GENERIC);
+  const messaging = useMessaging(MessagingContexts.VUE_GENERIC);
   const isConnected = ref(true);
   const messageListeners = ref([]);
 
@@ -23,12 +24,8 @@ export function useExtensionAPI() {
 
   const sendMessage = async (action, data = {}) => {
     try {
-      // Use enhanced messaging system for better reliability
-      const response = await messenger.sendMessage({
-        action,
-        data,
-        timestamp: Date.now(),
-      });
+      // Use simplified messaging system for better reliability
+      const response = await messaging.sendMessage(action, data);
 
       if (!response?.success) {
         throw new Error(response?.error || "Unknown error");

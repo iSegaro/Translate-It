@@ -1,19 +1,19 @@
-import { MessagingCore } from "../messaging/core/MessagingCore.js";
+import { MessageFormat } from "../../messaging/core/MessagingCore.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { cropImageData } from "../utils/imageProcessing.js";
 import { logME } from "../utils/core/helpers.js";
-import { MessageContexts } from "../../messaging/core/MessagingCore.js";
+import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "../../messaging/core/MessageActions.js";
+import browser from "webextension-polyfill";
 
 export class ContentCaptureHandler {
   constructor() {
     this.screenSelector = null;
     this.capturePreview = null;
     this.captureResult = null;
-    this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
     this.handleAreaSelectionComplete = this.handleAreaSelectionComplete.bind(this);
     this.handlePreviewConfirm = this.handlePreviewConfirm.bind(this);
     this.handlePreviewCancel = this.handlePreviewCancel.bind(this);
@@ -36,10 +36,28 @@ export class ContentCaptureHandler {
 
   async handleAreaSelectionComplete(selectionData, captureOptions) {
     try {
-      const fullCaptureResponse = await this.messenger.specialized.capture.captureScreen({ mode: 'full' });
+      const fullCaptureMessage = MessageFormat.create(
+        MessageActions.CAPTURE_SCREEN,
+        { mode: 'full' },
+        MessagingContexts.CONTENT
+      );
+      
+      const fullCaptureResponse = await browser.runtime.sendMessage(fullCaptureMessage);
       if (!fullCaptureResponse || fullCaptureResponse.error) throw new Error(fullCaptureResponse.error || "Failed to capture full screen");
+      
       const croppedImageData = await cropImageData(fullCaptureResponse.imageData, selectionData);
-      await this.messenger.specialized.capture.processImageOCR(croppedImageData, { ...captureOptions, selectionData });
+      
+      const ocrMessage = MessageFormat.create(
+        MessageActions.PROCESS_IMAGE_OCR,
+        { 
+          imageData: croppedImageData,
+          ...captureOptions,
+          selectionData 
+        },
+        MessagingContexts.CONTENT
+      );
+      
+      await browser.runtime.sendMessage(ocrMessage);
       if (this.screenSelector) this.screenSelector.cleanup();
     } catch (error) {
       this.handleCaptureError(error, "area-completion");

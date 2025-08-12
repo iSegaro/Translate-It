@@ -1,51 +1,72 @@
-import { MessagingCore } from '../core/MessagingCore.js'
+import browser from "webextension-polyfill";
+import { MessageFormat, MessagingContexts } from '../core/MessagingCore.js'
+import { MessageActions } from '../core/MessageActions.js'
 
 /**
  * Provides a standardized interface for messaging within Vue components.
+ * Now uses direct browser.runtime.sendMessage for better performance and simplicity.
  *
  * @param {string} context - The messaging context (e.g., 'popup', 'sidepanel').
- * @returns {object} An object with messenger instances and specialized messengers.
+ * @returns {object} Simplified messaging utilities
  * 
  * @example
  * ```javascript
- * const { translation, tts, provider, service, background } = useMessaging('popup');
+ * const { sendMessage, createMessage } = useMessaging('popup');
  * 
- * // Translation operations
- * await translation.translate('Hello', { from: 'en', to: 'fa' });
+ * // Create a message
+ * const message = createMessage(MessageActions.TRANSLATE, { text: 'Hello' });
  * 
- * // TTS operations  
- * await tts.speak('Hello world', 'en-US');
- * 
- * // Provider management
- * const providers = await provider.getProviders();
- * await provider.testConnection('google-translate');
- * 
- * // Service operations
- * const status = await service.getServiceStatus();
- * await service.clearCache();
- * 
- * // Background operations
- * await background.warmupServices();
- * const metrics = await background.getPerformanceMetrics();
+ * // Send message
+ * const response = await sendMessage(message);
  * ```
  */
 export function useMessaging(context) {
-  const messenger = MessagingCore.getMessenger(context)
+  /**
+   * Send a message using browser.runtime.sendMessage
+   * @param {Object} message - Message object (should use MessageFormat.create)
+   * @returns {Promise} Response promise
+   */
+  const sendMessage = async (message) => {
+    try {
+      return await browser.runtime.sendMessage(message);
+    } catch (error) {
+      console.error(`[useMessaging:${context}] Send failed:`, error);
+      throw error;
+    }
+  };
+
+  /**
+   * Create a standardized message
+   * @param {string} action - Message action
+   * @param {*} data - Message data
+   * @param {Object} options - Additional options
+   * @returns {Object} Standardized message
+   */
+  const createMessage = (action, data, options = {}) => {
+    return MessageFormat.create(action, data, context, options);
+  };
+
+  /**
+   * Send a message with fire-and-forget pattern
+   * @param {string} action - Message action
+   * @param {*} data - Message data
+   * @param {Object} options - Additional options
+   */
+  const sendFireAndForget = (action, data, options = {}) => {
+    const message = createMessage(action, data, options);
+    browser.runtime.sendMessage(message).catch(error => {
+      // Silently ignore send errors for fire-and-forget
+      console.debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
+    });
+  };
 
   return {
-    // General purpose sendMessage
-    sendMessage: messenger.sendMessage.bind(messenger),
-
-    // Specialized messengers for domain-specific tasks
-    tts: messenger.specialized.tts,
-    capture: messenger.specialized.capture,
-    selection: messenger.specialized.selection,
-    translation: messenger.specialized.translation,
-    provider: messenger.specialized.provider,
-    service: messenger.specialized.service,
-    background: messenger.specialized.background,
-
-    // Direct access to the core messenger if needed
-    messenger
+    sendMessage,
+    createMessage,
+    sendFireAndForget,
+    
+    // Constants for convenience
+    MessageActions,
+    MessagingContexts,
   }
 }

@@ -7,6 +7,7 @@ import { generateMessageId } from "../utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { MessagingContexts } from "@/messaging/core/MessagingCore.js";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('UI', 'useSidepanelTranslation');
@@ -105,6 +106,12 @@ export function useSidepanelTranslation() {
       if (
         message.action === MessageActions.TRANSLATION_RESULT_UPDATE
       ) {
+        // Only process messages intended for sidepanel or without specific context
+        if (message.context && message.context !== MessagingContexts.SIDEPANEL) {
+          logger.debug("[useSidepanelTranslation] Message filtered out. Context:", message.context, "Expected:", MessagingContexts.SIDEPANEL);
+          return;
+        }
+        
         logger.debug(
           "[useSidepanelTranslation] Received TRANSLATION_RESULT_UPDATE:",
           message,

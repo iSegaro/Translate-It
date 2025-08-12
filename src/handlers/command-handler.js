@@ -1,12 +1,18 @@
-import { MessageContexts, MessagingCore } from '../messaging/core/MessagingCore.js';
+import browser from "webextension-polyfill";
+import { MessagingContexts, MessageFormat, MessageActions } from '../messaging/core/MessagingCore.js';
 import { logME } from "../utils/core/helpers.js";
-
-const messenger = MessagingCore.getMessenger(MessageContexts.BACKGROUND);
 
 async function handleCommand(tab, action, data = {}) {
   try {
     logME(`[CommandHandler] ${action} command triggered`);
-    await messenger.sendMessageToTab(tab.id, { action, data: { ...data, source: 'keyboard_shortcut' } });
+    
+    const message = MessageFormat.create(
+      action,
+      { ...data, source: 'keyboard_shortcut' },
+      MessagingContexts.BACKGROUND
+    );
+    
+    await browser.tabs.sendMessage(tab.id, message);
     logME(`[CommandHandler] ${action} command sent to content script`);
   } catch (error) {
     logME(`[CommandHandler] Error handling ${action} command:`, error);

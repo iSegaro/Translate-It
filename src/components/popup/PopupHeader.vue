@@ -12,10 +12,10 @@
     </div>
     <div class="toolbar-right-group">
       <IconButton
+        ref="sidePanelButton"
         icon="side-panel.png"
         :title="$i18n('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
         type="toolbar"
-        @click="handleOpenSidePanel"
       />
       <IconButton
         icon="select.png"
@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
@@ -75,6 +75,9 @@ import { MessageContexts } from '../../messaging/core/MessagingCore.js'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'PopupHeader');
+
+// Refs
+const sidePanelButton = ref(null)
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -105,31 +108,6 @@ const handleTranslatePage = async () => {
     }
   } catch (error) {
     await handleError(error, 'PopupHeader-translatePage')
-  }
-}
-
-const handleOpenSidePanel = async () => {
-  try {
-    // Get the current tab information to provide context
-    const [activeTab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-    
-    logger.debug('[PopupHeader] Opening side panel for tab:', activeTab?.id)
-    
-    await sendMessage({ 
-      action: MessageActions.OPEN_SIDE_PANEL,
-      data: {
-        tabId: activeTab?.id,
-        windowId: activeTab?.windowId
-      }
-    })
-    
-    logger.debug('[PopupHeader] Side panel open request sent successfully')
-    window.close()
-  } catch (error) {
-    await handleError(error, 'PopupHeader-sidePanel')
   }
 }
 
@@ -230,10 +208,53 @@ onMounted(async () => {
       })
       excludeCurrentPage.value = response?.excluded || false
     }
+    
+    // Add native event listener for sidepanel button (Firefox compatibility)
+    if (sidePanelButton.value && sidePanelButton.value.$el) {
+      sidePanelButton.value.$el.addEventListener('click', handleOpenSidePanelNative, true)
+    }
   } catch (error) {
     await handleError(error, 'PopupHeader-getExcludeStatus')
   }
 });
+
+onUnmounted(() => {
+  // Cleanup event listener
+  if (sidePanelButton.value && sidePanelButton.value.$el) {
+    sidePanelButton.value.$el.removeEventListener('click', handleOpenSidePanelNative, true)
+  }
+})
+
+// Native event handler for cross-browser compatibility
+const handleOpenSidePanelNative = async (event) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  logger.debug('[PopupHeader] Opening sidepanel')
+  
+  try {
+    if (browser.sidebarAction) {
+      // Firefox: toggle behavior
+      browser.sidebarAction.toggle()
+      logger.debug('[PopupHeader] Firefox sidebar toggled')
+    } else if (browser.sidePanel) {
+      // Chrome: simple open behavior
+      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
+      
+      if (activeTab?.id) {
+        await browser.sidePanel.open({ tabId: activeTab.id })
+      } else {
+        await browser.sidePanel.open({})
+      }
+      logger.debug('[PopupHeader] Chrome sidePanel opened')
+    }
+    
+    window.close()
+  } catch (error) {
+    logger.error('[PopupHeader] Sidepanel failed:', error)
+    await handleError(error, 'PopupHeader-sidePanel')
+  }
+}
 
 
 </script>

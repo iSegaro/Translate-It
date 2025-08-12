@@ -26,8 +26,8 @@ const _registerSelectStateListener = async () => {
 
   // Initialize from background via messaging
   try {
-    const { selection } = useMessaging('sidepanel');
-    const response = await selection.getSelectionState();
+    const { sendMessage, MessageActions } = useMessaging('sidepanel');
+    const response = await sendMessage(MessageActions.GET_SELECT_ELEMENT_STATE);
     if (response && response.success) {
       sharedIsSelectModeActive.value = !!response.active;
       _currentTabId = response.tabId;
@@ -285,7 +285,7 @@ export function useSelectElementTranslation() {
     try {
       logME("[useSelectElementTranslation] Deactivating select element mode");
       await browser.runtime.sendMessage({
-        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+        action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
         data: { active: false }

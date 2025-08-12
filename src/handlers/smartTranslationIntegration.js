@@ -1,6 +1,6 @@
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { MessageFormat, MessageContexts } from "../messaging/core/MessagingCore.js";
+import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
@@ -84,7 +84,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         mode: mode,
         options: {}
       },
-      MessageContexts.CONTENT
+      MessagingContexts.CONTENT
     );
     
     browser.runtime.sendMessage(translationMessage).catch(sendError => {

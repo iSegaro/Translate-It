@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
-import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
+import { MessagingContexts, MessageFormat } from '@/messaging/core/MessagingCore.js';
 import { generateBackgroundMessageId } from '@/utils/messaging/messageId.js';
 
 // In-memory per-tab select element state
@@ -13,13 +13,12 @@ function setStateForTab(tabId, active) {
   // Notify interested parties via runtime message (background -> tabs)
   try {
     // Broadcast state change using standardized message envelope so receivers can validate
-    browser.runtime.sendMessage({
-      action: MessageActions.SELECT_ELEMENT_STATE_CHANGED,
-      data: { tabId, active },
-      context: MessagingContexts.BACKGROUND,
-      messageId: generateBackgroundMessageId('selectElementStateChanged'),
-      timestamp: Date.now()
-    }).catch(() => {});
+    const message = MessageFormat.create(
+      MessageActions.SELECT_ELEMENT_STATE_CHANGED,
+      { tabId, active },
+      MessagingContexts.BACKGROUND
+    );
+    browser.runtime.sendMessage(message).catch(() => {});
   } catch {
     // ignore
   }
@@ -60,11 +59,12 @@ try {
             if (prevState && prevState.active) {
               // notify content script in that tab to deactivate
               try {
-                await browser.tabs.sendMessage(_lastActiveTabId, {
-                  action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                  context: MessagingContexts.BACKGROUND,
-                  messageId: generateBackgroundMessageId('deactivateSelectElement')
-                });
+                const message = MessageFormat.create(
+                  MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+                  {},
+                  MessagingContexts.BACKGROUND
+                );
+                await browser.tabs.sendMessage(_lastActiveTabId, message);
               } catch (e) {
                 // ignore if sendMessage fails
               }
@@ -90,11 +90,12 @@ try {
             for (const [tabId, state] of selectElementStateByTab.entries()) {
               if (state && state.active) {
                 try {
-                  await browser.tabs.sendMessage(Number(tabId), {
-                    action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                    context: MessagingContexts.BACKGROUND,
-                    messageId: generateBackgroundMessageId('deactivateSelectElement_onFocus')
-                  });
+                  const message = MessageFormat.create(
+                    MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+                    {},
+                    MessagingContexts.BACKGROUND
+                  );
+                  await browser.tabs.sendMessage(Number(tabId), message);
                 } catch {
                   // ignore
                 }

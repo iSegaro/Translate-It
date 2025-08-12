@@ -1,6 +1,6 @@
 import { ref, onMounted } from 'vue';
 import browser from 'webextension-polyfill';
-import { MessagingCore } from '../messaging/core/MessagingCore.js';
+import { useMessaging } from '../messaging/composables/useMessaging.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
 
 // Global state for API readiness
@@ -42,8 +42,8 @@ export function useBrowserAPI(context = 'vue-generic') { // This context is now 
   const error = ref("");
   const isLoading = ref(!globalApiReady.value);
 
-  // Get context-specific messenger
-  const messenger = MessagingCore.getMessenger(context);
+  // Get messaging utilities for this context
+  const messaging = useMessaging(context);
 
   const updateState = () => {
     isReady.value = globalApiReady.value;
@@ -85,13 +85,10 @@ export function useBrowserAPI(context = 'vue-generic') { // This context is now 
     error,
     isLoading,
 
-    // Messaging (full messenger interface)
-    messenger,
-    sendMessage: messenger.sendMessage.bind(messenger),
-    tts: messenger.specialized.tts,
-    capture: messenger.specialized.capture,
-    selection: messenger.specialized.selection,
-    translation: messenger.specialized.translation,
+    // Messaging (simplified interface)
+    messaging,
+    sendMessage: messaging.sendMessage,
+    sendMessageNoResponse: messaging.sendMessageNoResponse,
 
     // Storage
     safeStorageGet: storageManager.get.bind(storageManager),

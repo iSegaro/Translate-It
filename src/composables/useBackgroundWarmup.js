@@ -1,6 +1,6 @@
 import { ref, onMounted } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
-import { MessageContexts } from "../messaging/core/MessagingCore.js";
+import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 
 const isWarmedUp = ref(false);
@@ -8,7 +8,7 @@ const warmupInProgress = ref(false);
 let warmupPromise = null;
 
 export function useBackgroundWarmup() {
-  const { messenger } = useBrowserAPI(MessageContexts.BACKGROUND_WARMUP);
+  const { messenger } = useBrowserAPI(MessagingContexts.BACKGROUND_WARMUP);
 
   const warmupBackground = () => {
     if (warmupPromise) return warmupPromise;

@@ -2,7 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
 import browser from "webextension-polyfill";
-import { MessagingCore, MessageFormat, MessageContexts } from "../../messaging/core/MessagingCore.js";
+import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -14,7 +14,6 @@ class ContentScriptVueBridge {
     this.pinia = createPinia();
     this.isInitialized = false;
     this.componentRegistry = new Map();
-    this.messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
 
     this.actionMap = {
       CREATE_VUE_MICRO_APP: this.handleCreateMicroApp,

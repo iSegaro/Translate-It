@@ -2,7 +2,7 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { MessageFormat, MessagingContexts, MessagingCore } from '../../../messaging/core/MessagingCore.js';
+import { MessageFormat, MessagingContexts } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { createLogger } from '@/utils/core/logger.js';
 import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
@@ -10,8 +10,6 @@ import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
 const logger = createLogger('Core', 'handleActivateSelectElementMode');
 
 const errorHandler = new ErrorHandler();
-// Create messenger instance for centralized tab messaging
-const messenger = MessagingCore.getMessenger(MessagingContexts.BACKGROUND);
 
 /**
  * Handles the 'activateSelectElementMode' message action.
@@ -64,6 +62,10 @@ export async function handleActivateSelectElementMode(message, sender) {
     if (typeof message.data === 'boolean') {
       isActivating = message.data;
       modeForContentScript = isActivating ? 'select' : 'normal';
+    } else if (message.data && typeof message.data.active === 'boolean') {
+      // Handle data: { active: true/false } format from useTranslationModes
+      isActivating = message.data.active;
+      modeForContentScript = isActivating ? 'select' : 'normal';
     } else if (typeof message === 'object' && message.action === MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) {
       isActivating = true;
       modeForContentScript = 'select';
@@ -87,8 +89,8 @@ export async function handleActivateSelectElementMode(message, sender) {
       MessagingContexts.CONTENT // Context for content script
     );
 
-    // Use centralized sendToTab method for enhanced cross-browser compatibility
-    const response = await messenger.sendToTab(targetTabId, contentMessage);
+    // Use direct browser.tabs.sendMessage for cross-browser compatibility
+    const response = await browser.tabs.sendMessage(targetTabId, contentMessage);
     
     // Check if tab communication actually succeeded
     const statusText = isActivating ? 'activated' : 'deactivated';

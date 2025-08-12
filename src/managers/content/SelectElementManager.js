@@ -8,8 +8,7 @@ import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { createLogger } from "../../utils/core/logger.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
-import { MessagingCore } from "../../messaging/core/MessagingCore.js";
-import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
+import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "../../utils/messaging/messageId.js";
 
@@ -43,7 +42,6 @@ export class SelectElementManager {
     // Service instances
     this.errorHandler = new ErrorHandler();
     this.notificationManager = new NotificationManager(this.errorHandler);
-    this.messenger = MessagingCore.getMessenger(MessagingContexts.CONTENT);
 
     // Event handlers (bound to this)
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -998,8 +996,18 @@ export class SelectElementManager {
         // Send translation request - don't wait for direct response
         // The ContentMessageHandler will process TRANSLATION_RESULT_UPDATE and apply SmartTranslation
         try {
+          // Create and send message directly using browser.runtime.sendMessage
+          const message = MessageFormat.create(
+            MessageActions.TRANSLATE,
+            translationRequest,
+            MessagingContexts.CONTENT,
+            { messageId: messageId }
+          );
+          
           // Fire and forget - let SmartTranslation system handle the result
-          this.messenger.translate(translationRequest);
+          browser.runtime.sendMessage(message).catch(error => {
+            this.logger.warn('Translation message send failed:', error);
+          });
           
           this.logger.debug("[SelectElementManager] Field translation request sent, letting ContentMessageHandler process result");
           

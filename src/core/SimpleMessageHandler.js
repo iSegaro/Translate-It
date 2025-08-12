@@ -4,7 +4,7 @@
  * Enhanced with context-aware routing for MessagingStandards integration
  */
 import browser from "webextension-polyfill";
-import { MessageContexts } from "../messaging/core/MessagingCore";
+import { MessagingContexts } from "../messaging/core/MessagingCore";
 import { createLogger } from '@/utils/core/logger.js';
 
 const logger = createLogger('Core', 'SimpleMessageHandler');

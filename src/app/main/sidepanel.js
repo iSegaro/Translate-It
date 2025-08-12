@@ -3,7 +3,7 @@ import { pinia } from '@/store'
 import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessageContexts } from '../../messaging/core/MessagingCore'
+import { MessagingContexts } from '../../messaging/core/MessagingCore'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -53,7 +53,7 @@ async function initializeApp() {
 
     // Global properties for extension context
     app.config.globalProperties.$isExtension = true
-    app.config.globalProperties.$context = MessageContexts.SIDEPANEL
+    app.config.globalProperties.$context = MessagingContexts.SIDEPANEL
 
     // Setup unified error handling
     setupGlobalErrorHandler(app, 'sidepanel')

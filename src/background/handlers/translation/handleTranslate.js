@@ -171,7 +171,7 @@ export async function handleTranslate(message, sender) {
         logger.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
       });
     } else {
-      logger.warn("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
+      logger.debug("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
       browser.runtime.sendMessage(updateMessage).catch(error => {
         logger.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
       });
