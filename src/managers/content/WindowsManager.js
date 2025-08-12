@@ -353,7 +353,9 @@ export default class SelectionWindows {
           --sw-original-text-color: #fff; --sw-loading-dot-opacity-start: 0.5; --sw-loading-dot-opacity-mid: 1; --sw-link-color: #58a6ff;
         }
         .popup-container { background-color: var(--sw-bg-color); color: var(--sw-text-color); border: 1px solid var(--sw-border-color);
-          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); max-width: 300px; overflow-wrap: break-word;
+          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); 
+          max-width: min(300px, calc(100vw - 40px)); overflow-wrap: break-word;
+          word-break: break-word; overflow: hidden; box-sizing: border-box; min-width: 200px;
         }
         
         /* Unified Translation Display Styles */
@@ -751,7 +753,7 @@ export default class SelectionWindows {
     };
 
     // Estimated popup dimensions (will be refined after DOM insertion)
-    const popupWidth = 320; // Slightly larger than max-width: 300px + padding
+    const popupWidth = 330; // More conservative estimate: max-width: 300px + padding + borders + safety margin
     const popupHeight = 120; // Estimated height for typical translations
 
     // Calculate available space in each direction
@@ -1107,10 +1109,17 @@ export default class SelectionWindows {
       // Popup extends beyond right edge
       newX = viewport.width - rect.width - 10;
       needsRepositioning = true;
-    } else if (currentX < 10) {
+    } 
+    // MORE AGGRESSIVE left edge check to prevent content overflow
+    if (currentX < 10) {
       // Popup extends beyond left edge
       newX = 10;
       needsRepositioning = true;
+    }
+    // Additional check: ensure popup with actual width fits within viewport
+    if (newX + rect.width > viewport.width - 10) {
+      // Even after adjustment, popup is too wide - force fit
+      newX = Math.max(10, viewport.width - rect.width - 10);
     }
 
     // Check vertical bounds
