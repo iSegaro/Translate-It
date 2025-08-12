@@ -1,52 +1,622 @@
 # Translation System Architecture Documentation
 
-This document provides a comprehensive guide to the translation system architecture in the Translate-It browser extension. It covers the complete flow from user interaction to translation delivery, explaining every component and pathway.
+This document provides a comprehensive guide to the **refactored translation system** in the Translate-It browser extension. The system has been **modernized and simplified**, moving away from complex messaging classes to **direct browser API usage** with **standardized message handling**.
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [Core Components](#core-components)
-3. [Translation Pathways](#translation-pathways)
-4. [Message Flow Architecture](#message-flow-architecture)
-5. [handleTranslate.js - The Translation Hub](#handletranslatejs---the-translation-hub)
-6. [Provider System Integration](#provider-system-integration)
-7. [Cross-Browser Compatibility](#cross-browser-compatibility)
-8. [Error Handling & Recovery](#error-handling--recovery)
-9. [Performance Considerations](#performance-considerations)
-10. [Development Guidelines](#development-guidelines)
+2. [Core Architecture](#core-architecture)
+3. [Translation Flow](#translation-flow)
+4. [Component Integration](#component-integration)
+5. [Background Processing](#background-processing)
+6. [Provider System](#provider-system)
+7. [Context Separation](#context-separation)
+8. [Error Handling](#error-handling)
+9. [Best Practices](#best-practices)
 
 ---
 
 ## Overview
 
-The translation system is the **core functionality** of the Translate-It extension, designed to handle translation requests from multiple contexts (sidepanel, popup, select element) through a unified, scalable architecture. The system supports **10+ translation providers**, **cross-browser compatibility** (Chrome/Firefox), and **multiple interaction modes**.
+The translation system is the **core functionality** of the Translate-It extension, designed to handle translation requests from multiple contexts (sidepanel, popup, select element) through a **unified, simplified architecture**.
+
+### 🔄 Major Refactoring Changes
+
+**Before**: Complex messaging classes with timeout issues  
+**After**: Direct browser API with standardized message formats
 
 ### Key Features
 
-- **🔄 Unified Translation Pipeline**: All translation requests flow through a single, well-defined pathway
-- **🌐 Multi-Context Support**: Sidepanel, Popup, Select Element, and Content Script translations
-- **🏭 Provider Factory Pattern**: Extensible system supporting multiple translation APIs
-- **🔧 Cross-Browser Compatibility**: Chrome and Firefox MV3 support with automatic detection
-- **⚡ Real-time Results**: Firebase MV3 compatible result broadcasting system
-- **🛡️ Error Resilience**: Comprehensive error handling and recovery mechanisms
+- **🎯 Unified Handler**: All translation requests flow through `handleTranslate.js`
+- **🌐 Multi-Context Support**: Popup, Sidepanel, Content Script, Select Element
+- **🏭 Provider System**: Extensible architecture supporting 10+ translation APIs
+- **🔧 Cross-Browser Compatibility**: Chrome and Firefox MV3 support
+- **⚡ Real-time Results**: Direct message broadcasting system
+- **🛡️ Error Resilience**: Comprehensive error handling and recovery
 
 ---
 
-## Core Components
+## Core Architecture
 
-### 1. Translation Request Handlers
+### 1. Simplified Message Flow
 
-#### Primary Handler: `handleTranslate.js`
-**Location:** `src/background/handlers/translation/handleTranslate.js`
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   UI Component  │ ── │   useMessaging  │ ── │ browser.runtime │
+│                 │    │   Composable    │    │  .sendMessage() │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    BACKGROUND SCRIPT                           │
+├─────────────────────────────────────────────────────────────────┤
+│  LifecycleManager → handleTranslate.js → TranslationEngine     │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              PROVIDER LAYER (Google, OpenAI, etc.)            │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               RESULT BROADCASTING                              │
+│        All contexts receive TRANSLATION_RESULT_UPDATE         │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-**Role:** Central processing unit for ALL translation requests
+### 2. Key Components
 
-**Key Responsibilities:**
-- Message validation and normalization
-- SelectElement mode JSON payload processing
-- Translation Engine coordination
-- Result broadcasting to all contexts
-- Error handling and recovery
+#### Frontend Layer
+- **Vue Components**: `PopupTranslation.vue`, `SidepanelTranslation.vue`
+- **Composables**: `usePopupTranslation.js`, `useSidepanelTranslation.js`
+- **Messaging**: `useMessaging.js` composable for direct browser API usage
+
+#### Background Layer
+- **Router**: `LifecycleManager.js` - Central message router
+- **Handler**: `handleTranslate.js` - Translation request processor
+- **Engine**: `TranslationEngine.js` - Provider coordination
+- **Providers**: Individual translation service implementations
+
+---
+
+## Translation Flow
+
+### 1️⃣ Popup Translation Flow
+
+```mermaid
+graph TD
+    A[User enters text in popup] --> B[PopupTranslation.vue]
+    B --> C[usePopupTranslation.translateText]
+    C --> D[useMessaging.sendMessage]
+    D --> E[browser.runtime.sendMessage]
+    E --> F[LifecycleManager.handleMessage]
+    F --> G[handleTranslate.js]
+    G --> H[TranslationEngine.handleTranslateMessage]
+    H --> I[Provider.translate]
+    I --> J[Translation Result]
+    J --> K[TRANSLATION_RESULT_UPDATE broadcast]
+    K --> L[Popup UI update]
+```
+
+**Code Example - Popup Translation:**
+
+```javascript
+// PopupTranslation.vue
+import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
+
+export default {
+  setup() {
+    const { translateText, isTranslating, translationResult } = usePopupTranslation()
+    
+    const handleTranslate = async () => {
+      try {
+        const result = await translateText({
+          text: inputText.value,
+          sourceLang: 'auto',
+          targetLang: settingsStore.settings.TARGET_LANGUAGE
+        })
+        
+        // Result automatically updates via TRANSLATION_RESULT_UPDATE
+      } catch (error) {
+        console.error('Translation failed:', error)
+      }
+    }
+    
+    return { handleTranslate, isTranslating, translationResult }
+  }
+}
+```
+
+### 2️⃣ Sidepanel Translation Flow
+
+```mermaid
+graph TD
+    A[User clicks translate in sidepanel] --> B[SidepanelTranslation.vue]
+    B --> C[useSidepanelTranslation.triggerTranslation]
+    C --> D[useMessaging.sendMessage with SIDEPANEL context]
+    D --> E[Background: handleTranslate.js]
+    E --> F[TranslationEngine processing]
+    F --> G[Provider execution]
+    G --> H[Result broadcast to SIDEPANEL context]
+    H --> I[Sidepanel UI update]
+```
+
+**Code Example - Sidepanel Translation:**
+
+```javascript
+// useSidepanelTranslation.js
+import { useMessaging } from '@/messaging/composables/useMessaging.js'
+import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { MessagingContexts } from '@/messaging/core/MessagingCore.js'
+
+export const useSidepanelTranslation = () => {
+  const { sendMessage } = useMessaging()
+  
+  const triggerTranslation = async (translationData) => {
+    const response = await sendMessage({
+      action: MessageActions.TRANSLATE,
+      data: {
+        text: translationData.text,
+        sourceLang: translationData.sourceLang,
+        targetLang: translationData.targetLang,
+        mode: 'Sidepanel_Translate'
+      }
+    }, MessagingContexts.SIDEPANEL)
+    
+    return response
+  }
+  
+  // Context filtering for message listener
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.context !== MessagingContexts.SIDEPANEL) {
+      return false // Not for sidepanel
+    }
+    
+    if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+      // Update sidepanel UI with translation result
+      updateTranslationDisplay(message.data)
+    }
+  })
+  
+  return { triggerTranslation }
+}
+```
+
+### 3️⃣ Select Element Translation Flow
+
+```mermaid
+graph TD
+    A[User selects element on page] --> B[SelectElementManager]
+    B --> C[Extract text content]
+    C --> D[Create JSON payload if multiple elements]
+    D --> E[Send TRANSLATE with rawJsonPayload flag]
+    E --> F[handleTranslate.js: Special JSON processing]
+    F --> G[Extract plain text from JSON]
+    G --> H[Provider translation]
+    H --> I[Rewrap result back to JSON]
+    I --> J[Content script UI update]
+```
+
+**Code Example - Select Element Processing:**
+
+```javascript
+// handleTranslate.js - Special SelectElement processing
+if (normalizedMessage.data.mode === 'SelectElement' && 
+    normalizedMessage.data.options?.rawJsonPayload) {
+  
+  try {
+    const parsedPayload = JSON.parse(normalizedMessage.data.text)
+    
+    // Extract plain text from JSON structure
+    let extractedText = ''
+    if (Array.isArray(parsedPayload)) {
+      extractedText = parsedPayload.map(item => item.text).join('
+')
+    } else if (parsedPayload.text) {
+      extractedText = parsedPayload.text
+    }
+    
+    // Translate plain text
+    const translationResult = await translatePlainText(extractedText)
+    
+    // Rewrap result back to JSON format
+    const wrappedResult = wrapTranslationToJson(parsedPayload, translationResult)
+    
+    return wrappedResult
+  } catch (jsonError) {
+    logger.error('JSON processing failed:', jsonError)
+    // Fallback to plain text translation
+  }
+}
+```
+
+---
+
+## Component Integration
+
+### 1. Vue Composables
+
+Each UI context has its dedicated composable:
+
+#### usePopupTranslation.js
+```javascript
+export const usePopupTranslation = () => {
+  const { sendMessage } = useMessaging()
+  const isTranslating = ref(false)
+  const translationResult = ref(null)
+  
+  const translateText = async (data) => {
+    isTranslating.value = true
+    try {
+      const response = await sendMessage({
+        action: MessageActions.TRANSLATE,
+        data: { ...data, mode: 'Popup_Translate' }
+      }, MessagingContexts.POPUP)
+      
+      return response
+    } finally {
+      isTranslating.value = false
+    }
+  }
+  
+  return { translateText, isTranslating, translationResult }
+}
+```
+
+#### useSidepanelTranslation.js
+```javascript
+export const useSidepanelTranslation = () => {
+  // Context-specific translation logic
+  // Message filtering to prevent popup interference
+  
+  browser.runtime.onMessage.addListener((message) => {
+    if (message.context !== MessagingContexts.SIDEPANEL) {
+      return false // Ignore non-sidepanel messages
+    }
+    // Handle sidepanel-specific translation updates
+  })
+}
+```
+
+### 2. Context Separation
+
+**Problem Solved**: Previously, translation results would appear in both popup and sidepanel simultaneously.
+
+**Solution**: Context filtering in message listeners:
+
+```javascript
+// Each component filters messages by context
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Only handle messages for this context
+  if (message.context !== MessagingContexts.SIDEPANEL) {
+    return false
+  }
+  
+  // Process sidepanel-specific messages
+  if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+    updateSidepanelUI(message.data)
+  }
+})
+```
+
+---
+
+## Background Processing
+
+### 1. LifecycleManager - Message Router
+
+```javascript
+// src/managers/core/LifecycleManager.js
+class LifecycleManager {
+  constructor() {
+    this.messageHandlers = {
+      'TRANSLATE': Handlers.handleTranslate,
+      'ping': Handlers.handlePing,
+      // ... other handlers
+    }
+  }
+  
+  async handleMessage(message, sender, sendResponse) {
+    const handler = this.messageHandlers[message.action]
+    if (handler) {
+      return await handler(message, sender, sendResponse)
+    }
+    
+    console.warn('No handler for action:', message.action)
+    return MessageFormat.createResponse(false, null, { 
+      message: 'Unknown action' 
+    })
+  }
+}
+```
+
+### 2. handleTranslate.js - Translation Hub
+
+**Location**: `src/background/handlers/translation/handleTranslate.js`
+
+**Role**: Central processor for ALL translation requests
+
+```javascript
+export const handleTranslate = async (message, sender, sendResponse) => {
+  try {
+    logger.debug(`[TRANSLATE] Processing request from context: ${message.context}`)
+    
+    // 1. Validate message format
+    if (!MessageFormat.validate(message)) {
+      throw new Error('Invalid message format')
+    }
+    
+    // 2. Special processing for SelectElement JSON payloads
+    if (message.data.mode === 'SelectElement' && 
+        message.data.options?.rawJsonPayload) {
+      // Handle JSON extraction and rewrapping
+    }
+    
+    // 3. Route to TranslationEngine
+    const translationEngine = globalThis.backgroundService.translationEngine
+    const result = await translationEngine.handleTranslateMessage(message, sender)
+    
+    // 4. Broadcast result to appropriate context
+    if (sender.tab?.id) {
+      await browser.tabs.sendMessage(sender.tab.id, 
+        MessageFormat.create(
+          MessageActions.TRANSLATION_RESULT_UPDATE,
+          result,
+          message.context
+        )
+      )
+    }
+    
+    sendResponse(MessageFormat.createResponse(true, result))
+  } catch (error) {
+    logger.error('[TRANSLATE] Processing failed:', error)
+    sendResponse(MessageFormat.createResponse(false, null, {
+      message: error.message,
+      code: 'TRANSLATION_ERROR'
+    }))
+  }
+  
+  return true
+}
+```
+
+---
+
+## Provider System
+
+### 1. Provider Factory
+
+```javascript
+// src/services/translation/providers/ProviderFactory.js
+export class ProviderFactory {
+  static getProvider(providerType) {
+    switch (providerType) {
+      case 'google-translate':
+        return new GoogleTranslateProvider()
+      case 'openai':
+        return new OpenAIProvider()
+      case 'deepseek':
+        return new DeepSeekProvider()
+      default:
+        throw new Error(`Unknown provider: ${providerType}`)
+    }
+  }
+}
+```
+
+### 2. Provider Interface
+
+All providers implement a standard interface:
+
+```javascript
+class BaseProvider {
+  async translate(options) {
+    const { text, sourceLang, targetLang } = options
+    
+    // Provider-specific implementation
+    const result = await this.performTranslation(text, sourceLang, targetLang)
+    
+    return {
+      translatedText: result.text,
+      sourceLanguage: result.detectedLanguage || sourceLang,
+      targetLanguage: targetLang,
+      provider: this.name,
+      timestamp: Date.now()
+    }
+  }
+}
+```
+
+### 3. Translation Engine Coordination
+
+```javascript
+// src/services/translation/TranslationEngine.js
+export class TranslationEngine {
+  async handleTranslateMessage(message, sender) {
+    const { text, sourceLang, targetLang, provider } = message.data
+    
+    // Get configured provider
+    const translationProvider = ProviderFactory.getProvider(
+      provider || this.getDefaultProvider()
+    )
+    
+    // Perform translation
+    const result = await translationProvider.translate({
+      text,
+      sourceLang,
+      targetLang
+    })
+    
+    // Add metadata
+    result.mode = message.data.mode
+    result.context = message.context
+    result.originalText = text
+    
+    return result
+  }
+}
+```
+
+---
+
+## Context Separation
+
+### Problem & Solution
+
+**❌ Before**: Translation results appeared in multiple components simultaneously
+
+**✅ After**: Context-based message filtering ensures proper component isolation
+
+### Implementation
+
+```javascript
+// Popup component - only receives POPUP context messages
+browser.runtime.onMessage.addListener((message) => {
+  if (message.context !== MessagingContexts.POPUP) {
+    return false // Ignore non-popup messages
+  }
+  
+  if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+    updatePopupTranslation(message.data)
+  }
+})
+
+// Sidepanel component - only receives SIDEPANEL context messages  
+browser.runtime.onMessage.addListener((message) => {
+  if (message.context !== MessagingContexts.SIDEPANEL) {
+    return false // Ignore non-sidepanel messages
+  }
+  
+  if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
+    updateSidepanelTranslation(message.data)
+  }
+})
+```
+
+---
+
+## Error Handling
+
+### 1. Standardized Error Responses
+
+```javascript
+// Error response format
+{
+  success: false,
+  error: {
+    message: 'Provider authentication failed',
+    code: 'PROVIDER_AUTH_ERROR',
+    details: { provider: 'openai', statusCode: 401 }
+  },
+  messageId: 'translate-12345',
+  timestamp: 1672531200000
+}
+```
+
+### 2. Provider Error Handling
+
+```javascript
+// In provider implementations
+async translate(options) {
+  try {
+    const result = await this.apiCall(options)
+    return this.formatSuccess(result)
+  } catch (error) {
+    if (error.status === 401) {
+      throw new Error('Provider authentication failed')
+    } else if (error.status === 429) {
+      throw new Error('Rate limit exceeded')
+    } else {
+      throw new Error(`Translation failed: ${error.message}`)
+    }
+  }
+}
+```
+
+### 3. UI Error Handling
+
+```javascript
+// In Vue composables
+const translateText = async (data) => {
+  try {
+    const response = await sendMessage({
+      action: MessageActions.TRANSLATE,
+      data
+    })
+    
+    if (!response.success) {
+      throw new Error(response.error.message)
+    }
+    
+    return response.data
+  } catch (error) {
+    // Show user-friendly error message
+    showErrorNotification(error.message)
+    throw error
+  }
+}
+```
+
+---
+
+## Best Practices
+
+### 1. Message Design
+- ✅ Use `MessageActions` constants for consistency
+- ✅ Include context for proper routing
+- ✅ Validate messages with `MessageFormat.validate()`
+- ❌ Don't send large payloads in messages
+
+### 2. Context Separation
+- ✅ Filter messages by context in listeners
+- ✅ Use appropriate `MessagingContexts` values
+- ❌ Don't assume all components need all messages
+
+### 3. Error Handling
+- ✅ Provide meaningful error messages
+- ✅ Include error codes for programmatic handling
+- ✅ Log errors with appropriate detail level
+- ❌ Don't expose internal error details to users
+
+### 4. Performance
+- ✅ Use context filtering to reduce message processing
+- ✅ Avoid unnecessary message broadcasts
+- ✅ Cache translation results when appropriate
+- ❌ Don't create message loops
+
+---
+
+## Key Files
+
+### Core Translation Files
+- `src/background/handlers/translation/handleTranslate.js` - Central translation processor
+- `src/services/translation/TranslationEngine.js` - Provider coordination
+- `src/services/translation/providers/` - Individual provider implementations
+
+### Frontend Integration
+- `src/composables/usePopupTranslation.js` - Popup translation logic
+- `src/composables/useSidepanelTranslation.js` - Sidepanel translation logic
+- `src/messaging/composables/useMessaging.js` - Core messaging utilities
+
+### Background Infrastructure
+- `src/managers/core/LifecycleManager.js` - Message routing
+- `src/messaging/core/MessagingCore.js` - Message format utilities
+- `src/messaging/core/MessageActions.js` - Action constants
+
+---
+
+## Summary
+
+The refactored translation system provides:
+
+- **🎯 Centralized Processing**: All translations flow through `handleTranslate.js`
+- **🔧 Simplified Architecture**: Direct browser API usage instead of complex classes
+- **🌐 Context Isolation**: Components only receive relevant messages
+- **⚡ Better Performance**: Eliminated timeout issues and reduced overhead
+- **🛡️ Robust Error Handling**: Comprehensive error management throughout the pipeline
+
+**Key Insight**: The translation system is now **simpler, faster, and more maintainable** while preserving all functionality and adding better component isolation.
 
 #### Translation Engine: `translation-engine.js`
 **Location:** `src/background/translation-engine.js`
