@@ -1,5 +1,6 @@
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { MessageFormat, MessageContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
@@ -73,21 +74,20 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     // Send direct translation message to background (fire-and-forget pattern like element selection)
     // Response will come via TRANSLATION_RESULT_UPDATE broadcast and handled by ContentMessageHandler
-    browser.runtime.sendMessage({
-      action: MessageActions.TRANSLATE,
-      context: 'content',
-      messageId: `content-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
-      timestamp: Date.now(),
-      version: "2.0",
-      data: {
+    const translationMessage = MessageFormat.create(
+      MessageActions.TRANSLATE,
+      {
         text: text,
         provider: currentProvider,
         sourceLanguage: currentSourceLang || 'auto',
         targetLanguage: currentTargetLang || 'fa',
         mode: mode,
         options: {}
-      }
-    }).catch(sendError => {
+      },
+      MessageContexts.CONTENT
+    );
+    
+    browser.runtime.sendMessage(translationMessage).catch(sendError => {
       logger.warn('Translation request send failed (background may be unreachable):', sendError.message);
     });
     
