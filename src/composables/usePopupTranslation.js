@@ -4,6 +4,8 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import { generateMessageId } from "../utils/messaging/messageId.js";
+import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
+import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -50,6 +52,13 @@ export function usePopupTranslation() {
       const currentProvider = settingsStore.settings.TRANSLATION_API || 'google-translate';
       const messageId = generateMessageId('popup');
       
+      // Determine translation mode (same logic as sidepanel)
+      let mode = TranslationMode.Popup_Translate;
+      const isDictionaryCandidate = isSingleWordOrShortPhrase(sourceText.value);
+      if (settingsStore.settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+        mode = TranslationMode.Dictionary_Translation;
+      }
+      
       // Send direct message to background using browser.runtime.sendMessage 
       // (bypassing UnifiedMessenger to avoid timeout issues)
       browserAPI.sendMessage({
@@ -62,7 +71,7 @@ export function usePopupTranslation() {
           provider: currentProvider,
           sourceLanguage: sourceLanguage,
           targetLanguage: targetLanguage,
-          mode: 'popup',
+          mode: mode,
           options: {}
         }
       }).catch(error => {
