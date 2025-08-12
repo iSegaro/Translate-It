@@ -11,20 +11,14 @@ import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 // or
 import { useSidepanelTranslation } from '@/composables/useSidepanelTranslation.js'
 
-const { 
-  triggerTranslation, 
-  isTranslating, 
-  translatedText,
-  sourceText 
-} = usePopupTranslation()
+const { triggerTranslation, isTranslating, translatedText } = usePopupTranslation()
 
-// Set source text
-sourceText.value = 'Hello world'
-
-// Translate with specific languages
-await triggerTranslation('auto', 'fa')
-// or use default settings languages
-await triggerTranslation()
+// Translate text
+await triggerTranslation({
+  text: 'Hello world',
+  sourceLang: 'auto',
+  targetLang: 'fa'
+})
 ```
 
 ### Message Flow
@@ -237,7 +231,7 @@ if (!result.success && data.provider !== 'google-translate') {
 - `src/managers/core/LifecycleManager.js` - Message routing
 - `src/messaging/core/MessagingCore.js` - Message utilities
 - `src/providers/core/ProviderFactory.js` - Provider management
-- `src/providers/implementations/` - Provider implementations
+- `src/services/translation/providers/` - Provider implementations
 
 ## Summary
 
