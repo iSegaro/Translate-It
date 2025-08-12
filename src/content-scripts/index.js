@@ -5,6 +5,9 @@ import browser from "webextension-polyfill";
 import { createLogger } from "../utils/core/logger.js";
 import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
 
+// Import CSS styles for content script functionality
+import "../styles/disable_links.css";
+
 // Create logger for content script
 const logger = createLogger('Content', 'ContentScript');
 
