@@ -58,38 +58,36 @@ export class UnifiedMessenger {
               .then(async (response) => { // Make this callback async too
                 clearTimeout(timeoutId);
 
+                // For TRANSLATE messages, always wait for the actual result via TRANSLATION_RESULT_UPDATE 
+                // (regardless of response being undefined or not - background always sends broadcast)
+                if (messageToSend.action === MessageActions.TRANSLATE) {
+                  const actualTranslationResult = await new Promise((resolveResult, rejectResult) => {
+                    const listener = (msg) => {
+                      // Primary match is messageId - context matching is too complex and unreliable
+                      if (msg.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
+                          msg.messageId === messageToSend.messageId) {
+                        browser.runtime.onMessage.removeListener(listener);
+                        resolveResult(msg);
+                      }
+                    };
+                    browser.runtime.onMessage.addListener(listener);
+
+                    // Set a timeout for the actual translation result
+                    setTimeout(() => {
+                      browser.runtime.onMessage.removeListener(listener);
+                      rejectResult(new Error('Actual translation result timeout'));
+                    }, 20000); // 20 seconds timeout for actual result
+                  });
+                  resolve(actualTranslationResult); // Resolve with the actual result
+                  return;
+                }
+
                 // MV3 workaround: check if response is undefined but message was actually processed (both Firefox and Chrome)
                 if (response === undefined) {
                   console.info("[UnifiedMessenger] MV3 undefined response detected for", messageToSend.action);
                   // For ping messages, we know it should work, so provide expected response
                   if (messageToSend.action === MessageActions.PING) {
                     resolve({ success: true, message: "pong" });
-                    return;
-                  }
-                  // For TRANSLATE messages from all contexts, we need to wait for the actual result via TRANSLATION_RESULT_UPDATE (Firefox MV3 issue)
-                  if (messageToSend.action === MessageActions.TRANSLATE) {
-                    const actualTranslationResult = await new Promise((resolveResult, rejectResult) => {
-                      const listener = (msg) => {
-                        if (msg.action === MessageActions.TRANSLATION_RESULT_UPDATE && msg.context === messageToSend.context && msg.messageId === messageToSend.messageId) {
-                          browser.runtime.onMessage.removeListener(listener);
-                          resolveResult(msg);
-                        }
-                      };
-                      browser.runtime.onMessage.addListener(listener);
-
-                      // Set a timeout for the actual translation result
-                      setTimeout(() => {
-                        browser.runtime.onMessage.removeListener(listener);
-                        rejectResult(new Error('Actual translation result timeout'));
-                      }, 20000); // 20 seconds timeout for actual result
-                    });
-                    resolve(actualTranslationResult); // Resolve with the actual result
-                    return;
-                  }
-                  // This should not happen anymore for TRANSLATE messages
-                  if (messageToSend.action === MessageActions.TRANSLATE) {
-                    logger.warn("[UnifiedMessenger] TRANSLATE got undefined response after TRANSLATION_RESULT_UPDATE implementation");
-                    resolve({ success: false, error: "Unexpected undefined response for TRANSLATE" });
                     return;
                   }
                   // For Google TTS messages, we need to wait for actual background processing
