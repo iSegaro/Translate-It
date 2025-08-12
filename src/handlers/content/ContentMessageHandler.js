@@ -228,19 +228,19 @@ export class ContentMessageHandler {
     });
     
     try {
-      // Route based on translation mode - delegate specialized modes first (before validation)
+      // Route based on translation mode - handle specialized modes first (before validation)
       if (this.shouldDelegate(translationMode, messageId)) {
         this.logger.debug('Delegating to specialized handler for mode:', translationMode);
         return this.createDelegatedResponse(translationMode, messageId);
       }
-
-      // Validate message data only for modes we handle directly
-      if (!message.data.translatedText) {
-        throw new Error('No translated text received');
-      }
       
       if (this.isFieldTranslation(translationMode)) {
         return await this.handleFieldTranslation(message);
+      }
+
+      // Validate message data only for generic modes we handle directly
+      if (!message.data.translatedText) {
+        throw new Error('No translated text received');
       }
       
       return this.createNoActionResponse(translationMode);
@@ -294,9 +294,31 @@ export class ContentMessageHandler {
    * @returns {Promise<Object>} Handler result
    */
   async handleFieldTranslation(message) {
-    const { translatedText, originalText, translationMode } = message.data;
+    const { translatedText, originalText, translationMode, success, error } = message.data;
     
-    this.logger.debug('Handling field translation');
+    this.logger.debug('Handling field translation', { hasTranslatedText: !!translatedText, hasError: !!error, success });
+    
+    // Handle error case
+    if (!success || error) {
+      this.logger.debug('Field translation failed, handling error:', error);
+      
+      // Import error handling for field translation
+      const { handleTranslationError } = await import('../smartTranslationIntegration.js');
+      await handleTranslationError(error || 'Translation failed', 'field');
+      
+      return {
+        success: true, // We handled the error successfully
+        message: 'Translation error handled for field',
+        applied: false,
+        mode: 'field',
+        error: error
+      };
+    }
+    
+    // Handle success case
+    if (!translatedText) {
+      throw new Error('No translated text received for field translation');
+    }
     
     // Import and apply to text field
     const { applyTranslationToTextField } = await import('../smartTranslationIntegration.js');

@@ -1,14 +1,12 @@
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { MessageContexts, MessagingCore } from "../messaging/core/MessagingCore.js";
-import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "../config.js";
+import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { createLogger } from "../utils/core/logger.js";
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
-
-const messenger = MessagingCore.getMessenger(MessageContexts.CONTENT);
+import browser from "webextension-polyfill";
 const logger = createLogger('Translation', 'SmartTranslation');
 
 // Helper function to dismiss pending translation notification
@@ -62,52 +60,42 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
     logger.debug('Stored pending translation data', { target: target?.tagName, mode, platform });
     
-    // Send translation request - response will be handled by ContentMessageHandler
-    logger.debug('Sending translation request to background');
+    // Get current settings from storage
+    const currentProvider = await getTranslationApiAsync();
+    const currentSourceLang = await getSourceLanguageAsync();
+    const currentTargetLang = await getTargetLanguageAsync();
     
-    // Test connection first
-    try {
-      const pingResult = await messenger.sendMessage({ action: 'ping', data: { test: true } }, 3000);
-      logger.debug('Background connection test result', pingResult);
-      
-      // Handle graceful failure response
-      if (pingResult && pingResult.contextInvalidated) {
-        logger.warn('Extension context invalidated during ping, aborting translation');
-        dismissPendingTranslationNotification('translateFieldViaSmartHandler-ping');
-        return; // Exit gracefully without error
-      }
-    } catch (pingError) {
-      const handler = ErrorHandler.getInstance();
-      handler.handle(pingError, { type: ErrorTypes.NETWORK_ERROR, context: 'smartTranslate-ping' });
-      throw new Error('Background script not responding - extension may need reload');
-    }
-    
-    // Send direct translation message to background (bypassing specialized.translation to avoid timeout)
-    const result = await messenger.sendMessage({
+    logger.debug('Retrieved current settings for translation', { 
+      provider: currentProvider, 
+      source: currentSourceLang, 
+      target: currentTargetLang 
+    });
+
+    // Send direct translation message to background (fire-and-forget pattern like element selection)
+    // Response will come via TRANSLATION_RESULT_UPDATE broadcast and handled by ContentMessageHandler
+    browser.runtime.sendMessage({
       action: MessageActions.TRANSLATE,
       context: 'content',
+      messageId: `content-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
       timestamp: Date.now(),
+      version: "2.0",
       data: {
         text: text,
-        provider: 'google', // Default provider - will be overridden by background settings
-        sourceLanguage: 'auto',
-        targetLanguage: 'fa', // Will be overridden by background settings
+        provider: currentProvider,
+        sourceLanguage: currentSourceLang || 'auto',
+        targetLanguage: currentTargetLang || 'fa',
         mode: mode,
         options: {}
       }
+    }).catch(sendError => {
+      logger.warn('Translation request send failed (background may be unreachable):', sendError.message);
     });
     
-    logger.debug('Translation request completed', result);
-    
-    // Handle graceful failure response
-    if (result && result.contextInvalidated) {
-      logger.warn('Extension context invalidated during translation, aborting');
-      dismissPendingTranslationNotification('translateFieldViaSmartHandler-translate');
-      return; // Exit gracefully without error
-    }
+    logger.debug('Translation request dispatched (fire-and-forget)');
     
     // Note: The actual translation result will arrive via TRANSLATION_RESULT_UPDATE message
     // which is handled by ContentMessageHandler and will call applyTranslationToTextField
+    // No need to wait for response here - this prevents timeout issues
     
   } catch (err) {
     const handler = ErrorHandler.getInstance();
@@ -116,11 +104,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     // Dismiss notification on error
     dismissPendingTranslationNotification('translateFieldViaSmartHandler-error');
     
-    try {
-      messenger.sendMessage({ action: 'handleError', data: { error: err, context: 'smartTranslate-handler' } });
-    } catch (errorSendError) {
-      logger.error('Failed to send error message to background', errorSendError);
-    }
+    // Handle translation error locally
+    await handleTranslationError(err, mode);
   }
 }
 
@@ -345,11 +330,40 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
   }
 }
 
+export async function handleTranslationError(error, mode = 'field') {
+  logger.error('Handling translation error for mode:', mode, error);
+  
+  try {
+    // Dismiss any pending notifications
+    dismissPendingTranslationNotification('handleTranslationError');
+    
+    // Show in-page error notification using NotificationManager
+    const errorMessage = error?.message || error || 'Translation failed';
+    
+    // Import NotificationManager dynamically
+    const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
+    const notificationManager = new NotificationManager();
+    
+    // Show error notification in page
+    await notificationManager.show(`Translation Error: ${errorMessage}`, 'error');
+    
+  } catch (notificationError) {
+    logger.error('Failed to show translation error notification:', notificationError);
+    
+    // Fallback: Try simple alert for critical errors
+    try {
+      console.error('Translation Error:', errorMessage);
+    } catch (fallbackError) {
+      // Silent fallback
+    }
+  }
+}
+
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    messenger.sendMessage({ action: MessageActions.SHOW_NOTIFICATION_SIMPLE, data: { message: await getTranslationString("STATUS_SMART_TRANSLATE_COPIED"), type: 'success' } });
+    browser.runtime.sendMessage({ action: MessageActions.SHOW_NOTIFICATION_SIMPLE, data: { message: await getTranslationString("STATUS_SMART_TRANSLATE_COPIED"), type: 'success' } });
   } catch (error) {
-    messenger.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } });
+    browser.runtime.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } });
   }
 }
