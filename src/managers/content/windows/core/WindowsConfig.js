@@ -19,8 +19,12 @@ export class WindowsConfig {
     POPUP_WIDTH: 330,
     POPUP_HEIGHT: 120,
     ICON_SIZE: 24,
-    VIEWPORT_MARGIN: 10,
-    SELECTION_OFFSET: 5
+    VIEWPORT_MARGIN: 8, // Reduced for less aggressive repositioning
+    SELECTION_OFFSET: 3, // Reduced offset for closer positioning to selection
+    SMART_POSITIONING: {
+      VERTICAL_OFFSET_MULTIPLIER: 10, // Used to calculate vertical offset (SELECTION_OFFSET * 10)
+      SAFETY_MARGIN_EXTRA: 2 // Extra margin for smart positioning (VIEWPORT_MARGIN + 2)
+    }
   };
 
   static Z_INDEX = {

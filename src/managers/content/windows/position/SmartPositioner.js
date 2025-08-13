@@ -4,16 +4,16 @@ import { createLogger } from "../../../../utils/core/logger.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 
 /**
- * Handles intelligent positioning of translation windows
+ * Handles smart positioning and repositioning of translation popups
  */
 export class SmartPositioner {
   constructor(positionCalculator) {
-    this.logger = createLogger('Content', 'SmartPositioner');
     this.positionCalculator = positionCalculator;
+    this.logger = createLogger('Content', 'SmartPositioner');
   }
 
   /**
-   * Calculate smart position that stays within viewport
+   * Calculate smart position for popup considering viewport bounds
    */
   calculateSmartPosition(position, topWindow = null) {
     if (!topWindow) {
@@ -30,195 +30,115 @@ export class SmartPositioner {
     };
 
     // Popup dimensions
-    const popupWidth = WindowsConfig.POSITIONING.POPUP_WIDTH;
     const popupHeight = WindowsConfig.POSITIONING.POPUP_HEIGHT;
-    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
+    const verticalOffset = WindowsConfig.POSITIONING.SELECTION_OFFSET * 10; // 30px (3 * 10)
+    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN + 2; // 10px (8 + 2)
 
-    // Calculate available space in each direction
-    const spaceRight = viewport.width - (position.x - viewport.scrollX);
-    const spaceLeft = position.x - viewport.scrollX;
-    const spaceBelow = viewport.height - (position.y - viewport.scrollY);
-    const spaceAbove = position.y - viewport.scrollY;
+    // Calculate space below and above the icon position
+    const iconY = position.y - viewport.scrollY; // Icon position relative to viewport
+    const spaceBelow = viewport.height - iconY;
+    const spaceAbove = iconY;
 
     let finalX = position.x;
     let finalY = position.y;
     let transformOrigin = "top left";
 
-    // Horizontal positioning logic
-    if (spaceRight >= popupWidth) {
-      // Enough space on the right
-      finalX = position.x;
-    } else if (spaceLeft >= popupWidth) {
-      // Not enough space on right, try left
-      finalX = position.x - popupWidth;
-      transformOrigin = transformOrigin.replace("left", "right");
+    // Decide whether to place popup below or above based on available space
+    if (spaceBelow >= popupHeight + verticalOffset + margin) {
+      // Enough space below - place popup below icon
+      finalY = position.y + verticalOffset;
+      transformOrigin = "top left";
+      
+      this.logger.debug('SmartPositioner - positioning popup below icon', {
+        original: position,
+        spaceBelow,
+        strategy: 'below-icon-positioning'
+      });
+    } else if (spaceAbove >= popupHeight + verticalOffset + margin) {
+      // Not enough space below, but enough above - place popup above icon
+      finalY = position.y - popupHeight - verticalOffset;
+      transformOrigin = "bottom left";
+      
+      this.logger.debug('SmartPositioner - positioning popup above icon', {
+        original: position,
+        spaceAbove,
+        strategy: 'above-icon-positioning'
+      });
     } else {
-      // Not enough space on either side, position to fit within viewport
-      const maxRight = viewport.scrollX + viewport.width - popupWidth - margin;
-      const minLeft = viewport.scrollX + margin;
-      finalX = Math.max(minLeft, Math.min(position.x, maxRight));
-      transformOrigin = "top center";
-    }
-
-    // Vertical positioning logic
-    if (spaceBelow >= popupHeight) {
-      // Enough space below
-      finalY = position.y;
-    } else if (spaceAbove >= popupHeight) {
-      // Not enough space below, try above
-      finalY = position.y - popupHeight - margin;
-      transformOrigin = transformOrigin.replace("top", "bottom");
-    } else {
-      // Not enough space above or below, position to fit within viewport
-      const maxBottom = viewport.scrollY + viewport.height - popupHeight - margin;
-      const minTop = viewport.scrollY + margin;
-      finalY = Math.max(minTop, Math.min(position.y, maxBottom));
-
-      // Adjust transform origin based on final position relative to selection
-      if (finalY < position.y) {
-        transformOrigin = transformOrigin.replace("top", "bottom");
+      // Limited space both above and below - choose the better option
+      if (spaceBelow >= spaceAbove) {
+        // More space below
+        finalY = position.y + verticalOffset;
+        transformOrigin = "top left";
+        
+        this.logger.debug('SmartPositioner - positioning popup below icon (limited space)', {
+          original: position,
+          spaceBelow,
+          spaceAbove,
+          strategy: 'below-icon-limited-space'
+        });
+      } else {
+        // More space above
+        finalY = position.y - popupHeight - verticalOffset;
+        transformOrigin = "bottom left";
+        
+        this.logger.debug('SmartPositioner - positioning popup above icon (limited space)', {
+          original: position,
+          spaceBelow,
+          spaceAbove,
+          strategy: 'above-icon-limited-space'
+        });
       }
     }
 
-    // Handle fixed/sticky elements by checking for overlaps
-    finalY = this.adjustForFixedElements(finalX, finalY, popupWidth, popupHeight, topWindow);
-
-    const result = {
+    return {
       x: finalX,
       y: finalY,
       origin: transformOrigin
     };
-
-    this.logger.debug('Calculated smart position', {
-      original: position,
-      viewport,
-      spaces: { spaceRight, spaceLeft, spaceBelow, spaceAbove },
-      final: result
-    });
-
-    return result;
   }
 
   /**
-   * Adjust position to avoid fixed/sticky elements
+   * DISABLED: No adjustment for fixed elements to avoid displacement
    */
   adjustForFixedElements(x, y, width, height, topWindow) {
-    const topDocument = this.positionCalculator.getTopDocument();
-    
-    // Get all fixed and sticky positioned elements
-    const fixedElements = Array.from(topDocument.querySelectorAll("*")).filter(el => {
-      const style = topWindow.getComputedStyle(el);
-      return style.position === "fixed" || style.position === "sticky";
+    // Simply return original Y position - no adjustment
+    this.logger.debug('Fixed element adjustment disabled - using original Y position', {
+      originalY: y,
+      strategy: 'no-adjustment'
     });
-
-    const popupRect = {
-      left: x - topWindow.scrollX,
-      top: y - topWindow.scrollY,
-      right: x - topWindow.scrollX + width,
-      bottom: y - topWindow.scrollY + height
-    };
-
-    for (const element of fixedElements) {
-      const rect = element.getBoundingClientRect();
-
-      // Skip invisible or zero-dimension elements
-      if (rect.width === 0 || rect.height === 0 || 
-          rect.left >= topWindow.innerWidth || rect.top >= topWindow.innerHeight ||
-          rect.right <= 0 || rect.bottom <= 0) {
-        continue;
-      }
-
-      // Check for overlap
-      const isOverlapping = !(
-        popupRect.right <= rect.left ||
-        popupRect.left >= rect.right ||
-        popupRect.bottom <= rect.top ||
-        popupRect.top >= rect.bottom
-      );
-
-      if (isOverlapping) {
-        this.logger.debug('Found overlapping fixed element, adjusting position', {
-          popup: popupRect,
-          element: rect
-        });
-
-        // Try to reposition below the fixed element
-        const newY = topWindow.scrollY + rect.bottom + WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
-        const spaceBelow = topWindow.innerHeight - (rect.bottom + WindowsConfig.POSITIONING.VIEWPORT_MARGIN);
-
-        if (spaceBelow >= height) {
-          return newY;
-        } else {
-          // Try above the fixed element
-          const newYAbove = topWindow.scrollY + rect.top - height - WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
-          if (rect.top >= height + WindowsConfig.POSITIONING.VIEWPORT_MARGIN) {
-            return newYAbove;
-          }
-        }
-      }
-    }
-
     return y;
   }
 
   /**
-   * Adjust position after content change (when actual dimensions are known)
+   * DISABLED: Minimal position adjustment to avoid displacement
    */
   adjustPositionAfterContentChange(element, topWindow = null) {
     if (!element || !element.isConnected) return;
 
-    if (!topWindow) {
-      const topDocument = this.positionCalculator.getTopDocument();
-      topWindow = topDocument.defaultView || topDocument.parentWindow || window;
-    }
-
-    // Get actual popup dimensions after content is rendered
-    const rect = element.getBoundingClientRect();
+    // Only check absolute viewport bounds - no other adjustments
     const currentX = parseInt(element.style.left) || 0;
     const currentY = parseInt(element.style.top) || 0;
-
-    const viewport = {
-      width: topWindow.innerWidth,
-      height: topWindow.innerHeight
+    
+    const viewportDims = {
+      width: (topWindow || window).innerWidth,
+      height: (topWindow || window).innerHeight
     };
 
-    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
-    let needsRepositioning = false;
+    // Only adjust if completely outside viewport
     let newX = currentX;
     let newY = currentY;
-
-    // Check horizontal bounds
-    if (currentX + rect.width > viewport.width - margin) {
-      newX = viewport.width - rect.width - margin;
-      needsRepositioning = true;
-    }
     
-    if (currentX < margin) {
-      newX = margin;
-      needsRepositioning = true;
-    }
+    if (currentX < -200) newX = 5;  // Only if way off screen
+    if (currentX > viewportDims.width + 100) newX = viewportDims.width - 350;
+    if (currentY < -100) newY = 5;
+    if (currentY > viewportDims.height + 100) newY = viewportDims.height - 150;
 
-    // Ensure popup fits within viewport even after adjustment
-    if (newX + rect.width > viewport.width - margin) {
-      newX = Math.max(margin, viewport.width - rect.width - margin);
-    }
-
-    // Check vertical bounds
-    if (currentY + rect.height > viewport.height - margin) {
-      newY = viewport.height - rect.height - margin;
-      needsRepositioning = true;
-    } else if (currentY < margin) {
-      newY = margin;
-      needsRepositioning = true;
-    }
-
-    // Apply new position if needed
-    if (needsRepositioning) {
-      this.logger.debug('Repositioning after content change', {
+    if (newX !== currentX || newY !== currentY) {
+      this.logger.debug('Minimal viewport bounds adjustment', {
         old: { x: currentX, y: currentY },
         new: { x: newX, y: newY },
-        rect: { width: rect.width, height: rect.height },
-        viewport
+        reason: 'completely-outside-viewport'
       });
 
       element.style.left = `${newX}px`;

@@ -12,32 +12,92 @@ export class PositionCalculator {
   }
 
   /**
-   * Calculate position for translate icon
+   * Calculate position for translate icon - now trusts TextSelectionManager calculations
    */
   calculateIconPosition(selection, providedPosition) {
-    // Use provided position if valid
+    // If TextSelectionManager provided a position, trust it (it has viewport-aware logic now)
     if (providedPosition && 
         typeof providedPosition.x === 'number' && 
         typeof providedPosition.y === 'number') {
-      this.logger.debug('Using provided position for icon', providedPosition);
+      this.logger.debug('Using smart position from TextSelectionManager', providedPosition);
       return providedPosition;
     }
 
-    // Calculate from selection if no valid position provided
+    return this._calculateFromSelection(selection);
+  }
+
+  /**
+   * Private method to calculate position from selection
+   */
+  _calculateFromSelection(selection) {
     if (!selection || selection.rangeCount === 0) {
       this.logger.warn('No selection range found for icon positioning');
       return null;
     }
-
+    
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     
-    const position = {
-      x: window.scrollX + rect.left + rect.width / 2 - (WindowsConfig.POSITIONING.ICON_SIZE / 2),
-      y: window.scrollY + rect.bottom + WindowsConfig.POSITIONING.SELECTION_OFFSET
-    };
+    const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
+    const selectionOffset = WindowsConfig.POSITIONING.SELECTION_OFFSET;
+    
+    // Calculate preferred position (centered under selection)
+    const preferredX = window.scrollX + rect.left + rect.width / 2 - (iconSize / 2);
+    const preferredY = window.scrollY + rect.bottom + selectionOffset;
+    
+    return this._applySmartPositioning(rect, preferredX, preferredY);
+  }
 
-    this.logger.debug('Calculated icon position from selection', { rect, position });
+  /**
+   * Apply smart positioning logic
+   */
+  _applySmartPositioning(rect, preferredX, preferredY) {
+    // Get viewport dimensions for intelligent positioning
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    
+    const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
+    const selectionOffset = WindowsConfig.POSITIONING.SELECTION_OFFSET;
+    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
+    
+    // Smart horizontal adjustment based on available space
+    const rectLeft = rect.left + window.scrollX;
+    const rectRight = rect.right + window.scrollX;
+    let finalX = preferredX;
+    let finalY = preferredY;
+    
+    if (preferredX + iconSize > window.scrollX + viewport.width - margin) {
+      // Icon would overflow right edge - align to right of selection
+      finalX = rectRight - iconSize;
+      this.logger.debug('Icon adjusted to avoid right overflow');
+    } else if (preferredX < window.scrollX + margin) {
+      // Icon would overflow left edge - align to left of selection
+      finalX = rectLeft;
+      this.logger.debug('Icon adjusted to avoid left overflow');
+    }
+    
+    // Ensure icon stays within absolute viewport bounds
+    finalX = Math.max(window.scrollX + margin, 
+                     Math.min(finalX, window.scrollX + viewport.width - iconSize - margin));
+    
+    // Smart vertical adjustment if needed
+    if (preferredY + iconSize > window.scrollY + viewport.height - margin) {
+      // Position above selection if no space below
+      finalY = window.scrollY + rect.top - iconSize - selectionOffset;
+      this.logger.debug('Icon positioned above selection due to space constraints');
+    }
+    
+    const position = { x: finalX, y: finalY };
+
+    this.logger.debug('Calculated smart icon position from selection', { 
+      rect, 
+      viewport, 
+      original: { x: preferredX, y: preferredY },
+      adjusted: position 
+    });
+    
     return position;
   }
 
@@ -47,17 +107,26 @@ export class PositionCalculator {
   calculateFinalIconPosition(originalPosition, targetWindow = window) {
     const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
     
+    // Convert absolute position to fixed position (relative to viewport)
     const finalPosition = {
-      left: originalPosition.x - targetWindow.scrollX - (iconSize / 2),
-      top: originalPosition.y - targetWindow.scrollY + WindowsConfig.POSITIONING.SELECTION_OFFSET
+      left: originalPosition.x - targetWindow.scrollX,
+      top: originalPosition.y - targetWindow.scrollY
     };
+
+    // Ensure the final position stays within viewport bounds
+    const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
+    finalPosition.left = Math.max(margin, 
+                         Math.min(finalPosition.left, targetWindow.innerWidth - iconSize - margin));
+    finalPosition.top = Math.max(margin, 
+                        Math.min(finalPosition.top, targetWindow.innerHeight - iconSize - margin));
 
     this.logger.debug('Calculated final icon position', {
       original: originalPosition,
       scroll: { x: targetWindow.scrollX, y: targetWindow.scrollY },
       iconSize,
       final: finalPosition,
-      viewport: { width: targetWindow.innerWidth, height: targetWindow.innerHeight }
+      viewport: { width: targetWindow.innerWidth, height: targetWindow.innerHeight },
+      constraints: { margin }
     });
 
     return finalPosition;

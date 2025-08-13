@@ -6,6 +6,7 @@
 import { createLogger } from "../../utils/core/logger.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
+import { WindowsConfig } from "./windows/core/WindowsConfig.js";
 
 export class TextSelectionManager {
   constructor(options = {}) {
@@ -185,13 +186,44 @@ export class TextSelectionManager {
         beforeCalculation: { x: 0, y: 0 }
       });
       
-      // محاسبه موقعیت زیر متن انتخاب شده
-      // در حالت onClick (آیکون)، X را مرکز باکس انتخاب قرار می‌دهیم تا آیکون زیرِ وسطِ متن بیفتد
-      // در حالت immediate (پنجره فوری)، مانند قبل از لبه‌ی چپ استفاده می‌کنیم تا منطق پنجره حفظ شود
-      const centerX = rect.left + (rect.width / 2);
+      // محاسبه موقعیت با در نظر گیری viewport و جلوگیری از جابجایی زیاد
+      let targetX, targetY;
+      const viewportWidth = window.innerWidth;
+      const iconSize = WindowsConfig.POSITIONING.ICON_SIZE;
+      const popupWidth = WindowsConfig.POSITIONING.POPUP_WIDTH;
+      const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
+      
+      // محاسبه X موثر بر اساس نوع حالت
+      if (selectionTranslationMode === 'onClick') {
+        // برای آیکون: سعی کن در وسط متن قرار بگیری، اگر نمی‌شه کنار متن
+        const centerX = rect.left + (rect.width / 2);
+        const iconRight = centerX + iconSize;
+        
+        if (iconRight <= viewportWidth - margin) {
+          targetX = centerX; // وسط متن
+        } else if (rect.right + iconSize <= viewportWidth - margin) {
+          targetX = rect.right - iconSize; // سمت راست متن
+        } else {
+          targetX = rect.left; // سمت چپ متن
+        }
+      } else {
+        // برای پنجره فوری: سعی کن نزدیک چپ متن باشی
+        const popupRight = rect.left + popupWidth;
+        
+        if (popupRight <= viewportWidth - margin) {
+          targetX = rect.left; // چپ متن
+        } else if (rect.right - popupWidth >= margin) {
+          targetX = rect.right - popupWidth; // راست متن منهای عرض پنجره
+        } else {
+          targetX = Math.max(margin, viewportWidth - popupWidth - margin); // آخرین گزینه
+        }
+      }
+      
+      targetY = rect.bottom + WindowsConfig.POSITIONING.SELECTION_OFFSET; // استفاده از config
+      
       position = {
-        x: (selectionTranslationMode === 'onClick' ? centerX : rect.left) + window.scrollX,
-        y: rect.bottom + window.scrollY + 15, // کمی فاصله
+        x: targetX + window.scrollX,
+        y: targetY + window.scrollY
       };
 
       this.logger.debug('Position after initial calculation', {
@@ -200,63 +232,19 @@ export class TextSelectionManager {
         usedCenterX: selectionTranslationMode === 'onClick',
       });
 
-      // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
-      const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ
-      const viewportWidth = window.innerWidth;
-      
-      this.logger.debug('Position adjustment check', {
-        positionX: position.x,
-        viewportWidth,
-        popupMaxWidth,
-        willAdjustLeft: position.x < 10,
-        willAdjustRight: position.x + popupMaxWidth > viewportWidth - 10
-      });
-      
-  // **IFRAME-SPECIFIC LOGIC**: Handle small iframes differently
-      const isSmallIframe = viewportWidth < 400;
-      
-      if (isSmallIframe) {
-        // For small iframes, ignore popup size and just position icon properly
-        this.logger.debug('Small iframe detected, using icon-only positioning logic');
-        
-        if (position.x < 10) {
-          position.x = 10;
-        } else if (position.x > viewportWidth - 30) { // Just need space for icon (24px + margin)
-          position.x = viewportWidth - 30;
-        }
-        // Otherwise keep original position
-        
-        this.logger.debug('Small iframe positioning', {
-          originalX: position.x,
-          strategy: 'icon-only',
+      this.logger.debug('Smart positioning completed in TextSelectionManager', {
+        finalPosition: position,
+        mode: selectionTranslationMode,
+        strategy: 'viewport-aware-calculation',
+        targetX,
+        targetY,
+        selectionRect: {
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
           viewportWidth
-        });
-  } else {
-        // Original logic for normal/large contexts
-        if (position.x < 10) {
-          this.logger.debug('Adjusting position to prevent left edge clipping', { oldX: position.x, newX: 10 });
-          position.x = 10;
-        } else if (position.x + popupMaxWidth > viewportWidth - 10) {
-          const oldX = position.x;
-          const availableSpace = viewportWidth - 20;
-          
-          const rightEdgeIfKeepPosition = position.x + popupMaxWidth;
-          const maxAllowedRight = viewportWidth - 10;
-          
-          if (availableSpace >= 150) {
-            const idealRight = Math.min(rightEdgeIfKeepPosition, maxAllowedRight);
-            position.x = Math.max(10, idealRight - popupMaxWidth);
-          } else {
-            position.x = Math.max(10, (viewportWidth - 50) / 2);
-          }
-          
-          this.logger.debug('Large context positioning adjustment', { 
-            oldX, 
-            newX: position.x, 
-            strategy: 'popup-aware'
-          });
         }
-      }
+      });
     }
 
     this.logger.debug('Final position before showing window', { position });
