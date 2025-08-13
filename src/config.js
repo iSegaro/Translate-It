@@ -302,6 +302,7 @@ export const state = {
   activeTranslateIcon: null,
   originalTexts: new Map(),
   translateMode: null,
+  preventTextFieldIconCreation: false, // FIX FOR DISCORD: Prevent text field icon creation during selection window transition
 };
 
 // --- Settings Cache & Retrieval via StorageManager ---

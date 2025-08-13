@@ -4,7 +4,7 @@
  */
 
 import { createLogger } from "../../utils/core/logger.js";
-import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG } from "../../config.js";
+import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 
 export class TextSelectionManager {
@@ -17,6 +17,11 @@ export class TextSelectionManager {
     // Selection state management
     this.selectionTimeoutId = null;
     this.ctrlKeyPressed = false;
+    
+    // **FIX FOR DISCORD**: Track last processed selection to prevent duplicate processing
+    this.lastProcessedText = null;
+    this.lastProcessedTime = 0;
+    this.selectionProcessingCooldown = 1000; // 1 second cooldown
     
     // Bind methods for event handlers
     this.handleTextSelection = this.handleTextSelection.bind(this);
@@ -33,6 +38,13 @@ export class TextSelectionManager {
    */
   async handleTextSelection(event) {
     this.logger.debug('handleTextSelection called');
+    
+    // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
+    // This prevents conflicts and duplicate selection windows during the transition
+    if (state && state.preventTextFieldIconCreation === true) {
+      this.logger.debug('Skipping handleTextSelection due to active selection window transition');
+      return;
+    }
     
     const selectedText = getSelectedTextWithDash();
     const path = getEventPath(event);
@@ -58,6 +70,23 @@ export class TextSelectionManager {
     }
 
     if (selectedText) {
+      // **FIX FOR DISCORD**: Check if this is a duplicate selection event
+      // But allow processing if enough time has passed or if no selection window is visible
+      const currentTime = Date.now();
+      const isRecentDuplicate = selectedText === this.lastProcessedText && 
+                               (currentTime - this.lastProcessedTime) < this.selectionProcessingCooldown;
+      
+      // **IMPORTANT**: Don't skip if selection window is not visible anymore
+      // This allows normal processing after user dismisses the window
+      if (isRecentDuplicate && this.selectionWindows?.isVisible) {
+        this.logger.debug('Skipping duplicate selection event for same text', {
+          text: selectedText.substring(0, 30) + '...',
+          timeSinceLastProcess: currentTime - this.lastProcessedTime,
+          selectionWindowVisible: this.selectionWindows?.isVisible
+        });
+        return;
+      }
+
       if (!this.selectionTimeoutId) {
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
         const settings = await getSettingsAsync();
@@ -74,29 +103,44 @@ export class TextSelectionManager {
           this.processSelectedText(selectedText, event);
         }, delay);
 
+        // **FIX FOR DISCORD**: Track this text as being processed
+        this.lastProcessedText = selectedText;
+        this.lastProcessedTime = currentTime;
+
         // اضافه کردن listener برای لغو ترجمه در صورت کلیک
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
       }
     } else {
+      // **IMPORTANT**: When no text is selected (outside click), always allow dismissal
       const settings = await getSettingsAsync();
       const selectionTranslationMode =
         settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
       if (selectionTranslationMode === "onClick") {
-        return;
-      }
+        // In onClick mode, outside clicks should still dismiss windows
+        // Don't return early - allow dismissal logic to run
+      } else {
+        // **FIX FOR DISCORD**: Clear tracking when no text is selected
+        this.lastProcessedText = null;
+        this.lastProcessedTime = 0;
 
-      // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
-      if (this.selectionTimeoutId) {
-        clearTimeout(this.selectionTimeoutId);
-        this.selectionTimeoutId = null;
-        document.removeEventListener("mousedown", this.cancelSelectionTranslation);
+        // اگر متنی انتخاب نشده، هر تایمر فعالی را پاک کنید و listener را حذف کنید
+        if (this.selectionTimeoutId) {
+          clearTimeout(this.selectionTimeoutId);
+          this.selectionTimeoutId = null;
+          document.removeEventListener("mousedown", this.cancelSelectionTranslation);
+        }
       }
 
       // همچنین اگر پاپ‌آپ ترجمه متن انتخاب شده باز است آن را ببندید.
+      // This should run for both onClick and immediate modes
       if (this.selectionWindows?.isVisible) {
-        this.logger.debug('Dismiss SelectionWindows - no text selected');
+        this.logger.debug('Dismiss SelectionWindows - no text selected (outside click)');
         this.selectionWindows.dismiss();
+        
+        // **FIX FOR DISCORD**: Clear tracking when dismissing
+        this.lastProcessedText = null;
+        this.lastProcessedTime = 0;
       }
     }
   }
@@ -109,6 +153,13 @@ export class TextSelectionManager {
    */
   async processSelectedText(selectedText) {
     this.logger.debug('processSelectedText called', { text: selectedText.substring(0, 50) + '...' });
+    
+    // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
+    // This prevents conflicts with text field icon creation during the transition
+    if (state && state.preventTextFieldIconCreation === true) {
+      this.logger.debug('Skipping processSelectedText due to active selection window transition');
+      return;
+    }
     
     const selection = window.getSelection();
     let position = { x: 0, y: 0 };
@@ -138,6 +189,11 @@ export class TextSelectionManager {
 
     // نمایش پاپ آپ با متن و موقعیت جدید
     if (this.selectionWindows) {
+      this.logger.debug('📢 Calling selectionWindows.show()', { 
+        text: selectedText.substring(0, 30) + '...',
+        position,
+        selectionWindowsExists: !!this.selectionWindows
+      });
       this.selectionWindows.show(selectedText, position);
     } else {
       this.logger.warn('SelectionWindows not available');
@@ -156,6 +212,10 @@ export class TextSelectionManager {
       clearTimeout(this.selectionTimeoutId);
       this.selectionTimeoutId = null;
       this.logger.debug('Selection translation cancelled');
+      
+      // **FIX FOR DISCORD**: Clear tracking when cancelling
+      this.lastProcessedText = null;
+      this.lastProcessedTime = 0;
       
       try {
         document.removeEventListener("mousedown", this.cancelSelectionTranslation);
@@ -220,6 +280,10 @@ export class TextSelectionManager {
     // Cancel any pending selection translation
     this.cancelSelectionTranslation();
     
+    // **FIX FOR DISCORD**: Clear tracking state
+    this.lastProcessedText = null;
+    this.lastProcessedTime = 0;
+    
     // Clear any remaining timeouts
     if (this.selectionTimeoutId) {
       clearTimeout(this.selectionTimeoutId);
@@ -246,7 +310,10 @@ export class TextSelectionManager {
       hasSelectionWindows: !!this.selectionWindows,
       hasMessenger: !!this.messenger,
       activeTimeout: !!this.selectionTimeoutId,
-      ctrlKeyPressed: this.ctrlKeyPressed
+      ctrlKeyPressed: this.ctrlKeyPressed,
+      lastProcessedText: this.lastProcessedText ? this.lastProcessedText.substring(0, 50) + '...' : null,
+      lastProcessedTime: this.lastProcessedTime,
+      timeSinceLastProcess: this.lastProcessedTime ? Date.now() - this.lastProcessedTime : null
     };
   }
 }

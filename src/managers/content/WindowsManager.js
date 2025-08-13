@@ -10,6 +10,7 @@ import {
   TranslationMode,
   getThemeAsync,
   getSettingsAsync,
+  state,
 } from "../../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { getResolvedUserTheme } from "../../utils/ui/theme.js";
@@ -163,6 +164,29 @@ export default class SelectionWindows {
 
   async show(selectedText, position) {
     if (!isExtensionContextValid()) return;
+    
+    this.logger.debug('🎯 WindowsManager.show() called', {
+      text: selectedText ? selectedText.substring(0, 30) + '...' : 'null',
+      position,
+      isVisible: this.isVisible,
+      isIconMode: this.isIconMode,
+      originalText: this.originalText ? this.originalText.substring(0, 30) + '...' : 'null'
+    });
+    
+    // **FIX FOR DISCORD**: Prevent showing same text multiple times
+    // But still allow showing if no window is currently visible (user dismissed it)
+    if (selectedText && 
+        this.isVisible && 
+        ((this.originalText === selectedText) ||
+         (this.isIconMode && this.iconClickContext && this.iconClickContext.text === selectedText))) {
+      this.logger.debug('Skipping show - same text already displayed', {
+        text: selectedText.substring(0, 30) + '...',
+        isVisible: this.isVisible,
+        isIconMode: this.isIconMode
+      });
+      return;
+    }
+    
     this.dismiss(false);
     if (!selectedText) return;
 
@@ -170,11 +194,15 @@ export default class SelectionWindows {
     const selectionTranslationMode =
       settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
 
+    this.logger.debug('📋 Selection translation mode', { mode: selectionTranslationMode });
+
     if (selectionTranslationMode === "onClick") {
       this.isIconMode = true;
+      this.logger.debug('🔸 Creating icon for onClick mode');
       this._createTranslateIcon(selectedText, position);
     } else {
       this.isIconMode = false;
+      this.logger.debug('🔹 Creating window for immediate mode');
       this._createTranslateWindow(selectedText, position);
     }
   }
@@ -288,6 +316,13 @@ export default class SelectionWindows {
       // Set flag to prevent immediate dismissal during transition
       this.pendingTranslationWindow = true;
 
+      // **FIX FOR DISCORD**: Prevent new text field icons from being created
+      // This is especially important for Discord where focus/blur events 
+      // might trigger during the transition from icon to translation window
+      if (state && typeof state === 'object') {
+        state.preventTextFieldIconCreation = true;
+      }
+
       // Clean up icon visuals.
       // The 'false' argument to _cleanupIcon means it won't try to remove the outside click listener again,
       // which is correct because we've just manually removed it.
@@ -297,11 +332,14 @@ export default class SelectionWindows {
       // Create translation window
       this._createTranslateWindow(text, position);
 
-      // Reset flag after a short delay, allowing the new window to establish its own event listeners.
-      // This timeout can be experimented with if needed.
+      // Reset flags after a longer delay to ensure translation window is fully established
+      // This is increased from 100ms to 500ms to handle Discord's complex event handling
       setTimeout(() => {
         this.pendingTranslationWindow = false;
-      }, 100); // Original timeout value, can be tuned if necessary
+        if (state && typeof state === 'object') {
+          state.preventTextFieldIconCreation = false;
+        }
+      }, 500); // Increased timeout for Discord compatibility
     }
   }
 
@@ -505,7 +543,16 @@ export default class SelectionWindows {
     // pendingTranslationWindow flag is false.
     // The timeout here ensures that the click event that initiated the window creation
     // has fully propagated and won't be caught by this new listener.
+    // CRITICAL: This timeout must be LONGER than the timeout in onIconClick (500ms)
+    // to ensure pendingTranslationWindow is already false when we check it
     setTimeout(() => {
+      this.logger.debug('Checking if should add outside click listener for translation window', {
+        isVisible: this.isVisible,
+        hasDisplayElement: !!this.displayElement,
+        pendingTranslationWindow: this.pendingTranslationWindow,
+        shouldAdd: this.isVisible && this.displayElement && !this.pendingTranslationWindow
+      });
+
       // Ensure we only add the listener if the window is still supposed to be visible
       // and we are NOT in the process of transitioning (pendingTranslationWindow is false).
       if (
@@ -513,21 +560,38 @@ export default class SelectionWindows {
         this.displayElement &&
         !this.pendingTranslationWindow
       ) {
+        this.logger.debug('Adding outside click listener for translation window');
         this._addOutsideClickListener();
+      } else {
+        this.logger.debug('NOT adding outside click listener for translation window');
       }
-    }, 150); // Slightly increased delay for robustness, can be tuned.
+    }, 600); // MUST be > 500ms to ensure pendingTranslationWindow is reset
   }
 
   _onOutsideClick(e) {
+    this.logger.debug('Outside click detected', {
+      target: e.target.tagName,
+      className: e.target.className?.substring(0, 50) || '',
+      id: e.target.id,
+      documentOrigin: e.target.ownerDocument === document ? 'current' : 'other',
+      pendingTranslationWindow: this.pendingTranslationWindow,
+      isIconMode: this.isIconMode,
+      isVisible: this.isVisible
+    });
+
     // Prevent dismissal if we're in the middle of transitioning from icon to window
     if (this.pendingTranslationWindow) {
+      this.logger.debug('Ignoring outside click - pending translation window');
       return;
     }
 
     // Handle icon mode
     if (this.isIconMode && this.icon) {
       if (!this.icon.contains(e.target)) {
+        this.logger.debug('Outside click on icon mode - dismissing');
         this.dismiss(true);
+      } else {
+        this.logger.debug('Click inside icon - not dismissing');
       }
       return;
     }
@@ -545,11 +609,30 @@ export default class SelectionWindows {
       const clickedIcon = topDocument.getElementById("translate-it-icon");
       const isClickOnIcon = clickedIcon && clickedIcon.contains(e.target);
 
+      // **FIX FOR DISCORD SIDEPANELS**: Special handling for cross-document clicks
+      // If the click is from a different document (like Discord sidepanels), 
+      // and it's not inside our popup, dismiss the window
+      const isFromDifferentDocument = e.target.ownerDocument !== topDocument;
+      
+      this.logger.debug('Outside click on window mode', {
+        isClickInsidePopup,
+        isClickOnIcon,
+        isFromDifferentDocument,
+        targetElement: e.target.tagName,
+        targetDocument: e.target.ownerDocument === document ? 'current' : 'top'
+      });
+
       // If click is outside popup and not on icon, dismiss
-      if (!isClickInsidePopup && !isClickOnIcon) {
+      // Also dismiss if click is from different document (sidepanels)
+      if ((!isClickInsidePopup && !isClickOnIcon) || isFromDifferentDocument) {
+        this.logger.debug('Outside click confirmed - dismissing window', {
+          reason: isFromDifferentDocument ? 'different-document' : 'outside-popup'
+        });
         // Immediate dismissal for outside clicks - no need for complex checks
         // since we're now properly handling cross-iframe scenarios
         this.cancelCurrentTranslation();
+      } else {
+        this.logger.debug('Click inside popup or on icon - not dismissing');
       }
     }
   }
@@ -557,22 +640,49 @@ export default class SelectionWindows {
   _addOutsideClickListener() {
     if (!isExtensionContextValid()) return;
 
+    this.logger.debug('Adding outside click listener', {
+      isIconMode: this.isIconMode,
+      isVisible: this.isVisible
+    });
+
     // Remove existing listener first
     this._removeOutsideClickListener();
 
     // Get top document - this is where popup exists and where we should listen
     const topDocument = this._getTopDocument();
 
-    // Only add listener to top document since popup is always there
+    // **OPTIMIZED FIX FOR DISCORD SIDEPANELS**: 
+    // Add listeners only where needed to catch Discord sidepanel clicks
+    const listeners = [];
+
+    // 1. Primary listener on top document (where popup is)
     topDocument.addEventListener("click", this._onOutsideClick, {
       capture: true,
     });
-
-    // Store removal function
-    this.removeMouseDownListener = () => {
+    listeners.push(() => {
       topDocument.removeEventListener("click", this._onOutsideClick, {
         capture: true,
       });
+    });
+    this.logger.debug('Added primary outside click listener');
+
+    // 2. Secondary listener on current document if different (for iframe scenarios)
+    if (document !== topDocument) {
+      document.addEventListener("click", this._onOutsideClick, {
+        capture: true,
+      });
+      listeners.push(() => {
+        document.removeEventListener("click", this._onOutsideClick, {
+          capture: true,
+        });
+      });
+      this.logger.debug('Added secondary outside click listener for different document');
+    }
+
+    // Store removal function for all listeners
+    this.removeMouseDownListener = () => {
+      this.logger.debug('Removing outside click listeners');
+      listeners.forEach(removeListener => removeListener());
     };
   }
 
@@ -1215,6 +1325,21 @@ export default class SelectionWindows {
   }
 
   dismiss(withFadeOut = true) {
+    // **FIX FOR DISCORD**: Clear text selection ONLY when dismissing icon mode
+    // to prevent immediate re-triggering. Don't clear selection when dismissing translation window.
+    if (this.isIconMode) {
+      try {
+        if (window.getSelection) {
+          const selection = window.getSelection();
+          if (selection && selection.removeAllRanges) {
+            selection.removeAllRanges();
+          }
+        }
+      } catch (error) {
+        this.logger.warn('Failed to clear text selection on dismiss', error);
+      }
+    }
+
     // Ensure icon is cleaned up, including its outside click listener if active
     // _cleanupIcon is called with 'true' to ensure its outside click listener is removed IF it was active for the icon.
     // If we are dismissing from a window state, _cleanupIcon(true) will try to remove listeners,
@@ -1225,6 +1350,14 @@ export default class SelectionWindows {
     if (!this.displayElement || !this.isVisible) {
       // If only an icon was visible and now dismissed, ensure no lingering listeners.
       if (!this.isVisible) this._removeOutsideClickListener();
+      
+      // **FIX FOR DISCORD**: Reset all flags when dismissing
+      this.isIconMode = false; // Reset mode
+      this.pendingTranslationWindow = false; // Reset pending flag
+      if (state && typeof state === 'object') {
+        state.preventTextFieldIconCreation = false;
+      }
+      
       return;
     }
 
@@ -1234,7 +1367,12 @@ export default class SelectionWindows {
 
     this.isVisible = false;
     this.pendingTranslationWindow = false; // Reset this flag
-    // this.isIconMode = false; // Reset mode, though usually handled by show() or onIconClick()
+    this.isIconMode = false; // Reset mode when dismissing
+
+    // **FIX FOR DISCORD**: Reset text field icon prevention flag when dismissing
+    if (state && typeof state === 'object') {
+      state.preventTextFieldIconCreation = false;
+    }
 
     if (withFadeOut && this.fadeOutDuration > 0 && this.displayElement) {
       this.displayElement.style.transition = `opacity ${this.fadeOutDuration}ms ease-in-out, transform 0.1s ease-in`;

@@ -99,6 +99,13 @@ export class TextFieldManager {
       return false;
     }
 
+    // **FIX FOR DISCORD**: Check if we should prevent text field icon creation
+    // This prevents conflicts when transitioning from selection icon to translation window
+    if (state && state.preventTextFieldIconCreation === true) {
+      this.logger.debug('Text field icon creation prevented due to active selection window transition');
+      return false;
+    }
+
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
       return false;
@@ -109,10 +116,13 @@ export class TextFieldManager {
       return false;
     }
 
-    return true;
-  }
+    // Platform-specific filtering
+    if (!this.applyPlatformFiltering(element)) {
+      return false;
+    }
 
-  /**
+    return true;
+  }  /**
    * Apply platform-specific filtering for special fields
    * @param {Element} element - Target element
    * @returns {boolean} Whether element should be processed (false = skip)
