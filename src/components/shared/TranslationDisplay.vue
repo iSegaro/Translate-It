@@ -11,29 +11,16 @@
       'selection-mode': mode === 'selection'
     }"
   >
-    <!-- Toolbar (copy, tts, etc.) -->
-    <div
-      v-if="showToolbar"
-      class="translation-toolbar"
-      :class="{ 'visible': hasContent }"
-    >
-      <IconButton
-        v-if="showCopyButton"
-        icon="copy.png"
-        :title="copyTitle"
-        :alt="copyAlt"
-        type="inline"
-        @click="handleCopy"
-      />
-      <IconButton
-        v-if="showTTSButton"
-        icon="speaker.png"
-        :title="ttsTitle"
-        :alt="ttsAlt"
-        type="inline"
-        @click="handleTTS"
-      />
-    </div>
+    <!-- Enhanced Actions Toolbar -->
+    <ActionToolbar
+      v-if="showToolbar && hasContent"
+      :text="content"
+      :target-language="targetLanguage"
+      mode="display"
+      class="display-toolbar"
+      :show-copy="showCopyButton"
+      :show-tts="showTTSButton"
+    />
     
     <!-- Loading Spinner -->
     <div
@@ -60,13 +47,11 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useClipboard } from '@/composables/useClipboard.js'
-import { useTTSSimple } from '@/composables/useTTSSimple.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
-import IconButton from '@/components/shared/IconButton.vue'
+import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
@@ -154,6 +139,17 @@ const props = defineProps({
   ttsAlt: {
     type: String,
     default: 'Play'
+  },
+  // Target language for TTS
+  targetLanguage: {
+    type: String,
+    default: 'auto'
+  },
+  
+  // Language for TTS
+  targetLanguage: {
+    type: String,
+    default: 'auto'
   }
 })
 
@@ -162,8 +158,6 @@ const contentRef = ref(null)
 const showFadeIn = ref(false)
 
 // Composables
-const clipboard = useClipboard()
-const tts = useTTSSimple()
 const { handleError } = useErrorHandler()
 
 // Computed
@@ -195,30 +189,6 @@ const renderedContent = computed(() => {
     return props.content.replace(/\n/g, '<br>')
   }
 })
-
-// Methods
-const handleCopy = async () => {
-  if (!hasContent.value) return
-  
-  try {
-    const textToCopy = contentRef.value?.dataset?.originalMarkdown || props.content
-    const success = await clipboard.copyToClipboard(textToCopy)
-  } catch (error) {
-    await handleError(error, 'TranslationDisplay-copy')
-  }
-}
-
-const handleTTS = async () => {
-  if (!hasContent.value) return
-  
-  try {
-    const textForTTS = props.content.replace(/<[^>]*>/g, '')
-    const langCode = getLanguageCodeForTTS(props.language)
-    await tts.speak(textForTTS, langCode)
-  } catch (error) {
-    await handleError(error, 'TranslationDisplay-tts')
-  }
-}
 
 // Watchers
 watch(() => props.content, (newContent, oldContent) => {
@@ -454,32 +424,30 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Toolbar */
-.translation-toolbar {
+/* Enhanced Display Toolbar */
+.display-toolbar {
   position: absolute;
-  top: 5px;
-  left: 8px;
-  display: none;
-  align-items: center;
-  gap: 10px;
-  background: transparent;
+  top: 6px;
+  left: 12px;
   z-index: 10;
-  padding: 2px;
-  direction: ltr;
-}
-
-.translation-display.has-content .translation-toolbar {
-  display: flex;
-}
-
-.translation-toolbar.visible {
-  display: flex;
+  opacity: 1;
 }
 
 /* Selection mode toolbar */
-.selection-mode .translation-toolbar {
+.selection-mode .display-toolbar {
   top: 8px;
   left: 12px;
+}
+
+/* RTL adjustments for toolbar */
+html[dir="rtl"] .display-toolbar {
+  left: auto;
+  right: 12px;
+}
+
+html[dir="rtl"] .selection-mode .display-toolbar {
+  left: auto;
+  right: 12px;
 }
 
 /* Loading overlay */
@@ -515,6 +483,38 @@ onMounted(() => {
 :root.theme-dark .spinner {
   border: 3px solid var(--header-border-color, #555);
   border-top: 3px solid var(--toolbar-link-color, #58a6ff);
+}
+
+/* Enhanced Display Toolbar */
+.display-toolbar {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  z-index: 10;
+  opacity: 1;
+}
+
+.sidepanel-mode .display-toolbar {
+  left: 18px;
+}
+
+.selection-mode .display-toolbar {
+  left: 8px;
+}
+
+html[dir="rtl"] .display-toolbar {
+  left: auto;
+  right: 12px;
+}
+
+html[dir="rtl"] .sidepanel-mode .display-toolbar {
+  left: auto;
+  right: 18px;
+}
+
+html[dir="rtl"] .selection-mode .display-toolbar {
+  left: auto;
+  right: 8px;
 }
 
 /* Animations */

@@ -287,22 +287,16 @@
             
             <!-- Item actions -->
             <div class="item-actions">
-              <button 
-                class="action-btn copy-btn"
-                title="Copy translation"
-                @click.stop="copyTranslation(item)"
-              >
-                <span class="action-icon">📋</span>
-              </button>
-              
-              <button 
-                v-if="!item.isImageTranslation"
-                class="action-btn tts-btn"
-                title="Play audio"
-                @click.stop="playTTS(item)"
-              >
-                <span class="action-icon">🔊</span>
-              </button>
+              <!-- Enhanced Text Actions -->
+              <ActionGroup
+                :text="item.translatedText"
+                :target-language="item.targetLanguage"
+                mode="history-item"
+                :show-copy="true"
+                :show-tts="!item.isImageTranslation"
+                :show-paste="false"
+                class="history-actions"
+              />
               
               <button 
                 class="action-btn retranslate-btn"
@@ -419,13 +413,14 @@
       </div>
       
       <div class="bulk-buttons">
-        <button
-          class="bulk-btn"
-          @click="bulkCopy"
-        >
-          <span class="bulk-icon">📋</span>
-          Copy All
-        </button>
+        <!-- Enhanced Bulk Copy -->
+        <CopyButton
+          :text="bulkSelectedText"
+          mode="bulk"
+          class="bulk-copy-btn"
+          title="Copy all selected"
+          @copied="onBulkCopied"
+        />
         
         <button
           class="bulk-btn"
@@ -491,6 +486,8 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
+import ActionGroup from '@/components/shared/actions/ActionGroup.vue'
+import CopyButton from '@/components/shared/actions/CopyButton.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');
@@ -616,6 +613,15 @@ const paginatedHistory = computed(() => {
   return filteredHistory.value.slice(start, end)
 })
 
+const bulkSelectedText = computed(() => {
+  const selectedTexts = selectedItems.value.map(id => {
+    const item = history.value.find(h => h.id === id)
+    return item ? item.translatedText || item.text : ''
+  }).filter(text => text.length > 0)
+  
+  return selectedTexts.join('\n\n')
+})
+
 // Methods
 const truncateText = (text, maxLength) => {
   if (text.length <= maxLength) return text
@@ -696,19 +702,9 @@ const retranslate = (item) => {
   emit('retranslate', item)
 }
 
-const copyTranslation = async (item) => {
-  try {
-    await navigator.clipboard.writeText(item.text)
-    emit('copy', item)
-    showFeedback('Copied to clipboard!')
-  } catch (_err) {
-    await handleError(_err, 'translation-history-copy')
-    showFeedback('Copy failed', 'error')
-  }
-}
-
-const playTTS = (item) => {
-  emit('tts', item)
+const onBulkCopied = () => {
+  showFeedback(`${selectedItems.value.length} items copied to clipboard!`)
+  logger.debug('[TranslationHistoryPanel] Bulk copy completed')
 }
 
 const editTranslation = (item) => {
@@ -753,22 +749,6 @@ const confirmClearHistory = () => {
   showFeedback('History cleared')
 }
 
-const bulkCopy = async () => {
-  const items = selectedItems.value.map(id => 
-    history.value.find(item => item.id === id)
-  ).filter(Boolean)
-  
-  const text = items.map(item => item.text).join('\n\n')
-  
-  try {
-    await navigator.clipboard.writeText(text)
-    showFeedback(`Copied ${items.length} translations`)
-    clearSelection()
-  } catch {
-    showFeedback('Copy failed', 'error')
-  }
-}
-
 const bulkExport = () => {
   const items = selectedItems.value.map(id => 
     history.value.find(item => item.id === id)
@@ -776,6 +756,11 @@ const bulkExport = () => {
   
   emit('export', items)
   clearSelection()
+}
+
+const onBulkCopied = () => {
+  showFeedback('All selected translations copied to clipboard')
+  logger.debug('[TranslationHistoryPanel] Bulk copy completed')
 }
 
 const bulkDelete = () => {
@@ -1154,17 +1139,28 @@ onMounted(() => {
 /* Item actions */
 .item-actions {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.history-actions {
+  display: flex;
   gap: 4px;
 }
 
 .action-btn {
-  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--color-border);
   border-radius: 4px;
   background: var(--color-background);
   cursor: pointer;
   transition: all 0.2s ease;
+  font-size: 12px;
   
   &:hover {
     background: var(--color-surface);
@@ -1299,6 +1295,26 @@ onMounted(() => {
   }
 }
 
+.bulk-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-background);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    border-color: #4caf50;
+    color: #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+  }
+}
+
 /* Clear confirmation */
 .clear-confirm {
   text-align: center;
@@ -1386,5 +1402,11 @@ onMounted(() => {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* Enhanced Actions Styling */
+.history-actions {
+  display: flex;
+  gap: 4px;
 }
 </style>

@@ -3,35 +3,23 @@
     class="textarea-container"
     :class="{ 'has-content': hasContent }"
   >
-    <!-- Inline Toolbar (copy, tts) -->
-    <div
-      class="inline-toolbar"
-      :class="{ 'visible': hasContent }"
-    >
-      <IconButton
-        icon="copy.png"
-        :title="copyTitle"
-        :alt="copyAlt"
-        type="inline"
-        @click="handleCopy"
-      />
-      <IconButton
-        icon="speaker.png"
-        :title="ttsTitle"
-        :alt="ttsAlt"
-        type="inline"
-        @click="handleTTS"
-      />
-    </div>
+    <!-- Enhanced Text Actions Toolbar -->
+    <ActionToolbar
+      v-if="hasContent"
+      :text="modelValue"
+      :source-language="sourceLanguage"
+      mode="input-field"
+      class="input-toolbar"
+      @paste="handlePaste"
+    />
     
-    <!-- Paste Button (separate positioning) -->
-    <IconButton
-      icon="paste.png"
+    <!-- Standalone Paste Button -->
+    <PasteButton
       :title="pasteTitle"
       :alt="pasteAlt"
-      type="paste-separate"
-      :hidden-by-clipboard="!canPaste"
-      @click="handlePaste"
+      mode="standalone"
+      class="paste-standalone"
+      @paste="handlePaste"
     />
     
     <!-- Textarea -->
@@ -51,13 +39,11 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useClipboard } from '@/composables/useClipboard.js'
-import { useTTSSimple } from '@/composables/useTTSSimple.js'
-import { useSettingsStore } from '@/store/core/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
-import IconButton from '@/components/shared/IconButton.vue'
+import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
+import PasteButton from '@/components/shared/actions/PasteButton.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
@@ -113,6 +99,11 @@ const props = defineProps({
     type: String,
     default: 'Paste'
   },
+  // Language for TTS
+  sourceLanguage: {
+    type: String,
+    default: 'auto'
+  },
   // Auto-translate on paste
   autoTranslateOnPaste: {
     type: Boolean,
@@ -130,12 +121,8 @@ const emit = defineEmits([
 
 // Refs
 const textareaRef = ref(null)
-const canPaste = ref(true)
 
 // Composables
-const clipboard = useClipboard()
-const tts = useTTSSimple()
-const settingsStore = useSettingsStore()
 const { handleError } = useErrorHandler()
 
 // Computed
@@ -171,22 +158,8 @@ const handleKeydown = (event) => {
   }
 }
 
-const handleCopy = async () => {
-  if (!hasContent.value) return
-  
+const handlePaste = async (pastedText) => {
   try {
-    const success = await clipboard.copyToClipboard(props.modelValue)
-    if (success) {
-      logger.debug('[TranslationInputField] Text copied to clipboard')
-    }
-  } catch (error) {
-    await handleError(error, 'translation-input-field-copy')
-  }
-}
-
-const handlePaste = async () => {
-  try {
-    const pastedText = await clipboard.pasteFromClipboard()
     if (pastedText) {
       emit('update:modelValue', pastedText)
       
@@ -200,7 +173,7 @@ const handlePaste = async () => {
       })
       
       // Auto-translate if enabled
-      if (props.autoTranslateOnPaste || settingsStore.settings.AUTO_TRANSLATE_ON_PASTE) {
+      if (props.autoTranslateOnPaste) {
         await nextTick()
         emit('translate')
       }
@@ -212,35 +185,8 @@ const handlePaste = async () => {
   }
 }
 
-const handleTTS = async () => {
-  if (!hasContent.value) return
-  
-  try {
-    const langCode = getLanguageCodeForTTS(props.language)
-    await tts.speak(props.modelValue, langCode)
-    logger.debug('[TranslationInputField] Playing TTS for text')
-  } catch (error) {
-    await handleError(error, 'translation-input-field-tts')
-  }
-}
-
-const checkClipboardPermissions = async () => {
-  try {
-    const text = await navigator.clipboard.readText()
-    canPaste.value = text && text.trim().length > 0
-  } catch {
-    canPaste.value = false
-  }
-}
-
 // Lifecycle
 onMounted(async () => {
-  // Check clipboard permissions initially
-  await checkClipboardPermissions()
-  
-  // Set up clipboard monitoring
-  setInterval(checkClipboardPermissions, 2000)
-  
   // Auto-resize initial content
   if (textareaRef.value && props.modelValue) {
     nextTick(() => {
@@ -290,26 +236,26 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-/* Inline Toolbar */
-.inline-toolbar {
+/* Enhanced Text Actions Toolbar */
+.input-toolbar {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  display: none;
-  align-items: center;
-  gap: 10px;
-  background: transparent;
+  top: 6px;
+  left: 12px;
   z-index: 10;
-  padding: 2px;
-  direction: ltr; /* Force LTR to maintain consistent positioning */
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.textarea-container.has-content .inline-toolbar {
-  display: flex;
+.textarea-container.has-content .input-toolbar {
+  opacity: 1;
 }
 
-.inline-toolbar.visible {
-  display: flex;
+/* Standalone Paste Button */
+.paste-standalone {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  z-index: 10;
 }
 
 /* Context-specific adjustments for sidepanel */
@@ -317,9 +263,12 @@ onMounted(async () => {
   margin: 8px 0;
 }
 
-.sidepanel-wrapper .inline-toolbar {
+.sidepanel-wrapper .input-toolbar {
   left: 18px;
-  gap: 12px;
+}
+
+.sidepanel-wrapper .paste-standalone {
+  right: 18px;
 }
 
 .sidepanel-wrapper .translation-textarea {
@@ -333,5 +282,26 @@ onMounted(async () => {
 
 html[dir="rtl"] .sidepanel-wrapper .translation-textarea {
   padding: 32px 14px 12px 14px;
+}
+
+/* RTL adjustments */
+html[dir="rtl"] .input-toolbar {
+  left: auto;
+  right: 12px;
+}
+
+html[dir="rtl"] .paste-standalone {
+  right: auto;
+  left: 12px;
+}
+
+html[dir="rtl"] .sidepanel-wrapper .input-toolbar {
+  left: auto;
+  right: 18px;
+}
+
+html[dir="rtl"] .sidepanel-wrapper .paste-standalone {
+  right: auto;
+  left: 18px;
 }
 </style>

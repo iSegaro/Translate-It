@@ -39,7 +39,7 @@
       <TranslationInputField
         v-model="sourceText"
         :placeholder="'Enter text to translate...'"
-        :language="sourceLanguageValue"
+        :source-language="sourceLanguageValue"
         :rows="6"
         :tabindex="1"
         :copy-title="'Copy source text'"
@@ -56,7 +56,7 @@
       <!-- Result Area with Toolbar -->
       <TranslationDisplay
         :content="translatedText"
-        :language="targetLanguageValue"
+        :target-language="targetLanguageValue"
         :is-loading="isTranslating"
         :error="translationError"
         :placeholder="'Translation will appear here...'"
