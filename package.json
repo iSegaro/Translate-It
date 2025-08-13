@@ -73,6 +73,7 @@
     "web-ext": "^8.9.0"
   },
   "dependencies": {
+    "@iconify/vue": "^5.0.0",
     "@vueuse/core": "^13.5.0",
     "archiver": "^7.0.1",
     "chalk": "^5.4.1",

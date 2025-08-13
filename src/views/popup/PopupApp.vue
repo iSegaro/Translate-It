@@ -39,14 +39,35 @@
       
       <!-- Scrollable Content Section -->
       <div class="scrollable-content">
-        <TranslationForm @can-translate-change="canTranslateFromForm = $event" />
+        <!-- Original TranslationForm -->
+        <TranslationForm 
+          v-if="!useEnhancedVersion"
+          @can-translate-change="canTranslateFromForm = $event" 
+        />
+        
+        <!-- Enhanced TranslationForm with new ActionSystem -->
+        <EnhancedTranslationForm 
+          v-else
+          @can-translate-change="canTranslateFromForm = $event" 
+        />
+      </div>
+      
+      <!-- Development Toggle -->
+            <div
+        v-if="isDevelopment"
+        class="enhanced-version-toggle"
+        @click="toggleEnhancedVersion"
+      >
+        <Icon icon="fa6-solid:toggle-on" v-if="useEnhancedVersion" />
+        <Icon icon="fa6-solid:toggle-off" v-else />
+        <span>{{ useEnhancedVersion ? 'Enhanced' : 'Classic' }}</span>
       </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -54,8 +75,12 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageControls from '@/components/popup/LanguageControls.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
+import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
 import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
+import { createLogger } from '@/utils/core/logger.js'
+
+const logger = createLogger('UI', 'PopupApp')
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
@@ -68,6 +93,23 @@ const loadingText = ref('Initializing...')
 const hasError = ref(false)
 const errorMessage = ref('')
 const canTranslateFromForm = ref(false)
+
+// Enhanced version toggle
+const useEnhancedVersion = ref(false) // Default to original version
+const isDevelopment = computed(() => {
+  return import.meta.env.MODE === 'development' || 
+         window.location.hostname === 'localhost' ||
+         localStorage.getItem('dev-mode') === 'true'
+})
+
+// Methods
+const toggleVersion = () => {
+  useEnhancedVersion.value = !useEnhancedVersion.value
+  logger.debug('[PopupApp] Switched to version:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
+  
+  // Store preference
+  localStorage.setItem('popup-enhanced-version', useEnhancedVersion.value.toString())
+}
 
 // Lifecycle
 onMounted(async () => {
@@ -96,6 +138,17 @@ onMounted(async () => {
     // Step 4: Apply theme
     const settings = settingsStore.settings
     await applyTheme(settings.THEME)
+    
+    // Step 5: Check for saved version preference
+    const savedVersion = localStorage.getItem('popup-enhanced-version')
+    if (savedVersion !== null) {
+      useEnhancedVersion.value = savedVersion === 'true'
+    }
+    
+    logger.debug('[PopupApp] Popup initialized successfully', {
+      useEnhancedVersion: useEnhancedVersion.value,
+      isDevelopment: isDevelopment.value
+    })
     
   } catch (error) {
     const isSilent = await handleError(error, 'popup-initialization')
@@ -218,5 +271,39 @@ const retryLoading = () => {
 
 .retry-button:hover {
   background-color: var(--toolbar-link-hover-bg-color);
+}
+
+.enhanced-version-toggle {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  background: rgba(var(--color-bg-secondary-rgb), 0.9);
+  border: 1px solid rgba(var(--color-border-rgb), 0.3);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(var(--color-bg-secondary-rgb), 1);
+    border-color: rgba(var(--color-border-rgb), 0.5);
+    transform: scale(1.05);
+  }
+  
+  span {
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+  
+  .iconify {
+    font-size: 12px;
+    color: var(--color-primary);
+  }
 }
 </style>

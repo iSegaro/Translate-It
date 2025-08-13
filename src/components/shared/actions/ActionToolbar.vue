@@ -1,0 +1,332 @@
+<template>
+  <div
+    class="action-toolbar"
+    :class="[
+      `mode-${mode}`,
+      `layout-${layout}`,
+      `position-${position}`,
+      { 'visible': visible, 'has-content': hasContent }
+    ]"
+  >
+    <CopyButton
+      v-if="showCopy"
+      :text="text"
+      :size="buttonSize"
+      :variant="buttonVariant"
+      :title="copyTitle"
+      :aria-label="copyAriaLabel"
+      :disabled="copyDisabled"
+      @copied="handleCopied"
+      @copy-failed="handleCopyFailed"
+    />
+    
+    <PasteButton
+      v-if="showPaste"
+      :size="buttonSize"
+      :variant="buttonVariant"
+      :title="pasteTitle"
+      :aria-label="pasteAriaLabel"
+      :disabled="pasteDisabled"
+      :auto-translate="autoTranslateOnPaste"
+      @pasted="handlePasted"
+      @paste-failed="handlePasteFailed"
+    />
+    
+    <TTSButton
+      v-if="showTTS"
+      :text="text"
+      :language="language"
+      :size="buttonSize"
+      :variant="buttonVariant"
+      :title="ttsTitle"
+      :aria-label="ttsAriaLabel"
+      :disabled="ttsDisabled"
+      @speaking="handleTTSSpeaking"
+      @stopped="handleTTSStopped"
+      @tts-failed="handleTTSFailed"
+    />
+    
+    <!-- Custom actions slot -->
+    <slot name="custom-actions" />
+  </div>
+</template>
+
+<script setup>
+import { computed, defineProps, defineEmits } from 'vue'
+import CopyButton from './CopyButton.vue'
+import PasteButton from './PasteButton.vue'
+import TTSButton from './TTSButton.vue'
+import { createLogger } from '@/utils/core/logger.js'
+
+const logger = createLogger('UI', 'ActionToolbar')
+
+// Props
+const props = defineProps({
+  // Content
+  text: {
+    type: String,
+    default: ''
+  },
+  language: {
+    type: String,
+    default: 'auto'
+  },
+  
+  // Display control
+  mode: {
+    type: String,
+    default: 'input', // input, output, inline, floating
+    validator: (value) => ['input', 'output', 'inline', 'floating'].includes(value)
+  },
+  layout: {
+    type: String,
+    default: 'horizontal', // horizontal, vertical
+    validator: (value) => ['horizontal', 'vertical'].includes(value)
+  },
+  position: {
+    type: String,
+    default: 'top-right', // top-right, top-left, bottom-right, bottom-left, inline
+    validator: (value) => ['top-right', 'top-left', 'bottom-right', 'bottom-left', 'inline'].includes(value)
+  },
+  visible: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Button control
+  showCopy: {
+    type: Boolean,
+    default: true
+  },
+  showPaste: {
+    type: Boolean,
+    default: true
+  },
+  showTTS: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Size and styling
+  size: {
+    type: String,
+    default: 'medium',
+    validator: (value) => ['small', 'medium', 'large'].includes(value)
+  },
+  variant: {
+    type: String,
+    default: 'inline',
+    validator: (value) => ['inline', 'standalone', 'toolbar'].includes(value)
+  },
+  
+  // Behavior
+  autoTranslateOnPaste: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Disabled states
+  copyDisabled: {
+    type: Boolean,
+    default: false
+  },
+  pasteDisabled: {
+    type: Boolean,
+    default: false
+  },
+  ttsDisabled: {
+    type: Boolean,
+    default: false
+  },
+  
+  // i18n titles
+  copyTitle: {
+    type: String,
+    default: 'Copy text'
+  },
+  copyAriaLabel: {
+    type: String,
+    default: 'Copy text to clipboard'
+  },
+  pasteTitle: {
+    type: String,
+    default: 'Paste from clipboard'
+  },
+  pasteAriaLabel: {
+    type: String,
+    default: 'Paste text from clipboard'
+  },
+  ttsTitle: {
+    type: String,
+    default: 'Play text'
+  },
+  ttsAriaLabel: {
+    type: String,
+    default: 'Play text to speech'
+  }
+})
+
+// Emits
+const emit = defineEmits([
+  'text-copied',
+  'text-pasted', 
+  'tts-speaking',
+  'tts-stopped',
+  'action-failed'
+])
+
+// Computed
+const hasContent = computed(() => {
+  return props.text && props.text.trim().length > 0
+})
+
+const buttonSize = computed(() => {
+  return props.size
+})
+
+const buttonVariant = computed(() => {
+  return props.variant
+})
+
+// Event Handlers
+const handleCopied = (text) => {
+  logger.debug('[ActionToolbar] Text copied:', text.substring(0, 50) + '...')
+  emit('text-copied', text)
+}
+
+const handleCopyFailed = (error) => {
+  logger.error('[ActionToolbar] Copy failed:', error)
+  emit('action-failed', { action: 'copy', error })
+}
+
+const handlePasted = (data) => {
+  logger.debug('[ActionToolbar] Text pasted:', data.text.substring(0, 50) + '...')
+  emit('text-pasted', {
+    text: data.text,
+    autoTranslate: data.autoTranslate
+  })
+}
+
+const handlePasteFailed = (error) => {
+  logger.error('[ActionToolbar] Paste failed:', error)
+  emit('action-failed', { action: 'paste', error })
+}
+
+const handleTTSSpeaking = (data) => {
+  logger.debug('[ActionToolbar] TTS speaking:', data.text.substring(0, 50) + '...')
+  emit('tts-speaking', data)
+}
+
+const handleTTSStopped = () => {
+  logger.debug('[ActionToolbar] TTS stopped')
+  emit('tts-stopped')
+}
+
+const handleTTSFailed = (error) => {
+  logger.error('[ActionToolbar] TTS failed:', error)
+  emit('action-failed', { action: 'tts', error })
+}
+</script>
+
+<style scoped>
+.action-toolbar {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.action-toolbar:not(.visible) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Layout variants */
+.layout-horizontal {
+  flex-direction: row;
+}
+
+.layout-vertical {
+  flex-direction: column;
+}
+
+/* Position variants */
+.position-top-right {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.position-top-left {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.position-bottom-right {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
+.position-bottom-left {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+}
+
+.position-inline {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Mode-specific styles */
+.mode-input {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  padding: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mode-output {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.mode-inline {
+  background: transparent;
+  padding: 0;
+}
+
+.mode-floating {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+/* Content-based visibility */
+.mode-input:not(.has-content),
+.mode-output:not(.has-content) {
+  opacity: 0.3;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .mode-input {
+    background: rgba(0, 0, 0, 0.9);
+    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
+  }
+  
+  .mode-output {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .mode-floating {
+    background: rgba(0, 0, 0, 0.95);
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
+  }
+}
+</style>

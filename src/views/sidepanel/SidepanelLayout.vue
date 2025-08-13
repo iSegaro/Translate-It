@@ -13,7 +13,8 @@
     <!-- Content area -->
     <div class="content-area">
       <!-- Main Content -->
-      <SidepanelMainContent />
+      <SidepanelMainContent v-if="!useEnhancedVersion" />
+      <EnhancedSidepanelMainContent v-else />
 
       <!-- History Panel -->
       <SidepanelHistory 
@@ -22,18 +23,34 @@
         @select-history-item="handleHistoryItemSelect"
       />
     </div>
+    
+    <!-- Development Toggle -->
+    <div
+      v-if="isDevelopment"
+      class="enhanced-version-toggle"
+      @click="toggleEnhancedVersion"
+    >
+      <Icon icon="fa6-solid:toggle-on" v-if="useEnhancedVersion" />
+      <Icon icon="fa6-solid:toggle-off" v-else />
+      <span>{{ useEnhancedVersion ? 'Enhanced' : 'Classic' }}</span>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { useTranslationStore } from '@/store/modules/translation';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import { useHistory } from '@/composables/useHistory.js';
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
+import EnhancedSidepanelMainContent from './components/EnhancedSidepanelMainContent.vue';
 import SidepanelToolbar from './components/SidepanelToolbar.vue';
+import { Icon } from '@iconify/vue';
+import { createLogger } from '@/utils/core/logger.js';
+
+const logger = createLogger('UI', 'SidepanelLayout');
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()
@@ -43,6 +60,20 @@ const { handleError } = useErrorHandler()
 
 // Shared state between components
 const isHistoryVisible = ref(false)
+
+// Enhanced version toggle
+const useEnhancedVersion = ref(false) // Default to original version
+const isDevelopment = computed(() => {
+  return import.meta.env.MODE === 'development' || 
+         window.location.hostname === 'localhost' ||
+         localStorage.getItem('dev-mode') === 'true'
+})
+
+const toggleEnhancedVersion = () => {
+  useEnhancedVersion.value = !useEnhancedVersion.value
+  localStorage.setItem('sidepanel-enhanced-version', useEnhancedVersion.value.toString())
+  logger.debug('[SidepanelLayout] Enhanced version toggled:', useEnhancedVersion.value)
+}
 
 // Handle history panel toggle
 const handleHistoryToggle = (visible) => {
@@ -106,6 +137,17 @@ const handleKeyDown = async (event) => {
 // Lifecycle management for ESC listener
 onMounted(() => {
   document.addEventListener('keydown', handleKeyDown, { capture: true })
+  
+  // Load saved version preference
+  const savedVersion = localStorage.getItem('sidepanel-enhanced-version')
+  if (savedVersion !== null) {
+    useEnhancedVersion.value = savedVersion === 'true'
+  }
+  
+  logger.debug('[SidepanelLayout] Component initialized', {
+    useEnhancedVersion: useEnhancedVersion.value,
+    isDevelopment: isDevelopment.value
+  })
 })
 
 onUnmounted(() => {
@@ -124,6 +166,40 @@ onUnmounted(() => {
   color: var(--text-color);
   position: relative;
   overflow: hidden;
+}
+
+.enhanced-version-toggle {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  background: rgba(var(--color-bg-secondary-rgb), 0.9);
+  border: 1px solid rgba(var(--color-border-rgb), 0.3);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(var(--color-bg-secondary-rgb), 1);
+    border-color: rgba(var(--color-border-rgb), 0.5);
+    transform: scale(1.05);
+  }
+  
+  span {
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+  
+  .iconify {
+    font-size: 12px;
+    color: var(--color-primary);
+  }
 }
 
 .content-area {

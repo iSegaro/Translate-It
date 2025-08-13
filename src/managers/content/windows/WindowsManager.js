@@ -12,6 +12,7 @@ import { AnimationManager } from "./animation/AnimationManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { TTSManager } from "./translation/TTSManager.js";
 import { TranslationRenderer } from "./translation/TranslationRenderer.js";
+import { EnhancedTranslationRenderer } from "./translation/EnhancedTranslationRenderer.js";
 import { DragHandler } from "./interaction/DragHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
@@ -48,7 +49,16 @@ export class WindowsManager {
     // Initialize translation
     this.translationHandler = new TranslationHandler();
     this.ttsManager = new TTSManager();
-    this.translationRenderer = new TranslationRenderer(this.factory, this.ttsManager);
+    
+    // Initialize translation renderer (enhanced version detection)
+    this.useEnhancedRenderer = this._shouldUseEnhancedRenderer();
+    if (this.useEnhancedRenderer) {
+      this.translationRenderer = new EnhancedTranslationRenderer(this.factory, this.ttsManager);
+      this.logger.debug('Using Enhanced TranslationRenderer with Text Actions System');
+    } else {
+      this.translationRenderer = new TranslationRenderer(this.factory, this.ttsManager);
+      this.logger.debug('Using Classic TranslationRenderer');
+    }
     
     // Initialize interaction
     this.dragHandler = new DragHandler(this.positionCalculator);
@@ -90,6 +100,73 @@ export class WindowsManager {
       onOutsideClick: this._handleOutsideClick.bind(this),
       onIconClick: this._handleIconClick.bind(this)
     });
+
+    // Development toggle handler
+    window.addEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
+  }
+
+  /**
+   * Handle renderer toggle event
+   */
+  _handleToggleRenderer(event) {
+    this.logger.debug('Renderer toggle requested', event.detail);
+    const newRendererType = this.toggleEnhancedRenderer();
+    
+    // If there's an active translation window, recreate it with new renderer
+    if (this.state.isVisible && this.displayElement && this.state.originalText) {
+      const originalText = this.state.originalText;
+      const translatedText = this.state.translatedText;
+      
+      if (translatedText) {
+        // Re-render the content with new renderer
+        this.innerContainer.innerHTML = '';
+        this._renderTranslationContent(translatedText, originalText);
+        this.logger.debug('Active translation re-rendered with new renderer');
+      }
+    }
+    
+    this.logger.debug(`Renderer toggled to: ${newRendererType ? 'Enhanced' : 'Classic'}`);
+  }
+
+  /**
+   * Determine if enhanced renderer should be used
+   */
+  _shouldUseEnhancedRenderer() {
+    // Check for development mode
+    const isDevelopment = (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname.includes('dev') ||
+      localStorage.getItem('dev-mode') === 'true'
+    );
+    
+    // Check for saved preference
+    const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
+    
+    if (savedPreference !== null) {
+      return savedPreference === 'true';
+    }
+    
+    // Default to enhanced in development, classic in production
+    return isDevelopment;
+  }
+
+  /**
+   * Toggle between enhanced and classic renderers
+   */
+  toggleEnhancedRenderer() {
+    this.useEnhancedRenderer = !this.useEnhancedRenderer;
+    localStorage.setItem('windows-manager-enhanced-version', this.useEnhancedRenderer.toString());
+    
+    // Recreate renderer
+    if (this.useEnhancedRenderer) {
+      this.translationRenderer = new EnhancedTranslationRenderer(this.factory, this.ttsManager);
+      this.logger.debug('Switched to Enhanced TranslationRenderer');
+    } else {
+      this.translationRenderer = new TranslationRenderer(this.factory, this.ttsManager);
+      this.logger.debug('Switched to Classic TranslationRenderer');
+    }
+    
+    return this.useEnhancedRenderer;
   }
 
   /**
@@ -591,6 +668,9 @@ export class WindowsManager {
   destroy() {
     try {
       this.dismiss(false);
+      
+      // Remove event listeners
+      window.removeEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
       
       // Cleanup all modules
       this.crossFrameManager.cleanup();
