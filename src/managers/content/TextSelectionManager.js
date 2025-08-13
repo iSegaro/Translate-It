@@ -161,12 +161,16 @@ export class TextSelectionManager {
       return;
     }
     
-    const selection = window.getSelection();
-    let position = { x: 0, y: 0 };
+  const selection = window.getSelection();
+  let position = { x: 0, y: 0 };
     
     if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+  const range = selection.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+
+  // Read current selection translation mode to decide how to place the icon/window
+  const settings = await getSettingsAsync();
+  const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
       
       this.logger.debug('Selection rect DEBUG', {
         rect: {
@@ -182,12 +186,19 @@ export class TextSelectionManager {
       });
       
       // محاسبه موقعیت زیر متن انتخاب شده
+      // در حالت onClick (آیکون)، X را مرکز باکس انتخاب قرار می‌دهیم تا آیکون زیرِ وسطِ متن بیفتد
+      // در حالت immediate (پنجره فوری)، مانند قبل از لبه‌ی چپ استفاده می‌کنیم تا منطق پنجره حفظ شود
+      const centerX = rect.left + (rect.width / 2);
       position = {
-        x: rect.left + window.scrollX,
+        x: (selectionTranslationMode === 'onClick' ? centerX : rect.left) + window.scrollX,
         y: rect.bottom + window.scrollY + 15, // کمی فاصله
       };
 
-      this.logger.debug('Position after initial calculation', { position });
+      this.logger.debug('Position after initial calculation', {
+        position,
+        mode: selectionTranslationMode,
+        usedCenterX: selectionTranslationMode === 'onClick',
+      });
 
       // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
       const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ
@@ -201,7 +212,7 @@ export class TextSelectionManager {
         willAdjustRight: position.x + popupMaxWidth > viewportWidth - 10
       });
       
-      // **IFRAME-SPECIFIC LOGIC**: Handle small iframes differently
+  // **IFRAME-SPECIFIC LOGIC**: Handle small iframes differently
       const isSmallIframe = viewportWidth < 400;
       
       if (isSmallIframe) {
@@ -220,7 +231,7 @@ export class TextSelectionManager {
           strategy: 'icon-only',
           viewportWidth
         });
-      } else {
+  } else {
         // Original logic for normal/large contexts
         if (position.x < 10) {
           this.logger.debug('Adjusting position to prevent left edge clipping', { oldX: position.x, newX: 10 });
