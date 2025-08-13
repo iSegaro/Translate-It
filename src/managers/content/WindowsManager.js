@@ -55,6 +55,8 @@ export default class SelectionWindows {
     this.frameId = Math.random().toString(36).substring(7);
   // Cross-frame debug (scoped)
   this.debugCrossFrame = options.debugCrossFrame === true;
+  // Track if this frame has requested global relay enablement to prevent refcount leaks
+  this._relayRequested = false;
 
     // Cross-iframe dismiss functionality - removed complex system
 
@@ -81,6 +83,9 @@ export default class SelectionWindows {
   // Defer global click broadcasting until an icon/window is active
   this._globalClickHandler = null;
   this._broadcastEnabled = false;
+  // Relay broadcasting: enabled across frames while any UI is active
+  this._relayClickHandler = null;
+  this._relayEnabled = false;
     
     // Register this frame in the global registry
     if (!window.translateItFrameRegistry) {
@@ -124,6 +129,63 @@ export default class SelectionWindows {
       } catch (e) {
         this._logXF('Failed to register frame', { error: e?.message });
       }
+      return;
+    }
+
+    // Centralized request to enable/disable global click relay (main document only)
+    if (event.data.type === 'translateit-set-broadcast-request' && !this.isInIframe) {
+      try {
+        // Initialize ref counter on top window
+        if (typeof window.translateItBroadcastCount !== 'number') {
+          window.translateItBroadcastCount = 0;
+        }
+        const enable = !!event.data.enabled;
+        // Update counter
+        if (enable) {
+          window.translateItBroadcastCount += 1;
+        } else {
+          window.translateItBroadcastCount -= 1;
+          if (window.translateItBroadcastCount < 0) window.translateItBroadcastCount = 0;
+        }
+
+        const shouldEnable = window.translateItBroadcastCount > 0;
+        // Apply locally on main document
+        this._applyGlobalClickRelay(shouldEnable);
+
+        // Fan out apply message with final state to all iframes
+        const frames = document.querySelectorAll('iframe');
+        frames.forEach((frame) => {
+          try {
+            frame.contentWindow?.postMessage({
+              type: 'translateit-set-broadcast-apply',
+              enabled: shouldEnable,
+              timestamp: Date.now()
+            }, '*');
+          } catch {}
+        });
+      } catch (e) {
+        this._logXF('Failed broadcast request handling', { error: e?.message });
+      }
+      return;
+    }
+
+    // Apply global click relay state (all frames)
+    if (event.data.type === 'translateit-set-broadcast-apply') {
+      const enabled = !!event.data.enabled;
+      this._applyGlobalClickRelay(enabled);
+      // Forward to this frame's child iframes to cover nested frames
+      try {
+        const frames = document.querySelectorAll('iframe');
+        frames.forEach((frame) => {
+          try {
+            frame.contentWindow?.postMessage({
+              type: 'translateit-set-broadcast-apply',
+              enabled,
+              timestamp: Date.now()
+            }, '*');
+          } catch {}
+        });
+      } catch {}
       return;
     }
 
@@ -267,6 +329,8 @@ export default class SelectionWindows {
         targetFrame: 'all',
         timestamp: Date.now(),
         isInIframe: this.isInIframe,
+  // Mark relay-origin to help future filtering if needed
+  relayed: !!originalEvent?.__translateItRelay,
         target: {
           tagName: originalEvent.target.tagName,
           className: originalEvent.target.className?.substring(0, 50) || ''
@@ -287,7 +351,7 @@ export default class SelectionWindows {
           if (window.top && window.top !== window.parent) {
             window.top.postMessage(message, '*');
           }
-        } catch (error) {
+        } catch {
           // Silently ignore CORS errors
         }
       }
@@ -297,7 +361,7 @@ export default class SelectionWindows {
       frames.forEach((frame, index) => {
         try {
           frame.contentWindow?.postMessage(message, '*');
-        } catch (error) {
+        } catch {
           // Silently ignore CORS errors
         }
       });
@@ -321,6 +385,54 @@ export default class SelectionWindows {
       this._globalClickHandler = null;
     }
     this._broadcastEnabled = false;
+  }
+
+  // Apply or remove a lightweight relay click handler in this frame
+  _applyGlobalClickRelay(enable) {
+    try {
+      if (enable) {
+        if (this._relayEnabled) return;
+        // Avoid duplicate broadcast if this frame already owns an active UI broadcast
+        if (this._broadcastEnabled) {
+          this._relayEnabled = false;
+          return;
+        }
+        this._relayClickHandler = (e) => {
+          // Tag the event so receivers know it's from relay
+          try { Object.defineProperty(e, '__translateItRelay', { value: true, enumerable: false }); } catch {}
+          this._broadcastOutsideClick(e);
+        };
+        document.addEventListener('click', this._relayClickHandler, { capture: true });
+        this._relayEnabled = true;
+        this._logXF('Relay click enabled in frame', { frameId: this.frameId });
+      } else {
+        if (!this._relayEnabled) return;
+        if (this._relayClickHandler) {
+          document.removeEventListener('click', this._relayClickHandler, { capture: true });
+          this._relayClickHandler = null;
+        }
+        this._relayEnabled = false;
+        this._logXF('Relay click disabled in frame', { frameId: this.frameId });
+      }
+    } catch (e) {
+      this._logXF('Failed to apply relay state', { error: e?.message });
+    }
+  }
+
+  // Request main document to enable/disable relay across all frames
+  _broadcastGlobalClickRelay(enable) {
+    try {
+  // Update local request flag
+  this._relayRequested = !!enable;
+      const msg = { type: 'translateit-set-broadcast-request', enabled: !!enable, timestamp: Date.now() };
+      if (this.isInIframe) {
+        if (window.parent) window.parent.postMessage(msg, '*');
+        if (window.top && window.top !== window.parent) window.top.postMessage(msg, '*');
+      } else {
+        // If we're main document, handle directly as if we received the request
+        this._handleCrossFrameMessage({ data: msg, source: window });
+      }
+    } catch {}
   }
 
   _getTopDocument() {
@@ -1179,6 +1291,8 @@ export default class SelectionWindows {
 
   // Enable cross-frame broadcast while an icon/window is active
   this._enableGlobalClickBroadcast();
+  // Ensure all frames relay clicks while UI is active
+  this._broadcastGlobalClickRelay(true);
 
     // Store removal function
     this.removeMouseDownListener = () => {
@@ -1188,6 +1302,8 @@ export default class SelectionWindows {
       // Disable cross-frame broadcast if nothing is visible anymore
       if (!this.icon && !this.displayElement) {
         this._disableGlobalClickBroadcast();
+          // Ask main to disable relay if no UI remains
+          this._broadcastGlobalClickRelay(false);
       }
     };
   }
