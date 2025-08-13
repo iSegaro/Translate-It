@@ -53,6 +53,8 @@ export default class SelectionWindows {
     this.isInIframe = window !== window.top;
     this.crossFrameListeners = new Set();
     this.frameId = Math.random().toString(36).substring(7);
+  // Cross-frame debug (scoped)
+  this.debugCrossFrame = options.debugCrossFrame === true;
 
     // Cross-iframe dismiss functionality - removed complex system
 
@@ -76,25 +78,25 @@ export default class SelectionWindows {
   _setupCrossFrameListening() {
     // Listen for messages from other frames
     window.addEventListener('message', this._handleCrossFrameMessage);
-    
-    // Request iframe position if we're in an iframe
-    if (this.isInIframe) {
-      this._requestIframePositionFromParent();
-    }
-    
-    // Add global click listener for cross-frame broadcasting
-    // This ensures ALL clicks are broadcast to other frames for cross-frame dismissal
-    this._globalClickHandler = (e) => {
-      this._broadcastOutsideClick(e);
-    };
-    
-    document.addEventListener('click', this._globalClickHandler, { capture: true });
+  // Defer global click broadcasting until an icon/window is active
+  this._globalClickHandler = null;
+  this._broadcastEnabled = false;
     
     // Register this frame in the global registry
     if (!window.translateItFrameRegistry) {
       window.translateItFrameRegistry = new Set();
     }
     window.translateItFrameRegistry.add(this.frameId);
+
+    // If we're inside an iframe, register our frameId with the parent/top for precise mapping
+    if (this.isInIframe) {
+      try {
+        const msg = { type: 'translateit-register-frame', frameId: this.frameId, timestamp: Date.now() };
+        if (window.parent) window.parent.postMessage(msg, '*');
+        if (window.top && window.top !== window.parent) window.top.postMessage(msg, '*');
+        this._logXF('Sent translateit-register-frame');
+      } catch {}
+    }
   }
 
   /**
@@ -102,6 +104,28 @@ export default class SelectionWindows {
    */
   _handleCrossFrameMessage(event) {
     if (!event.data) return;
+
+    // Handle iframe registration (main document only)
+    if (event.data.type === 'translateit-register-frame' && !this.isInIframe) {
+      try {
+        // Create map store if not present
+        if (!window.translateItFrameMap) {
+          window.translateItFrameMap = new Map();
+        }
+        // Find the iframe element that posted this message
+        const frames = document.querySelectorAll('iframe');
+        for (const frame of frames) {
+          if (frame.contentWindow === event.source) {
+            window.translateItFrameMap.set(event.data.frameId, frame);
+            this._logXF('Registered frameId → iframe element', { frameId: event.data.frameId });
+            break;
+          }
+        }
+      } catch (e) {
+        this._logXF('Failed to register frame', { error: e?.message });
+      }
+      return;
+    }
 
     // Handle outside click messages
     if (event.data.type === 'translateit-outside-click') {
@@ -125,7 +149,7 @@ export default class SelectionWindows {
 
     // Handle window creation request from iframe
     if (event.data.type === 'translateit-create-window-request' && !this.isInIframe) {
-      this._handleWindowCreationRequest(event.data);
+      this._handleWindowCreationRequest(event.data, event.source);
       return;
     }
 
@@ -136,18 +160,7 @@ export default class SelectionWindows {
       return;
     }
 
-    // Handle iframe position request
-    if (event.data.type === 'REQUEST_IFRAME_POSITION' && !this.isInIframe) {
-      this._handleIframePositionRequest(event.data, event.source);
-      return;
-    }
-
-    // Handle iframe position response  
-    if (event.data.type === 'IFRAME_POSITION_RESPONSE' && 
-        event.data.targetFrameId === this.frameId) {
-      this._handleIframePositionResponse(event.data);
-      return;
-    }
+  // Removed iframe position request/response handling
   }
 
   /**
@@ -175,14 +188,50 @@ export default class SelectionWindows {
   /**
    * Handle window creation request from iframe (main document only)
    */
-  _handleWindowCreationRequest(data) {
+  _handleWindowCreationRequest(data, sourceWindow) {
     if (this.isInIframe) return; // Only main document should handle this
 
     try {
+      // Try to find the requesting iframe and adjust coordinates
+      let adjustedPosition = { ...data.position };
+      try {
+        // Prefer explicit frameId→iframe mapping if available
+        let targetFrame = null;
+        if (!this.isInIframe && window.translateItFrameMap && data.frameId && window.translateItFrameMap.has(data.frameId)) {
+          targetFrame = window.translateItFrameMap.get(data.frameId);
+        } else {
+          // Fallback: find by sourceWindow
+          const frames = document.querySelectorAll('iframe');
+          for (const frame of frames) {
+            if (frame.contentWindow === sourceWindow) {
+              targetFrame = frame;
+              break;
+            }
+          }
+        }
+
+        if (targetFrame) {
+          const rect = targetFrame.getBoundingClientRect();
+          adjustedPosition = {
+            x: (data.position?.x ?? 0) + window.scrollX + rect.left,
+            y: (data.position?.y ?? 0) + window.scrollY + rect.top
+          };
+        }
+      } catch {}
+
       // Create window in main document with adjusted coordinates
-      this._createTranslateWindowInMainDocument(data.selectedText, data.position, data.frameId);
+      this._createTranslateWindowInMainDocument(data.selectedText, adjustedPosition, data.frameId);
     } catch (error) {
       this.logger.error('Failed to create window in main document:', error);
+    }
+  }
+
+  // Scoped cross-frame debug logger
+  _logXF(message, meta) {
+    if (this.debugCrossFrame) {
+      try {
+        this.logger.debug(`[XF] ${message}`, meta || {});
+      } catch {}
     }
   }
 
@@ -204,86 +253,7 @@ export default class SelectionWindows {
     }
   }
 
-  /**
-   * Handle iframe position request (main document only)
-   */
-  _handleIframePositionRequest(data, sourceWindow) {
-    if (this.isInIframe) return; // Only main document should handle this
-
-    try {
-      // Find the iframe that sent the request
-      const frames = document.querySelectorAll('iframe');
-      let targetFrame = null;
-      
-      for (const frame of frames) {
-        if (frame.contentWindow === sourceWindow) {
-          targetFrame = frame;
-          break;
-        }
-      }
-
-      if (targetFrame) {
-        const frameRect = targetFrame.getBoundingClientRect();
-        const framePosition = {
-          left: frameRect.left + window.scrollX,
-          top: frameRect.top + window.scrollY,
-          width: frameRect.width,
-          height: frameRect.height
-        };
-
-        // Send response back to iframe
-        sourceWindow.postMessage({
-          type: 'IFRAME_POSITION_RESPONSE',
-          requestId: data.requestId,
-          targetFrameId: data.frameId,
-          position: framePosition
-        }, '*');
-
-        this.logger.debug('Sent iframe position to child frame', {
-          frameId: data.frameId,
-          position: framePosition
-        });
-      } else {
-        this.logger.warn('Could not find iframe that requested position');
-      }
-    } catch (error) {
-      this.logger.error('Failed to handle iframe position request:', error);
-    }
-  }
-
-  /**
-   * Handle iframe position response (iframe only)
-   */
-  _handleIframePositionResponse(data) {
-    if (!this.isInIframe) return; // Only iframes should handle this
-
-    // Store the iframe position for use in coordinate calculations
-    this.iframePosition = data.position;
-    this.logger.debug('Received iframe position from parent', {
-      position: data.position
-    });
-  }
-
-  /**
-   * Request iframe position from parent (iframe only)
-   */
-  _requestIframePositionFromParent() {
-    if (!this.isInIframe) return;
-
-    try {
-      const requestId = 'iframe-position-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-      
-      window.parent.postMessage({
-        type: 'REQUEST_IFRAME_POSITION',
-        requestId: requestId,
-        frameId: this.frameId || 'unknown'
-      }, '*');
-      
-      this.logger.debug('Requested initial iframe position from parent');
-    } catch (error) {
-      this.logger.warn('Failed to request initial iframe position:', error.message);
-    }
-  }
+  // Removed iframe position request/response methods. Parent adjusts using iframe rect at request time.
 
   /**
    * Broadcast outside click to other frames
@@ -337,6 +307,22 @@ export default class SelectionWindows {
     }
   }
 
+  _enableGlobalClickBroadcast() {
+    if (this._broadcastEnabled) return;
+    this._globalClickHandler = (e) => this._broadcastOutsideClick(e);
+    document.addEventListener('click', this._globalClickHandler, { capture: true });
+    this._broadcastEnabled = true;
+  }
+
+  _disableGlobalClickBroadcast() {
+    if (!this._broadcastEnabled) return;
+    if (this._globalClickHandler) {
+      document.removeEventListener('click', this._globalClickHandler, { capture: true });
+      this._globalClickHandler = null;
+    }
+    this._broadcastEnabled = false;
+  }
+
   _getTopDocument() {
     // Try to get the topmost document accessible
     let currentWindow = window;
@@ -359,7 +345,7 @@ export default class SelectionWindows {
           break;
         }
       }
-    } catch {
+    } catch (e) {
       // If anything fails, use current document
       this.logger.warn(
         "Could not access top document, using current:",
@@ -375,13 +361,8 @@ export default class SelectionWindows {
    */
   _requestWindowCreationInMainDocument(selectedText, position) {
     try {
-      // **IFRAME POSITION FIX**: Use the position as-is, it's already calculated correctly in icon creation
-      // Only adjust it for main document coordinates
-      const adjustedPosition = this._calculateCoordsForTopWindow(position);
-      
       this.logger.debug('Requesting window creation in main document', {
         originalPosition: position,
-        adjustedPosition: adjustedPosition,
         frameId: this.frameId
       });
       
@@ -389,7 +370,7 @@ export default class SelectionWindows {
         type: 'translateit-create-window-request',
         frameId: this.frameId,
         selectedText: selectedText,
-        position: adjustedPosition,
+        position: position,
         timestamp: Date.now()
       };
 
@@ -731,61 +712,13 @@ export default class SelectionWindows {
               
               currentWindow = parentWindow;
             } else {
-              this.logger.warn('No frameElement found, checking cached iframe position');
-              // **IFRAME FALLBACK**: Use cached iframe position if available
-              if (this.iframePosition) {
-                this.logger.debug('Using cached iframe position', this.iframePosition);
-                // Don't replace original position, ADD iframe offset to it
-                totalOffsetX += this.iframePosition.left;
-                totalOffsetY += this.iframePosition.top;
-                break;
-              } else if (currentWindow.parent && currentWindow !== currentWindow.parent) {
-                // Request iframe position from parent window (async)
-                try {
-                  const requestId = 'iframe-position-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                  
-                  currentWindow.parent.postMessage({
-                    type: 'REQUEST_IFRAME_POSITION',
-                    requestId: requestId,
-                    frameId: this.frameId || 'unknown'
-                  }, '*');
-                  
-                  this.logger.debug('Requested iframe position from parent, using default offset');
-                  totalOffsetX += 100; // Default offset
-                  totalOffsetY += 100; // Default offset
-                } catch (postMessageError) {
-                  this.logger.warn('Failed to request iframe position from parent:', postMessageError.message);
-                }
-              }
+              // No frameElement accessible (likely cross-origin) – stop accumulating; use best effort so far
               break;
             }
           } catch (e) {
             // Cross-origin restriction
             this.logger.warn('Cross-origin restriction in iframe offset calculation:', e.message);
-            // **IFRAME FALLBACK**: Try to estimate offset using viewport differences
-            try {
-              if (currentWindow.parent && currentWindow !== currentWindow.parent) {
-                // Try to detect if we're in an iframe by checking viewport differences
-                const parentViewport = {
-                  width: currentWindow.parent.innerWidth,
-                  height: currentWindow.parent.innerHeight
-                };
-                const currentViewport = {
-                  width: currentWindow.innerWidth,
-                  height: currentWindow.innerHeight
-                };
-                
-                if (parentViewport.width > currentViewport.width || parentViewport.height > currentViewport.height) {
-                  // We're likely in an iframe, but can't get exact position
-                  // Use a reasonable default offset for embedded frames
-                  this.logger.debug('Using fallback iframe offset estimation');
-                  totalOffsetX += 50; // Reasonable default
-                  totalOffsetY += 50; // Reasonable default
-                }
-              }
-            } catch (fallbackError) {
-              this.logger.warn('Fallback iframe position estimation also failed:', fallbackError.message);
-            }
+            // No reliable fallback; keep current accumulated offset only
             break;
           }
         }
@@ -1244,11 +1177,18 @@ export default class SelectionWindows {
       capture: true,
     });
 
+  // Enable cross-frame broadcast while an icon/window is active
+  this._enableGlobalClickBroadcast();
+
     // Store removal function
     this.removeMouseDownListener = () => {
       document.removeEventListener("click", this._onOutsideClick, {
         capture: true,
       });
+      // Disable cross-frame broadcast if nothing is visible anymore
+      if (!this.icon && !this.displayElement) {
+        this._disableGlobalClickBroadcast();
+      }
     };
   }
 
@@ -1256,6 +1196,10 @@ export default class SelectionWindows {
     if (this.removeMouseDownListener) {
       this.removeMouseDownListener();
       this.removeMouseDownListener = null;
+    }
+    // Also ensure we don't keep broadcasting when nothing is shown
+    if (!this.icon && !this.displayElement) {
+      this._disableGlobalClickBroadcast();
     }
   }
 
@@ -1523,8 +1467,8 @@ export default class SelectionWindows {
       if (
         rect.width === 0 ||
         rect.height === 0 ||
-        rect.left >= window.innerWidth ||
-        rect.top >= window.innerHeight ||
+        rect.left >= topWindow.innerWidth ||
+        rect.top >= topWindow.innerHeight ||
         rect.right <= 0 ||
         rect.bottom <= 0
       ) {
@@ -1541,14 +1485,14 @@ export default class SelectionWindows {
 
       if (isOverlapping) {
         // Try to reposition below the fixed element
-        const newY = window.scrollY + rect.bottom + 10;
-        const spaceBelow = window.innerHeight - (rect.bottom + 10);
+  const newY = topWindow.scrollY + rect.bottom + 10;
+  const spaceBelow = topWindow.innerHeight - (rect.bottom + 10);
 
         if (spaceBelow >= height) {
           return newY;
         } else {
           // Try above the fixed element
-          const newYAbove = window.scrollY + rect.top - height - 10;
+          const newYAbove = topWindow.scrollY + rect.top - height - 10;
           if (rect.top >= height + 10) {
             return newYAbove;
           }
@@ -1662,11 +1606,8 @@ export default class SelectionWindows {
       // Remove message listener
       window.removeEventListener('message', this._handleCrossFrameMessage);
       
-      // Remove global click handler
-      if (this._globalClickHandler) {
-        document.removeEventListener('click', this._globalClickHandler, { capture: true });
-        this._globalClickHandler = null;
-      }
+  // Remove global click handler via helper
+  this._disableGlobalClickBroadcast();
       
       // Remove from frame registry
       if (window.translateItFrameRegistry) {
