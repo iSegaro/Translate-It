@@ -49,6 +49,11 @@ export default class SelectionWindows {
     this.dragOffset = { x: 0, y: 0 };
     this.dragHandle = null;
 
+    // **IFRAME SUPPORT**: Cross-frame communication for outside click detection
+    this.isInIframe = window !== window.top;
+    this.crossFrameListeners = new Set();
+    this.frameId = Math.random().toString(36).substring(7);
+
     // Cross-iframe dismiss functionality - removed complex system
 
     this.show = this.show.bind(this);
@@ -59,6 +64,131 @@ export default class SelectionWindows {
     this._onMouseDown = this._onMouseDown.bind(this);
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseUp = this._onMouseUp.bind(this);
+    this._handleCrossFrameMessage = this._handleCrossFrameMessage.bind(this);
+
+    // Setup cross-frame communication
+    this._setupCrossFrameListening();
+  }
+
+  /**
+   * Setup cross-frame communication for iframe support
+   */
+  _setupCrossFrameListening() {
+    // Listen for messages from other frames
+    window.addEventListener('message', this._handleCrossFrameMessage);
+    
+    // Add global click listener for cross-frame broadcasting
+    // This ensures ALL clicks are broadcast to other frames for cross-frame dismissal
+    this._globalClickHandler = (e) => {
+      this._broadcastOutsideClick(e);
+    };
+    
+    document.addEventListener('click', this._globalClickHandler, { capture: true });
+    
+    // Register this frame in the global registry
+    if (!window.translateItFrameRegistry) {
+      window.translateItFrameRegistry = new Set();
+    }
+    window.translateItFrameRegistry.add(this.frameId);
+  }
+
+  /**
+   * Handle cross-frame messages for outside click detection
+   */
+  _handleCrossFrameMessage(event) {
+    if (!event.data || event.data.type !== 'translateit-outside-click') {
+      return;
+    }
+
+    // Don't process our own messages (including forwarded ones from us)
+    if (event.data.frameId === this.frameId || event.data.forwardedFrom === this.frameId) {
+      return;
+    }
+
+    // If we're in main document and received message from iframe,
+    // forward it to all other iframes (but only if not already forwarded)
+    if (!this.isInIframe && event.data.isInIframe && !event.data.forwardedFrom) {
+      this._forwardMessageToIframes(event.data);
+    }
+
+    // Only dismiss if we have active elements (icon or window)
+    if ((this.isIconMode && this.icon) || (this.isVisible && this.displayElement)) {
+      this.dismiss(true);
+    }
+  }
+
+  /**
+   * Forward cross-frame message to all iframes (called from main document)
+   */
+  _forwardMessageToIframes(originalMessage) {
+    const frames = document.querySelectorAll('iframe');
+    frames.forEach((frame, index) => {
+      try {
+        // Create forwarded message to avoid infinite loops
+        const forwardedMessage = {
+          ...originalMessage,
+          type: 'translateit-outside-click',
+          forwardedFrom: this.frameId,
+          originalSender: originalMessage.frameId
+        };
+        
+        frame.contentWindow?.postMessage(forwardedMessage, '*');
+      } catch (error) {
+        // Silently ignore CORS errors
+      }
+    });
+  }
+
+  /**
+   * Broadcast outside click to other frames
+   */
+  _broadcastOutsideClick(originalEvent) {
+    try {
+      // Message for same-origin frames
+      const message = {
+        type: 'translateit-outside-click',
+        frameId: this.frameId,
+        targetFrame: 'all',
+        timestamp: Date.now(),
+        isInIframe: this.isInIframe,
+        target: {
+          tagName: originalEvent.target.tagName,
+          className: originalEvent.target.className?.substring(0, 50) || ''
+        }
+      };
+
+      // If in iframe, broadcast to parent and top windows
+      if (this.isInIframe) {
+        try {
+          if (window.parent) {
+            window.parent.postMessage(message, '*');
+          }
+        } catch (error) {
+          // Silently ignore CORS errors
+        }
+
+        try {
+          if (window.top && window.top !== window.parent) {
+            window.top.postMessage(message, '*');
+          }
+        } catch (error) {
+          // Silently ignore CORS errors
+        }
+      }
+
+      // Always broadcast to all child frames
+      const frames = document.querySelectorAll('iframe');
+      frames.forEach((frame, index) => {
+        try {
+          frame.contentWindow?.postMessage(message, '*');
+        } catch (error) {
+          // Silently ignore CORS errors
+        }
+      });
+
+    } catch (error) {
+      // Silently ignore errors
+    }
   }
 
   _getTopDocument() {
@@ -95,12 +225,18 @@ export default class SelectionWindows {
   }
 
   _calculateCoordsForTopWindow(position) {
-    // If we're in an iframe, we need to adjust coordinates
+    // **ENHANCED IFRAME SUPPORT**: Better coordinate calculation for nested iframes
     if (window !== window.top) {
       try {
         let totalOffsetX = position.x;
         let totalOffsetY = position.y;
         let currentWindow = window;
+
+        this.logger.debug('Calculating iframe coordinates', {
+          originalPosition: position,
+          isInIframe: this.isInIframe,
+          frameId: this.frameId
+        });
 
         // Add iframe offsets up the chain
         while (currentWindow.parent !== currentWindow) {
@@ -109,8 +245,25 @@ export default class SelectionWindows {
             if (frameElement) {
               const frameRect = frameElement.getBoundingClientRect();
               const parentWindow = currentWindow.parent;
+              
+              // Add iframe position offset
               totalOffsetX += frameRect.left + parentWindow.scrollX;
               totalOffsetY += frameRect.top + parentWindow.scrollY;
+              
+              // Add any CSS transforms or borders
+              const computedStyle = parentWindow.getComputedStyle(frameElement);
+              const borderLeft = parseInt(computedStyle.borderLeftWidth) || 0;
+              const borderTop = parseInt(computedStyle.borderTopWidth) || 0;
+              
+              totalOffsetX += borderLeft;
+              totalOffsetY += borderTop;
+              
+              this.logger.debug('Added iframe offset', {
+                frameRect: { left: frameRect.left, top: frameRect.top },
+                borders: { left: borderLeft, top: borderTop },
+                cumulativeOffset: { x: totalOffsetX, y: totalOffsetY }
+              });
+              
               currentWindow = parentWindow;
             } else {
               break;
@@ -569,120 +722,66 @@ export default class SelectionWindows {
   }
 
   _onOutsideClick(e) {
-    this.logger.debug('Outside click detected', {
-      target: e.target.tagName,
-      className: e.target.className?.substring(0, 50) || '',
-      id: e.target.id,
-      documentOrigin: e.target.ownerDocument === document ? 'current' : 'other',
-      pendingTranslationWindow: this.pendingTranslationWindow,
-      isIconMode: this.isIconMode,
-      isVisible: this.isVisible
-    });
+    // Note: Cross-frame broadcasting is handled by global click handler
+    // No need to broadcast here to avoid double broadcasting
 
     // Prevent dismissal if we're in the middle of transitioning from icon to window
     if (this.pendingTranslationWindow) {
-      this.logger.debug('Ignoring outside click - pending translation window');
       return;
     }
 
+    // Check if we should dismiss based on any visible elements
+    const shouldDismiss = this._shouldDismissOnOutsideClick(e);
+    
+    if (shouldDismiss) {
+      this.dismiss(true);
+    }
+  }
+
+  /**
+   * Determine if outside click should trigger dismissal
+   */
+  _shouldDismissOnOutsideClick(e) {
     // Handle icon mode
     if (this.isIconMode && this.icon) {
-      if (!this.icon.contains(e.target)) {
-        this.logger.debug('Outside click on icon mode - dismissing');
-        this.dismiss(true);
-      } else {
-        this.logger.debug('Click inside icon - not dismissing');
-      }
-      return;
+      const isClickInsideIcon = this.icon.contains(e.target);
+      return !isClickInsideIcon; // Dismiss if click is outside icon
     }
 
     // Handle translation window mode
     if (this.displayElement && this.isVisible) {
-      // Get top document for proper element checking
-      const topDocument = this._getTopDocument();
-
-      // Check if click target is outside our popup
-      // Since popup is in top document, we can directly check contains
+      // Check if click target is inside our popup
       const isClickInsidePopup = this.displayElement.contains(e.target);
 
-      // Check for potential icon clicks (shouldn't exist in window mode but safety check)
+      // Check for potential icon clicks (safety check)
+      const topDocument = this._getTopDocument();
       const clickedIcon = topDocument.getElementById("translate-it-icon");
       const isClickOnIcon = clickedIcon && clickedIcon.contains(e.target);
 
-      // **FIX FOR DISCORD SIDEPANELS**: Special handling for cross-document clicks
-      // If the click is from a different document (like Discord sidepanels), 
-      // and it's not inside our popup, dismiss the window
-      const isFromDifferentDocument = e.target.ownerDocument !== topDocument;
-      
-      this.logger.debug('Outside click on window mode', {
-        isClickInsidePopup,
-        isClickOnIcon,
-        isFromDifferentDocument,
-        targetElement: e.target.tagName,
-        targetDocument: e.target.ownerDocument === document ? 'current' : 'top'
-      });
-
-      // If click is outside popup and not on icon, dismiss
-      // Also dismiss if click is from different document (sidepanels)
-      if ((!isClickInsidePopup && !isClickOnIcon) || isFromDifferentDocument) {
-        this.logger.debug('Outside click confirmed - dismissing window', {
-          reason: isFromDifferentDocument ? 'different-document' : 'outside-popup'
-        });
-        // Immediate dismissal for outside clicks - no need for complex checks
-        // since we're now properly handling cross-iframe scenarios
-        this.cancelCurrentTranslation();
-      } else {
-        this.logger.debug('Click inside popup or on icon - not dismissing');
-      }
+      return !isClickInsidePopup && !isClickOnIcon; // Dismiss if click is outside popup and not on icon
     }
+
+    // No active elements, no need to dismiss
+    return false;
   }
 
   _addOutsideClickListener() {
     if (!isExtensionContextValid()) return;
 
-    this.logger.debug('Adding outside click listener', {
-      isIconMode: this.isIconMode,
-      isVisible: this.isVisible
-    });
-
     // Remove existing listener first
     this._removeOutsideClickListener();
 
-    // Get top document - this is where popup exists and where we should listen
-    const topDocument = this._getTopDocument();
-
-    // **OPTIMIZED FIX FOR DISCORD SIDEPANELS**: 
-    // Add listeners only where needed to catch Discord sidepanel clicks
-    const listeners = [];
-
-    // 1. Primary listener on top document (where popup is)
-    topDocument.addEventListener("click", this._onOutsideClick, {
+    // Add listener to current document only
+    // Cross-frame detection relies on postMessage system
+    document.addEventListener("click", this._onOutsideClick, {
       capture: true,
     });
-    listeners.push(() => {
-      topDocument.removeEventListener("click", this._onOutsideClick, {
-        capture: true,
-      });
-    });
-    this.logger.debug('Added primary outside click listener');
 
-    // 2. Secondary listener on current document if different (for iframe scenarios)
-    if (document !== topDocument) {
-      document.addEventListener("click", this._onOutsideClick, {
-        capture: true,
-      });
-      listeners.push(() => {
-        document.removeEventListener("click", this._onOutsideClick, {
-          capture: true,
-        });
-      });
-      this.logger.debug('Added secondary outside click listener for different document');
-    }
-
-    // Store removal function for all listeners
+    // Store removal function
     this.removeMouseDownListener = () => {
-      this.logger.debug('Removing outside click listeners');
-      listeners.forEach(removeListener => removeListener());
+      document.removeEventListener("click", this._onOutsideClick, {
+        capture: true,
+      });
     };
   }
 
@@ -1078,6 +1177,47 @@ export default class SelectionWindows {
     this.isDragging = false;
   }
 
+  /**
+   * Clean up cross-frame communication
+   * NOTE: This should only be called when the extension is being unloaded,
+   * NOT on regular dismiss operations!
+   */
+  _cleanupCrossFrameListening() {
+    try {
+      // Remove message listener
+      window.removeEventListener('message', this._handleCrossFrameMessage);
+      
+      // Remove global click handler
+      if (this._globalClickHandler) {
+        document.removeEventListener('click', this._globalClickHandler, { capture: true });
+        this._globalClickHandler = null;
+      }
+      
+      // Remove from frame registry
+      if (window.translateItFrameRegistry) {
+        window.translateItFrameRegistry.delete(this.frameId);
+      }
+
+      // Clear cross-frame listeners
+      this.crossFrameListeners.clear();
+    } catch (error) {
+      this.logger.warn('Error cleaning up cross-frame communication:', error);
+    }
+  }
+
+  /**
+   * Complete cleanup - call this only when destroying the instance
+   */
+  destroy() {
+    try {
+      this.dismiss(false); // Dismiss without fade
+      this._cleanupCrossFrameListening(); // Now it's safe to cleanup
+      this.logger.debug('WindowsManager destroyed', { frameId: this.frameId });
+    } catch (error) {
+      this.logger.warn('Error during WindowsManager destruction:', error);
+    }
+  }
+
   createLoadingDots() {
     const container = document.createElement("div");
     container.classList.add("loading-container");
@@ -1364,6 +1504,9 @@ export default class SelectionWindows {
     this._removeThemeChangeListener();
     this._removeOutsideClickListener(); // Specifically for the window
     this._removeDragHandlers(); // Clean up drag handlers
+    
+    // **CRITICAL**: Do NOT cleanup cross-frame listening on dismiss
+    // Global click handler must remain active for cross-frame communication
 
     this.isVisible = false;
     this.pendingTranslationWindow = false; // Reset this flag

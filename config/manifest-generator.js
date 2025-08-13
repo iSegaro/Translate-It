@@ -38,7 +38,7 @@ export function generateManifest(browser = 'chrome') {
         // CSS files will be manually copied and injected via JS
         matches: ['<all_urls>'],
         run_at: 'document_idle',
-        all_frames: false
+        all_frames: true
       }
     ],
     
