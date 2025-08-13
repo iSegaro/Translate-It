@@ -168,24 +168,87 @@ export class TextSelectionManager {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       
+      this.logger.debug('Selection rect DEBUG', {
+        rect: {
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        },
+        windowScroll: { x: window.scrollX, y: window.scrollY },
+        beforeCalculation: { x: 0, y: 0 }
+      });
+      
       // محاسبه موقعیت زیر متن انتخاب شده
       position = {
         x: rect.left + window.scrollX,
         y: rect.bottom + window.scrollY + 15, // کمی فاصله
       };
 
+      this.logger.debug('Position after initial calculation', { position });
+
       // --- بهبود: تنظیم موقعیت افقی برای جلوگیری از خروج از صفحه ---
       const popupMaxWidth = 300; // عرض تقریبی پاپ‌آپ
       const viewportWidth = window.innerWidth;
       
-      if (position.x < 10) {
-        // جلوگیری از چسبیدن به لبه چپ
-        position.x = 10;
-      } else if (position.x + popupMaxWidth > viewportWidth - 10) {
-        // جلوگیری از خروج از لبه راست
-        position.x = viewportWidth - popupMaxWidth - 10;
+      this.logger.debug('Position adjustment check', {
+        positionX: position.x,
+        viewportWidth,
+        popupMaxWidth,
+        willAdjustLeft: position.x < 10,
+        willAdjustRight: position.x + popupMaxWidth > viewportWidth - 10
+      });
+      
+      // **IFRAME-SPECIFIC LOGIC**: Handle small iframes differently
+      const isSmallIframe = viewportWidth < 400;
+      
+      if (isSmallIframe) {
+        // For small iframes, ignore popup size and just position icon properly
+        this.logger.debug('Small iframe detected, using icon-only positioning logic');
+        
+        if (position.x < 10) {
+          position.x = 10;
+        } else if (position.x > viewportWidth - 30) { // Just need space for icon (24px + margin)
+          position.x = viewportWidth - 30;
+        }
+        // Otherwise keep original position
+        
+        this.logger.debug('Small iframe positioning', {
+          originalX: position.x,
+          strategy: 'icon-only',
+          viewportWidth
+        });
+      } else {
+        // Original logic for normal/large contexts
+        if (position.x < 10) {
+          this.logger.debug('Adjusting position to prevent left edge clipping', { oldX: position.x, newX: 10 });
+          position.x = 10;
+        } else if (position.x + popupMaxWidth > viewportWidth - 10) {
+          const oldX = position.x;
+          const availableSpace = viewportWidth - 20;
+          
+          const rightEdgeIfKeepPosition = position.x + popupMaxWidth;
+          const maxAllowedRight = viewportWidth - 10;
+          
+          if (availableSpace >= 150) {
+            const idealRight = Math.min(rightEdgeIfKeepPosition, maxAllowedRight);
+            position.x = Math.max(10, idealRight - popupMaxWidth);
+          } else {
+            position.x = Math.max(10, (viewportWidth - 50) / 2);
+          }
+          
+          this.logger.debug('Large context positioning adjustment', { 
+            oldX, 
+            newX: position.x, 
+            strategy: 'popup-aware'
+          });
+        }
       }
     }
+
+    this.logger.debug('Final position before showing window', { position });
 
     // نمایش پاپ آپ با متن و موقعیت جدید
     if (this.selectionWindows) {

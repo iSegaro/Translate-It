@@ -77,6 +77,11 @@ export default class SelectionWindows {
     // Listen for messages from other frames
     window.addEventListener('message', this._handleCrossFrameMessage);
     
+    // Request iframe position if we're in an iframe
+    if (this.isInIframe) {
+      this._requestIframePositionFromParent();
+    }
+    
     // Add global click listener for cross-frame broadcasting
     // This ensures ALL clicks are broadcast to other frames for cross-frame dismissal
     this._globalClickHandler = (e) => {
@@ -93,27 +98,55 @@ export default class SelectionWindows {
   }
 
   /**
-   * Handle cross-frame messages for outside click detection
+   * Handle cross-frame messages for outside click detection and window creation
    */
   _handleCrossFrameMessage(event) {
-    if (!event.data || event.data.type !== 'translateit-outside-click') {
+    if (!event.data) return;
+
+    // Handle outside click messages
+    if (event.data.type === 'translateit-outside-click') {
+      // Don't process our own messages (including forwarded ones from us)
+      if (event.data.frameId === this.frameId || event.data.forwardedFrom === this.frameId) {
+        return;
+      }
+
+      // If we're in main document and received message from iframe,
+      // forward it to all other iframes (but only if not already forwarded)
+      if (!this.isInIframe && event.data.isInIframe && !event.data.forwardedFrom) {
+        this._forwardMessageToIframes(event.data);
+      }
+
+      // Only dismiss if we have active elements (icon or window)
+      if ((this.isIconMode && this.icon) || (this.isVisible && this.displayElement)) {
+        this.dismiss(true);
+      }
       return;
     }
 
-    // Don't process our own messages (including forwarded ones from us)
-    if (event.data.frameId === this.frameId || event.data.forwardedFrom === this.frameId) {
+    // Handle window creation request from iframe
+    if (event.data.type === 'translateit-create-window-request' && !this.isInIframe) {
+      this._handleWindowCreationRequest(event.data);
       return;
     }
 
-    // If we're in main document and received message from iframe,
-    // forward it to all other iframes (but only if not already forwarded)
-    if (!this.isInIframe && event.data.isInIframe && !event.data.forwardedFrom) {
-      this._forwardMessageToIframes(event.data);
+    // Handle window creation response to iframe
+    if (event.data.type === 'translateit-window-created' && 
+        event.data.targetFrameId === this.frameId) {
+      this._handleWindowCreatedResponse(event.data);
+      return;
     }
 
-    // Only dismiss if we have active elements (icon or window)
-    if ((this.isIconMode && this.icon) || (this.isVisible && this.displayElement)) {
-      this.dismiss(true);
+    // Handle iframe position request
+    if (event.data.type === 'REQUEST_IFRAME_POSITION' && !this.isInIframe) {
+      this._handleIframePositionRequest(event.data, event.source);
+      return;
+    }
+
+    // Handle iframe position response  
+    if (event.data.type === 'IFRAME_POSITION_RESPONSE' && 
+        event.data.targetFrameId === this.frameId) {
+      this._handleIframePositionResponse(event.data);
+      return;
     }
   }
 
@@ -137,6 +170,119 @@ export default class SelectionWindows {
         // Silently ignore CORS errors
       }
     });
+  }
+
+  /**
+   * Handle window creation request from iframe (main document only)
+   */
+  _handleWindowCreationRequest(data) {
+    if (this.isInIframe) return; // Only main document should handle this
+
+    try {
+      // Create window in main document with adjusted coordinates
+      this._createTranslateWindowInMainDocument(data.selectedText, data.position, data.frameId);
+    } catch (error) {
+      this.logger.error('Failed to create window in main document:', error);
+    }
+  }
+
+  /**
+   * Handle window creation response (iframe only)
+   */
+  _handleWindowCreatedResponse(data) {
+    if (!this.isInIframe) return; // Only iframes should handle this
+
+    if (data.success) {
+      // Window was successfully created in main document
+      this.isVisible = true;
+      this.mainDocumentWindowId = data.windowId;
+      
+      // Add outside click listener to handle dismissal
+      this._addOutsideClickListener();
+    } else {
+      this.logger.error('Failed to create window in main document:', data.error);
+    }
+  }
+
+  /**
+   * Handle iframe position request (main document only)
+   */
+  _handleIframePositionRequest(data, sourceWindow) {
+    if (this.isInIframe) return; // Only main document should handle this
+
+    try {
+      // Find the iframe that sent the request
+      const frames = document.querySelectorAll('iframe');
+      let targetFrame = null;
+      
+      for (const frame of frames) {
+        if (frame.contentWindow === sourceWindow) {
+          targetFrame = frame;
+          break;
+        }
+      }
+
+      if (targetFrame) {
+        const frameRect = targetFrame.getBoundingClientRect();
+        const framePosition = {
+          left: frameRect.left + window.scrollX,
+          top: frameRect.top + window.scrollY,
+          width: frameRect.width,
+          height: frameRect.height
+        };
+
+        // Send response back to iframe
+        sourceWindow.postMessage({
+          type: 'IFRAME_POSITION_RESPONSE',
+          requestId: data.requestId,
+          targetFrameId: data.frameId,
+          position: framePosition
+        }, '*');
+
+        this.logger.debug('Sent iframe position to child frame', {
+          frameId: data.frameId,
+          position: framePosition
+        });
+      } else {
+        this.logger.warn('Could not find iframe that requested position');
+      }
+    } catch (error) {
+      this.logger.error('Failed to handle iframe position request:', error);
+    }
+  }
+
+  /**
+   * Handle iframe position response (iframe only)
+   */
+  _handleIframePositionResponse(data) {
+    if (!this.isInIframe) return; // Only iframes should handle this
+
+    // Store the iframe position for use in coordinate calculations
+    this.iframePosition = data.position;
+    this.logger.debug('Received iframe position from parent', {
+      position: data.position
+    });
+  }
+
+  /**
+   * Request iframe position from parent (iframe only)
+   */
+  _requestIframePositionFromParent() {
+    if (!this.isInIframe) return;
+
+    try {
+      const requestId = 'iframe-position-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      
+      window.parent.postMessage({
+        type: 'REQUEST_IFRAME_POSITION',
+        requestId: requestId,
+        frameId: this.frameId || 'unknown'
+      }, '*');
+      
+      this.logger.debug('Requested initial iframe position from parent');
+    } catch (error) {
+      this.logger.warn('Failed to request initial iframe position:', error.message);
+    }
   }
 
   /**
@@ -224,6 +370,324 @@ export default class SelectionWindows {
     return topDocument;
   }
 
+  /**
+   * Request window creation in main document (called from iframe)
+   */
+  _requestWindowCreationInMainDocument(selectedText, position) {
+    try {
+      // **IFRAME POSITION FIX**: Use the position as-is, it's already calculated correctly in icon creation
+      // Only adjust it for main document coordinates
+      const adjustedPosition = this._calculateCoordsForTopWindow(position);
+      
+      this.logger.debug('Requesting window creation in main document', {
+        originalPosition: position,
+        adjustedPosition: adjustedPosition,
+        frameId: this.frameId
+      });
+      
+      const message = {
+        type: 'translateit-create-window-request',
+        frameId: this.frameId,
+        selectedText: selectedText,
+        position: adjustedPosition,
+        timestamp: Date.now()
+      };
+
+      // Send to parent and top windows
+      if (window.parent) {
+        window.parent.postMessage(message, '*');
+      }
+      
+      if (window.top && window.top !== window.parent) {
+        window.top.postMessage(message, '*');
+      }
+    } catch (error) {
+      this.logger.error('Failed to request window creation:', error);
+      // Fallback to creating window in iframe
+      this._createTranslateWindowInIframe(selectedText, position);
+    }
+  }
+
+  /**
+   * Create window in main document (called from main document)
+   */
+  async _createTranslateWindowInMainDocument(selectedText, position, requestingFrameId) {
+    try {
+      // Store the requesting frame ID for later reference
+      this.requestingFrameId = requestingFrameId;
+      
+      // **IFRAME COORDINATE FIX**: Position is already adjusted from iframe to main document
+      // Mark it as already adjusted to prevent double calculation
+      const adjustedPosition = { 
+        ...position, 
+        _alreadyAdjusted: true
+      };
+      
+      this.logger.debug('Creating window in main document for iframe', {
+        requestingFrameId,
+        position: adjustedPosition
+      });
+      
+      // Create the window normally in main document
+      await this._createTranslateWindowDirectly(selectedText, adjustedPosition);
+      
+      // Notify the requesting iframe that window was created
+      this._notifyFrameWindowCreated(requestingFrameId, true);
+      
+    } catch (error) {
+      this.logger.error('Failed to create window in main document:', error);
+      this._notifyFrameWindowCreated(requestingFrameId, false, error.message);
+    }
+  }
+
+  /**
+   * Notify iframe that window was created
+   */
+  _notifyFrameWindowCreated(frameId, success, error = null) {
+    const message = {
+      type: 'translateit-window-created',
+      targetFrameId: frameId,
+      success: success,
+      windowId: this.displayElement?.id || null,
+      error: error,
+      timestamp: Date.now()
+    };
+
+    // Broadcast to all iframes
+    const frames = document.querySelectorAll('iframe');
+    frames.forEach((frame) => {
+      try {
+        frame.contentWindow?.postMessage(message, '*');
+      } catch (error) {
+        // Silently ignore CORS errors
+      }
+    });
+  }
+
+  /**
+   * Fallback: Create window in iframe if main document communication fails
+   */
+  _createTranslateWindowInIframe(selectedText, position) {
+    this.logger.warn('Creating window in iframe as fallback');
+    return this._createTranslateWindowDirectly(selectedText, position);
+  }
+
+  /**
+   * Actually create the translation window (extracted from original method)
+   */
+  async _createTranslateWindowDirectly(selectedText, position) {
+    this.originalText = selectedText;
+    this.isTranslationCancelled = false;
+    this.isIconMode = false; // Now in window mode
+
+    const translationMode = determineTranslationMode(
+      selectedText,
+      TranslationMode.Selection
+    );
+
+    this.logger.debug("Creating translation window directly", { 
+      translationMode, 
+      isInIframe: this.isInIframe 
+    });
+
+    this.displayElement = document.createElement("div");
+    this.displayElement.classList.add("aiwc-selection-popup-host");
+    
+    // Generate unique ID for window tracking
+    this.displayElement.id = `translate-window-${this.frameId || 'main'}-${Date.now()}`;
+
+    // Apply theme class to host before appending to body
+    await this._applyThemeToHost();
+    this._addThemeChangeListener(); // Add listener for theme changes
+    this.applyInitialStyles(position);
+
+    const shadowRoot = this.displayElement.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    if (style) {
+      // CSS variables will be scoped to the shadow DOM via :host
+      // These variables will be updated based on :host(.theme-light) or :host(.theme-dark)
+      style.textContent = `
+        :host {
+          --sw-bg-color: #f8f8f8; --sw-text-color: #333; --sw-border-color: #ddd; --sw-shadow-color: rgba(0,0,0,0.1);
+          --sw-original-text-color: #000; --sw-loading-dot-opacity-start: 0.3; --sw-loading-dot-opacity-mid: 0.8;
+          --sw-link-color: #0066cc; font-family: Vazirmatn, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+        :host(.theme-dark) {
+          --sw-bg-color: #2a2a2a; --sw-text-color: #e0e0e0; --sw-border-color: #444; --sw-shadow-color: rgba(255,255,255,0.08);
+          --sw-original-text-color: #fff; --sw-loading-dot-opacity-start: 0.5; --sw-loading-dot-opacity-mid: 1; --sw-link-color: #58a6ff;
+        }
+        .popup-container { background-color: var(--sw-bg-color); color: var(--sw-text-color); border: 1px solid var(--sw-border-color);
+          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); max-width: 300px; overflow-wrap: break-word;
+        }
+        
+        /* Unified Translation Display Styles */
+        ${getTranslationDisplayStyles()}
+        .loading-container { display: flex; justify-content: center; align-items: center; color: var(--sw-text-color); }
+        @keyframes blink { 0% { opacity: var(--sw-loading-dot-opacity-start); } 50% { opacity: var(--sw-loading-dot-opacity-mid); } 100% { opacity: var(--sw-loading-dot-opacity-start); } }
+        .loading-dot { font-size: 1.2em; margin: 0 2px; animation: blink 0.7s infinite; }
+        .first-line { margin-bottom: 6px; display: flex; align-items: center; 
+          user-select: none; padding: 6px 8px; margin: -8px -12px 6px -12px; 
+          background-color: var(--sw-border-color); border-radius: 4px 4px 0 0; 
+          border-bottom: 1px solid var(--sw-border-color); opacity: 0.9;
+        }
+        .first-line:hover { opacity: 1; }
+        .original-text { font-weight: bold; margin-left: 6px; color: var(--sw-original-text-color); }
+        .second-line { margin-top: 4px; }
+        .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; vertical-align: middle; }
+        :host(.theme-dark) .tts-icon { filter: invert(90%) brightness(1.1); }
+        .text-content a { color: var(--sw-link-color); text-decoration: none; }
+        .text-content a:hover { text-decoration: underline; }
+      `;
+      shadowRoot.appendChild(style);
+    }
+
+    this.innerContainer = document.createElement("div");
+    this.innerContainer.classList.add("popup-container");
+    shadowRoot.appendChild(this.innerContainer);
+    const loading = this.createLoadingDots();
+    this.innerContainer.appendChild(loading);
+
+    // **IFRAME FIX**: Always append to current document for proper positioning
+    // The cross-frame communication ensures the window is created in main document when needed
+    document.body.appendChild(this.displayElement);
+    this.isVisible = true;
+
+    // Add drag functionality
+    this._setupDragHandlers();
+
+    requestAnimationFrame(() => {
+      if (this.displayElement) {
+        this.displayElement.style.opacity = "0.95";
+        this.displayElement.style.transform = "scale(1)";
+      }
+    });
+
+    // Use same approach as SelectElement - direct messaging with manual listener
+    try {
+      const settings = await getSettingsAsync();
+      
+      // Generate messageId for tracking  
+      const messageId = generateTranslationMessageId('content');
+      this.logger.debug(`Generated messageId: ${messageId}`);
+      
+      // Set up direct listener like SelectElement does
+      const resultPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (messageListener) {
+            browser.runtime.onMessage.removeListener(messageListener);
+          }
+          reject(new Error('Translation timeout'));
+        }, 30000);
+        
+        const messageListener = (message) => {
+          this.logger.debug(`Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
+          
+          if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
+              message.messageId === messageId) {
+            this.logger.operation("Message matched! Processing translation result");
+            clearTimeout(timeout);
+            browser.runtime.onMessage.removeListener(messageListener);
+            
+            if (message.data?.success === false && message.data?.error) {
+              this.logger.error("Translation error received", message.data.error);
+              const errorMessage = message.data.error.message || 'Translation failed';
+              reject(new Error(errorMessage));
+            } else if (message.data?.translatedText) {
+              this.logger.operation("Translation success received");
+              resolve({ translatedText: message.data.translatedText });
+            } else {
+              this.logger.error("Unexpected message data", message.data);
+              reject(new Error('No translated text in result'));
+            }
+          }
+        };
+        
+        browser.runtime.onMessage.addListener(messageListener);
+      });
+      
+      // Send translation request using browser.runtime.sendMessage directly
+      const payload = {
+        text: selectedText,
+        from: settings.SOURCE_LANGUAGE || 'auto',
+        to: settings.TARGET_LANGUAGE || 'fa',
+        provider: settings.TRANSLATION_API || 'google',
+        messageId: messageId,
+        mode: translationMode,
+        options: {}
+      };
+      
+      this.logger.debug("Sending translation request with payload", payload);
+      
+      // Send the translation request using correct action (TRANSLATE, not TRANSLATE_TEXT)
+      browser.runtime.sendMessage({
+        action: MessageActions.TRANSLATE,
+        context: 'content',
+        messageId: messageId,
+        data: {
+          text: payload.text,
+          provider: payload.provider,
+          sourceLanguage: payload.from,
+          targetLanguage: payload.to,
+          mode: payload.mode,
+          options: payload.options
+        }
+      });
+
+      // Wait for the result
+      const result = await resultPromise;
+      
+      if (this.isTranslationCancelled || !this.innerContainer) return;
+      
+      if (result && result.translatedText) {
+        const translatedText = result.translatedText;
+        if (!translatedText) {
+          throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
+        }
+        
+        this.transitionToTranslatedText(
+          translatedText,
+          loading,
+          selectedText,
+          translationMode
+        );
+      } else {
+        throw new Error('Translation failed: No translated text received');
+      }
+      
+    } catch (error) {
+      if (this.isTranslationCancelled || !this.innerContainer) return;
+      await this.handleTranslationError(error, loading);
+    }
+
+    // Add outside click listener after translation window is ready AND
+    // pendingTranslationWindow flag is false.
+    // The timeout here ensures that the click event that initiated the window creation
+    // has fully propagated and won't be caught by this new listener.
+    // CRITICAL: This timeout must be LONGER than the timeout in onIconClick (500ms)
+    // to ensure pendingTranslationWindow is already false when we check it
+    setTimeout(() => {
+      this.logger.debug('Checking if should add outside click listener for translation window', {
+        isVisible: this.isVisible,
+        hasDisplayElement: !!this.displayElement,
+        pendingTranslationWindow: this.pendingTranslationWindow,
+        shouldAdd: this.isVisible && this.displayElement && !this.pendingTranslationWindow
+      });
+
+      // Ensure we only add the listener if the window is still supposed to be visible
+      // and we are NOT in the process of transitioning (pendingTranslationWindow is false).
+      if (
+        this.isVisible &&
+        this.displayElement &&
+        !this.pendingTranslationWindow
+      ) {
+        this.logger.debug('Adding outside click listener for translation window');
+        this._addOutsideClickListener();
+      } else {
+        this.logger.debug('NOT adding outside click listener for translation window');
+      }
+    }, 600); // MUST be > 500ms to ensure pendingTranslationWindow is reset
+  }
+
   _calculateCoordsForTopWindow(position) {
     // **ENHANCED IFRAME SUPPORT**: Better coordinate calculation for nested iframes
     if (window !== window.top) {
@@ -235,7 +699,8 @@ export default class SelectionWindows {
         this.logger.debug('Calculating iframe coordinates', {
           originalPosition: position,
           isInIframe: this.isInIframe,
-          frameId: this.frameId
+          frameId: this.frameId,
+          windowVsTop: window !== window.top
         });
 
         // Add iframe offsets up the chain
@@ -266,20 +731,79 @@ export default class SelectionWindows {
               
               currentWindow = parentWindow;
             } else {
+              this.logger.warn('No frameElement found, checking cached iframe position');
+              // **IFRAME FALLBACK**: Use cached iframe position if available
+              if (this.iframePosition) {
+                this.logger.debug('Using cached iframe position', this.iframePosition);
+                // Don't replace original position, ADD iframe offset to it
+                totalOffsetX += this.iframePosition.left;
+                totalOffsetY += this.iframePosition.top;
+                break;
+              } else if (currentWindow.parent && currentWindow !== currentWindow.parent) {
+                // Request iframe position from parent window (async)
+                try {
+                  const requestId = 'iframe-position-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                  
+                  currentWindow.parent.postMessage({
+                    type: 'REQUEST_IFRAME_POSITION',
+                    requestId: requestId,
+                    frameId: this.frameId || 'unknown'
+                  }, '*');
+                  
+                  this.logger.debug('Requested iframe position from parent, using default offset');
+                  totalOffsetX += 100; // Default offset
+                  totalOffsetY += 100; // Default offset
+                } catch (postMessageError) {
+                  this.logger.warn('Failed to request iframe position from parent:', postMessageError.message);
+                }
+              }
               break;
             }
-          } catch {
+          } catch (e) {
             // Cross-origin restriction
+            this.logger.warn('Cross-origin restriction in iframe offset calculation:', e.message);
+            // **IFRAME FALLBACK**: Try to estimate offset using viewport differences
+            try {
+              if (currentWindow.parent && currentWindow !== currentWindow.parent) {
+                // Try to detect if we're in an iframe by checking viewport differences
+                const parentViewport = {
+                  width: currentWindow.parent.innerWidth,
+                  height: currentWindow.parent.innerHeight
+                };
+                const currentViewport = {
+                  width: currentWindow.innerWidth,
+                  height: currentWindow.innerHeight
+                };
+                
+                if (parentViewport.width > currentViewport.width || parentViewport.height > currentViewport.height) {
+                  // We're likely in an iframe, but can't get exact position
+                  // Use a reasonable default offset for embedded frames
+                  this.logger.debug('Using fallback iframe offset estimation');
+                  totalOffsetX += 50; // Reasonable default
+                  totalOffsetY += 50; // Reasonable default
+                }
+              }
+            } catch (fallbackError) {
+              this.logger.warn('Fallback iframe position estimation also failed:', fallbackError.message);
+            }
             break;
           }
         }
 
-        return { x: totalOffsetX, y: totalOffsetY };
+        const finalPosition = { x: totalOffsetX, y: totalOffsetY };
+        this.logger.debug('Final calculated position for top window', {
+          original: position,
+          final: finalPosition,
+          difference: { x: finalPosition.x - position.x, y: finalPosition.y - position.y }
+        });
+        
+        return finalPosition;
       } catch (e) {
         this.logger.warn("Could not calculate top window coords:", e);
       }
     }
 
+    this.logger.debug('No iframe conversion needed, using original position', position);
     return position;
   }
 
@@ -362,54 +886,128 @@ export default class SelectionWindows {
 
   _createTranslateIcon(selectedText, position) {
     try {
-      const selection = window.getSelection();
-      if (selection.rangeCount === 0) return;
-
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      this.logger.debug('Starting _createTranslateIcon', { selectedText, position });
+      
+      // **IFRAME FIX**: Use passed position instead of recalculating from selection
+      // This avoids issues where selection is lost between calls
+      if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+        this.logger.warn('Invalid position provided, trying to get from selection');
+        const selection = window.getSelection();
+        this.logger.debug('Got selection', { rangeCount: selection.rangeCount });
+        if (selection.rangeCount === 0) {
+          this.logger.warn('No selection range found, returning');
+          return;
+        }
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        this.logger.debug('Got selection rect', { rect });
+        // Calculate position from selection
+        position = {
+          x: window.scrollX + rect.left + rect.width / 2 - 12,
+          y: window.scrollY + rect.bottom + 5,
+        };
+      } else {
+        this.logger.debug('Using provided position', { position });
+      }
 
       const topDocument = this._getTopDocument();
+      this.logger.debug('Got top document', { hasTopDocument: !!topDocument, hasBody: !!topDocument?.body });
       if (!topDocument?.body) {
         this.logger.warn("Cannot access top document body");
         return;
       }
 
+      // **IFRAME FIX**: Use appropriate document based on iframe context
+      const targetDocument = this.isInIframe ? document : topDocument;
       const hostId = "aiwc-selection-icon-host";
-      let iconHost = topDocument.getElementById(hostId);
+      let iconHost = targetDocument.getElementById(hostId);
+      this.logger.debug('Checking for icon host', { hostId, hasExistingHost: !!iconHost, isInIframe: this.isInIframe, targetDocument: targetDocument === document ? 'iframe' : 'top' });
+      
       if (!iconHost) {
         try {
-          iconHost = topDocument.createElement("div");
+          this.logger.debug('Creating new icon host');
+          iconHost = targetDocument.createElement("div");
           iconHost.id = hostId;
-          topDocument.body.appendChild(iconHost);
+          targetDocument.body.appendChild(iconHost);
+          this.logger.debug('Successfully created and appended icon host');
         } catch (e) {
           this.logger.error("Failed to create icon host container", e);
           return;
         }
       }
 
-      this.icon = document.createElement("div");
+      // **IFRAME FIX**: Create icon in appropriate document
+      this.logger.debug('Creating icon element');
+      this.icon = targetDocument.createElement("div");
       this.icon.id = "translate-it-icon";
+      this.logger.debug('Created icon element', { iconId: this.icon.id });
 
       const iconUrl = browser.runtime.getURL("icons/extension_icon_32.png");
+      this.logger.debug('Got icon URL', { iconUrl });
 
-      // Calculate position for iframe escape
-      const iconPosition = this._calculateCoordsForTopWindow({
-        x: window.scrollX + rect.left + rect.width / 2 - 12,
-        y: window.scrollY + rect.bottom + 5,
+      // Use the position that was already calculated (either from parameter or selection)
+      const originalPosition = {
+        x: position.x,
+        y: position.y,
+      };
+      this.logger.debug('Using position for icon - DETAILED', { 
+        originalPosition,
+        inputPosition: position,
+        xValue: position.x,
+        yValue: position.y,
+        positionType: typeof position.x
       });
+      
+      // **IFRAME FIX**: Don't transform coordinates if creating icon in iframe
+      const iconPosition = this.isInIframe ? originalPosition : this._calculateCoordsForTopWindow(originalPosition);
+      this.logger.debug('Calculated icon position', { iconPosition, coordinateTransformed: !this.isInIframe });
 
-      // Get top window for positioning
-      const topWindow =
-        topDocument.defaultView || topDocument.parentWindow || window;
+      // **IFRAME FIX**: Get appropriate window for positioning
+      const targetWindow = this.isInIframe ? window : (topDocument.defaultView || topDocument.parentWindow || window);
+      this.logger.debug('Got target window', { hasTargetWindow: !!targetWindow, isIframeWindow: this.isInIframe });
+
+      // Calculate final position with scroll offset and proper icon placement
+      // Adjust position to place icon below and centered relative to the selection
+      const iconSize = 24; // icon width/height
+      const finalPosition = {
+        left: iconPosition.x - targetWindow.scrollX - (iconSize / 2), // Center horizontally
+        top: iconPosition.y - targetWindow.scrollY + 5 // Place slightly below selection
+      };
+      this.logger.debug('Final icon position DETAILED', { 
+        step1_iconPosition: iconPosition, 
+        step2_windowScroll: { x: targetWindow.scrollX, y: targetWindow.scrollY },
+        step3_iconSize: iconSize,
+        step4_finalCalculation: {
+          left: `${iconPosition.x} - ${targetWindow.scrollX} - ${iconSize/2} = ${finalPosition.left}`,
+          top: `${iconPosition.y} - ${targetWindow.scrollY} + 5 = ${finalPosition.top}`,
+          breakdown: {
+            iconPositionX: iconPosition.x,
+            scrollX: targetWindow.scrollX, 
+            iconHalfSize: iconSize/2,
+            finalLeft: finalPosition.left,
+            iconPositionY: iconPosition.y,
+            scrollY: targetWindow.scrollY,
+            offset: 5,
+            finalTop: finalPosition.top
+          }
+        },
+        finalPosition,
+        viewport: { width: targetWindow.innerWidth, height: targetWindow.innerHeight },
+        isInsideViewport: {
+          x: finalPosition.left >= 0 && finalPosition.left <= targetWindow.innerWidth,
+          y: finalPosition.top >= 0 && finalPosition.top <= targetWindow.innerHeight
+        }
+      });
 
       // --- شروع تغییرات برای افزودن انیمیشن ---
 
       // 1. تعریف استایل‌های اولیه (حالت شروع انیمیشن)
+      this.logger.debug('Applying styles to icon');
       Object.assign(this.icon.style, {
         position: "fixed", // Use fixed for iframe escape
         zIndex: "2147483647",
-        left: `${iconPosition.x - topWindow.scrollX}px`,
-        top: `${iconPosition.y - topWindow.scrollY}px`,
+        left: `${finalPosition.left}px`,
+        top: `${finalPosition.top}px`,
         width: "24px",
         height: "24px",
         backgroundColor: "#f0f0f0",
@@ -429,25 +1027,101 @@ export default class SelectionWindows {
         transition:
           "opacity 120ms ease-out, transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1)", // انیمیشن برای شفافیت و اندازه
       });
+      this.logger.debug('Applied styles to icon');
 
       // 2. افزودن آیکون به صفحه (top document's HOST برای iframe escape)
+      this.logger.debug('Appending icon to host');
       iconHost.appendChild(this.icon);
+      this.logger.debug('Successfully appended icon to host');
+
+      // Debug: Check if icon is actually visible
+      setTimeout(() => {
+        if (this.icon) {
+          const iconRect = this.icon.getBoundingClientRect();
+          const isVisible = iconRect.width > 0 && iconRect.height > 0;
+          const computedStyle = targetWindow.getComputedStyle(this.icon);
+          const targetDocument = this.isInIframe ? document : topDocument;
+          
+          this.logger.debug('Icon visibility check EXPANDED', {
+            iconRect: {
+              left: iconRect.left,
+              top: iconRect.top,
+              right: iconRect.right,
+              bottom: iconRect.bottom,
+              width: iconRect.width,
+              height: iconRect.height
+            },
+            viewport: {
+              width: targetWindow.innerWidth,
+              height: targetWindow.innerHeight
+            },
+            isVisible,
+            computedOpacity: computedStyle.opacity,
+            computedDisplay: computedStyle.display,
+            computedVisibility: computedStyle.visibility,
+            computedPosition: computedStyle.position,
+            computedZIndex: computedStyle.zIndex,
+            parentElement: this.icon.parentElement?.tagName,
+            inDocument: targetDocument.contains(this.icon),
+            actualStyleValues: {
+              left: this.icon.style.left,
+              top: this.icon.style.top,
+              position: this.icon.style.position
+            },
+            targetContext: this.isInIframe ? 'iframe' : 'top-document',
+            isOffScreen: {
+              left: iconRect.right < 0,
+              right: iconRect.left > targetWindow.innerWidth, 
+              top: iconRect.bottom < 0,
+              bottom: iconRect.top > targetWindow.innerHeight
+            }
+          });
+          
+          // Only reposition if icon is completely off-screen (not just partially)
+          const completelyOffScreen = (
+            iconRect.right < 0 || // completely left of screen
+            iconRect.left > targetWindow.innerWidth || // completely right of screen
+            iconRect.bottom < 0 || // completely above screen
+            iconRect.top > targetWindow.innerHeight // completely below screen
+          );
+          
+          this.logger.debug('Off-screen detection result', {
+            completelyOffScreen,
+            checks: {
+              rightLessThanZero: iconRect.right < 0,
+              leftGreaterThanWidth: iconRect.left > targetWindow.innerWidth,
+              bottomLessThanZero: iconRect.bottom < 0,
+              topGreaterThanHeight: iconRect.top > targetWindow.innerHeight
+            }
+          });
+          
+          if (completelyOffScreen) {
+            this.logger.warn('Icon appears to be completely off-screen, attempting to reposition');
+            this.icon.style.left = '100px';
+            this.icon.style.top = '100px';
+          }
+        }
+      }, 100);
 
       // 3. با یک تأخیر بسیار کوتاه، استایل نهایی را اعمال کن تا انیمیشن اجرا شود
       setTimeout(() => {
         // اطمینان از اینکه آیکون هنوز در صفحه وجود دارد
         if (this.icon) {
+          this.logger.debug('Applying final animation styles');
           this.icon.style.opacity = "1";
           this.icon.style.transform = "scale(1)";
         }
       }, 10); // یک تأخیر کوتاه برای اجرای صحیح انیمیشن کافی است
 
+      this.logger.debug('Setting up icon click context and listeners');
       this.iconClickContext = { text: selectedText, position };
       this.icon.addEventListener("click", this.onIconClick);
 
       // Add outside click listener for icon dismissal
       this._addOutsideClickListener();
+      this.logger.debug('Icon creation completed successfully');
     } catch (error) {
+      this.logger.error('Error in _createTranslateIcon:', error);
       const handler = new ErrorHandler();
       handler.handle(error, { type: ErrorTypes.CONTEXT, context: 'SelectionWindows-_createTranslateIcon' });
     }
@@ -482,7 +1156,7 @@ export default class SelectionWindows {
       // This maintains compatibility with how _cleanupIcon is used elsewhere (e.g., in dismiss()).
       this._cleanupIcon(false); // Icon visuals and its specific event listeners are cleaned.
 
-      // Create translation window
+      // Create translation window with original position
       this._createTranslateWindow(text, position);
 
       // Reset flags after a longer delay to ensure translation window is fully established
@@ -505,220 +1179,13 @@ export default class SelectionWindows {
       return;
     }
 
-    this.originalText = selectedText;
-    this.isTranslationCancelled = false;
-    this.isIconMode = false; // Now in window mode
-
-    const translationMode = determineTranslationMode(
-      selectedText,
-      TranslationMode.Selection
-    );
-
-    this.logger.debug("Creating translation window", { translationMode });
-
-    this.displayElement = document.createElement("div");
-    this.displayElement.classList.add("aiwc-selection-popup-host");
-
-    // Apply theme class to host before appending to body
-    await this._applyThemeToHost();
-    this._addThemeChangeListener(); // Add listener for theme changes
-    this.applyInitialStyles(position);
-
-    const shadowRoot = this.displayElement.attachShadow({ mode: "open" });
-    const style = document.createElement("style");
-    if (style) {
-      // CSS variables will be scoped to the shadow DOM via :host
-      // These variables will be updated based on :host(.theme-light) or :host(.theme-dark)
-      style.textContent = `
-        :host {
-          --sw-bg-color: #f8f8f8; --sw-text-color: #333; --sw-border-color: #ddd; --sw-shadow-color: rgba(0,0,0,0.1);
-          --sw-original-text-color: #000; --sw-loading-dot-opacity-start: 0.3; --sw-loading-dot-opacity-mid: 0.8;
-          --sw-link-color: #0066cc; font-family: Vazirmatn, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        }
-        :host(.theme-dark) {
-          --sw-bg-color: #2a2a2a; --sw-text-color: #e0e0e0; --sw-border-color: #444; --sw-shadow-color: rgba(255,255,255,0.08);
-          --sw-original-text-color: #fff; --sw-loading-dot-opacity-start: 0.5; --sw-loading-dot-opacity-mid: 1; --sw-link-color: #58a6ff;
-        }
-        .popup-container { background-color: var(--sw-bg-color); color: var(--sw-text-color); border: 1px solid var(--sw-border-color);
-          border-radius: 4px; padding: 8px 12px; font-size: 14px; box-shadow: 0 2px 8px var(--sw-shadow-color); max-width: 300px; overflow-wrap: break-word;
-        }
-        
-        /* Unified Translation Display Styles */
-        ${getTranslationDisplayStyles()}
-        .loading-container { display: flex; justify-content: center; align-items: center; color: var(--sw-text-color); }
-        @keyframes blink { 0% { opacity: var(--sw-loading-dot-opacity-start); } 50% { opacity: var(--sw-loading-dot-opacity-mid); } 100% { opacity: var(--sw-loading-dot-opacity-start); } }
-        .loading-dot { font-size: 1.2em; margin: 0 2px; animation: blink 0.7s infinite; }
-        .first-line { margin-bottom: 6px; display: flex; align-items: center; 
-          user-select: none; padding: 6px 8px; margin: -8px -12px 6px -12px; 
-          background-color: var(--sw-border-color); border-radius: 4px 4px 0 0; 
-          border-bottom: 1px solid var(--sw-border-color); opacity: 0.9;
-        }
-        .first-line:hover { opacity: 1; }
-        .original-text { font-weight: bold; margin-left: 6px; color: var(--sw-original-text-color); }
-        .second-line { margin-top: 4px; }
-        .tts-icon { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; vertical-align: middle; }
-        :host(.theme-dark) .tts-icon { filter: invert(90%) brightness(1.1); }
-        .text-content a { color: var(--sw-link-color); text-decoration: none; }
-        .text-content a:hover { text-decoration: underline; }
-      `;
-      shadowRoot.appendChild(style);
+    // **IFRAME WINDOW CREATION FIX**: If we're in an iframe, request main document to create window
+    if (this.isInIframe) {
+      return this._requestWindowCreationInMainDocument(selectedText, position);
     }
 
-    this.innerContainer = document.createElement("div");
-    this.innerContainer.classList.add("popup-container");
-    shadowRoot.appendChild(this.innerContainer);
-    const loading = this.createLoadingDots();
-    this.innerContainer.appendChild(loading);
-
-    // Get the top-level document to escape iframe constraints
-    const topDocument = this._getTopDocument();
-    topDocument.body.appendChild(this.displayElement);
-    this.isVisible = true;
-
-    // Add drag functionality
-    this._setupDragHandlers();
-
-    requestAnimationFrame(() => {
-      if (this.displayElement) {
-        this.displayElement.style.opacity = "0.95";
-        this.displayElement.style.transform = "scale(1)";
-      }
-    });
-
-    // Use same approach as SelectElement - direct messaging with manual listener
-    try {
-      const settings = await getSettingsAsync();
-      
-      // Generate messageId for tracking  
-      const messageId = generateTranslationMessageId('content');
-      this.logger.debug(`Generated messageId: ${messageId}`);
-      
-      // Set up direct listener like SelectElement does
-      const resultPromise = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (messageListener) {
-            browser.runtime.onMessage.removeListener(messageListener);
-          }
-          reject(new Error('Translation timeout'));
-        }, 30000);
-        
-        const messageListener = (message) => {
-          this.logger.debug(`Received message: ${message.action}, messageId: ${message.messageId}, expected: ${messageId}`);
-          
-          if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE && 
-              message.messageId === messageId) {
-            this.logger.operation("Message matched! Processing translation result");
-            clearTimeout(timeout);
-            browser.runtime.onMessage.removeListener(messageListener);
-            
-            if (message.data?.success === false && message.data?.error) {
-              this.logger.error("Translation error received", message.data.error);
-              const errorMessage = message.data.error.message || 'Translation failed';
-              reject(new Error(errorMessage));
-            } else if (message.data?.translatedText) {
-              this.logger.operation("Translation success received");
-              resolve({ translatedText: message.data.translatedText });
-            } else {
-              this.logger.error("Unexpected message data", message.data);
-              reject(new Error('No translated text in result'));
-            }
-          }
-        };
-        
-        browser.runtime.onMessage.addListener(messageListener);
-      });
-      
-      // Send translation request using browser.runtime.sendMessage directly
-      const payload = {
-        text: selectedText,
-        from: settings.SOURCE_LANGUAGE || 'auto',
-        to: settings.TARGET_LANGUAGE || 'fa',
-        provider: settings.TRANSLATION_API || 'google',
-        messageId: messageId,
-        mode: translationMode,
-        options: {}
-      };
-      
-      this.logger.debug("Sending translation request with payload", payload);
-      
-      // Send direct message to background (no UnifiedMessenger to avoid timeout)
-      browser.runtime.sendMessage({
-        action: MessageActions.TRANSLATE,
-        messageId: messageId,
-        context: 'content',
-        timestamp: Date.now(),
-        data: {
-          text: payload.text,
-          provider: payload.provider,
-          sourceLanguage: payload.from,
-          targetLanguage: payload.to,
-          mode: payload.mode,
-          options: payload.options
-        }
-      }).catch(error => {
-        this.logger.error("Failed to send translation request", error);
-      });
-      
-      // Wait for the broadcast result
-      const result = await resultPromise;
-      
-      // Check if translation was cancelled during async operation
-      if (
-        this.isTranslationCancelled ||
-        this.originalText !== selectedText ||
-        !this.innerContainer
-      ) {
-        return;
-      }
-      
-      if (result?.translatedText) {
-        const translatedText = result.translatedText.trim();
-        if (!translatedText) {
-          throw new Error(ErrorTypes.TRANSLATION_NOT_FOUND);
-        }
-        
-        this.transitionToTranslatedText(
-          translatedText,
-          loading,
-          selectedText,
-          translationMode
-        );
-      } else {
-        throw new Error('Translation failed: No translated text received');
-      }
-      
-    } catch (error) {
-      if (this.isTranslationCancelled || !this.innerContainer) return;
-      await this.handleTranslationError(error, loading);
-    }
-
-    // Add outside click listener after translation window is ready AND
-    // pendingTranslationWindow flag is false.
-    // The timeout here ensures that the click event that initiated the window creation
-    // has fully propagated and won't be caught by this new listener.
-    // CRITICAL: This timeout must be LONGER than the timeout in onIconClick (500ms)
-    // to ensure pendingTranslationWindow is already false when we check it
-    setTimeout(() => {
-      this.logger.debug('Checking if should add outside click listener for translation window', {
-        isVisible: this.isVisible,
-        hasDisplayElement: !!this.displayElement,
-        pendingTranslationWindow: this.pendingTranslationWindow,
-        shouldAdd: this.isVisible && this.displayElement && !this.pendingTranslationWindow
-      });
-
-      // Ensure we only add the listener if the window is still supposed to be visible
-      // and we are NOT in the process of transitioning (pendingTranslationWindow is false).
-      if (
-        this.isVisible &&
-        this.displayElement &&
-        !this.pendingTranslationWindow
-      ) {
-        this.logger.debug('Adding outside click listener for translation window');
-        this._addOutsideClickListener();
-      } else {
-        this.logger.debug('NOT adding outside click listener for translation window');
-      }
-    }, 600); // MUST be > 500ms to ensure pendingTranslationWindow is reset
+    // Otherwise create window directly (we're in main document or using fallback)
+    return this._createTranslateWindowDirectly(selectedText, position);
   }
 
   _onOutsideClick(e) {
@@ -918,8 +1385,16 @@ export default class SelectionWindows {
   }
 
   applyInitialStyles(position) {
-    // Calculate coordinates relative to top window if in iframe
-    const topWindowPosition = this._calculateCoordsForTopWindow(position);
+    // **IFRAME COORDINATE FIX**: Check if coordinates are already adjusted from iframe
+    let topWindowPosition;
+    if (position._alreadyAdjusted) {
+      // Position is already calculated relative to top window, use as-is
+      topWindowPosition = { x: position.x, y: position.y };
+      this.logger.debug('Using pre-adjusted coordinates from iframe', topWindowPosition);
+    } else {
+      // Calculate coordinates relative to top window if in iframe
+      topWindowPosition = this._calculateCoordsForTopWindow(position);
+    }
 
     // Calculate smart position that stays within viewport
     const smartPosition = this.calculateSmartPosition(topWindowPosition);
