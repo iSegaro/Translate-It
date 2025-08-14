@@ -1,6 +1,5 @@
 // File: src/error-management/ErrorService.js
 
-import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/core/NotificationManager.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
@@ -62,12 +61,18 @@ export class ErrorHandler {
     this.displayedErrors = new Set();
     this.handling = false;
     this.openOptionsPageCallback = null; // Property to hold the callback
+    this.debugMode = false; // Debug mode state
     _instance = this; // Set singleton instance
   }
 
   // Method to set the callback from outside
   setOpenOptionsPageCallback(callback) {
     this.openOptionsPageCallback = callback;
+  }
+
+  // Method to set debug mode
+  setDebugMode(enabled) {
+    this.debugMode = enabled;
   }
 
   static getInstance() {
@@ -87,8 +92,9 @@ export class ErrorHandler {
       const raw = err instanceof Error ? err.message : String(err);
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
-      const debug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
-      if (debug && !SUPPRESS_CONSOLE.has(type)) {
+      
+      // Use instance debug mode instead of importing from config to avoid circular dependency
+      if (this.debugMode && !SUPPRESS_CONSOLE.has(type)) {
         logger.error(`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
@@ -136,6 +142,7 @@ Stack: ${error.stack}`,
       [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "warning",
     };
     const toastType = typeMap[type] || "error";
+    
     this.notifier.show(message, toastType, true, 5000, action);
     this.displayedErrors.add(message);
     setTimeout(() => this.displayedErrors.delete(message), 5500);

@@ -376,7 +376,15 @@ export const getUseMockAsync = async () => {
 };
 
 export const getDebugModeAsync = async () => {
-  return getSettingValueAsync("DEBUG_MODE", CONFIG.DEBUG_MODE);
+  const debugMode = await getSettingValueAsync("DEBUG_MODE", CONFIG.DEBUG_MODE);
+  // Update ErrorHandler with current debug mode
+  try {
+    const errorHandler = ErrorHandler.getInstance();
+    errorHandler.setDebugMode(debugMode);
+  } catch (e) {
+    // Ignore errors during ErrorHandler setup
+  }
+  return debugMode;
 };
 
 export const getThemeAsync = async () => {
