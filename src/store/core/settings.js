@@ -250,64 +250,44 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const exportSettings = async (password = '') => {
     try {
+      // Lazy read manifest version (avoid hardcoding); fallback to undefined if runtime not available.
+      let version;
+      try { version = browser.runtime.getManifest()?.version; } catch(_) {}
       const exportData = {
         ...settings.value,
         _exported: true,
         _timestamp: new Date().toISOString(),
-  _version: '0.10.2'
-      }
-      
-      // Note: In real implementation, encrypt API keys if password provided
+        _version: version
+      };
       if (password) {
-        exportData._hasEncryptedKeys = true
-        // Actual encryption would happen here
+        exportData._hasEncryptedKeys = true; // placeholder flag
       }
-      
-      return exportData
+      return exportData;
     } catch (error) {
-      logger.error('Failed to export settings:', error)
-      throw error
+      logger.error('Failed to export settings:', error);
+      throw error;
     }
   }
   
   const importSettings = async (importData, password = '') => {
-    logger.debug('[Import Settings] Starting import process.');
     try {
-      logger.debug('[Import Settings] Raw importData:', importData);
-      logger.debug('[Import Settings] Password provided:', !!password);
-
-      // Process imported settings (with optional decryption)
-      const processedSettings = await secureStorage.processImportedSettings(
-        importData,
-        password
-      );
-      logger.debug('[Import Settings] Processed settings from secureStorage:', processedSettings);
-
-      // Update settings
-      Object.assign(settings.value, processedSettings)
-      logger.debug('[Import Settings] Settings after Object.assign:', settings.value);
-
-      // Special handling for RegExp objects that might be imported as empty objects
+      logger.info('[Import] Starting');
+      const processedSettings = await secureStorage.processImportedSettings(importData, password);
+      Object.assign(settings.value, processedSettings);
+      // Normalize possible empty regex placeholders
       if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
         settings.value.RTL_REGEX = CONFIG.RTL_REGEX;
-        logger.debug('[Import Settings] Corrected RTL_REGEX to default.');
       }
       if (typeof settings.value.PERSIAN_REGEX === 'object' && settings.value.PERSIAN_REGEX !== null && Object.keys(settings.value.PERSIAN_REGEX).length === 0) {
         settings.value.PERSIAN_REGEX = CONFIG.PERSIAN_REGEX;
-        logger.debug('[Import Settings] Corrected PERSIAN_REGEX to default.');
       }
-      logger.debug('[Import Settings] Settings before saving all:', settings.value);
-
-      await saveAllSettings()
-      logger.debug('[Import Settings] saveAllSettings completed.');
-      
-      // Reload the page to ensure UI reflects new settings
+      await saveAllSettings();
+      logger.info('[Import] Completed – reloading UI');
       window.location.reload();
-      
-      return true
+      return true;
     } catch (error) {
-      logger.error('[Import Settings] Failed to import settings:', error)
-      throw error
+      logger.error('[Import] Failed:', error);
+      throw error;
     }
   }
   

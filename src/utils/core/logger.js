@@ -14,12 +14,7 @@ import { LOG_LEVELS } from "./logConstants.js";
 // Development environment detection
 const isDevelopment = process.env.NODE_ENV === "development";
 
-// --- Instrumentation (temporary for debugging circular import + TDZ) ---
-// Bump this version string whenever we patch logger.js to ensure the runtime actually loaded the latest file.
-export const __LOGGER_VERSION = '5-prod-clean';
-// Early timestamped marker (should appear BEFORE any error if this file is truly the one executing)
-try { console.debug(`[init] logger.js loaded (version=${__LOGGER_VERSION}) at`, new Date().toISOString()); } catch(_) {}
-try { console.debug('[init] logger.js import url =', import.meta.url); } catch(_) {}
+// (Instrumentation removed after stabilization)
 
 // Global log level - can be overridden per component
 let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
@@ -52,8 +47,7 @@ function __getLoggerCache() {
   }
   return g.__TRANSLATE_IT__.__LOGGER_CACHE;
 }
-// Devtools inspection helper
-try { if (globalThis) { globalThis.__TRANSLATE_IT__.__GET_LOGGER_CACHE = __getLoggerCache; } } catch(_) {}
+// (Devtools helper removed for production cleanliness)
 const __initialComponentLevels = { ...componentLogLevels };
 
 /**
