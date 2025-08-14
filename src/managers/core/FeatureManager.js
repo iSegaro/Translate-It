@@ -2,8 +2,21 @@
 
 import browser from "webextension-polyfill";
 import { CONFIG } from "../../config.js";
-import { logME } from "../../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Feature');
+  }
+  return _logger;
+};
+
 import { storageManager } from "@/storage/core/StorageCore.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * @typedef {"EXTENSION_ENABLED"|"TEXT_FIELDS"|"SHORTCUT_TEXT_FIELDS"|
@@ -62,7 +75,7 @@ export default class FeatureManager {
         });
       })
       .catch((err) => {
-        logME("[FeatureManager] failed to load initial flags", err);
+        getLogger().error('failed to load initial flags', err);
       });
 
     // افزودن listener برای تغییرات آینده با StorageManager

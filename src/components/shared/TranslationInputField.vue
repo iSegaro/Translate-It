@@ -38,7 +38,16 @@ import { correctTextDirection } from '@/utils/text/textDetection.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
+  }
+  return _logger;
+};
+
 
 // Props
 const props = defineProps({
@@ -171,7 +180,7 @@ const handlePaste = async (data) => {
         emit('translate')
       }
       
-      logger.debug('[TranslationInputField] Text pasted from clipboard')
+      getLogger().debug('[TranslationInputField] Text pasted from clipboard')
     }
   } catch (error) {
     await handleError(error, 'translation-input-field-paste')

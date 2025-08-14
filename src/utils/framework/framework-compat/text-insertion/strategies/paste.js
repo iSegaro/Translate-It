@@ -1,14 +1,26 @@
 // src/utils/framework-compat/text-insertion/strategies/paste.js
 
-import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'paste');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * تلاش برای جایگذاری با Paste Event (روش قدیمی)
  */
 export async function tryPasteInsertion(element, text, hasSelection) {
   try {
-    logME("[tryPasteInsertion] Attempting paste event simulation");
+    getLogger().debug('Attempting paste event simulation');
 
     // ایجاد DataTransfer object
     const clipboardData = new DataTransfer();
@@ -36,14 +48,10 @@ export async function tryPasteInsertion(element, text, hasSelection) {
         range.selectNodeContents(element);
         selection.removeAllRanges();
         selection.addRange(range);
-        logME(
-          "[tryPasteInsertion] Selected all content in contentEditable for undo preservation"
-        );
+        getLogger().debug('Selected all content in contentEditable for undo preservation');
       } else {
         element.setSelectionRange(0, element.value.length);
-        logME(
-          "[tryPasteInsertion] Selected all content in input/textarea for undo preservation"
-        );
+        getLogger().debug('Selected all content in input/textarea for undo preservation');
       }
     }
 
@@ -60,7 +68,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
       : element.value;
 
     if (currentText && currentText.includes(text)) {
-      logME("[tryPasteInsertion] Success verified");
+      getLogger().init('Success verified');
       clipboardData.clearData();
       return true;
     }
@@ -68,7 +76,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
     clipboardData.clearData();
     return false;
   } catch (error) {
-    logME("[tryPasteInsertion] Error:", error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

@@ -20,7 +20,16 @@ import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
 import browser from 'webextension-polyfill'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
+  }
+  return _logger;
+};
+
 
 // RTL detection using i18n plugin
 const isRTL = computed(() => {
@@ -31,7 +40,7 @@ const isRTL = computed(() => {
     }
     return false
   } catch (e) {
-    logger.debug('Failed to get RTL setting:', e.message)
+    getLogger().debug('Failed to get RTL setting:', e.message)
     return false
   }
 })</script>

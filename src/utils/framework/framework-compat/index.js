@@ -8,10 +8,8 @@ import {
   optimizedTextInsertion,
 } from "./text-insertion/index.js";
 import { handleSimpleReplacement } from "./simpleReplacement.js";
-import { logME } from "../../core/helpers.js";
 
 const logger = createLogger('Translation', 'TextReplacement');
-
 
 /**
  * جایگزینی هوشمند متن با چندین استراتژی fallback
@@ -107,10 +105,10 @@ export async function smartTextReplacement(
     }
 
     // استراتژی 4: Simple Replacement (fallback نهایی)
-    logME("[smartTextReplacement] Falling back to simple replacement");
+    logger.debug('Falling back to simple replacement');
     return handleSimpleReplacement(element, newValue, start, end);
   } catch (error) {
-    logME("[smartTextReplacement] Error in smart replacement:", error);
+    logger.error('Error in smart replacement:', error);
     return false;
   }
 }

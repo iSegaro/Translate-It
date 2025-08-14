@@ -7,7 +7,19 @@ import {
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
-import { logME } from "@/utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export class OpenAIProvider extends BaseProvider {
   constructor() {
@@ -81,7 +93,7 @@ export class OpenAIProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    logME(`[${this.providerName}] translateImage called with mode:`, translateMode);
+    getLogger().debug('translateImage called with mode:', translateMode);
 
     // Build prompt for screen capture translation
     const basePrompt = await getPromptBASEScreenCaptureAsync();
@@ -89,7 +101,7 @@ export class OpenAIProvider extends BaseProvider {
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    logME(`[${this.providerName}] translateImage built prompt:`, prompt);
+    getLogger().debug('translateImage built prompt:', prompt);
 
     // Prepare message with image
     const messages = [
@@ -124,7 +136,7 @@ export class OpenAIProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    logME(`[${this.providerName}] about to call _executeApiCall for image translation`);
+    getLogger().debug('about to call _executeApiCall for image translation');
 
     try {
       const result = await this._executeApiCall({
@@ -134,15 +146,11 @@ export class OpenAIProvider extends BaseProvider {
         context: context,
       });
 
-      logME(
-        `[${this.providerName}] image translation completed with result:`,
-        result
+      getLogger().info('image translation completed with result:', result
       );
       return result;
     } catch (error) {
-      logME(
-        `[${this.providerName}] image translation failed with error:`,
-        error
+      getLogger().error('image translation failed with error:', error
       );
       throw error;
     }

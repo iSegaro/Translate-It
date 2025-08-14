@@ -1,7 +1,19 @@
 // src/subtitle/NetflixSubtitleHandler.js
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'NetflixSubtitle');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {
@@ -63,12 +75,10 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
               ?.videoPlayer;
           if (videoPlayer) {
             this.netflixPlayer = videoPlayer;
-            logME("[NetflixSubtitleHandler] Netflix player API found");
+            getLogger().debug('Netflix player API found');
             resolve(true);
           } else if (elapsed >= maxWait) {
-            logME(
-              "[NetflixSubtitleHandler] Netflix player API not found, using fallback",
-            );
+            getLogger().debug('Netflix player API not found, using fallback',  );
             resolve(false);
           } else {
             elapsed += checkInterval;
@@ -92,7 +102,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     this.currentMovieId = this.getCurrentMovieId();
 
     if (!this.currentMovieId) {
-      logME("[NetflixSubtitleHandler] No movie ID found");
+      getLogger().debug('No movie ID found');
       return false;
     }
 
@@ -301,7 +311,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
 
     if (newMovieId !== this.currentMovieId) {
       this.currentMovieId = newMovieId;
-      logME(`[NetflixSubtitleHandler] Movie changed to: ${newMovieId}`);
+      getLogger().debug('Movie changed to: ${newMovieId}');
       super.handleUrlChange();
     }
   }

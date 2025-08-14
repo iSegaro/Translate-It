@@ -1,14 +1,26 @@
 // src/utils/framework-compat/text-insertion/strategies/paste-optimized.js
 
-import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'paste-optimized');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * تلاش برای جایگذاری با Paste Event بهینه‌شده (الهام از example.js)
  */
 export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
   try {
-    logME("[tryOptimizedPasteInsertion] Attempting optimized paste insertion");
+    getLogger().debug('Attempting optimized paste insertion');
 
     // ایجاد DataTransfer object
     const clipboardData = new DataTransfer();
@@ -37,14 +49,10 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
         range.selectNodeContents(element);
         selection.removeAllRanges();
         selection.addRange(range);
-        logME(
-          "[tryOptimizedPasteInsertion] Selected all content in contentEditable"
-        );
+        getLogger().debug('Selected all content in contentEditable');
       } else {
         element.setSelectionRange(0, element.value.length);
-        logME(
-          "[tryOptimizedPasteInsertion] Selected all content in input/textarea"
-        );
+        getLogger().debug('Selected all content in input/textarea');
       }
     }
 
@@ -70,13 +78,13 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
     const success = currentText && currentText.includes(text);
 
     if (success) {
-      logME("[tryOptimizedPasteInsertion] ✅ Optimized paste succeeded");
+      getLogger().init('Optimized paste succeeded');
       return true;
     }
 
     return false;
   } catch (error) {
-    logME("[tryOptimizedPasteInsertion] Error:", error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

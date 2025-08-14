@@ -6,8 +6,21 @@
 
 // src/handlers/getSelectedTextHandler.js
 import browser from "webextension-polyfill";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'getSelectedText');
+  }
+  return _logger;
+};
+
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export async function handleGetSelectedText(
   message,
@@ -15,7 +28,7 @@ export async function handleGetSelectedText(
   sendResponse,
   safeSendMessage,
 ) {
-  logME("[Handler:GetSelectedText] Handling request.");
+  getLogger().debug('Handling request.');
   try {
     const tabs = await browser.tabs.query({
       active: true,
@@ -28,13 +41,13 @@ export async function handleGetSelectedText(
       const response = await safeSendMessage(tab.id, {
         action: "getSelectedText",
       });
-      logME("[Handler:GetSelectedText] Got:", response);
+      getLogger().debug('Got:', response);
       sendResponse(response || { selectedText: "" });
     } else {
       sendResponse({ selectedText: "" });
     }
   } catch (err) {
-    logME("[Handler:GetSelectedText] Error:", err);
+    getLogger().error('Error:', err);
     sendResponse({ selectedText: "", error: String(err) });
   }
   return true;

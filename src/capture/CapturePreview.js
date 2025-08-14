@@ -1,9 +1,21 @@
 // src/capture/CapturePreview.js
 
-import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'CapturePreview');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Screen capture preview and confirmation system
@@ -39,7 +51,7 @@ export class CapturePreview {
    */
   async show() {
     try {
-      logME("[CapturePreview] Showing capture preview");
+      getLogger().debug('Showing capture preview');
 
       if (this.isVisible) {
         this.hide();
@@ -50,9 +62,9 @@ export class CapturePreview {
 
       this.isVisible = true;
 
-      logME("[CapturePreview] Preview shown successfully");
+      getLogger().init('Preview shown successfully');
     } catch (error) {
-      logME("[CapturePreview] Error showing preview:", error);
+      getLogger().error('Error showing preview:', error);
       throw this._createError(
         ErrorTypes.UI,
         `Failed to show capture preview: ${error.message}`,
@@ -66,7 +78,7 @@ export class CapturePreview {
   hide() {
     if (!this.isVisible) return;
 
-    logME("[CapturePreview] Hiding preview");
+    getLogger().debug('Hiding preview');
 
     this._removeEventListeners();
 
@@ -260,9 +272,9 @@ export class CapturePreview {
       // Focus confirm button
       this.confirmButton.focus();
 
-      logME("[CapturePreview] Modal created successfully");
+      getLogger().init('Modal created successfully');
     } catch (error) {
-      logME("[CapturePreview] Error creating modal:", error);
+      getLogger().error('Error creating modal:', error);
       throw error;
     }
   }
@@ -377,13 +389,13 @@ export class CapturePreview {
    * @private
    */
   _handleConfirmClick() {
-    logME("[CapturePreview] Confirm clicked");
+    getLogger().debug('Confirm clicked');
 
     try {
       this.hide();
       this.onConfirm(this.captureData);
     } catch (error) {
-      logME("[CapturePreview] Error in confirm callback:", error);
+      getLogger().error('Error in confirm callback:', error);
     }
   }
 
@@ -392,13 +404,13 @@ export class CapturePreview {
    * @private
    */
   _handleCancelClick() {
-    logME("[CapturePreview] Cancel clicked");
+    getLogger().debug('Cancel clicked');
 
     try {
       this.hide();
       this.onCancel();
     } catch (error) {
-      logME("[CapturePreview] Error in cancel callback:", error);
+      getLogger().error('Error in cancel callback:', error);
     }
   }
 
@@ -407,13 +419,13 @@ export class CapturePreview {
    * @private
    */
   _handleRetryClick() {
-    logME("[CapturePreview] Retry clicked");
+    getLogger().debug('Retry clicked');
 
     try {
       this.hide();
       this.onRetry(this.captureType);
     } catch (error) {
-      logME("[CapturePreview] Error in retry callback:", error);
+      getLogger().error('Error in retry callback:', error);
     }
   }
 
@@ -435,7 +447,7 @@ export class CapturePreview {
    * Clean up preview and remove from DOM
    */
   cleanup() {
-    logME("[CapturePreview] Cleaning up");
+    getLogger().debug('Cleaning up');
 
     this.hide();
 

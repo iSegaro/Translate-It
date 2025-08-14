@@ -23,12 +23,14 @@ const componentLogLevels = {
   // WARN = 1
   // INFO = 2
   // DEBUG = 3
-  Core: LOG_LEVELS.DEBUG,
-  Content: LOG_LEVELS.DEBUG,
-  Messaging: LOG_LEVELS.DEBUG,
-  Translation: LOG_LEVELS.DEBUG,
-  UI: LOG_LEVELS.DEBUG,
-  Storage: LOG_LEVELS.DEBUG,
+  Background: LOG_LEVELS.INFO,    // عملیات مهم service worker
+  Content: LOG_LEVELS.DEBUG,      // جزئیات DOM manipulation  
+  Messaging: LOG_LEVELS.WARN,     // فقط مشکلات communication
+  Providers: LOG_LEVELS.INFO,     // API calls و نتایج
+  UI: LOG_LEVELS.WARN,           // فقط خطاهای UI
+  Storage: LOG_LEVELS.INFO,       // عملیات persistence
+  Capture: LOG_LEVELS.DEBUG,      // جزئیات image processing
+  Error: LOG_LEVELS.ERROR,        // همیشه نمایش خطاها
 };
 
 /**
@@ -161,10 +163,12 @@ export function logInitSequence(component, steps) {
  * Quick loggers for common components (created on-demand)
  */
 export const quickLoggers = {
-  getCore: () => createLogger("Core"),
+  getBackground: () => createLogger("Background"),
   getContent: () => createLogger("Content"),
   getMessaging: () => createLogger("Messaging"),
-  getTranslation: () => createLogger("Translation"),
+  getProviders: () => createLogger("Providers"),
   getUI: () => createLogger("UI"),
   getStorage: () => createLogger("Storage"),
+  getCapture: () => createLogger("Capture"),
+  getError: () => createLogger("Error"),
 };

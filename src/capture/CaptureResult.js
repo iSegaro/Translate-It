@@ -1,10 +1,22 @@
 // src/capture/CaptureResult.js
 
-import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { SimpleMarkdown } from "../utils/text/markdown.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'CaptureResult');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Screen capture translation result display system
@@ -45,7 +57,7 @@ export class CaptureResult {
    */
   async show() {
     try {
-      logME("[CaptureResult] Showing translation result");
+      getLogger().info('Showing translation result');
 
       if (this.isVisible) {
         this.hide();
@@ -57,9 +69,9 @@ export class CaptureResult {
 
       this.isVisible = true;
 
-      logME("[CaptureResult] Result shown successfully");
+      getLogger().init('Result shown successfully');
     } catch (error) {
-      logME("[CaptureResult] Error showing result:", error);
+      getLogger().error('Error showing result:', error);
       throw this._createError(
         ErrorTypes.UI,
         `Failed to show capture result: ${error.message}`,
@@ -73,7 +85,7 @@ export class CaptureResult {
   hide() {
     if (!this.isVisible) return;
 
-    logME("[CaptureResult] Hiding result");
+    getLogger().info('Hiding result');
 
     this._clearAutoFadeTimer();
     this._removeEventListeners();
@@ -198,7 +210,7 @@ export class CaptureResult {
           JSON.stringify(this.translationText);
       }
 
-      logME("[CaptureResult] Processing translation text:", {
+      getLogger().info('Processing translation text:', {
         originalType: typeof this.translationText,
         extractedText: actualTranslationText,
         original: this.translationText,
@@ -250,9 +262,9 @@ export class CaptureResult {
       // Inject into page
       document.body.appendChild(this.resultOverlay);
 
-      logME("[CaptureResult] Result overlay created successfully");
+      getLogger().init('Result overlay created successfully');
     } catch (error) {
-      logME("[CaptureResult] Error creating result overlay:", error);
+      getLogger().error('Error creating result overlay:', error);
       throw error;
     }
   }
@@ -293,7 +305,7 @@ export class CaptureResult {
   _handleMouseDown(event) {
     if (event.button !== 0) return; // Only left click
 
-    logME("[CaptureResult] Starting drag");
+    getLogger().info('Starting drag');
 
     this.isDragging = true;
 
@@ -356,7 +368,7 @@ export class CaptureResult {
   _handleMouseUp(event) {
     if (!this.isDragging) return;
 
-    logME("[CaptureResult] Ending drag");
+    getLogger().info('Ending drag');
 
     this.isDragging = false;
 
@@ -387,13 +399,13 @@ export class CaptureResult {
    * @private
    */
   _handleCloseClick() {
-    logME("[CaptureResult] Close clicked");
+    getLogger().info('Close clicked');
 
     try {
       this.hide();
       this.onClose();
     } catch (error) {
-      logME("[CaptureResult] Error in close callback:", error);
+      getLogger().error('Error in close callback:', error);
     }
   }
 
@@ -406,7 +418,7 @@ export class CaptureResult {
 
     this.autoFadeTimer = setTimeout(() => {
       if (this.isVisible && !this.isDragging) {
-        logME("[CaptureResult] Auto-fading result");
+        getLogger().info('Auto-fading result');
         this.resultOverlay.style.opacity = "0.3";
 
         // Complete auto-close after fade
@@ -453,7 +465,7 @@ export class CaptureResult {
    * Clean up result and remove from DOM
    */
   cleanup() {
-    logME("[CaptureResult] Cleaning up");
+    getLogger().info('Cleaning up');
 
     this._clearAutoFadeTimer();
     this.hide();

@@ -1,9 +1,21 @@
 // src/capture/ScreenSelector.js
 
-import { logME } from "../utils/core/helpers.js";
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement } from "../utils/ui/html-sanitizer.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'ScreenSelector');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Screen area selection overlay system
@@ -40,7 +52,7 @@ export class ScreenSelector {
    */
   async start() {
     try {
-      logME("[ScreenSelector] Starting area selection");
+      getLogger().debug('Starting area selection');
 
       if (this.isActive) {
         this.cleanup();
@@ -54,9 +66,9 @@ export class ScreenSelector {
       // Add event listeners
       this._addEventListeners();
 
-      logME("[ScreenSelector] Area selection started successfully");
+      getLogger().init('Area selection started successfully');
     } catch (error) {
-      logME("[ScreenSelector] Error starting selection:", error);
+      getLogger().error('Error starting selection:', error);
       this.cleanup();
       throw this._createError(
         ErrorTypes.SCREEN_CAPTURE,
@@ -130,9 +142,9 @@ export class ScreenSelector {
       // Inject into page
       document.body.appendChild(this.overlay);
 
-      logME("[ScreenSelector] Overlay created successfully");
+      getLogger().init('Overlay created successfully');
     } catch (error) {
-      logME("[ScreenSelector] Error creating overlay:", error);
+      getLogger().error('Error creating overlay:', error);
       throw error;
     }
   }
@@ -188,7 +200,7 @@ export class ScreenSelector {
   _handleMouseDown(event) {
     if (event.button !== 0) return; // Only left click
 
-    logME("[ScreenSelector] Mouse down, starting selection");
+    getLogger().debug('Mouse down, starting selection');
 
     this.isSelecting = true;
 
@@ -252,7 +264,7 @@ export class ScreenSelector {
   _handleMouseUp(event) {
     if (!this.isSelecting) return;
 
-    logME("[ScreenSelector] Mouse up, completing selection");
+    getLogger().debug('Mouse up, completing selection');
 
     this.isSelecting = false;
 
@@ -262,7 +274,7 @@ export class ScreenSelector {
       this.currentSelection.width < 10 ||
       this.currentSelection.height < 10
     ) {
-      logME("[ScreenSelector] Selection too small, ignoring");
+      getLogger().debug('Selection too small, ignoring');
       this._resetSelection();
       return;
     }
@@ -281,7 +293,7 @@ export class ScreenSelector {
    */
   _handleKeyDown(event) {
     if (event.key === "Escape") {
-      logME("[ScreenSelector] Escape pressed, cancelling selection");
+      getLogger().debug('Escape pressed, cancelling selection');
       this._cancelSelection();
       event.preventDefault();
       event.stopPropagation();
@@ -315,7 +327,7 @@ export class ScreenSelector {
       note: "Using viewport coordinates because browser capture API captures visible viewport only",
     };
 
-    logME("[ScreenSelector] Completing selection with debug info:", debugInfo);
+    getLogger().info('Completing selection with debug info:', debugInfo);
 
     const selectionData = {
       x: this.currentSelection.left,
@@ -334,7 +346,7 @@ export class ScreenSelector {
     try {
       this.onSelectionComplete(selectionData);
     } catch (error) {
-      logME("[ScreenSelector] Error in selection completion callback:", error);
+      getLogger().error('Error in selection completion callback:', error);
       handleUIError(
         this._createError(
           ErrorTypes.SCREEN_CAPTURE,
@@ -349,7 +361,7 @@ export class ScreenSelector {
    * @private
    */
   _cancelSelection() {
-    logME("[ScreenSelector] Cancelling selection");
+    getLogger().debug('Cancelling selection');
 
     // Clean up before callback
     this.cleanup();
@@ -358,7 +370,7 @@ export class ScreenSelector {
     try {
       this.onCancel();
     } catch (error) {
-      logME("[ScreenSelector] Error in cancellation callback:", error);
+      getLogger().error('Error in cancellation callback:', error);
     }
   }
 
@@ -394,7 +406,7 @@ export class ScreenSelector {
    * Clean up selector and remove from DOM
    */
   cleanup() {
-    logME("[ScreenSelector] Cleaning up");
+    getLogger().debug('Cleaning up');
 
     this.isActive = false;
     this.isSelecting = false;

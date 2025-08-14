@@ -12,7 +12,7 @@ import NotificationManager from "../managers/core/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/core/debounce.js";
 import { state, TranslationMode, CONFIG } from "../config.js";
-import { logMethod, isExtensionContextValid, logME } from "../utils/core/helpers.js";
+import { logMethod, isExtensionContextValid} from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
@@ -20,6 +20,19 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "../managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Translation');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class TranslationHandler {
   constructor() {
@@ -73,7 +86,7 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-    logME("[TranslationHandler] Reinitializing state after update...");
+    getLogger().debug('Reinitializing state after update...');
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
   }
@@ -112,7 +125,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-      logME("[TranslationHandler] Error handling failed:", error);
+      getLogger().error('Error handling failed:', error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
@@ -134,7 +147,7 @@ export default class TranslationHandler {
 
   async handleCtrlSlash() {
     // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
-    logME('[TranslationHandler] Ctrl+/ handling delegated to ShortcutManager');
+    getLogger().debug('Ctrl+/ handling delegated to ShortcutManager');
   }
 
   async handleEditableElement(event) {

@@ -1,7 +1,19 @@
 // src/utils/cleanupSelectionWindows.js
 
 import { browser } from "@/utils/browser-polyfill.js";
-import { logME } from "./helpers";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'cleanupSelectionWindows');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Injects and runs a DOM cleanup script in the given tab to remove
@@ -15,7 +27,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
         try {
           el.remove();
         } catch (e) {
-          logME("[SelectionWindows] remove failed:", e);
+          getLogger().error('remove failed:', e);
         }
       });
     };
@@ -32,7 +44,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
       });
     }
   } catch {
-    // logME(`[SelectionWindows] dismissAll in tab ${tabId} failed:`, err);
+    // getLogger().error('dismissAll in tab ${tabId} failed:', err);
   }
 }
 
@@ -47,6 +59,6 @@ export async function dismissAllSelectionWindows() {
       await dismissAllSelectionWindowsInTab(tab.id);
     }
   } catch (err) {
-    logME("[SelectionWindows] dismissAllSelectionWindows failed:", err);
+    getLogger().error('dismissAllSelectionWindows failed:', err);
   }
 }

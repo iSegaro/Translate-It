@@ -1,16 +1,26 @@
 // src/utils/framework-compat/text-insertion/strategies/input.js
 
-import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'input');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * روش عمومی input/textarea (با حفظ undo)
  */
 export async function tryInputInsertion(element, text, hasSelection, start, end) {
   try {
-    logME(
-      "[tryInputInsertion] Attempting input/textarea insertion with undo preservation"
-    );
+    getLogger().debug('Attempting input/textarea insertion with undo preservation');
 
     // Focus element
     element.focus();
@@ -38,7 +48,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
     if (typeof document.execCommand === "function") {
       const execResult = document.execCommand("insertText", false, text);
       if (execResult) {
-        logME("[tryInputInsertion] ✅ Used execCommand for undo preservation");
+        getLogger().init('Used execCommand for undo preservation');
 
         // رویدادهای ضروری
         element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -49,9 +59,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
     }
 
     // fallback: جایگزینی مستقیم (بدون undo)
-    logME(
-      "[tryInputInsertion] ⚠️ Falling back to direct value assignment (no undo)"
-    );
+    getLogger().debug('Falling back to direct value assignment (no undo)');
     const newValue =
       currentValue.substring(0, startPos) +
       text +
@@ -68,7 +76,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
 
     return true;
   } catch (error) {
-    logME("[tryInputInsertion] Error:", error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

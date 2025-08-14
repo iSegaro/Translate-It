@@ -4,7 +4,7 @@
  */
 
 import browser from "webextension-polyfill";
-import { logME } from "../utils/core/helpers.js";
+
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
@@ -33,7 +33,7 @@ async function detectLegacyMigration() {
       storageKeys: Object.keys(storage),
     };
   } catch (error) {
-    logME("[Migration] Error detecting legacy migration:", error);
+    logger.error('Error detecting legacy migration:', error);
     return {
       isLegacyMigration: false,
       hasExistingData: false,
@@ -47,7 +47,7 @@ async function detectLegacyMigration() {
  */
 async function performLegacyMigration(existingData) {
   try {
-    logME("[Migration] Starting legacy data migration...");
+    logger.debug('Starting legacy data migration...');
 
     const migratedData = { ...existingData };
     const migrationLog = [];
@@ -97,8 +97,8 @@ async function performLegacyMigration(existingData) {
     await storageManager.clear();
     await storageManager.set(migratedData);
 
-    logME("[Migration] Legacy migration completed successfully:");
-    migrationLog.forEach((entry) => logME(`  - ${entry}`));
+    logger.init('Legacy migration completed successfully:');
+    migrationLog.forEach((entry) => logger.debug('- ${entry}'));
 
     return {
       success: true,
@@ -106,7 +106,7 @@ async function performLegacyMigration(existingData) {
       migrationLog,
     };
   } catch (error) {
-    logME("[Migration] Legacy migration failed:", error);
+    logger.error('Legacy migration failed:', error);
     throw error;
   }
 }
@@ -116,14 +116,12 @@ async function performLegacyMigration(existingData) {
  */
 async function migrateConfigSettings() {
   try {
-    logME("[InstallationHandler] Starting config migration...");
+    logger.debug('Starting config migration...');
 
     const migrationStatus = await detectLegacyMigration();
 
     if (migrationStatus.isLegacyMigration) {
-      logME(
-        "[InstallationHandler] Legacy migration detected - performing full migration",
-      );
+      logger.debug('Legacy migration detected - performing full migration',  );
       const existingData = await storageManager.get();
       return await performLegacyMigration(existingData);
     }
@@ -137,16 +135,12 @@ async function migrateConfigSettings() {
     // Check for customized settings
     Object.keys(CONFIG).forEach((key) => {
       if (key in currentSettings && currentSettings[key] !== CONFIG[key]) {
-        logME(
-          `[InstallationHandler] Preserving user setting: ${key} = ${currentSettings[key]} (default: ${CONFIG[key]})`,
-        );
+        logger.debug('Preserving user setting: ${key} = ${currentSettings[key]} (default: ${CONFIG[key]})',  );
       }
     });
 
     if (newKeys.length > 0) {
-      logME(
-        `[InstallationHandler] Adding ${newKeys.length} new config keys:`,
-        newKeys,
+      logger.debug('Adding ${newKeys.length} new config keys:', newKeys,
       );
 
       const newSettings = {};
@@ -155,16 +149,14 @@ async function migrateConfigSettings() {
       });
 
       await storageManager.set(newSettings);
-      logME("[InstallationHandler] Config migration completed successfully");
+      logger.init('Config migration completed successfully');
     } else {
-      logME(
-        "[InstallationHandler] No new config keys found, migration skipped",
-      );
+      logger.debug('No new config keys found, migration skipped',  );
     }
 
     return { newKeys, success: true };
   } catch (error) {
-    logME("[InstallationHandler] Config migration failed:", error);
+    logger.error('Config migration failed:', error);
     throw error;
   }
 }
@@ -173,15 +165,13 @@ async function migrateConfigSettings() {
  * Handle fresh installation
  */
 async function handleFreshInstallation() {
-  logME("[InstallationHandler] First installation detected.");
+  logger.debug('First installation detected.');
 
   const storage = await storageManager.get();
   const hasExistingData = Object.keys(storage).length > 0;
 
   if (hasExistingData) {
-    logME(
-      "[InstallationHandler] Existing data found during fresh install - likely legacy migration",
-    );
+    logger.debug('Existing data found during fresh install - likely legacy migration',  );
 
     // Open options page with welcome message for migrated users
     const optionsUrl = browser.runtime.getURL("options.html#about");
@@ -197,14 +187,12 @@ async function handleFreshInstallation() {
           "Your settings have been migrated to the new Vue version. Click to review your settings.",
       });
     } catch (error) {
-      logME(
-        "[InstallationHandler] Failed to show migration notification:",
-        error,
+      logger.error('Failed to show migration notification:', error,
       );
     }
   } else {
     // Truly fresh installation
-    logME("[InstallationHandler] Fresh installation with no existing data");
+    logger.debug('Fresh installation with no existing data');
     const optionsUrl = browser.runtime.getURL("options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   }
@@ -272,16 +260,14 @@ async function handleExtensionUpdate() {
       "[InstallationHandler] Notification created with ID:",
       notificationId,
     );
-    logME(
-      "[InstallationHandler] Update notification created with browser-specific options.",
-    );
+    logger.debug('Update notification created with browser-specific options.',  );
   } catch (e) {
     // This will now only catch unexpected errors, not the compatibility error.
     logger.error(
       "[InstallationHandler] Failed to create update notification:",
       e,
     );
-    logME("[InstallationHandler] Failed to create update notification:", e);
+    logger.error('Failed to create update notification:', e);
   }
 }
 
@@ -295,7 +281,7 @@ async function setupContextMenus() {
     // Clear all previous context menus to prevent duplicate errors
     await browser.contextMenus.removeAll();
     logger.debug("[InstallationHandler] All previous context menus removed.");
-    logME("[InstallationHandler] All previous context menus removed.");
+    logger.debug('All previous context menus removed.');
 
     // Basic context menu setup - will be expanded when full context menu system is implemented
     const pageMenuTitle =
@@ -313,13 +299,13 @@ async function setupContextMenus() {
     });
 
     logger.debug("[InstallationHandler] Context menu created:", menuItem);
-    logME("[InstallationHandler] Basic context menus setup completed");
+    logger.info('Basic context menus setup completed');
   } catch (error) {
     logger.error(
       "[InstallationHandler] Failed to setup context menus:",
       error,
     );
-    logME("[InstallationHandler] Failed to setup context menus:", error);
+    logger.error('Failed to setup context menus:', error);
   }
 }
 
@@ -330,7 +316,7 @@ export async function handleInstallationEvent(details) {
   logger.debug(
     `[InstallationHandler] 🌟 Installation event triggered: ${details.reason}`,
   );
-  logME(`[InstallationHandler] 🌟 Success: ${details.reason}`);
+  logger.init('🌟 Success: ${details.reason}');
 
   try {
     // Setup context menus for all scenarios
@@ -349,12 +335,12 @@ export async function handleInstallationEvent(details) {
       details.reason === "browser_update"
     ) {
       // Browser was updated but extension wasn't - just log
-      logME("[InstallationHandler] Browser updated, extension still running");
+      logger.debug('Browser updated, extension still running');
     }
 
-    logME("[InstallationHandler] Installation handling completed successfully");
+    logger.init('Installation handling completed successfully');
   } catch (error) {
-    logME("[InstallationHandler] Error during installation handling:", error);
+    logger.error('Error during installation handling:', error);
     // Don't throw - allow extension to continue working
   }
 }
@@ -363,7 +349,7 @@ export async function handleInstallationEvent(details) {
  * Manual trigger for testing update notifications (for development)
  */
 export async function triggerTestUpdateNotification() {
-  logME("[InstallationHandler] Manual update notification trigger");
+  logger.debug('Manual update notification trigger');
   await handleExtensionUpdate();
 }
 
@@ -371,6 +357,6 @@ export async function triggerTestUpdateNotification() {
  * Manual trigger for testing installation events (for development)
  */
 export async function triggerTestInstallation(reason = "update") {
-  logME(`[InstallationHandler] Manual installation trigger: ${reason}`);
+  logger.debug('Manual installation trigger: ${reason}');
   await handleInstallationEvent({ reason });
 }

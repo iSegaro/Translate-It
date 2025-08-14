@@ -2,7 +2,20 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CONFIG } from "../config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay} from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'TelegramStrategy');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class TelegramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -165,7 +178,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       // 2. اعتبارسنجی پیشرفته
       if (!this.validateField(telegramField)) {
-        logME("فیلد تلگرام یافت نشد");
+        getLogger().debug('فیلد تلگرام یافت نشد');
         return false;
       }
 

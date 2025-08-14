@@ -63,7 +63,16 @@ import browser from 'webextension-polyfill'
 import { useLanguages } from '@/composables/useLanguages.js' // Import useLanguages
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
+  }
+  return _logger;
+};
+
 
 const settingsStore = useSettingsStore()
 const { findLanguageByCode, getInterfaceLanguages } = useLanguages() // Destructure from useLanguages
@@ -95,7 +104,7 @@ onMounted(async () => {
     const manifest = browser.runtime.getManifest()
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {
-    logger.warn('Failed to get manifest version:', error)
+    getLogger().warn('Failed to get manifest version:', error)
   }
 })</script>
 

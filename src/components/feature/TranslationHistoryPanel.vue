@@ -488,7 +488,16 @@ import ActionGroup from '@/components/shared/actions/ActionGroup.vue'
 import CopyButton from '@/components/shared/actions/CopyButton.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');
+  }
+  return _logger;
+};
+
 
 const emit = defineEmits(['retranslate', 'copy', 'tts', 'export'])
 
@@ -702,12 +711,12 @@ const retranslate = (item) => {
 
 const onBulkCopied = () => {
   showFeedback(`${selectedItems.value.length} items copied to clipboard!`)
-  logger.debug('[TranslationHistoryPanel] Bulk copy completed')
+  getLogger().debug('[TranslationHistoryPanel] Bulk copy completed')
 }
 
 const editTranslation = (item) => {
   // This would open an edit modal
-  logger.debug('Edit translation:', item)
+  getLogger().debug('Edit translation:', item)
 }
 
 const favoriteItem = (item) => {
@@ -758,7 +767,7 @@ const bulkExport = () => {
 
 const onBulkCopied = () => {
   showFeedback('All selected translations copied to clipboard')
-  logger.debug('[TranslationHistoryPanel] Bulk copy completed')
+  getLogger().debug('[TranslationHistoryPanel] Bulk copy completed')
 }
 
 const bulkDelete = () => {

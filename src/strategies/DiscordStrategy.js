@@ -2,7 +2,20 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay} from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'DiscordStrategy');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class DiscordStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -88,7 +101,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return null;
     } catch (error) {
-      logME("[DiscordStrategy] خطا در _getSlateEditor:", error);
+      getLogger().debug('خطا در _getSlateEditor:', error);
       return null;
     }
   }
@@ -100,11 +113,11 @@ export default class DiscordStrategy extends PlatformStrategy {
     try {
       const slateEditor = this._getSlateEditor(element);
       if (!slateEditor) {
-        logME("[DiscordStrategy] Slate editor instance پیدا نشد");
+        getLogger().debug('Slate editor instance پیدا نشد');
         return false;
       }
 
-      logME("[DiscordStrategy] Slate editor instance پیدا شد");
+      getLogger().debug('Slate editor instance پیدا شد');
 
       // تلاش برای استفاده از Slate Transforms
       if (window.Slate && window.Slate.Transforms) {
@@ -122,13 +135,13 @@ export default class DiscordStrategy extends PlatformStrategy {
         // درج متن جدید
         Transforms.insertText(slateEditor, translatedText);
 
-        logME("[DiscordStrategy] محتوا از طریق Slate API به‌روزرسانی شد");
+        getLogger().debug('محتوا از طریق Slate API به‌روزرسانی شد');
         return true;
       }
 
       return false;
     } catch (error) {
-      logME("[DiscordStrategy] خطا در _updateViaSlateAPI:", error);
+      getLogger().debug('خطا در _updateViaSlateAPI:', error);
       return false;
     }
   }
@@ -219,7 +232,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return true;
     } catch (error) {
-      logME("[DiscordStrategy] خطا در _simulateNaturalTyping:", error);
+      getLogger().debug('خطا در _simulateNaturalTyping:', error);
       return false;
     }
   }
@@ -279,7 +292,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return true;
     } catch (error) {
-      logME("[DiscordStrategy] خطا در _updateViaClipboard:", error);
+      getLogger().debug('خطا در _updateViaClipboard:', error);
       return false;
     }
   }
@@ -317,7 +330,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return false;
     } catch (error) {
-      logME("[DiscordStrategy] خطا در _fallbackExecCommand:", error);
+      getLogger().debug('خطا در _fallbackExecCommand:', error);
       return false;
     }
   }
@@ -338,32 +351,30 @@ export default class DiscordStrategy extends PlatformStrategy {
     let success = false;
 
     try {
-      logME(
-        "[DiscordStrategy] شروع به‌روزرسانی element با متن:",
-        translatedText.substring(0, 50) + "...",
+      getLogger().debug('شروع به‌روزرسانی element با متن:', translatedText.substring(0, 50) + "...",
       );
 
       // روش 1: استفاده از Slate API (بهترین روش)
       if (this._isSlateEditor(element)) {
-        logME("[DiscordStrategy] تلاش با Slate API...");
+        getLogger().debug('تلاش با Slate API...');
         success = await this._updateViaSlateAPI(element, translatedText);
       }
 
       // روش 2: شبیه‌سازی clipboard paste
       if (!success) {
-        logME("[DiscordStrategy] تلاش با clipboard paste...");
+        getLogger().debug('تلاش با clipboard paste...');
         success = await this._updateViaClipboard(element, translatedText);
       }
 
       // روش 3: شبیه‌سازی تایپ طبیعی
       if (!success) {
-        logME("[DiscordStrategy] تلاش با شبیه‌سازی تایپ...");
+        getLogger().debug('تلاش با شبیه‌سازی تایپ...');
         success = await this._simulateNaturalTyping(element, translatedText);
       }
 
       // روش 4: fallback با execCommand
       if (!success) {
-        logME("[DiscordStrategy] تلاش با execCommand...");
+        getLogger().debug('تلاش با execCommand...');
         success = await this._fallbackExecCommand(element, translatedText);
       }
 
@@ -374,7 +385,7 @@ export default class DiscordStrategy extends PlatformStrategy {
         // بررسی صحت به‌روزرسانی
         const finalText = this.extractText(element);
         if (finalText.trim() === translatedText.trim()) {
-          logME("[DiscordStrategy] به‌روزرسانی با موفقیت تأیید شد");
+          getLogger().debug('به‌روزرسانی با موفقیت تأیید شد');
 
           // اعمال direction
           this.applyTextDirection(element, translatedText);
@@ -400,9 +411,7 @@ export default class DiscordStrategy extends PlatformStrategy {
             }
           }
         } else {
-          logME(
-            "[DiscordStrategy] متن نهایی مطابقت نداشت. انتظار:",
-            translatedText.trim(),
+          getLogger().debug('متن نهایی مطابقت نداشت. انتظار:', translatedText.trim(),
             "دریافت:",
             finalText.trim(),
           );
@@ -410,7 +419,7 @@ export default class DiscordStrategy extends PlatformStrategy {
         }
       }
     } catch (error) {
-      logME("[DiscordStrategy] خطای عمومی در updateElement:", error);
+      getLogger().debug('خطای عمومی در updateElement:', error);
       success = false;
       await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.UI,
@@ -420,7 +429,7 @@ export default class DiscordStrategy extends PlatformStrategy {
     }
 
     if (!success) {
-      logME("[DiscordStrategy] همه روش‌ها ناموفق بودند");
+      getLogger().debug('همه روش‌ها ناموفق بودند');
     }
 
     return success;

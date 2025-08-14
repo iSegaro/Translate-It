@@ -43,7 +43,16 @@ import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
+  }
+  return _logger;
+};
+
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -67,23 +76,23 @@ const handleMessage = (message) => {
 
 // Lifecycle
 onMounted(async () => {
-  logger.debug('🚀 SidepanelApp mounting...')
+  getLogger().debug('🚀 SidepanelApp mounting...')
   
   try {
     // Step 1: Set loading text
-    logger.debug('📝 Setting loading text...')
+    getLogger().debug('📝 Setting loading text...')
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
-    logger.debug('✅ Loading text set')
+    getLogger().debug('✅ Loading text set')
     
     // Step 2: Load settings store
-    logger.debug('⚙️ Loading settings store...')
+    getLogger().debug('⚙️ Loading settings store...')
     await Promise.race([
       settingsStore.loadSettings(),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
-    logger.debug('✅ Settings store loaded')
+    getLogger().debug('✅ Settings store loaded')
 
     // Step 3: Add message listener
     browser.runtime.onMessage.addListener(handleMessage);
@@ -93,7 +102,7 @@ onMounted(async () => {
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
-    logger.debug('✨ SidepanelApp initialization complete')
+    getLogger().debug('✨ SidepanelApp initialization complete')
     isLoading.value = false
   }
 })
@@ -103,7 +112,7 @@ onUnmounted(() => {
 });
 
 const retryLoading = () => {
-  logger.debug('🔄 Retrying sidepanel loading...')
+  getLogger().debug('🔄 Retrying sidepanel loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true

@@ -1,7 +1,20 @@
 // src/strategies/MediumStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay} from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'MediumStrategy');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class MediumStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -270,9 +283,7 @@ export default class MediumStrategy extends PlatformStrategy {
           if (currentNode.tagName === "DIV" || currentNode.tagName === "P") {
             const text = currentNode.innerText?.trim();
             if (text) {
-              logME(
-                "[MediumStrategy] Found current line:",
-                text.substring(0, 50),
+              getLogger().debug('Found current line:', text.substring(0, 50),
               );
               return text;
             }
@@ -287,9 +298,7 @@ export default class MediumStrategy extends PlatformStrategy {
       if (firstParagraph) {
         const text = firstParagraph.innerText?.trim();
         if (text) {
-          logME(
-            "[MediumStrategy] Using first paragraph:",
-            text.substring(0, 50),
+          getLogger().debug('Using first paragraph:', text.substring(0, 50),
           );
           return text;
         }
@@ -297,13 +306,11 @@ export default class MediumStrategy extends PlatformStrategy {
 
       // آخرین fallback: کل محتوا
       const fullText = element.innerText?.trim();
-      logME(
-        "[MediumStrategy] Using full content as fallback:",
-        fullText?.substring(0, 50),
+      getLogger().debug('Using full content as fallback:', fullText?.substring(0, 50),
       );
       return fullText || "";
     } catch (error) {
-      logME("[MediumStrategy] extractCurrentLine error:", error);
+      getLogger().error('extractCurrentLine error:', error);
       return element.innerText?.trim() || "";
     }
   }
@@ -342,7 +349,7 @@ export default class MediumStrategy extends PlatformStrategy {
             selection.removeAllRanges();
             selection.addRange(range);
 
-            logME("[MediumStrategy] Current line replaced successfully");
+            getLogger().init('Current line replaced successfully');
             return true;
           }
           currentNode = currentNode.parentElement;
@@ -353,16 +360,16 @@ export default class MediumStrategy extends PlatformStrategy {
       const firstParagraph = element.querySelector("div, p");
       if (firstParagraph) {
         firstParagraph.innerText = translatedText;
-        logME("[MediumStrategy] First paragraph replaced as fallback");
+        getLogger().debug('First paragraph replaced as fallback');
         return true;
       }
 
       // آخرین fallback: کل المان
       element.innerText = translatedText;
-      logME("[MediumStrategy] Full element replaced as final fallback");
+      getLogger().debug('Full element replaced as final fallback');
       return true;
     } catch (error) {
-      logME("[MediumStrategy] replaceCurrentLine error:", error);
+      getLogger().error('replaceCurrentLine error:', error);
       return false;
     }
   }

@@ -1,6 +1,17 @@
 // src/utils/framework-compat/selectionUtils.js
 
-import { logME } from "../../core/helpers.js";
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'selectionUtils');
+  }
+  return _logger;
+};
+
 
 /**
  * بررسی وجود انتخاب متن
@@ -17,7 +28,7 @@ export function checkTextSelection(element) {
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
     if (window.location.hostname.includes('reddit.com')) {
-      logME('[checkTextSelection] Reddit selection check:', {
+      getLogger().debug('Reddit selection check:', {
         hasSelection,
         isCollapsed: selection?.isCollapsed,
         selectionText: selection?.toString(),
@@ -32,7 +43,7 @@ export function checkTextSelection(element) {
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
     if (window.location.hostname.includes('reddit.com')) {
-      logME('[checkTextSelection] Reddit input/textarea selection check:', {
+      getLogger().debug('Reddit input/textarea selection check:', {
         hasSelection,
         selectionStart: element.selectionStart,
         selectionEnd: element.selectionEnd,

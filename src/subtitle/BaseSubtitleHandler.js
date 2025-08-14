@@ -1,8 +1,20 @@
 // src/subtitle/BaseSubtitleHandler.js
 
-import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { TranslationMode } from "../config.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'BaseSubtitle');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class BaseSubtitleHandler {
   constructor(translationProvider, errorHandler, notifier) {
@@ -39,7 +51,7 @@ export default class BaseSubtitleHandler {
     if (this.isActive) return true;
 
     if (!this.isCompatibleSite()) {
-      logME(`[${this.constructor.name}] Site not compatible`);
+      getLogger().debug('Site not compatible');
       return false;
     }
 
@@ -49,7 +61,7 @@ export default class BaseSubtitleHandler {
       this.setupObserver();
       this.setupPeriodicCheck();
 
-      logME(`[${this.constructor.name}] Subtitle translation started`);
+      getLogger().debug('Subtitle translation started');
       // const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
       // this.notifier?.show(startMessage, "success", 2000);
       return true;
@@ -82,7 +94,7 @@ export default class BaseSubtitleHandler {
     this.translationCache.clear();
     this.lastProcessedText = "";
 
-    logME(`[${this.constructor.name}] Subtitle translation stopped`);
+    getLogger().debug('Subtitle translation stopped');
     // const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
     // this.notifier?.show(stopMessage, "info", 2000);
   }
@@ -98,12 +110,10 @@ export default class BaseSubtitleHandler {
       const check = () => {
         const container = document.querySelector(selectors.container);
         if (container) {
-          logME(`[${this.constructor.name}] Subtitle container found`);
+          getLogger().debug('Subtitle container found');
           resolve(container);
         } else if (elapsed >= maxWait) {
-          logME(
-            `[${this.constructor.name}] Subtitle container not found after ${maxWait}ms, but continuing`,
-          );
+          getLogger().debug('Subtitle container not found after ${maxWait}ms, but continuing',  );
           // بجای reject کردن، resolve می‌کنیم تا ادامه پیدا کند
           resolve(null);
         } else {
@@ -121,15 +131,11 @@ export default class BaseSubtitleHandler {
     const container = document.querySelector(selectors.container);
 
     if (!container) {
-      logME(
-        `[${this.constructor.name}] No container found for observer, will use periodic check only`,
-      );
+      getLogger().debug('No container found for observer, will use periodic check only',  );
       return;
     }
 
-    logME(
-      `[${this.constructor.name}] Setting up MutationObserver on container`,
-    );
+    getLogger().debug('Setting up MutationObserver on container',  );
 
     this.observer = new MutationObserver((mutations) => {
       let hasChanges = false;
@@ -213,15 +219,13 @@ export default class BaseSubtitleHandler {
 
     try {
       if (!this.translationProvider) {
-        logME(`Translation provider not available for: ${text}`);
+        getLogger().debug('Translation provider not available for: ${text}');
         return null;
       }
 
       // بررسی اینکه آیا translate method وجود دارد
       if (typeof this.translationProvider.translate !== "function") {
-        logME(
-          `Translation provider does not have translate method for: ${text}`,
-        );
+        getLogger().debug('Translation provider does not have translate method for: ${text}',  );
         return null;
       }
 
@@ -234,7 +238,7 @@ export default class BaseSubtitleHandler {
       this.translationCache.set(text, translatedText);
       return translatedText;
     } catch (error) {
-      logME(`Translation failed for: ${text}`, error);
+      getLogger().error('Translation failed for: ${text}', error);
       return null;
     }
   }

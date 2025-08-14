@@ -1,16 +1,26 @@
 // src/utils/framework-compat/text-insertion/strategies/content-editable.js
 
-import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'content-editable');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * روش عمومی contentEditable (با حفظ undo)
  */
 export async function tryContentEditableInsertion(element, text, hasSelection) {
   try {
-    logME(
-      "[tryContentEditableInsertion] Attempting contentEditable insertion with undo preservation"
-    );
+    getLogger().debug('Attempting contentEditable insertion with undo preservation');
 
     // Focus element
     element.focus();
@@ -25,9 +35,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
       selection.removeAllRanges();
       selection.addRange(range);
       await smartDelay(10);
-      logME(
-        "[tryContentEditableInsertion] Selected all content for full replacement"
-      );
+      getLogger().debug('Selected all content for full replacement');
     }
 
     // تلاش برای استفاده از execCommand برای حفظ undo
@@ -63,9 +71,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
         }
 
         if (insertSuccess) {
-          logME(
-            "[tryContentEditableInsertion] ✅ Used execCommand for undo preservation"
-          );
+          getLogger().init('Used execCommand for undo preservation');
 
           // رویدادهای ضروری
           element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -77,9 +83,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
     }
 
     // fallback: جایگزینی مستقیم (بدون undo)
-    logME(
-      "[tryContentEditableInsertion] ⚠️ Falling back to direct DOM manipulation (no undo)"
-    );
+    getLogger().debug('Falling back to direct DOM manipulation (no undo)');
 
     if (hasSelection && selection.rangeCount > 0) {
       // جایگزینی انتخاب
@@ -134,7 +138,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
 
     return true;
   } catch (error) {
-    logME("[tryContentEditableInsertion] Error:", error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

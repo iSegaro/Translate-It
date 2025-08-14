@@ -54,7 +54,16 @@ import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
+  }
+  return _logger;
+};
+
 
 // Props
 const props = defineProps({
@@ -182,7 +191,7 @@ const renderedContent = computed(() => {
       const markdownElement = SimpleMarkdown.render(props.content)
       return markdownElement ? markdownElement.innerHTML : props.content.replace(/\n/g, '<br>')
     } catch (error) {
-      logger.warn('[TranslationDisplay] Markdown rendering failed:', error)
+      getLogger().warn('[TranslationDisplay] Markdown rendering failed:', error)
       return props.content.replace(/\n/g, '<br>')
     }
   } else {

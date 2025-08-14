@@ -1,7 +1,20 @@
 // src/strategies/WhatsAppStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay} from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'WhatsAppStrategy');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class WhatsAppStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -25,7 +38,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       let whatsappField = this.findField(element, SELECTORS);
 
       if (!whatsappField) {
-        logME("فیلد واتساپ یافت نشد");
+        getLogger().debug('فیلد واتساپ یافت نشد');
         return;
       }
 
@@ -37,7 +50,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         whatsappField.isConnected;
 
       if (!isValidField) {
-        logME("فیلد واتساپ نامعتبر است");
+        getLogger().debug('فیلد واتساپ نامعتبر است');
         return false;
       }
 
@@ -48,7 +61,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       // اعتبارسنجی وجود المان در DOM
       if (!document.body.contains(element)) {
-        logME("Element removed from DOM");
+        getLogger().debug('Element removed from DOM');
         return false;
       }
 

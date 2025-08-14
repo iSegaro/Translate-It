@@ -62,10 +62,23 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useI18n } from '@/composables/useI18n.js'
-import { logME } from '@/utils/core/helpers.js'
+import  from '@/utils/core/helpers.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'TranslationForm');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 // Props
 const props = defineProps({
@@ -127,7 +140,7 @@ const canTranslate = computed(() => {
   const notAutoDetect = targetLanguage.value !== 'Auto-Detect' && targetLanguage.value !== AUTO_DETECT_VALUE
   const notTranslating = !props.isTranslating
   
-  logME('[TranslationForm] canTranslate check:', {
+  getLogger().debug('canTranslate check:', {
     hasText,
     hasTarget,
     targetLanguage: targetLanguage.value,
@@ -142,7 +155,7 @@ const canTranslate = computed(() => {
 // Event Handlers
 const handleSubmit = () => {
   if (canTranslate.value) {
-    logME('[TranslationForm] Form submitted for translation')
+    getLogger().debug('Form submitted for translation')
     emit('translate', {
       text: sourceText.value,
       sourceLanguage: sourceLanguage.value,
@@ -152,7 +165,7 @@ const handleSubmit = () => {
 }
 
 const handleSwapLanguages = () => {
-  logME('[TranslationForm] Swapping languages')
+  getLogger().debug('Swapping languages')
   emit('swap-languages')
 }
 

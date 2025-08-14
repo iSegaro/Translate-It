@@ -1,5 +1,17 @@
 // src/background/handlers/common/handlePing.js
-import { logME } from '../../../utils/core/helpers.js';
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'handlePing');
+  }
+  return _logger;
+};
+
 
 /**
  * Handles the 'ping' message action.
@@ -8,8 +20,8 @@ import { logME } from '../../../utils/core/helpers.js';
  * @returns {Promise<Object>} - Returns a promise for webextension-polyfill compatibility.
  */
 export async function handlePing() {
-  logME("[Handler:Common] Ping received, responding with pong");
+  getLogger().debug('Ping received, responding with pong');
   const response = { success: true, message: "pong" };
-  logME("[Handler:Common] Returning pong response:", response);
+  getLogger().debug('Returning pong response:', response);
   return response;
 }

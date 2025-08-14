@@ -1,12 +1,25 @@
 import { MessagingContexts, MessageFormat, MessageActions } from "../messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'subtitle');
+  }
+  return _logger;
+};
+
 import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import browser from "webextension-polyfill";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export class SubtitleHandler {
   constructor(translationHandler) {
@@ -29,7 +42,7 @@ export class SubtitleHandler {
   }
 
   async initialize() {
-    logME(`[SubtitleHandler] Initializing for ${this.site}...`);
+    getLogger().debug('Initializing for ${this.site}...');
     if (!this.featureManager) {
       setTimeout(() => this.initialize(), 200);
       return;
@@ -54,7 +67,7 @@ export class SubtitleHandler {
       const { EXCLUDED_SITES } = await getSettingsAsync();
       return isUrlExcluded(window.location.href, EXCLUDED_SITES || []);
     } catch (error) {
-      logME("[SubtitleHandler] Error checking site exclusion:", error);
+      getLogger().error('Error checking site exclusion:', error);
       return false;
     }
   }
@@ -68,7 +81,7 @@ export class SubtitleHandler {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logME("[SubtitleHandler] Error checking storage, proceeding with current state:", error);
+      getLogger().error('Error checking storage, proceeding with current state:', error);
     }
   }
 
@@ -107,10 +120,10 @@ export class SubtitleHandler {
       this.updateYouTubeButtonState();
     } catch (error) {
       if (matchErrorToType(error) === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-        logME("[SubtitleHandler] Extension context invalidated, cannot create YouTube button");
+        getLogger().debug('Extension context invalidated, cannot create YouTube button');
         return;
       }
-      logME("[SubtitleHandler] Error creating YouTube button:", error);
+      getLogger().error('Error creating YouTube button:', error);
     }
   }
 
@@ -123,7 +136,7 @@ export class SubtitleHandler {
     } catch (error) {
       const errorType = matchErrorToType(error);
       if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-        logME("[SubtitleHandler] Extension context invalidated, cannot toggle subtitle setting");
+        getLogger().debug('Extension context invalidated, cannot toggle subtitle setting');
         const button = document.querySelector(".translate-it-yt-button");
         if (button) { button.disabled = true; button.style.opacity = "0.5"; button.title = "Extension reloaded, please refresh page"; }
         return;
@@ -153,7 +166,7 @@ export class SubtitleHandler {
   }
 
   async startSubtitleIntegration() {
-    logME(`[SubtitleHandler] Starting subtitle integration for ${this.site}.`);
+    getLogger().debug('Starting subtitle integration for ${this.site}.');
     try {
       if (this.subtitleIntegration) return;
 

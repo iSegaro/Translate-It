@@ -2,8 +2,21 @@
 
 import YouTubeSubtitleHandler from "./YouTubeSubtitleHandler.js";
 import NetflixSubtitleHandler from "./NetflixSubtitleHandler.js";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Subtitle');
+  }
+  return _logger;
+};
+
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class SubtitleManager {
   constructor(translationProvider, errorHandler, notifier) {
@@ -36,7 +49,7 @@ export default class SubtitleManager {
 
     for (const { handler, pattern, name } of this.supportedHandlers) {
       if (pattern.test(currentUrl)) {
-        logME(`[SubtitleManager] Detected ${name} site`);
+        getLogger().debug('Detected ${name} site');
         return handler;
       }
     }
@@ -52,13 +65,13 @@ export default class SubtitleManager {
   // شروع ترجمه زیرنویس
   async start() {
     if (this.isEnabled) {
-      logME("[SubtitleManager] Already enabled");
+      getLogger().debug('Already enabled');
       return true;
     }
 
     const HandlerClass = this.detectCurrentHandler();
     if (!HandlerClass) {
-      logME("[SubtitleManager] No suitable handler found for current site");
+      getLogger().debug('No suitable handler found for current site');
       return false;
     }
 
@@ -75,11 +88,11 @@ export default class SubtitleManager {
 
       if (started) {
         this.isEnabled = true;
-        logME(`[SubtitleManager] Started with ${HandlerClass.name}`);
+        getLogger().debug('Started with ${HandlerClass.name}');
         return true;
       } else {
         this.currentHandler = null;
-        logME("[SubtitleManager] Failed to start handler");
+        getLogger().error('Failed to start handler');
         return false;
       }
     } catch (error) {
@@ -105,7 +118,7 @@ export default class SubtitleManager {
       }
 
       this.isEnabled = false;
-      logME("[SubtitleManager] Stopped");
+      getLogger().debug('Stopped');
     } catch (error) {
       this.errorHandler?.handle(error, {
         type: ErrorTypes.SUBTITLE,

@@ -1,12 +1,25 @@
 // src/strategies/YoutubeStrategy.js
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'YoutubeStrategy');
+  }
+  return _logger;
+};
+
 import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
 } from "../utils/framework/framework-compat/index.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -72,7 +85,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (!element || !element.isConnected) {
-        logME("عنصر معتبر برای به‌روزرسانی وجود ندارد");
+        getLogger().debug('عنصر معتبر برای به‌روزرسانی وجود ندارد');
         return false;
       }
 
@@ -87,10 +100,10 @@ export default class YoutubeStrategy extends PlatformStrategy {
           // تاخیر هوشمند برای اطمینان از پردازش کامل
           await smartDelay(200);
 
-          logME("[YoutubeStrategy] Smart replacement completed successfully");
+          getLogger().init('Smart replacement completed successfully');
         } else {
           // fallback به روش قدیمی
-          logME("[YoutubeStrategy] Falling back to legacy replacement method");
+          getLogger().debug('Falling back to legacy replacement method');
 
           if (element.isContentEditable) {
             // برای عناصر contentEditable از <br> استفاده کنید

@@ -74,7 +74,16 @@ import { MessageActions } from '@/messaging/core/MessageActions.js'
 import { MessageContexts } from '../../messaging/core/MessagingCore.js'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'PopupHeader');
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'PopupHeader');
+  }
+  return _logger;
+};
+
 
 // Refs
 const sidePanelButton = ref(null)
@@ -113,9 +122,9 @@ const handleTranslatePage = async () => {
 
 const handleSelectElement = async () => {
   try {
-    logger.debug('[PopupHeader] Select element button clicked')
+    getLogger().debug('[PopupHeader] Select element button clicked')
     await toggleSelectElement()
-    logger.debug('[PopupHeader] Select element mode toggled successfully')
+    getLogger().debug('[PopupHeader] Select element mode toggled successfully')
     window.close()
   } catch (error) {
     await handleError(error, 'PopupHeader-selectElement')
@@ -129,7 +138,7 @@ const handleClearStorage = () => {
 
 const handleRevert = async () => {
   try {
-    logger.debug('[PopupHeader] Executing revert action')
+    getLogger().debug('[PopupHeader] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -145,7 +154,7 @@ const handleRevert = async () => {
     })
     
     if (response?.success) {
-      logger.debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      getLogger().debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
       await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
@@ -236,13 +245,13 @@ const handleOpenSidePanelNative = async (event) => {
   event.preventDefault()
   event.stopPropagation()
   
-  logger.debug('[PopupHeader] Opening sidepanel')
+  getLogger().debug('[PopupHeader] Opening sidepanel')
   
   try {
     if (browser.sidebarAction) {
       // Firefox: toggle behavior
       browser.sidebarAction.toggle()
-      logger.debug('[PopupHeader] Firefox sidebar toggled')
+      getLogger().debug('[PopupHeader] Firefox sidebar toggled')
     } else if (browser.sidePanel) {
       // Chrome: simple open behavior
       const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -252,12 +261,12 @@ const handleOpenSidePanelNative = async (event) => {
       } else {
         await browser.sidePanel.open({})
       }
-      logger.debug('[PopupHeader] Chrome sidePanel opened')
+      getLogger().debug('[PopupHeader] Chrome sidePanel opened')
     }
     
     window.close()
   } catch (error) {
-    logger.error('[PopupHeader] Sidepanel failed:', error)
+    getLogger().error('[PopupHeader] Sidepanel failed:', error)
     await handleError(error, 'PopupHeader-sidePanel')
   }
 }

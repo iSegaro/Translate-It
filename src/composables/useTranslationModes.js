@@ -2,7 +2,7 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { generateMessageId } from "../utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode, getSettingsAsync } from "@/config.js";
-import { logME } from "@/utils/core/helpers.js";
+
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useMessaging } from '@/messaging/composables/useMessaging.js';
@@ -53,7 +53,7 @@ const _registerSelectStateListener = async () => {
 
         if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
           sharedIsSelectModeActive.value = !!active;
-          logME('[useSelectElementTranslation] selectElementState changed (broadcast for current tab):', tabId, active);
+          logger.debug('selectElementState changed (broadcast for current tab):', tabId, active);
         }
       }
     } catch (e) {
@@ -107,7 +107,7 @@ export function useSidepanelTranslation() {
         languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
       const targetLangCode = languages.getLanguagePromptName(targetLang);
 
-      logME("[useSidepanelTranslation] Starting translation:", {
+      logger.debug('Starting translation:', {
         text: text.substring(0, 50) + "...",
         sourceLangCode,
         targetLangCode,
@@ -142,18 +142,18 @@ export function useSidepanelTranslation() {
 
       if (response?.success) {
         result.value = response;
-        logME("[useSidepanelTranslation] Translation successful");
+        logger.init('Translation successful');
         return response;
       } else {
         const errorMsg = response?.error || "Translation failed";
         error.value = errorMsg;
-        logME("[useSidepanelTranslation] Translation failed:", errorMsg);
+        logger.error('Translation failed:', errorMsg);
         return null;
       }
     } catch (err) {
       const errorMsg = err.message || "Translation error occurred";
       error.value = errorMsg;
-      logME("[useSidepanelTranslation] Translation error:", err);
+      logger.error('Translation error:', err);
       return null;
     } finally {
       isLoading.value = false;
@@ -251,7 +251,7 @@ export function useSelectElementTranslation() {
     error.value = null;
 
     try {
-      logME("[useSelectElementTranslation] Activating select element mode");
+      logger.debug('Activating select element mode');
       const result = await browser.runtime.sendMessage({
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
@@ -265,16 +265,16 @@ export function useSelectElementTranslation() {
         // The background script now provides a user-friendly message.
         const errorMsg = result.message || "Failed to activate select element mode";
         error.value = errorMsg;
-        logME("[useSelectElementTranslation] Select mode activation failed:", { errorMsg, result });
+        logger.error('Select mode activation failed:', { errorMsg, result });
         return false;
       }
       
-      logME("[useSelectElementTranslation] Select element mode activated");
+      logger.debug('Select element mode activated');
       return true;
     } catch (err) {
       const errorMsg = err.message || "Failed to activate select element mode";
       error.value = errorMsg;
-      logME("[useSelectElementTranslation] Error activating select mode:", err);
+      logger.error('Error activating select mode:', err);
       return false;
     } finally {
       isActivating.value = false;
@@ -283,22 +283,20 @@ export function useSelectElementTranslation() {
 
   const deactivateSelectMode = async () => {
     try {
-      logME("[useSelectElementTranslation] Deactivating select element mode");
+      logger.debug('Deactivating select element mode');
       await browser.runtime.sendMessage({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
         data: { active: false }
       });
-      logME("[useSelectElementTranslation] Select element mode deactivated");
+      logger.debug('Select element mode deactivated');
       return true;
     } catch (err) {
       const errorMsg =
         err.message || "Failed to deactivate select element mode";
       error.value = errorMsg;
-      logME(
-        "[useSelectElementTranslation] Error deactivating select mode:",
-        err,
+      logger.error('Error deactivating select mode:', err,
       );
       return false;
     }
@@ -335,18 +333,18 @@ export function useSidepanelActions() {
     error.value = null;
 
     try {
-      logME("[useSidepanelActions] Reverting translation");
+      logger.debug('Reverting translation');
       await browser.runtime.sendMessage({
         action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now()
       });
-      logME("[useSidepanelActions] Translation reverted successfully");
+      logger.init('Translation reverted successfully');
       return true;
     } catch (err) {
       const errorMsg = err.message || "Failed to revert translation";
       error.value = errorMsg;
-      logME("[useSidepanelActions] Error reverting translation:", err);
+      logger.error('Error reverting translation:', err);
       return false;
     } finally {
       isProcessing.value = false;
@@ -355,16 +353,14 @@ export function useSidepanelActions() {
 
   const stopTTS = async () => {
     try {
-      logME("[useSidepanelActions] Stopping TTS");
+      logger.debug('Stopping TTS');
       await browser.runtime.sendMessage({
         action: MessageActions.TTS_STOP,
         context: 'sidepanel',
         timestamp: Date.now()
       });
     } catch (err) {
-      logME(
-        "[useSidepanelActions] TTS stop failed (might not be active):",
-        err,
+      logger.error('TTS stop failed (might not be active):', err,
       );
     }
   };

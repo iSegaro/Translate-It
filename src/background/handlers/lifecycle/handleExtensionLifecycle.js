@@ -1,7 +1,20 @@
 // src/background/handlers/lifecycle/handleExtensionLifecycle.js
 import browser from 'webextension-polyfill';
-import { logME } from "../../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'handleExtensionLifecycle');
+  }
+  return _logger;
+};
+
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js"; // Changed from services
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 // Note: errorHandler is passed as an argument
 
@@ -12,15 +25,13 @@ export async function handleExtensionLifecycle(
   errorHandler
 ) {
   const action = message.action || message.type;
-  logME(`[Handler:Lifecycle] Handling action: ${action}`);
+  getLogger().debug('Handling action: ${action}');
   try {
-    logME(`[Handler:Lifecycle] Reloading extension due to action: ${action}`);
+    getLogger().debug('Reloading extension due to action: ${action}');
     browser.runtime.reload();
     // sendResponse might not be reached
   } catch (error) {
-    logME(
-      `[Handler:Lifecycle] Reload failed, attempting content script injection:`,
-      error
+    getLogger().error('Reload failed, attempting content script injection:', error
     );
     if (sender.tab?.id) {
       browser.scripting
@@ -29,9 +40,7 @@ export async function handleExtensionLifecycle(
           files: ["content.bundle.js"],
         })
         .catch((injectionError) => {
-          logME(
-            "[Handler:Lifecycle] Content script injection fallback failed:",
-            injectionError
+          getLogger().error('Content script injection fallback failed:', injectionError
           );
           errorHandler.handle(injectionError, {
             type: ErrorTypes.INTEGRATION,

@@ -1,6 +1,17 @@
 // src/utils/framework-compat/editorDetection.js
 
-import { logME } from "../../core/helpers.js";
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'editorDetection');
+  }
+  return _logger;
+};
+
 
 /**
  * تشخیص ویرایشگرهای پیچیده که نیاز به copy-only دارند
@@ -14,7 +25,7 @@ export function isComplexEditor(element) {
     // بررسی ویرایشگرهای شناخته شده
     const isKnownEditor = checkKnownEditors(element);
     if (isKnownEditor) {
-      logME('[isComplexEditor] Known editor detected:', isKnownEditor);
+      getLogger().debug('Known editor detected:', isKnownEditor);
       return true;
     }
 
@@ -33,7 +44,7 @@ export function isComplexEditor(element) {
 
     const isComplexSite = trueComplexSites.some(site => hostname.includes(site));
     if (isComplexSite) {
-      logME('[isComplexEditor] Complex office site detected:', hostname);
+      getLogger().debug('Complex office site detected:', hostname);
       return true;
     }
 
@@ -43,13 +54,13 @@ export function isComplexEditor(element) {
     // بررسی ساختار DOM پیچیده
     const hasDangerousStructure = checkDangerousStructure(element);
     if (hasDangerousStructure) {
-      logME('[isComplexEditor] Dangerous DOM structure detected');
+      getLogger().debug('Dangerous DOM structure detected');
       return true;
     }
 
     return false;
   } catch (error) {
-    logME('[isComplexEditor] Error:', error);
+    getLogger().error('Error:', error);
     return false;
   }
 }
@@ -148,25 +159,25 @@ function checkDangerousStructure(element) {
     // بررسی تعداد المان‌های فرزند
     const childElementCount = element.querySelectorAll?.('*').length || 0;
     if (childElementCount > 20) {
-      logME('[checkDangerousStructure] Too many child elements:', childElementCount);
+      getLogger().debug('Too many child elements:', childElementCount);
       return true;
     }
 
     // بررسی iframe ها
     if (element.querySelector?.('iframe')) {
-      logME('[checkDangerousStructure] Contains iframe');
+      getLogger().debug('Contains iframe');
       return true;
     }
 
     // بررسی script tags
     if (element.querySelector?.('script')) {
-      logME('[checkDangerousStructure] Contains script tags');
+      getLogger().debug('Contains script tags');
       return true;
     }
 
     // بررسی Shadow DOM
     if (element.shadowRoot) {
-      logME('[checkDangerousStructure] Has shadow root');
+      getLogger().debug('Has shadow root');
       return true;
     }
 
@@ -177,7 +188,7 @@ function checkDangerousStructure(element) {
     );
 
     if (hasSuspiciousAttrs) {
-      logME('[checkDangerousStructure] Has suspicious data attributes');
+      getLogger().debug('Has suspicious data attributes');
       return true;
     }
 
@@ -191,7 +202,7 @@ function checkDangerousStructure(element) {
     );
     
     if (hasEditorClasses) {
-      logME('[checkDangerousStructure] Has editor classes:', editorClasses.filter(cls => 
+      getLogger().debug('Has editor classes:', editorClasses.filter(cls => 
         cls.startsWith('ck') || cls.startsWith('mce-') || cls.startsWith('tox-') || cls.startsWith('ql-') || cls.includes('editor')
       ));
       return true;
@@ -199,7 +210,7 @@ function checkDangerousStructure(element) {
 
     return false;
   } catch (error) {
-    logME('[checkDangerousStructure] Error:', error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

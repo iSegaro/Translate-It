@@ -99,7 +99,16 @@ import { useSidepanelActions } from '@/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useI18n } from '@/composables/useI18n.js'
-import { logME } from '@/utils/core/helpers.js'
+import  from '@/utils/core/helpers.js'
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'SideToolbar');
+  }
+  return _logger;
+};
 
 // Props
 defineProps({
@@ -147,49 +156,49 @@ const getSelectElementTooltip = () => {
 
 // Event Handlers
 const handleSelectElement = async () => {
-  logME('[SideToolbar] Select element button clicked')
+  getLogger().debug('Select element button clicked')
   
   try {
     await selectElement.toggleSelectElement()
     emit('select-element')
   } catch (error) {
-    logger.error('[SideToolbar] Failed to toggle select element mode:', error)
+    getLogger().error('[SideToolbar] Failed to toggle select element mode:', error)
   }
 }
 
 const handleRevert = async () => {
-  logME('[SideToolbar] Revert button clicked')
+  getLogger().debug('Revert button clicked')
   
   const success = await sidepanelActions.revertTranslation()
   if (success) {
     emit('revert')
   } else {
-    logger.error('[SideToolbar] Failed to revert translation:', sidepanelActions.error.value)
+    getLogger().error('[SideToolbar] Failed to revert translation:', sidepanelActions.error.value)
   }
 }
 
 const handleClear = () => {
-  logME('[SideToolbar] Clear button clicked')
+  getLogger().debug('Clear button clicked')
   emit('clear')
 }
 
 const handleApiProvider = () => {
-  logME('[SideToolbar] API provider button clicked')
+  getLogger().debug('API provider button clicked')
   emit('api-provider')
 }
 
 const handleHistory = () => {
-  logME('[SideToolbar] History button clicked')
+  getLogger().debug('History button clicked')
   emit('history')
 }
 
 const handleSettings = () => {
-  logME('[SideToolbar] Settings button clicked')
+  getLogger().debug('Settings button clicked')
   
   // باز کردن صفحه تنظیمات
   browserAPI.safeSendMessage({ action: 'openOptionsPage' })
     .catch(error => {
-      logger.error('[SideToolbar] Failed to open settings:', error)
+      getLogger().error('[SideToolbar] Failed to open settings:', error)
     })
   
   emit('settings')
@@ -209,7 +218,7 @@ if (typeof document !== 'undefined') {
 import { onUnmounted } from 'vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'SideToolbar');
+
 onUnmounted(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('click', handleGlobalClick)

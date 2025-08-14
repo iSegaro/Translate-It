@@ -2,6 +2,19 @@ import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts } from '../core/MessagingCore.js'
 import { MessageActions } from '../core/MessageActions.js'
 
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+
 /**
  * Provides a standardized interface for messaging within Vue components.
  * Now uses direct browser.runtime.sendMessage for better performance and simplicity.
@@ -30,7 +43,7 @@ export function useMessaging(context) {
     try {
       return await browser.runtime.sendMessage(message);
     } catch (error) {
-      console.error(`[useMessaging:${context}] Send failed:`, error);
+      getLogger().error('Send failed:', error);
       throw error;
     }
   };

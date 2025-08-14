@@ -1,9 +1,21 @@
 // src/utils/langUtils.js
 
-import { logME } from "./helpers.js";
 import { detectTextLanguage } from "./textDetection.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { getLanguageInfoFromName } from "./textDetection.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'langUtils');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * دریافت کد زبان قابل استفاده در TTS
@@ -31,17 +43,15 @@ export async function getEffectiveLanguage(
   label = AUTO_DETECT_VALUE,
 ) {
   if (selectedLang && selectedLang !== AUTO_DETECT_VALUE) {
-    logME(`[Lang Resolver]: Using selected ${label} language: ${selectedLang}`);
+    getLogger().debug(': Using selected ${label} language: ${selectedLang}');
     return selectedLang;
   }
 
   try {
-    logME(`[Lang Resolver]: Detecting ${label} language from text...`);
+    getLogger().debug(': Detecting ${label} language from text...');
     const detectedLang = await detectTextLanguage(text);
     if (detectedLang) {
-      logME(
-        `[Lang Resolver]: Auto-detected ${label} language: ${detectedLang}`,
-      );
+      getLogger().debug(': Auto-detected ${label} language: ${detectedLang}',  );
       return detectedLang;
     } else {
       logME(
@@ -50,7 +60,7 @@ export async function getEffectiveLanguage(
       return "en"; // fallback
     }
   } catch (error) {
-    logME(`[Lang Resolver]: Error detecting ${label} language:`, error);
+    getLogger().error(': Error detecting ${label} language:', error);
     return "en"; // fallback on error
   }
 }

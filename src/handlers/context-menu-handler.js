@@ -4,16 +4,29 @@
  */
 
 import browser from "webextension-polyfill";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler');
+  }
+  return _logger;
+};
+
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Handle translate element context menu
  */
 async function handleTranslateElement(info, tab) {
   try {
-    logME("[ContextMenuHandler] Translate element menu clicked");
+    getLogger().debug('Translate element menu clicked');
 
     // Send message to content script to translate selected element
     await browser.tabs.sendMessage(tab.id, {
@@ -22,11 +35,9 @@ async function handleTranslateElement(info, tab) {
       timestamp: Date.now(),
     });
 
-    logME(
-      "[ContextMenuHandler] Translate element message sent to content script",
-    );
+    getLogger().debug('Translate element message sent to content script',  );
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling translate element:", error);
+    getLogger().error('Error handling translate element:', error);
   }
 }
 
@@ -35,11 +46,11 @@ async function handleTranslateElement(info, tab) {
  */
 async function handleTranslateText(info, tab) {
   try {
-    logME("[ContextMenuHandler] Translate text menu clicked");
+    getLogger().debug('Translate text menu clicked');
 
     const selectedText = info.selectionText;
     if (!selectedText) {
-      logME("[ContextMenuHandler] No text selected");
+      getLogger().debug('No text selected');
       return;
     }
 
@@ -51,9 +62,9 @@ async function handleTranslateText(info, tab) {
       timestamp: Date.now(),
     });
 
-    logME("[ContextMenuHandler] Translate text message sent to content script");
+    getLogger().debug('Translate text message sent to content script');
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling translate text:", error);
+    getLogger().error('Error handling translate text:', error);
   }
 }
 
@@ -62,7 +73,7 @@ async function handleTranslateText(info, tab) {
  */
 async function handleProviderSelection(info, tab, providerId) {
   try {
-    logME(`[ContextMenuHandler] Provider selection: ${providerId}`);
+    getLogger().debug('Provider selection: ${providerId}');
 
     // Update the translation API setting
     await storageManager.set({ TRANSLATION_API: providerId });
@@ -82,15 +93,13 @@ async function handleProviderSelection(info, tab, providerId) {
         message: `Translation provider changed to ${providerId}`,
       });
     } catch (notifError) {
-      logME(
-        "[ContextMenuHandler] Failed to show provider change notification:",
-        notifError,
+      getLogger().error('Failed to show provider change notification:', notifError,
       );
     }
 
-    logME(`[ContextMenuHandler] Provider changed to ${providerId}`);
+    getLogger().debug('Provider changed to ${providerId}');
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling provider selection:", error);
+    getLogger().error('Error handling provider selection:', error);
   }
 }
 
@@ -99,13 +108,13 @@ async function handleProviderSelection(info, tab, providerId) {
  */
 async function handleOpenSidepanel(info, tab) {
   try {
-    logME("[ContextMenuHandler] Open sidepanel menu clicked");
+    getLogger().debug('Open sidepanel menu clicked');
 
     // Try to open sidepanel
     try {
       if (browser.sidePanel && browser.sidePanel.open) {
         await browser.sidePanel.open({ windowId: tab.windowId });
-        logME("[ContextMenuHandler] Sidepanel opened");
+        getLogger().debug('Sidepanel opened');
       } else {
         // Fallback - send message to background to handle
         await browser.runtime.sendMessage({
@@ -114,13 +123,13 @@ async function handleOpenSidepanel(info, tab) {
           tabId: tab.id,
           timestamp: Date.now(),
         });
-        logME("[ContextMenuHandler] Sidepanel open request sent to background");
+        getLogger().debug('Sidepanel open request sent to background');
       }
     } catch (sidepanelError) {
-      logME("[ContextMenuHandler] Error opening sidepanel:", sidepanelError);
+      getLogger().error('Error opening sidepanel:', sidepanelError);
     }
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling open sidepanel:", error);
+    getLogger().error('Error handling open sidepanel:', error);
   }
 }
 
@@ -129,7 +138,7 @@ async function handleOpenSidepanel(info, tab) {
  */
 async function handleScreenCapture(info, tab) {
   try {
-    logME("[ContextMenuHandler] Screen capture menu clicked");
+    getLogger().debug('Screen capture menu clicked');
 
     // Send message to background to start screen capture
     await browser.runtime.sendMessage({
@@ -139,9 +148,9 @@ async function handleScreenCapture(info, tab) {
       timestamp: Date.now(),
     });
 
-    logME("[ContextMenuHandler] Screen capture request sent to background");
+    getLogger().debug('Screen capture request sent to background');
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling screen capture:", error);
+    getLogger().error('Error handling screen capture:', error);
   }
 }
 
@@ -150,14 +159,14 @@ async function handleScreenCapture(info, tab) {
  */
 async function handleOpenOptions(info, tab) {
   try {
-    logME("[ContextMenuHandler] Open options menu clicked");
+    getLogger().debug('Open options menu clicked');
 
     const optionsUrl = browser.runtime.getURL("options.html");
     await browser.tabs.create({ url: optionsUrl });
 
-    logME("[ContextMenuHandler] Options page opened");
+    getLogger().debug('Options page opened');
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling open options:", error);
+    getLogger().error('Error handling open options:', error);
   }
 }
 
@@ -215,7 +224,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
       `[ContextMenuHandler] Page ${exclude ? "excluded" : "included"}: ${domain}`,
     );
   } catch (error) {
-    logME("[ContextMenuHandler] Error handling page exclusion:", error);
+    getLogger().error('Error handling page exclusion:', error);
   }
 }
 
@@ -223,7 +232,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
  * Main context menu event handler
  */
 export async function handleContextMenuEvent(info, tab) {
-  logME(`[ContextMenuHandler] Context menu clicked: ${info.menuItemId}`, {
+  getLogger().info('Context menu clicked: ${info.menuItemId}', {
     tabId: tab.id,
     url: tab.url,
   });
@@ -251,14 +260,12 @@ export async function handleContextMenuEvent(info, tab) {
       const providerId = menuItemId.replace("provider-", "");
       await handleProviderSelection(info, tab, providerId);
     } else {
-      logME(`[ContextMenuHandler] Unknown menu item: ${menuItemId}`);
+      getLogger().debug('Unknown menu item: ${menuItemId}');
     }
 
-    logME(`[ContextMenuHandler] Menu item ${menuItemId} handled successfully`);
+    getLogger().init('Menu item ${menuItemId} handled successfully');
   } catch (error) {
-    logME(
-      `[ContextMenuHandler] Error handling context menu ${info.menuItemId}:`,
-      error,
+    getLogger().error('Error handling context menu ${info.menuItemId}:', error,
     );
     throw error;
   }

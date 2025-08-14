@@ -1,7 +1,19 @@
 // src/utils/framework-compat/text-insertion/strategies/exec-command.js
 
-import { logME } from "../../../../core/helpers.js";
 import { smartDelay } from "../helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'exec-command');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * تلاش برای جایگذاری با execCommand (بهترین روش برای حفظ undo)
@@ -13,7 +25,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
       return false;
     }
 
-    logME("[tryExecCommandInsertion] Attempting execCommand insertText", {
+    getLogger().debug('Attempting execCommand insertText', {
       hasSelection,
       isContentEditable: element.isContentEditable,
       tagName: element.tagName,
@@ -29,9 +41,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         // اگر انتخاب دارد، مستقیماً جایگزین کن
         const result = document.execCommand("insertText", false, text);
         if (result) {
-          logME(
-            "[tryExecCommandInsertion] ✅ execCommand succeeded for input/textarea with selection"
-          );
+          getLogger().init('execCommand succeeded for input/textarea with selection');
           await smartDelay(50);
           return true;
         }
@@ -41,9 +51,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         await smartDelay(10);
         const result = document.execCommand("insertText", false, text);
         if (result) {
-          logME(
-            "[tryExecCommandInsertion] ✅ execCommand succeeded for input/textarea full replacement"
-          );
+          getLogger().init('execCommand succeeded for input/textarea full replacement');
           await smartDelay(50);
           return true;
         }
@@ -60,9 +68,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         await smartDelay(10);
         const insertResult = document.execCommand("insertText", false, text);
         if (deleteResult && insertResult) {
-          logME(
-            "[tryExecCommandInsertion] ✅ execCommand succeeded for contentEditable with selection"
-          );
+          getLogger().init('execCommand succeeded for contentEditable with selection');
           await smartDelay(50);
           return true;
         }
@@ -81,9 +87,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         // درج متن جدید
         const insertResult = document.execCommand("insertText", false, text);
         if (deleteResult && insertResult) {
-          logME(
-            "[tryExecCommandInsertion] ✅ execCommand succeeded for contentEditable full replacement"
-          );
+          getLogger().init('execCommand succeeded for contentEditable full replacement');
           await smartDelay(50);
           return true;
         }
@@ -92,7 +96,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
 
     return false;
   } catch (error) {
-    logME("[tryExecCommandInsertion] Error:", error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

@@ -2,7 +2,20 @@
 import browser from "webextension-polyfill";
 import { CONFIG } from "../../config.js";
 import { languageList } from "../i18n/languages.js";
-// import { logME } from "./helpers.js";
+// import  from "./helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'textDetection');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export const isPersianText = (text) => {
   return CONFIG.PERSIAN_REGEX.test(text);
@@ -74,11 +87,11 @@ export async function detectTextLanguage(text) {
       // );
       return detectedLanguage; // برگرداندن کد زبان تشخیص داده شده
     } else {
-      // logME("امکان تشخیص زبان وجود ندارد.");
+      // getLogger().debug('امکان تشخیص زبان وجود ندارد.');
       return null;
     }
   } catch {
-    // logME("خطا در تشخیص زبان:", error);
+    // getLogger().debug('خطا در تشخیص زبان:', error);
     return null;
   }
 }

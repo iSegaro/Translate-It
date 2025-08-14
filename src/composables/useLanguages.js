@@ -3,7 +3,19 @@
 
 import { ref, computed } from "vue";
 import { languageList } from "@/utils/i18n/languages.js";
-import { logME } from "@/utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'useLanguages');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Composable for managing different types of languages in the extension
@@ -23,13 +35,11 @@ export function useLanguages() {
         // زبان‌ها از فایل استاتیک بارگذاری می‌شوند
         languages.value = languageList || [];
         isLoaded.value = true;
-        logME(
-          "[useLanguages] Languages loaded successfully:",
-          languages.value.length,
+        getLogger().init('Languages loaded successfully:', languages.value.length,
         );
       }
     } catch (error) {
-      logME("[useLanguages] Failed to load languages:", error);
+      getLogger().error('Failed to load languages:', error);
       // در صورت خطا، از لیست خالی استفاده می‌کنیم
       languages.value = [];
       isLoaded.value = true;

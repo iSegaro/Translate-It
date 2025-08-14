@@ -85,12 +85,21 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import { computed, ref } from 'vue';
 import browser from 'webextension-polyfill';
 
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelToolbar');
+  }
+  return _logger;
+};
+
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { MessageActions } from '../../../messaging/core/MessageActions';
 import { MessageContexts } from '../../../messaging/core/MessagingCore.js';
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelToolbar');
+
 
 const props = defineProps({
   isHistoryVisible: {
@@ -138,7 +147,7 @@ const handleSelectElement = async () => {
 
 const handleRevertAction = async () => {
   try {
-    logger.debug('[SidepanelToolbar] Executing revert action')
+    getLogger().debug('[SidepanelToolbar] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -153,10 +162,10 @@ const handleRevertAction = async () => {
       timestamp: Date.now()
     })
     
-    logger.debug('[SidepanelToolbar] Revert response:', response)
+    getLogger().debug('[SidepanelToolbar] Revert response:', response)
     
     if (response?.success) {
-      logger.debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      getLogger().debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
@@ -184,7 +193,7 @@ const handleClearFields = () => {
 }
 
 const handleProviderChange = (provider) => {
-  logger.debug('[SidepanelToolbar] Provider changed to:', provider)
+  getLogger().debug('[SidepanelToolbar] Provider changed to:', provider)
 }
 
 const handleHistoryClick = () => {

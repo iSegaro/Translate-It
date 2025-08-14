@@ -143,13 +143,22 @@ import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { marked } from 'marked';
 
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.UI, 'EnhancedSidepanelMainContent');
+  }
+  return _logger;
+};
+
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 import ActionToolbar from "@/components/shared/actions/ActionToolbar.vue";
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger(LOG_COMPONENTS.UI, 'EnhancedSidepanelMainContent');
+
 
 // Composables
 const tts = useTTSSmart();
@@ -203,14 +212,14 @@ const formattedTranslation = computed(() => {
   try {
     return marked.parse(translatedText.value);
   } catch (error) {
-    logger.error("[EnhancedSidepanelMainContent] Markdown parsing failed:", error);
+    getLogger().error("[EnhancedSidepanelMainContent] Markdown parsing failed:", error);
     return translatedText.value;
   }
 });
 
 // Event Handlers
 const handleSourceTextInput = (event) => {
-  logger.debug("[EnhancedSidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
+  getLogger().debug("[EnhancedSidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
 };
 
 const handleKeydown = (event) => {
@@ -224,7 +233,7 @@ const handleTranslationSubmit = async () => {
   if (!canTranslate.value) return;
   
   try {
-    logger.debug("[EnhancedSidepanelMainContent] Starting translation");
+    getLogger().debug("[EnhancedSidepanelMainContent] Starting translation");
     await triggerTranslation(sourceLang.value, targetLang.value);
     
     showFadeInAnimation.value = true;
@@ -234,7 +243,7 @@ const handleTranslationSubmit = async () => {
     
     showStatus("Translation completed!", "success", 2000);
   } catch (error) {
-    logger.error("[EnhancedSidepanelMainContent] Translation failed:", error);
+    getLogger().error("[EnhancedSidepanelMainContent] Translation failed:", error);
     await handleError(error, "enhanced-sidepanel-translation");
     showStatus("Translation failed", "error", 3000);
   }
@@ -242,12 +251,12 @@ const handleTranslationSubmit = async () => {
 
 // Action Handlers
 const handleSourceTextCopied = (text) => {
-  logger.debug("[EnhancedSidepanelMainContent] Source text copied");
+  getLogger().debug("[EnhancedSidepanelMainContent] Source text copied");
   showStatus("Source text copied to clipboard!", "success", 2000);
 };
 
 const handleSourceTextPasted = (event) => {
-  logger.debug("[EnhancedSidepanelMainContent] Text pasted:", event.text.substring(0, 30) + "...");
+  getLogger().debug("[EnhancedSidepanelMainContent] Text pasted:", event.text.substring(0, 30) + "...");
   sourceText.value = event.text;
   showStatus("Text pasted from clipboard!", "success", 2000);
   
@@ -268,22 +277,22 @@ const handleSourceTextPasted = (event) => {
 };
 
 const handleSourceTTSSpeaking = (event) => {
-  logger.debug("[EnhancedSidepanelMainContent] Playing source TTS");
+  getLogger().debug("[EnhancedSidepanelMainContent] Playing source TTS");
   showStatus("Playing source text...", "info", 0);
 };
 
 const handleTranslationCopied = (text) => {
-  logger.debug("[EnhancedSidepanelMainContent] Translation copied");
+  getLogger().debug("[EnhancedSidepanelMainContent] Translation copied");
   showStatus("Translation copied to clipboard!", "success", 2000);
 };
 
 const handleTranslationTTSSpeaking = (event) => {
-  logger.debug("[EnhancedSidepanelMainContent] Playing translation TTS");
+  getLogger().debug("[EnhancedSidepanelMainContent] Playing translation TTS");
   showStatus("Playing translation...", "info", 0);
 };
 
 const handleActionFailed = (event) => {
-  logger.error("[EnhancedSidepanelMainContent] Action failed:", event);
+  getLogger().error("[EnhancedSidepanelMainContent] Action failed:", event);
   showStatus(`${event.action} failed: ${event.error.message}`, "error", 3000);
 };
 
@@ -301,7 +310,7 @@ const showStatus = (message, type = "info", duration = 2000) => {
 
 // Lifecycle
 onMounted(async () => {
-  logger.debug("[EnhancedSidepanelMainContent] Component mounted");
+  getLogger().debug("[EnhancedSidepanelMainContent] Component mounted");
   
   try {
     // Load saved languages
@@ -319,7 +328,7 @@ onMounted(async () => {
       });
     }
   } catch (error) {
-    logger.error("[EnhancedSidepanelMainContent] Initialization failed:", error);
+    getLogger().error("[EnhancedSidepanelMainContent] Initialization failed:", error);
     await handleError(error, "enhanced-sidepanel-init");
   }
 });

@@ -4,10 +4,23 @@ import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
 import { cropImageData } from "../utils/imageProcessing.js";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Capture');
+  }
+  return _logger;
+};
+
 import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "../../messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export class ContentCaptureHandler {
   constructor() {
@@ -100,17 +113,17 @@ export class ContentCaptureHandler {
 
   handlePreviewCancel() {
     if (this.capturePreview) this.capturePreview.cleanup();
-    this.messenger.sendMessage({ action: "previewCancelled" }).catch(err => logME('Error sending preview cancel', err));
+    this.messenger.sendMessage({ action: "previewCancelled" }).catch(err => getLogger().error('Error sending preview cancel', err));
   }
 
   handlePreviewRetry(captureType) {
     if (this.capturePreview) this.capturePreview.cleanup();
-    this.messenger.sendMessage({ action: "previewRetry", data: { captureType } }).catch(err => logME('Error sending preview retry', err));
+    this.messenger.sendMessage({ action: "previewRetry", data: { captureType } }).catch(err => getLogger().error('Error sending preview retry', err));
   }
 
   handleResultClose() {
     if (this.captureResult) this.captureResult.cleanup();
-    this.messenger.sendMessage({ action: "resultClosed" }).catch(err => logME('Error sending result close', err));
+    this.messenger.sendMessage({ action: "resultClosed" }).catch(err => getLogger().error('Error sending result close', err));
   }
 
   handleCaptureError(error, context) {
@@ -118,7 +131,7 @@ export class ContentCaptureHandler {
     this.messenger.sendMessage({
       action: "captureError",
       data: { error: error.message, context, type: error.type || ErrorTypes.SCREEN_CAPTURE },
-    }).catch(err => logME('Error sending capture error', err));
+    }).catch(err => getLogger().error('Error sending capture error', err));
     this._showErrorNotification(`Screen capture ${context} failed. Please try again.`, error);
   }
 
@@ -133,7 +146,7 @@ export class ContentCaptureHandler {
     this.messenger.sendMessage({
       action: MessageActions.SHOW_ERROR_NOTIFICATION,
       data: { message, error: error.message, type: error.type || ErrorTypes.SCREEN_CAPTURE },
-    }).catch(err => logME('Error sending error notification', err));
+    }).catch(err => getLogger().error('Error sending error notification', err));
   }
 
   isActive() {

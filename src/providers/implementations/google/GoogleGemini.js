@@ -8,8 +8,21 @@ import {
   getGeminiThinkingEnabledAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-import { logME } from "@/utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
+  }
+  return _logger;
+};
+
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export class GeminiProvider extends BaseProvider {
   constructor() {
@@ -44,14 +57,14 @@ export class GeminiProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    logME(`[${this.providerName}] translate input text:`, text);
+    getLogger().debug('translate input text:', text);
     const prompt = await buildPrompt(
       text,
       sourceLang,
       targetLang,
       translateMode
     );
-    logME(`[${this.providerName}] translate built prompt:`, prompt);
+    getLogger().debug('translate built prompt:', prompt);
 
     // Determine thinking budget based on model and user settings
     let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
@@ -88,7 +101,7 @@ export class GeminiProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-translation`;
-    logME(`[${this.providerName}] about to call _executeApiCall with:`, {
+    getLogger().debug('about to call _executeApiCall with:', {
       url: url.replace(/key=[^&]+/, "key=***"),
       context: context,
     });
@@ -102,9 +115,7 @@ export class GeminiProvider extends BaseProvider {
         context: context,
       });
 
-      logME(
-        `[${this.providerName}] _executeApiCall completed with result:`,
-        result
+      getLogger().info('_executeApiCall completed with result:', result
       );
       return result;
     } catch (error) {
@@ -114,9 +125,7 @@ export class GeminiProvider extends BaseProvider {
         error.message.includes("thinkingBudget") &&
         requestBody.generationConfig?.thinkingConfig
       ) {
-        logME(
-          `[${this.providerName}] thinking parameter not supported, retrying without thinking...`
-        );
+        getLogger().debug('thinking parameter not supported, retrying without thinking...');
 
         // Remove thinking config and retry
         delete requestBody.generationConfig;
@@ -134,16 +143,12 @@ export class GeminiProvider extends BaseProvider {
           context: `${context}-fallback`,
         });
 
-        logME(
-          `[${this.providerName}] fallback _executeApiCall completed with result:`,
-          fallbackResult
+        getLogger().info('fallback _executeApiCall completed with result:', fallbackResult
         );
         return fallbackResult;
       }
 
-      logME(
-        `[${this.providerName}] _executeApiCall failed with error:`,
-        error
+      getLogger().error('_executeApiCall failed with error:', error
       );
       throw error;
     }
@@ -183,7 +188,7 @@ export class GeminiProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    logME(`[${this.providerName}] translateImage called with mode:`, translateMode);
+    getLogger().debug('translateImage called with mode:', translateMode);
 
     // Build prompt for screen capture translation
     const basePrompt = await getPromptBASEScreenCaptureAsync();
@@ -191,7 +196,7 @@ export class GeminiProvider extends BaseProvider {
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    logME(`[${this.providerName}] translateImage built prompt:`, prompt);
+    getLogger().debug('translateImage built prompt:', prompt);
 
     // Extract image format and data
     const imageMatch = imageData.match(/^data:image\/([^;]+);base64,(.+)/);
@@ -229,7 +234,7 @@ export class GeminiProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    logME(`[${this.providerName}] about to call _executeApiCall for image translation`);
+    getLogger().debug('about to call _executeApiCall for image translation');
 
     try {
       const result = await this._executeApiCall({
@@ -240,15 +245,11 @@ export class GeminiProvider extends BaseProvider {
         context: context,
       });
 
-      logME(
-        `[${this.providerName}] image translation completed with result:`,
-        result
+      getLogger().info('image translation completed with result:', result
       );
       return result;
     } catch (error) {
-      logME(
-        `[${this.providerName}] image translation failed with error:`,
-        error
+      getLogger().error('image translation failed with error:', error
       );
       throw error;
     }

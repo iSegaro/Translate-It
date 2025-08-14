@@ -1,8 +1,21 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'TwitterStrategy');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+
 import PlatformStrategy from "./PlatformStrategy.js";
 
-import { delay, logME } from "../utils/core/helpers.js";
+import { delay} from "../utils/core/helpers.js";
 
 export default class TwitterStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -147,15 +160,15 @@ export default class TwitterStrategy extends PlatformStrategy {
           await this.pasteText(tweetField, translatedText);
           this.applyTextDirection(tweetField, translatedText);
 
-          logME("[TwitterStrategy] Tweet field updated successfully.");
+          getLogger().init('Tweet field updated successfully.');
           return true; // گزارش موفقیت
         }
       }
 
-      logME("[TwitterStrategy] No specific element matched. Update failed.");
+      getLogger().error('No specific element matched. Update failed.');
       return false; // اگر هیچ یک از شرایط بالا برقرار نبود
     } catch (error) {
-      logME("[TwitterStrategy] Critical error in updateElement:", error);
+      getLogger().error('Critical error in updateElement:', error);
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "twitter-strategy-updateElement",

@@ -1,13 +1,26 @@
 // src/providers/implementations/BingTranslateProvider.js
 import browser from 'webextension-polyfill';
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
-import { logME } from "@/utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
+  }
+  return _logger;
+};
+
 import { isPersianText } from "@/utils/text/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 const getLanguageCode = (lang) => lang;
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/config.js";
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -212,7 +225,7 @@ export class BingTranslateProvider extends BaseProvider {
         Date.now() - BingTranslateProvider.bingAccessToken.tokenTs >
           BingTranslateProvider.bingAccessToken.tokenExpiryInterval
       ) {
-        logME(`[${this.providerName}] Fetching new Bing access token`);
+        getLogger().debug('Fetching new Bing access token');
         
         const response = await fetch(BingTranslateProvider.bingTokenUrl);
         if (!response.ok) {
@@ -244,12 +257,12 @@ export class BingTranslateProvider extends BaseProvider {
           count: 0,
         };
         
-        logME(`[${this.providerName}] New Bing access token obtained`);
+        getLogger().debug('New Bing access token obtained');
       }
       
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
-      logME(`[${this.providerName}] Failed to get Bing access token:`, error);
+      getLogger().error('Failed to get Bing access token:', error);
       const err = new Error(`Failed to get Bing access token: ${error.message}`);
       err.type = ErrorTypes.API;
       err.context = `${this.providerName.toLowerCase()}-token-fetch`;
@@ -275,7 +288,7 @@ export class BingTranslateProvider extends BaseProvider {
 
         if (detectedLangCode === targetLangCode) {
           // Swap languages
-          logME(`[${this.providerName}] Languages swapped: ${detectedLangCode} → ${targetLangCode}`);
+          getLogger().debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
           return [targetLang, sourceLang];
         }
       } else {
@@ -285,12 +298,12 @@ export class BingTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          logME(`[${this.providerName}] Languages swapped using regex fallback`);
+          getLogger().debug('Languages swapped using regex fallback');
           return [targetLang, sourceLang];
         }
       }
     } catch (error) {
-      logME(`[${this.providerName}] Language detection failed:`, error);
+      getLogger().error('Language detection failed:', error);
       // Regex fallback
       const targetLangCode = getLanguageCode(targetLang).split("-")[0];
       if (
@@ -419,9 +432,7 @@ export class BingTranslateProvider extends BaseProvider {
       if (isJsonMode) {
         const translatedParts = result.targetText.split(TEXT_DELIMITER);
         if (translatedParts.length !== originalJsonStruct.length) {
-          logME(
-            `[${this.providerName}] JSON reconstruction failed due to segment mismatch.`
-          );
+          getLogger().error('JSON reconstruction failed due to segment mismatch.');
           return result.targetText; // Fallback to raw translated text
         }
         const translatedJson = originalJsonStruct.map((item, index) => ({
@@ -451,7 +462,7 @@ export class BingTranslateProvider extends BaseProvider {
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
 
-      logME(`[${this.providerName}] Translation error:`, error);
+      getLogger().error('Translation error:', error);
       throw error;
     }
   }

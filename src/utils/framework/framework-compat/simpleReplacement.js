@@ -1,6 +1,17 @@
 // src/utils/framework-compat/simpleReplacement.js
 
-import { logME } from "../../core/helpers.js";
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'simpleReplacement');
+  }
+  return _logger;
+};
+
 
 /**
  * جایگزینی ساده (fallback) با حفظ undo capability
@@ -13,7 +24,7 @@ export function handleSimpleReplacement(element, newValue, start, end) {
       return handleInputWithUndo(element, newValue, start, end);
     }
   } catch (error) {
-    logME('[handleSimpleReplacement] Error in simple replacement:', error);
+    getLogger().error('Error in simple replacement:', error);
     return false;
   }
 }
@@ -27,7 +38,7 @@ function handleContentEditableWithUndo(element, newValue) {
     const selection = window.getSelection();
     let hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
     
-    logME('[handleContentEditableWithUndo] Processing:', {
+    getLogger().debug('Processing:', {
       hasSelection,
       selectionText: selection?.toString(),
       newValue: newValue.substring(0, 50)
@@ -44,11 +55,11 @@ function handleContentEditableWithUndo(element, newValue) {
           document.execCommand('delete', false);
           // اضافه کردن متن جدید
           document.execCommand('insertText', false, newValue);
-          logME('[handleContentEditableWithUndo] Used execCommand for selection');
+          getLogger().debug('Used execCommand for selection');
           return true;
         }
       } catch (execError) {
-        logME('[handleContentEditableWithUndo] execCommand failed:', execError);
+        getLogger().error('execCommand failed:', execError);
       }
       
       // fallback: استفاده از range API
@@ -71,11 +82,11 @@ function handleContentEditableWithUndo(element, newValue) {
           selection.addRange(range);
           // جایگزینی با execCommand
           document.execCommand('insertText', false, newValue);
-          logME('[handleContentEditableWithUndo] Used execCommand for full replacement');
+          getLogger().debug('Used execCommand for full replacement');
           return true;
         }
       } catch (execError) {
-        logME('[handleContentEditableWithUndo] execCommand failed:', execError);
+        getLogger().error('execCommand failed:', execError);
       }
       
       // fallback
@@ -88,7 +99,7 @@ function handleContentEditableWithUndo(element, newValue) {
     
     return true;
   } catch (error) {
-    logME('[handleContentEditableWithUndo] Error:', error);
+    getLogger().error('Error:', error);
     return false;
   }
 }
@@ -118,11 +129,11 @@ function handleInputWithUndo(element, newValue, start, end) {
     // استفاده از execCommand برای input elements
     try {
       if (document.execCommand && document.execCommand('insertText', false, newValue)) {
-        logME('[handleInputWithUndo] Used execCommand for input');
+        getLogger().debug('Used execCommand for input');
         return true;
       }
     } catch (execError) {
-      logME('[handleInputWithUndo] execCommand failed:', execError);
+      getLogger().error('execCommand failed:', execError);
     }
     
     // fallback: manual replacement
@@ -141,7 +152,7 @@ function handleInputWithUndo(element, newValue, start, end) {
     
     return true;
   } catch (error) {
-    logME('[handleInputWithUndo] Error:', error);
+    getLogger().error('Error:', error);
     return false;
   }
 }

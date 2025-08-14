@@ -1,5 +1,5 @@
 // src/providers/core/BaseTranslationProvider.js
-import { logME } from "@/utils/core/helpers.js";
+
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { createLogger } from '@/utils/core/logger.js';
 
@@ -54,15 +54,13 @@ export class BaseProvider {
    * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
    */
   async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
-    logME(`[${this.providerName}] _executeApiCall starting for context: ${context}`);
-    logME(`[${this.providerName}] _executeApiCall URL: ${url}`);
-    logME(`[${this.providerName}] _executeApiCall fetchOptions:`, fetchOptions);
+    logger.debug('_executeApiCall starting for context: ${context}');
+    logger.debug('_executeApiCall URL: ${url}');
+    logger.debug('_executeApiCall fetchOptions:', fetchOptions);
 
     try {
       const response = await fetch(url, fetchOptions);
-      logME(
-        `[${this.providerName}] _executeApiCall response status: ${response.status} ${response.statusText}`
-      );
+      logger.debug('_executeApiCall response status: ${response.status} ${response.statusText}');
 
       if (!response.ok) {
         // Extract error details if available
@@ -96,11 +94,11 @@ export class BaseProvider {
 
       // Parse successful response
       const data = await response.json();
-      logME(`[${this.providerName}] _executeApiCall raw response data:`, data);
-      logME(`[${this.providerName}] _executeApiCall response data:`, data);
+      logger.debug('_executeApiCall raw response data:', data);
+      logger.debug('_executeApiCall response data:', data);
 
       const result = extractResponse(data, response.status);
-      logME(`[${this.providerName}] _executeApiCall extracted result:`, result);
+      logger.info('_executeApiCall extracted result:', result);
 
       if (result === undefined) {
         logger.error(
@@ -114,7 +112,7 @@ export class BaseProvider {
         throw err;
       }
 
-      logME(`[${this.providerName}] _executeApiCall success for context: ${context}`);
+      logger.init('_executeApiCall success for context: ${context}');
       return result;
     } catch (err) {
       // Handle fetch network errors (e.g., offline)

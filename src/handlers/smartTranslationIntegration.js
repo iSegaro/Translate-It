@@ -414,7 +414,7 @@ export async function handleTranslationError(error, mode = 'field') {
     
     // Fallback: Try simple alert for critical errors
     try {
-      console.error('Translation Error:', errorMessage);
+      logger.error('Translation Error:', errorMessage);
     } catch (fallbackError) {
       // Silent fallback
     }

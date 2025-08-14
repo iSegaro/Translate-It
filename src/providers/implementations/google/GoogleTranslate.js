@@ -6,11 +6,24 @@ import {
   getEnableDictionaryAsync,
   TranslationMode 
 } from "@/config.js";
-import { logME } from "@/utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
+  }
+  return _logger;
+};
+
 import { isPersianText } from "@/utils/text/textDetection.js";
 // import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 const getLanguageCode = (lang) => lang;
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 const TEXT_DELIMITER = "\n\n---\n\n";
 
@@ -172,7 +185,7 @@ export class GoogleTranslateProvider extends BaseProvider {
         }
       }
     } catch (e) {
-      logME(`[${this.providerName}] Language detection failed:`, e);
+      getLogger().error('Language detection failed:', e);
     }
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
@@ -279,9 +292,7 @@ export class GoogleTranslateProvider extends BaseProvider {
     if (isJsonMode) {
       const translatedParts = result.resultText.split(TEXT_DELIMITER);
       if (translatedParts.length !== originalJsonStruct.length) {
-        logME(
-          "Google Translate: JSON reconstruction failed due to segment mismatch."
-        );
+        getLogger().error('Google Translate: JSON reconstruction failed due to segment mismatch.');
         return result.resultText; // Fallback to returning the raw translated text
       }
       const translatedJson = originalJsonStruct.map((item, index) => ({

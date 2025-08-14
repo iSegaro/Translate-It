@@ -8,12 +8,14 @@ export const LOG_LEVELS = {
 };
 
 export const LOG_COMPONENTS = {
-  CORE: 'Core',
-  CONTENT: 'Content',
+  BACKGROUND: 'Background',
+  CONTENT: 'Content', 
   MESSAGING: 'Messaging',
-  TRANSLATION: 'Translation',
+  PROVIDERS: 'Providers',
   UI: 'UI',
   STORAGE: 'Storage',
+  CAPTURE: 'Capture',
+  ERROR: 'Error',
 };
 
 export default {

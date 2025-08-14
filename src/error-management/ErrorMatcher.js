@@ -1,7 +1,19 @@
 // s../error-management/ErrorMatcher.js
 
-import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "./ErrorTypes.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Determines the error type for a given error object or message by prioritizing:
@@ -157,9 +169,7 @@ export function matchErrorToType(rawOrError = "") {
     (msg.includes("quota exceeded") && msg.includes("region")) ||
     msg.includes("location is not supported")
   ) {
-    logME(
-      "[ErrorMatcher] Quota exceeded with region, indicating Gemini-specific quota.",
-    );
+    getLogger().error('Quota exceeded with region, indicating Gemini-specific quota.',  );
     return ErrorTypes.GEMINI_QUOTA_REGION;
   }
 

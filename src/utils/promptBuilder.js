@@ -9,7 +9,19 @@ import {
   getPromptDictionaryAsync,
   TranslationMode,
 } from "../config.js";
-import { logME } from "./core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * بررسی می‌کند که آیا آبجکت ورودی مطابق با فرمت JSON خاص است
@@ -105,8 +117,8 @@ export async function buildPrompt(
     finalPromptWithUserRules = baseClean.replace(/\$_{USER_RULES}/g, userRules);
   }
 
-  logME("Prompt template: ", finalPromptWithUserRules);
-  logME("Text for translation: ", textForTranslation);
+  getLogger().debug('Prompt template:', finalPromptWithUserRules);
+  getLogger().debug('Text for translation:', textForTranslation);
 
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
@@ -122,10 +134,10 @@ export async function buildPrompt(
       /\$_{TEXT}/g,
       textForTranslation,
     );
-    logME("Final prompt with TEXT replacement: ", finalPrompt);
+    getLogger().debug('Final prompt with TEXT replacement:', finalPrompt);
   } else {
     finalPrompt = `${finalPromptWithUserRules}\n\n${textForTranslation}\n\n`;
-    logME("Final prompt with appended text: ", finalPrompt);
+    getLogger().debug('Final prompt with appended text:', finalPrompt);
   }
 
   return finalPrompt;

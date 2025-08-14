@@ -4,14 +4,26 @@
  */
 
 import browser from "webextension-polyfill";
-import { logME } from "../utils/core/helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'notification-handler');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Handle update notification click
  */
 async function handleUpdateNotification() {
   try {
-    logME("[NotificationHandler] Update notification clicked");
+    getLogger().debug('Update notification clicked');
 
     // Open options page to show changelog/about
     const optionsUrl = browser.runtime.getURL("options.html#about");
@@ -31,11 +43,9 @@ async function handleUpdateNotification() {
     // Clear the notification
     await browser.notifications.clear("update-notification");
 
-    logME(
-      "[NotificationHandler] Update notification handled - opened options page",
-    );
+    getLogger().debug('Update notification handled - opened options page',  );
   } catch (error) {
-    logME("[NotificationHandler] Error handling update notification:", error);
+    getLogger().error('Error handling update notification:', error);
   }
 }
 
@@ -44,7 +54,7 @@ async function handleUpdateNotification() {
  */
 async function handleMigrationNotification() {
   try {
-    logME("[NotificationHandler] Migration notification clicked");
+    getLogger().debug('Migration notification clicked');
 
     // Open options page to show settings
     const optionsUrl = browser.runtime.getURL("options.html");
@@ -53,13 +63,9 @@ async function handleMigrationNotification() {
     // Clear the notification
     await browser.notifications.clear("migration-success");
 
-    logME(
-      "[NotificationHandler] Migration notification handled - opened options page",
-    );
+    getLogger().debug('Migration notification handled - opened options page',  );
   } catch (error) {
-    logME(
-      "[NotificationHandler] Error handling migration notification:",
-      error,
+    getLogger().error('Error handling migration notification:', error,
     );
   }
 }
@@ -69,7 +75,7 @@ async function handleMigrationNotification() {
  */
 async function handleProviderChangeNotification() {
   try {
-    logME("[NotificationHandler] Provider change notification clicked");
+    getLogger().debug('Provider change notification clicked');
 
     // Open options page to API settings
     const optionsUrl = browser.runtime.getURL("options.html#api");
@@ -78,13 +84,9 @@ async function handleProviderChangeNotification() {
     // Clear the notification
     await browser.notifications.clear("provider-changed");
 
-    logME(
-      "[NotificationHandler] Provider change notification handled - opened API settings",
-    );
+    getLogger().debug('Provider change notification handled - opened API settings',  );
   } catch (error) {
-    logME(
-      "[NotificationHandler] Error handling provider change notification:",
-      error,
+    getLogger().error('Error handling provider change notification:', error,
     );
   }
 }
@@ -94,7 +96,7 @@ async function handleProviderChangeNotification() {
  */
 async function handleSiteExclusionNotification() {
   try {
-    logME("[NotificationHandler] Site exclusion notification clicked");
+    getLogger().debug('Site exclusion notification clicked');
 
     // Open options page to advanced settings
     const optionsUrl = browser.runtime.getURL("options.html#advance");
@@ -103,13 +105,9 @@ async function handleSiteExclusionNotification() {
     // Clear the notification
     await browser.notifications.clear("site-excluded");
 
-    logME(
-      "[NotificationHandler] Site exclusion notification handled - opened advanced settings",
-    );
+    getLogger().debug('Site exclusion notification handled - opened advanced settings',  );
   } catch (error) {
-    logME(
-      "[NotificationHandler] Error handling site exclusion notification:",
-      error,
+    getLogger().error('Error handling site exclusion notification:', error,
     );
   }
 }
@@ -119,7 +117,7 @@ async function handleSiteExclusionNotification() {
  */
 async function handleSiteInclusionNotification() {
   try {
-    logME("[NotificationHandler] Site inclusion notification clicked");
+    getLogger().debug('Site inclusion notification clicked');
 
     // Open options page to advanced settings
     const optionsUrl = browser.runtime.getURL("options.html#advance");
@@ -128,13 +126,9 @@ async function handleSiteInclusionNotification() {
     // Clear the notification
     await browser.notifications.clear("site-included");
 
-    logME(
-      "[NotificationHandler] Site inclusion notification handled - opened advanced settings",
-    );
+    getLogger().debug('Site inclusion notification handled - opened advanced settings',  );
   } catch (error) {
-    logME(
-      "[NotificationHandler] Error handling site inclusion notification:",
-      error,
+    getLogger().error('Error handling site inclusion notification:', error,
     );
   }
 }
@@ -144,7 +138,7 @@ async function handleSiteInclusionNotification() {
  */
 async function handleTranslationErrorNotification() {
   try {
-    logME("[NotificationHandler] Translation error notification clicked");
+    getLogger().error('Translation error notification clicked');
 
     // Open options page to API settings for troubleshooting
     const optionsUrl = browser.runtime.getURL("options.html#api");
@@ -153,13 +147,9 @@ async function handleTranslationErrorNotification() {
     // Clear the notification
     await browser.notifications.clear("translation-error");
 
-    logME(
-      "[NotificationHandler] Translation error notification handled - opened API settings",
-    );
+    getLogger().error('Translation error notification handled - opened API settings',  );
   } catch (error) {
-    logME(
-      "[NotificationHandler] Error handling translation error notification:",
-      error,
+    getLogger().error('Error handling translation error notification:', error,
     );
   }
 }
@@ -169,18 +159,14 @@ async function handleTranslationErrorNotification() {
  */
 async function handleSuccessNotification(notificationId) {
   try {
-    logME(
-      `[NotificationHandler] Success notification clicked: ${notificationId}`,
-    );
+    getLogger().init('Success notification clicked: ${notificationId}',  );
 
     // Just clear the notification
     await browser.notifications.clear(notificationId);
 
-    logME(
-      `[NotificationHandler] Success notification ${notificationId} cleared`,
-    );
+    getLogger().init('Success notification ${notificationId} cleared',  );
   } catch (error) {
-    logME("[NotificationHandler] Error handling success notification:", error);
+    getLogger().init('Error handling success notification:', error);
   }
 }
 
@@ -189,9 +175,7 @@ async function handleSuccessNotification(notificationId) {
  */
 async function handleErrorNotification(notificationId) {
   try {
-    logME(
-      `[NotificationHandler] Error notification clicked: ${notificationId}`,
-    );
+    getLogger().error('Error notification clicked: ${notificationId}',  );
 
     // Open options page for help/troubleshooting
     const optionsUrl = browser.runtime.getURL("options.html#help");
@@ -200,11 +184,9 @@ async function handleErrorNotification(notificationId) {
     // Clear the notification
     await browser.notifications.clear(notificationId);
 
-    logME(
-      `[NotificationHandler] Error notification ${notificationId} handled - opened help page`,
-    );
+    getLogger().error('Error notification ${notificationId} handled - opened help page',  );
   } catch (error) {
-    logME("[NotificationHandler] Error handling error notification:", error);
+    getLogger().error('Error handling error notification:', error);
   }
 }
 
@@ -213,24 +195,24 @@ async function handleErrorNotification(notificationId) {
  */
 async function handleTTSNotification() {
   try {
-    logME("[NotificationHandler] TTS notification clicked");
+    getLogger().debug('TTS notification clicked');
 
     // Open sidepanel if available
     try {
       const windows = await browser.windows.getAll({ focused: true });
       if (windows.length > 0 && browser.sidePanel && browser.sidePanel.open) {
         await browser.sidePanel.open({ windowId: windows[0].id });
-        logME("[NotificationHandler] Opened sidepanel for TTS");
+        getLogger().debug('Opened sidepanel for TTS');
       } else {
         // Fallback to popup
         await browser.action.openPopup();
-        logME("[NotificationHandler] Opened popup for TTS");
+        getLogger().debug('Opened popup for TTS');
       }
     } catch {
       // If sidepanel/popup fails, open options page
       const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });
-      logME("[NotificationHandler] Opened options page as TTS fallback");
+      getLogger().debug('Opened options page as TTS fallback');
     }
 
     // Clear TTS-related notifications
@@ -238,9 +220,9 @@ async function handleTTSNotification() {
     await browser.notifications.clear("tts-completed");
     await browser.notifications.clear("tts-error");
 
-    logME("[NotificationHandler] TTS notification handled");
+    getLogger().debug('TTS notification handled');
   } catch (error) {
-    logME("[NotificationHandler] Error handling TTS notification:", error);
+    getLogger().error('Error handling TTS notification:', error);
   }
 }
 
@@ -248,7 +230,7 @@ async function handleTTSNotification() {
  * Main notification event handler
  */
 export async function handleNotificationEvent(notificationId) {
-  logME(`[NotificationHandler] Notification clicked: ${notificationId}`);
+  getLogger().debug('Notification clicked: ${notificationId}');
 
   try {
     // Handle specific notification types
@@ -294,21 +276,15 @@ export async function handleNotificationEvent(notificationId) {
           await handleErrorNotification(notificationId);
         } else {
           // Unknown notification - just clear it
-          logME(
-            `[NotificationHandler] Unknown notification: ${notificationId}, clearing`,
-          );
+          getLogger().debug('Unknown notification: ${notificationId}, clearing',  );
           await browser.notifications.clear(notificationId);
         }
         break;
     }
 
-    logME(
-      `[NotificationHandler] Notification ${notificationId} handled successfully`,
-    );
+    getLogger().init('Notification ${notificationId} handled successfully',  );
   } catch (error) {
-    logME(
-      `[NotificationHandler] Error handling notification ${notificationId}:`,
-      error,
+    getLogger().error('Error handling notification ${notificationId}:', error,
     );
     throw error;
   }

@@ -1,7 +1,19 @@
 // src/utils/imageProcessing.js
 
-import { logME } from "./helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.CONTENT, 'imageProcessing');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Crop image data using canvas (content script only)
@@ -12,7 +24,7 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 export async function cropImageData(imageDataUrl, selectionData) {
   return new Promise((resolve, reject) => {
     try {
-      logME("[ImageProcessing] Starting image crop:", {
+      getLogger().debug('Starting image crop:', {
         selection: selectionData,
         hasImage: !!imageDataUrl,
       });
@@ -48,7 +60,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
           const safeWidth = Math.min(actualWidth, img.naturalWidth - safeX);
           const safeHeight = Math.min(actualHeight, img.naturalHeight - safeY);
 
-          logME("[ImageProcessing] Coordinate calculation:", {
+          getLogger().debug('Coordinate calculation:', {
             original: {
               x: selectionData.x,
               y: selectionData.y,
@@ -84,7 +96,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
           // Convert to data URL
           const croppedDataUrl = canvas.toDataURL("image/png", 1.0);
 
-          logME("[ImageProcessing] Image cropped successfully", {
+          getLogger().init('Image cropped successfully', {
             originalSize: `${img.naturalWidth}x${img.naturalHeight}`,
             croppedSize: `${selectionData.width}x${selectionData.height}`,
             actualCroppedSize: `${safeWidth}x${safeHeight}`,
@@ -93,7 +105,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
 
           resolve(croppedDataUrl);
         } catch (error) {
-          logME("[ImageProcessing] Error during canvas drawing:", error);
+          getLogger().error('Error during canvas drawing:', error);
           const cropError = new Error(`Failed to crop image: ${error.message}`);
           cropError.type = ErrorTypes.IMAGE_PROCESSING_FAILED;
           reject(cropError);
@@ -101,7 +113,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
       };
 
       img.onerror = (error) => {
-        logME("[ImageProcessing] Error loading image for cropping:", error);
+        getLogger().error('Error loading image for cropping:', error);
         const loadError = new Error("Failed to load image for cropping");
         loadError.type = ErrorTypes.IMAGE_PROCESSING_FAILED;
         reject(loadError);
@@ -110,7 +122,7 @@ export async function cropImageData(imageDataUrl, selectionData) {
       // Start loading image
       img.src = imageDataUrl;
     } catch (error) {
-      logME("[ImageProcessing] Error setting up image crop:", error);
+      getLogger().error('Error setting up image crop:', error);
       const setupError = new Error(
         `Failed to setup image cropping: ${error.message}`,
       );

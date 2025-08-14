@@ -1,7 +1,19 @@
 // src/capture/TextExtractor.js
 
-import { logME } from "../utils/core/helpers.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'TextExtractor');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 /**
  * Text extraction interface - supports both AI and OCR methods
@@ -21,7 +33,7 @@ export class TextExtractor {
    */
   registerMethod(methodName, extractorFunction) {
     this.extractionMethods.set(methodName, extractorFunction);
-    logME(`[TextExtractor] Registered method: ${methodName}`);
+    getLogger().debug('Registered method: ${methodName}');
   }
 
   /**
@@ -39,7 +51,7 @@ export class TextExtractor {
     try {
       const method = options.method || this.defaultMethod;
 
-      logME(`[TextExtractor] Extracting text using method: ${method}`, {
+      getLogger().debug('Extracting text using method: ${method}', {
         method,
         hasImage: !!imageData,
         options: { ...options, imageData: "[base64-data]" },
@@ -55,7 +67,7 @@ export class TextExtractor {
 
       const result = await extractorFunction(imageData, options);
 
-      logME(`[TextExtractor] Text extraction completed:`, {
+      getLogger().info('Text extraction completed:', {
         method,
         success: !!result,
         textLength: result?.extractedText?.length || 0,
@@ -69,7 +81,7 @@ export class TextExtractor {
         timestamp: Date.now(),
       };
     } catch (error) {
-      logME(`[TextExtractor] Text extraction failed:`, error);
+      getLogger().error('Text extraction failed:', error);
       throw this._normalizeError(error, "extractText");
     }
   }
@@ -82,7 +94,7 @@ export class TextExtractor {
    */
   async extractAndTranslate(imageData, options = {}) {
     try {
-      logME(`[TextExtractor] Starting extract and translate operation`);
+      getLogger().debug('Starting extract and translate operation');
 
       // For AI method, use direct AI translation (current implementation)
       if (!options.method || options.method === "ai") {
@@ -108,7 +120,7 @@ export class TextExtractor {
         translationMethod: "pending-ocr-implementation",
       };
     } catch (error) {
-      logME(`[TextExtractor] Extract and translate failed:`, error);
+      getLogger().error('Extract and translate failed:', error);
       throw this._normalizeError(error, "extractAndTranslate");
     }
   }
@@ -176,7 +188,7 @@ export class TextExtractor {
   setDefaultMethod(method) {
     if (this.isMethodAvailable(method)) {
       this.defaultMethod = method;
-      logME(`[TextExtractor] Default method set to: ${method}`);
+      getLogger().debug('Default method set to: ${method}');
     } else {
       throw this._createError(
         ErrorTypes.INTEGRATION,

@@ -6,7 +6,20 @@ import { getApplication_LocalizeAsync } from "../../config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "../text/markdown.js";
-// import { logME } from "./helpers.js";
+// import  from "./helpers.js";
+
+// Lazy logger to avoid initialization order issues
+let _logger;
+const getLogger = () => {
+  if (!_logger) {
+    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'i18n');
+  }
+  return _logger;
+};
+
+import { createLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 
 export function parseBoolean(value) {
   return String(value).trim().toLowerCase() === "true";
