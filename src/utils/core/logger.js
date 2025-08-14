@@ -27,8 +27,8 @@ const componentLogLevels = {
   Content: LOG_LEVELS.DEBUG,
   Messaging: LOG_LEVELS.DEBUG,
   Translation: LOG_LEVELS.DEBUG,
-  UI: LOG_LEVELS.INFO,
-  Storage: LOG_LEVELS.WARN,
+  UI: LOG_LEVELS.DEBUG,
+  Storage: LOG_LEVELS.DEBUG,
 };
 
 /**
