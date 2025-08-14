@@ -1,8 +1,9 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useExtensionAPI } from "./useExtensionAPI.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useTTS');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTS');
 
 export function useTTS() {
   const { getStorageData, setStorageData } = useExtensionAPI();

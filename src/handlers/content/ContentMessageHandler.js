@@ -7,14 +7,15 @@
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
 import { TranslationMode } from '../../config.js';
-import { createLogger } from '../../utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
 export class ContentMessageHandler {
   constructor() {
     this.handlers = new Map();
     this.initialized = false;
     this.context = MessagingContexts.CONTENT;
-    this.logger = createLogger('Content', 'MessageHandler');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageHandler');
   }
 
   /**

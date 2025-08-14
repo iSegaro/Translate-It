@@ -4,17 +4,9 @@ import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement } from "../utils/ui/html-sanitizer.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'ScreenSelector');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'ScreenSelector');
 
 
 /**
@@ -52,7 +44,7 @@ export class ScreenSelector {
    */
   async start() {
     try {
-      getLogger().debug('Starting area selection');
+  logger.debug('Starting area selection');
 
       if (this.isActive) {
         this.cleanup();
@@ -66,9 +58,9 @@ export class ScreenSelector {
       // Add event listeners
       this._addEventListeners();
 
-      getLogger().init('Area selection started successfully');
+  logger.init('Area selection started successfully');
     } catch (error) {
-      getLogger().error('Error starting selection:', error);
+  logger.error('Error starting selection:', error);
       this.cleanup();
       throw this._createError(
         ErrorTypes.SCREEN_CAPTURE,

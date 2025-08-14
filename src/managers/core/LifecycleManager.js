@@ -5,9 +5,10 @@ import { initializeSettingsListener } from "../../config.js";
 import { TranslationEngine } from "../../background/translation-engine.js";
 import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // This might need to be moved later
 import * as Handlers from "../../background/handlers/index.js"; // This might need to be moved later
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'LifecycleManager');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
 class LifecycleManager {
   constructor() {

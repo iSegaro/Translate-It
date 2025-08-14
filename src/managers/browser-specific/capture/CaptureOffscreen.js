@@ -3,9 +3,10 @@
 
 import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts, MessageActions } from "../../../messaging/core/MessagingCore.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'CaptureOffscreen');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'CaptureOffscreen');
 
 /**
  * Offscreen Screen Capture Manager for Chrome

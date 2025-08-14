@@ -4,9 +4,10 @@ import NotificationManager from "../managers/core/NotificationManager.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'ErrorService');
+const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorService');
 
 const SILENT = new Set([
   ErrorTypes.CONTEXT,

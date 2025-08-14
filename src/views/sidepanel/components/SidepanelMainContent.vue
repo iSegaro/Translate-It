@@ -87,21 +87,15 @@ import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode } from "
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import TranslationInputField from "@/components/shared/TranslationInputField.vue";
 import ProviderSelector from "@/components/shared/ProviderSelector.vue";
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// removed legacy createLogger import
 
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
@@ -155,7 +149,7 @@ const hasTranslationContent = computed(() => {
     const error = translationError?.value || "";
     return (translated + error).trim().length > 0;
   } catch (err) {
-    getLogger().warn('[SidepanelMainContent] Error in hasTranslationContent computed:', err);
+  logger.warn('[SidepanelMainContent] Error in hasTranslationContent computed:', err);
     return false;
   }
 });
@@ -165,7 +159,7 @@ const isSelecting = computed(() => {
   try {
     return selectElement?.isActivating?.value || false;
   } catch (err) {
-    getLogger().warn('[SidepanelMainContent] Error in isSelecting computed:', err);
+  logger.warn('[SidepanelMainContent] Error in isSelecting computed:', err);
     return false;
   }
 });
@@ -173,7 +167,7 @@ const isSelectElementActivating = computed(() => {
   try {
     return selectElement?.isActivating?.value || false;
   } catch (err) {
-    getLogger().warn('[SidepanelMainContent] Error in isSelectElementActivating computed:', err);
+  logger.warn('[SidepanelMainContent] Error in isSelectElementActivating computed:', err);
     return false;
   }
 });
@@ -223,7 +217,7 @@ const handleTranslationSubmit = async () => {
     // Start translation immediately - service worker will wake up when needed
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
   } catch (error) {
-    getLogger().error("[SidepanelMainContent] Translation error caught:", error);
+  logger.error("[SidepanelMainContent] Translation error caught:", error);
     await handleError(error, 'SidepanelMainContent-translation');
   }
 };
@@ -232,7 +226,7 @@ const handleTranslationSubmit = async () => {
 const copySourceText = async () => {
   try {
     await navigator.clipboard.writeText(sourceText.value);
-    getLogger().debug("[SidepanelMainContent] Source text copied to clipboard");
+  logger.debug("[SidepanelMainContent] Source text copied to clipboard");
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-copySource');
   }
@@ -242,7 +236,7 @@ const copySourceText = async () => {
 const copyTranslationText = async () => {
   try {
     await navigator.clipboard.writeText(translatedText.value);
-    getLogger().debug("[SidepanelMainContent] Translation copied to clipboard");
+  logger.debug("[SidepanelMainContent] Translation copied to clipboard");
   } catch (error) {
     await handleError(error, 'SidepanelMainContent-copyTranslation');
   }
@@ -263,7 +257,7 @@ const speakSourceText = async () => {
   const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
   const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
   await tts.speak(sourceText.value, langCode);
-  getLogger().debug(
+  logger.debug(
     "[SidepanelMainContent] Source text TTS started with language:",
     { sourceLanguage, langCode }
   );
@@ -274,7 +268,7 @@ const speakTranslationText = async () => {
     const targetLanguageCode = getLanguageCode(targetLang.value) || AUTO_DETECT_VALUE;
   const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
   await tts.speak(translatedText.value, langCode);
-  getLogger().debug(
+  logger.debug(
     "[SidepanelMainContent] Translation TTS started with language:",
     { targetLanguage: targetLang.value, langCode }
   );
@@ -284,36 +278,36 @@ const speakTranslationText = async () => {
 onMounted(async () => {
   try {
     // Load languages first
-    getLogger().debug("[SidepanelMainContent] Loading languages...");
+  logger.debug("[SidepanelMainContent] Loading languages...");
     await languages.loadLanguages();
-    getLogger().debug("[SidepanelMainContent] Languages loaded successfully");
+  logger.debug("[SidepanelMainContent] Languages loaded successfully");
     
     // Initialize language selector display values from settings
-    getLogger().debug("[SidepanelMainContent] Getting language settings...");
+  logger.debug("[SidepanelMainContent] Getting language settings...");
     try {
       const savedSource = await getSourceLanguageAsync();
       const savedTarget = await getTargetLanguageAsync();
       sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
       targetLang.value = getLanguageDisplayName(savedTarget) || 'Persian';
-      getLogger().debug("[SidepanelMainContent] Language settings loaded successfully");
+  logger.debug("[SidepanelMainContent] Language settings loaded successfully");
     } catch (err) {
-      getLogger().warn("[SidepanelMainContent] Error loading language settings:", err);
+  logger.warn("[SidepanelMainContent] Error loading language settings:", err);
       sourceLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
       targetLang.value = targetLang.value || 'Persian';
     }
 
     // Add focus listener for clipboard updates
-    getLogger().debug("[SidepanelMainContent] Adding focus listeners...");
+  logger.debug("[SidepanelMainContent] Adding focus listeners...");
     document.addEventListener("focus", handleFocus, true);
     window.addEventListener("focus", handleFocus);
 
     // Initialize translation data
-    getLogger().debug("[SidepanelMainContent] Loading last translation...");
+  logger.debug("[SidepanelMainContent] Loading last translation...");
     loadLastTranslation();
 
-    getLogger().debug("[SidepanelMainContent] Component mounted with Select Element integration");
+  logger.debug("[SidepanelMainContent] Component mounted with Select Element integration");
   } catch (error) {
-    getLogger().error("[SidepanelMainContent] Error during component mounting:", error);
+  logger.error("[SidepanelMainContent] Error during component mounting:", error);
   }
 });
 

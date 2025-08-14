@@ -48,9 +48,10 @@ import SidepanelMainContent from './components/SidepanelMainContent.vue';
 import EnhancedSidepanelMainContent from './components/EnhancedSidepanelMainContent.vue';
 import SidepanelToolbar from './components/SidepanelToolbar.vue';
 import { Icon } from '@iconify/vue';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'SidepanelLayout');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelLayout');
 
 // Get composables to sync state
 const { closeHistoryPanel, openHistoryPanel, setHistoryPanelOpen } = useHistory()

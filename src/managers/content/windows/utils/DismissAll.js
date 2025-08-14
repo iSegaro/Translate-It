@@ -1,13 +1,14 @@
 // src/managers/content/windows/utils/DismissAll.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 
 /**
  * Utility function to dismiss all selection windows across all documents
  */
 export function dismissAllSelectionWindows() {
-  const logger = createLogger('Content', 'DismissAll');
+  const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'DismissAll');
   logger.debug("Dismissing all selection windows");
   
   try {

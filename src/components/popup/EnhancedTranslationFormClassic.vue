@@ -102,9 +102,9 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { marked } from 'marked'
-import { createLogger } from '@/utils/core/logger.js'
-
-const logger = createLogger('UI', 'EnhancedTranslationForm')
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'EnhancedTranslationForm')
 
 // Props & Emits
 const emit = defineEmits(['can-translate-change'])

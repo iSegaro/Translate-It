@@ -32,9 +32,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useTTSSmart } from '@/composables/useTTSSmart.js'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = createLogger('UI', 'TTSButton')
+// Scoped logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSButton')
 
 // Props
 const props = defineProps({

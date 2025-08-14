@@ -1,6 +1,6 @@
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'provider-handler');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'provider-handler');
 /**
  * Provider Handler - Handle provider-related requests
  * Based on OLD implementation pattern for reliability

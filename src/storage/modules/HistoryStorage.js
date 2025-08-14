@@ -4,9 +4,10 @@
  */
 
 import { storageCore } from '../core/StorageCore.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Storage', 'HistoryStorage');
+const logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'HistoryStorage');
 
 export class HistoryStorage {
   constructor() {

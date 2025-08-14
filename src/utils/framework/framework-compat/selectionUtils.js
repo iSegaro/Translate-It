@@ -1,16 +1,10 @@
 // src/utils/framework-compat/selectionUtils.js
 
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'selectionUtils');
-  }
-  return _logger;
-};
+// Use scoped cached logger (migration from old lazy pattern)
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'selectionUtils');
 
 
 /**
@@ -28,7 +22,7 @@ export function checkTextSelection(element) {
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
     if (window.location.hostname.includes('reddit.com')) {
-      getLogger().debug('Reddit selection check:', {
+  logger.debug('Reddit selection check:', {
         hasSelection,
         isCollapsed: selection?.isCollapsed,
         selectionText: selection?.toString(),
@@ -43,7 +37,7 @@ export function checkTextSelection(element) {
     // TODO: Need to Check
     // اضافی logging برای Reddit debugging
     if (window.location.hostname.includes('reddit.com')) {
-      getLogger().debug('Reddit input/textarea selection check:', {
+  logger.debug('Reddit input/textarea selection check:', {
         hasSelection,
         selectionStart: element.selectionStart,
         selectionEnd: element.selectionEnd,

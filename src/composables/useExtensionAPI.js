@@ -1,9 +1,10 @@
 import { ref, onUnmounted } from "vue";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { useMessaging } from "../messaging/composables/useMessaging.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useExtensionAPI');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useExtensionAPI');
 
 export function useExtensionAPI() {
   // Enhanced messaging for Vue extension API - use generic Vue context

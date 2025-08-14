@@ -3,19 +3,13 @@
 import browser from "webextension-polyfill";
 import { CONFIG } from "../../config.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Feature');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'FeatureManager');
 
 import { storageManager } from "@/storage/core/StorageCore.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// ...existing code...
 
 
 /**
@@ -75,7 +69,7 @@ export default class FeatureManager {
         });
       })
       .catch((err) => {
-        getLogger().error('failed to load initial flags', err);
+  logger.error('failed to load initial flags', err);
       });
 
     // افزودن listener برای تغییرات آینده با StorageManager

@@ -9,7 +9,8 @@
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
-import { createLogger } from '../../utils/core/logger.js';
+import { getScopedLogger } from '../../utils/core/logger.js';
+import { LOG_COMPONENTS } from '../../utils/core/logConstants.js';
 
 class StorageCore {
   constructor() {
@@ -18,7 +19,7 @@ class StorageCore {
     this._isReady = false;
     this._readyPromise = null;
     this._changeListener = null;
-    this.logger = createLogger('Storage', 'Core');
+  this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
     this._initializeAsync();
   }
 

@@ -1,18 +1,9 @@
 // src/utils/framework-compat/naturalTyping.js
 
 import { checkTextSelection } from "./selectionUtils.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'naturalTyping');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'naturalTyping');
 
 
 /**
@@ -24,12 +15,12 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 export async function simulateNaturalTyping(element, text, delay = 10, replaceSelection = false) {
   if (!element || !text) {
-    getLogger().debug('Invalid params:', { element: !!element, text: !!text });
+  logger.debug('Invalid params:', { element: !!element, text: !!text });
     return false;
   }
 
   try {
-    getLogger().debug('Starting for element:', {
+  logger.debug('Starting for element:', {
       tagName: element.tagName,
       isContentEditable: element.isContentEditable,
       textLength: text.length,
@@ -41,7 +32,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     
     // بررسی انتخاب متن
     const hasSelection = checkTextSelection(element);
-    getLogger().debug('Selection status:', {
+  logger.debug('Selection status:', {
       hasSelection,
       replaceSelection,
       selectionStart: element.selectionStart,
@@ -55,7 +46,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
         return true;
       }
       // اگر روش ساده شکست بخورد، ادامه به character-by-character
-      getLogger().error('Reddit simple method failed, falling back to character-by-character');
+  logger.error('Reddit simple method failed, falling back to character-by-character');
     }
     
     // فقط در صورتی کل محتوا را پاک کن که:
@@ -63,10 +54,10 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     // 2. و این درخواست برای جایگزینی انتخاب نباشد
     if (!hasSelection && !replaceSelection) {
       // پاک کردن کل محتوا فقط اگر متن انتخاب نشده باشد
-      getLogger().debug('Clearing element content (full replacement mode)');
+  logger.debug('Clearing element content (full replacement mode)');
       await clearElementContent(element);
     } else if (replaceSelection && hasSelection) {
-      getLogger().debug('Selection replacement mode - will replace selected text only');
+  logger.debug('Selection replacement mode - will replace selected text only');
     }
     
     // تایپ کردن کاراکتر به کاراکتر
@@ -95,15 +86,15 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
           // اگر اولین کاراکتر است و متن انتخاب شده دارد، ابتدا آن را پاک کن
           if (i === 0 && hasSelection) {
             try {
-              getLogger().debug('Before deleteContents:', {
+              logger.debug('Before deleteContents:', {
                 collapsed: range.collapsed,
                 startContainer: range.startContainer?.nodeName,
                 endContainer: range.endContainer?.nodeName
               });
               range.deleteContents();
-              getLogger().debug('After deleteContents - selected content deleted');
+              logger.debug('After deleteContents - selected content deleted');
             } catch (error) {
-              getLogger().error('Error deleting content:', error);
+              logger.error('Error deleting content:', error);
               // fallback: تلاش برای پاک کردن محتوا با روش دیگر
               if (range.startContainer && range.endContainer) {
                 range.extractContents();
@@ -120,11 +111,11 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
               // range را دوباره تنظیم کن
               range.setStart(range.startContainer, range.startOffset);
               range.setEnd(range.startContainer, range.startOffset);
-              getLogger().debug('Reset range after deletion');
+              logger.debug('Reset range after deletion');
             }
             
             range.insertNode(textNode);
-            getLogger().init('Text node inserted successfully');
+            logger.init('Text node inserted successfully');
             
             // تنظیم مجدد range برای ادامه تایپ
             range.setStartAfter(textNode);
@@ -132,9 +123,9 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
             selection.removeAllRanges();
             selection.addRange(range);
             
-            getLogger().debug('Range updated for next character');
+            logger.debug('Range updated for next character');
           } catch (insertError) {
-            getLogger().error('Error inserting text node:', insertError);
+            logger.error('Error inserting text node:', insertError);
             // fallback: یک approach متفاوت امتحان کردن
             try {
               // سعی کن یک range جدید ایجاد کنی
@@ -149,16 +140,16 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
               selection.removeAllRanges();
               selection.addRange(newRange);
               
-              getLogger().init('Fallback range creation successful');
+              logger.init('Fallback range creation successful');
             } catch (fallbackError) {
-              getLogger().error('Fallback also failed:', fallbackError);
+              logger.error('Fallback also failed:', fallbackError);
               // آخرین fallback: اضافه کردن مستقیم
               element.appendChild(document.createTextNode(char));
             }
           }
         } else {
           // اگر range وجود ندارد، سعی کن یکی ایجاد کنی
-          getLogger().debug('No range found, creating new one');
+          logger.debug('No range found, creating new one');
           const range = document.createRange();
           range.selectNodeContents(element);
           range.collapse(false); // به انتها منتقل کن
@@ -225,11 +216,11 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     });
     element.dispatchEvent(changeEvent);
     
-    getLogger().info('Natural typing simulation completed');
+  logger.info('Natural typing simulation completed');
     return true;
     
   } catch (error) {
-    getLogger().error('Error in natural typing:', error);
+  logger.error('Error in natural typing:', error);
     return false;
   }
 }
@@ -244,7 +235,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
  */
 async function handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection) {
   try {
-    getLogger().debug('Starting Reddit-specific replacement:', {
+  logger.debug('Starting Reddit-specific replacement:', {
       hasSelection,
       replaceSelection,
       textLength: text.length
@@ -256,7 +247,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       // جایگزینی انتخاب
       const range = selection.getRangeAt(0);
       const originalText = range.toString();
-      getLogger().debug('Replacing selected text:', originalText);
+  logger.debug('Replacing selected text:', originalText);
       
       range.deleteContents();
       
@@ -276,7 +267,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       const currentText = element.textContent || element.innerText;
       const replacementWorked = currentText.includes(text) && !currentText.includes(originalText);
       
-      getLogger().info('Selection replacement result:', {
+  logger.info('Selection replacement result:', {
         originalText,
         newText: text,
         currentText: currentText.substring(0, 100),
@@ -284,13 +275,13 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       });
       
       if (!replacementWorked) {
-        getLogger().error('Selection replacement appears to have failed');
+  logger.error('Selection replacement appears to have failed');
         return false;
       }
     } else {
       // جایگزینی کل محتوا
       const originalText = element.textContent || element.innerText;
-      getLogger().debug('Replacing all content');
+  logger.debug('Replacing all content');
       element.textContent = text;
       
       // تنظیم cursor در انتها
@@ -306,7 +297,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       const currentText = element.textContent || element.innerText;
       const replacementWorked = currentText === text;
       
-      getLogger().info('Full replacement result:', {
+  logger.info('Full replacement result:', {
         originalText,
         newText: text,
         currentText,
@@ -314,7 +305,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       });
       
       if (!replacementWorked) {
-        getLogger().error('Full replacement appears to have failed');
+  logger.error('Full replacement appears to have failed');
         return false;
       }
     }
@@ -334,10 +325,10 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
     });
     element.dispatchEvent(changeEvent);
 
-    getLogger().init('Reddit replacement completed successfully');
+  logger.init('Reddit replacement completed successfully');
     return true;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }
@@ -394,6 +385,6 @@ async function clearElementContent(element) {
     element.dispatchEvent(inputEvent);
     
   } catch (error) {
-    getLogger().error('Error clearing content:', error);
+  logger.error('Error clearing content:', error);
   }
 }

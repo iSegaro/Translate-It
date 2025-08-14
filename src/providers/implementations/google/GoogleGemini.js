@@ -8,20 +8,13 @@ import {
   getGeminiThinkingEnabledAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// (logger already defined)
 
 
 export class GeminiProvider extends BaseProvider {
@@ -57,14 +50,14 @@ export class GeminiProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    getLogger().debug('translate input text:', text);
+  logger.debug('translate input text:', text);
     const prompt = await buildPrompt(
       text,
       sourceLang,
       targetLang,
       translateMode
     );
-    getLogger().debug('translate built prompt:', prompt);
+  logger.debug('translate built prompt:', prompt);
 
     // Determine thinking budget based on model and user settings
     let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
@@ -101,7 +94,7 @@ export class GeminiProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-translation`;
-    getLogger().debug('about to call _executeApiCall with:', {
+  logger.debug('about to call _executeApiCall with:', {
       url: url.replace(/key=[^&]+/, "key=***"),
       context: context,
     });
@@ -115,7 +108,7 @@ export class GeminiProvider extends BaseProvider {
         context: context,
       });
 
-      getLogger().info('_executeApiCall completed with result:', result
+  logger.info('_executeApiCall completed with result:', result
       );
       return result;
     } catch (error) {

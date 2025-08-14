@@ -1,8 +1,9 @@
 // Composable for smart popup resizing based on content
 import { ref, nextTick } from 'vue'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'usePopupResize');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePopupResize');
 
 export function usePopupResize() {
   const isResizing = ref(false)

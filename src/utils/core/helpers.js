@@ -2,9 +2,9 @@
 import browser from "webextension-polyfill";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'helpers');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'helpers');
 
 // Lazy loader for ErrorHandler to break circular dependency
 let errorHandlerInstance = null;

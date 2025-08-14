@@ -1,9 +1,9 @@
 // src/utils/core/tabPermissions.js
 // Tab permissions and accessibility utilities
 
-import { createLogger } from './logger.js';
-
-const logger = createLogger('Core', 'TabPermissions');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissions');
 
 /**
  * Check if a URL is restricted for content script injection
@@ -129,7 +129,7 @@ export function checkContentScriptAccess() {
  */
 export class TabPermissionChecker {
   constructor() {
-    this.logger = createLogger('Core', 'TabPermissionChecker');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissionChecker');
   }
   
   /**

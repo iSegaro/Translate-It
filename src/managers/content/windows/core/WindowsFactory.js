@@ -2,14 +2,15 @@
 
 import browser from "webextension-polyfill";
 import { WindowsConfig } from "./WindowsConfig.js";
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 
 /**
  * Factory for creating UI elements used by WindowsManager
  */
 export class WindowsFactory {
   constructor() {
-    this.logger = createLogger('Content', 'WindowsFactory');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsFactory');
   }
 
   /**

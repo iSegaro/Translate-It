@@ -1,6 +1,7 @@
 // src/managers/content/windows/theme/ThemeManager.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { getThemeAsync } from "../../../../config.js";
 import { getResolvedUserTheme } from "../../../../utils/ui/theme.js";
@@ -11,7 +12,7 @@ import { storageManager } from "../../../../storage/core/StorageCore.js";
  */
 export class ThemeManager {
   constructor() {
-    this.logger = createLogger('Content', 'ThemeManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ThemeManager');
     this.currentTheme = 'light';
     this.themeChangeListener = null;
     this.boundHandleThemeChange = null;

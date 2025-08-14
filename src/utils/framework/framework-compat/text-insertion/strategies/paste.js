@@ -1,18 +1,9 @@
 // src/utils/framework-compat/text-insertion/strategies/paste.js
 
 import { smartDelay } from "../helpers.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'paste');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'paste');
 
 
 /**
@@ -20,7 +11,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 export async function tryPasteInsertion(element, text, hasSelection) {
   try {
-    getLogger().debug('Attempting paste event simulation');
+  logger.debug('Attempting paste event simulation');
 
     // ایجاد DataTransfer object
     const clipboardData = new DataTransfer();
@@ -48,10 +39,10 @@ export async function tryPasteInsertion(element, text, hasSelection) {
         range.selectNodeContents(element);
         selection.removeAllRanges();
         selection.addRange(range);
-        getLogger().debug('Selected all content in contentEditable for undo preservation');
+  logger.debug('Selected all content in contentEditable for undo preservation');
       } else {
         element.setSelectionRange(0, element.value.length);
-        getLogger().debug('Selected all content in input/textarea for undo preservation');
+  logger.debug('Selected all content in input/textarea for undo preservation');
       }
     }
 
@@ -68,7 +59,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
       : element.value;
 
     if (currentText && currentText.includes(text)) {
-      getLogger().init('Success verified');
+  logger.init('Success verified');
       clipboardData.clearData();
       return true;
     }
@@ -76,7 +67,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
     clipboardData.clearData();
     return false;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }

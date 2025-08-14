@@ -1,7 +1,8 @@
 // src/managers/content/windows/translation/TranslationHandler.js
 
 import browser from "webextension-polyfill";
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "../../../../utils/messaging/messageId.js";
@@ -13,7 +14,7 @@ import { TranslationMode, getSettingsAsync } from "../../../../config.js";
  */
 export class TranslationHandler {
   constructor() {
-    this.logger = createLogger('Content', 'TranslationHandler');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationHandler');
     this.activeRequests = new Map();
   }
 

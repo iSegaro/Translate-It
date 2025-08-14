@@ -2,9 +2,10 @@
 // Unified copy action composable
 
 import { ref } from 'vue'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = createLogger('Composables', 'useCopyAction')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useCopyAction')
 
 export function useCopyAction() {
   // State

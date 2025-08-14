@@ -2,14 +2,16 @@
 
 import { CONFIG, state } from "../config.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
 
 export default class IconManager {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
     this.container = null;
     this.canShowIcons = false;
-    this.logger = createLogger('UI', 'IconManager');
+  // Scoped cached logger (no lazy wrapper needed)
+  this.logger = getScopedLogger(LOG_COMPONENTS.UI, 'IconManager');
   }
 
   _ensureContainerExists() {

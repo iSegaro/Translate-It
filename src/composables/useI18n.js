@@ -2,9 +2,10 @@
 // Safe i18n composable with fallback support
 
 import { computed, getCurrentInstance } from "vue";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useI18n');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useI18n');
 
 /**
  * Safe i18n composable that provides fallback when i18n is not ready

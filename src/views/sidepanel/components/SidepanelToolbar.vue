@@ -89,7 +89,7 @@ import browser from 'webextension-polyfill';
 let _logger;
 const getLogger = () => {
   if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelToolbar');
+  _logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelToolbar');
   }
   return _logger;
 };
@@ -97,7 +97,7 @@ const getLogger = () => {
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { MessageActions } from '../../../messaging/core/MessageActions';
 import { MessageContexts } from '../../../messaging/core/MessagingCore.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
 

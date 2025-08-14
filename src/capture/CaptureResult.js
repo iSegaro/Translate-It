@@ -5,17 +5,9 @@ import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { SimpleMarkdown } from "../utils/text/markdown.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'CaptureResult');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'CaptureResult');
 
 
 /**
@@ -57,7 +49,7 @@ export class CaptureResult {
    */
   async show() {
     try {
-      getLogger().info('Showing translation result');
+  logger.info('Showing translation result');
 
       if (this.isVisible) {
         this.hide();
@@ -69,9 +61,9 @@ export class CaptureResult {
 
       this.isVisible = true;
 
-      getLogger().init('Result shown successfully');
+  logger.init('Result shown successfully');
     } catch (error) {
-      getLogger().error('Error showing result:', error);
+  logger.error('Error showing result:', error);
       throw this._createError(
         ErrorTypes.UI,
         `Failed to show capture result: ${error.message}`,
@@ -85,7 +77,7 @@ export class CaptureResult {
   hide() {
     if (!this.isVisible) return;
 
-    getLogger().info('Hiding result');
+  logger.info('Hiding result');
 
     this._clearAutoFadeTimer();
     this._removeEventListeners();

@@ -79,9 +79,9 @@ import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormC
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
-import { createLogger } from '@/utils/core/logger.js'
-
-const logger = createLogger('UI', 'PopupApp')
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Stores & Composables
 const settingsStore = useSettingsStore()

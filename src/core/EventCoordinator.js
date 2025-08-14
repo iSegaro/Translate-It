@@ -18,7 +18,8 @@ import {
 } from "../config.js";
 import { ErrorHandler } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { logMethod } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
 import SelectionWindows from "../managers/content/WindowsManager.js";
@@ -37,8 +38,8 @@ export default class EventCoordinator {
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
     
-    // Initialize logger
-    this.logger = createLogger('Content', 'EventCoordinator');
+  // Initialize logger
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
     
     // Initialize SelectionWindows for text selection manager
     this.SelectionWindows = new SelectionWindows({

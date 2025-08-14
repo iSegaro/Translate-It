@@ -3,18 +3,9 @@
 
 import { ref, computed } from "vue";
 import { languageList } from "@/utils/i18n/languages.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'useLanguages');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useLanguages');
 
 
 /**
@@ -35,11 +26,11 @@ export function useLanguages() {
         // زبان‌ها از فایل استاتیک بارگذاری می‌شوند
         languages.value = languageList || [];
         isLoaded.value = true;
-        getLogger().init('Languages loaded successfully:', languages.value.length,
-        );
+  logger.init('Languages loaded successfully:', languages.value.length,
+  );
       }
     } catch (error) {
-      getLogger().error('Failed to load languages:', error);
+  logger.error('Failed to load languages:', error);
       // در صورت خطا، از لیست خالی استفاده می‌کنیم
       languages.value = [];
       isLoaded.value = true;

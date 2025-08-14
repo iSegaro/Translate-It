@@ -3,7 +3,8 @@
  * Handles ESC, Ctrl+/, and other shortcuts in an organized manner
  */
 
-import { createLogger } from '../../../utils/core/logger.js';
+import { getScopedLogger } from '../../../utils/core/logger.js';
+import { LOG_COMPONENTS } from '../../../utils/core/logConstants.js';
 import { KeyboardStateManager } from '../KeyboardStateManager.js';
 
 export class ShortcutManager {
@@ -14,7 +15,7 @@ export class ShortcutManager {
     this.globalListener = null;
     this.keyboardStateManager = null;
     this.ctrlSlashShortcut = null;
-    this.logger = createLogger('Content', 'ShortcutManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ShortcutManager');
   }
 
   /**

@@ -1,9 +1,10 @@
 // src/composables/useClipboard.js
 // Vue composable for clipboard functionality in sidepanel
 import { ref, onMounted, onUnmounted } from "vue";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useClipboard');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useClipboard');
 
 export function useClipboard() {
   // State

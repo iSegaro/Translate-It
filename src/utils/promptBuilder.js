@@ -10,17 +10,9 @@ import {
   TranslationMode,
 } from "../config.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
 
 
 /**
@@ -117,8 +109,8 @@ export async function buildPrompt(
     finalPromptWithUserRules = baseClean.replace(/\$_{USER_RULES}/g, userRules);
   }
 
-  getLogger().debug('Prompt template:', finalPromptWithUserRules);
-  getLogger().debug('Text for translation:', textForTranslation);
+  logger.debug('Prompt template:', finalPromptWithUserRules);
+  logger.debug('Text for translation:', textForTranslation);
 
   // اگر قالب نهایی شامل کلید $_{TEXT} باشد، تنها یک‌بار جایگذاری می‌کند.
   // در غیر این صورت، متن ترجمه‌شده به انتهای پرامت اضافه می‌شود.
@@ -134,10 +126,10 @@ export async function buildPrompt(
       /\$_{TEXT}/g,
       textForTranslation,
     );
-    getLogger().debug('Final prompt with TEXT replacement:', finalPrompt);
+  logger.debug('Final prompt with TEXT replacement:', finalPrompt);
   } else {
     finalPrompt = `${finalPromptWithUserRules}\n\n${textForTranslation}\n\n`;
-    getLogger().debug('Final prompt with appended text:', finalPrompt);
+  logger.debug('Final prompt with appended text:', finalPrompt);
   }
 
   return finalPrompt;

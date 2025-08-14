@@ -61,17 +61,9 @@ import ThemeSelector from './components/ThemeSelector.vue'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
 import browser from 'webextension-polyfill'
 import { useLanguages } from '@/composables/useLanguages.js' // Import useLanguages
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
 
 
 const settingsStore = useSettingsStore()
@@ -104,7 +96,7 @@ onMounted(async () => {
     const manifest = browser.runtime.getManifest()
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {
-    getLogger().warn('Failed to get manifest version:', error)
+  logger.warn('Failed to get manifest version:', error)
   }
 })</script>
 

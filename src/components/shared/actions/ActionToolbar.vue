@@ -62,9 +62,10 @@ import { computed } from 'vue'
 import CopyButton from './CopyButton.vue'
 import PasteButton from './PasteButton.vue'
 import TTSButton from './TTSButton.vue'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = createLogger('UI', 'ActionToolbar')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActionToolbar')
 
 // Props
 const props = defineProps({

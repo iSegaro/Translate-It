@@ -143,20 +143,14 @@ import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { marked } from 'marked';
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'EnhancedSidepanelMainContent');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'EnhancedSidepanelMainContent');
 
 import LanguageSelector from "@/components/shared/LanguageSelector.vue";
 import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 import ActionToolbar from "@/components/shared/actions/ActionToolbar.vue";
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// removed legacy createLogger import
 
 
 

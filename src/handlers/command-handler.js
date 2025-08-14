@@ -1,22 +1,13 @@
 import browser from "webextension-polyfill";
 import { MessagingContexts, MessageFormat, MessageActions } from '../messaging/core/MessagingCore.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
 
 
 async function handleCommand(tab, action, data = {}) {
   try {
-    getLogger().debug('${action} command triggered');
+    logger.debug(action, 'command triggered');
     
     const message = MessageFormat.create(
       action,
@@ -25,34 +16,34 @@ async function handleCommand(tab, action, data = {}) {
     );
     
     await browser.tabs.sendMessage(tab.id, message);
-    getLogger().debug('${action} command sent to content script');
+  logger.debug(action, 'command sent to content script');
   } catch (error) {
-    getLogger().error('Error handling ${action} command:', error);
+  logger.error('Error handling command', action, error);
     // Fallback logic for injection can be added here if needed
   }
 }
 
 async function handleBackgroundCommand(action, data = {}) {
-    try {
-        getLogger().debug('${action} background command triggered');
+  try {
+    logger.debug(action, 'background command triggered');
         await messenger.sendMessage({ action, data: { ...data, source: 'keyboard_shortcut' } });
-        getLogger().debug('${action} background command sent');
-    } catch (error) {
-        getLogger().error('Error handling ${action} background command:', error);
+  logger.debug(action, 'background command sent');
+  } catch (error) {
+    logger.error('Error handling background command', action, error);
     }
 }
 
 async function handleOptionsCommand() {
-    try {
-        getLogger().debug('Options command triggered');
+  try {
+    logger.debug('Options command triggered');
         await messenger.sendMessage({ action: 'openOptionsPage' });
-    } catch (error) {
-        getLogger().error('Error handling options command:', error);
+  } catch (error) {
+    logger.error('Error handling options command:', error);
     }
 }
 
 export async function handleCommandEvent(command, tab) {
-  getLogger().debug('Command received: ${command}', { tabId: tab?.id });
+  logger.debug('Command received:', command, { tabId: tab?.id });
 
   const commandMap = {
     translate: () => handleCommand(tab, 'KEYBOARD_SHORTCUT_TRANSLATE'),
@@ -72,8 +63,8 @@ export async function handleCommandEvent(command, tab) {
   const handler = commandMap[command];
   if (handler) {
     await handler();
-    getLogger().init('Command ${command} handled successfully');
+  logger.init('Command handled successfully', command);
   } else {
-    getLogger().debug('Unknown command: ${command}');
+  logger.debug('Unknown command:', command);
   }
 }

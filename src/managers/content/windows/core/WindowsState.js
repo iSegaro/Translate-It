@@ -1,13 +1,14 @@
 // src/managers/content/windows/core/WindowsState.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 
 /**
  * Manages state for WindowsManager
  */
 export class WindowsState {
   constructor(frameId) {
-    this.logger = createLogger('Content', 'WindowsState');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsState');
     this.frameId = frameId;
     this.isInIframe = window !== window.top;
     this.reset();

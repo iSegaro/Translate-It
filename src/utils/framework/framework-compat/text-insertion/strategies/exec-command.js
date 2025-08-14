@@ -1,18 +1,9 @@
 // src/utils/framework-compat/text-insertion/strategies/exec-command.js
 
 import { smartDelay } from "../helpers.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'exec-command');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'exec-command');
 
 
 /**
@@ -25,7 +16,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
       return false;
     }
 
-    getLogger().debug('Attempting execCommand insertText', {
+  logger.debug('Attempting execCommand insertText', {
       hasSelection,
       isContentEditable: element.isContentEditable,
       tagName: element.tagName,
@@ -41,7 +32,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         // اگر انتخاب دارد، مستقیماً جایگزین کن
         const result = document.execCommand("insertText", false, text);
         if (result) {
-          getLogger().init('execCommand succeeded for input/textarea with selection');
+          logger.init('execCommand succeeded for input/textarea with selection');
           await smartDelay(50);
           return true;
         }
@@ -51,7 +42,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         await smartDelay(10);
         const result = document.execCommand("insertText", false, text);
         if (result) {
-          getLogger().init('execCommand succeeded for input/textarea full replacement');
+          logger.init('execCommand succeeded for input/textarea full replacement');
           await smartDelay(50);
           return true;
         }
@@ -68,7 +59,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         await smartDelay(10);
         const insertResult = document.execCommand("insertText", false, text);
         if (deleteResult && insertResult) {
-          getLogger().init('execCommand succeeded for contentEditable with selection');
+          logger.init('execCommand succeeded for contentEditable with selection');
           await smartDelay(50);
           return true;
         }
@@ -87,7 +78,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         // درج متن جدید
         const insertResult = document.execCommand("insertText", false, text);
         if (deleteResult && insertResult) {
-          getLogger().init('execCommand succeeded for contentEditable full replacement');
+          logger.init('execCommand succeeded for contentEditable full replacement');
           await smartDelay(50);
           return true;
         }
@@ -96,7 +87,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
 
     return false;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }

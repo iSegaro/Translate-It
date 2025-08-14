@@ -1,14 +1,9 @@
 // src/providers/core/browserTranslateProvider.js
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 
 import { isPersianText } from "@/utils/text/textDetection.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
@@ -16,8 +11,6 @@ import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/config.js";
 import browser from 'webextension-polyfill';
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
 
 const TEXT_DELIMITER = "\n\n---\n\n";

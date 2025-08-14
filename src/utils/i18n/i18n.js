@@ -8,17 +8,9 @@ import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "../text/markdown.js";
 // import  from "./helpers.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'i18n');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'i18n');
 
 
 export function parseBoolean(value) {

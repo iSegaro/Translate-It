@@ -4,9 +4,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { SimpleMarkdown } from "@/utils/text/markdown.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useHistory');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useHistory');
 
 const MAX_HISTORY_ITEMS = 100;
 

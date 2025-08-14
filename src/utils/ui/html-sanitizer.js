@@ -2,9 +2,9 @@
 // Utility for safe HTML insertion with XSS protection
 
 import { filterXSS } from "xss";
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'html-sanitizer');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'html-sanitizer');
 
 /**
  * XSS configuration that matches the project's security requirements

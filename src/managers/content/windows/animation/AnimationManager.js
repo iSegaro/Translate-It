@@ -1,6 +1,7 @@
 // src/managers/content/windows/animation/AnimationManager.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 
 /**
@@ -8,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class AnimationManager {
   constructor() {
-    this.logger = createLogger('Content', 'AnimationManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'AnimationManager');
   }
 
   /**

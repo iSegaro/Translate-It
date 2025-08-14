@@ -3,7 +3,8 @@
  * Manages key press states for better keyboard shortcut handling
  */
 
-import { createLogger } from "../../utils/core/logger.js";
+import { getScopedLogger } from "../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 
 export class KeyboardStateManager {
   constructor() {
@@ -12,7 +13,7 @@ export class KeyboardStateManager {
     this.initialized = false;
     
     // Initialize logger
-    this.logger = createLogger('Content', 'KeyboardStateManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'KeyboardStateManager');
     
     // Commonly tracked keys
     this.TRACKED_KEYS = {

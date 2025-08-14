@@ -21,17 +21,9 @@ import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "../managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'Translation');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
 
 
 export default class TranslationHandler {
@@ -86,7 +78,7 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-    getLogger().debug('Reinitializing state after update...');
+  logger.debug('Reinitializing state after update...');
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
   }
@@ -125,7 +117,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-      getLogger().error('Error handling failed:', error);
+  logger.error('Error handling failed:', error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
@@ -147,7 +139,7 @@ export default class TranslationHandler {
 
   async handleCtrlSlash() {
     // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
-    getLogger().debug('Ctrl+/ handling delegated to ShortcutManager');
+  logger.debug('Ctrl+/ handling delegated to ShortcutManager');
   }
 
   async handleEditableElement(event) {

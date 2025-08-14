@@ -1,6 +1,7 @@
 // src/managers/content/windows/crossframe/MessageRouter.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 
 /**
@@ -8,7 +9,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
  */
 export class MessageRouter {
   constructor(frameRegistry, options = {}) {
-    this.logger = createLogger('Content', 'MessageRouter');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageRouter');
     this.frameRegistry = frameRegistry;
     this.onOutsideClick = options.onOutsideClick;
     this.onWindowCreationRequest = options.onWindowCreationRequest;

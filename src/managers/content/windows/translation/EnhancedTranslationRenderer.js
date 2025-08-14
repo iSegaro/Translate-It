@@ -1,7 +1,8 @@
 // src/managers/content/windows/translation/EnhancedTranslationRenderer.js
 
 import browser from "webextension-polyfill";
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "../../../../config.js";
@@ -17,7 +18,7 @@ import { useTTSAction } from "../../../../composables/actions/useTTSAction.js";
  */
 export class EnhancedTranslationRenderer {
   constructor(factory, ttsManager) {
-    this.logger = createLogger('Content', 'EnhancedTranslationRenderer');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EnhancedTranslationRenderer');
     this.factory = factory;
     this.ttsManager = ttsManager;
     

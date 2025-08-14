@@ -85,6 +85,14 @@ export default [
     },
     rules: {
       "no-undef": "warn",
+      'no-restricted-imports': [
+        'error',
+        {
+          name: '@/utils/core/logger.js',
+          importNames: ['createLogger'],
+          message: 'Use getScopedLogger instead of createLogger outside logger infrastructure.'
+        }
+      ]
     },
   },
 

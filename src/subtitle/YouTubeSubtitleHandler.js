@@ -1,20 +1,13 @@
 // src/subtitle/YouTubeSubtitleHandler.js
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'YouTubeSubtitle');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'YouTubeSubtitle');
 
 import { safeSetText } from "../utils/ui/html-sanitizer.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// (logger defined above)
 
 
 export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
@@ -117,7 +110,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     if (newVideoId !== this.currentVideoId) {
       this.currentVideoId = newVideoId;
-      getLogger().debug('Video changed to: ${newVideoId}');
+  logger.debug(`Video changed to: ${newVideoId}`);
 
       if (this.isActive) {
         this.handleUrlChange();
@@ -131,7 +124,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     // اگر video ID نیست، منتظر بمان تا ویدیو بارگذاری شود
     if (!this.currentVideoId) {
-      getLogger().debug('No video ID found, waiting for video to load...',  );
+  logger.debug('No video ID found, waiting for video to load...');
 
       // منتظر بمان تا video ID پیدا شود (حداکثر 10 ثانیه)
       const maxWait = 10000;
@@ -145,7 +138,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       }
 
       if (!this.currentVideoId) {
-        getLogger().debug('Still no video ID after waiting, but continuing anyway',  );
+  logger.debug('Still no video ID after waiting, but continuing anyway');
         // ادامه می‌دهیم حتی بدون video ID - ممکن است بعداً پیدا شود
       }
     }

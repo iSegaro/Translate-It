@@ -1,9 +1,10 @@
 // src/background/handlers/screen-capture/handleStartFullScreenCapture.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'handleStartFullScreenCapture');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleStartFullScreenCapture');
 
 const errorHandler = new ErrorHandler();
 

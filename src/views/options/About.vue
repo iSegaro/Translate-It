@@ -30,17 +30,9 @@
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import browser from 'webextension-polyfill'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'About');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About');
 
 
 const isLoadingChangelog = ref(true)
@@ -58,7 +50,7 @@ const fetchChangelog = async () => {
     const markdown = await response.text()
     renderedChangelog.value = marked(markdown)
   } catch (error) {
-    getLogger().error('Error fetching changelog:', error)
+  logger.error('Error fetching changelog:', error)
     changelogError.value = true
   } finally {
     isLoadingChangelog.value = false
@@ -67,7 +59,8 @@ const fetchChangelog = async () => {
 
 onMounted(() => {
   fetchChangelog()
-})</script>
+})
+</script>
 
 <style lang="scss" scoped>
 @use '@/assets/styles/variables.scss' as *;

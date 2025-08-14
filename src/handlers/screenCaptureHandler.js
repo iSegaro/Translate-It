@@ -1,15 +1,9 @@
 // src/handlers/screenCaptureHandler.js
 
 import browser from "webextension-polyfill";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'screenCapture');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'screenCapture');
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import {
@@ -22,8 +16,7 @@ import { ProviderRegistry } from "../core/provider-registry.js";
 import { captureManager } from "../managers/browser-specific/capture/CaptureManager.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// removed legacy createLogger import
 
 
 /**
@@ -48,7 +41,7 @@ export async function handleStartAreaCapture(
   errorHandler,
   injectionState,
 ) {
-  getLogger().debug('Starting area capture request');
+  logger.debug('Starting area capture request');
 
   try {
     // 1. Validate screen capture is enabled
@@ -104,7 +97,7 @@ export async function handleStartAreaCapture(
 
     // 6. Handle content script injection if needed
     if (response?.error && !injectionState.inProgress) {
-      getLogger().debug('Content script not available, injecting...',  );
+  logger.debug('Content script not available, injecting...');
 
       injectionState.inProgress = true;
       try {
@@ -131,7 +124,7 @@ export async function handleStartAreaCapture(
           );
         }
       } catch (injectionErr) {
-        getLogger().error('Script injection failed:', injectionErr);
+  logger.error('Script injection failed:', injectionErr);
         throw createScreenCaptureError(
           ErrorTypes.INTEGRATION,
           "Could not inject content script for screen capture",
@@ -141,10 +134,10 @@ export async function handleStartAreaCapture(
       }
     }
 
-    getLogger().init('Area capture initiated successfully');
+  logger.init('Area capture initiated successfully');
     sendResponse({ success: true, message: "Area selection started" });
   } catch (error) {
-    getLogger().error('Error in area capture:', error);
+  logger.error('Error in area capture:', error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-area",
@@ -173,7 +166,7 @@ export async function handleStartFullScreenCapture(
   safeSendMessage,
   errorHandler
 ) {
-  getLogger().debug('Starting full screen capture request');
+  logger.debug('Starting full screen capture request');
 
   try {
     // 1. Validate screen capture is enabled
@@ -208,10 +201,10 @@ export async function handleStartFullScreenCapture(
       provider,
     });
 
-    getLogger().init('Full screen capture completed successfully');
+  logger.init('Full screen capture completed successfully');
     sendResponse({ success: true, message: "Full screen capture completed" });
   } catch (error) {
-    getLogger().error('Error in full screen capture:', error);
+  logger.error('Error in full screen capture:', error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-fullscreen",
@@ -236,7 +229,7 @@ export async function handleRequestFullScreenCapture(
   sendResponse,
   errorHandler,
 ) {
-  getLogger().debug('Request for full screen capture received');
+  logger.debug('Request for full screen capture received');
 
   try {
     // Get active tab
@@ -267,13 +260,13 @@ export async function handleRequestFullScreenCapture(
       url: activeTab.url,
     };
 
-    getLogger().info('Full screen capture completed for cropping');
+  logger.info('Full screen capture completed for cropping');
     sendResponse({
       success: true,
       ...captureData,
     });
   } catch (error) {
-    getLogger().error('Error capturing full screen:', error);
+  logger.error('Error capturing full screen:', error);
 
     let errorType = ErrorTypes.SCREEN_CAPTURE_FAILED;
     if (error.message?.includes("permission")) {
@@ -305,7 +298,7 @@ export async function handleProcessAreaCaptureImage(
   sendResponse,
   errorHandler,
 ) {
-  getLogger().debug('Processing cropped area capture image');
+  logger.debug('Processing cropped area capture image');
 
   try {
     const { imageData, selectionData, captureOptions, originalCapture } =
@@ -334,10 +327,10 @@ export async function handleProcessAreaCaptureImage(
     // Process with CaptureManager (preview and translation)
     await captureManager.processAreaCaptureImage(captureData, captureOptions);
 
-    getLogger().init('Area capture image processed successfully');
+  logger.init('Area capture image processed successfully');
     sendResponse({ success: true, message: "Area capture completed" });
   } catch (error) {
-    getLogger().error('Error processing area capture image:', error,
+  logger.error('Error processing area capture image:', error,
     );
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
@@ -363,7 +356,7 @@ export async function handlePreviewConfirmed(
   sendResponse,
   errorHandler,
 ) {
-  getLogger().debug('Preview confirmed, starting translation');
+  logger.debug('Preview confirmed, starting translation');
 
   try {
     const { captureData, translationOptions } = message.data;
@@ -378,10 +371,10 @@ export async function handlePreviewConfirmed(
     // Process with CaptureManager
     await captureManager.handlePreviewConfirm(captureData);
 
-    getLogger().init('Preview confirmation processed successfully',  );
+  logger.init('Preview confirmation processed successfully');
     sendResponse({ success: true, message: "Translation started" });
   } catch (error) {
-    getLogger().error('Error processing preview confirmation:', error,
+  logger.error('Error processing preview confirmation:', error,
     );
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
@@ -401,7 +394,7 @@ export async function handlePreviewConfirmed(
  * @param {Function} sendResponse - Response callback
  */
 export function handlePreviewCancelled(message, sender, sendResponse) {
-  getLogger().debug('Preview cancelled by user');
+  logger.debug('Preview cancelled by user');
 
   // Clean up capture operations
   captureManager.handlePreviewCancel();
@@ -422,8 +415,8 @@ export async function handlePreviewRetry(
   sendResponse,
   errorHandler,
 ) {
-  getLogger().debug('Preview retry requested');
-  getLogger().debug('Preview retry message data:', {
+  logger.debug('Preview retry requested');
+  logger.debug('Preview retry message data:', {
     messageData: message.data,
     hasData: !!message.data,
     captureType: message.data?.captureType,
@@ -442,10 +435,10 @@ export async function handlePreviewRetry(
     // Process retry with CaptureManager
     await captureManager.handlePreviewRetry(captureType);
 
-    getLogger().init('Preview retry processed successfully');
+  logger.init('Preview retry processed successfully');
     sendResponse({ success: true, message: "Retry initiated" });
   } catch (error) {
-    getLogger().error('Error processing preview retry:', error);
+  logger.error('Error processing preview retry:', error);
     await errorHandler.handle(error, {
       type: error.type || ErrorTypes.SCREEN_CAPTURE_FAILED,
       context: "handler-screenCapture-previewRetry",
@@ -464,7 +457,7 @@ export async function handlePreviewRetry(
  * @param {Function} sendResponse - Response callback
  */
 export function handleResultClosed(message, sender, sendResponse) {
-  getLogger().info('Result closed by user');
+  logger.info('Result closed by user');
 
   // Clean up capture operations
   captureManager.handleResultClose();
@@ -479,7 +472,7 @@ export function handleResultClosed(message, sender, sendResponse) {
  * @param {Function} sendResponse - Response callback
  */
 export function handleCaptureError(message, sender, sendResponse) {
-  getLogger().error('Capture error reported from content script:', message.data,
+  logger.error('Capture error reported from content script:', message.data,
   );
 
   // Clean up capture operations
@@ -495,7 +488,7 @@ export function handleCaptureError(message, sender, sendResponse) {
  * @param {Function} sendResponse - Response callback
  */
 export function handleAreaSelectionCancel(message, sender, sendResponse) {
-  getLogger().debug('Area selection cancelled by user');
+  logger.debug('Area selection cancelled by user');
 
   // Clean up any pending capture operations
   captureManager.cleanup();

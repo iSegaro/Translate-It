@@ -18,17 +18,9 @@ import { computed } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
 import browser from 'webextension-polyfill'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
 
 
 // RTL detection using i18n plugin
@@ -40,10 +32,11 @@ const isRTL = computed(() => {
     }
     return false
   } catch (e) {
-    getLogger().debug('Failed to get RTL setting:', e.message)
+  logger.debug('Failed to get RTL setting:', e.message)
     return false
   }
-})</script>
+})
+</script>
 
 <style lang="scss" scoped>
 @use '@/assets/styles/variables.scss' as *;

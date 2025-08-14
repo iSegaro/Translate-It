@@ -100,17 +100,9 @@ import { useUI } from '@/composables/useUI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { languageList } from '@/utils/i18n/languages.js'
 import browser from 'webextension-polyfill'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
 
 
 const { handleError } = useErrorHandler()
@@ -179,7 +171,7 @@ const handleClose = () => {
   
   // Emit update:isVisible to sync with parent (SidepanelLayout)
   emit('update:isVisible', false)
-  getLogger().debug('[SidepanelHistory] handleClose: Emitting update:isVisible(false)')
+  logger.debug('[SidepanelHistory] handleClose: Emitting update:isVisible(false)')
   
   setTimeout(() => {
     isClosing.value = false
@@ -194,7 +186,7 @@ const handleClearAllHistory = async () => {
     if (cleared) {
       const button = document.getElementById('clearAllHistoryBtn')
       showVisualFeedback(button, 'success')
-      getLogger().debug('[SidepanelHistory] All history cleared')
+  logger.debug('[SidepanelHistory] All history cleared')
     }
   } catch (error) {
     await handleError(error, 'sidepanel-history-clear-all')
@@ -231,7 +223,7 @@ const handleDeleteHistoryItem = async (index, event) => {
       showVisualFeedback(button, 'success', 400)
     }
     
-    getLogger().debug(`[SidepanelHistory] History item ${index} deleted`)
+  logger.debug(`[SidepanelHistory] History item ${index} deleted`)
   } catch (error) {
     await handleError(error, 'sidepanel-history-delete-item')
     const button = event.target.closest('.delete-btn')
@@ -244,7 +236,7 @@ const handleDeleteHistoryItem = async (index, event) => {
 // Render history items
 const renderHistoryItems = () => {
   // No longer manually rendering, Vue will handle it
-  getLogger().debug('[SidepanelHistory] Finished rendering', formattedHistoryItems.value.length, 'items')
+  logger.debug('[SidepanelHistory] Finished rendering', formattedHistoryItems.value.length, 'items')
 }
 
 // Setup event listeners
@@ -283,7 +275,7 @@ const initialize = async () => {
     await loadHistory()
     renderHistoryItems()
     
-    getLogger().debug('[SidepanelHistory] Component initialized')
+  logger.debug('[SidepanelHistory] Component initialized')
   } catch (error) {
     await handleError(error, 'sidepanel-history-init')
   }

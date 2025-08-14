@@ -1,9 +1,10 @@
 // src/background/handlers/common/handleContentScriptWillReload.js
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'handleContentScriptWillReload');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleContentScriptWillReload');
 
 const errorHandler = new ErrorHandler();
 

@@ -4,20 +4,11 @@ import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'localization');
-  }
-  return _logger;
-};
-
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'localization');
 
 
 /**
@@ -78,19 +69,19 @@ function initLocalizationUI() {
  */
 async function setLanguage(locale) {
   try {
-    getLogger().debug('Changing language to:', locale);
+  logger.debug('Changing language to:', locale);
     await app_localize(locale);
 
     // --- Send a message to the background script to refresh context menus ---
-    getLogger().debug('Sending message to refresh context menus for locale:', locale,
+  logger.debug('Sending message to refresh context menus for locale:', locale,
     );
     browser.runtime
       .sendMessage({ action: MessageActions.REFRESH_CONTEXT_MENUS })
       .catch((err) =>
-        getLogger().error('Error sending REFRESH_CONTEXT_MENUS message:', err.message),
+  logger.error('Error sending REFRESH_CONTEXT_MENUS message:', err.message),
       );
   } catch (err) {
-    getLogger().error('setLanguage error:', err);
+  logger.error('setLanguage error:', err);
   }
 }
 

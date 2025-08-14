@@ -1,9 +1,10 @@
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageActions } from '../../../messaging/core/MessageActions.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'handleTranslateText');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleTranslateText');
 
 const errorHandler = new ErrorHandler();
 

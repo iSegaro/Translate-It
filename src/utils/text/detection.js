@@ -6,9 +6,9 @@
 
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'detection');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'detection');
 
 // Translation cache (same as OLD version)
 const translationCache = new Map();

@@ -31,9 +31,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useCopyAction } from '@/composables/actions/useCopyAction.js'
-import { createLogger } from '@/utils/core/logger.js'
-
-const logger = createLogger('UI', 'CopyButton')
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'CopyButton')
 
 // Props
 const props = defineProps({

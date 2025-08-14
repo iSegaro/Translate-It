@@ -2,10 +2,11 @@
 import browser from 'webextension-polyfill';
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '../../../messaging/core/MessageActions.js';
 
-const logger = createLogger('Core', 'handleGetSelectedText');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleGetSelectedText');
 
 const errorHandler = new ErrorHandler();
 

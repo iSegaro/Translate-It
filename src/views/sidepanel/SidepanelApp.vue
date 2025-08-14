@@ -41,17 +41,9 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 
 // Stores
@@ -76,33 +68,29 @@ const handleMessage = (message) => {
 
 // Lifecycle
 onMounted(async () => {
-  getLogger().debug('🚀 SidepanelApp mounting...')
-  
+  logger.debug('🚀 SidepanelApp mounting...')
   try {
     // Step 1: Set loading text
-    getLogger().debug('📝 Setting loading text...')
+    logger.debug('📝 Setting loading text...')
     loadingText.value = browser.i18n.getMessage('sidepanel_loading') || 'Loading Sidepanel...'
-    getLogger().debug('✅ Loading text set')
-    
+    logger.debug('✅ Loading text set')
+
     // Step 2: Load settings store
-    getLogger().debug('⚙️ Loading settings store...')
+    logger.debug('⚙️ Loading settings store...')
     await Promise.race([
       settingsStore.loadSettings(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Settings loading timeout')), 10000)
-      )
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Settings loading timeout')), 10000))
     ])
-    getLogger().debug('✅ Settings store loaded')
+    logger.debug('✅ Settings store loaded')
 
     // Step 3: Add message listener
-    browser.runtime.onMessage.addListener(handleMessage);
-    
+    browser.runtime.onMessage.addListener(handleMessage)
   } catch (error) {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
     errorMessage.value = error.message || 'Unknown error occurred'
   } finally {
-    getLogger().debug('✨ SidepanelApp initialization complete')
+    logger.debug('✨ SidepanelApp initialization complete')
     isLoading.value = false
   }
 })
@@ -112,7 +100,7 @@ onUnmounted(() => {
 });
 
 const retryLoading = () => {
-  getLogger().debug('🔄 Retrying sidepanel loading...')
+  logger.debug('🔄 Retrying sidepanel loading...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true
@@ -121,10 +109,9 @@ const retryLoading = () => {
   settingsStore.$reset && settingsStore.$reset()
   
   // Retry mounting logic
-  setTimeout(() => {
-    onMounted()
-  }, 100)
-}</script>
+  setTimeout(() => { onMounted() }, 100)
+}
+</script>
 
 <style scoped>
 .extension-sidepanel {

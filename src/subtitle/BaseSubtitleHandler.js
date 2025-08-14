@@ -2,18 +2,9 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { TranslationMode } from "../config.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'BaseSubtitle');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'BaseSubtitle');
 
 
 export default class BaseSubtitleHandler {
@@ -51,7 +42,7 @@ export default class BaseSubtitleHandler {
     if (this.isActive) return true;
 
     if (!this.isCompatibleSite()) {
-      getLogger().debug('Site not compatible');
+  logger.debug('Site not compatible');
       return false;
     }
 
@@ -61,7 +52,7 @@ export default class BaseSubtitleHandler {
       this.setupObserver();
       this.setupPeriodicCheck();
 
-      getLogger().debug('Subtitle translation started');
+  logger.debug('Subtitle translation started');
       // const startMessage = await getTranslationString("SUBTITLE_TRANSLATION_STARTED");
       // this.notifier?.show(startMessage, "success", 2000);
       return true;
@@ -94,7 +85,7 @@ export default class BaseSubtitleHandler {
     this.translationCache.clear();
     this.lastProcessedText = "";
 
-    getLogger().debug('Subtitle translation stopped');
+  logger.debug('Subtitle translation stopped');
     // const stopMessage = await getTranslationString("SUBTITLE_TRANSLATION_STOPPED");
     // this.notifier?.show(stopMessage, "info", 2000);
   }
@@ -110,10 +101,10 @@ export default class BaseSubtitleHandler {
       const check = () => {
         const container = document.querySelector(selectors.container);
         if (container) {
-          getLogger().debug('Subtitle container found');
+          logger.debug('Subtitle container found');
           resolve(container);
         } else if (elapsed >= maxWait) {
-          getLogger().debug('Subtitle container not found after ${maxWait}ms, but continuing',  );
+          logger.debug(`Subtitle container not found after ${maxWait}ms, but continuing`);
           // بجای reject کردن، resolve می‌کنیم تا ادامه پیدا کند
           resolve(null);
         } else {
@@ -131,11 +122,11 @@ export default class BaseSubtitleHandler {
     const container = document.querySelector(selectors.container);
 
     if (!container) {
-      getLogger().debug('No container found for observer, will use periodic check only',  );
+  logger.debug('No container found for observer, will use periodic check only');
       return;
     }
 
-    getLogger().debug('Setting up MutationObserver on container',  );
+  logger.debug('Setting up MutationObserver on container');
 
     this.observer = new MutationObserver((mutations) => {
       let hasChanges = false;

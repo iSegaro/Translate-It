@@ -1,18 +1,9 @@
 // src/subtitle/NetflixSubtitleHandler.js
 
 import BaseSubtitleHandler from "./BaseSubtitleHandler.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'NetflixSubtitle');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'NetflixSubtitle');
 
 
 export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
@@ -75,10 +66,10 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
               ?.videoPlayer;
           if (videoPlayer) {
             this.netflixPlayer = videoPlayer;
-            getLogger().debug('Netflix player API found');
+            logger.debug('Netflix player API found');
             resolve(true);
           } else if (elapsed >= maxWait) {
-            getLogger().debug('Netflix player API not found, using fallback',  );
+            logger.debug('Netflix player API not found, using fallback');
             resolve(false);
           } else {
             elapsed += checkInterval;
@@ -102,7 +93,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
     this.currentMovieId = this.getCurrentMovieId();
 
     if (!this.currentMovieId) {
-      getLogger().debug('No movie ID found');
+  logger.debug('No movie ID found');
       return false;
     }
 

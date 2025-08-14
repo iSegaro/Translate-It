@@ -1,6 +1,7 @@
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'CaptureContent');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'CaptureContent');
 class CaptureContent {
   constructor() {
     logger.debug("CaptureContent initialized");

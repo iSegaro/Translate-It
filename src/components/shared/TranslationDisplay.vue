@@ -52,17 +52,11 @@ import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
-  }
-  return _logger;
-};
+// Scoped logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');
 
 
 // Props
@@ -191,7 +185,7 @@ const renderedContent = computed(() => {
       const markdownElement = SimpleMarkdown.render(props.content)
       return markdownElement ? markdownElement.innerHTML : props.content.replace(/\n/g, '<br>')
     } catch (error) {
-      getLogger().warn('[TranslationDisplay] Markdown rendering failed:', error)
+  logger.warn('[TranslationDisplay] Markdown rendering failed:', error)
       return props.content.replace(/\n/g, '<br>')
     }
   } else {

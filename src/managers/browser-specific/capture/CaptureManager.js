@@ -1,15 +1,9 @@
 // src/capture/CaptureManager.js
 
 import { getbrowser } from "@/utils/browser-polyfill.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'Capture');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'CaptureManager');
 
 import { handleUIError } from "../error-management/ErrorService.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
@@ -19,8 +13,7 @@ import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// ...existing code...
 
 
 /**
@@ -45,7 +38,7 @@ export class CaptureManager {
    */
   async startAreaCapture(options) {
     try {
-      getLogger().debug('Starting area capture', options);
+  logger.debug('Starting area capture', options);
 
       // Validate provider supports image translation
       if (!this._validateProviderSupport(options.provider)) {
@@ -75,9 +68,9 @@ export class CaptureManager {
       // Start area selection
       await this.screenSelector.start();
 
-      getLogger().init('Area capture initialized successfully');
+  logger.init('Area capture initialized successfully');
     } catch (error) {
-      getLogger().error('Error starting area capture:', error);
+  logger.error('Error starting area capture:', error);
       this.cleanup();
       throw this._normalizeError(error, "startAreaCapture");
     }
@@ -90,7 +83,7 @@ export class CaptureManager {
    */
   async startFullScreenCapture(options) {
     try {
-      getLogger().debug('Starting full screen capture', options);
+  logger.debug('Starting full screen capture', options);
 
       // Validate provider supports image translation
       if (!this._validateProviderSupport(options.provider)) {
@@ -114,9 +107,9 @@ export class CaptureManager {
       // Show preview for confirmation
       await this._showPreview(captureData, "fullscreen");
 
-      getLogger().info('Full screen capture completed');
+  logger.info('Full screen capture completed');
     } catch (error) {
-      getLogger().error('Error in full screen capture:', error);
+  logger.error('Error in full screen capture:', error);
       this.cleanup();
       throw this._normalizeError(error, "startFullScreenCapture");
     }
@@ -130,7 +123,7 @@ export class CaptureManager {
    */
   async processAreaCaptureImage(captureData, captureOptions) {
     try {
-      getLogger().debug('Processing area capture image from content script',  );
+  logger.debug('Processing area capture image from content script');
 
       // Store options
       this.captureOptions = captureOptions;
@@ -139,7 +132,7 @@ export class CaptureManager {
       // Show preview for confirmation (image already cropped by content script)
       await this._showPreview(captureData, "area", captureData.dimensions);
     } catch (error) {
-      getLogger().error('Error processing area capture image:', error);
+  logger.error('Error processing area capture image:', error);
       this.cleanup();
       throw this._normalizeError(error, "processAreaCaptureImage");
     }
@@ -153,8 +146,8 @@ export class CaptureManager {
    * @deprecated Use processAreaCaptureImage instead
    */
   async _handleAreaSelection(_selectionData) {
-    getLogger().debug('Legacy area selection handler called - this should not happen',  );
-    getLogger().debug('Image cropping should be handled in content script now',  );
+  logger.debug('Legacy area selection handler called - this should not happen');
+  logger.debug('Image cropping should be handled in content script now');
     throw this._createError(
       ErrorTypes.INTEGRATION,
       "Legacy area selection method called - use content script cropping instead",
@@ -166,7 +159,7 @@ export class CaptureManager {
    * @private
    */
   _handleCaptureCancel() {
-    getLogger().debug('Capture cancelled by user');
+  logger.debug('Capture cancelled by user');
     this.cleanup();
   }
 
@@ -179,7 +172,7 @@ export class CaptureManager {
    */
   async _showPreview(captureData, captureType, selectionData = null) {
     try {
-      getLogger().debug('Requesting preview display in content script');
+  logger.debug('Requesting preview display in content script');
 
       // Get active tab to send preview message
       const [activeTab] = await getbrowser().tabs.query({
@@ -205,9 +198,9 @@ export class CaptureManager {
         },
       });
 
-      getLogger().debug('Preview request sent to content script');
+  logger.debug('Preview request sent to content script');
     } catch (error) {
-      getLogger().error('Error requesting preview display:', error);
+  logger.error('Error requesting preview display:', error);
       throw this._normalizeError(error, "showPreview");
     }
   }
@@ -218,7 +211,7 @@ export class CaptureManager {
    */
   async handlePreviewConfirm(captureData) {
     try {
-      getLogger().debug('Preview confirmed, starting translation');
+  logger.debug('Preview confirmed, starting translation');
 
       // Store current capture data
       this.currentCapture = captureData;
@@ -226,7 +219,7 @@ export class CaptureManager {
       // Start translation process
       await this._translateCapturedImage(captureData);
     } catch (error) {
-      getLogger().error('Error in preview confirmation:', error);
+  logger.error('Error in preview confirmation:', error);
       handleUIError(this._normalizeError(error, "handlePreviewConfirm"));
     }
   }
@@ -235,7 +228,7 @@ export class CaptureManager {
    * Handle preview cancellation from content script
    */
   handlePreviewCancel() {
-    getLogger().debug('Preview cancelled');
+  logger.debug('Preview cancelled');
     this.cleanup();
   }
 
@@ -245,12 +238,12 @@ export class CaptureManager {
    */
   async handlePreviewRetry(captureType) {
     try {
-      getLogger().debug('Retrying capture', { captureType });
+  logger.debug('Retrying capture', { captureType });
 
       // Restart based on capture type
       if (captureType === "area") {
         // For area capture, restart the area selection process
-        getLogger().debug('Restarting area capture selection');
+  logger.debug('Restarting area capture selection');
 
         // Get active tab to send area selection restart message
         const [activeTab] = await getbrowser().tabs.query({
@@ -271,10 +264,10 @@ export class CaptureManager {
           data: this.captureOptions,
         });
 
-        getLogger().init('Area capture retry initiated successfully');
+  logger.init('Area capture retry initiated successfully');
       } else {
         // For fullscreen, wait for preview to close then capture again
-        getLogger().debug('Restarting fullscreen capture');
+  logger.debug('Restarting fullscreen capture');
 
         // Add delay to ensure preview window is fully closed and DOM updated
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -282,10 +275,10 @@ export class CaptureManager {
         const captureData = await this._captureScreen();
         await this._showPreview(captureData, "fullscreen");
 
-        getLogger().info('Fullscreen capture retry completed');
+  logger.info('Fullscreen capture retry completed');
       }
     } catch (error) {
-      getLogger().error('Error retrying capture:', error);
+  logger.error('Error retrying capture:', error);
       handleUIError(this._normalizeError(error, "handlePreviewRetry"));
     }
   }
@@ -297,7 +290,7 @@ export class CaptureManager {
    */
   async _translateCapturedImage(captureData) {
     try {
-      getLogger().debug('Starting image translation');
+  logger.debug('Starting image translation');
 
       const { provider, sourceLanguage, targetLanguage } = this.captureOptions;
 
@@ -313,14 +306,14 @@ export class CaptureManager {
         },
       );
 
-      getLogger().info('Translation completed:', {
+  logger.info('Translation completed:', {
         method: extractionResult.method,
         success: !!extractionResult.translatedText,
         textLength: extractionResult.translatedText?.length || 0,
       });
 
       // Display translation result
-      getLogger().info('About to display result:', {
+  logger.info('About to display result:', {
         translatedText: extractionResult.translatedText,
         translatedTextType: typeof extractionResult.translatedText,
         translatedTextStringified: JSON.stringify(
@@ -334,7 +327,7 @@ export class CaptureManager {
         extractionResult,
       );
     } catch (error) {
-      getLogger().error('Error translating image:', error);
+  logger.error('Error translating image:', error);
       throw this._normalizeError(error, "translateCapturedImage");
     }
   }
@@ -352,7 +345,7 @@ export class CaptureManager {
     _extractionMetadata = {},
   ) {
     try {
-      getLogger().info('Requesting result display in content script');
+  logger.info('Requesting result display in content script');
 
       // Use the tab ID from capture data instead of querying for active tab
       // This ensures we send result to the correct tab even if focus has changed
@@ -360,7 +353,7 @@ export class CaptureManager {
         captureData.tabId || (this.currentCapture && this.currentCapture.tabId);
 
       if (!targetTabId) {
-        getLogger().debug('No tab ID found in capture data, trying active tab fallback',  );
+  logger.debug('No tab ID found in capture data, trying active tab fallback');
         // Fallback to active tab query
         const [activeTab] = await getbrowser().tabs.query({
           active: true,
@@ -375,7 +368,7 @@ export class CaptureManager {
         targetTabId = activeTab.id;
       }
 
-      getLogger().info('Using tab ID for result display:', targetTabId);
+  logger.info('Using tab ID for result display:', targetTabId);
 
       // Send result data to content script
       await getbrowser().tabs.sendMessage(targetTabId, {
@@ -387,9 +380,9 @@ export class CaptureManager {
         },
       });
 
-      getLogger().info('Result display request sent to content script');
+  logger.info('Result display request sent to content script');
     } catch (error) {
-      getLogger().error('Error requesting result display:', error);
+  logger.error('Error requesting result display:', error);
       throw this._normalizeError(error, "displayTranslationResult");
     }
   }
@@ -398,7 +391,7 @@ export class CaptureManager {
    * Handle translation result close from content script
    */
   handleResultClose() {
-    getLogger().info('Translation result closed');
+  logger.info('Translation result closed');
     this.cleanup();
   }
 
@@ -409,7 +402,7 @@ export class CaptureManager {
    */
   async _captureScreen() {
     try {
-      getLogger().debug('Capturing screen');
+  logger.debug('Capturing screen');
 
       // Get active tab
       const [activeTab] = await getbrowser().tabs.query({
@@ -441,7 +434,7 @@ export class CaptureManager {
         position: { x: 0, y: 0 },
       };
     } catch (error) {
-      getLogger().error('Error capturing screen:', error);
+  logger.error('Error capturing screen:', error);
 
       if (error.message?.includes("permission")) {
         throw this._createError(
@@ -529,7 +522,7 @@ export class CaptureManager {
    * Clean up all capture components and reset state
    */
   cleanup() {
-    getLogger().debug('Cleaning up');
+  logger.debug('Cleaning up');
 
     this.isActive = false;
     this.currentCapture = null;

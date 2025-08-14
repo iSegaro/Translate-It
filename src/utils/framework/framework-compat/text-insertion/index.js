@@ -1,6 +1,6 @@
 // src/utils/framework-compat/text-insertion/index.js
 
-import { createLogger } from "../../../core/logger.js";
+import { getScopedLogger } from "../../../core/logger.js";
 import { checkTextSelection } from "../selectionUtils.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {
@@ -18,7 +18,7 @@ import {
   tryPasteInsertion,
 } from "./strategies/index.js";
 
-const logger = createLogger('Translation', 'TextInsertion');
+const logger = getScopedLogger('Translation', 'TextInsertion');
 
 /**
  * جایگذاری بهینه‌شده متن با تشخیص هوشمند استراتژی

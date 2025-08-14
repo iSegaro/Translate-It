@@ -5,10 +5,10 @@ The extension uses a unified logging system for structured, environment-aware lo
 ## Quick Start
 
 ```javascript
-import { createLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
 
-// Create logger for your component
-const logger = createLogger(LOG_COMPONENTS.CONTENT, 'MyComponent')
+// Prefer cached scoped logger
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MyComponent')
 
 // Use different log levels
 logger.error('Something went wrong', error)
@@ -47,12 +47,15 @@ LOG_COMPONENTS.STORAGE     // Storage operations
 
 ## API Reference
 
-### createLogger(component, subComponent?)
-Creates a logger instance for a specific component.
+### getScopedLogger(component, subComponent?)
+Returns a cached logger instance for a component (and optional sub-scope). Repeat calls with identical args return the same object.
 
 ```javascript
-const logger = createLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
 ```
+
+### createLogger(component, subComponent?) (low-level)
+Always creates a new instance. Reserved for internal or exceptional meta use-cases. Prefer getScopedLogger in normal code.
 
 ### Logger Methods
 
@@ -85,9 +88,9 @@ const level = getLogLevel(LOG_COMPONENTS.CONTENT)
 ### Vue Component
 ```javascript
 // In Vue component
-import { createLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
 
-const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationBox')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 
 const handleTranslation = async () => {
   try {
@@ -107,11 +110,11 @@ onMounted(() => {
 ### Background Script
 ```javascript
 // In background script
-import { createLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
 
 class TranslationService {
   constructor() {
-    this.logger = createLogger(LOG_COMPONENTS.CORE, 'TranslationService')
+  this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TranslationService')
   }
   
   async translateText(text, options) {
@@ -141,11 +144,11 @@ class TranslationService {
 ### Content Script
 ```javascript
 // In content script
-import { createLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
 
 class SelectElementManager {
   constructor() {
-    this.logger = createLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
   }
   
   initialize() {
@@ -175,11 +178,11 @@ Use descriptive component and sub-component names:
 
 ```javascript
 // Good
-const logger = createLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
-const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationBox')
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 
 // Avoid
-const logger = createLogger(LOG_COMPONENTS.CORE, 'Handler')
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'Handler')
 ```
 
 ### 2. Log Level Selection
@@ -233,14 +236,7 @@ logger.info('Ready')
 
 ### Default Levels
 ```javascript
-const componentLogLevels = {
-  'Core': LOG_LEVELS.DEBUG,
-  'Content': LOG_LEVELS.DEBUG,
-  'Messaging': LOG_LEVELS.DEBUG,
-  'Translation': LOG_LEVELS.DEBUG,
-  'UI': LOG_LEVELS.DEBUG,
-  'Storage': LOG_LEVELS.DEBUG
-}
+// Default levels are internal; inspect with listLoggerLevels() or adjust via setLogLevel().
 ```
 
 ### Runtime Configuration
@@ -264,8 +260,8 @@ setLogLevel('global', LOG_LEVELS.INFO)
 | `console.warn('[Component] Warning')` | `logger.warn('Warning description')` |
 
 ### Migration Steps
-1. Import logger system at top of file
-2. Create logger instance in constructor or setup
+1. Import getScopedLogger at top of file
+2. Remove any local lazy singleton wrappers
 3. Replace console.log with appropriate level
 4. Add structured data where helpful
 5. Use init() for initialization logs
@@ -301,21 +297,28 @@ setLogLevel('Content', 3)
 
 ```
 src/utils/core/
-├── logger.js          # Main logging system
+├── logger.js          # Main logging system (getScopedLogger, createLogger)
 ├── logConstants.js    # LOG_LEVELS and LOG_COMPONENTS
 ```
 
 **Key Files**:
-- `src/utils/core/logger.js` - Main logging implementation
+- `src/utils/core/logger.js` - Main logging implementation (use getScopedLogger)
 - `src/utils/core/logConstants.js` - Constants and types
 
 ## Summary
 
 The logging system provides:
 - **Environment-Aware**: Automatic development vs production detection
-- **Component-Based**: Organized by categories with individual log levels  
+- **Component-Based**: Organized by categories with individual log levels
 - **Structured Logging**: Support for objects and structured data
 - **Performance-Optimized**: Level checking before message formatting
 - **Easy Configuration**: Simple API for adjusting log levels
 
-**Key Insight**: Use appropriate log levels and structured data to create maintainable, debuggable logs across the extension.
+**Key Insight**: Use getScopedLogger universally; only reach for createLogger in meta tooling.
+
+## Cache & Internals
+
+- Keys: `Component` or `Component::SubComponent`.
+- Cached instance re-used (memory efficiency & simple identity comparisons).
+- Test helper: `__resetLoggingSystemForTests()` clears cache and restores defaults.
+- Logger core only imports LOG_LEVELS to minimize potential circular or temporal dead zone issues; user code imports LOG_COMPONENTS from `logConstants.js`.

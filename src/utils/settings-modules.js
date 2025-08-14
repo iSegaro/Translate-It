@@ -1,6 +1,6 @@
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'settings-modules');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'settings-modules');
 // Utility for loading settings modules
 // Separated from main options.js to avoid circular imports
 

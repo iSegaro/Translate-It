@@ -4,10 +4,11 @@ import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat, MessagingContexts } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
 
-const logger = createLogger('Core', 'handleActivateSelectElementMode');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleActivateSelectElementMode');
 
 const errorHandler = new ErrorHandler();
 

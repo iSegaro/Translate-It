@@ -1,6 +1,7 @@
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Content', 'RevertShortcut');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
 /**
  * Revert Shortcut - ESC key handler for reverting translations
  * Modular shortcut handler that integrates with RevertHandler

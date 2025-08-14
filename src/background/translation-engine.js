@@ -7,9 +7,10 @@ import { ProviderFactory } from "@/providers/core/ProviderFactory.js";
 import { providerRegistry } from "@/providers/core/ProviderRegistry.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'translation-engine');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
 
 export class TranslationEngine {
   constructor() {

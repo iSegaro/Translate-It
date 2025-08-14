@@ -1,7 +1,8 @@
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
 
-const logger = createLogger('Core', 'handleSetExcludeCurrentPage');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleSetExcludeCurrentPage');
 /**
  * Handler for setting page exclusion status
  */

@@ -3,20 +3,14 @@ import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { IsDebug } from "../../config.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'extraction');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'extraction');
 
 import { correctTextDirection } from "./textDetection.js";
 import { getTranslationString } from "../i18n/i18n.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// ...existing code...
 
 
 const translationCache = new Map();
@@ -185,7 +179,7 @@ export function applyTranslationsToNodes(textNodes, translations, context) {
       try {
         parentElement.replaceChild(containerSpan, textNode);
       } catch (error) {
-        getLogger().error('Error replacing text node with container:', error,
+  logger.error('Error replacing text node with container:', error,
           {
             textNode,
             containerSpan,
@@ -298,7 +292,7 @@ export function parseAndCleanTranslationResponse(
     // return plain string responses (separated by markers). Don't notify
     // the user here to avoid showing spurious errors; fall back to
     // string-based parsing in the caller.
-    getLogger().debug('No JSON structure (array or object) found in the response string.');
+  logger.debug('No JSON structure (array or object) found in the response string.');
     return []; // برگرداندن آرایه خالی
   }
 
@@ -309,7 +303,7 @@ export function parseAndCleanTranslationResponse(
     // اگر مستقیما پارس شد، نتیجه را برگردان
     return JSON.parse(potentialJsonString);
   } catch (initialError) {
-    getLogger().error('Initial JSON.parse failed. Attempting repair by removing the last element.', initialError.message, // لاگ کردن پیام خطا اولیه
+  logger.error('Initial JSON.parse failed. Attempting repair by removing the last element.', initialError.message, // لاگ کردن پیام خطا اولیه
     );
 
     // 3. تلاش برای تعمیر فقط اگر شبیه آرایه باشد
@@ -337,19 +331,19 @@ export function parseAndCleanTranslationResponse(
         // (ممکن است فضای خالی یا کاراکترهای خراب بعد از ویرگول وجود داشته باشد)
         repairedJsonString = repairedJsonString.trimEnd() + "]";
 
-        getLogger().debug('Attempting to parse repaired JSON string:', repairedJsonString);
+  logger.debug('Attempting to parse repaired JSON string:', repairedJsonString);
 
         // 4. تلاش دوم برای پارس کردن رشته تعمیر شده
         try {
           const parsedResult = JSON.parse(repairedJsonString);
-          getLogger().init('Successfully parsed JSON after removing the potentially corrupted last element.', "warning",
+          logger.init('Successfully parsed JSON after removing the potentially corrupted last element.', "warning",
           );
           // می‌توانید در اینجا یک نوع هشدار خاص برای handler ارسال کنید که تعمیر موفق بود
           // context.errorHandler.handle(new Error("JSON repaired successfully"), { type: ..., level: 'warning' });
           return parsedResult; // نتیجه تعمیر شده را برگردان
         } catch (repairError) {
           // اگر تعمیر هم ناموفق بود
-          getLogger().error('Repair attempt also failed.', repairError.message, // لاگ کردن پیام خطای دوم
+          logger.error('Repair attempt also failed.', repairError.message, // لاگ کردن پیام خطای دوم
           );
           // خطای اولیه را به handler ارسال کن چون ریشه مشکل همان بود
           const processedError = ErrorHandler.processError(initialError);
@@ -357,29 +351,29 @@ export function parseAndCleanTranslationResponse(
             type: ErrorTypes.API_RESPONSE_INVALID,
             context: "parseAndCleanTranslationResponse-RepairFailed",
           });
-          getLogger().debug('Original problematic string:', potentialJsonString); // لاگ کردن رشته مشکل‌دار اصلی
+          logger.debug('Original problematic string:', potentialJsonString); // لاگ کردن رشته مشکل‌دار اصلی
           return []; // برگرداندن آرایه خالی
         }
       } else {
         // اگر ویرگولی پیدا نشد (مثلاً فقط یک آیتم خراب بود مثل "[{"text":"a"" )
-        getLogger().debug('Could not repair JSON: No comma found to separate the last element.',  );
+  logger.debug('Could not repair JSON: No comma found to separate the last element.');
         const processedError = ErrorHandler.processError(initialError);
         context.errorHandler.handle(processedError, {
           type: ErrorTypes.API_RESPONSE_INVALID,
           context: "parseAndCleanTranslationResponse-NoCommaForRepair",
         });
-        getLogger().debug('Original problematic string:', potentialJsonString);
+  logger.debug('Original problematic string:', potentialJsonString);
         return [];
       }
     } else {
       // اگر خطای اولیه SyntaxError نبود یا رشته با '[' شروع نشده بود
-      getLogger().error('Initial parse failed, and repair condition not met (not array or not SyntaxError).',  );
+  logger.error('Initial parse failed, and repair condition not met (not array or not SyntaxError).');
       const processedError = ErrorHandler.processError(initialError);
       context.errorHandler.handle(processedError, {
         type: ErrorTypes.API_RESPONSE_INVALID,
         context: "parseAndCleanTranslationResponse-InitialErrorNotRepaired",
       });
-      getLogger().debug('Original problematic string:', potentialJsonString);
+  logger.debug('Original problematic string:', potentialJsonString);
       return [];
     }
   }
@@ -407,13 +401,13 @@ export function expandTextsForTranslation(textsToTranslate) {
 
 export function handleTranslationLengthMismatch(translatedData, expandedTexts) {
   if (!Array.isArray(translatedData)) {
-    getLogger().debug('پاسخ ترجمه یک آرایه نیست.', "داده پارس شده:", translatedData);
+  logger.debug('پاسخ ترجمه یک آرایه نیست.', "داده پارس شده:", translatedData);
     // throw new Error("Translated response is not an array.");
     return false;
   }
 
   if (translatedData.length !== expandedTexts.length) {
-    getLogger().debug('عدم تطابق طول.', `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
+  logger.debug('عدم تطابق طول.', `طول مورد انتظار (بر اساس متن‌های گسترش‌یافته): ${expandedTexts.length}`,
       `طول دریافت شده: ${translatedData.length}`,
       "علت احتمالی: تقسیم/ادغام متفاوت متن توسط API یا افزودن/حذف آیتم‌ها.",
       "تلاش برای پردازش با داده‌های موجود ادامه می‌یابد...",
@@ -494,7 +488,7 @@ export function reassembleTranslations(
       }
       translatedSegmentsMap.get(originalIndex).push(translatedItem.text);
     } else {
-      getLogger().debug('داده ترجمه نامعتبر یا گمشده برای آیتم در اندیس ${i}.', "آیتم دریافتی:",
+  logger.debug(`داده ترجمه نامعتبر یا گمشده برای آیتم در اندیس ${i}.`, "آیتم دریافتی:",
         translatedItem,
         "اطلاعات نگاشت:",
         mappingInfo,

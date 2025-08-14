@@ -10,7 +10,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     include: [
       'src/components/**/__tests__/*.test.js', // Vue component unit tests
-      'src/messaging/**/__tests__/*.test.js'   // Messaging system tests
+      'src/messaging/**/__tests__/*.test.js',  // Messaging system tests
+      'src/utils/**/__tests__/*.test.js'       // Utility & core system tests (logger, etc.)
     ],
     exclude: ['tests/e2e/**'],
     coverage: {

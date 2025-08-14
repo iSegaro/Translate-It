@@ -1,6 +1,6 @@
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Content', 'RevertHandler');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
  * Handles both Vue and Legacy translation systems

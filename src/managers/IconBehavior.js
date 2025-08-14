@@ -7,7 +7,8 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { isExtensionContextValid } from "../utils/core/helpers.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
 
 export default function setupIconBehavior(
   icon,
@@ -19,7 +20,7 @@ export default function setupIconBehavior(
   if (!icon || !target) return;
   
   // Initialize logger for this icon instance
-  const logger = createLogger('UI', 'IconManager');
+  const logger = getScopedLogger(LOG_COMPONENTS.UI, 'IconManager');
 
   let isCleanedUp = false;
   let resizeObserver;

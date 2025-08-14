@@ -4,21 +4,14 @@
  */
 
 import browser from "webextension-polyfill";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler');
-  }
-  return _logger;
-};
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler');
 
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 
-import { createLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+// removed legacy createLogger import
 
 
 /**
@@ -26,7 +19,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 async function handleTranslateElement(info, tab) {
   try {
-    getLogger().debug('Translate element menu clicked');
+  logger.debug('Translate element menu clicked');
 
     // Send message to content script to translate selected element
     await browser.tabs.sendMessage(tab.id, {
@@ -35,9 +28,9 @@ async function handleTranslateElement(info, tab) {
       timestamp: Date.now(),
     });
 
-    getLogger().debug('Translate element message sent to content script',  );
+  logger.debug('Translate element message sent to content script');
   } catch (error) {
-    getLogger().error('Error handling translate element:', error);
+  logger.error('Error handling translate element:', error);
   }
 }
 
@@ -46,11 +39,11 @@ async function handleTranslateElement(info, tab) {
  */
 async function handleTranslateText(info, tab) {
   try {
-    getLogger().debug('Translate text menu clicked');
+  logger.debug('Translate text menu clicked');
 
     const selectedText = info.selectionText;
     if (!selectedText) {
-      getLogger().debug('No text selected');
+  logger.debug('No text selected');
       return;
     }
 
@@ -62,9 +55,9 @@ async function handleTranslateText(info, tab) {
       timestamp: Date.now(),
     });
 
-    getLogger().debug('Translate text message sent to content script');
+  logger.debug('Translate text message sent to content script');
   } catch (error) {
-    getLogger().error('Error handling translate text:', error);
+  logger.error('Error handling translate text:', error);
   }
 }
 
@@ -73,7 +66,7 @@ async function handleTranslateText(info, tab) {
  */
 async function handleProviderSelection(info, tab, providerId) {
   try {
-    getLogger().debug('Provider selection: ${providerId}');
+  logger.debug('Provider selection:', providerId);
 
     // Update the translation API setting
     await storageManager.set({ TRANSLATION_API: providerId });
@@ -93,13 +86,12 @@ async function handleProviderSelection(info, tab, providerId) {
         message: `Translation provider changed to ${providerId}`,
       });
     } catch (notifError) {
-      getLogger().error('Failed to show provider change notification:', notifError,
-      );
+  logger.error('Failed to show provider change notification:', notifError);
     }
 
-    getLogger().debug('Provider changed to ${providerId}');
+  logger.debug('Provider changed to', providerId);
   } catch (error) {
-    getLogger().error('Error handling provider selection:', error);
+  logger.error('Error handling provider selection:', error);
   }
 }
 
@@ -108,13 +100,13 @@ async function handleProviderSelection(info, tab, providerId) {
  */
 async function handleOpenSidepanel(info, tab) {
   try {
-    getLogger().debug('Open sidepanel menu clicked');
+  logger.debug('Open sidepanel menu clicked');
 
     // Try to open sidepanel
     try {
       if (browser.sidePanel && browser.sidePanel.open) {
         await browser.sidePanel.open({ windowId: tab.windowId });
-        getLogger().debug('Sidepanel opened');
+  logger.debug('Sidepanel opened');
       } else {
         // Fallback - send message to background to handle
         await browser.runtime.sendMessage({
@@ -123,13 +115,13 @@ async function handleOpenSidepanel(info, tab) {
           tabId: tab.id,
           timestamp: Date.now(),
         });
-        getLogger().debug('Sidepanel open request sent to background');
+  logger.debug('Sidepanel open request sent to background');
       }
     } catch (sidepanelError) {
-      getLogger().error('Error opening sidepanel:', sidepanelError);
+  logger.error('Error opening sidepanel:', sidepanelError);
     }
   } catch (error) {
-    getLogger().error('Error handling open sidepanel:', error);
+  logger.error('Error handling open sidepanel:', error);
   }
 }
 
@@ -138,7 +130,7 @@ async function handleOpenSidepanel(info, tab) {
  */
 async function handleScreenCapture(info, tab) {
   try {
-    getLogger().debug('Screen capture menu clicked');
+  logger.debug('Screen capture menu clicked');
 
     // Send message to background to start screen capture
     await browser.runtime.sendMessage({
@@ -148,9 +140,9 @@ async function handleScreenCapture(info, tab) {
       timestamp: Date.now(),
     });
 
-    getLogger().debug('Screen capture request sent to background');
+  logger.debug('Screen capture request sent to background');
   } catch (error) {
-    getLogger().error('Error handling screen capture:', error);
+  logger.error('Error handling screen capture:', error);
   }
 }
 

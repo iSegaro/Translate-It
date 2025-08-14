@@ -3,7 +3,8 @@
  * Extracted from EventHandler for modular keyboard shortcut management
  */
 
-import { createLogger } from "../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { isEditable } from "../../../utils/core/helpers.js";
 import { ErrorHandler } from "../../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
@@ -17,7 +18,7 @@ export class CtrlSlashShortcut {
     this.initialized = false;
     
     // Initialize logger
-    this.logger = createLogger('Content', 'CtrlSlashShortcut');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'CtrlSlashShortcut');
     this.logger.init('CtrlSlashShortcut initialized');
   }
 

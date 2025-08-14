@@ -1,18 +1,9 @@
 // src/utils/framework-compat/text-insertion/strategies/before-input.js
 
 import { smartDelay } from "../helpers.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'before-input');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'before-input');
 
 
 /**
@@ -24,11 +15,11 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 export async function tryBeforeInputInsertion(element, text, hasSelection) {
   try {
-    getLogger().debug('Attempting beforeinput event simulation');
+  logger.debug('Attempting beforeinput event simulation');
 
     // بررسی پشتیبانی از beforeinput
     if (typeof InputEvent === "undefined") {
-      getLogger().debug('InputEvent not supported');
+  logger.debug('InputEvent not supported');
       return false;
     }
 
@@ -60,7 +51,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
     // ارسال beforeinput
     const isAllowed = element.dispatchEvent(beforeInputEvent);
     if (!isAllowed) {
-      getLogger().debug('beforeinput was prevented');
+  logger.debug('beforeinput was prevented');
       return false;
     }
 
@@ -80,7 +71,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
     await smartDelay(50);
     return true;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }

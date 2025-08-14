@@ -3,7 +3,8 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay } from "../utils/core/helpers.js";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
 import { filterXSS } from "xss";
 import {
   smartTextReplacement,
@@ -14,7 +15,7 @@ export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
     this.errorHandler = errorHandler;
-    this.logger = createLogger('Translation', 'DefaultStrategy');
+  this.logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'DefaultStrategy');
   }
 
   /**

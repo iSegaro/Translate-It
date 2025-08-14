@@ -4,9 +4,13 @@ import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/storage/core/SecureStorage.js'
 import { storageManager } from '@/storage/core/StorageCore.js'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'settings');
+// Defensive: ensure LOG_COMPONENTS is defined before using (avoids rare TDZ issues during bundle ordering)
+const logger = (typeof LOG_COMPONENTS !== 'undefined')
+  ? getScopedLogger(LOG_COMPONENTS.CORE, 'settings')
+  : { debug:()=>{}, info:()=>{}, warn:()=>{}, error:()=>{}, init:()=>{}, operation:()=>{} };
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults

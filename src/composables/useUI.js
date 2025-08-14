@@ -1,9 +1,10 @@
 // src/composables/useUI.js
 // Vue composable for UI state management in sidepanel
 import { ref, nextTick } from "vue";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useUI');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
 
 export function useUI() {
   // State

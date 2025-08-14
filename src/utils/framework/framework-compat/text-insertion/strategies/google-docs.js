@@ -1,18 +1,9 @@
 // src/utils/framework-compat/text-insertion/strategies/google-docs.js
 
 import { tryOptimizedPasteInsertion } from "./paste-optimized.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'google-docs');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'google-docs');
 
 
 /**
@@ -20,7 +11,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 export async function tryGoogleDocsInsertion(element, text) {
   try {
-    getLogger().debug('Attempting Google Docs specific method');
+  logger.debug('Attempting Google Docs specific method');
 
     // پیدا کردن iframe Google Docs
     const iframe = document.querySelector(".docs-texteventtarget-iframe");
@@ -41,7 +32,7 @@ export async function tryGoogleDocsInsertion(element, text) {
 
     return false;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }

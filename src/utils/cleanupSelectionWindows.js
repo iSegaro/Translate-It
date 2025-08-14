@@ -2,17 +2,9 @@
 
 import { browser } from "@/utils/browser-polyfill.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'cleanupSelectionWindows');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'cleanupSelectionWindows');
 
 
 /**
@@ -27,7 +19,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
         try {
           el.remove();
         } catch (e) {
-          getLogger().error('remove failed:', e);
+          logger.error('remove failed:', e);
         }
       });
     };
@@ -44,7 +36,7 @@ export async function dismissAllSelectionWindowsInTab(tabId) {
       });
     }
   } catch {
-    // getLogger().error('dismissAll in tab ${tabId} failed:', err);
+  // logger.error(`dismissAll in tab ${tabId} failed:`, err);
   }
 }
 
@@ -59,6 +51,6 @@ export async function dismissAllSelectionWindows() {
       await dismissAllSelectionWindowsInTab(tab.id);
     }
   } catch (err) {
-    getLogger().error('dismissAllSelectionWindows failed:', err);
+  logger.error('dismissAllSelectionWindows failed:', err);
   }
 }

@@ -2,7 +2,8 @@
 
 import browser from "webextension-polyfill";
 import { isExtensionContextValid } from "../../utils/core/helpers.js";
-import { createLogger } from "../../utils/core/logger.js";
+import { getScopedLogger } from "../../utils/core/logger.js";
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { parseBoolean, getTranslationString } from "../../utils/i18n/i18n.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 
@@ -25,7 +26,7 @@ export default class NotificationManager {
     }
 
     this.errorHandler = errorHandler || { handle: () => {} };
-    this.logger = createLogger('UI', 'NotificationManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.UI, 'NotificationManager');
     this.map = {
       error: {
         title: "Translate It! - Error",

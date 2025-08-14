@@ -2,17 +2,9 @@
 
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'TextExtractor');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'TextExtractor');
 
 
 /**
@@ -33,7 +25,7 @@ export class TextExtractor {
    */
   registerMethod(methodName, extractorFunction) {
     this.extractionMethods.set(methodName, extractorFunction);
-    getLogger().debug('Registered method: ${methodName}');
+  logger.debug(`Registered method: ${methodName}`);
   }
 
   /**
@@ -51,7 +43,7 @@ export class TextExtractor {
     try {
       const method = options.method || this.defaultMethod;
 
-      getLogger().debug('Extracting text using method: ${method}', {
+  logger.debug(`Extracting text using method: ${method}`, {
         method,
         hasImage: !!imageData,
         options: { ...options, imageData: "[base64-data]" },
@@ -67,7 +59,7 @@ export class TextExtractor {
 
       const result = await extractorFunction(imageData, options);
 
-      getLogger().info('Text extraction completed:', {
+  logger.info('Text extraction completed:', {
         method,
         success: !!result,
         textLength: result?.extractedText?.length || 0,
@@ -81,7 +73,7 @@ export class TextExtractor {
         timestamp: Date.now(),
       };
     } catch (error) {
-      getLogger().error('Text extraction failed:', error);
+  logger.error('Text extraction failed:', error);
       throw this._normalizeError(error, "extractText");
     }
   }
@@ -94,7 +86,7 @@ export class TextExtractor {
    */
   async extractAndTranslate(imageData, options = {}) {
     try {
-      getLogger().debug('Starting extract and translate operation');
+  logger.debug('Starting extract and translate operation');
 
       // For AI method, use direct AI translation (current implementation)
       if (!options.method || options.method === "ai") {

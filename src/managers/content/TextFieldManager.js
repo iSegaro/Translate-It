@@ -3,7 +3,8 @@
  * Extracted from EventHandler for better separation of concerns
  */
 
-import { createLogger } from "../../utils/core/logger.js";
+import { getScopedLogger } from "../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../../utils/ui/exclusion.js";
 import { detectPlatform, Platform } from "../../utils/browser/platform.js";
 import setupIconBehavior from "../IconBehavior.js";
@@ -20,7 +21,7 @@ export class TextFieldManager {
     this.loggedInit = false; // Flag to prevent duplicate logging
     
     // Initialize logger
-    this.logger = createLogger('Content', 'TextFieldManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldManager');
     
     // Track active icons and timeouts
     this.activeIcons = new Map();

@@ -6,7 +6,8 @@ import browser from "webextension-polyfill";
 import { taggleLinks } from "@/utils/core/helpers.js";
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
-import { createLogger } from "../../utils/core/logger.js";
+import { getScopedLogger } from "../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
@@ -28,7 +29,7 @@ export class SelectElementManager {
     this.overlayElements = new Set();
     this.currentHighlighted = null;
     this.browser = null;
-    this.logger = createLogger('Content', 'SelectElement');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement');
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer

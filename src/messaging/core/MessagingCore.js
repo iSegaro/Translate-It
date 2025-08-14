@@ -5,18 +5,9 @@
  */
 
 import { MessageActions } from './MessageActions.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.MESSAGING, 'MessagingCore');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessagingCore');
 
 
 /**
@@ -52,7 +43,7 @@ export class MessageFormat {
    */
   static validate(message) {
     if (!message || typeof message !== "object") {
-      getLogger().warn('Invalid message type or null', message);
+  logger.warn('Invalid message type or null', message);
       return false;
     }
 
@@ -66,7 +57,7 @@ export class MessageFormat {
     );
 
     if (!isValid) {
-      getLogger().warn('Validation failed for message', {
+  logger.warn('Validation failed for message', {
         message,
         actionValid: message.action && typeof message.action === "string",
         contextValid: message.context && typeof message.context === "string",

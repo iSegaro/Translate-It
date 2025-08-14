@@ -1,9 +1,10 @@
 // src/providers/core/BaseTranslationProvider.js
 
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'BaseProvider');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseProvider');
 
 /**
  * Base class for all translation providers
@@ -54,13 +55,13 @@ export class BaseProvider {
    * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
    */
   async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
-    logger.debug('_executeApiCall starting for context: ${context}');
-    logger.debug('_executeApiCall URL: ${url}');
+  logger.debug(`_executeApiCall starting for context: ${context}`);
+  logger.debug(`_executeApiCall URL: ${url}`);
     logger.debug('_executeApiCall fetchOptions:', fetchOptions);
 
     try {
       const response = await fetch(url, fetchOptions);
-      logger.debug('_executeApiCall response status: ${response.status} ${response.statusText}');
+  logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         // Extract error details if available
@@ -94,7 +95,7 @@ export class BaseProvider {
 
       // Parse successful response
       const data = await response.json();
-      logger.debug('_executeApiCall raw response data:', data);
+  logger.debug('_executeApiCall raw response data:', data);
       logger.debug('_executeApiCall response data:', data);
 
       const result = extractResponse(data, response.status);
@@ -112,7 +113,7 @@ export class BaseProvider {
         throw err;
       }
 
-      logger.init('_executeApiCall success for context: ${context}');
+  logger.init(`_executeApiCall success for context: ${context}`);
       return result;
     } catch (err) {
       // Handle fetch network errors (e.g., offline)

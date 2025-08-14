@@ -4,17 +4,9 @@ import { CONFIG } from "../../config.js";
 import { languageList } from "../i18n/languages.js";
 // import  from "./helpers.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'textDetection');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'textDetection');
 
 
 export const isPersianText = (text) => {
@@ -87,11 +79,11 @@ export async function detectTextLanguage(text) {
       // );
       return detectedLanguage; // برگرداندن کد زبان تشخیص داده شده
     } else {
-      // getLogger().debug('امکان تشخیص زبان وجود ندارد.');
+  // logger.debug('امکان تشخیص زبان وجود ندارد.');
       return null;
     }
   } catch {
-    // getLogger().debug('خطا در تشخیص زبان:', error);
+  // logger.debug('خطا در تشخیص زبان:', error);
     return null;
   }
 }

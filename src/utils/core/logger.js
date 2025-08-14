@@ -9,7 +9,7 @@
  * - Easy to disable/enable per component
  */
 
-import { LOG_LEVELS, LOG_COMPONENTS } from "./logConstants.js";
+import { LOG_LEVELS } from "./logConstants.js";
 
 // Development environment detection
 const isDevelopment = process.env.NODE_ENV === "development";
@@ -17,21 +17,44 @@ const isDevelopment = process.env.NODE_ENV === "development";
 // Global log level - can be overridden per component
 let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
 
-// Component-specific log levels
+// Component-specific log levels (tuned for Vue migration)
+// ERROR = 0 | WARN = 1 | INFO = 2 | DEBUG = 3
 const componentLogLevels = {
-  // ERROR = 0
-  // WARN = 1
-  // INFO = 2
-  // DEBUG = 3
-  Background: LOG_LEVELS.INFO,    // عملیات مهم service worker
-  Content: LOG_LEVELS.DEBUG,      // جزئیات DOM manipulation  
-  Messaging: LOG_LEVELS.WARN,     // فقط مشکلات communication
-  Providers: LOG_LEVELS.INFO,     // API calls و نتایج
-  UI: LOG_LEVELS.WARN,           // فقط خطاهای UI
-  Storage: LOG_LEVELS.INFO,       // عملیات persistence
-  Capture: LOG_LEVELS.DEBUG,      // جزئیات image processing
-  Error: LOG_LEVELS.ERROR,        // همیشه نمایش خطاها
+  Background: LOG_LEVELS.INFO,     // عملیات مهم service worker
+  Core: LOG_LEVELS.INFO,           // راه‌اندازی و wiring
+  Content: LOG_LEVELS.DEBUG,       // جزئیات DOM manipulation
+  Translation: LOG_LEVELS.DEBUG,   // pipeline ترجمه، trace در توسعه
+  Messaging: LOG_LEVELS.WARN,      // فقط مشکلات communication
+  Providers: LOG_LEVELS.INFO,      // API calls و نتایج مهم
+  UI: LOG_LEVELS.INFO,             // رخدادهای قابل مشاهده کاربر
+  Storage: LOG_LEVELS.INFO,        // عملیات persistence
+  Capture: LOG_LEVELS.DEBUG,       // جزئیات image processing
+  Error: LOG_LEVELS.ERROR,         // همیشه نمایش خطاها
 };
+
+// Internal cache to avoid recreating identical loggers
+const loggerCache = new Map();
+
+// Snapshot of initial component levels (for test reset helpers)
+const __initialComponentLevels = { ...componentLogLevels };
+
+/**
+ * Get (cached) scoped logger. Use this instead of ad-hoc singleton patterns.
+ * @param {string} component One of LOG_COMPONENTS.* values
+ * @param {string|null} subComponent Optional sub-scope (e.g. specific strategy or feature)
+ */
+export function getScopedLogger(component, subComponent = null) {
+  const key = subComponent ? `${component}::${subComponent}` : component;
+  if (!loggerCache.has(key)) {
+    loggerCache.set(key, createLogger(component, subComponent));
+  }
+  return loggerCache.get(key);
+}
+
+// Introspection helper (mainly for debugging / devtools)
+export function listLoggerLevels() {
+  return { global: globalLogLevel, components: { ...componentLogLevels } };
+}
 
 /**
  * Format log message with timestamp and component info
@@ -172,3 +195,15 @@ export const quickLoggers = {
   getCapture: () => createLogger("Capture"),
   getError: () => createLogger("Error"),
 };
+
+/**
+ * Test-only helper to reset logging system state (cache + levels).
+ * Exposed with a double underscore prefix to discourage production use.
+ */
+export function __resetLoggingSystemForTests() {
+  loggerCache.clear();
+  // Reset component-specific levels to their original values
+  Object.keys(componentLogLevels).forEach((k) => delete componentLogLevels[k]);
+  Object.assign(componentLogLevels, { ...__initialComponentLevels });
+  globalLogLevel = isDevelopment ? 3 : 1;
+}

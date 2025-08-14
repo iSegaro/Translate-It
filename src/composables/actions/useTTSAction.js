@@ -2,12 +2,13 @@
 // Unified TTS action composable
 
 import { ref } from 'vue'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 
-const logger = createLogger('Composables', 'useTTSAction')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSAction')
 
 export function useTTSAction() {
   // Dependencies

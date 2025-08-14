@@ -9,7 +9,9 @@ export const LOG_LEVELS = {
 
 export const LOG_COMPONENTS = {
   BACKGROUND: 'Background',
-  CONTENT: 'Content', 
+  CORE: 'Core',            // لایه هسته (bootstrapping, dependency wiring)
+  CONTENT: 'Content',      // اسکریپت‌های content و تعامل DOM
+  TRANSLATION: 'Translation', // موتور ترجمه / pipeline
   MESSAGING: 'Messaging',
   PROVIDERS: 'Providers',
   UI: 'UI',

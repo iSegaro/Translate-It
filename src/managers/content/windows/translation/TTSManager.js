@@ -1,7 +1,8 @@
 // src/managers/content/windows/translation/TTSManager.js
 
 import browser from "webextension-polyfill";
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
 
@@ -10,7 +11,7 @@ import { MessageActions } from "../../../../messaging/core/MessageActions.js";
  */
 export class TTSManager {
   constructor() {
-    this.logger = createLogger('Content', 'TTSManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TTSManager');
   }
 
   /**

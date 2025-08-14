@@ -7,9 +7,10 @@ import { useBrowserAPI } from "./useBrowserAPI.js";
 import SelectionWindows from "@/managers/content/WindowsManager.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useSelectionWindows');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useSelectionWindows');
 
 export function useSelectionWindows() {
   const browserAPI = useBrowserAPI();

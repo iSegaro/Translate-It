@@ -2,9 +2,9 @@
 // Base class for cross-browser event listeners
 
 import browser from "webextension-polyfill";
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Messaging', 'base-listener');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'base-listener');
 
 /**
  * Base Event Listener class

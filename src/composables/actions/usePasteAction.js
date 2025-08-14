@@ -2,9 +2,10 @@
 // Unified paste action composable
 
 import { ref, onMounted, onUnmounted } from 'vue'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = createLogger('Composables', 'usePasteAction')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePasteAction')
 
 export function usePasteAction() {
   // State

@@ -1,6 +1,7 @@
 // src/utils/framework-compat/index.js
 
-import { createLogger } from "../../core/logger.js";
+import { getScopedLogger } from "../../core/logger.js";
+import { LOG_COMPONENTS } from "../../core/logConstants.js";
 import { checkTextSelection } from "./selectionUtils.js";
 import { simulateNaturalTyping } from "./naturalTyping.js";
 import {
@@ -9,7 +10,7 @@ import {
 } from "./text-insertion/index.js";
 import { handleSimpleReplacement } from "./simpleReplacement.js";
 
-const logger = createLogger('Translation', 'TextReplacement');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TextReplacement');
 
 /**
  * جایگزینی هوشمند متن با چندین استراتژی fallback

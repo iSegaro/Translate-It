@@ -1,10 +1,11 @@
 import { ref } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 
-const logger = createLogger('UI', 'useTTSSmart');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
 
 export function useTTSSmart() {
   const browserAPI = useBrowserAPI('tts-smart');

@@ -1,7 +1,8 @@
 import { MessageActions } from "../../../messaging/core/MessageActions.js";
-import { createLogger } from "../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 
-const logger = createLogger('Core', 'triggerSidebarFromContent');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'triggerSidebarFromContent');
 
 /**
  * Handle sidebar trigger from content script

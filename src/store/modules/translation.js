@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'translation');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-store');
 
 export const useTranslationStore = defineStore('translation', () => {
   // State

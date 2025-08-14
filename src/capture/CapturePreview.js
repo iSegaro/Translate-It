@@ -4,17 +4,9 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.CAPTURE, 'CapturePreview');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'CapturePreview');
 
 
 /**
@@ -51,7 +43,7 @@ export class CapturePreview {
    */
   async show() {
     try {
-      getLogger().debug('Showing capture preview');
+  logger.debug('Showing capture preview');
 
       if (this.isVisible) {
         this.hide();
@@ -62,9 +54,9 @@ export class CapturePreview {
 
       this.isVisible = true;
 
-      getLogger().init('Preview shown successfully');
+  logger.init('Preview shown successfully');
     } catch (error) {
-      getLogger().error('Error showing preview:', error);
+  logger.error('Error showing preview:', error);
       throw this._createError(
         ErrorTypes.UI,
         `Failed to show capture preview: ${error.message}`,
@@ -78,7 +70,7 @@ export class CapturePreview {
   hide() {
     if (!this.isVisible) return;
 
-    getLogger().debug('Hiding preview');
+  logger.debug('Hiding preview');
 
     this._removeEventListeners();
 

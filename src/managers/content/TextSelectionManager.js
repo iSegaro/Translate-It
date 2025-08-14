@@ -3,7 +3,8 @@
  * Extracted from EventHandler for better maintainability and separation of concerns
  */
 
-import { createLogger } from "../../utils/core/logger.js";
+import { getScopedLogger } from "../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 import { WindowsConfig } from "./windows/core/WindowsConfig.js";
@@ -13,7 +14,7 @@ export class TextSelectionManager {
     this.selectionWindows = options.selectionWindows;
     this.messenger = options.messenger;
     this.notifier = options.notifier;
-    this.logger = createLogger('Content', 'TextSelectionManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionManager');
     
     // Selection state management
     this.selectionTimeoutId = null;

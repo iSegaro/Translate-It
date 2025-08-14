@@ -93,20 +93,12 @@ import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useI18n } from '@/composables/useI18n.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
-import  from '@/utils/core/helpers.js'
+// (helpers import removed: was empty / invalid)
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 
 // Composables

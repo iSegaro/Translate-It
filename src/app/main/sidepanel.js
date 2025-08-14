@@ -5,9 +5,10 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingContexts } from '../../messaging/core/MessagingCore'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'sidepanel');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {

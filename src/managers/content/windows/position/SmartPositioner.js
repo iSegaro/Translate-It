@@ -1,6 +1,7 @@
 // src/managers/content/windows/position/SmartPositioner.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 
 /**
@@ -9,7 +10,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
 export class SmartPositioner {
   constructor(positionCalculator) {
     this.positionCalculator = positionCalculator;
-    this.logger = createLogger('Content', 'SmartPositioner');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SmartPositioner');
   }
 
   /**

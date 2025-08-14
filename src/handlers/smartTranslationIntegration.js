@@ -4,11 +4,12 @@ import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCor
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
-const logger = createLogger('Translation', 'SmartTranslation');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 
 // Helper function to dismiss pending translation notification
 function dismissPendingTranslationNotification(context = 'unknown') {

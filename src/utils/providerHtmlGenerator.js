@@ -1,17 +1,9 @@
 // src/utils/providerHtmlGenerator.js
 import { getSupportedProviders } from "../core/provider-registry.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'providerHtmlGenerator');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'providerHtmlGenerator');
 
 
 // Helper function to get provider by ID
@@ -31,7 +23,7 @@ export class ProviderHtmlGenerator {
    */
   static generateOptionsHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-    getLogger().debug('Generating options HTML for ${availableProviders.length} providers',  );
+  logger.debug(`Generating options HTML for ${availableProviders.length} providers`);
 
     return availableProviders
       .map((provider) => {
@@ -53,7 +45,7 @@ export class ProviderHtmlGenerator {
    */
   static generateDropdownHtml(providers = null) {
     const availableProviders = providers || getSupportedProviders();
-    getLogger().debug('Generating dropdown HTML for ${availableProviders.length} providers',  );
+  logger.debug(`Generating dropdown HTML for ${availableProviders.length} providers`);
 
     return availableProviders
       .map((provider) => {

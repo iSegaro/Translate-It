@@ -1,18 +1,9 @@
 // src/utils/framework-compat/text-insertion/strategies/input.js
 
 import { smartDelay } from "../helpers.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'input');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'input');
 
 
 /**
@@ -20,7 +11,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
  */
 export async function tryInputInsertion(element, text, hasSelection, start, end) {
   try {
-    getLogger().debug('Attempting input/textarea insertion with undo preservation');
+  logger.debug('Attempting input/textarea insertion with undo preservation');
 
     // Focus element
     element.focus();
@@ -48,7 +39,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
     if (typeof document.execCommand === "function") {
       const execResult = document.execCommand("insertText", false, text);
       if (execResult) {
-        getLogger().init('Used execCommand for undo preservation');
+  logger.init('Used execCommand for undo preservation');
 
         // رویدادهای ضروری
         element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -59,7 +50,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
     }
 
     // fallback: جایگزینی مستقیم (بدون undo)
-    getLogger().debug('Falling back to direct value assignment (no undo)');
+  logger.debug('Falling back to direct value assignment (no undo)');
     const newValue =
       currentValue.substring(0, startPos) +
       text +
@@ -76,7 +67,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
 
     return true;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }

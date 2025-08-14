@@ -3,9 +3,10 @@ import { MessageActions } from '@/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
 import { generateBackgroundMessageId } from '@/utils/messaging/messageId.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'handleSetSelectElementState');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleSetSelectElementState');
 
 /**
  * Handle setting select element state for a tab

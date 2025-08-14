@@ -1,6 +1,7 @@
 // src/managers/content/windows/NewWindowsManager.js
 
-import { createLogger } from "../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { isExtensionContextValid } from "../../../utils/core/helpers.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
@@ -28,7 +29,7 @@ import { matchErrorToType } from "../../../error-management/ErrorMatcher.js";
 export class WindowsManager {
   constructor(options = {}) {
     // Initialize logger
-    this.logger = createLogger('Content', 'WindowsManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManager');
     
     // Initialize cross-frame communication first to get frameId
     this.crossFrameManager = new CrossFrameManager({

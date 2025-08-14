@@ -2,7 +2,8 @@
 // Modern modular architecture with organized handlers and shortcuts
 
 import browser from "webextension-polyfill";
-import { createLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
 import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
 
@@ -10,7 +11,7 @@ import { MessageActions } from "../messaging/core/MessageActions.js";
 import "../styles/disable_links.css";
 
 // Create logger for content script
-const logger = createLogger('Content', 'ContentScript');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
 
 // --- Early exit for restricted pages ---
 const access = checkContentScriptAccess();

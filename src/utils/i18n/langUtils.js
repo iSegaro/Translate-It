@@ -4,17 +4,9 @@ import { detectTextLanguage } from "./textDetection.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
 import { getLanguageInfoFromName } from "./textDetection.js";
 
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'langUtils');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'langUtils');
 
 
 /**
@@ -43,15 +35,15 @@ export async function getEffectiveLanguage(
   label = AUTO_DETECT_VALUE,
 ) {
   if (selectedLang && selectedLang !== AUTO_DETECT_VALUE) {
-    getLogger().debug(': Using selected ${label} language: ${selectedLang}');
+  logger.debug(`: Using selected ${label} language: ${selectedLang}`);
     return selectedLang;
   }
 
   try {
-    getLogger().debug(': Detecting ${label} language from text...');
+  logger.debug(`: Detecting ${label} language from text...`);
     const detectedLang = await detectTextLanguage(text);
     if (detectedLang) {
-      getLogger().debug(': Auto-detected ${label} language: ${detectedLang}',  );
+  logger.debug(`: Auto-detected ${label} language: ${detectedLang}`);
       return detectedLang;
     } else {
       logME(
@@ -60,7 +52,7 @@ export async function getEffectiveLanguage(
       return "en"; // fallback
     }
   } catch (error) {
-    getLogger().error(': Error detecting ${label} language:', error);
+  logger.error(`: Error detecting ${label} language:`, error);
     return "en"; // fallback on error
   }
 }

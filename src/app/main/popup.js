@@ -4,9 +4,10 @@ import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'popup');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'popup');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {

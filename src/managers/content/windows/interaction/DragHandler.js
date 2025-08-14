@@ -1,13 +1,14 @@
 // src/managers/content/windows/interaction/DragHandler.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 
 /**
  * Handles drag and drop functionality for translation windows
  */
 export class DragHandler {
   constructor(positionCalculator) {
-    this.logger = createLogger('Content', 'DragHandler');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'DragHandler');
     this.positionCalculator = positionCalculator;
     
     // Drag state

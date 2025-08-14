@@ -3,10 +3,11 @@
 // This file can be imported in content scripts that need SelectionWindows
 
 import { useSelectionWindows } from '@/composables/useSelectionWindows.js';
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { checkContentScriptAccess } from '@/utils/core/tabPermissions.js';
 
-const logger = createLogger('Core', 'selection-windows-bridge');
+const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'selection-windows-bridge');
 
 let selectionWindowsComposable = null;
 

@@ -8,9 +8,10 @@ import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/messaging/core/MessagingCore.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useSidepanelTranslation');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useSidepanelTranslation');
 
 export function useSidepanelTranslation() {
   // State

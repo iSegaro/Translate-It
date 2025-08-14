@@ -1,16 +1,8 @@
 // src/utils/framework-compat/text-insertion/helpers.js
 
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.BACKGROUND, 'helpers');
-  }
-  return _logger;
-};
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'helpers');
 
 
 /**
@@ -39,7 +31,7 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
     // بررسی اینکه آیا متن در فیلد به‌روزرسانی شده یا خیر
     const hasAnyChange = currentText !== initialContent;
 
-    getLogger().debug('Verification details', {
+  logger.debug('Verification details', {
       hasNewText,
       contentChanged,
       isCompleteReplacement,
@@ -64,7 +56,7 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
     
     return isSuccess;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return false;
   }
 }
@@ -94,7 +86,7 @@ export function findTextNodeAtPosition(element, position) {
 
     return element.firstChild || element;
   } catch (error) {
-    getLogger().error('Error:', error);
+  logger.error('Error:', error);
     return element.firstChild || element;
   }
 }

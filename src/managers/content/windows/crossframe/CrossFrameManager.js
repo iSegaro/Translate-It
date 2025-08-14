@@ -1,6 +1,7 @@
 // src/managers/content/windows/crossframe/CrossFrameManager.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { FrameRegistry } from "./FrameRegistry.js";
 import { MessageRouter } from "./MessageRouter.js";
 
@@ -9,7 +10,7 @@ import { MessageRouter } from "./MessageRouter.js";
  */
 export class CrossFrameManager {
   constructor(options = {}) {
-    this.logger = createLogger('Content', 'CrossFrameManager');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'CrossFrameManager');
     this.debugCrossFrame = options.debugCrossFrame === true;
     
     // Initialize registry and router

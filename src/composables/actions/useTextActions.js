@@ -5,9 +5,10 @@ import { computed } from 'vue'
 import { useCopyAction } from './useCopyAction.js'
 import { usePasteAction } from './usePasteAction.js'
 import { useTTSAction } from './useTTSAction.js'
-import { createLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = createLogger('Composables', 'useTextActions')
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTextActions')
 
 export function useTextActions(options = {}) {
   // Default options

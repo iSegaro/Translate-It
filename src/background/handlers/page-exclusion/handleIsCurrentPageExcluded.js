@@ -1,7 +1,8 @@
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
 
-const logger = createLogger('Core', 'handleIsCurrentPageExcluded');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleIsCurrentPageExcluded');
 /**
  * Handler for checking if current page is excluded from extension
  */

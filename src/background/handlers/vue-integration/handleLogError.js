@@ -1,9 +1,10 @@
 // Handler for logging errors from Vue apps
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('Core', 'handleLogError');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleLogError');
 
 const errorHandler = new ErrorHandler();
 

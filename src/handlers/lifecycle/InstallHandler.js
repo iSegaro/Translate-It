@@ -8,9 +8,9 @@ import browser from "webextension-polyfill";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "../config.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
-import { createLogger } from '@/utils/core/logger.js';
-
-const logger = createLogger('Core', 'InstallHandler');
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
 
 /**
  * Detects if this is a migration from old version to Vue version

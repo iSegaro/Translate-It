@@ -7,18 +7,9 @@ import {
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
-
-// Lazy logger to avoid initialization order issues
-let _logger;
-const getLogger = () => {
-  if (!_logger) {
-    _logger = createLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
-  }
-  return _logger;
-};
-
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
 
 export class OpenAIProvider extends BaseProvider {
@@ -93,7 +84,7 @@ export class OpenAIProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-image-translation`
     );
 
-    getLogger().debug('translateImage called with mode:', translateMode);
+  logger.debug('translateImage called with mode:', translateMode);
 
     // Build prompt for screen capture translation
     const basePrompt = await getPromptBASEScreenCaptureAsync();
@@ -101,7 +92,7 @@ export class OpenAIProvider extends BaseProvider {
       .replace(/\$_\{TARGET\}/g, targetLang)
       .replace(/\$_\{SOURCE\}/g, sourceLang);
 
-    getLogger().debug('translateImage built prompt:', prompt);
+  logger.debug('translateImage built prompt:', prompt);
 
     // Prepare message with image
     const messages = [

@@ -1,6 +1,7 @@
 // src/managers/content/windows/translation/TranslationRenderer.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "../../../../config.js";
@@ -10,7 +11,7 @@ import { TranslationMode, CONFIG } from "../../../../config.js";
  */
 export class TranslationRenderer {
   constructor(factory, ttsManager) {
-    this.logger = createLogger('Content', 'TranslationRenderer');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationRenderer');
     this.factory = factory;
     this.ttsManager = ttsManager;
   }

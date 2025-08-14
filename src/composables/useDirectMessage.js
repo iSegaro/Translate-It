@@ -4,9 +4,10 @@
 import { ref } from "vue";
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useDirectMessage');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useDirectMessage');
 
 export function useDirectMessage() {
   const isReady = ref(false);

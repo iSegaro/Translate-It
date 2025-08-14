@@ -2,10 +2,11 @@
 // Content script-based screen capture manager (fallback)
 
 import browser from "webextension-polyfill";
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 
-const logger = createLogger('Core', 'capture-content');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'capture-content');
 
 /**
  * Content Script Screen Capture Manager

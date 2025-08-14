@@ -1,13 +1,14 @@
 // src/managers/content/windows/crossframe/FrameRegistry.js
 
-import { createLogger } from "../../../../utils/core/logger.js";
+import { getScopedLogger } from "../../../../utils/core/logger.js";
+import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 
 /**
  * Manages frame registration and mapping for cross-frame communication
  */
 export class FrameRegistry {
   constructor() {
-    this.logger = createLogger('Content', 'FrameRegistry');
+  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FrameRegistry');
     this.frameId = Math.random().toString(36).substring(7);
     this.isInIframe = window !== window.top;
     this.debugCrossFrame = false;

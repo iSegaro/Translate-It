@@ -5,9 +5,10 @@ import { ref } from 'vue'
 import { ErrorHandler } from '../error-management/ErrorService.js'
 import { ErrorTypes } from '../error-management/ErrorTypes.js'
 import { matchErrorToType } from '../error-management/ErrorMatcher.js'
-import { createLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = createLogger('UI', 'useErrorHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useErrorHandler');
 
 /**
  * Vue composable for unified error handling
