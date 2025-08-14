@@ -1,5 +1,6 @@
 <template>
   <button
+    type="button"
     class="action-button copy-button"
     :class="[
       `size-${size}`,
@@ -28,7 +29,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from 'vue'
+import { ref, computed } from 'vue'
 import { useCopyAction } from '@/composables/actions/useCopyAction.js'
 import { createLogger } from '@/utils/core/logger.js'
 

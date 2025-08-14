@@ -16,7 +16,7 @@
       v-if="showToolbar && hasContent"
       :text="content"
       :target-language="targetLanguage"
-      mode="display"
+      :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
       class="display-toolbar"
       :show-copy="showCopyButton"
       :show-tts="showTTSButton"
@@ -270,7 +270,7 @@ onMounted(() => {
 /* Content container */
 .translation-content {
   width: 100%;
-  padding: 26px 10px 10px 10px;
+  padding: 32px 10px 10px 10px;
   border-radius: 3px;
   font-family: inherit;
   font-size: 14px;
@@ -298,7 +298,7 @@ onMounted(() => {
   flex-grow: 1;
   border: none;
   border-radius: 0;
-  padding: 32px 14px 12px 14px;
+  padding: 42px 14px 12px 14px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -431,6 +431,10 @@ onMounted(() => {
   left: 12px;
   z-index: 10;
   opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 2px;
 }
 
 /* Selection mode toolbar */
@@ -492,10 +496,15 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   left: 12px;
   z-index: 10;
   opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 2px;
 }
 
 .sidepanel-mode .display-toolbar {
   left: 18px;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .selection-mode .display-toolbar {

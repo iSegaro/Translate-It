@@ -5,21 +5,14 @@
   >
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
-      v-if="hasContent"
       :text="modelValue"
-      :source-language="sourceLanguage"
-      mode="input-field"
+      :language="sourceLanguage"
+      mode="input"
+      :show-copy="hasContent"
+      :show-tts="hasContent"
+      :show-paste="true"
       class="input-toolbar"
-      @paste="handlePaste"
-    />
-    
-    <!-- Standalone Paste Button -->
-    <PasteButton
-      :title="pasteTitle"
-      :alt="pasteAlt"
-      mode="standalone"
-      class="paste-standalone"
-      @paste="handlePaste"
+      @text-pasted="handlePaste"
     />
     
     <!-- Textarea -->
@@ -43,7 +36,6 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
-import PasteButton from '@/components/shared/actions/PasteButton.vue'
 import { createLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = createLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
@@ -158,8 +150,9 @@ const handleKeydown = (event) => {
   }
 }
 
-const handlePaste = async (pastedText) => {
+const handlePaste = async (data) => {
   try {
+    const pastedText = data?.text || data // support both ActionToolbar format and direct string
     if (pastedText) {
       emit('update:modelValue', pastedText)
       
@@ -172,8 +165,8 @@ const handlePaste = async (pastedText) => {
         }
       })
       
-      // Auto-translate if enabled
-      if (props.autoTranslateOnPaste) {
+      // Auto-translate if enabled (from ActionToolbar or prop)
+      if (props.autoTranslateOnPaste || data?.autoTranslate) {
         await nextTick()
         emit('translate')
       }
@@ -208,7 +201,7 @@ onMounted(async () => {
 
 .translation-textarea {
   width: 100%;
-  padding: 24px 10px 10px 10px;
+  padding: 28px 10px 10px 10px;
   /* border-radius: 3px; */
   font-family: inherit;
   font-size: 13px;
@@ -244,9 +237,17 @@ onMounted(async () => {
   z-index: 10;
   opacity: 0;
   transition: opacity 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 2px;
 }
 
 .textarea-container.has-content .input-toolbar {
+  opacity: 1;
+}
+
+.textarea-container:hover .input-toolbar {
   opacity: 1;
 }
 
@@ -265,6 +266,8 @@ onMounted(async () => {
 
 .sidepanel-wrapper .input-toolbar {
   left: 18px;
+  top: 8px;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .sidepanel-wrapper .paste-standalone {
@@ -273,7 +276,7 @@ onMounted(async () => {
 
 .sidepanel-wrapper .translation-textarea {
   height: 140px;
-  padding: 32px 14px 12px 14px;
+  padding: 42px 14px 12px 14px;
   font-size: 15px;
   line-height: 1.7;
   border-radius: 5px;
@@ -281,7 +284,7 @@ onMounted(async () => {
 }
 
 html[dir="rtl"] .sidepanel-wrapper .translation-textarea {
-  padding: 32px 14px 12px 14px;
+  padding: 42px 14px 12px 14px;
 }
 
 /* RTL adjustments */

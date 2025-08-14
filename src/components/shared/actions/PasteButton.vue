@@ -1,5 +1,6 @@
 <template>
   <button
+    type="button"
     class="action-button paste-button"
     :class="[
       `size-${size}`,
@@ -28,7 +29,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from 'vue'
+import { ref, computed } from 'vue'
 import { usePasteAction } from '@/composables/actions/usePasteAction.js'
 import { createLogger } from '@/utils/core/logger.js'
 

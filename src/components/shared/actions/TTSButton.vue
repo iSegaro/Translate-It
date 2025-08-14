@@ -1,5 +1,6 @@
 <template>
   <button
+    type="button"
     class="action-button tts-button"
     :class="[
       `size-${size}`,
@@ -29,8 +30,8 @@
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue'
-import { useTTSAction } from '@/composables/actions/useTTSAction.js'
+import { computed } from 'vue'
+import { useTTSSmart } from '@/composables/useTTSSmart.js'
 import { createLogger } from '@/utils/core/logger.js'
 
 const logger = createLogger('UI', 'TTSButton')
@@ -97,7 +98,7 @@ const props = defineProps({
 const emit = defineEmits(['speaking', 'stopped', 'tts-failed'])
 
 // Composables
-const { speak, stop, isPlaying } = useTTSAction()
+const { speak, stop, isPlaying } = useTTSSmart()
 
 // Computed
 const canSpeak = computed(() => {
@@ -113,8 +114,7 @@ const dynamicLabel = computed(() => {
 })
 
 const iconSrc = computed(() => {
-  // Use existing icon from assets
-  return new URL('@/assets/icons/speaker.png', import.meta.url).href
+  return '/icons/speaker.png'
 })
 
 // Methods

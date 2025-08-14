@@ -8,43 +8,49 @@
       { 'visible': visible, 'has-content': hasContent }
     ]"
   >
-    <CopyButton
-      v-if="showCopy"
-      :text="text"
-      :size="buttonSize"
-      :variant="buttonVariant"
-      :title="copyTitle"
-      :aria-label="copyAriaLabel"
-      :disabled="copyDisabled"
-      @copied="handleCopied"
-      @copy-failed="handleCopyFailed"
-    />
+    <!-- Left group: Copy + TTS -->
+    <div class="toolbar-left">
+      <CopyButton
+        v-if="showCopy"
+        :text="text"
+        :size="buttonSize"
+        :variant="buttonVariant"
+        :title="copyTitle"
+        :aria-label="copyAriaLabel"
+        :disabled="copyDisabled"
+        @copied="handleCopied"
+        @copy-failed="handleCopyFailed"
+      />
+      
+      <TTSButton
+        v-if="showTTS"
+        :text="text"
+        :language="language"
+        :size="buttonSize"
+        :variant="buttonVariant"
+        :title="ttsTitle"
+        :aria-label="ttsAriaLabel"
+        :disabled="ttsDisabled"
+        @speaking="handleTTSSpeaking"
+        @stopped="handleTTSStopped"
+        @tts-failed="handleTTSFailed"
+      />
+    </div>
     
-    <PasteButton
-      v-if="showPaste"
-      :size="buttonSize"
-      :variant="buttonVariant"
-      :title="pasteTitle"
-      :aria-label="pasteAriaLabel"
-      :disabled="pasteDisabled"
-      :auto-translate="autoTranslateOnPaste"
-      @pasted="handlePasted"
-      @paste-failed="handlePasteFailed"
-    />
-    
-    <TTSButton
-      v-if="showTTS"
-      :text="text"
-      :language="language"
-      :size="buttonSize"
-      :variant="buttonVariant"
-      :title="ttsTitle"
-      :aria-label="ttsAriaLabel"
-      :disabled="ttsDisabled"
-      @speaking="handleTTSSpeaking"
-      @stopped="handleTTSStopped"
-      @tts-failed="handleTTSFailed"
-    />
+    <!-- Right group: Paste -->
+    <div class="toolbar-right">
+      <PasteButton
+        v-if="showPaste"
+        :size="buttonSize"
+        :variant="buttonVariant"
+        :title="pasteTitle"
+        :aria-label="pasteAriaLabel"
+        :disabled="pasteDisabled"
+        :auto-translate="autoTranslateOnPaste"
+        @pasted="handlePasted"
+        @paste-failed="handlePasteFailed"
+      />
+    </div>
     
     <!-- Custom actions slot -->
     <slot name="custom-actions" />
@@ -52,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue'
+import { computed } from 'vue'
 import CopyButton from './CopyButton.vue'
 import PasteButton from './PasteButton.vue'
 import TTSButton from './TTSButton.vue'
@@ -75,8 +81,8 @@ const props = defineProps({
   // Display control
   mode: {
     type: String,
-    default: 'input', // input, output, inline, floating
-    validator: (value) => ['input', 'output', 'inline', 'floating'].includes(value)
+    default: 'output',
+    validator: (value) => ['input', 'output', 'inline', 'floating', 'sidepanel'].includes(value)
   },
   layout: {
     type: String,
@@ -231,9 +237,10 @@ const handleTTSFailed = (error) => {
 <style scoped>
 .action-toolbar {
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
   align-items: center;
   transition: opacity 0.2s ease, visibility 0.2s ease;
+  width: 100%;
 }
 
 .action-toolbar:not(.visible) {
@@ -241,13 +248,46 @@ const handleTTSFailed = (error) => {
   visibility: hidden;
 }
 
+/* Toolbar groups */
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.toolbar-left {
+  flex: 0 0 auto;
+}
+
+.toolbar-right {
+  flex: 0 0 auto;
+}
+
 /* Layout variants */
 .layout-horizontal {
   flex-direction: row;
 }
 
+.layout-horizontal .toolbar-left,
+.layout-horizontal .toolbar-right {
+  flex-direction: row;
+}
+
 .layout-vertical {
   flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.layout-vertical .toolbar-left,
+.layout-vertical .toolbar-right {
+  flex-direction: column;
+  width: 100%;
+}
+
+.layout-vertical .toolbar-right {
+  margin-top: 4px;
 }
 
 /* Position variants */
@@ -282,10 +322,11 @@ const handleTTSFailed = (error) => {
 
 /* Mode-specific styles */
 .mode-input {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 4px;
   padding: 2px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(4px);
 }
 
 .mode-output {
@@ -307,6 +348,12 @@ const handleTTSFailed = (error) => {
   backdrop-filter: blur(8px);
 }
 
+.mode-sidepanel {
+  background: transparent;
+  border-radius: 4px;
+  padding: 2px;
+}
+
 /* Content-based visibility */
 .mode-input:not(.has-content),
 .mode-output:not(.has-content) {
@@ -316,8 +363,8 @@ const handleTTSFailed = (error) => {
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .mode-input {
-    background: rgba(0, 0, 0, 0.9);
-    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.05);
   }
   
   .mode-output {
