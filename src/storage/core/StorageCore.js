@@ -6,11 +6,13 @@
  * This is the new unified storage system that replaces the old StorageManager
  */
 
+// Early debug to trace module evaluation order
+console.debug('[init] StorageCore module evaluating');
 import { ErrorHandler } from "../../error-management/ErrorService.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '../../utils/core/logger.js';
-import { LOG_COMPONENTS } from '../../utils/core/logConstants.js';
+// Avoid importing LOG_COMPONENTS here to prevent early evaluation cycles; use literal names instead.
 
 class StorageCore {
   constructor() {
@@ -19,7 +21,7 @@ class StorageCore {
     this._isReady = false;
     this._readyPromise = null;
     this._changeListener = null;
-  this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
+  this.logger = getScopedLogger('Storage', 'Core');
     this._initializeAsync();
   }
 

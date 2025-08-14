@@ -7,9 +7,7 @@ import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorHandler');
+const logger = getScopedLogger('Error', 'ErrorHandler');
 
 const SILENT = new Set([
   ErrorTypes.CONTEXT,

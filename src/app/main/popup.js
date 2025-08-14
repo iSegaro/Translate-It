@@ -5,9 +5,7 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'popup');
+const logger = getScopedLogger('UI', 'popup');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {

@@ -8,9 +8,7 @@ import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'usePopupTranslation');
+const logger = getScopedLogger('UI', 'usePopupTranslation');
 
 export function usePopupTranslation() {
   // State

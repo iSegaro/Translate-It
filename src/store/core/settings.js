@@ -3,14 +3,16 @@ import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/storage/core/SecureStorage.js'
-import { storageManager } from '@/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-// Defensive: ensure LOG_COMPONENTS is defined before using (avoids rare TDZ issues during bundle ordering)
-const logger = (typeof LOG_COMPONENTS !== 'undefined')
-  ? getScopedLogger(LOG_COMPONENTS.CORE, 'settings')
-  : { debug:()=>{}, info:()=>{}, warn:()=>{}, error:()=>{}, init:()=>{}, operation:()=>{} };
+// Lazy-load storageManager to avoid unnecessary upfront cost (no longer needed for circular safety, retained for perf)
+let __storageManagerPromise = null;
+async function getStorageManager() {
+  if (!__storageManagerPromise) {
+    __storageManagerPromise = import('@/storage/core/StorageCore.js').then(m => m.storageManager);
+  }
+  return __storageManagerPromise;
+}
+const logger = getScopedLogger('Core', 'settings');
 
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
@@ -101,7 +103,8 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true
     try {
       // Get all settings from storage using StorageManager
-      const stored = await storageManager.get(null)
+  const storageManager = await getStorageManager();
+  const stored = await storageManager.get(null)
       
       // Merge with defaults, preserving existing values
       Object.keys(settings.value).forEach(key => {
@@ -141,7 +144,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const saveAllSettings = async () => {
     isSaving.value = true
     try {
-      await storageManager.set(settings.value)
+  const storageManager = await getStorageManager();
+  await storageManager.set(settings.value)
       return true
     } catch (error) {
       logger.error('Failed to save all settings:', error)
@@ -161,7 +165,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       logger.debug(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
       settings.value[key] = value // Update local state
-      await storageManager.set({ [key]: value }) // Persist immediately
+  const storageManager = await getStorageManager();
+  await storageManager.set({ [key]: value }) // Persist immediately
       logger.debug(`[settingsStore] Successfully saved ${key} to browser storage`)
       return true
     } catch (error) {
@@ -176,7 +181,8 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.assign(settings.value, updates)
       
       // Get browser API and save to storage
-      await storageManager.set(settings.value)
+  const storageManager = await getStorageManager();
+  await storageManager.set(settings.value)
       
       return true
     } catch (error) {
@@ -188,7 +194,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const resetSettings = async () => {
     try {
       // Clear all storage using StorageManager
-      await storageManager.clear()
+  const storageManager = await getStorageManager();
+  await storageManager.clear()
       
       // Reset to CONFIG defaults
       const defaultSettings = {
@@ -247,7 +254,7 @@ export const useSettingsStore = defineStore('settings', () => {
         ...settings.value,
         _exported: true,
         _timestamp: new Date().toISOString(),
-        _version: '0.10.0'
+  _version: '0.10.2'
       }
       
       // Note: In real implementation, encrypt API keys if password provided
@@ -398,7 +405,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const setupStorageListener = async () => {
     try {
       storageListener = handleStorageChange
-      storageManager.on('change', storageListener)
+  const storageManager = await getStorageManager();
+  storageManager.on('change', storageListener)
       logger.debug('[SettingsStore] Storage listener setup successfully with StorageManager')
     } catch (error) {
       logger.warn('[SettingsStore] Unable to setup storage listener:', error.message)
@@ -409,7 +417,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cleanupStorageListener = async () => {
     if (storageListener) {
       try {
-        storageManager.off('change', storageListener)
+  getStorageManager().then(sm => sm.off('change', storageListener))
         storageListener = null
         logger.debug('[SettingsStore] Storage listener cleaned up from StorageManager')
       } catch (error) {

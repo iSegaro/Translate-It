@@ -2,9 +2,7 @@
 
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorMatcher');
+const logger = getScopedLogger('Error', 'ErrorMatcher');
 
 
 /**

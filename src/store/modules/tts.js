@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'tts');
+// Use literal component name to avoid TDZ on LOG_COMPONENTS during early evaluation
+const logger = getScopedLogger('Core', 'tts');
 
 export const useTTSStore = defineStore('tts', () => {
   // State

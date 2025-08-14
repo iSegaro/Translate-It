@@ -3,9 +3,10 @@ import { ErrorHandler } from './error-management/ErrorService.js';
 import { ErrorTypes } from './error-management/ErrorTypes.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'config');
+// NOTE: Avoid importing LOG_COMPONENTS here to reduce risk of circular/TDZ during very early store initialization.
+// Using literal 'Core' keeps semantics intact.
+console.debug('[init] config.js module evaluating');
+const logger = getScopedLogger('Core', 'config');
 
 export const TRANSLATION_ERRORS = {
   INVALID_CONTEXT:

@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-store');
+// Use literal component name to avoid circular TDZ on LOG_COMPONENTS during early store evaluation
+const logger = getScopedLogger('Core', 'translation-store');
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
