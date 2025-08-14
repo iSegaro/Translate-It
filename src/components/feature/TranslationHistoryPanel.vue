@@ -291,7 +291,6 @@
               <ActionGroup
                 :text="item.translatedText"
                 :target-language="item.targetLanguage"
-                mode="history-item"
                 :show-copy="true"
                 :show-tts="!item.isImageTranslation"
                 :show-paste="false"
@@ -416,7 +415,6 @@
         <!-- Enhanced Bulk Copy -->
         <CopyButton
           :text="bulkSelectedText"
-          mode="bulk"
           class="bulk-copy-btn"
           title="Copy all selected"
           @copied="onBulkCopied"
