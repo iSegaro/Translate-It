@@ -20,6 +20,7 @@
       </div>
 
       <!-- Select Element Status -->
+      <!-- Temporarily disabled to debug error
       <div
         v-if="isSelecting"
         class="selection-status"
@@ -34,6 +35,7 @@
           }}</span>
         </div>
       </div>
+      -->
 
       <!-- Source Text Area -->
       <TranslationInputField
@@ -103,10 +105,10 @@ const { t } = useI18n();
 // Languages composable
 const languages = useLanguages();
 
-// Translation Composable - SAME AS POPUP
+// Translation Composable
 const translation = useSidepanelTranslation();
 
-// Extract states from composable - SAME AS POPUP
+// Extract states from composable
 const {
   sourceText,
   translatedText,
@@ -119,7 +121,6 @@ const {
 } = translation;
 
 // Local UI state (not related to translation)
-const showPasteButton = ref(true);
 const currentAbortController = ref(null);
 // Bindings for LanguageSelector component (display names)
 const sourceLang = ref('Auto-Detect');
@@ -140,16 +141,33 @@ const hasSourceContent = computed(() => {
 });
 
 const hasTranslationContent = computed(() => {
-  return (
-    (translatedText.value || translationError.value || "").trim().length > 0
-  );
+  try {
+    const translated = translatedText?.value || "";
+    const error = translationError?.value || "";
+    return (translated + error).trim().length > 0;
+  } catch (err) {
+    logger.warn('[SidepanelMainContent] Error in hasTranslationContent computed:', err);
+    return false;
+  }
 });
 
 // Select Element computed properties
-const isSelecting = computed(() => selectElement.isActivating.value);
-const isSelectElementActivating = computed(
-  () => selectElement.isActivating.value,
-);
+const isSelecting = computed(() => {
+  try {
+    return selectElement?.isActivating?.value || false;
+  } catch (err) {
+    logger.warn('[SidepanelMainContent] Error in isSelecting computed:', err);
+    return false;
+  }
+});
+const isSelectElementActivating = computed(() => {
+  try {
+    return selectElement?.isActivating?.value || false;
+  } catch (err) {
+    logger.warn('[SidepanelMainContent] Error in isSelectElementActivating computed:', err);
+    return false;
+  }
+});
 
 const targetLanguageValue = computed(() => targetLang.value || 'Persian');
 
@@ -176,7 +194,7 @@ watch(
   { deep: true },
 );
 
-// Handle form submission using composable - SAME AS POPUP
+// Handle form submission using composable
 const handleTranslationSubmit = async () => {
   // Early return without warning since button is now disabled when conditions not met
   if (!canTranslate.value) {
@@ -195,7 +213,6 @@ const handleTranslationSubmit = async () => {
     
     // Start translation immediately - service worker will wake up when needed
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
-    
   } catch (error) {
     logger.error("[SidepanelMainContent] Translation error caught:", error);
     await handleError(error, 'SidepanelMainContent-translation');
@@ -222,49 +239,15 @@ const copyTranslationText = async () => {
   }
 };
 
-// Paste text into source textarea
-const pasteSourceText = async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    sourceText.value = text;
-    // Trigger input event to update reactive properties
-    handleSourceTextInput();
-    logger.debug("[SidepanelMainContent] Text pasted from clipboard");
-  } catch (error) {
-    await handleError(error, 'SidepanelMainContent-paste');
-  }
+// Listen for focus events to handle any UI updates if needed
+const handleFocus = () => {
+  // Focus handling can be added here if needed
 };
 
 // Handle source text input to update toolbar visibility
 const handleSourceTextInput = () => {
-  // Reactive hasSourceContent will automatically handle toolbar visibility
-  // This is called on input events
+  // This is called on input events - reactive hasSourceContent will automatically handle toolbar visibility
 };
-
-// Check clipboard for paste button visibility
-const checkClipboard = async () => {
-  try {
-    logger.debug("[SidepanelMainContent] Checking clipboard...");
-    const text = await navigator.clipboard.readText();
-    const hasContent = text.trim().length > 0;
-
-    showPasteButton.value = hasContent;
-  } catch (error) {
-    logger.debug(
-      "[SidepanelMainContent] Clipboard check failed:",
-      error.message,
-    );
-    // Fallback: show button always if permission denied
-    showPasteButton.value = true;
-  }
-};
-
-// Listen for focus events to update paste button
-const handleFocus = () => {
-  checkClipboard();
-};
-
-// Remove local function - use centralized getLanguageCodeForTTS instead
 
 // Speak source text using TTS
 const speakSourceText = async () => {
@@ -288,51 +271,41 @@ const speakTranslationText = async () => {
   );
 };
 
-
-// Remove local function
-
-// Remove local function - use centralized getLanguageDisplayName instead
-
-
-
 // Lifecycle - setup event listeners
 onMounted(async () => {
-  // Load languages first
-  await languages.loadLanguages();
-  
-  // Initialize language selector display values from settings
   try {
-    const savedSource = await getSourceLanguageAsync();
-    const savedTarget = await getTargetLanguageAsync();
-    sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
-    targetLang.value = getLanguageDisplayName(savedTarget) || 'Persian';
-  } catch (err) {
-    sourceLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
-    targetLang.value = targetLang.value || 'Persian';
+    // Load languages first
+    logger.debug("[SidepanelMainContent] Loading languages...");
+    await languages.loadLanguages();
+    logger.debug("[SidepanelMainContent] Languages loaded successfully");
+    
+    // Initialize language selector display values from settings
+    logger.debug("[SidepanelMainContent] Getting language settings...");
+    try {
+      const savedSource = await getSourceLanguageAsync();
+      const savedTarget = await getTargetLanguageAsync();
+      sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
+      targetLang.value = getLanguageDisplayName(savedTarget) || 'Persian';
+      logger.debug("[SidepanelMainContent] Language settings loaded successfully");
+    } catch (err) {
+      logger.warn("[SidepanelMainContent] Error loading language settings:", err);
+      sourceLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
+      targetLang.value = targetLang.value || 'Persian';
+    }
+
+    // Add focus listener for clipboard updates
+    logger.debug("[SidepanelMainContent] Adding focus listeners...");
+    document.addEventListener("focus", handleFocus, true);
+    window.addEventListener("focus", handleFocus);
+
+    // Initialize translation data
+    logger.debug("[SidepanelMainContent] Loading last translation...");
+    loadLastTranslation();
+
+    logger.debug("[SidepanelMainContent] Component mounted with Select Element integration");
+  } catch (error) {
+    logger.error("[SidepanelMainContent] Error during component mounting:", error);
   }
-
-  // Suppress no-unused-vars warnings for template-used variables/functions
-  // These are used in the template but not directly in the script setup block
-  logger.debug(historyComposable); // Explicitly use historyComposable to satisfy linter
-  hasTranslationContent.value;
-  isSelectElementActivating.value;
-  // Remove automatic clipboard/TTS operations on mount to prevent errors
-
-  // Initial clipboard check
-  checkClipboard();
-
-  // Add focus listener for clipboard updates
-  document.addEventListener("focus", handleFocus, true);
-  window.addEventListener("focus", handleFocus);
-
-  // Message listener is now handled by useSidepanelTranslation composable - SAME AS POPUP
-
-  // Initialize translation data - SAME AS POPUP
-  await loadLastTranslation();
-
-  logger.debug(
-    "[SidepanelMainContent] Component mounted with Select Element integration",
-  );
 });
 
 onUnmounted(() => {
@@ -426,9 +399,9 @@ form {
   width: 100%;
 }
 
-/* Remove local language control styles - they will be handled by shared component context-specific styles */
+/* Language control styles handled by shared component */
 
-/* Remove local textarea styles - they will be handled by TranslationInputField component */
+/* Textarea styles handled by TranslationInputField component */
 
 .controls-container {
   display: flex;
@@ -507,7 +480,7 @@ form {
   min-width: 0;
 }
 
-/* Result placeholder - Match OLD implementation */
+/* Result placeholder */
 .result:empty::before {
   content: attr(data-i18n-placeholder);
   color: #6c757d;
@@ -527,10 +500,7 @@ html[dir="rtl"] .result:empty::before {
   background: #ffe6e6;
 }
 
-/* Remove local inline toolbar styles - they will be handled by TranslationInputField component */
-
-
-/* Spinner styles - Match OLD implementation */
+/* Spinner styles */
 .spinner-center {
   position: absolute;
   top: 50%;
