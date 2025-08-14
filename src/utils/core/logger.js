@@ -14,28 +14,46 @@ import { LOG_LEVELS } from "./logConstants.js";
 // Development environment detection
 const isDevelopment = process.env.NODE_ENV === "development";
 
+// --- Instrumentation (temporary for debugging circular import + TDZ) ---
+// Bump this version string whenever we patch logger.js to ensure the runtime actually loaded the latest file.
+export const __LOGGER_VERSION = '5-prod-clean';
+// Early timestamped marker (should appear BEFORE any error if this file is truly the one executing)
+try { console.debug(`[init] logger.js loaded (version=${__LOGGER_VERSION}) at`, new Date().toISOString()); } catch(_) {}
+try { console.debug('[init] logger.js import url =', import.meta.url); } catch(_) {}
+
 // Global log level - can be overridden per component
 let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
 
-// Component-specific log levels (tuned for Vue migration)
+// Component-specific log levels (production defaults)
 // ERROR = 0 | WARN = 1 | INFO = 2 | DEBUG = 3
+// Keep noise low in UI & content paths while retaining Info for core/background workflows.
 const componentLogLevels = {
-  Background: LOG_LEVELS.INFO,     // عملیات مهم service worker
-  Core: LOG_LEVELS.INFO,           // راه‌اندازی و wiring
-  Content: LOG_LEVELS.DEBUG,       // جزئیات DOM manipulation
-  Translation: LOG_LEVELS.DEBUG,   // pipeline ترجمه، trace در توسعه
-  Messaging: LOG_LEVELS.WARN,      // فقط مشکلات communication
-  Providers: LOG_LEVELS.INFO,      // API calls و نتایج مهم
-  UI: LOG_LEVELS.INFO,             // رخدادهای قابل مشاهده کاربر
-  Storage: LOG_LEVELS.INFO,        // عملیات persistence
-  Capture: LOG_LEVELS.DEBUG,       // جزئیات image processing
-  Error: LOG_LEVELS.ERROR,         // همیشه نمایش خطاها
+  Background: LOG_LEVELS.INFO,
+  Core: LOG_LEVELS.INFO,
+  Content: LOG_LEVELS.WARN,
+  Translation: LOG_LEVELS.INFO,
+  Messaging: LOG_LEVELS.WARN,
+  Providers: LOG_LEVELS.INFO,
+  UI: LOG_LEVELS.WARN,
+  Storage: LOG_LEVELS.WARN,
+  Capture: LOG_LEVELS.INFO,
+  Error: LOG_LEVELS.INFO,
 };
 
-// Internal cache to avoid recreating identical loggers
-const loggerCache = new Map();
-
-// Snapshot of initial component levels (for test reset helpers)
+// Lazily-initialized cache stored on globalThis to avoid ANY module-level TDZ during circular evaluation.
+// Using globalThis also guarantees a single cache across multiple bundled copies (if that ever occurs).
+function __getLoggerCache() {
+  const g = globalThis;
+  if (!g.__TRANSLATE_IT__) {
+    Object.defineProperty(g, '__TRANSLATE_IT__', { value: {}, configurable: true });
+  }
+  if (!g.__TRANSLATE_IT__.__LOGGER_CACHE || !(g.__TRANSLATE_IT__.__LOGGER_CACHE instanceof Map)) {
+    g.__TRANSLATE_IT__.__LOGGER_CACHE = new Map();
+  }
+  return g.__TRANSLATE_IT__.__LOGGER_CACHE;
+}
+// Devtools inspection helper
+try { if (globalThis) { globalThis.__TRANSLATE_IT__.__GET_LOGGER_CACHE = __getLoggerCache; } } catch(_) {}
 const __initialComponentLevels = { ...componentLogLevels };
 
 /**
@@ -44,11 +62,11 @@ const __initialComponentLevels = { ...componentLogLevels };
  * @param {string|null} subComponent Optional sub-scope (e.g. specific strategy or feature)
  */
 export function getScopedLogger(component, subComponent = null) {
+  // Pure implementation: always go through global cache accessor (fully lazy & TDZ-proof)
+  const cache = __getLoggerCache();
   const key = subComponent ? `${component}::${subComponent}` : component;
-  if (!loggerCache.has(key)) {
-    loggerCache.set(key, createLogger(component, subComponent));
-  }
-  return loggerCache.get(key);
+  if (!cache.has(key)) cache.set(key, createLogger(component, subComponent));
+  return cache.get(key);
 }
 
 // Introspection helper (mainly for debugging / devtools)
@@ -201,7 +219,7 @@ export const quickLoggers = {
  * Exposed with a double underscore prefix to discourage production use.
  */
 export function __resetLoggingSystemForTests() {
-  loggerCache.clear();
+  __getLoggerCache().clear(); // global cache
   // Reset component-specific levels to their original values
   Object.keys(componentLogLevels).forEach((k) => delete componentLogLevels[k]);
   Object.assign(componentLogLevels, { ...__initialComponentLevels });
