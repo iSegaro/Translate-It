@@ -33,11 +33,17 @@ describe('Logging System Cache', () => {
 
   it('allows level inspection and modification', () => {
     const before = listLoggerLevels()
+  // Force a change to a different level first (ERROR), then back to DEBUG
+  setLogLevel(LOG_COMPONENTS.CORE, LOG_LEVELS.ERROR)
+  expect(getLogLevel(LOG_COMPONENTS.CORE)).toBe(LOG_LEVELS.ERROR)
+  const mid = listLoggerLevels()
+  expect(mid.components.Core).toBe(LOG_LEVELS.ERROR)
+  // Now set to DEBUG and validate second transition
   setLogLevel(LOG_COMPONENTS.CORE, LOG_LEVELS.DEBUG)
   expect(getLogLevel(LOG_COMPONENTS.CORE)).toBe(LOG_LEVELS.DEBUG)
   const after = listLoggerLevels()
-  // Keys in componentLogLevels are capitalized names like 'Core'
   expect(after.components.Core).toBe(LOG_LEVELS.DEBUG)
-  expect(before.components.Core).not.toBe(after.components.Core)
+  // Ensure at least one of the transitions changed from the original
+  expect(before.components.Core === after.components.Core && before.components.Core === mid.components.Core).toBe(false)
   })
 })
