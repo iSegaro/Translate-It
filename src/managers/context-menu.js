@@ -18,7 +18,6 @@ const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
-const COMMAND_NAME = "toggle-select-element";
 
 // --- Get API Providers from Registry ---
 async function getApiProviders() {
@@ -34,7 +33,6 @@ async function getApiProviders() {
   }
 }
 
-// ▼▼▼ تابع کمکی برای غیرفعال کردن حالت انتخاب المنت ▼▼▼
 /**
  * Sends a message to all tabs to deactivate the "Select Element" mode.
  * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
@@ -147,7 +145,7 @@ export class ContextMenuManager {
           (await getTranslationString("context_menu_translate_with_selection")) ||
           "Translate Element";
         const commands = await browser.commands.getAll();
-        const command = commands.find((c) => c.name === COMMAND_NAME);
+        const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
         if (command && command.shortcut) {
           pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
         }
@@ -321,7 +319,7 @@ export class ContextMenuManager {
     try {
       logger.debug(`📋 Context menu clicked: ${info.menuItemId}`);
 
-      // --- شناسایی و مدیریت کلیک روی منوی آیکون افزونه (Action Context) ---
+      // --- Handle browser action menu clicks ---
       const isApiProviderClick = info.menuItemId.startsWith(
         API_PROVIDER_ITEM_ID_PREFIX
       );
@@ -331,7 +329,7 @@ export class ContextMenuManager {
         HELP_MENU_ID,
       ].includes(info.menuItemId);
 
-      // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
+      // Deactivate select element mode when clicking on browser action menu items
       if (isApiProviderClick || isStaticActionClick) {
         await deactivateSelectElementModeInAllTabs();
       }
@@ -354,7 +352,7 @@ export class ContextMenuManager {
       switch (info.menuItemId) {
         case PAGE_CONTEXT_MENU_ID:
           if (tab && tab.id) {
-            // فعال کردن حالت انتخاب المنت با فرمت صحیح پیام
+            // Activate select element mode with proper message format
             browser.tabs
               .sendMessage(tab.id, MessageFormat.create(
                 MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
@@ -395,26 +393,6 @@ export class ContextMenuManager {
           await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
           break;
 
-        // Legacy menu handlers (keeping for compatibility)
-        case "translate-selection":
-          await this.handleTranslateSelection(info, tab);
-          break;
-
-        case "translate-page":
-          await this.handleTranslatePage(info, tab);
-          break;
-
-        case "select-element-mode":
-          await this.handleSelectElementMode(info, tab);
-          break;
-
-        case "capture-screen":
-          await this.handleCaptureScreen(info, tab);
-          break;
-
-        case "open-options":
-          await this.handleOpenOptions(info, tab);
-          break;
 
         default:
           logger.warn(`Unhandled context menu: ${info.menuItemId}`);
@@ -424,107 +402,6 @@ export class ContextMenuManager {
     }
   }
 
-  /**
-   * Handle translate selection
-   * @private
-   */
-  async handleTranslateSelection(info, tab) {
-    if (!info.selectionText) return;
-
-    try {
-      // Send message to content script to handle translation
-      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
-        MessageActions.TRANSLATE_SELECTION,
-        {
-          text: info.selectionText,
-          pageUrl: info.pageUrl,
-        },
-        'context-menu'
-      ));
-    } catch (error) {
-      logger.error("❌ Failed to handle translate selection:", error);
-    }
-  }
-
-  /**
-   * Handle translate page
-   * @private
-   */
-  async handleTranslatePage(info, tab) {
-    try {
-      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
-        MessageActions.TRANSLATE_PAGE,
-        {
-          pageUrl: info.pageUrl,
-        },
-        'context-menu'
-      ));
-    } catch (error) {
-      logger.error("❌ Failed to handle translate page:", error);
-    }
-  }
-
-  /**
-   * Handle select element mode
-   * @private
-   */
-  async handleSelectElementMode(info, tab) {
-    try {
-      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
-        MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-        {
-          pageUrl: info.pageUrl,
-        },
-        'context-menu'
-      ));
-    } catch (error) {
-      logger.error("❌ Failed to handle select element mode:", error);
-    }
-  }
-
-  /**
-   * Handle screen capture
-   * @private
-   */
-  async handleCaptureScreen(info, tab) {
-    try {
-      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
-        MessageActions.START_SCREEN_CAPTURE,
-        {
-          pageUrl: info.pageUrl,
-        },
-        'context-menu'
-      ));
-    } catch (error) {
-      logger.error("❌ Failed to handle screen capture:", error);
-    }
-  }
-
-  /**
-   * Handle open options
-   * @private
-   */
-  async handleOpenOptions() {
-    try {
-      const optionsUrl = browser.runtime.getURL("html/options.html");
-      await browser.tabs.create({ url: optionsUrl });
-    } catch (error) {
-      logger.error("❌ Failed to handle open options:", error);
-    }
-  }
-
-  /**
-   * Register context menu click listener
-   */
-  registerClickListener() {
-    if (browser?.contextMenus?.onClicked) {
-      browser.contextMenus.onClicked.addListener.call(
-        browser.contextMenus.onClicked,
-        this.handleMenuClick.bind(this),
-      );
-      logger.debug("📋 Context menu click listener registered");
-    }
-  }
 
   /**
    * Register storage change listener to sync context menus

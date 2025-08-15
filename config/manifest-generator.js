@@ -74,10 +74,10 @@ export function generateManifest(browser = 'chrome') {
     
     // Commands
     commands: {
-      'toggle-select-element': {
+      'SELECT-ELEMENT-COMMAND': {
         suggested_key: {
-          default: 'Ctrl+Shift+Z',
-          mac: 'Command+Shift+Z'
+          default: 'Alt+A',
+          mac: 'Command+A'
         },
         description: 'Activate the \'Select Element\' mode for translation.'
       }

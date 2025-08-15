@@ -72,10 +72,10 @@ const manifest = {
     "extension_pages": "script-src 'self' http://localhost:*; object-src 'self'; connect-src 'self' ws://localhost:*;"
   },
   "commands": {
-    "toggle-select-element": {
+    "SELECT-ELEMENT-COMMAND": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Z",
-        "mac": "Command+Shift+Z"
+        "default": "Alt+A",
+        "mac": "Command+A"
       },
       "description": "Activate the 'Select Element' mode for translation."
     }
