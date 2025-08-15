@@ -1,5 +1,5 @@
 // src/config.js
-import { ErrorHandler } from './error-management/ErrorService.js';
+import { ErrorHandler } from './error-management/ErrorHandler.js';
 import { ErrorTypes } from './error-management/ErrorTypes.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/utils/core/logger.js';

@@ -18,7 +18,7 @@ import { DragHandler } from "./interaction/DragHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
-import { ErrorHandler } from "../../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import { getErrorMessage } from "../../../error-management/ErrorMessages.js";
 import { matchErrorToType } from "../../../error-management/ErrorMatcher.js";
 
@@ -75,7 +75,7 @@ export class WindowsManager {
     this.icon = null;
     
     // External dependencies
-    this.translationHandler.errorHandler = options.translationHandler?.errorHandler || new ErrorHandler();
+    this.translationHandler.errorHandler = options.translationHandler?.errorHandler || ErrorHandler.getInstance();
     this.notifier = options.notifier;
     
     // Animation durations (backward compatibility)

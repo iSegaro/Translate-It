@@ -19,7 +19,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'windowErrorHandlers')
  * @param {string} context - Context identifier (e.g., 'popup', 'sidepanel', 'options')
  */
 export function setupWindowErrorHandlers(context) {
-  const errorHandler = new ErrorHandler()
+  const errorHandler = ErrorHandler.getInstance()
   
   /**
    * Handle uncaught errors (including from third-party libraries)

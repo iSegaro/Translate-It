@@ -1,6 +1,6 @@
 // src/utils/helpers.js
 import browser from "webextension-polyfill";
-import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

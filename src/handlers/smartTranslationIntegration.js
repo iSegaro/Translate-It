@@ -1,4 +1,4 @@
-import { ErrorHandler } from "../error-management/ErrorService.js";
+import { ErrorHandler } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";

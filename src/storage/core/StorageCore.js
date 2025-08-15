@@ -8,7 +8,7 @@
 
 // Early debug to trace module evaluation order
 console.debug('[init] StorageCore module evaluating');
-import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '../../utils/core/logger.js';

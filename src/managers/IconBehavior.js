@@ -1,6 +1,6 @@
 // src/managers/IconBehavior.js
 
-import { ErrorHandler } from "../error-management/ErrorService.js";
+import { ErrorHandler } from "../error-management/ErrorHandler.js";
 import { state } from "../config.js";
 import { detectPlatform } from "../utils/browser/platform.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";

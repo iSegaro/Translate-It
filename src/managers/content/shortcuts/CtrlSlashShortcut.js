@@ -6,7 +6,7 @@
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { isEditable } from "../../../utils/core/helpers.js";
-import { ErrorHandler } from "../../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 
 export class CtrlSlashShortcut {

@@ -4,7 +4,7 @@
 
 import browser from "webextension-polyfill";
 import { taggleLinks } from "@/utils/core/helpers.js";
-import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { getScopedLogger } from "../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
@@ -20,7 +20,7 @@ import { generateContentMessageId } from "../../utils/messaging/messageId.js";
  * - Element highlighting on hover
  * - Click to select and extract text
  * - ESC key cancellation
- * - Service integration (ErrorService, NotificationManager)
+ * - Service integration (ErrorHandler, NotificationManager)
  * - Cross-browser compatibility
  */
 export class SelectElementManager {
@@ -41,7 +41,7 @@ export class SelectElementManager {
     };
 
     // Service instances
-    this.errorHandler = new ErrorHandler();
+    this.errorHandler = ErrorHandler.getInstance();
     this.notificationManager = new NotificationManager(this.errorHandler);
 
     // Event handlers (bound to this)
@@ -139,7 +139,7 @@ export class SelectElementManager {
       } catch (error) {
         this.logger.error("Toggle error", error);
 
-        // Handle error via ErrorService
+        // Handle error via ErrorHandler
         await this.errorHandler.handle(error, {
           type: ErrorTypes.INTEGRATION,
           context: "select-element-toggle",
@@ -715,7 +715,7 @@ export class SelectElementManager {
     } catch (error) {
       this.logger.error("Element selection error", error);
 
-      // Handle error via ErrorService
+      // Handle error via ErrorHandler
       await this.errorHandler.handle(error, {
         type: ErrorTypes.INTEGRATION,
         context: "select-element-click",

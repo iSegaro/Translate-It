@@ -1,7 +1,7 @@
 // src/utils/browserCompat.js
 // browser compatibility utilities
 
-import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/utils/core/logger.js';

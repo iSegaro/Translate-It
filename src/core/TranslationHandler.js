@@ -15,7 +15,7 @@ import { state, TranslationMode, CONFIG } from "../config.js";
 import { logMethod, isExtensionContextValid} from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
-import { ErrorHandler } from "../error-management/ErrorService.js";
+import { ErrorHandler } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "../managers/core/FeatureManager.js";

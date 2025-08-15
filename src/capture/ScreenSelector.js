@@ -1,6 +1,6 @@
 // src/capture/ScreenSelector.js
 
-import { handleUIError } from "../error-management/ErrorService.js";
+import { handleUIError } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { createSafeElement } from "../utils/ui/html-sanitizer.js";
 

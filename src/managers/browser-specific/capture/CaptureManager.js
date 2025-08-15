@@ -5,7 +5,7 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'CaptureManager');
 
-import { handleUIError } from "../error-management/ErrorService.js";
+import { handleUIError } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { ProviderRegistry } from "../core/provider-registry.js";
 import { TranslationMode } from "../config.js";

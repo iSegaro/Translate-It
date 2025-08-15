@@ -4,7 +4,7 @@
  * Handles complex DOM structures, multi-line text, and preserves styling
  */
 
-import { ErrorHandler } from "../../error-management/ErrorService.js";
+import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -214,7 +214,7 @@ export function applyTranslationsToNodes(textNodes, translations, context = {}) 
         parentElement: textNode.parentNode
       });
 
-      const errorHandler = context.errorHandler || new ErrorHandler();
+      const errorHandler = context.errorHandler || ErrorHandler.getInstance();
       errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "advanced-text-extraction-replace",

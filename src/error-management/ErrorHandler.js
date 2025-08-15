@@ -1,6 +1,5 @@
 // File: src/error-management/ErrorHandler.js
 
-import { getDebugModeAsync, CONFIG } from "../config.js";
 import NotificationManager from "../managers/core/NotificationManager.js";
 import { openOptionsPage } from "../utils/core/helpers.js";
 import { matchErrorToType } from "./ErrorMatcher.js";
@@ -8,6 +7,8 @@ import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 const logger = getScopedLogger('Error', 'ErrorHandler');
+
+let _instance = null; // Singleton instance
 
 const SILENT = new Set([
   ErrorTypes.CONTEXT,
@@ -53,9 +54,32 @@ const OPEN_SETTINGS = new Set([
 
 export class ErrorHandler {
   constructor() {
+    if (_instance) {
+      return _instance;
+    }
     this.notifier = new NotificationManager();
     this.displayedErrors = new Set();
     this.handling = false;
+    this.openOptionsPageCallback = null; // Property to hold the callback
+    this.debugMode = false; // Debug mode state
+    _instance = this; // Set singleton instance
+  }
+
+  // Method to set the callback from outside
+  setOpenOptionsPageCallback(callback) {
+    this.openOptionsPageCallback = callback;
+  }
+
+  // Method to set debug mode
+  setDebugMode(enabled) {
+    this.debugMode = enabled;
+  }
+
+  static getInstance() {
+    if (!_instance) {
+      _instance = new ErrorHandler();
+    }
+    return _instance;
   }
   static async processError(err) {
     return err?.then ? await err : err;
@@ -67,14 +91,15 @@ export class ErrorHandler {
       const raw = err instanceof Error ? err.message : String(err);
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
-      const debug = await getDebugModeAsync().catch(() => CONFIG.DEBUG_MODE);
-      if (debug && !SUPPRESS_CONSOLE.has(type)) {
+      
+      // Use instance debug mode instead of importing from config to avoid circular dependency
+      if (this.debugMode && !SUPPRESS_CONSOLE.has(type)) {
         logger.error(`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
 
       const action = OPEN_SETTINGS.has(type)
-        ? () => openOptionsPage("api")
+        ? () => this.openOptionsPageCallback?.() || openOptionsPage("api")
         : undefined;
 
       this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
@@ -86,7 +111,7 @@ export class ErrorHandler {
 
   _logError(error, meta) {
     logger.error(
-      `[ErrorService] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
+      `[ErrorHandler] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
     );
   }
 
@@ -118,6 +143,6 @@ export class ErrorHandler {
 }
 
 export async function handleUIError(err, context = "") {
-  const handler = new ErrorHandler();
+  const handler = ErrorHandler.getInstance();
   return handler.handle(err, { type: ErrorTypes.UI, context });
 }

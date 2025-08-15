@@ -34,8 +34,8 @@ export function useErrorHandler() {
     isHandlingError.value = true
     
     try {
-      // Use the centralized ErrorHandler
-      const errorHandler = new ErrorHandler()
+      // Use the centralized ErrorHandler singleton
+      const errorHandler = ErrorHandler.getInstance()
       
       // Determine error type
       const errorType = matchErrorToType(error?.message || error)
@@ -119,7 +119,7 @@ export function useErrorHandler() {
  * Call this in main.js for each Vue app
  */
 export function setupGlobalErrorHandler(app, appName = 'vue-app') {
-  const errorHandler = new ErrorHandler()
+  const errorHandler = ErrorHandler.getInstance()
   
   app.config.errorHandler = async (error, instance, info) => {
     try {
