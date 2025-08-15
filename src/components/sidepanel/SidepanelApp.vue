@@ -138,7 +138,7 @@ const showApiProviderDropdown = computed(() => state.showApiProviderDropdown)
 
 // Event Handlers
 const handleTranslate = async (data) => {
-  getLogger().debug('Translation requested:', data)
+  logger.debug('Translation requested:', data)
   
   state.isTranslating = true
   state.translationError = ''
@@ -153,7 +153,7 @@ const handleTranslate = async (data) => {
 
     if (result && result.success) {
       state.translationResult = result
-      getLogger().init('Translation successful')
+      logger.init('Translation successful')
       
       // The history is now managed by the translation engine
       // No need to add it here manually
@@ -161,16 +161,16 @@ const handleTranslate = async (data) => {
     } else {
       // Handle Firefox MV3 bug where response is undefined
       if (result?.firefoxBug) {
-        getLogger().debug('Firefox MV3 bug detected. Waiting for history update.')
+        logger.debug('Firefox MV3 bug detected. Waiting for history update.')
         // The watcher on history.sortedHistoryItems will handle this
       } else {
         state.translationError = sidepanelTranslation.error.value || 'Translation failed'
-        getLogger().error('Translation failed:', state.translationError)
+        logger.error('Translation failed:', state.translationError)
       }
     }
   } catch (error) {
     state.translationError = error.message || 'Translation error occurred'
-    getLogger().error('Translation error:', error)
+    logger.error('Translation error:', error)
   } finally {
     state.isTranslating = false
   }
@@ -183,7 +183,7 @@ watch(() => history.sortedHistoryItems, (newHistory) => {
     
     // If the last history item matches the current source text, update the result
     if (lastItem.sourceText === state.sourceText && !state.translationResult) {
-      getLogger().debug('Updating translation from history due to watcher trigger.')
+      logger.debug('Updating translation from history due to watcher trigger.')
       state.translationResult = {
         success: true,
         data: {
@@ -197,7 +197,7 @@ watch(() => history.sortedHistoryItems, (newHistory) => {
 }, { deep: true })
 
 const handleSwapLanguages = async () => {
-  getLogger().debug('Language swap requested')
+  logger.debug('Language swap requested')
   
   const sourceVal = state.sourceLanguage
   const targetVal = state.targetLanguage
@@ -215,7 +215,7 @@ const handleSwapLanguages = async () => {
       await settingsStore.loadSettings()
       resolvedSourceCode = settingsStore.settings.SOURCE_LANGUAGE
     } catch (err) {
-      getLogger().error('Failed to load source language from settings', err)
+      logger.error('Failed to load source language from settings', err)
       resolvedSourceCode = null
     }
   }
@@ -225,7 +225,7 @@ const handleSwapLanguages = async () => {
       await settingsStore.loadSettings()
       resolvedTargetCode = settingsStore.settings.TARGET_LANGUAGE
     } catch (err) {
-      getLogger().error('Failed to load target language from settings', err)
+      logger.error('Failed to load target language from settings', err)
       resolvedTargetCode = null
     }
   }
@@ -241,24 +241,24 @@ const handleSwapLanguages = async () => {
     state.sourceLanguage = newSourceDisplay || targetVal
     state.targetLanguage = newTargetDisplay || sourceVal
     
-    getLogger().init('Languages swapped successfully')
+    logger.init('Languages swapped successfully')
   } else {
-    getLogger().debug('Cannot swap - invalid language selection')
+    logger.debug('Cannot swap - invalid language selection')
   }
 }
 
 const handleSelectElement = () => {
-  getLogger().debug('Select element activated')
+  logger.debug('Select element activated')
   // SelectElement logic در composable handle شده
 }
 
 const handleRevert = () => {
-  getLogger().debug('Revert requested')
+  logger.debug('Revert requested')
   // Revert logic در composable handle شده
 }
 
 const handleClear = () => {
-  getLogger().debug('Clear requested')
+  logger.debug('Clear requested')
   
   // پاک کردن فیلدها
   state.sourceText = ''
@@ -274,16 +274,16 @@ const handleClear = () => {
   
   // پاک کردن lastTranslation از storage
   browserAPI.safeSendMessage({ action: 'clearLastTranslation' })
-    .catch(error => getLogger().error('Failed to clear last translation:', error))
+    .catch(error => logger.error('Failed to clear last translation:', error))
 }
 
 const handleApiProvider = () => {
-  getLogger().debug('API provider dropdown toggled')
+  logger.debug('API provider dropdown toggled')
   state.showApiProviderDropdown = !state.showApiProviderDropdown
 }
 
 const handleHistory = () => {
-  getLogger().debug('History panel toggled')
+  logger.debug('History panel toggled')
   state.showHistoryPanel = !state.showHistoryPanel
   
   if (state.showHistoryPanel) {
@@ -295,16 +295,16 @@ const handleHistory = () => {
 }
 
 const handleSettings = () => {
-  getLogger().debug('Settings requested')
+  logger.debug('Settings requested')
   // Settings button در SideToolbar handle شده
 }
 
 const handleClearAllHistory = async () => {
-  getLogger().debug('Clear all history requested')
+  logger.debug('Clear all history requested')
   
   const success = await history.clearAllHistory()
   if (success) {
-    getLogger().debug('All history cleared')
+    logger.debug('All history cleared')
   }
 }
 
@@ -312,7 +312,7 @@ const handleClearAllHistory = async () => {
 const handleMessage = (message) => {
   if (message.action === MessageActions.SELECTED_TEXT_FOR_SIDEPANEL) {
     state.sourceText = message.text
-    getLogger().debug('Received selected text:', message.text)
+    logger.debug('Received selected text:', message.text)
     
     // شروع خودکار ترجمه
     if (state.sourceText.trim() && state.targetLanguage) {
@@ -357,13 +357,13 @@ const loadLastTranslation = async () => {
       }
     }
   } catch (error) {
-    getLogger().error('Error loading last translation:', error)
+    logger.error('Error loading last translation:', error)
   }
 }
 
 // Initialize
 onMounted(async () => {
-  getLogger().debug('Sidepanel Vue app mounted')
+  logger.debug('Sidepanel Vue app mounted')
   
   try {
     // بارگذاری تنظیمات اولیه
@@ -383,9 +383,9 @@ onMounted(async () => {
       browserAPI.browser.runtime.onMessage.addListener.call(browserAPI.browser.runtime.onMessage, handleMessage)
     }
     
-    getLogger().debug('Initialization complete')
+    logger.debug('Initialization complete')
   } catch (error) {
-    getLogger().error('Error during initialization:', error)
+    logger.error('Error during initialization:', error)
   }
 })
 
@@ -394,7 +394,7 @@ onUnmounted(() => {
   if (browserAPI.browser?.runtime?.onMessage) {
     browserAPI.browser.runtime.onMessage.removeListener(handleMessage)
   }
-  getLogger().debug('Sidepanel Vue app unmounted')
+  logger.debug('Sidepanel Vue app unmounted')
 })
 </script>
 

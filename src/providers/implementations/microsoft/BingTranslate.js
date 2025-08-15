@@ -218,7 +218,7 @@ export class BingTranslateProvider extends BaseProvider {
         Date.now() - BingTranslateProvider.bingAccessToken.tokenTs >
           BingTranslateProvider.bingAccessToken.tokenExpiryInterval
       ) {
-        getLogger().debug('Fetching new Bing access token');
+        logger.debug('Fetching new Bing access token');
         
         const response = await fetch(BingTranslateProvider.bingTokenUrl);
         if (!response.ok) {
@@ -250,12 +250,12 @@ export class BingTranslateProvider extends BaseProvider {
           count: 0,
         };
         
-        getLogger().debug('New Bing access token obtained');
+        logger.debug('New Bing access token obtained');
       }
       
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
-      getLogger().error('Failed to get Bing access token:', error);
+      logger.error('Failed to get Bing access token:', error);
       const err = new Error(`Failed to get Bing access token: ${error.message}`);
       err.type = ErrorTypes.API;
       err.context = `${this.providerName.toLowerCase()}-token-fetch`;
@@ -281,7 +281,7 @@ export class BingTranslateProvider extends BaseProvider {
 
         if (detectedLangCode === targetLangCode) {
           // Swap languages
-          getLogger().debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
+          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
           return [targetLang, sourceLang];
         }
       } else {
@@ -291,12 +291,12 @@ export class BingTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          getLogger().debug('Languages swapped using regex fallback');
+          logger.debug('Languages swapped using regex fallback');
           return [targetLang, sourceLang];
         }
       }
     } catch (error) {
-      getLogger().error('Language detection failed:', error);
+      logger.error('Language detection failed:', error);
       // Regex fallback
       const targetLangCode = getLanguageCode(targetLang).split("-")[0];
       if (
@@ -425,7 +425,7 @@ export class BingTranslateProvider extends BaseProvider {
       if (isJsonMode) {
         const translatedParts = result.targetText.split(TEXT_DELIMITER);
         if (translatedParts.length !== originalJsonStruct.length) {
-          getLogger().error('JSON reconstruction failed due to segment mismatch.');
+          logger.error('JSON reconstruction failed due to segment mismatch.');
           return result.targetText; // Fallback to raw translated text
         }
         const translatedJson = originalJsonStruct.map((item, index) => ({
@@ -455,7 +455,7 @@ export class BingTranslateProvider extends BaseProvider {
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
 
-      getLogger().error('Translation error:', error);
+      logger.error('Translation error:', error);
       throw error;
     }
   }

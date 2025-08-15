@@ -52,7 +52,7 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
     // 3. هر نوع تغییری نسبت به محتوای اولیه رخ داده باشد
     const isSuccess = hasNewText || isCompleteReplacement || hasAnyChange;
     
-    logME(`[verifyTextInsertion] Final result: ${isSuccess ? 'SUCCESS' : 'FAILED'}`);
+    logger.debug(`Final result: ${isSuccess ? 'SUCCESS' : 'FAILED'}`);
     
     return isSuccess;
   } catch (error) {

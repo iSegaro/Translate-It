@@ -132,7 +132,7 @@ const canTranslate = computed(() => {
   const notAutoDetect = targetLanguage.value !== 'Auto-Detect' && targetLanguage.value !== AUTO_DETECT_VALUE
   const notTranslating = !props.isTranslating
   
-  getLogger().debug('canTranslate check:', {
+  logger.debug('canTranslate check:', {
     hasText,
     hasTarget,
     targetLanguage: targetLanguage.value,
@@ -147,7 +147,7 @@ const canTranslate = computed(() => {
 // Event Handlers
 const handleSubmit = () => {
   if (canTranslate.value) {
-    getLogger().debug('Form submitted for translation')
+    logger.debug('Form submitted for translation')
     emit('translate', {
       text: sourceText.value,
       sourceLanguage: sourceLanguage.value,
@@ -157,7 +157,7 @@ const handleSubmit = () => {
 }
 
 const handleSwapLanguages = () => {
-  getLogger().debug('Swapping languages')
+  logger.debug('Swapping languages')
   emit('swap-languages')
 }
 

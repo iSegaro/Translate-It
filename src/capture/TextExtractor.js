@@ -112,7 +112,7 @@ export class TextExtractor {
         translationMethod: "pending-ocr-implementation",
       };
     } catch (error) {
-      getLogger().error('Extract and translate failed:', error);
+      logger.error('Extract and translate failed:', error);
       throw this._normalizeError(error, "extractAndTranslate");
     }
   }
@@ -180,7 +180,7 @@ export class TextExtractor {
   setDefaultMethod(method) {
     if (this.isMethodAvailable(method)) {
       this.defaultMethod = method;
-      getLogger().debug('Default method set to: ${method}');
+      logger.debug(`Default method set to: ${method}`);
     } else {
       throw this._createError(
         ErrorTypes.INTEGRATION,

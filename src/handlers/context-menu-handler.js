@@ -151,14 +151,14 @@ async function handleScreenCapture(info, tab) {
  */
 async function handleOpenOptions(info, tab) {
   try {
-    getLogger().debug('Open options menu clicked');
+    logger.debug('Open options menu clicked');
 
     const optionsUrl = browser.runtime.getURL("options.html");
     await browser.tabs.create({ url: optionsUrl });
 
-    getLogger().debug('Options page opened');
+    logger.debug('Options page opened');
   } catch (error) {
-    getLogger().error('Error handling open options:', error);
+    logger.error('Error handling open options:', error);
   }
 }
 
@@ -167,9 +167,7 @@ async function handleOpenOptions(info, tab) {
  */
 async function handlePageExclusion(info, tab, exclude = true) {
   try {
-    logME(
-      `[ContextMenuHandler] ${exclude ? "Exclude" : "Include"} page menu clicked`,
-    );
+    logger.debug(`${exclude ? "Exclude" : "Include"} page menu clicked`);
 
     const currentUrl = tab.url;
     const domain = new URL(currentUrl).hostname;
@@ -212,11 +210,9 @@ async function handlePageExclusion(info, tab, exclude = true) {
       });
     }
 
-    logME(
-      `[ContextMenuHandler] Page ${exclude ? "excluded" : "included"}: ${domain}`,
-    );
+    logger.info(`Page ${exclude ? "excluded" : "included"}: ${domain}`);
   } catch (error) {
-    getLogger().error('Error handling page exclusion:', error);
+    logger.error('Error handling page exclusion:', error);
   }
 }
 
@@ -224,7 +220,7 @@ async function handlePageExclusion(info, tab, exclude = true) {
  * Main context menu event handler
  */
 export async function handleContextMenuEvent(info, tab) {
-  getLogger().info('Context menu clicked: ${info.menuItemId}', {
+  logger.info('Context menu clicked: ${info.menuItemId}', {
     tabId: tab.id,
     url: tab.url,
   });
@@ -252,12 +248,12 @@ export async function handleContextMenuEvent(info, tab) {
       const providerId = menuItemId.replace("provider-", "");
       await handleProviderSelection(info, tab, providerId);
     } else {
-      getLogger().debug('Unknown menu item: ${menuItemId}');
+      logger.debug('Unknown menu item: ${menuItemId}');
     }
 
-    getLogger().init('Menu item ${menuItemId} handled successfully');
+    logger.init('Menu item ${menuItemId} handled successfully');
   } catch (error) {
-    getLogger().error('Error handling context menu ${info.menuItemId}:', error,
+    logger.error('Error handling context menu ${info.menuItemId}:', error,
     );
     throw error;
   }

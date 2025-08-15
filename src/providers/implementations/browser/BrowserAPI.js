@@ -116,7 +116,7 @@ export class browserTranslateProvider extends BaseProvider {
     if (!lang || typeof lang !== "string") return "en";
     // AUTO_DETECT_VALUE should not reach this function - handled separately
     if (lang === AUTO_DETECT_VALUE) {
-      getLogger().warn('WARNING: AUTO_DETECT_VALUE reached _getLangCode - this should be handled earlier');
+      logger.warn('WARNING: AUTO_DETECT_VALUE reached _getLangCode - this should be handled earlier');
       return "en";
     }
     const lowerCaseLang = lang.toLowerCase();
@@ -144,23 +144,23 @@ export class browserTranslateProvider extends BaseProvider {
           detectedLangCode = results[0].detectedLanguage;
         }
       } catch (detectorError) {
-        getLogger().error('LanguageDetector failed for swapping, trying browser.i18n fallback:', detectorError);
+        logger.error('LanguageDetector failed for swapping, trying browser.i18n fallback:', detectorError);
       }
     }
     
     // Fallback to browser.i18n.detectLanguage if LanguageDetector failed
     if (!detectedLangCode) {
       try {
-        getLogger().debug('Trying browser.i18n.detectLanguage for swapping...');
+        logger.debug('Trying browser.i18n.detectLanguage for swapping...');
         const detectionResult = await browser.i18n.detectLanguage(text);
-        getLogger().info('browser.i18n.detectLanguage swapping result:', detectionResult);
+        logger.info('browser.i18n.detectLanguage swapping result:', detectionResult);
         if (detectionResult?.languages && detectionResult.languages.length > 0) {
           detectedLangCode = detectionResult.languages[0].language.split("-")[0];
           const percentage = detectionResult.languages[0].percentage || 0;
-          getLogger().info('Detected language for swapping: ${detectedLangCode} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
+          logger.info('Detected language for swapping: ${detectedLangCode} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
         }
       } catch (i18nError) {
-        getLogger().error('browser.i18n.detectLanguage failed for swapping:', i18nError);
+        logger.error('browser.i18n.detectLanguage failed for swapping:', i18nError);
       }
     }
     
@@ -183,19 +183,19 @@ export class browserTranslateProvider extends BaseProvider {
         const targetLangCode = this._getLangCode(targetLang);
         if (detectedLangCode === targetLangCode) {
           // Swap languages similar to Google Translate
-          getLogger().debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
+          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
           return [targetLang, sourceLang];
         }
       } else {
         // Final regex fallback for Persian text
         const targetLangCode = this._getLangCode(targetLang);
         if (isPersianText(text) && (targetLangCode === "fa")) {
-          getLogger().debug('Languages swapped using regex fallback');
+          logger.debug('Languages swapped using regex fallback');
           return [targetLang, sourceLang];
         }
       }
     } catch (error) {
-      getLogger().error('Language detection for swapping failed:', error);
+      logger.error('Language detection for swapping failed:', error);
       // Regex fallback
       const targetLangCode = this._getLangCode(targetLang);
       if (isPersianText(text) && (targetLangCode === "fa")) {
@@ -229,34 +229,34 @@ export class browserTranslateProvider extends BaseProvider {
         const results = await browserTranslateProvider.detector.detect(text);
         
         if (results && results.length > 0 && results[0].confidence > 0.5) {
-          getLogger().info('Language detected using LanguageDetector: ${results[0].detectedLanguage}');
+          logger.info('Language detected using LanguageDetector: ${results[0].detectedLanguage}');
           return results[0].detectedLanguage;
         }
       }
     } catch (error) {
-      getLogger().error('LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage');
+      logger.error('LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage');
     }
 
     // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
     try {
-      logME(`[${this.providerName}] Trying browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
+      logger.debug(`[${this.providerName}] Trying browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
       const detectionResult = await browser.i18n.detectLanguage(text);
-      getLogger().info('browser.i18n.detectLanguage result:', detectionResult);
+      logger.info('browser.i18n.detectLanguage result:', detectionResult);
       
       if (detectionResult?.languages && detectionResult.languages.length > 0) {
         const detectedLang = detectionResult.languages[0].language.split("-")[0];
         const percentage = detectionResult.languages[0].percentage || 0;
-        getLogger().info('Language detected using browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
+        logger.info('Language detected using browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
         return detectedLang;
       } else {
-        getLogger().info('browser.i18n.detectLanguage result empty');
+        logger.info('browser.i18n.detectLanguage result empty');
       }
     } catch (error) {
-      getLogger().error('browser.i18n.detectLanguage failed:', error);
+      logger.error('browser.i18n.detectLanguage failed:', error);
     }
 
     // Final fallback to regex detection
-    getLogger().debug('Using regex fallback for language detection');
+    logger.debug('Using regex fallback for language detection');
     if (isPersianText(text)) {
       return "fa";
     }
@@ -297,7 +297,7 @@ export class browserTranslateProvider extends BaseProvider {
       monitor(monitor) {
         monitor.addEventListener("downloadprogress", (e) => {
           const progress = Math.floor(e.loaded * 100);
-          getLogger().debug('Language pack download: ${progress}%');
+          logger.debug('Language pack download: ${progress}%');
         });
       },
     });
@@ -341,7 +341,7 @@ export class browserTranslateProvider extends BaseProvider {
       try {
         sourceLanguageCode = await this._detectLanguage(text, sourceLang);
       } catch (error) {
-        getLogger().error('Language detection error:', error);
+        logger.error('Language detection error:', error);
         sourceLanguageCode = "en"; // fallback
       }
     } else {
@@ -400,7 +400,7 @@ export class browserTranslateProvider extends BaseProvider {
       // --- Response Processing ---
       if (isJsonMode) {
         if (translatedResults.length !== originalJsonStruct.length) {
-          getLogger().error('JSON reconstruction failed due to segment mismatch.');
+          logger.error('JSON reconstruction failed due to segment mismatch.');
           return translatedResults.join(" "); // Fallback to joined text
         }
         
@@ -432,7 +432,7 @@ export class browserTranslateProvider extends BaseProvider {
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
       
-      getLogger().error('Translation error:', error);
+      logger.error('Translation error:', error);
       throw error;
     }
   }
@@ -447,7 +447,7 @@ export class browserTranslateProvider extends BaseProvider {
       try {
         this.detector.destroy();
       } catch (error) {
-        getLogger().error('Error destroying detector:', error);
+        logger.error('Error destroying detector:', error);
       }
       this.detector = null;
     }
@@ -458,7 +458,7 @@ export class browserTranslateProvider extends BaseProvider {
         try {
           this.translators[key].destroy();
         } catch (error) {
-          getLogger().error('Error destroying translator ${key}:', error);
+          logger.error('Error destroying translator ${key}:', error);
         }
         delete this.translators[key];
       }

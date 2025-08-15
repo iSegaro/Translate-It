@@ -78,7 +78,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
       // اضافه کردن کاراکتر
       if (element.isContentEditable) {
         const selection = window.getSelection();
-        logME(`[simulateNaturalTyping] Char ${i+1}/${text.length}: "${char}", rangeCount: ${selection.rangeCount}`);
+        logger.debugLazy(() => [`Char ${i+1}/${text.length}: "${char}", rangeCount: ${selection.rangeCount}`]);
         
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
@@ -104,7 +104,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
           
           try {
             const textNode = document.createTextNode(char);
-            logME(`[simulateNaturalTyping] Created text node for char: "${char}"`);
+            logger.debugLazy(() => [`Created text node for char: "${char}"`]);
             
             // برای اولین کاراکتر بعد از پاک کردن، range ممکن است خراب باشد
             if (i === 0 && hasSelection) {

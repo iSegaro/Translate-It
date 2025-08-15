@@ -76,7 +76,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
   async updateElement(element, translatedText) {
     try {
       if (!element || !element.isConnected) {
-        getLogger().debug('عنصر معتبر برای به‌روزرسانی وجود ندارد');
+        logger.debug('عنصر معتبر برای به‌روزرسانی وجود ندارد');
         return false;
       }
 
@@ -91,10 +91,10 @@ export default class YoutubeStrategy extends PlatformStrategy {
           // تاخیر هوشمند برای اطمینان از پردازش کامل
           await smartDelay(200);
 
-          getLogger().init('Smart replacement completed successfully');
+          logger.init('Smart replacement completed successfully');
         } else {
           // fallback به روش قدیمی
-          getLogger().debug('Falling back to legacy replacement method');
+          logger.debug('Falling back to legacy replacement method');
 
           if (element.isContentEditable) {
             // برای عناصر contentEditable از <br> استفاده کنید

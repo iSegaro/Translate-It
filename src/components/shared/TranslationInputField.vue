@@ -172,7 +172,7 @@ const handlePaste = async (data) => {
         emit('translate')
       }
       
-      getLogger().debug('[TranslationInputField] Text pasted from clipboard')
+      logger.debug('[TranslationInputField] Text pasted from clipboard')
     }
   } catch (error) {
     await handleError(error, 'translation-input-field-paste')

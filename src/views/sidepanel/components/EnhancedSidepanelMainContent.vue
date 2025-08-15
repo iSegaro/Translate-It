@@ -206,14 +206,14 @@ const formattedTranslation = computed(() => {
   try {
     return marked.parse(translatedText.value);
   } catch (error) {
-    getLogger().error("[EnhancedSidepanelMainContent] Markdown parsing failed:", error);
+    logger.error("[EnhancedSidepanelMainContent] Markdown parsing failed:", error);
     return translatedText.value;
   }
 });
 
 // Event Handlers
 const handleSourceTextInput = (event) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
+  logger.debug("[EnhancedSidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
 };
 
 const handleKeydown = (event) => {
@@ -227,7 +227,7 @@ const handleTranslationSubmit = async () => {
   if (!canTranslate.value) return;
   
   try {
-    getLogger().debug("[EnhancedSidepanelMainContent] Starting translation");
+    logger.debug("[EnhancedSidepanelMainContent] Starting translation");
     await triggerTranslation(sourceLang.value, targetLang.value);
     
     showFadeInAnimation.value = true;
@@ -237,7 +237,7 @@ const handleTranslationSubmit = async () => {
     
     showStatus("Translation completed!", "success", 2000);
   } catch (error) {
-    getLogger().error("[EnhancedSidepanelMainContent] Translation failed:", error);
+    logger.error("[EnhancedSidepanelMainContent] Translation failed:", error);
     await handleError(error, "enhanced-sidepanel-translation");
     showStatus("Translation failed", "error", 3000);
   }
@@ -245,12 +245,12 @@ const handleTranslationSubmit = async () => {
 
 // Action Handlers
 const handleSourceTextCopied = (text) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Source text copied");
+  logger.debug("[EnhancedSidepanelMainContent] Source text copied");
   showStatus("Source text copied to clipboard!", "success", 2000);
 };
 
 const handleSourceTextPasted = (event) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Text pasted:", event.text.substring(0, 30) + "...");
+  logger.debug("[EnhancedSidepanelMainContent] Text pasted:", event.text.substring(0, 30) + "...");
   sourceText.value = event.text;
   showStatus("Text pasted from clipboard!", "success", 2000);
   
@@ -271,22 +271,22 @@ const handleSourceTextPasted = (event) => {
 };
 
 const handleSourceTTSSpeaking = (event) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Playing source TTS");
+  logger.debug("[EnhancedSidepanelMainContent] Playing source TTS");
   showStatus("Playing source text...", "info", 0);
 };
 
 const handleTranslationCopied = (text) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Translation copied");
+  logger.debug("[EnhancedSidepanelMainContent] Translation copied");
   showStatus("Translation copied to clipboard!", "success", 2000);
 };
 
 const handleTranslationTTSSpeaking = (event) => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Playing translation TTS");
+  logger.debug("[EnhancedSidepanelMainContent] Playing translation TTS");
   showStatus("Playing translation...", "info", 0);
 };
 
 const handleActionFailed = (event) => {
-  getLogger().error("[EnhancedSidepanelMainContent] Action failed:", event);
+  logger.error("[EnhancedSidepanelMainContent] Action failed:", event);
   showStatus(`${event.action} failed: ${event.error.message}`, "error", 3000);
 };
 
@@ -304,7 +304,7 @@ const showStatus = (message, type = "info", duration = 2000) => {
 
 // Lifecycle
 onMounted(async () => {
-  getLogger().debug("[EnhancedSidepanelMainContent] Component mounted");
+  logger.debug("[EnhancedSidepanelMainContent] Component mounted");
   
   try {
     // Load saved languages
@@ -322,7 +322,7 @@ onMounted(async () => {
       });
     }
   } catch (error) {
-    getLogger().error("[EnhancedSidepanelMainContent] Initialization failed:", error);
+    logger.error("[EnhancedSidepanelMainContent] Initialization failed:", error);
     await handleError(error, "enhanced-sidepanel-init");
   }
 });

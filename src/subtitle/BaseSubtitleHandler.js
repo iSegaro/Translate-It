@@ -210,13 +210,13 @@ export default class BaseSubtitleHandler {
 
     try {
       if (!this.translationProvider) {
-        getLogger().debug('Translation provider not available for: ${text}');
+        logger.debug('Translation provider not available for: ${text}');
         return null;
       }
 
       // بررسی اینکه آیا translate method وجود دارد
       if (typeof this.translationProvider.translate !== "function") {
-        getLogger().debug('Translation provider does not have translate method for: ${text}',  );
+        logger.debug('Translation provider does not have translate method for: ${text}',  );
         return null;
       }
 
@@ -229,7 +229,7 @@ export default class BaseSubtitleHandler {
       this.translationCache.set(text, translatedText);
       return translatedText;
     } catch (error) {
-      getLogger().error('Translation failed for: ${text}', error);
+      logger.error('Translation failed for: ${text}', error);
       return null;
     }
   }
@@ -279,7 +279,7 @@ export default class BaseSubtitleHandler {
       element.dataset.translated = "true";
       element.dataset.originalText = originalText;
 
-      logME(
+      logger.debug(
         `[${this.constructor.name}] Translated: "${originalText}" -> "${translatedText}"`,
       );
     } catch (error) {

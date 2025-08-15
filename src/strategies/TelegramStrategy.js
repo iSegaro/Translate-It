@@ -169,7 +169,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       // 2. اعتبارسنجی پیشرفته
       if (!this.validateField(telegramField)) {
-        getLogger().debug('فیلد تلگرام یافت نشد');
+        logger.debug('فیلد تلگرام یافت نشد');
         return false;
       }
 

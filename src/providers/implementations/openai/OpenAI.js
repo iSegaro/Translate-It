@@ -127,7 +127,7 @@ export class OpenAIProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-image-translation`;
-    getLogger().debug('about to call _executeApiCall for image translation');
+    logger.debug('about to call _executeApiCall for image translation');
 
     try {
       const result = await this._executeApiCall({
@@ -137,11 +137,11 @@ export class OpenAIProvider extends BaseProvider {
         context: context,
       });
 
-      getLogger().info('image translation completed with result:', result
+      logger.info('image translation completed with result:', result
       );
       return result;
     } catch (error) {
-      getLogger().error('image translation failed with error:', error
+      logger.error('image translation failed with error:', error
       );
       throw error;
     }

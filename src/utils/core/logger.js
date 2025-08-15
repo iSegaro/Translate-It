@@ -219,6 +219,18 @@ export function createLogger(component, subComponent = null) {
     },
   };
   return Object.freeze(loggerApi);
+}
+
+// --- Legacy Compatibility Layer (to be removed after refactor) -----------------
+// Some existing modules still call getLogger() or logger.debug(). Provide shims so we
+// can migrate incrementally without breaking lint/build.
+export function getLogger(component, subComponent) {
+  return getScopedLogger(component, subComponent);
+}
+try {
+  if (!globalThis.getLogger) globalThis.getLogger = getLogger;
+  if (!globalThis.logME) globalThis.logME = (...a) => { if (isDevelopment) console.log('[logME]', ...a); };
+} catch(_) { /* ignore global assignment issues */ }
 
 /**
  * Update log level for a component or globally

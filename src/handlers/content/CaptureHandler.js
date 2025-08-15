@@ -140,7 +140,7 @@ export class ContentCaptureHandler {
     this.messenger.sendMessage({
       action: MessageActions.SHOW_ERROR_NOTIFICATION,
       data: { message, error: error.message, type: error.type || ErrorTypes.SCREEN_CAPTURE },
-    }).catch(err => getLogger().error('Error sending error notification', err));
+    }).catch(err => logger.error('Error sending error notification', err));
   }
 
   isActive() {

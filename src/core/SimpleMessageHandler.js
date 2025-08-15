@@ -264,7 +264,7 @@ class SimpleMessageHandler {
       );
     }
     this.handlers.set(action, handlerFn);
-    // logger.debug(`✅ SimpleMessageHandler: Registered handler for "${action}"`);
+    logger.debug(`Registered handler for "${action}"`);
   }
 
   /**

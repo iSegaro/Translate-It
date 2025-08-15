@@ -274,7 +274,7 @@ export default class MediumStrategy extends PlatformStrategy {
           if (currentNode.tagName === "DIV" || currentNode.tagName === "P") {
             const text = currentNode.innerText?.trim();
             if (text) {
-              getLogger().debug('Found current line:', text.substring(0, 50),
+              logger.debug('Found current line:', text.substring(0, 50),
               );
               return text;
             }
@@ -289,7 +289,7 @@ export default class MediumStrategy extends PlatformStrategy {
       if (firstParagraph) {
         const text = firstParagraph.innerText?.trim();
         if (text) {
-          getLogger().debug('Using first paragraph:', text.substring(0, 50),
+          logger.debug('Using first paragraph:', text.substring(0, 50),
           );
           return text;
         }
@@ -297,11 +297,11 @@ export default class MediumStrategy extends PlatformStrategy {
 
       // آخرین fallback: کل محتوا
       const fullText = element.innerText?.trim();
-      getLogger().debug('Using full content as fallback:', fullText?.substring(0, 50),
+      logger.debug('Using full content as fallback:', fullText?.substring(0, 50),
       );
       return fullText || "";
     } catch (error) {
-      getLogger().error('extractCurrentLine error:', error);
+      logger.error('extractCurrentLine error:', error);
       return element.innerText?.trim() || "";
     }
   }
@@ -340,7 +340,7 @@ export default class MediumStrategy extends PlatformStrategy {
             selection.removeAllRanges();
             selection.addRange(range);
 
-            getLogger().init('Current line replaced successfully');
+            logger.init('Current line replaced successfully');
             return true;
           }
           currentNode = currentNode.parentElement;
@@ -351,16 +351,16 @@ export default class MediumStrategy extends PlatformStrategy {
       const firstParagraph = element.querySelector("div, p");
       if (firstParagraph) {
         firstParagraph.innerText = translatedText;
-        getLogger().debug('First paragraph replaced as fallback');
+        logger.debug('First paragraph replaced as fallback');
         return true;
       }
 
       // آخرین fallback: کل المان
       element.innerText = translatedText;
-      getLogger().debug('Full element replaced as final fallback');
+      logger.debug('Full element replaced as final fallback');
       return true;
     } catch (error) {
-      getLogger().error('replaceCurrentLine error:', error);
+      logger.error('replaceCurrentLine error:', error);
       return false;
     }
   }

@@ -135,7 +135,7 @@ const targetLanguages = computed(() => {
 
 // Methods
 const handleSwapLanguages = () => {
-  getLogger().debug('[LanguageSelector] Swap requested:', {
+  logger.debug('[LanguageSelector] Swap requested:', {
     source: sourceLanguage.value,
     target: targetLanguage.value
   })
@@ -155,7 +155,7 @@ const handleSwapLanguages = () => {
       sourceLangFromConfig = settingsStore.settings.SOURCE_LANGUAGE
     }
     
-    getLogger().debug('[LanguageSelector] Resolving auto-detect to actual source language:', sourceLangFromConfig)
+    logger.debug('[LanguageSelector] Resolving auto-detect to actual source language:', sourceLangFromConfig)
     
     // Convert to display name if it's a code
     if (sourceLangFromConfig.length <= 3) {
@@ -164,7 +164,7 @@ const handleSwapLanguages = () => {
       currentSource = sourceLangFromConfig // Already a display name
     }
     
-    getLogger().debug('[LanguageSelector] Auto-detect resolved to:', currentSource)
+    logger.debug('[LanguageSelector] Auto-detect resolved to:', currentSource)
   }
   
   // NOW: Perform normal swap with resolved values
@@ -175,7 +175,7 @@ const handleSwapLanguages = () => {
   sourceLanguage.value = newSourceValue
   targetLanguage.value = newTargetValue
   
-  getLogger().debug('[LanguageSelector] Languages swapped:', {
+  logger.debug('[LanguageSelector] Languages swapped:', {
     to: `source="${newSourceValue}", target="${newTargetValue}"`,
     hadAutoDetect: (sourceLanguage.value === 'Auto-Detect' || currentSource !== sourceLanguage.value),
     resolvedValue: currentSource
@@ -210,7 +210,7 @@ onMounted(async () => {
         sourceDisplay = sourceLang // Already a display name
       }
       sourceLanguage.value = sourceDisplay
-      getLogger().debug('[LanguageSelector] Set source language from settings:', sourceDisplay)
+      logger.debug('[LanguageSelector] Set source language from settings:', sourceDisplay)
     }
     
     if (!targetLanguage.value || targetLanguage.value === 'English') {
@@ -223,7 +223,7 @@ onMounted(async () => {
         targetDisplay = targetLang // Already a display name
       }
       targetLanguage.value = targetDisplay
-      getLogger().debug('[LanguageSelector] Set target language from settings:', targetDisplay)
+      logger.debug('[LanguageSelector] Set target language from settings:', targetDisplay)
     }
   } catch (error) {
     await handleError(error, 'language-selector-init')

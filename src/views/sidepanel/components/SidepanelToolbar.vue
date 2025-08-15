@@ -147,7 +147,7 @@ const handleSelectElement = async () => {
 
 const handleRevertAction = async () => {
   try {
-    getLogger().debug('[SidepanelToolbar] Executing revert action')
+    logger.debug('[SidepanelToolbar] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -162,10 +162,10 @@ const handleRevertAction = async () => {
       timestamp: Date.now()
     })
     
-    getLogger().debug('[SidepanelToolbar] Revert response:', response)
+    logger.debug('[SidepanelToolbar] Revert response:', response)
     
     if (response?.success) {
-      getLogger().debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      logger.debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
@@ -193,7 +193,7 @@ const handleClearFields = () => {
 }
 
 const handleProviderChange = (provider) => {
-  getLogger().debug('[SidepanelToolbar] Provider changed to:', provider)
+  logger.debug('[SidepanelToolbar] Provider changed to:', provider)
 }
 
 const handleHistoryClick = () => {

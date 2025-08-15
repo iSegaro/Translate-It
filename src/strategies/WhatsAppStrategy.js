@@ -29,7 +29,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       let whatsappField = this.findField(element, SELECTORS);
 
       if (!whatsappField) {
-        getLogger().debug('فیلد واتساپ یافت نشد');
+        logger.debug('فیلد واتساپ یافت نشد');
         return;
       }
 
@@ -41,7 +41,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         whatsappField.isConnected;
 
       if (!isValidField) {
-        getLogger().debug('فیلد واتساپ نامعتبر است');
+        logger.debug('فیلد واتساپ نامعتبر است');
         return false;
       }
 
@@ -52,7 +52,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
 
       // اعتبارسنجی وجود المان در DOM
       if (!document.body.contains(element)) {
-        getLogger().debug('Element removed from DOM');
+        logger.debug('Element removed from DOM');
         return false;
       }
 

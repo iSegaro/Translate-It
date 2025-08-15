@@ -92,7 +92,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return null;
     } catch (error) {
-      getLogger().debug('خطا در _getSlateEditor:', error);
+      logger.debug('خطا در _getSlateEditor:', error);
       return null;
     }
   }
@@ -104,11 +104,11 @@ export default class DiscordStrategy extends PlatformStrategy {
     try {
       const slateEditor = this._getSlateEditor(element);
       if (!slateEditor) {
-        getLogger().debug('Slate editor instance پیدا نشد');
+        logger.debug('Slate editor instance پیدا نشد');
         return false;
       }
 
-      getLogger().debug('Slate editor instance پیدا شد');
+      logger.debug('Slate editor instance پیدا شد');
 
       // تلاش برای استفاده از Slate Transforms
       if (window.Slate && window.Slate.Transforms) {
@@ -126,13 +126,13 @@ export default class DiscordStrategy extends PlatformStrategy {
         // درج متن جدید
         Transforms.insertText(slateEditor, translatedText);
 
-        getLogger().debug('محتوا از طریق Slate API به‌روزرسانی شد');
+        logger.debug('محتوا از طریق Slate API به‌روزرسانی شد');
         return true;
       }
 
       return false;
     } catch (error) {
-      getLogger().debug('خطا در _updateViaSlateAPI:', error);
+      logger.debug('خطا در _updateViaSlateAPI:', error);
       return false;
     }
   }
@@ -223,7 +223,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return true;
     } catch (error) {
-      getLogger().debug('خطا در _simulateNaturalTyping:', error);
+      logger.debug('خطا در _simulateNaturalTyping:', error);
       return false;
     }
   }
@@ -283,7 +283,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return true;
     } catch (error) {
-      getLogger().debug('خطا در _updateViaClipboard:', error);
+      logger.debug('خطا در _updateViaClipboard:', error);
       return false;
     }
   }
@@ -321,7 +321,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       return false;
     } catch (error) {
-      getLogger().debug('خطا در _fallbackExecCommand:', error);
+      logger.debug('خطا در _fallbackExecCommand:', error);
       return false;
     }
   }
@@ -342,30 +342,30 @@ export default class DiscordStrategy extends PlatformStrategy {
     let success = false;
 
     try {
-      getLogger().debug('شروع به‌روزرسانی element با متن:', translatedText.substring(0, 50) + "...",
+      logger.debug('شروع به‌روزرسانی element با متن:', translatedText.substring(0, 50) + "...",
       );
 
       // روش 1: استفاده از Slate API (بهترین روش)
       if (this._isSlateEditor(element)) {
-        getLogger().debug('تلاش با Slate API...');
+        logger.debug('تلاش با Slate API...');
         success = await this._updateViaSlateAPI(element, translatedText);
       }
 
       // روش 2: شبیه‌سازی clipboard paste
       if (!success) {
-        getLogger().debug('تلاش با clipboard paste...');
+        logger.debug('تلاش با clipboard paste...');
         success = await this._updateViaClipboard(element, translatedText);
       }
 
       // روش 3: شبیه‌سازی تایپ طبیعی
       if (!success) {
-        getLogger().debug('تلاش با شبیه‌سازی تایپ...');
+        logger.debug('تلاش با شبیه‌سازی تایپ...');
         success = await this._simulateNaturalTyping(element, translatedText);
       }
 
       // روش 4: fallback با execCommand
       if (!success) {
-        getLogger().debug('تلاش با execCommand...');
+        logger.debug('تلاش با execCommand...');
         success = await this._fallbackExecCommand(element, translatedText);
       }
 
@@ -376,7 +376,7 @@ export default class DiscordStrategy extends PlatformStrategy {
         // بررسی صحت به‌روزرسانی
         const finalText = this.extractText(element);
         if (finalText.trim() === translatedText.trim()) {
-          getLogger().debug('به‌روزرسانی با موفقیت تأیید شد');
+          logger.debug('به‌روزرسانی با موفقیت تأیید شد');
 
           // اعمال direction
           this.applyTextDirection(element, translatedText);
@@ -402,7 +402,7 @@ export default class DiscordStrategy extends PlatformStrategy {
             }
           }
         } else {
-          getLogger().debug('متن نهایی مطابقت نداشت. انتظار:', translatedText.trim(),
+          logger.debug('متن نهایی مطابقت نداشت. انتظار:', translatedText.trim(),
             "دریافت:",
             finalText.trim(),
           );
@@ -410,7 +410,7 @@ export default class DiscordStrategy extends PlatformStrategy {
         }
       }
     } catch (error) {
-      getLogger().debug('خطای عمومی در updateElement:', error);
+      logger.debug('خطای عمومی در updateElement:', error);
       success = false;
       await this.errorHandler.handle(error, {
         type: error.type || ErrorTypes.UI,
@@ -420,7 +420,7 @@ export default class DiscordStrategy extends PlatformStrategy {
     }
 
     if (!success) {
-      getLogger().debug('همه روش‌ها ناموفق بودند');
+      logger.debug('همه روش‌ها ناموفق بودند');
     }
 
     return success;

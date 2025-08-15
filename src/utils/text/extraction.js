@@ -30,16 +30,16 @@ export function getTranslationCache() {
  * @param {object} context شیء context شامل state.
  */
 export function clearAllCaches(context) {
-  // پاکسازی حافظه کش ترجمه‌ها
+  // Clear translation cache
   translationCache.clear();
-  // getLogger().debug('translationCache با موفقیت پاکسازی شد.');
+  logger.debug('translationCache cleared successfully');
 
-  // پاکسازی متن‌های اصلی ذخیره شده در state (اگر context و state موجود باشند)
+  // Clear original texts stored in state (if context and state exist)
   if (context && context.state && context.state.originalTexts) {
     context.state.originalTexts.clear();
-    // getLogger().debug('state.originalTexts با موفقیت پاکسازی شد.');
+    logger.debug('state.originalTexts cleared successfully');
   } else {
-    // getLogger().debug('شیء context یا state.originalTexts در دسترس نیست.', "warning");
+    logger.warn('Context or state.originalTexts not available');
   }
 }
 
@@ -250,7 +250,7 @@ export async function revertTranslations(context) {
           context: "revert-translations-replace",
           elementId: container.getAttribute("data-aiwc-original-id"),
         });
-        logME(errorMessage, error);
+        logger.error(errorMessage, error);
       }
     }
   });
@@ -510,9 +510,7 @@ export function reassembleTranslations(
       newTranslations.set(originalText, reassembledText);
       translationCache.set(originalText, reassembledText);
     } else if (!cachedTranslations.has(originalText)) {
-      // logME(
-      //   `هیچ بخش ترجمه‌ای برای متن اصلی "${originalText}" یافت نشد. از متن اصلی استفاده می‌شود.`
-      // );
+      // No translated parts found for this text, using original
       newTranslations.set(originalText, originalText);
     }
   });

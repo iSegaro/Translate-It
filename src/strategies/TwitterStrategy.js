@@ -151,15 +151,15 @@ export default class TwitterStrategy extends PlatformStrategy {
           await this.pasteText(tweetField, translatedText);
           this.applyTextDirection(tweetField, translatedText);
 
-          getLogger().init('Tweet field updated successfully.');
+          logger.init('Tweet field updated successfully.');
           return true; // گزارش موفقیت
         }
       }
 
-      getLogger().error('No specific element matched. Update failed.');
+      logger.error('No specific element matched. Update failed.');
       return false; // اگر هیچ یک از شرایط بالا برقرار نبود
     } catch (error) {
-      getLogger().error('Critical error in updateElement:', error);
+      logger.error('Critical error in updateElement:', error);
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "twitter-strategy-updateElement",

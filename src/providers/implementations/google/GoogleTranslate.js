@@ -178,7 +178,7 @@ export class GoogleTranslateProvider extends BaseProvider {
         }
       }
     } catch (e) {
-      getLogger().error('Language detection failed:', e);
+      logger.error('Language detection failed:', e);
     }
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
@@ -285,7 +285,7 @@ export class GoogleTranslateProvider extends BaseProvider {
     if (isJsonMode) {
       const translatedParts = result.resultText.split(TEXT_DELIMITER);
       if (translatedParts.length !== originalJsonStruct.length) {
-        getLogger().error('Google Translate: JSON reconstruction failed due to segment mismatch.');
+        logger.error('Google Translate: JSON reconstruction failed due to segment mismatch.');
         return result.resultText; // Fallback to returning the raw translated text
       }
       const translatedJson = originalJsonStruct.map((item, index) => ({

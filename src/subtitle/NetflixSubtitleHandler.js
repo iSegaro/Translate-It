@@ -280,9 +280,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
       parentContainer.dataset.translated = "true";
       parentContainer.dataset.originalText = originalText;
 
-      logME(
-        `[NetflixSubtitleHandler] Updated subtitle: "${originalText}" -> "${translatedText}"`,
-      );
+      logger.debug(`Updated subtitle: "${originalText}" -> "${translatedText}"`);
     } catch {
       // Fallback to parent method
       super.updateSubtitleElement(element, originalText, translatedText);
@@ -302,7 +300,7 @@ export default class NetflixSubtitleHandler extends BaseSubtitleHandler {
 
     if (newMovieId !== this.currentMovieId) {
       this.currentMovieId = newMovieId;
-      getLogger().debug('Movie changed to: ${newMovieId}');
+      logger.debug('Movie changed to: ${newMovieId}');
       super.handleUrlChange();
     }
   }

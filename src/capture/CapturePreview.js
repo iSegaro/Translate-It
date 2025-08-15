@@ -264,9 +264,9 @@ export class CapturePreview {
       // Focus confirm button
       this.confirmButton.focus();
 
-      getLogger().init('Modal created successfully');
+      logger.init('Modal created successfully');
     } catch (error) {
-      getLogger().error('Error creating modal:', error);
+      logger.error('Error creating modal:', error);
       throw error;
     }
   }
@@ -381,13 +381,13 @@ export class CapturePreview {
    * @private
    */
   _handleConfirmClick() {
-    getLogger().debug('Confirm clicked');
+    logger.debug('Confirm clicked');
 
     try {
       this.hide();
       this.onConfirm(this.captureData);
     } catch (error) {
-      getLogger().error('Error in confirm callback:', error);
+      logger.error('Error in confirm callback:', error);
     }
   }
 
@@ -396,13 +396,13 @@ export class CapturePreview {
    * @private
    */
   _handleCancelClick() {
-    getLogger().debug('Cancel clicked');
+    logger.debug('Cancel clicked');
 
     try {
       this.hide();
       this.onCancel();
     } catch (error) {
-      getLogger().error('Error in cancel callback:', error);
+      logger.error('Error in cancel callback:', error);
     }
   }
 
@@ -411,13 +411,13 @@ export class CapturePreview {
    * @private
    */
   _handleRetryClick() {
-    getLogger().debug('Retry clicked');
+    logger.debug('Retry clicked');
 
     try {
       this.hide();
       this.onRetry(this.captureType);
     } catch (error) {
-      getLogger().error('Error in retry callback:', error);
+      logger.error('Error in retry callback:', error);
     }
   }
 
@@ -439,7 +439,7 @@ export class CapturePreview {
    * Clean up preview and remove from DOM
    */
   cleanup() {
-    getLogger().debug('Cleaning up');
+    logger.debug('Cleaning up');
 
     this.hide();
 

@@ -202,7 +202,7 @@ export class CaptureResult {
           JSON.stringify(this.translationText);
       }
 
-      getLogger().info('Processing translation text:', {
+      logger.info('Processing translation text:', {
         originalType: typeof this.translationText,
         extractedText: actualTranslationText,
         original: this.translationText,
@@ -254,9 +254,9 @@ export class CaptureResult {
       // Inject into page
       document.body.appendChild(this.resultOverlay);
 
-      getLogger().init('Result overlay created successfully');
+      logger.init('Result overlay created successfully');
     } catch (error) {
-      getLogger().error('Error creating result overlay:', error);
+      logger.error('Error creating result overlay:', error);
       throw error;
     }
   }
@@ -297,7 +297,7 @@ export class CaptureResult {
   _handleMouseDown(event) {
     if (event.button !== 0) return; // Only left click
 
-    getLogger().info('Starting drag');
+    logger.info('Starting drag');
 
     this.isDragging = true;
 
@@ -360,7 +360,7 @@ export class CaptureResult {
   _handleMouseUp(event) {
     if (!this.isDragging) return;
 
-    getLogger().info('Ending drag');
+    logger.info('Ending drag');
 
     this.isDragging = false;
 
@@ -391,13 +391,13 @@ export class CaptureResult {
    * @private
    */
   _handleCloseClick() {
-    getLogger().info('Close clicked');
+    logger.info('Close clicked');
 
     try {
       this.hide();
       this.onClose();
     } catch (error) {
-      getLogger().error('Error in close callback:', error);
+      logger.error('Error in close callback:', error);
     }
   }
 
@@ -410,7 +410,7 @@ export class CaptureResult {
 
     this.autoFadeTimer = setTimeout(() => {
       if (this.isVisible && !this.isDragging) {
-        getLogger().info('Auto-fading result');
+        logger.info('Auto-fading result');
         this.resultOverlay.style.opacity = "0.3";
 
         // Complete auto-close after fade
@@ -457,7 +457,7 @@ export class CaptureResult {
    * Clean up result and remove from DOM
    */
   cleanup() {
-    getLogger().info('Cleaning up');
+    logger.info('Cleaning up');
 
     this._clearAutoFadeTimer();
     this.hide();

@@ -159,7 +159,7 @@ export function matchErrorToType(rawOrError = "") {
     (msg.includes("quota exceeded") && msg.includes("region")) ||
     msg.includes("location is not supported")
   ) {
-    getLogger().error('Quota exceeded with region, indicating Gemini-specific quota.',  );
+    logger.error('Quota exceeded with region, indicating Gemini-specific quota.',  );
     return ErrorTypes.GEMINI_QUOTA_REGION;
   }
 

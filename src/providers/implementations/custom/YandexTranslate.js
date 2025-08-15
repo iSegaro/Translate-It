@@ -245,7 +245,7 @@ export class YandexTranslateProvider extends BaseProvider {
 
         if (detectedLangCode === targetLangCode) {
           // Swap languages
-          getLogger().debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
+          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
           return [targetLang, sourceLang];
         }
       } else {
@@ -255,12 +255,12 @@ export class YandexTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          getLogger().debug('Languages swapped using regex fallback');
+          logger.debug('Languages swapped using regex fallback');
           return [targetLang, sourceLang];
         }
       }
     } catch (error) {
-      getLogger().error('Language detection failed:', error);
+      logger.error('Language detection failed:', error);
       // Regex fallback
       const targetLangCode = getLanguageCode(targetLang).split("-")[0];
       if (
@@ -379,7 +379,7 @@ export class YandexTranslateProvider extends BaseProvider {
       if (isJsonMode) {
         const translatedParts = result.targetText.split(TEXT_DELIMITER);
         if (translatedParts.length !== originalJsonStruct.length) {
-          getLogger().error('JSON reconstruction failed due to segment mismatch.');
+          logger.error('JSON reconstruction failed due to segment mismatch.');
           return result.targetText; // Fallback to raw translated text
         }
         const translatedJson = originalJsonStruct.map((item, index) => ({
@@ -409,7 +409,7 @@ export class YandexTranslateProvider extends BaseProvider {
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
 
-      getLogger().error('Translation error:', error);
+      logger.error('Translation error:', error);
       throw error;
     }
   }

@@ -222,7 +222,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       }
     }
 
-    logME(
+    logger.debug(
       `[YouTubeSubtitleHandler] Container visibility updated: ${subtitlesEnabled ? "visible" : "hidden"}`,
     );
   }
@@ -370,7 +370,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       document.querySelector("#movie_player") ||
       document.querySelector(".html5-video-container");
     if (!videoContainer) {
-      getLogger().debug('Video container not found');
+      logger.debug('Video container not found');
       return;
     }
 
@@ -399,7 +399,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // تنظیم hover events بعد از ایجاد کادر
     this.setupDirectHoverEvents();
 
-    getLogger().debug('Fixed subtitle container created with 2 static lines',  );
+    logger.debug('Fixed subtitle container created with 2 static lines',  );
   }
 
   // تنظیم hover events و drag events مستقیم روی کادر زیرنویس
@@ -409,7 +409,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // Hover events for pause/resume
     this.subtitleBox.addEventListener("mouseenter", () => {
       if (!this.isDragging) {
-        getLogger().debug('Direct hover enter on subtitle box');
+        logger.debug('Direct hover enter on subtitle box');
         this.pauseVideo();
         this.pauseSubtitleHide(); // متوقف کردن تایمر مخفی شدن
       }
@@ -417,7 +417,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     this.subtitleBox.addEventListener("mouseleave", () => {
       if (!this.isDragging) {
-        getLogger().debug('Direct hover leave from subtitle box');
+        logger.debug('Direct hover leave from subtitle box');
         this.resumeVideo();
         this.scheduleSubtitleHide(); // شروع مجدد تایمر مخفی شدن
       }
@@ -445,7 +445,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     e.preventDefault();
     e.stopPropagation();
 
-    getLogger().debug('Drag started');
+    logger.debug('Drag started');
   }
 
   handleDragMove(e) {
@@ -489,7 +489,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     // بررسی اینکه آیا کادر هنوز در viewport قابل مشاهده است
     this.ensureContainerVisible();
 
-    getLogger().debug('Drag ended');
+    logger.debug('Drag ended');
 
     e.preventDefault();
   }
@@ -508,7 +508,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     if (isCompletelyOutOfBounds) {
       // بازگرداندن به موقعیت پیش‌فرض (وسط-پایین)
       this.resetContainerPosition();
-      getLogger().debug('Container was completely out of bounds, reset to default position',  );
+      logger.debug('Container was completely out of bounds, reset to default position',  );
     }
   }
 
@@ -576,13 +576,13 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
   shouldUpdateSubtitle(originalText, translatedText) {
     // اگر ویدیو متوقف است، اپدیت نکن
     if (!this.isVideoPlaying()) {
-      getLogger().debug('Video is paused, not updating subtitles');
+      logger.debug('Video is paused, not updating subtitles');
       return false;
     }
 
     // بررسی تکرار با زیرنویس‌های اخیر
     if (this.recentSubtitles.has(translatedText)) {
-      logME(
+      logger.debug(
         `[YouTubeSubtitleHandler] Duplicate subtitle in recent history, ignoring: "${translatedText}"`,
       );
       return false;
@@ -590,7 +590,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     // بررسی تکراری بودن با زیرنویس فعلی
     if (this.currentSubtitleText === translatedText) {
-      logME(
+      logger.debug(
         `[YouTubeSubtitleHandler] Same as current subtitle, not updating: "${translatedText}"`,
       );
       return false;
@@ -604,7 +604,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       this.lastDisplayTime > 0 &&
       timeSinceLastDisplay < this.minDisplayDuration
     ) {
-      getLogger().debug('Too soon to update subtitle (${timeSinceLastDisplay}ms < ${this.minDisplayDuration}ms)',  );
+      logger.debug('Too soon to update subtitle (${timeSinceLastDisplay}ms < ${this.minDisplayDuration}ms)',  );
       return false;
     }
 
@@ -622,7 +622,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
 
     this.subtitleCleanupTimeout = setTimeout(() => {
       this.recentSubtitles.clear();
-      getLogger().debug('Recent subtitles history cleared');
+      logger.debug('Recent subtitles history cleared');
     }, this.minClearSubtitleLines);
   }
 
@@ -638,12 +638,12 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     this.subtitleHideTimeout = setTimeout(() => {
       if (this.subtitleBox) {
         this.subtitleBox.classList.remove("visible");
-        getLogger().debug('Subtitle box auto-hidden after timeout',  );
+        logger.debug('Subtitle box auto-hidden after timeout',  );
       }
       this.subtitleHideTimeout = null;
     }, this.autoHideDelay);
 
-    getLogger().debug('Scheduled subtitle hide in ${this.autoHideDelay}ms',  );
+    logger.debug('Scheduled subtitle hide in ${this.autoHideDelay}ms',  );
   }
 
   // متوقف کردن تایمر مخفی شدن
@@ -651,14 +651,14 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
     if (this.subtitleHideTimeout) {
       clearTimeout(this.subtitleHideTimeout);
       this.subtitleHideTimeout = null;
-      getLogger().debug('Subtitle hide timer paused');
+      logger.debug('Subtitle hide timer paused');
     }
   }
 
   // نمایش فوری زیرنویس (بدون صف)
   async displaySubtitleImmediate(originalText, translatedText) {
     try {
-      logME(
+      logger.debug(
         `[YouTubeSubtitleHandler] Displaying subtitle: "${originalText}" -> "${translatedText}"`,
       );
 
@@ -668,13 +668,13 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       }
 
       if (!this.subtitleBox || !this.subtitleLines) {
-        getLogger().debug('Subtitle box not available');
+        logger.debug('Subtitle box not available');
         return;
       }
 
       // بررسی اینکه آیا زیرنویس فعال است
       if (!this.areSubtitlesEnabled()) {
-        getLogger().debug('Subtitles are disabled, not updating');
+        logger.debug('Subtitles are disabled, not updating');
         return;
       }
 
@@ -739,9 +739,9 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       // تنظیم تایمر برای مخفی کردن کادر بعد از مدت زمان مشخص
       this.scheduleSubtitleHide();
 
-      getLogger().init('Successfully displayed subtitle');
+      logger.init('Successfully displayed subtitle');
     } catch (error) {
-      getLogger().error('Error displaying subtitle:', error);
+      logger.error('Error displaying subtitle:', error);
     }
   }
 
@@ -752,7 +752,7 @@ export default class YouTubeSubtitleHandler extends BaseSubtitleHandler {
       return;
     }
 
-    logME(
+    logger.debug(
       `[YouTubeSubtitleHandler] New subtitle accepted: "${originalText}" -> "${translatedText}"`,
     );
 

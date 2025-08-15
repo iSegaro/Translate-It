@@ -43,12 +43,10 @@ export async function getEffectiveLanguage(
   logger.debug(`: Detecting ${label} language from text...`);
     const detectedLang = await detectTextLanguage(text);
     if (detectedLang) {
-  logger.debug(`: Auto-detected ${label} language: ${detectedLang}`);
+      logger.debug(`Auto-detected ${label} language: ${detectedLang}`);
       return detectedLang;
     } else {
-      logME(
-        `[Lang Resolver]: Failed to detect ${label} language. Fallback to 'en'.`,
-      );
+      logger.warn(`Failed to detect ${label} language. Fallback to 'en'.`);
       return "en"; // fallback
     }
   } catch (error) {
