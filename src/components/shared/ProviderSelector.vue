@@ -171,6 +171,10 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
 import browser from 'webextension-polyfill'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
 
 // Props
 const props = defineProps({
@@ -221,7 +225,16 @@ const getProviderIcon = (iconPath) => {
 }
 
 const handleTranslate = () => {
-  if (isTranslating.value) return
+  logger.debug('🚀 Translate button clicked!', {
+    currentProvider: currentProvider.value?.name || 'Unknown',
+    isTranslating: isTranslating.value,
+    mode: props.mode
+  })
+  
+  if (isTranslating.value) {
+    logger.debug('⏳ Translation already in progress, ignoring click')
+    return
+  }
   
   isTranslating.value = true
   emit('translate', { provider: currentProvider.value })
@@ -233,20 +246,33 @@ const handleTranslate = () => {
 }
 
 const toggleDropdown = () => {
+  logger.debug('🔧 Provider selector dropdown toggled!', {
+    currentState: isDropdownOpen.value,
+    newState: !isDropdownOpen.value,
+    mode: props.mode
+  })
   isDropdownOpen.value = !isDropdownOpen.value
 }
 
 const selectProvider = async (provider) => {
+  logger.debug('🔧 Provider selected!', {
+    providerId: provider.id,
+    providerName: provider.name || 'Unknown',
+    mode: props.mode
+  })
   try {
     await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
+    logger.debug('✅ Provider updated successfully:', provider.id)
     emit('provider-change', provider.id)
     isDropdownOpen.value = false
   } catch (error) {
+    logger.error('❌ Failed to update provider:', error)
     await handleError(error, 'provider-selector-change')
   }
 }
 
 const handleProviderChange = (event) => {
+  logger.debug('🔧 Provider change event triggered:', event.target.value)
   selectProvider({ id: event.target.value })
 }
 
