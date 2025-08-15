@@ -137,6 +137,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useScreenCapture } from '@/composables/useScreenCapture.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
 
 const props = defineProps({
   onSelect: {
@@ -186,36 +190,50 @@ const cursorY = ref(0)
 
 // Methods
 const confirmSelection = async () => {
-  if (!hasSelection.value || isCapturing.value) return
+  logger.debug('✅ Confirm Selection clicked!')
+  if (!hasSelection.value || isCapturing.value) {
+    logger.debug('⚠️ Cannot confirm: no selection or already capturing')
+    return
+  }
 
   try {
     const result = await captureSelection()
+    logger.debug('✅ Selection captured successfully')
     emit('select', result)
     props.onSelect(result)
   } catch (err) {
+    logger.error('❌ Selection capture failed:', err)
     emit('error', err)
     props.onError(err)
   }
 }
 
 const captureFullScreen = async () => {
-  if (isCapturing.value) return
+  logger.debug('🖥️ Capture Full Screen clicked!')
+  if (isCapturing.value) {
+    logger.debug('⚠️ Already capturing, ignoring click')
+    return
+  }
 
   try {
     const result = await captureFullScreenArea()
+    logger.debug('✅ Full screen captured successfully')
     emit('select', result)
     props.onSelect(result)
   } catch (err) {
+    logger.error('❌ Full screen capture failed:', err)
     emit('error', err)
     props.onError(err)
   }
 }
 
 const resetSelection = () => {
+  logger.debug('🔄 Reset Selection clicked!')
   resetCaptureSelection()
 }
 
 const cancel = () => {
+  logger.debug('❌ Cancel clicked!')
   cancelSelection()
   emit('cancel')
   props.onCancel()

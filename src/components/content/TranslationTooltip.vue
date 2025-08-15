@@ -135,7 +135,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationTooltip')
 const { handleError } = useErrorHandler()
 
 const props = defineProps({
@@ -253,15 +256,18 @@ const translateText = async () => {
 }
 
 const copyTranslation = async () => {
+  logger.debug('📋 Copy translation clicked!', { text: translation.value?.substring(0, 50) + '...' })
   if (!translation.value) return
   
   try {
     await navigator.clipboard.writeText(translation.value)
+    logger.debug('✅ Translation copied to clipboard')
     emit('copy', translation.value)
     
     // Visual feedback
     showBriefFeedback('Copied!')
   } catch (error) {
+    logger.error('❌ Copy to clipboard failed:', error)
     await handleError(error, 'translation-tooltip-copy')
     // Fallback for older browsers
     fallbackCopy(translation.value)
@@ -279,7 +285,16 @@ const fallbackCopy = (text) => {
 }
 
 const playTTS = async () => {
-  if (!supportsTTS.value || !translation.value) return
+  logger.debug('🔊 TTS play clicked!', { 
+    text: translation.value?.substring(0, 50) + '...',
+    supportsTTS: supportsTTS.value,
+    language: props.toLanguage 
+  })
+  
+  if (!supportsTTS.value || !translation.value) {
+    logger.debug('⚠️ TTS not supported or no text available')
+    return
+  }
   
   try {
     isPlayingTTS.value = true
@@ -293,10 +308,12 @@ const playTTS = async () => {
     utterance.pitch = 1
     
     utterance.onend = () => {
+      logger.debug('✅ TTS playback completed')
       isPlayingTTS.value = false
     }
     
     utterance.onerror = async () => {
+      logger.error('❌ TTS playback error')
       isPlayingTTS.value = false
       await handleError(new Error('TTS error'), 'translation-tooltip-tts-error')
     }

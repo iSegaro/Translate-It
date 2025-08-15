@@ -31,6 +31,10 @@
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
 // Access i18n function through current instance
 const { proxy } = getCurrentInstance()
@@ -57,12 +61,14 @@ const isSaving = ref(false)
 
 // Save all settings
 const saveAllSettings = async () => {
+  logger.debug('💾 Save All Settings clicked!')
   isSaving.value = true
   statusType.value = ''
   statusMessage.value = ''
   
   try {
     await settingsStore.saveAllSettings()
+    logger.debug('✅ All settings saved successfully')
     statusType.value = 'success'
     statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     
@@ -71,7 +77,8 @@ const saveAllSettings = async () => {
       statusMessage.value = ''
       statusType.value = ''
     }, 2000)
-  } catch {
+  } catch (error) {
+    logger.error('❌ Failed to save settings:', error)
     statusType.value = 'error'
     statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
     
