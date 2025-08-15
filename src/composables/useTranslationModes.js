@@ -266,7 +266,7 @@ export function useSelectElementTranslation() {
         // The background script now provides a user-friendly message.
         const errorMsg = result.message || "Failed to activate select element mode";
         error.value = errorMsg;
-        logger.error('Select mode activation failed:', { errorMsg, result });
+        logger.debug('Select mode activation failed:', { errorMsg, result });
         return false;
       }
       
