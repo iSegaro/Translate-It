@@ -14,8 +14,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
 // Initialize the sidepanel application
 async function initializeApp() {
   try {
-    logger.debug('🚀 Initializing sidepanel...')
-
+    logger.debug('🚀 Starting sidepanel app initialization...')
+    
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('sidepanel')
     
@@ -30,16 +30,17 @@ async function initializeApp() {
     logger.debug('🌐 Browser API globals configured')
 
     // Debug browser API availability for i18n
-    if (logger.isDebugEnabled()) {
-      logger.debug('🔍 Browser API Debug Info:', {
+    logger.debugLazy(() => [
+      '🔍 Browser API Debug Info:',
+      {
         'browser.runtime': !!browser.runtime,
         'browser.runtime.getURL': !!browser.runtime?.getURL,
         'browserAPI.i18n': !!browser.i18n,
         'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
         'window.browser.i18n': !!window.browser.i18n,
         'chrome.i18n (native)': !!chrome?.i18n
-      });
-    }
+      }
+    ])
 
     // Import i18n plugin after browser API is ready and globally available
     logger.debug('📦 Importing i18n plugin...')
@@ -49,8 +50,9 @@ async function initializeApp() {
     // Create Vue app
     logger.debug('🎨 Creating Vue app...')
     const app = createApp(SidepanelApp)
+    logger.debug('✅ Vue app created successfully')
 
-    // Use Pinia for state management
+    // Use plugins (order matters: pinia first, then i18n)
     logger.debug('🔌 Installing Pinia...')
     app.use(pinia)
     logger.debug('✅ Pinia installed')
@@ -59,43 +61,36 @@ async function initializeApp() {
     app.use(i18n)
     logger.debug('✅ i18n installed')
 
-    // Global properties for extension context
+    // Global properties for extension context and messaging
+    logger.debug('⚙️ Setting global properties...')
     app.config.globalProperties.$isExtension = true
-    app.config.globalProperties.$context = MessagingContexts.SIDEPANEL
+    app.config.globalProperties.$context = 'sidepanel'
+    app.config.globalProperties.$messagingContext = MessagingContexts.SIDEPANEL
+    logger.debug('✅ Global properties configured')
 
     // Setup unified error handling
+    logger.debug('🛡️ Setting up unified error handler...')
     setupGlobalErrorHandler(app, 'sidepanel')
 
     // Mount the app
+    logger.debug('🎯 Mounting Vue app to #app...')
     app.mount('#app')
+    logger.debug('🎉 Sidepanel app mounted successfully!')
   } catch (error) {
     logger.error('Failed to initialize sidepanel app:', error)
-    // Show error UI
-    document.getElementById('app').innerHTML = '<div style="padding: 16px; color: red;">Failed to load extension sidepanel. Please try reloading.</div>'
+    logger.error('Error stack:', error.stack)
+    
+    // Show simple error UI
+    document.getElementById('app').innerHTML = `
+      <div style="padding: 16px; color: red; font-family: monospace;">
+        <h3>Failed to load sidepanel</h3>
+        <p>Error: ${error.message}</p>
+        <p>Please check the browser console for more details.</p>
+        <button onclick="location.reload()" style="padding: 8px 16px; margin-top: 8px;">Reload</button>
+      </div>
+    `
   }
 }
 
 // Initialize the app
-const appElement = document.getElementById('app')
-if (appElement && !appElement.__vue_app__) {
-  initializeApp()
-}
-
-// Lazy loading functions for advanced features
-export const loadAdvancedFeatures = async () => {
-  const [capture, tts, history, subtitle] = await Promise.all([
-    import('@/store/modules/capture.js'),
-    import('@/store/modules/tts.js'),
-    import('@/store/modules/history.js'),
-    import('@/store/modules/subtitle.js')
-  ])
-  return { capture, tts, history, subtitle }
-}
-
-export const loadTranslationFeatures = async () => {
-  const [translation, providers] = await Promise.all([
-    import('@/store/modules/translation.js'),
-    import('@/store/modules/providers.js')
-  ])
-  return { translation, providers }
-}
+initializeApp()
