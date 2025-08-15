@@ -506,7 +506,6 @@ html[dir="rtl"] .selection-mode .display-toolbar {
 }
 
 .sidepanel-mode .display-toolbar {
-  left: 18px;
   background: rgba(0, 0, 0, 0.02);
 }
 

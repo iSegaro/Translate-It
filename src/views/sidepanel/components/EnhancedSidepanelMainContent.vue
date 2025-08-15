@@ -52,7 +52,7 @@
           <ActionToolbar
             :text="sourceText"
             :language="sourceLanguageValue"
-            mode="input"
+            mode="sidepanel"
             position="top-right"
             :visible="sourceText.length > 0"
             :show-copy="true"
@@ -104,7 +104,7 @@
             v-if="hasTranslation && !isTranslating"
             :text="translatedText"
             :language="targetLanguageValue"
-            mode="output"
+            mode="sidepanel"
             position="top-right"
             :visible="true"
             :show-copy="true"

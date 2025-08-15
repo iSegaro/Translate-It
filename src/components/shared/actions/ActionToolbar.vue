@@ -255,14 +255,16 @@ const handleTTSFailed = (error) => {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .toolbar-left {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .toolbar-right {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 /* Layout variants */
@@ -295,25 +297,34 @@ const handleTTSFailed = (error) => {
 .position-top-right {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 0px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
 }
 
 .position-top-left {
   position: absolute;
   top: 8px;
-  left: 8px;
+  left: 0px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
 }
 
 .position-bottom-right {
   position: absolute;
   bottom: 8px;
+  right: 0px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
   right: 8px;
 }
 
 .position-bottom-left {
   position: absolute;
   bottom: 8px;
-  left: 8px;
+  left: 0px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
 }
 
 .position-inline {
@@ -352,7 +363,27 @@ const handleTTSFailed = (error) => {
 .mode-sidepanel {
   background: transparent;
   border-radius: 4px;
-  padding: 2px;
+  padding: 2px 12px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mode-sidepanel.position-top-right,
+.mode-sidepanel.position-top-left,
+.mode-sidepanel.position-bottom-right,
+.mode-sidepanel.position-bottom-left {
+  max-width: calc(100% - 24px);
+}
+
+/* Responsive button adjustments for constrained spaces */
+.mode-sidepanel :deep(.action-button) {
+  min-width: auto;
+  flex-shrink: 1;
+}
+
+.mode-sidepanel .toolbar-left,
+.mode-sidepanel .toolbar-right {
+  gap: 2px;
 }
 
 /* Content-based visibility */

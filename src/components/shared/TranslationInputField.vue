@@ -266,7 +266,6 @@ onMounted(async () => {
 }
 
 .sidepanel-wrapper .input-toolbar {
-  left: 18px;
   top: 8px;
   background: rgba(0, 0, 0, 0.02);
 }
@@ -300,7 +299,7 @@ html[dir="rtl"] .paste-standalone {
 }
 
 html[dir="rtl"] .sidepanel-wrapper .input-toolbar {
-  left: auto;
+  left: 18px;
   right: 18px;
 }
 
