@@ -228,9 +228,10 @@ class LifecycleManager {
       await contextMenuManager.initialize(); // Initialize to register listeners and setup menus
     } catch (error) {
       logger.error("❌ Failed to refresh context menus via featureLoader:", error);
-      // Fallback to direct import
-      const { createContextMenu } = await import("../../managers/context-menu-manager.js"); // This might need to be moved later
-      await createContextMenu();
+      // Fallback to direct import of new context menu manager
+      const { ContextMenuManager } = await import("../../managers/context-menu.js");
+      const contextMenuManager = new ContextMenuManager();
+      await contextMenuManager.initialize();
     }
   }
 }
