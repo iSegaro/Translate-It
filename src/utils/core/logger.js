@@ -19,6 +19,13 @@ const isDevelopment = process.env.NODE_ENV === "development";
 // Global log level - can be overridden per component
 let globalLogLevel = isDevelopment ? 3 : 1; // DEBUG : WARN
 
+// Runtime global debug override (when true, all debug logs are enabled regardless of per-component level)
+let __runtimeDebugOverride = false;
+
+export function enableGlobalDebug() { __runtimeDebugOverride = true; }
+export function disableGlobalDebug() { __runtimeDebugOverride = false; }
+export function isGlobalDebugEnabled() { return __runtimeDebugOverride; }
+
 // Component-specific log levels (production defaults)
 // ERROR = 0 | WARN = 1 | INFO = 2 | DEBUG = 3
 // Keep noise low in UI & content paths while retaining Info for core/background workflows.
@@ -34,6 +41,9 @@ const componentLogLevels = {
   Capture: LOG_LEVELS.INFO,
   Error: LOG_LEVELS.INFO,
 };
+
+// Freeze the initial shape to avoid accidental structural mutation; values still updated via setter.
+Object.seal(componentLogLevels);
 
 // Lazily-initialized cache stored on globalThis to avoid ANY module-level TDZ during circular evaluation.
 // Using globalThis also guarantees a single cache across multiple bundled copies (if that ever occurs).
@@ -92,7 +102,15 @@ function formatMessage(component, level, message, data) {
  */
 function shouldLog(component, level) {
   const componentLevel = componentLogLevels[component] ?? globalLogLevel;
+  // If debug override active, allow all levels up to DEBUG (3)
+  if (__runtimeDebugOverride) return level <= LOG_LEVELS.DEBUG;
   return level <= componentLevel;
+}
+
+// Fast helper specifically for debug gating (avoid recomputing numbers in callers if needed)
+export function shouldDebug(component) {
+  const componentLevel = componentLogLevels[component] ?? globalLogLevel;
+  return __runtimeDebugOverride || componentLevel >= LOG_LEVELS.DEBUG;
 }
 
 /**
@@ -101,7 +119,7 @@ function shouldLog(component, level) {
 export function createLogger(component, subComponent = null) {
   const loggerName = subComponent ? `${component}.${subComponent}` : component;
 
-  return {
+  const loggerApi = {
     error: (message, data) => {
       const ERROR_LEVEL = 0; // LOG_LEVELS.ERROR
       if (shouldLog(component, ERROR_LEVEL)) {
@@ -134,6 +152,29 @@ export function createLogger(component, subComponent = null) {
       }
     },
 
+    // Lazy debug: accept function returning (message, data?) tuple or array of args
+    debugLazy: (factory) => {
+      const DEBUG_LEVEL = 3;
+      if (!shouldLog(component, DEBUG_LEVEL)) return;
+      try {
+        const produced = factory();
+        if (!produced) return;
+        if (Array.isArray(produced)) {
+          const [message, data] = produced;
+          const formatted = formatMessage(loggerName, DEBUG_LEVEL, message, data);
+          console.log(...formatted);
+        } else if (typeof produced === 'object' && produced.message) {
+          const formatted = formatMessage(loggerName, DEBUG_LEVEL, produced.message, produced.data);
+          console.log(...formatted);
+        } else {
+          const formatted = formatMessage(loggerName, DEBUG_LEVEL, produced, undefined);
+          console.log(...formatted);
+        }
+      } catch (e) {
+        // Swallow to avoid breaking app due to logging
+      }
+    },
+
     // Special method for initialization logs (always important)
     init: (message, data) => {
       const INFO_LEVEL = 2; // LOG_LEVELS.INFO
@@ -156,8 +197,28 @@ export function createLogger(component, subComponent = null) {
         console.log(...formatted);
       }
     },
+    // Lazy info similar to debugLazy
+    infoLazy: (factory) => {
+      const INFO_LEVEL = 2;
+      if (!shouldLog(component, INFO_LEVEL)) return;
+      try {
+        const produced = factory();
+        if (!produced) return;
+        if (Array.isArray(produced)) {
+          const [message, data] = produced;
+          const formatted = formatMessage(loggerName, INFO_LEVEL, message, data);
+          console.info(...formatted);
+        } else if (typeof produced === 'object' && produced.message) {
+          const formatted = formatMessage(loggerName, INFO_LEVEL, produced.message, produced.data);
+          console.info(...formatted);
+        } else {
+          const formatted = formatMessage(loggerName, INFO_LEVEL, produced, undefined);
+          console.info(...formatted);
+        }
+      } catch (_) {}
+    },
   };
-}
+  return Object.freeze(loggerApi);
 
 /**
  * Update log level for a component or globally
