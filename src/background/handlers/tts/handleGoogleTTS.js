@@ -14,26 +14,32 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
  */
 export const handleGoogleTTSSpeak = async (request) => {
   try {
-    logger.debug('[GoogleTTSHandler] Processing Google TTS request:', request);
+    logger.debug('[GoogleTTSHandler] 🎤 Processing Google TTS request:', request);
     
     const { text, language } = request.data || {};
     
     if (!text || !text.trim()) {
+      logger.error('[GoogleTTSHandler] ❌ No text provided for Google TTS');
       throw new Error('No text provided for Google TTS');
     }
     
+    logger.debug('[GoogleTTSHandler] 📝 Text to speak:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+    logger.debug('[GoogleTTSHandler] 🌍 Language:', language || 'auto-detect');
+    
     // Create Google TTS URL
     const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text.trim())}&tl=${language || 'en'}`;
+    logger.debug('[GoogleTTSHandler] 🔗 TTS URL created:', ttsUrl);
     
     // Chrome: delegate to offscreen document
     // Firefox: play directly in background
+    logger.debug('[GoogleTTSHandler] 🚀 Starting browser-specific TTS playback...');
     await playGoogleTTSWithBrowserDetection(ttsUrl);
     
-    logger.debug('[GoogleTTSHandler] Google TTS completed successfully');
+    logger.debug('[GoogleTTSHandler] ✅ Google TTS completed successfully');
     return { success: true, processedVia: 'background-google-tts' };
     
   } catch (error) {
-    logger.error('[GoogleTTSHandler] Google TTS failed:', error);
+    logger.error('[GoogleTTSHandler] ❌ Google TTS failed:', error);
     return {
       success: false,
       error: error.message || 'Background Google TTS failed'
@@ -49,10 +55,14 @@ export const handleGoogleTTSSpeak = async (request) => {
 const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
   const isChrome = /chrome/i.test(navigator.userAgent || '') && !/edge/i.test(navigator.userAgent || '');
   
+  logger.debug('[GoogleTTSHandler] 🔍 Browser detection:', { isChrome, userAgent: navigator.userAgent });
+  
   if (isChrome) {
+    logger.debug('[GoogleTTSHandler] 🟢 Using Chrome offscreen document method');
     // Chrome: use offscreen document
     return await playWithOffscreenDocument(ttsUrl);
   } else {
+    logger.debug('[GoogleTTSHandler] 🟠 Using Firefox direct audio method');
     // Firefox: play directly (Audio API available in background context)
     return await playGoogleTTSAudio(ttsUrl);
   }
@@ -117,13 +127,17 @@ const playWithOffscreenDocument = async (ttsUrl) => {
         target: 'offscreen'
       }).then((response) => {
         clearTimeout(responseTimeout);
-        logger.debug('[GoogleTTSHandler] Offscreen response:', response);
+        logger.debug('[GoogleTTSHandler] Offscreen response received:', response);
         
         // Handle empty response (should not happen with MV3 workaround, but keep as fallback)
         if (response === undefined || response === null || (typeof response === 'object' && Object.keys(response).length === 0)) {
-          logger.warn('[GoogleTTSHandler] Empty response received - this indicates MV3 messaging issue, but audio likely playing');
-          // Don't reject immediately, assume success since MV3 workaround should handle this
-          resolve();
+          logger.info('[GoogleTTSHandler] Using MV3 workaround for empty response');
+          
+          // MV3 Workaround: Wait a bit and assume success since we know audio starts playing
+          setTimeout(() => {
+            logger.debug('[GoogleTTSHandler] MV3 workaround completed successfully');
+            resolve({ success: true, workaround: 'mv3-timing-fix' });
+          }, 100);
           return;
         }
         

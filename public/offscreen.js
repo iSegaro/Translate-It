@@ -1,10 +1,24 @@
 // public/offscreen.js
 // Chrome-specific offscreen script
 
+// Enhanced logging for offscreen document
+const createOffscreenLogger = () => {
+  const prefix = '[Offscreen]';
+  return {
+    debug: (...args) => console.log(`[DEBUG] ${prefix}`, ...args),
+    info: (...args) => console.log(`[INFO] ${prefix}`, ...args),
+    warn: (...args) => console.warn(`[WARN] ${prefix}`, ...args),
+    error: (...args) => console.error(`[ERROR] ${prefix}`, ...args),
+    log: (...args) => console.log(`[LOG] ${prefix}`, ...args) // Alias for compatibility
+  };
+};
+
+const logger = createOffscreenLogger();
+
 let currentAudio = null;
 let currentUtterance = null;
 
-console.log("[Offscreen] TTS script loaded");
+logger.info("TTS script loaded");
 
 // Signal readiness immediately to parent
 if (chrome.runtime) {
@@ -16,12 +30,12 @@ if (chrome.runtime) {
 
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[Offscreen] Received message:", message);
+  logger.debug("Received message:", message);
   
 
   // Only handle messages explicitly targeted to offscreen context
   if (!message.target || message.target !== "offscreen") {
-    console.log("[Offscreen] Message not targeted for offscreen, ignoring:", message.target);
+    logger.debug("Message not targeted for offscreen, ignoring:", message.target);
     return false;
   }
   
@@ -30,7 +44,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   delete cleanMessage.forwardedFromBackground;
   delete cleanMessage.target;
 
-  console.log("[Offscreen] Processing message targeted for offscreen:", cleanMessage.action);
+  logger.info("Processing message targeted for offscreen:", cleanMessage.action);
 
   // Handle different TTS and audio actions
   const action = cleanMessage.action;
@@ -72,7 +86,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   else {
-    console.warn("[Offscreen] Unknown offscreen action:", action);
+    logger.warn("Unknown offscreen action:", action);
     sendResponse({ success: false, error: `Unknown offscreen action: ${action}` });
     return false;
   }
@@ -539,18 +553,39 @@ function handleWebSpeechFallback(data, sendResponse) {
  * Handle audio playback (legacy support)
  */
 function handleAudioPlayback(url, sendResponse) {
+  logger.debug("Starting audio playback for URL:", url.substring(0, 100) + '...');
+  
   // Create a safe response wrapper to prevent multiple calls
   let responseSent = false;
   const safeResponse = (response) => {
     if (!responseSent) {
       responseSent = true;
-      sendResponse(response);
+      logger.debug("Sending response to background:", response);
+      
+      try {
+        sendResponse(response);
+        logger.debug("Response sent successfully");
+      } catch (error) {
+        logger.error("Response send failed:", error);
+        // Try alternative approach
+        setTimeout(() => {
+          try {
+            sendResponse(response);
+            logger.debug("Response sent via retry");
+          } catch (retryError) {
+            logger.error("Response retry failed:", retryError);
+          }
+        }, 50);
+      }
+    } else {
+      logger.warn("Duplicate response attempt blocked");
     }
   };
   
   try {
     // Stop any current audio
     if (currentAudio) {
+      logger.debug("Stopping current audio");
       currentAudio.pause();
       currentAudio.src = "";
     }
@@ -583,14 +618,14 @@ function handleAudioPlayback(url, sendResponse) {
         currentAudio.src = audioUrl;
         
         currentAudio.addEventListener("ended", () => {
-          console.log("[Offscreen] Audio playback ended");
+          logger.info("Audio playback ended");
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
           // Don't send response here anymore, already sent after play() starts
         });
 
         currentAudio.addEventListener("error", (e) => {
-          console.error("[Offscreen] Audio playback error:", e);
+          logger.error("Audio playback error:", e);
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
           safeResponse({
@@ -600,18 +635,23 @@ function handleAudioPlayback(url, sendResponse) {
         });
 
         currentAudio.addEventListener("loadstart", () => {
-          console.log("[Offscreen] Audio loading started");
+          logger.debug("Audio loading started");
         });
 
         return currentAudio.play();
       })
       .then(() => {
-        console.log("[Offscreen] Audio playback started successfully");
+        logger.info("Audio playback started successfully");
         // Send success response immediately after playback starts, don't wait for end
-        safeResponse({ success: true });
+        logger.debug("Sending success response to background...");
+        
+        // Add small delay to ensure MV3 messaging works properly
+        setTimeout(() => {
+          safeResponse({ success: true, message: "Audio playback started" });
+        }, 10);
       })
       .catch((err) => {
-        console.error("[Offscreen] Audio fetch/play failed:", err);
+        logger.error("Audio fetch/play failed:", err);
         currentAudio = null;
         safeResponse({ success: false, error: err.message });
       });
