@@ -152,6 +152,12 @@ export function createLogger(component, subComponent = null) {
       }
     },
 
+    // Check if debug logging is enabled for this logger
+    isDebugEnabled: () => {
+      const componentLevel = componentLogLevels[component] ?? globalLogLevel;
+      return __runtimeDebugOverride || componentLevel >= LOG_LEVELS.DEBUG;
+    },
+
     // Lazy debug: accept function returning (message, data?) tuple or array of args
     debugLazy: (factory) => {
       const DEBUG_LEVEL = 3;
