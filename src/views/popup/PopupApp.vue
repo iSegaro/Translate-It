@@ -104,7 +104,8 @@ const isDevelopment = computed(() => {
 })
 
 // Methods
-const toggleVersion = () => {
+const toggleEnhancedVersion = () => {
+  logger.debug('🔄 Enhanced Version toggle clicked! Current:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
   useEnhancedVersion.value = !useEnhancedVersion.value
   logger.debug('[PopupApp] Switched to version:', useEnhancedVersion.value ? 'Enhanced' : 'Original')
   
@@ -163,6 +164,7 @@ onMounted(async () => {
 })
 
 const retryLoading = () => {
+  logger.debug('🔄 Retry button clicked! Retrying popup initialization...')
   hasError.value = false
   errorMessage.value = ''
   isLoading.value = true

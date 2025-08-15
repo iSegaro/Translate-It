@@ -96,6 +96,7 @@ const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن 
 
 // Methods
 const handleTranslatePage = async () => {
+  logger.debug('🌐 Translate Page button clicked!')
   try {
     const [activeTab] = await browser.tabs.query({
       active: true,
@@ -104,33 +105,39 @@ const handleTranslatePage = async () => {
     
     if (activeTab) {
       const googleTranslateUrl = `https://translate.google.com/translate?sl=auto&tl=${encodeURIComponent(settingsStore.settings.TARGET_LANGUAGE)}&u=${encodeURIComponent(activeTab.url)}`
+      logger.debug('🌐 Opening Google Translate for page:', activeTab.url)
       await browser.tabs.create({ url: googleTranslateUrl })
       window.close()
     }
   } catch (error) {
+    logger.error('❌ Failed to translate page:', error)
     await handleError(error, 'PopupHeader-translatePage')
   }
 }
 
 const handleSelectElement = async () => {
+  logger.debug('🎯 Select Element button clicked!')
   try {
-  logger.debug('[PopupHeader] Select element button clicked')
+    logger.debug('[PopupHeader] Select element button clicked')
     await toggleSelectElement()
-  logger.debug('[PopupHeader] Select element mode toggled successfully')
+    logger.debug('[PopupHeader] Select element mode toggled successfully')
     window.close()
   } catch (error) {
+    logger.error('❌ Select element toggle failed:', error)
     await handleError(error, 'PopupHeader-selectElement')
   }
 }
 
 const handleClearStorage = () => {
+  logger.debug('🧹 Clear Storage button clicked!')
   const event = new CustomEvent('clear-storage')
   document.dispatchEvent(event)
 }
 
 const handleRevert = async () => {
+  logger.debug('↩️ Revert button clicked!')
   try {
-  logger.debug('[PopupHeader] Executing revert action')
+    logger.debug('[PopupHeader] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -146,7 +153,7 @@ const handleRevert = async () => {
     })
     
     if (response?.success) {
-  logger.debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      logger.debug(`[PopupHeader] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
       await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed')
@@ -165,15 +172,19 @@ const handleRevert = async () => {
 }
 
 const handleOpenSettings = async () => {
+  logger.debug('⚙️ Settings button clicked!')
   try {
     await browser.runtime.openOptionsPage()
+    logger.debug('✅ Options page opened successfully')
     window.close()
   } catch (error) {
+    logger.error('❌ Failed to open settings:', error)
     await handleError(error, 'PopupHeader-openSettings')
   }
 }
 
 const handleExcludeToggle = async () => {
+  logger.debug('🚫 Exclude Toggle button clicked! Current state:', isExtensionEnabled.value)
   try {
     const [activeTab] = await browser.tabs.query({
       active: true,
@@ -184,6 +195,7 @@ const handleExcludeToggle = async () => {
       // isExtensionEnabled = true یعنی exclude = false
       // isExtensionEnabled = false یعنی exclude = true
       const exclude = !isExtensionEnabled.value
+      logger.debug('🚫 Setting page exclusion to:', exclude, 'for URL:', activeTab.url)
       
       await sendMessage({
         action: MessageActions.Set_Exclude_Current_Page,
@@ -192,8 +204,11 @@ const handleExcludeToggle = async () => {
           url: activeTab.url,
         },
       })
+      
+      logger.debug('✅ Page exclusion updated successfully')
     }
   } catch (error) {
+    logger.error('❌ Failed to toggle exclusion:', error)
     await handleError(error, 'PopupHeader-excludeToggle')
   }
 }
