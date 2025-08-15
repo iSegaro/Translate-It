@@ -1,56 +1,15 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
-import SidepanelApp from '@/views/sidepanel/SidepanelLayout.vue'
+import SidepanelApp from '@/views/sidepanel/SidepanelApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
-import { MessagingContexts } from '../../messaging/core/MessagingCore'
+import { MessagingContexts } from '@/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { ErrorHandler } from '@/error-management/ErrorHandler.js'
-import { ErrorTypes } from '@/error-management/ErrorTypes.js'
-import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals, isExtensionContextValid } from '@/error-management/windowErrorHandlers.js'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
-
-/**
- * Setup window-level error handlers for extension context issues
- */
-function setupWindowErrorHandlers(context) {
-  const errorHandler = new ErrorHandler()
-  
-  // Handle uncaught errors (including from third-party libraries)
-  window.addEventListener('error', async (event) => {
-    const error = event.error || new Error(event.message)
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-window`,
-        silent: true
-      })
-      event.preventDefault() // Prevent default browser error handling
-    }
-  })
-  
-  // Handle unhandled promise rejections
-  window.addEventListener('unhandledrejection', async (event) => {
-    const error = event.reason
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-promise`,
-        silent: true
-      })
-      event.preventDefault() // Prevent unhandled rejection
-    }
-  })
-}
 
 // Initialize the sidepanel application
 async function initializeApp() {
@@ -60,14 +19,26 @@ async function initializeApp() {
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('sidepanel')
     
-    if (!browser?.runtime) {
+    // Check extension context validity
+    if (!isExtensionContextValid()) {
       throw new Error('Browser runtime not available - extension context may be invalid')
     }
 
-    // Global browser API check and setup
-    if (!window.browser) {
-      window.browser = browser
-      logger.debug('🌐 Browser API set on window object')
+    // Setup browser API globals for compatibility
+    setupBrowserAPIGlobals()
+    
+    logger.debug('🌐 Browser API globals configured')
+
+    // Debug browser API availability for i18n
+    if (logger.isDebugEnabled()) {
+      logger.debug('🔍 Browser API Debug Info:', {
+        'browser.runtime': !!browser.runtime,
+        'browser.runtime.getURL': !!browser.runtime?.getURL,
+        'browserAPI.i18n': !!browser.i18n,
+        'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
+        'window.browser.i18n': !!window.browser.i18n,
+        'chrome.i18n (native)': !!chrome?.i18n
+      });
     }
 
     // Import i18n plugin after browser API is ready and globally available
@@ -121,22 +92,10 @@ export const loadAdvancedFeatures = async () => {
   return { capture, tts, history, subtitle }
 }
 
-export const loadProviderFeatures = async () => {
-  // Providers are now handled by the background service worker
-  // UI contexts use TranslationClient for messaging
-  return { aiProviders: null, freeProviders: null }
+export const loadTranslationFeatures = async () => {
+  const [translation, providers] = await Promise.all([
+    import('@/store/modules/translation.js'),
+    import('@/store/modules/providers.js')
+  ])
+  return { translation, providers }
 }
-
-// Progressive loading after initial render
-setTimeout(async () => {
-  try {
-    // Load translation features first
-    const { loadTranslationFeatures } = await import('@/app/main/popup.js')
-    await loadTranslationFeatures()
-    
-    // Then load advanced features
-    await loadAdvancedFeatures()
-  } catch (error) {
-    logger.error('Failed to preload features:', error)
-  }
-}, 200)

@@ -2,52 +2,11 @@ import { createApp } from 'vue'
 import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
-import browser from 'webextension-polyfill'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { ErrorHandler } from '@/error-management/ErrorHandler.js'
-import { ErrorTypes } from '@/error-management/ErrorTypes.js'
-import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals, isExtensionContextValid } from '@/error-management/windowErrorHandlers.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
-const logger = getScopedLogger('UI', 'popup');
 
-/**
- * Setup window-level error handlers for extension context issues
- */
-function setupWindowErrorHandlers(context) {
-  const errorHandler = new ErrorHandler()
-  
-  // Handle uncaught errors (including from third-party libraries)
-  window.addEventListener('error', async (event) => {
-    const error = event.error || new Error(event.message)
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-window`,
-        silent: true
-      })
-      event.preventDefault()
-    }
-  })
-  
-  // Handle unhandled promise rejections
-  window.addEventListener('unhandledrejection', async (event) => {
-    const error = event.reason
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-promise`,
-        silent: true
-      })
-      event.preventDefault()
-    }
-  })
-}
+const logger = getScopedLogger('UI', 'popup');
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
@@ -55,13 +14,15 @@ async function initializeApp() {
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('popup')
     
-    // Wait for browser API to be ready
-    
-    // Ensure browser API is globally available for i18n plugin
-    if (typeof window !== 'undefined') {
-      window.browser = browser;
-      window.chrome = browser; // Some plugins expect chrome object
+    // Check extension context validity
+    if (!isExtensionContextValid()) {
+      throw new Error('Browser runtime not available - extension context may be invalid')
     }
+    
+    // Setup browser API globals for compatibility
+    setupBrowserAPIGlobals()
+    
+    logger.debug('🌐 Browser API globals configured')
 
     // Import i18n plugin after browser API is ready and globally available
     const { default: i18n } = await import('vue-plugin-webextension-i18n')
@@ -112,6 +73,3 @@ export const loadAdvancedFeatures = async () => {
   ])
   return { capture, tts, history }
 }
-
-// Note: Removed preloading to reduce popup bundle size
-// Features will be loaded on-demand when actually needed

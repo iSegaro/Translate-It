@@ -6,52 +6,11 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { ErrorHandler } from '@/error-management/ErrorHandler.js'
-import { ErrorTypes } from '@/error-management/ErrorTypes.js'
-import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
-
-/**
- * Setup window-level error handlers for extension context issues
- */
-function setupWindowErrorHandlers(context) {
-  const errorHandler = new ErrorHandler()
-  
-  // Handle uncaught errors (including from third-party libraries)
-  window.addEventListener('error', async (event) => {
-    const error = event.error || new Error(event.message)
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-window`,
-        silent: true
-      })
-      event.preventDefault()
-    }
-  })
-  
-  // Handle unhandled promise rejections
-  window.addEventListener('unhandledrejection', async (event) => {
-    const error = event.reason
-    const errorType = matchErrorToType(error?.message || error)
-    
-    // Only handle extension context related errors silently
-    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
-      await errorHandler.handle(error, {
-        type: errorType,
-        context: `${context}-promise`,
-        silent: true
-      })
-      event.preventDefault()
-    }
-  })
-}
 
 // Import route components (lazy loaded)
 const LanguagesTab = () => import('@/views/options/tabs/LanguagesTab.vue')
@@ -76,19 +35,8 @@ async function initializeApp() {
     
     logger.debug('✅ browser API is ready')
 
-    // Ensure browser API is globally available for i18n plugin
-    if (typeof window !== 'undefined') {
-      window.browser = browser;
-      window.chrome = browser; // Some plugins expect chrome object
-      
-      // Debug: Check if i18n is available
-      logger.debug('🔍 Checking i18n availability:', {
-        'browserAPI.i18n': !!browser.i18n,
-        'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
-        'window.browser.i18n': !!window.browser.i18n,
-        'chrome.i18n (native)': !!chrome?.i18n
-      });
-    }
+    // Setup browser API globals
+    setupBrowserAPIGlobals()
 
     // Import i18n plugin after browser API is ready and globally available
     logger.debug('📦 Importing i18n plugin...')
