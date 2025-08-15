@@ -104,6 +104,11 @@ const iconSrc = computed(() => {
 const handlePaste = async () => {
   if (!canPaste.value) return
   
+  // Log click event
+  logger.debug('📥 Paste button clicked!', { 
+    source: 'Vue PasteButton'
+  })
+  
   try {
     logger.debug('[PasteButton] Attempting to paste from clipboard')
     

@@ -164,19 +164,30 @@ import { useSettingsStore } from '@/store/core/settings'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 
 const settingsStore = useSettingsStore()
 
 // Extension enabled state
 const extensionEnabled = computed({
   get: () => settingsStore.settings?.EXTENSION_ENABLED ?? true,
-  set: (value) => settingsStore.updateSettingLocally('EXTENSION_ENABLED', value)
+  set: (value) => {
+    logger.debug('⚡ Extension enabled changed:', value)
+    settingsStore.updateSettingLocally('EXTENSION_ENABLED', value)
+  }
 })
 
 // Text field settings
 const translateOnTextFields = computed({
   get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_FIELDS || false,
-  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_FIELDS', value)
+  set: (value) => {
+    logger.debug('📝 Translate on text fields changed:', value)
+    settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_FIELDS', value)
+  }
 })
 
 const enableShortcutForTextFields = computed({

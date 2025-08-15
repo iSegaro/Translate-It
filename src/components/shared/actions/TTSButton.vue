@@ -123,6 +123,13 @@ const iconSrc = computed(() => {
 const handleTTS = async () => {
   if (!canSpeak.value) return
   
+  // Log click event
+  logger.debug('🔊 TTS button clicked!', { 
+    text: props.text.slice(0, 20) + (props.text.length > 20 ? '...' : ''),
+    language: props.language,
+    source: 'Vue TTSButton'
+  })
+  
   try {
     if (isPlaying.value) {
       logger.debug('[TTSButton] Stopping TTS')

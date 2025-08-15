@@ -104,6 +104,12 @@ const iconSrc = computed(() => {
 const handleCopy = async () => {
   if (!canCopy.value) return
   
+  // Log click event
+  logger.debug('📋 Copy button clicked!', { 
+    text: props.text.slice(0, 20) + (props.text.length > 20 ? '...' : ''),
+    source: 'Vue CopyButton'
+  })
+  
   try {
     logger.debug('[CopyButton] Copying text:', props.text.substring(0, 50) + '...')
     

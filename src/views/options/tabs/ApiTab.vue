@@ -52,6 +52,11 @@ import OpenAIApiSettings from '@/components/feature/api-settings/OpenAIApiSettin
 import OpenRouterApiSettings from '@/components/feature/api-settings/OpenRouterApiSettings.vue'
 import DeepseekApiSettings from '@/components/feature/api-settings/DeepseekApiSettings.vue'
 import CustomApiSettings from '@/components/feature/api-settings/CustomApiSettings.vue'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ApiTab')
 
 const settingsStore = useSettingsStore()
 
@@ -59,7 +64,8 @@ const settingsStore = useSettingsStore()
 const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || 'google')
 
 // Watch for changes in selectedProvider and update the store locally
-watch(selectedProvider, (newValue) => {
+watch(selectedProvider, (newValue, oldValue) => {
+  logger.debug('🔧 API provider changed:', oldValue, '→', newValue)
   settingsStore.updateSettingLocally('TRANSLATION_API', newValue)
 })
 </script>
