@@ -23,11 +23,12 @@ import { translateFieldViaSmartHandler } from "../handlers/smartTranslationInteg
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
-
 
 export default class TranslationHandler {
   constructor() {
+    // Initialize logger
+    this.logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
+    
     // IMPORTANT: FIRST initialize the notifier, then the errorHandler
     // This ensures that the errorHandler can use the notifier for displaying errors.
     // ابتدا notifier سپس errorHandler
@@ -73,7 +74,9 @@ export default class TranslationHandler {
       SUBTITLE_TRANSLATION: CONFIG.ENABLE_SUBTITLE_TRANSLATION,
     });
 
+    this.logger.debug('Creating EventCoordinator...');
     this.eventCoordinator = new EventCoordinator(this, this.featureManager);
+    this.logger.debug('EventCoordinator created successfully');
   }
 
   @logMethod

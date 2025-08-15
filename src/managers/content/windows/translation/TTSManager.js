@@ -11,7 +11,7 @@ import { MessageActions } from "../../../../messaging/core/MessageActions.js";
  */
 export class TTSManager {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TTSManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TTSManager');
   }
 
   /**
@@ -137,6 +137,7 @@ export class TTSManager {
     
     icon.addEventListener("click", async (e) => {
       e.stopPropagation();
+      this.logger.debug("🔊 TTS icon clicked!", { text: textToSpeak?.substring(0, 50) + "...", title });
       try {
         await this.speakTextUnified(textToSpeak.trim());
         this.logger.debug("TTS started via unified system");

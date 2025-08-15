@@ -11,7 +11,7 @@ import { TranslationMode, CONFIG } from "../../../../config.js";
  */
 export class TranslationRenderer {
   constructor(factory, ttsManager) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationRenderer');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationRenderer');
     this.factory = factory;
     this.ttsManager = ttsManager;
   }
@@ -72,6 +72,10 @@ export class TranslationRenderer {
     const closeButton = this.factory.createCloseButton();
     closeButton.addEventListener("click", (e) => {
       e.stopPropagation();
+      
+      // Log close event
+      this.logger.debug('❌ Close button clicked!');
+      
       if (onClose) onClose();
     });
     firstLine.appendChild(closeButton);
@@ -115,6 +119,13 @@ export class TranslationRenderer {
     
     icon.addEventListener("click", async (e) => {
       e.stopPropagation();
+      
+      // Log click event
+      this.logger.debug('📋 Copy icon clicked!', { 
+        text: textToCopy.slice(0, 20) + (textToCopy.length > 20 ? '...' : ''), 
+        title: title 
+      });
+      
       try {
         await navigator.clipboard.writeText(textToCopy);
         

@@ -42,10 +42,12 @@ export default class EventCoordinator {
   this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
     
     // Initialize SelectionWindows for text selection manager
+    this.logger.debug('Creating SelectionWindows instance...');
     this.SelectionWindows = new SelectionWindows({
       translationHandler: translationHandler,
       notifier: translationHandler.notifier,
     });
+    this.logger.debug('SelectionWindows instance created successfully');
 
     // Note: UnifiedMessenger removed - SelectElementManager handles its own messaging
     

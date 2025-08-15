@@ -29,7 +29,8 @@ import { matchErrorToType } from "../../../error-management/ErrorMatcher.js";
 export class WindowsManager {
   constructor(options = {}) {
     // Initialize logger
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManager');
+    this.logger.debug('WindowsManager constructor called', options);
     
     // Initialize cross-frame communication first to get frameId
     this.crossFrameManager = new CrossFrameManager({

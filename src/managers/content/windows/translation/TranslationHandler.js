@@ -14,7 +14,7 @@ import { TranslationMode, getSettingsAsync } from "../../../../config.js";
  */
 export class TranslationHandler {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationHandler');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationHandler');
     this.activeRequests = new Map();
   }
 

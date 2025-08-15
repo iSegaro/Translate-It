@@ -18,7 +18,7 @@ import { useTTSAction } from "../../../../composables/actions/useTTSAction.js";
  */
 export class EnhancedTranslationRenderer {
   constructor(factory, ttsManager) {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EnhancedTranslationRenderer');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EnhancedTranslationRenderer');
     this.factory = factory;
     this.ttsManager = ttsManager;
     
@@ -294,6 +294,10 @@ export class EnhancedTranslationRenderer {
     
     closeButton.addEventListener("click", (e) => {
       e.stopPropagation();
+      
+      // Log close event
+      this.logger.debug('❌ Enhanced close button clicked!');
+      
       if (onClose) onClose();
     });
     
