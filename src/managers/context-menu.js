@@ -13,6 +13,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
+const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
@@ -138,13 +139,15 @@ export class ContextMenuManager {
 
       // Get the currently active API to set the 'checked' state
       const currentApi = await getTranslationApiAsync();
+      
+      // Get commands for keyboard shortcuts
+      const commands = await browser.commands.getAll();
 
       // --- 1. Create Page Context Menu ---
       try {
         let pageMenuTitle =
           (await getTranslationString("context_menu_translate_with_selection")) ||
           "Translate Element";
-        const commands = await browser.commands.getAll();
         const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
         if (command && command.shortcut) {
           pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
@@ -163,10 +166,17 @@ export class ContextMenuManager {
 
       // --- 2. Create Action (Browser Action) Context Menus ---
       try {
-        // --- Options Menu ---
+        // --- Translate Element Menu (First option) ---
+        let actionPageMenuTitle =
+          (await getTranslationString("context_menu_translate_with_selection")) ||
+          "Translate Element";
+        const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
+        if (command && command.shortcut) {
+          actionPageMenuTitle = `${actionPageMenuTitle} (${command.shortcut})`;
+        }
         await this.createMenu({
-          id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-          title: (await getTranslationString("context_menu_options")) || "Options",
+          id: ACTION_TRANSLATE_ELEMENT_ID,
+          title: actionPageMenuTitle,
           contexts: ["action"],
         });
 
@@ -194,6 +204,20 @@ export class ContextMenuManager {
         logger.debug(
           `API Provider sub-menus created. Current API: ${currentApi}`
         );
+
+        // --- Options Menu ---
+        await this.createMenu({
+          id: ACTION_CONTEXT_MENU_OPTIONS_ID,
+          title: (await getTranslationString("context_menu_options")) || "Options",
+          contexts: ["action"],
+        });
+
+        // --- Separator ---
+        await this.createMenu({
+          id: "action-separator-1",
+          type: "separator",
+          contexts: ["action"],
+        });
 
         // --- Other Action Menus ---
         await this.createMenu({
@@ -365,6 +389,30 @@ export class ContextMenuManager {
                   err.message
                 );
               });
+          }
+          break;
+
+        case ACTION_TRANSLATE_ELEMENT_ID:
+          try {
+            // Get active tab for browser action context
+            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+            if (activeTab && activeTab.id) {
+              // Activate select element mode with proper message format
+              browser.tabs
+                .sendMessage(activeTab.id, MessageFormat.create(
+                  MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+                  { pageUrl: activeTab.url },
+                  'context-menu'
+                ))
+                .catch((err) => {
+                  logger.error(
+                    `Could not send message to tab ${activeTab.id}:`,
+                    err.message
+                  );
+                });
+            }
+          } catch (error) {
+            logger.error("Failed to get active tab for translate element action:", error);
           }
           break;
 
