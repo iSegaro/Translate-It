@@ -197,16 +197,57 @@ watch(
   { deep: true },
 );
 
+// Watch for language changes
+watch(
+  () => sourceLang.value,
+  (newValue, oldValue) => {
+    if (oldValue !== undefined && newValue !== oldValue) {
+      logger.info("[SidepanelMainContent] 🌍 Source language changed:", oldValue, "→", newValue);
+    }
+  }
+);
+
+watch(
+  () => targetLang.value,
+  (newValue, oldValue) => {
+    if (oldValue !== undefined && newValue !== oldValue) {
+      logger.info("[SidepanelMainContent] 🌍 Target language changed:", oldValue, "→", newValue);
+    }
+  }
+);
+
+// Watch for source text changes
+watch(
+  () => sourceText.value,
+  (newValue, oldValue) => {
+    if (oldValue !== undefined && newValue !== oldValue) {
+      logger.debug("[SidepanelMainContent] 📝 Source text changed:", {
+        from: oldValue?.substring(0, 30) + "...",
+        to: newValue?.substring(0, 30) + "...",
+        length: newValue?.length || 0
+      });
+    }
+  }
+);
+
 // Handle form submission using composable
 const handleTranslationSubmit = async () => {
+  logger.debug("[SidepanelMainContent] 🎯 Translation button clicked");
+  
   // Early return without warning since button is now disabled when conditions not met
   if (!canTranslate.value) {
+    logger.warn("[SidepanelMainContent] ⚠️ Translation blocked - canTranslate is false");
     return;
   }
 
   try {
+    logger.info("[SidepanelMainContent] 🚀 Starting translation process...");
+    logger.debug("[SidepanelMainContent] 📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    logger.debug("[SidepanelMainContent] 🌍 Source lang:", sourceLang.value, "→ Target lang:", targetLang.value);
+    
     // Cancel previous request if exists
     if (currentAbortController.value) {
+      logger.debug("[SidepanelMainContent] 🛑 Canceling previous translation request");
       currentAbortController.value.abort();
     }
 
@@ -214,10 +255,19 @@ const handleTranslationSubmit = async () => {
     const finalSourceLang = getLanguageCode(sourceLang.value) || await getSourceLanguageAsync();
     const finalTargetLang = getLanguageCode(targetLang.value) || await getTargetLanguageAsync();
     
+    logger.debug("[SidepanelMainContent] 🔍 Resolved languages:", finalSourceLang, "→", finalTargetLang);
+    
     // Start translation immediately - service worker will wake up when needed
+    logger.debug("[SidepanelMainContent] 📡 Triggering translation...");
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
+    
+    if (success) {
+      logger.info("[SidepanelMainContent] ✅ Translation completed successfully");
+    } else {
+      logger.warn("[SidepanelMainContent] ⚠️ Translation returned false/failed");
+    }
   } catch (error) {
-  logger.error("[SidepanelMainContent] Translation error caught:", error);
+    logger.error("[SidepanelMainContent] ❌ Translation error caught:", error);
     await handleError(error, 'SidepanelMainContent-translation');
   }
 };
@@ -225,24 +275,26 @@ const handleTranslationSubmit = async () => {
 // Copy source text to clipboard
 const copySourceText = async () => {
   try {
+    logger.debug("[SidepanelMainContent] 📋 Copying source text to clipboard...");
     await navigator.clipboard.writeText(sourceText.value);
-  logger.debug("[SidepanelMainContent] Source text copied to clipboard");
+    logger.info("[SidepanelMainContent] ✅ Source text copied to clipboard");
   } catch (error) {
-    await handleError(error, 'SidepanelMainContent-copySource');
+    logger.error("[SidepanelMainContent] ❌ Failed to copy source text:", error);
+    await handleError(error, 'SidepanelMainContent-copy-source');
   }
 };
 
-// Copy translation text to clipboard
-const copyTranslationText = async () => {
+// Copy translated text to clipboard  
+const copyTranslatedText = async () => {
   try {
+    logger.debug("[SidepanelMainContent] 📋 Copying translated text to clipboard...");
     await navigator.clipboard.writeText(translatedText.value);
-  logger.debug("[SidepanelMainContent] Translation copied to clipboard");
+    logger.info("[SidepanelMainContent] ✅ Translated text copied to clipboard");
   } catch (error) {
-    await handleError(error, 'SidepanelMainContent-copyTranslation');
+    logger.error("[SidepanelMainContent] ❌ Failed to copy translated text:", error);
+    await handleError(error, 'SidepanelMainContent-copy-translation');
   }
-};
-
-// Listen for focus events to handle any UI updates if needed
+};// Listen for focus events to handle any UI updates if needed
 const handleFocus = () => {
   // Focus handling can be added here if needed
 };
@@ -254,24 +306,36 @@ const handleSourceTextInput = () => {
 
 // Speak source text using TTS
 const speakSourceText = async () => {
-  const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
-  const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
-  await tts.speak(sourceText.value, langCode);
-  logger.debug(
-    "[SidepanelMainContent] Source text TTS started with language:",
-    { sourceLanguage, langCode }
-  );
+  try {
+    logger.debug("[SidepanelMainContent] 🎤 Starting TTS for source text...");
+    const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
+    const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
+    
+    logger.debug("[SidepanelMainContent] 🌍 TTS language:", { sourceLanguage, langCode });
+    logger.debug("[SidepanelMainContent] 📝 Speaking text:", sourceText.value?.substring(0, 50) + "...");
+    
+    await tts.speak(sourceText.value, langCode);
+    logger.info("[SidepanelMainContent] ✅ Source text TTS completed");
+  } catch (error) {
+    logger.error("[SidepanelMainContent] ❌ Source text TTS failed:", error);
+  }
 };
 
 // Speak translation text using TTS
 const speakTranslationText = async () => {
+  try {
+    logger.debug("[SidepanelMainContent] 🎤 Starting TTS for translated text...");
     const targetLanguageCode = getLanguageCode(targetLang.value) || AUTO_DETECT_VALUE;
-  const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
-  await tts.speak(translatedText.value, langCode);
-  logger.debug(
-    "[SidepanelMainContent] Translation TTS started with language:",
-    { targetLanguage: targetLang.value, langCode }
-  );
+    const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
+    
+    logger.debug("[SidepanelMainContent] 🌍 TTS language:", { targetLanguage: targetLang.value, langCode });
+    logger.debug("[SidepanelMainContent] 📝 Speaking text:", translatedText.value?.substring(0, 50) + "...");
+    
+    await tts.speak(translatedText.value, langCode);
+    logger.info("[SidepanelMainContent] ✅ Translated text TTS completed");
+  } catch (error) {
+    logger.error("[SidepanelMainContent] ❌ Translated text TTS failed:", error);
+  }
 };
 
 // Lifecycle - setup event listeners
