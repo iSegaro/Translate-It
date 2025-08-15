@@ -14,26 +14,19 @@ async function getStorageManager() {
 }
 const logger = getScopedLogger('Core', 'settings');
 
-export const useSettingsStore = defineStore('settings', () => {
-  // State - complete settings object with CONFIG defaults
-  const settings = ref({
-    // Basic settings
+// --- Helpers ------------------------------------------------------------
+function getDefaultSettings() {
+  return {
     THEME: CONFIG.THEME || 'auto',
     APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English',
     EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
-    
-    // Translation settings
     TRANSLATION_API: CONFIG.TRANSLATION_API || 'google',
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'English',
     selectionTranslationMode: CONFIG.selectionTranslationMode || 'onClick',
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'copy',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
-    
-    // Prompt settings
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
-    
-    // API keys and provider settings
     API_KEY: CONFIG.API_KEY || '',
     API_URL: CONFIG.API_URL || '',
     GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
@@ -49,8 +42,6 @@ export const useSettingsStore = defineStore('settings', () => {
     CUSTOM_API_URL: CONFIG.CUSTOM_API_URL || '',
     CUSTOM_API_KEY: CONFIG.CUSTOM_API_KEY || '',
     CUSTOM_API_MODEL: CONFIG.CUSTOM_API_MODEL || '',
-    
-    // Activation settings
     TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
     ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
     TRANSLATE_WITH_SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT ?? true,
@@ -59,21 +50,21 @@ export const useSettingsStore = defineStore('settings', () => {
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
     ENABLE_SUBTITLE_TRANSLATION: CONFIG.ENABLE_SUBTITLE_TRANSLATION ?? false,
     SHOW_SUBTITLE_ICON: CONFIG.SHOW_SUBTITLE_ICON ?? true,
-    
-    // Advanced settings
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
     USE_MOCK: CONFIG.USE_MOCK ?? false,
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
-    
-    // Migration and versioning
+    // Migration & versioning flags
     VUE_MIGRATED: false,
     MIGRATION_DATE: null,
     MIGRATION_FROM_VERSION: null,
     EXTENSION_VERSION: null,
-    
-    // History (newly added to settings for centralized management)
     translationHistory: []
-  })
+  };
+}
+
+export const useSettingsStore = defineStore('settings', () => {
+  // State - complete settings object with CONFIG defaults
+  const settings = ref(getDefaultSettings())
   
   // Loading states
   const isLoading = ref(false)
@@ -97,61 +88,66 @@ export const useSettingsStore = defineStore('settings', () => {
   const selectedProvider = computed(() => settings.value.TRANSLATION_API)
   
   // Actions
+  let __loadInFlight = null;
   const loadSettings = async () => {
-    if (isInitialized.value) return settings.value // Temporarily disable cache
-    
-    isLoading.value = true
-    try {
-      // Get all settings from storage using StorageManager
-  const storageManager = await getStorageManager();
-  const stored = await storageManager.get(null)
-      
-      // Merge with defaults, preserving existing values
-      Object.keys(settings.value).forEach(key => {
-        if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
-          if (key === 'EXCLUDED_SITES') {
-            if (Array.isArray(stored[key])) {
-              settings.value[key] = stored[key];
-            } else if (typeof stored[key] === 'object' && stored[key] !== null) {
-              // Attempt to convert object to array of strings
-              settings.value[key] = Object.values(stored[key]).filter(s => typeof s === 'string');
+    if (isInitialized.value) return settings.value;
+    if (__loadInFlight) return __loadInFlight;
+    isLoading.value = true;
+    __loadInFlight = (async () => {
+      try {
+        const storageManager = await getStorageManager();
+        const stored = await storageManager.get(null);
+        const current = settings.value;
+        Object.keys(current).forEach(key => {
+          if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
+            if (key === 'EXCLUDED_SITES') {
+              if (Array.isArray(stored[key])) current[key] = stored[key];
+              else if (typeof stored[key] === 'object' && stored[key] !== null) current[key] = Object.values(stored[key]).filter(s => typeof s === 'string');
+              else current[key] = [];
+            } else if (key === 'translationHistory') {
+              current[key] = Array.isArray(stored[key]) ? stored[key] : [];
             } else {
-              settings.value[key] = [];
+              current[key] = stored[key];
             }
-          } else if (key === 'translationHistory') {
-            if (Array.isArray(stored[key])) {
-              settings.value[key] = stored[key];
-            } else {
-              settings.value[key] = []; // Default to empty array if not an array
-            }
-          } else {
-            settings.value[key] = stored[key]
           }
-        }
-      })
-      
-      logger.debug('✅ Settings after merge:', settings.value)
-      isInitialized.value = true
-      return settings.value
-    } catch (error) {
-      logger.error('Failed to load settings:', error)
-      throw error
-    } finally {
-      isLoading.value = false
-    }
+        });
+        logger.debug('Settings merged from storage');
+        isInitialized.value = true;
+        return current;
+      } catch (error) {
+        logger.error('Failed to load settings:', error);
+        throw error;
+      } finally {
+        isLoading.value = false;
+        __loadInFlight = null;
+      }
+    })();
+    return __loadInFlight;
   }
   
-  const saveAllSettings = async () => {
-    isSaving.value = true
+  // Debounced save (simple trailing debounce)
+  let __saveTimer = null;
+  const saveAllSettings = async (immediate = false) => {
+    if (immediate) {
+      clearTimeout(__saveTimer);
+      return performSave();
+    }
+    return new Promise((resolve, reject) => {
+      clearTimeout(__saveTimer);
+      __saveTimer = setTimeout(() => performSave().then(resolve).catch(reject), 120);
+    });
+  }
+  async function performSave() {
+    isSaving.value = true;
     try {
-  const storageManager = await getStorageManager();
-  await storageManager.set(settings.value)
-      return true
+      const storageManager = await getStorageManager();
+      await storageManager.set(settings.value);
+      return true;
     } catch (error) {
-      logger.error('Failed to save all settings:', error)
-      throw error
+      logger.error('Failed to save all settings:', error);
+      throw error;
     } finally {
-      isSaving.value = false
+      isSaving.value = false;
     }
   }
   
@@ -193,58 +189,17 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
-      // Clear all storage using StorageManager
-  const storageManager = await getStorageManager();
-  await storageManager.clear()
-      
-      // Reset to CONFIG defaults
-      const defaultSettings = {
-        THEME: CONFIG.THEME || 'auto',
-        APPLICATION_LOCALIZE: CONFIG.APPLICATION_LOCALIZE || 'English',
-        EXTENSION_ENABLED: CONFIG.EXTENSION_ENABLED ?? true,
-        TRANSLATION_API: CONFIG.TRANSLATION_API || 'google',
-        SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
-        TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'English',
-        selectionTranslationMode: CONFIG.selectionTranslationMode || 'onClick',
-        COPY_REPLACE: CONFIG.COPY_REPLACE || 'copy',
-        REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
-        PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
-        API_KEY: CONFIG.API_KEY || '',
-        API_URL: CONFIG.API_URL || '',
-        GEMINI_MODEL: CONFIG.GEMINI_MODEL || 'gemini-2.5-flash',
-        GEMINI_THINKING_ENABLED: CONFIG.GEMINI_THINKING_ENABLED ?? true,
-        WEBAI_API_URL: CONFIG.WEBAI_API_URL || 'http://localhost:6969/translate',
-        WEBAI_API_MODEL: CONFIG.WEBAI_API_MODEL || 'gemini-2.0-flash',
-        OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',
-        OPENAI_API_MODEL: CONFIG.OPENAI_API_MODEL || 'gpt-4o',
-        OPENROUTER_API_KEY: CONFIG.OPENROUTER_API_KEY || '',
-        OPENROUTER_API_MODEL: CONFIG.OPENROUTER_API_MODEL || 'openai/gpt-4o',
-        DEEPSEEK_API_KEY: CONFIG.DEEPSEEK_API_KEY || '',
-        DEEPSEEK_API_MODEL: CONFIG.DEEPSEEK_API_MODEL || 'deepseek-chat',
-        CUSTOM_API_URL: CONFIG.CUSTOM_API_URL || '',
-        CUSTOM_API_KEY: CONFIG.CUSTOM_API_KEY || '',
-        CUSTOM_API_MODEL: CONFIG.CUSTOM_API_MODEL || '',
-        TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
-        ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
-        TRANSLATE_WITH_SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT ?? true,
-        TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION ?? true,
-        REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
-        ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
-        ENABLE_SUBTITLE_TRANSLATION: CONFIG.ENABLE_SUBTITLE_TRANSLATION ?? false,
-        SHOW_SUBTITLE_ICON: CONFIG.SHOW_SUBTITLE_ICON ?? true,
-        DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
-        USE_MOCK: CONFIG.USE_MOCK ?? false,
-        EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
-        translationHistory: []
-      }
-      
-      settings.value = { ...defaultSettings }
-      await saveAllSettings()
-      
-      return true
+      const storageManager = await getStorageManager();
+      await storageManager.clear();
+      const defaults = getDefaultSettings();
+      // Preserve reference to reactive object
+      Object.keys(settings.value).forEach(k => delete settings.value[k]);
+      Object.assign(settings.value, defaults);
+      await saveAllSettings(true);
+      return true;
     } catch (error) {
-      logger.error('Failed to reset settings:', error)
-      throw error
+      logger.error('Failed to reset settings:', error);
+      throw error;
     }
   }
   
@@ -312,7 +267,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     
     // Validate API keys for selected provider
-    const provider = settings.value.SELECTED_PROVIDER
+  const provider = settings.value.TRANSLATION_API
     if (['gemini', 'openai', 'openrouter', 'deepseek', 'custom'].includes(provider)) {
       const keyField = provider === 'custom' ? 'CUSTOM_API_KEY' : 'API_KEY'
       if (!settings.value[keyField]) {
@@ -343,22 +298,19 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const markMigrationComplete = async (fromVersion = 'legacy') => {
     try {
-      const manifest = browser.runtime.getManifest()
-      
-      const migrationData = {
+      let version; try { version = browser.runtime.getManifest()?.version; } catch(_) {}
+      Object.assign(settings.value, {
         VUE_MIGRATED: true,
         MIGRATION_DATE: new Date().toISOString(),
         MIGRATION_FROM_VERSION: fromVersion,
-        EXTENSION_VERSION: manifest.version
-      }
-      
-      await saveAllSettings()
-      
-      logger.debug('Migration status updated:', migrationData)
-      return true
+        EXTENSION_VERSION: version
+      });
+      await saveAllSettings(true);
+      logger.info('Migration status updated');
+      return true;
     } catch (error) {
-      logger.error('Failed to mark migration complete:', error)
-      throw error
+      logger.error('Failed to mark migration complete:', error);
+      throw error;
     }
   }
   
@@ -395,14 +347,14 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Cleanup storage listener using StorageManager
   const cleanupStorageListener = async () => {
-    if (storageListener) {
-      try {
-  getStorageManager().then(sm => sm.off('change', storageListener))
-        storageListener = null
-        logger.debug('[SettingsStore] Storage listener cleaned up from StorageManager')
-      } catch (error) {
-        logger.error('[SettingsStore] Error cleaning up storage listener:', error)
-      }
+    if (!storageListener) return;
+    try {
+      const sm = await getStorageManager();
+      sm.off('change', storageListener);
+      storageListener = null;
+      logger.debug('[SettingsStore] Storage listener cleaned up');
+    } catch (error) {
+      logger.error('[SettingsStore] Error cleaning up storage listener:', error);
     }
   }
 
