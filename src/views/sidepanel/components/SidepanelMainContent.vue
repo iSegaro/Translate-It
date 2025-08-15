@@ -149,7 +149,7 @@ const hasTranslationContent = computed(() => {
     const error = translationError?.value || "";
     return (translated + error).trim().length > 0;
   } catch (err) {
-  logger.warn('[SidepanelMainContent] Error in hasTranslationContent computed:', err);
+  logger.warn('Error in hasTranslationContent computed:', err);
     return false;
   }
 });
@@ -159,7 +159,7 @@ const isSelecting = computed(() => {
   try {
     return selectElement?.isActivating?.value || false;
   } catch (err) {
-  logger.warn('[SidepanelMainContent] Error in isSelecting computed:', err);
+  logger.warn('Error in isSelecting computed:', err);
     return false;
   }
 });
@@ -167,7 +167,7 @@ const isSelectElementActivating = computed(() => {
   try {
     return selectElement?.isActivating?.value || false;
   } catch (err) {
-  logger.warn('[SidepanelMainContent] Error in isSelectElementActivating computed:', err);
+  logger.warn('Error in isSelectElementActivating computed:', err);
     return false;
   }
 });
@@ -202,7 +202,7 @@ watch(
   () => sourceLang.value,
   (newValue, oldValue) => {
     if (oldValue !== undefined && newValue !== oldValue) {
-      logger.info("[SidepanelMainContent] 🌍 Source language changed:", oldValue, "→", newValue);
+      logger.info("🌍 Source language changed:", oldValue, "→", newValue);
     }
   }
 );
@@ -211,7 +211,7 @@ watch(
   () => targetLang.value,
   (newValue, oldValue) => {
     if (oldValue !== undefined && newValue !== oldValue) {
-      logger.info("[SidepanelMainContent] 🌍 Target language changed:", oldValue, "→", newValue);
+      logger.info("🌍 Target language changed:", oldValue, "→", newValue);
     }
   }
 );
@@ -221,7 +221,7 @@ watch(
   () => sourceText.value,
   (newValue, oldValue) => {
     if (oldValue !== undefined && newValue !== oldValue) {
-      logger.debug("[SidepanelMainContent] 📝 Source text changed:", {
+      logger.debug("📝 Source text changed:", {
         from: oldValue?.substring(0, 30) + "...",
         to: newValue?.substring(0, 30) + "...",
         length: newValue?.length || 0
@@ -232,22 +232,22 @@ watch(
 
 // Handle form submission using composable
 const handleTranslationSubmit = async () => {
-  logger.debug("[SidepanelMainContent] 🎯 Translation button clicked");
+  logger.debug("🎯 Translation button clicked");
   
   // Early return without warning since button is now disabled when conditions not met
   if (!canTranslate.value) {
-    logger.warn("[SidepanelMainContent] ⚠️ Translation blocked - canTranslate is false");
+    logger.warn("⚠️ Translation blocked - canTranslate is false");
     return;
   }
 
   try {
-    logger.info("[SidepanelMainContent] 🚀 Starting translation process...");
-    logger.debug("[SidepanelMainContent] 📝 Source text:", sourceText.value?.substring(0, 100) + "...");
-    logger.debug("[SidepanelMainContent] 🌍 Source lang:", sourceLang.value, "→ Target lang:", targetLang.value);
+    logger.info("🚀 Starting translation process...");
+    logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    logger.debug("🌍 Source lang:", sourceLang.value, "→ Target lang:", targetLang.value);
     
     // Cancel previous request if exists
     if (currentAbortController.value) {
-      logger.debug("[SidepanelMainContent] 🛑 Canceling previous translation request");
+      logger.debug("🛑 Canceling previous translation request");
       currentAbortController.value.abort();
     }
 
@@ -255,19 +255,19 @@ const handleTranslationSubmit = async () => {
     const finalSourceLang = getLanguageCode(sourceLang.value) || await getSourceLanguageAsync();
     const finalTargetLang = getLanguageCode(targetLang.value) || await getTargetLanguageAsync();
     
-    logger.debug("[SidepanelMainContent] 🔍 Resolved languages:", finalSourceLang, "→", finalTargetLang);
+    logger.debug("🔍 Resolved languages:", finalSourceLang, "→", finalTargetLang);
     
     // Start translation immediately - service worker will wake up when needed
-    logger.debug("[SidepanelMainContent] 📡 Triggering translation...");
+    logger.debug("📡 Triggering translation...");
     const success = await triggerTranslation(finalSourceLang, finalTargetLang);
     
     if (success) {
-      logger.info("[SidepanelMainContent] ✅ Translation completed successfully");
+      logger.info("✅ Translation completed successfully");
     } else {
-      logger.warn("[SidepanelMainContent] ⚠️ Translation returned false/failed");
+      logger.warn("⚠️ Translation returned false/failed");
     }
   } catch (error) {
-    logger.error("[SidepanelMainContent] ❌ Translation error caught:", error);
+    logger.error("❌ Translation error caught:", error);
     await handleError(error, 'SidepanelMainContent-translation');
   }
 };
@@ -275,11 +275,11 @@ const handleTranslationSubmit = async () => {
 // Copy source text to clipboard
 const copySourceText = async () => {
   try {
-    logger.debug("[SidepanelMainContent] 📋 Copying source text to clipboard...");
+    logger.debug("📋 Copying source text to clipboard...");
     await navigator.clipboard.writeText(sourceText.value);
-    logger.info("[SidepanelMainContent] ✅ Source text copied to clipboard");
+    logger.info("✅ Source text copied to clipboard");
   } catch (error) {
-    logger.error("[SidepanelMainContent] ❌ Failed to copy source text:", error);
+    logger.error("❌ Failed to copy source text:", error);
     await handleError(error, 'SidepanelMainContent-copy-source');
   }
 };
@@ -287,11 +287,11 @@ const copySourceText = async () => {
 // Copy translated text to clipboard  
 const copyTranslatedText = async () => {
   try {
-    logger.debug("[SidepanelMainContent] 📋 Copying translated text to clipboard...");
+    logger.debug("📋 Copying translated text to clipboard...");
     await navigator.clipboard.writeText(translatedText.value);
-    logger.info("[SidepanelMainContent] ✅ Translated text copied to clipboard");
+    logger.info("✅ Translated text copied to clipboard");
   } catch (error) {
-    logger.error("[SidepanelMainContent] ❌ Failed to copy translated text:", error);
+    logger.error("❌ Failed to copy translated text:", error);
     await handleError(error, 'SidepanelMainContent-copy-translation');
   }
 };// Listen for focus events to handle any UI updates if needed
@@ -307,34 +307,34 @@ const handleSourceTextInput = () => {
 // Speak source text using TTS
 const speakSourceText = async () => {
   try {
-    logger.debug("[SidepanelMainContent] 🎤 Starting TTS for source text...");
+    logger.debug("🎤 Starting TTS for source text...");
     const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
     const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
     
-    logger.debug("[SidepanelMainContent] 🌍 TTS language:", { sourceLanguage, langCode });
-    logger.debug("[SidepanelMainContent] 📝 Speaking text:", sourceText.value?.substring(0, 50) + "...");
+    logger.debug("🌍 TTS language:", { sourceLanguage, langCode });
+    logger.debug("📝 Speaking text:", sourceText.value?.substring(0, 50) + "...");
     
     await tts.speak(sourceText.value, langCode);
-    logger.info("[SidepanelMainContent] ✅ Source text TTS completed");
+    logger.info("✅ Source text TTS completed");
   } catch (error) {
-    logger.error("[SidepanelMainContent] ❌ Source text TTS failed:", error);
+    logger.error("❌ Source text TTS failed:", error);
   }
 };
 
 // Speak translation text using TTS
 const speakTranslationText = async () => {
   try {
-    logger.debug("[SidepanelMainContent] 🎤 Starting TTS for translated text...");
+    logger.debug("🎤 Starting TTS for translated text...");
     const targetLanguageCode = getLanguageCode(targetLang.value) || AUTO_DETECT_VALUE;
     const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
     
-    logger.debug("[SidepanelMainContent] 🌍 TTS language:", { targetLanguage: targetLang.value, langCode });
-    logger.debug("[SidepanelMainContent] 📝 Speaking text:", translatedText.value?.substring(0, 50) + "...");
+    logger.debug("🌍 TTS language:", { targetLanguage: targetLang.value, langCode });
+    logger.debug("📝 Speaking text:", translatedText.value?.substring(0, 50) + "...");
     
     await tts.speak(translatedText.value, langCode);
-    logger.info("[SidepanelMainContent] ✅ Translated text TTS completed");
+    logger.info("✅ Translated text TTS completed");
   } catch (error) {
-    logger.error("[SidepanelMainContent] ❌ Translated text TTS failed:", error);
+    logger.error("❌ Translated text TTS failed:", error);
   }
 };
 
@@ -342,36 +342,36 @@ const speakTranslationText = async () => {
 onMounted(async () => {
   try {
     // Load languages first
-  logger.debug("[SidepanelMainContent] Loading languages...");
+  logger.debug("Loading languages...");
     await languages.loadLanguages();
-  logger.debug("[SidepanelMainContent] Languages loaded successfully");
+  logger.debug("Languages loaded successfully");
     
     // Initialize language selector display values from settings
-  logger.debug("[SidepanelMainContent] Getting language settings...");
+  logger.debug("Getting language settings...");
     try {
       const savedSource = await getSourceLanguageAsync();
       const savedTarget = await getTargetLanguageAsync();
       sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
       targetLang.value = getLanguageDisplayName(savedTarget) || 'Persian';
-  logger.debug("[SidepanelMainContent] Language settings loaded successfully");
+  logger.debug("Language settings loaded successfully");
     } catch (err) {
-  logger.warn("[SidepanelMainContent] Error loading language settings:", err);
+  logger.warn("Error loading language settings:", err);
       sourceLang.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect';
       targetLang.value = targetLang.value || 'Persian';
     }
 
     // Add focus listener for clipboard updates
-  logger.debug("[SidepanelMainContent] Adding focus listeners...");
+  logger.debug("Adding focus listeners...");
     document.addEventListener("focus", handleFocus, true);
     window.addEventListener("focus", handleFocus);
 
     // Initialize translation data
-  logger.debug("[SidepanelMainContent] Loading last translation...");
+  logger.debug("Loading last translation...");
     loadLastTranslation();
 
-  logger.debug("[SidepanelMainContent] Component mounted with Select Element integration");
+  logger.debug("Component mounted with Select Element integration");
   } catch (error) {
-  logger.error("[SidepanelMainContent] Error during component mounting:", error);
+  logger.error("Error during component mounting:", error);
   }
 });
 

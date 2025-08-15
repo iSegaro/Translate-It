@@ -95,7 +95,7 @@ watch(canTranslate, (newValue) => {
 // Watch for source text changes
 watch(sourceText, (newValue, oldValue) => {
   if (oldValue !== undefined && newValue !== oldValue) {
-    logger.debug("[PopupTranslationForm] 📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
+    logger.debug("📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
   }
 }, { deep: true })
 
@@ -119,22 +119,22 @@ const handleKeydown = (_event) => {
 }
 
 const handleTranslate = async () => {
-  logger.debug("[PopupTranslationForm] 🎯 Translation button clicked");
+  logger.debug("🎯 Translation button clicked");
   
   if (!canTranslate.value) {
-    logger.warn("[PopupTranslationForm] ⚠️ Translation blocked - canTranslate is false");
+    logger.warn("⚠️ Translation blocked - canTranslate is false");
     return;
   }
   
   try {
-    logger.info("[PopupTranslationForm] 🚀 Starting translation process...");
-    logger.debug("[PopupTranslationForm] 📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    logger.info("🚀 Starting translation process...");
+    logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
     
     // Get current language values from settings store
     const sourceLanguage = settingsStore.settings.SOURCE_LANGUAGE;
     const targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
     
-    logger.debug("[PopupTranslationForm] 🌍 Languages:", sourceLanguage, "→", targetLanguage);
+    logger.debug("🌍 Languages:", sourceLanguage, "→", targetLanguage);
     
     // Store last translation for revert functionality
     lastTranslation.value = {
@@ -145,12 +145,12 @@ const handleTranslate = async () => {
     }
     
     // Use composable translation function with current language values
-    logger.debug("[PopupTranslationForm] 📡 Triggering translation...");
+    logger.debug("📡 Triggering translation...");
     await triggerTranslation(sourceLanguage, targetLanguage)    
-    logger.info("[PopupTranslationForm] ✅ Translation completed successfully");
+    logger.info("✅ Translation completed successfully");
 
   } catch (error) {
-    logger.error("[PopupTranslationForm] ❌ Translation failed:", error);
+    logger.error("❌ Translation failed:", error);
     await handleError(error, 'popup-translation')
   }
 }
@@ -179,13 +179,13 @@ const revertTranslation = () => {
 
 // Event listeners
 onMounted(async () => {
-  logger.debug("[PopupTranslationForm] Component mounting...");
+  logger.debug("Component mounting...");
   
   // Listen for global events from header component
   document.addEventListener('clear-storage', clearStorage)
   document.addEventListener('revert-translation', revertTranslation)
   document.addEventListener('translate-request', (_event) => {
-    logger.debug("[PopupTranslationForm] 🔔 Translate request received from header");
+    logger.debug("🔔 Translate request received from header");
     if (sourceText.value.trim()) {
       handleTranslate()
     }
