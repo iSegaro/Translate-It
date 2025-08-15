@@ -61,6 +61,12 @@ export const createBaseConfig = (browser, options = {}) => {
     build: {
       outDir: options.outDir || `dist/${browser}`,
       emptyOutDir: true,
+      // Force clean rebuild in watch mode
+      watch: isWatchMode ? {
+        include: ['src/**/*', 'html/**/*', 'public/**/*'],
+        exclude: ['node_modules/**', 'dist/**'],
+        clearScreen: false
+      } : undefined,
       rollupOptions: {
         
         output: {
@@ -224,7 +230,9 @@ export const createBaseConfig = (browser, options = {}) => {
         // Exclude large features for code splitting
         'src/capture',
         'src/subtitle'
-      ]
+      ],
+      // Disable caching in watch mode for better reliability
+      force: isWatchMode
     },
     
     // ESBuild options

@@ -9,6 +9,8 @@
     "build:firefox": "node scripts/build/build-firefox.mjs",
     "dev:chrome": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.chrome.js && echo '✅ Development build ready. Load extension from dist/chrome/Translate-It-v0.10.0/'",
     "dev:firefox": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.firefox.js && echo '✅ Development build ready. Load extension from dist/firefox/Translate-It-v0.10.0/'",
+    "dev:watch:chrome": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.chrome.js --watch --force",
+    "dev:watch:firefox": "cross-env NODE_ENV=development vite build --config config/vite/vite.config.firefox.js --watch --force",
     "serve:chrome": "cross-env NODE_ENV=development vite --config config/vite/vite.config.chrome.js",
     "serve:firefox": "cross-env NODE_ENV=development vite --config config/vite/vite.config.firefox.js",
     "watch:chrome": "cross-env NODE_ENV=development VITE_WATCH_MODE=true vite build --config config/vite/vite.config.chrome.js --watch",
