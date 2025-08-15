@@ -5,6 +5,7 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { MessageFormat } from '@/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 
@@ -46,10 +47,11 @@ async function deactivateSelectElementModeInAllTabs() {
         // We send the message but don't wait for a response.
         // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
         browser.tabs
-          .sendMessage(tab.id, {
-            action: "TOGGLE_SELECT_ELEMENT_MODE",
-            data: false, // `false` signals deactivation
-          })
+          .sendMessage(tab.id, MessageFormat.create(
+            MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+            { forceDeactivate: true },
+            'context-menu'
+          ))
           .catch(() => {
             // It's normal for this to fail on tabs without the content script; ignore the error.
           });
@@ -352,12 +354,13 @@ export class ContextMenuManager {
       switch (info.menuItemId) {
         case PAGE_CONTEXT_MENU_ID:
           if (tab && tab.id) {
-            // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
+            // فعال کردن حالت انتخاب المنت با فرمت صحیح پیام
             browser.tabs
-              .sendMessage(tab.id, {
-                action: "TOGGLE_SELECT_ELEMENT_MODE",
-                data: true,
-              })
+              .sendMessage(tab.id, MessageFormat.create(
+                MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+                { pageUrl: tab.url },
+                'context-menu'
+              ))
               .catch((err) => {
                 logger.error(
                   `Could not send message to tab ${tab.id}:`,
@@ -368,7 +371,7 @@ export class ContextMenuManager {
           break;
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:
-          await focusOrCreateTab(browser.runtime.getURL("options.html"));
+          await focusOrCreateTab(browser.runtime.getURL("html/options.html"));
           break;
 
         case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
@@ -376,7 +379,7 @@ export class ContextMenuManager {
             const browserInfo = await browser.runtime.getBrowserInfo();
             const url =
               browserInfo.name === "Firefox" ?
-                browser.runtime.getURL("options.html#help=shortcut")
+                browser.runtime.getURL("html/options.html#help=shortcut")
               : "chrome://extensions/shortcuts";
             await browser.tabs.create({ url });
           } catch (e) {
@@ -389,7 +392,7 @@ export class ContextMenuManager {
           break;
 
         case HELP_MENU_ID:
-          await focusOrCreateTab(browser.runtime.getURL("options.html#help"));
+          await focusOrCreateTab(browser.runtime.getURL("html/options.html#help"));
           break;
 
         // Legacy menu handlers (keeping for compatibility)
@@ -430,14 +433,14 @@ export class ContextMenuManager {
 
     try {
       // Send message to content script to handle translation
-      await browser.tabs.sendMessage(tab.id, {
-        action: MessageActions.TRANSLATE_SELECTION,
-        source: "context-menu",
-        data: {
+      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
+        MessageActions.TRANSLATE_SELECTION,
+        {
           text: info.selectionText,
           pageUrl: info.pageUrl,
         },
-      });
+        'context-menu'
+      ));
     } catch (error) {
       logger.error("❌ Failed to handle translate selection:", error);
     }
@@ -449,13 +452,13 @@ export class ContextMenuManager {
    */
   async handleTranslatePage(info, tab) {
     try {
-      await browser.tabs.sendMessage(tab.id, {
-        action: MessageActions.TRANSLATE_PAGE,
-        source: "context-menu",
-        data: {
+      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
+        MessageActions.TRANSLATE_PAGE,
+        {
           pageUrl: info.pageUrl,
         },
-      });
+        'context-menu'
+      ));
     } catch (error) {
       logger.error("❌ Failed to handle translate page:", error);
     }
@@ -467,13 +470,13 @@ export class ContextMenuManager {
    */
   async handleSelectElementMode(info, tab) {
     try {
-      await browser.tabs.sendMessage(tab.id, {
-        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-        source: "context-menu",
-        data: {
+      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
+        MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+        {
           pageUrl: info.pageUrl,
         },
-      });
+        'context-menu'
+      ));
     } catch (error) {
       logger.error("❌ Failed to handle select element mode:", error);
     }
@@ -485,13 +488,13 @@ export class ContextMenuManager {
    */
   async handleCaptureScreen(info, tab) {
     try {
-      await browser.tabs.sendMessage(tab.id, {
-        action: MessageActions.START_SCREEN_CAPTURE,
-        source: "context-menu",
-        data: {
+      await browser.tabs.sendMessage(tab.id, MessageFormat.create(
+        MessageActions.START_SCREEN_CAPTURE,
+        {
           pageUrl: info.pageUrl,
         },
-      });
+        'context-menu'
+      ));
     } catch (error) {
       logger.error("❌ Failed to handle screen capture:", error);
     }
@@ -503,7 +506,7 @@ export class ContextMenuManager {
    */
   async handleOpenOptions() {
     try {
-      const optionsUrl = browser.runtime.getURL("options.html");
+      const optionsUrl = browser.runtime.getURL("html/options.html");
       await browser.tabs.create({ url: optionsUrl });
     } catch (error) {
       logger.error("❌ Failed to handle open options:", error);
