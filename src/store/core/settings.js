@@ -111,7 +111,7 @@ export const useSettingsStore = defineStore('settings', () => {
             }
           }
         });
-        logger.debug('Settings merged from storage');
+  if (settings.value.DEBUG_MODE) logger.debug('Settings merged from storage');
         isInitialized.value = true;
         return current;
       } catch (error) {
@@ -159,11 +159,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
-      logger.debug(`[settingsStore] updateSettingAndPersist: ${key} = ${value}`)
+  if (settings.value.DEBUG_MODE) logger.debugLazy(() => [`[settingsStore] updateSettingAndPersist: ${key} = ${value}`])
       settings.value[key] = value // Update local state
   const storageManager = await getStorageManager();
   await storageManager.set({ [key]: value }) // Persist immediately
-      logger.debug(`[settingsStore] Successfully saved ${key} to browser storage`)
+  if (settings.value.DEBUG_MODE) logger.debug('[settingsStore] Saved key to storage');
       return true
     } catch (error) {
       logger.error(`Failed to update and persist setting ${key}:`, error)
@@ -326,7 +326,7 @@ export const useSettingsStore = defineStore('settings', () => {
           // Update the reactive settings ref
           if (settings.value[key] !== newValue) {
             settings.value[key] = newValue
-            logger.debug(`[SettingsStore] Setting '${key}' updated from storage:`, newValue)
+            if (settings.value.DEBUG_MODE) logger.debugLazy(() => [`[SettingsStore] Setting '${key}' updated from storage`, { key, newValue }])
           }
         }
       }
@@ -339,7 +339,7 @@ export const useSettingsStore = defineStore('settings', () => {
       storageListener = handleStorageChange
   const storageManager = await getStorageManager();
   storageManager.on('change', storageListener)
-      logger.debug('[SettingsStore] Storage listener setup successfully with StorageManager')
+  if (settings.value.DEBUG_MODE) logger.info('[SettingsStore] Listener setup')
     } catch (error) {
       logger.warn('[SettingsStore] Unable to setup storage listener:', error.message)
     }
@@ -352,7 +352,7 @@ export const useSettingsStore = defineStore('settings', () => {
       const sm = await getStorageManager();
       sm.off('change', storageListener);
       storageListener = null;
-      logger.debug('[SettingsStore] Storage listener cleaned up');
+  if (settings.value.DEBUG_MODE) logger.info('[SettingsStore] Listener cleaned up');
     } catch (error) {
       logger.error('[SettingsStore] Error cleaning up storage listener:', error);
     }
