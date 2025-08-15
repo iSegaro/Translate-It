@@ -121,6 +121,8 @@ const { handleError, handleConnectionError } = useErrorHandler()
 const isSelectElementDebounced = ref(false)
 
 const handleSelectElement = async () => {
+  getLogger().debug('🎯 Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')
+  
   if (isSelectElementDebounced.value) return
   isSelectElementDebounced.value = true
   setTimeout(() => { isSelectElementDebounced.value = false }, 500)
@@ -128,26 +130,33 @@ const handleSelectElement = async () => {
   try {
     // Send request and wait for confirmation from background/content script
     if (isSelectModeActive.value) {
+      getLogger().debug('🔄 Deactivating select element mode...')
       const result = await deactivateSelectMode()
       if (result) {
+        getLogger().debug('✅ Select element mode deactivated successfully')
         // composable will update shared state; UI follows isSelectModeActive
       }
     } else {
+      getLogger().debug('🔄 Activating select element mode...')
       const result = await activateSelectMode()
       if (result) {
+        getLogger().debug('✅ Select element mode activated successfully')
         // composable will update shared state; UI follows isSelectModeActive
       }
     }
     showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
   } catch (error) {
+    getLogger().error('❌ Select element mode error:', error)
     await handleError(error, 'SidepanelToolbar-selectElement')
     showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
   }
 }
 
 const handleRevertAction = async () => {
+  getLogger().debug('↩️ Revert Action button clicked!')
+  
   try {
-    logger.debug('[SidepanelToolbar] Executing revert action')
+    getLogger().debug('[SidepanelToolbar] Executing revert action')
     
     // Send revert message directly to content script (bypass background)
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
@@ -162,10 +171,10 @@ const handleRevertAction = async () => {
       timestamp: Date.now()
     })
     
-    logger.debug('[SidepanelToolbar] Revert response:', response)
+    getLogger().debug('[SidepanelToolbar] Revert response:', response)
     
     if (response?.success) {
-      logger.debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
+      getLogger().debug(`[SidepanelToolbar] ✅ Revert successful: ${response.revertedCount || 0} translations reverted`)
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')
     } else {
       const errorMsg = response?.error || response?.message || 'Unknown error'
@@ -188,24 +197,29 @@ const handleRevertAction = async () => {
 }
 
 const handleClearFields = () => {
+  getLogger().debug('🧹 Clear Fields button clicked!')
   emit('clear-fields')
   showVisualFeedback(document.getElementById('clearFieldsBtn'), 'success')
 }
 
 const handleProviderChange = (provider) => {
-  logger.debug('[SidepanelToolbar] Provider changed to:', provider)
+  getLogger().debug('🔧 Provider changed in sidepanel toolbar to:', provider)
 }
 
 const handleHistoryClick = () => {
+  getLogger().debug('📜 History button clicked! Current visibility:', props.isHistoryVisible, '→', !props.isHistoryVisible)
   emit('historyToggle', !props.isHistoryVisible)
   showVisualFeedback(document.getElementById('historyBtn'), 'success', 300)
 }
 
 const handleSettingsClick = async () => {
+  getLogger().debug('⚙️ Settings button clicked!')
   try {
     await browser.runtime.openOptionsPage();
+    getLogger().debug('✅ Options page opened successfully')
     showVisualFeedback(document.getElementById('settingsBtn'), 'success')
   } catch (error) {
+    getLogger().error('❌ Failed to open options page:', error)
     await handleError(error, 'SidepanelToolbar-openSettings')
     showVisualFeedback(document.getElementById('settingsBtn'), 'error')
   }
