@@ -5,33 +5,69 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingContexts } from '../../messaging/core/MessagingCore'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
+import { ErrorHandler } from '@/error-management/ErrorHandler.js'
+import { ErrorTypes } from '@/error-management/ErrorTypes.js'
+import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
 
-// Initialize and mount Vue app after browser API is ready
+/**
+ * Setup window-level error handlers for extension context issues
+ */
+function setupWindowErrorHandlers(context) {
+  const errorHandler = new ErrorHandler()
+  
+  // Handle uncaught errors (including from third-party libraries)
+  window.addEventListener('error', async (event) => {
+    const error = event.error || new Error(event.message)
+    const errorType = matchErrorToType(error?.message || error)
+    
+    // Only handle extension context related errors silently
+    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+      await errorHandler.handle(error, {
+        type: errorType,
+        context: `${context}-window`,
+        silent: true
+      })
+      event.preventDefault() // Prevent default browser error handling
+    }
+  })
+  
+  // Handle unhandled promise rejections
+  window.addEventListener('unhandledrejection', async (event) => {
+    const error = event.reason
+    const errorType = matchErrorToType(error?.message || error)
+    
+    // Only handle extension context related errors silently
+    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+      await errorHandler.handle(error, {
+        type: errorType,
+        context: `${context}-promise`,
+        silent: true
+      })
+      event.preventDefault() // Prevent unhandled rejection
+    }
+  })
+}
+
+// Initialize the sidepanel application
 async function initializeApp() {
   try {
-    logger.debug('🚀 Starting sidepanel app initialization...')
-    
-    // Wait for browser API to be ready
-    logger.debug('⏳ Waiting for browser API to be ready...')
-    
-    logger.debug('✅ browser API is ready')
+    logger.debug('🚀 Initializing sidepanel...')
 
-    // Ensure browser API is globally available for i18n plugin
-    if (typeof window !== 'undefined') {
-      window.browser = browser;
-      window.chrome = browser; // Some plugins expect chrome object
-      
-      // Debug: Check if i18n is available
-      logger.debug('🔍 Checking i18n availability:', {
-        'browserAPI.i18n': !!browser.i18n,
-        'browserAPI.i18n.getMessage': !!browser.i18n?.getMessage,
-        'window.browser.i18n': !!window.browser.i18n,
-        'chrome.i18n (native)': !!chrome?.i18n
-      });
+    // Setup global error handlers before anything else
+    setupWindowErrorHandlers('sidepanel')
+    
+    if (!browser?.runtime) {
+      throw new Error('Browser runtime not available - extension context may be invalid')
+    }
+
+    // Global browser API check and setup
+    if (!window.browser) {
+      window.browser = browser
+      logger.debug('🌐 Browser API set on window object')
     }
 
     // Import i18n plugin after browser API is ready and globally available

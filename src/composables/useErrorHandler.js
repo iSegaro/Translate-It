@@ -1,115 +1,99 @@
 // Vue Error Handler Composable
-// Provides unified error handling for Vue components using ErrorService
+// Provides unified error handling for Vue components using ErrorHandler
 
 import { ref } from 'vue'
-import { ErrorHandler } from '../error-management/ErrorService.js'
+import { ErrorHandler } from '../error-management/ErrorHandler.js'
 import { ErrorTypes } from '../error-management/ErrorTypes.js'
 import { matchErrorToType } from '../error-management/ErrorMatcher.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useErrorHandler');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useErrorHandler')
 
 /**
- * Vue composable for unified error handling
- * Integrates with ErrorService and provides smart UI feedback
+ * useErrorHandler composable - comprehensive error handling for Vue components
+ * 
+ * REFACTORED: Now uses the unified ErrorHandler for consistent error processing
+ * This ensures all errors go through the same centralized handling system
  */
 export function useErrorHandler() {
-  const errorHandler = ErrorHandler.getInstance()
   const isHandlingError = ref(false)
   
   /**
-   * Main error handling function
+   * Main error handler
    * @param {Error|string} error - The error to handle
-   * @param {string} context - Context information for debugging
+   * @param {string} context - Context where error occurred
    * @param {Object} options - Additional options
-   * @returns {Promise<boolean>} - Returns true if error was handled gracefully
    */
-  const handleError = async (error, context = 'vue-component', options = {}) => {
-    if (isHandlingError.value) return false
+  const handleError = async (error, context = 'unknown', options = {}) => {
+    if (isHandlingError.value) {
+      logger.warn('Error handling already in progress, skipping duplicate')
+      return
+    }
     
     isHandlingError.value = true
     
     try {
+      // Use the centralized ErrorHandler
+      const errorHandler = new ErrorHandler()
+      
       // Determine error type
       const errorType = matchErrorToType(error?.message || error)
       
-      // Handle the error through ErrorService
-      await errorHandler.handle(error, { 
-        type: errorType, 
-        context: `vue-${context}`,
-        ...options 
+      // Handle the error with proper metadata
+      await errorHandler.handle(error, {
+        type: errorType,
+        context,
+        component: options.component,
+        vue: true,
+        ...options
       })
       
-      // Return true for silent/graceful errors
-      const silentErrors = [
-        ErrorTypes.CONTEXT,
-        ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
-      ]
-      
-      return silentErrors.includes(errorType)
-      
     } catch (handlerError) {
-      logger.error('[useErrorHandler] Failed to handle error:', handlerError)
-      return false
+      // Fallback logging if ErrorHandler itself fails
+      logger.error(`[useErrorHandler] Handler failed for context "${context}":`, handlerError)
+      logger.error(`[useErrorHandler] Original error:`, error)
     } finally {
       isHandlingError.value = false
     }
   }
   
   /**
-   * Handle connection errors specifically (for tab communication)
-   * @param {Error} error - Connection error
-   * @param {string} context - Context information
-   * @returns {boolean} - True if it's a connection error that was handled
+   * Handle connection/network errors specifically
+   * @param {Error} error - Network error
+   * @param {string} context - Context of the error
    */
-  const handleConnectionError = async (error, context = 'vue-connection') => {
-    const connectionErrors = [
-      'Could not establish connection',
-      'Receiving end does not exist',
-      'message port closed',
-      'Extension context invalidated'
-    ]
-    
-    const isConnectionError = connectionErrors.some(msg => 
-      error?.message?.includes(msg)
-    )
-    
-    if (isConnectionError) {
-      await handleError(error, context)
-      return true
-    }
-    
-    return false
+  const handleConnectionError = async (error, context = 'network') => {
+    await handleError(error, `${context}-connection`, {
+      type: ErrorTypes.NETWORK_ERROR
+    })
   }
   
   /**
-   * Wrapper for async operations with automatic error handling
+   * Wrapper for async operations with error handling
    * @param {Function} asyncFn - Async function to execute
-   * @param {string} context - Context for error handling
+   * @param {string} context - Context for error reporting
    * @param {Object} options - Additional options
-   * @returns {Promise<any>} - Result of the async function
    */
-  const withErrorHandling = async (asyncFn, context = 'vue-operation', options = {}) => {
+  const withErrorHandling = async (asyncFn, context = 'async-operation', options = {}) => {
     try {
       return await asyncFn()
     } catch (error) {
-      const wasHandledGracefully = await handleError(error, context, options)
+      await handleError(error, context, options)
       
-      // If error was handled gracefully, don't rethrow
-      if (wasHandledGracefully) {
-        return null
+      // Re-throw if specified
+      if (options.rethrow) {
+        throw error
       }
       
-      // For non-graceful errors, rethrow after handling
-      throw error
+      return null
     }
   }
   
   /**
    * Check if an error should be handled silently
-   * @param {Error|string} error - The error to check
-   * @returns {boolean} - True if error should be silent
+   * @param {Error|string} error - Error to check
+   * @returns {boolean} True if error should be silent
    */
   const isSilentError = (error) => {
     const errorType = matchErrorToType(error?.message || error)
@@ -131,11 +115,11 @@ export function useErrorHandler() {
 }
 
 /**
- * Global Vue error handler setup function
+ * Setup global error handler for Vue app
  * Call this in main.js for each Vue app
  */
 export function setupGlobalErrorHandler(app, appName = 'vue-app') {
-  const errorHandler = ErrorHandler.getInstance()
+  const errorHandler = new ErrorHandler()
   
   app.config.errorHandler = async (error, instance, info) => {
     try {

@@ -4,12 +4,57 @@ import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
+import { ErrorHandler } from '@/error-management/ErrorHandler.js'
+import { ErrorTypes } from '@/error-management/ErrorTypes.js'
+import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 const logger = getScopedLogger('UI', 'popup');
+
+/**
+ * Setup window-level error handlers for extension context issues
+ */
+function setupWindowErrorHandlers(context) {
+  const errorHandler = new ErrorHandler()
+  
+  // Handle uncaught errors (including from third-party libraries)
+  window.addEventListener('error', async (event) => {
+    const error = event.error || new Error(event.message)
+    const errorType = matchErrorToType(error?.message || error)
+    
+    // Only handle extension context related errors silently
+    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+      await errorHandler.handle(error, {
+        type: errorType,
+        context: `${context}-window`,
+        silent: true
+      })
+      event.preventDefault()
+    }
+  })
+  
+  // Handle unhandled promise rejections
+  window.addEventListener('unhandledrejection', async (event) => {
+    const error = event.reason
+    const errorType = matchErrorToType(error?.message || error)
+    
+    // Only handle extension context related errors silently
+    if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || errorType === ErrorTypes.CONTEXT) {
+      await errorHandler.handle(error, {
+        type: errorType,
+        context: `${context}-promise`,
+        silent: true
+      })
+      event.preventDefault()
+    }
+  })
+}
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
+    // Setup global error handlers before anything else
+    setupWindowErrorHandlers('popup')
+    
     // Wait for browser API to be ready
     
     // Ensure browser API is globally available for i18n plugin
