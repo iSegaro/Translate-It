@@ -29,6 +29,10 @@ import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupLanguageControls');
+
 // Props
 const props = defineProps({
   disabled: {
@@ -46,8 +50,10 @@ const sourceLanguage = computed({
   get: () => settingsStore.settings.SOURCE_LANGUAGE || AUTO_DETECT_VALUE,
   set: async (value) => {
     try {
+      logger.info("[PopupLanguageControls] 🌍 Source language changed to:", value);
       await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
     } catch (error) {
+      logger.error("[PopupLanguageControls] ❌ Failed to update source language:", error);
       await handleError(error, 'language-controls-source')
     }
   }
@@ -57,8 +63,10 @@ const targetLanguage = computed({
   get: () => settingsStore.settings.TARGET_LANGUAGE || 'English',
   set: async (value) => {
     try {
+      logger.info("[PopupLanguageControls] 🌍 Target language changed to:", value);
       await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', value)
     } catch (error) {
+      logger.error("[PopupLanguageControls] ❌ Failed to update target language:", error);
       await handleError(error, 'language-controls-target')
     }
   }
@@ -68,12 +76,14 @@ const targetLanguage = computed({
 
 
 const handleTranslate = (data) => {
+  logger.debug("[PopupLanguageControls] 🎯 Translate button clicked from ProviderSelector");
   // Emit to parent component
   const event = new CustomEvent('translate-request', { detail: data })
   document.dispatchEvent(event)
 }
 
 const handleProviderChange = (provider) => {
+  logger.info("[PopupLanguageControls] 🔄 Provider changed to:", provider);
   // Emit to parent component
   const event = new CustomEvent('provider-changed', { detail: { provider } })
   document.dispatchEvent(event)

@@ -51,6 +51,10 @@ import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
+import { getScopedLogger } from '@/utils/core/logger.js';
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupTranslationForm');
+
 // Stores
 const settingsStore = useSettingsStore()
 
@@ -88,6 +92,13 @@ watch(canTranslate, (newValue) => {
   emit('can-translate-change', newValue)
 }, { immediate: true })
 
+// Watch for source text changes
+watch(sourceText, (newValue, oldValue) => {
+  if (oldValue !== undefined && newValue !== oldValue) {
+    logger.debug("[PopupTranslationForm] 📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
+  }
+}, { deep: true })
+
 // Reactive language values - these will update when settings change
 const currentSourceLanguage = computed(() => {
   const lang = settingsStore.settings.SOURCE_LANGUAGE
@@ -108,12 +119,22 @@ const handleKeydown = (_event) => {
 }
 
 const handleTranslate = async () => {
-  if (!canTranslate.value) return
+  logger.debug("[PopupTranslationForm] 🎯 Translation button clicked");
+  
+  if (!canTranslate.value) {
+    logger.warn("[PopupTranslationForm] ⚠️ Translation blocked - canTranslate is false");
+    return;
+  }
   
   try {
+    logger.info("[PopupTranslationForm] 🚀 Starting translation process...");
+    logger.debug("[PopupTranslationForm] 📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    
     // Get current language values from settings store
     const sourceLanguage = settingsStore.settings.SOURCE_LANGUAGE;
     const targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
+    
+    logger.debug("[PopupTranslationForm] 🌍 Languages:", sourceLanguage, "→", targetLanguage);
     
     // Store last translation for revert functionality
     lastTranslation.value = {
@@ -124,9 +145,12 @@ const handleTranslate = async () => {
     }
     
     // Use composable translation function with current language values
+    logger.debug("[PopupTranslationForm] 📡 Triggering translation...");
     await triggerTranslation(sourceLanguage, targetLanguage)    
+    logger.info("[PopupTranslationForm] ✅ Translation completed successfully");
 
   } catch (error) {
+    logger.error("[PopupTranslationForm] ❌ Translation failed:", error);
     await handleError(error, 'popup-translation')
   }
 }
@@ -155,11 +179,13 @@ const revertTranslation = () => {
 
 // Event listeners
 onMounted(async () => {
+  logger.debug("[PopupTranslationForm] Component mounting...");
   
   // Listen for global events from header component
   document.addEventListener('clear-storage', clearStorage)
   document.addEventListener('revert-translation', revertTranslation)
   document.addEventListener('translate-request', (_event) => {
+    logger.debug("[PopupTranslationForm] 🔔 Translate request received from header");
     if (sourceText.value.trim()) {
       handleTranslate()
     }
