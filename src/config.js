@@ -32,6 +32,7 @@ export const CONFIG = {
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
+  TIMEOUT: 15000,
   selectionTranslationMode: "onClick", // "immediate",
   COPY_REPLACE: "copy", // "replace",
   REPLACE_SPECIAL_SITES: true,
@@ -391,6 +392,10 @@ export const getDebugModeAsync = async () => {
 
 export const getThemeAsync = async () => {
   return getSettingValueAsync("THEME", CONFIG.THEME);
+};
+
+export const getTimeoutAsync = async () => {
+  return getSettingValueAsync("TIMEOUT", CONFIG.TIMEOUT);
 };
 
 // Function to check debug mode potentially faster if cache is warm

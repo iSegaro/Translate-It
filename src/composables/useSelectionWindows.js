@@ -4,6 +4,7 @@
 
 import { reactive, onMounted, onUnmounted, computed } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
+import { getTimeoutAsync } from "@/config.js";
 import SelectionWindows from "@/managers/content/WindowsManager.js";
 import { MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
@@ -28,6 +29,8 @@ export function useSelectionWindows() {
 
   // SelectionWindows instance (OLD)
   let selectionWindowsInstance = null;
+  // Timeout handler for translation
+  let translationTimeout = null;
 
   // Mock translation handler for SelectionWindows compatibility
   const mockTranslationHandler = {
@@ -120,6 +123,15 @@ export function useSelectionWindows() {
 
     try {
       await instance.show(selectedText, position);
+      // Set translation timeout from config
+      if (translationTimeout) {
+        clearTimeout(translationTimeout);
+      }
+      const timeoutMs = await getTimeoutAsync();
+      translationTimeout = setTimeout(() => {
+        logger.warn(`[useSelectionWindows] Translation timeout reached (${timeoutMs}ms)`);
+        handleTranslationResponse({ success: false, error: "زمان ترجمه به پایان رسید. لطفاً دوباره تلاش کنید." });
+      }, timeoutMs);
       return true;
     } catch (error) {
       logger.error("[useSelectionWindows] Error showing selection window:", error);
@@ -136,6 +148,12 @@ export function useSelectionWindows() {
     if (!instance) {
       logger.debug("[useSelectionWindows] Cannot dismiss - no instance");
       return;
+    }
+
+    // Clear translation timeout if exists
+    if (translationTimeout) {
+      clearTimeout(translationTimeout);
+      translationTimeout = null;
     }
 
     try {
@@ -170,9 +188,16 @@ export function useSelectionWindows() {
    * Handle translation response from background
    */
   const handleTranslationResponse = (response) => {
+    // Clear timeout if response received
+    if (translationTimeout) {
+      clearTimeout(translationTimeout);
+      translationTimeout = null;
+    }
+
     if (!response) {
       state.error = "No translation response received";
       state.isTranslating = false;
+      dismissSelectionWindow();
       return;
     }
 
@@ -183,6 +208,7 @@ export function useSelectionWindows() {
     } else {
       state.error = response.error || "Translation failed";
       logger.error("[useSelectionWindows] Translation error:", state.error);
+      dismissSelectionWindow();
     }
     
     state.isTranslating = false;
@@ -257,6 +283,11 @@ export function useSelectionWindows() {
         logger.warn("[useSelectionWindows] Error during cleanup dismiss:", error);
       }
       selectionWindowsInstance = null;
+    }
+    // Clear translation timeout if exists
+    if (translationTimeout) {
+      clearTimeout(translationTimeout);
+      translationTimeout = null;
     }
   });
 
