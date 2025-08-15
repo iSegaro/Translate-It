@@ -602,7 +602,9 @@ export class TranslationEngine {
    */
   async getAvailableProviders() {
     try {
-      return providerRegistry.getAll().map(p => ({ id: p.id, name: p.name }));
+      // Use the provider handler to get consistent provider list
+      const { getAvailableProviders } = await import("../handlers/provider-handler.js");
+      return await getAvailableProviders();
     } catch (error) {
       logger.error("[TranslationEngine] Failed to get providers:", error);
       return [];

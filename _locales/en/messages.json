@@ -22,6 +22,9 @@
   "api_provider_openai": { "message": "OpenAI" },
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
+  "api_provider_bing": { "message": "Microsoft Bing" },
+  "api_provider_browser": { "message": "Browser API" },
+  "api_provider_yandex": { "message": "Yandex Translate" },
   "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "Custom (OpenAI)" },
 

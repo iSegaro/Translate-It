@@ -225,7 +225,7 @@ class LifecycleManager {
   async refreshContextMenus() {
     try {
       const contextMenuManager = await this.featureLoader.loadContextMenuManager();
-      await contextMenuManager.setupDefaultMenus();
+      await contextMenuManager.initialize(); // Initialize to register listeners and setup menus
     } catch (error) {
       logger.error("❌ Failed to refresh context menus via featureLoader:", error);
       // Fallback to direct import

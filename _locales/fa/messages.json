@@ -20,6 +20,9 @@
   "api_provider_openai": { "message": "OpenAI" },
   "api_provider_openrouter": { "message": "OpenRouter" },
   "api_provider_deepseek": { "message": "DeepSeek" },
+  "api_provider_bing": { "message": "مترجم بینگ" },
+  "api_provider_browser": { "message": "مترجم مرورگر" },
+  "api_provider_yandex": { "message": "مترجم یاندکس" },
   "api_provider_browserapi": { "message": "Browser Translator" },
   "api_provider_custom": { "message": "(OpenAI) سفارشی" },
 

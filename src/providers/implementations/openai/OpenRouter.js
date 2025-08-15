@@ -9,6 +9,9 @@ import {
 import { buildPrompt } from "@/utils/promptBuilder.js";
 
 export class OpenRouterProvider extends BaseProvider {
+  static type = "api";
+  static description = "OpenRouter API";
+  static displayName = "OpenRouter";
   constructor() {
     super("OpenRouter");
   }

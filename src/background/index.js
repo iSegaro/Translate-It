@@ -6,6 +6,9 @@ import { registerAllProviders } from "../providers/register-providers.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
+// Import context menu click listener
+import "./listeners/onContextMenuClicked.js";
+
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'index');
 
 registerAllProviders();

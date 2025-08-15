@@ -175,6 +175,9 @@ const langNameToCodeMap = {
 };
 
 export class YandexTranslateProvider extends BaseProvider {
+  static type = "free";
+  static description = "Yandex translation service";
+  static displayName = "Yandex Translate";
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
 
   constructor() {

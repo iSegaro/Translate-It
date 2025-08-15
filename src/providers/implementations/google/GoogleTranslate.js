@@ -88,6 +88,9 @@ const langNameToCodeMap = {
 };
 
 export class GoogleTranslateProvider extends BaseProvider {
+  static type = "free";
+  static description = "Free Google Translate service";
+  static displayName = "Google Translate";
   constructor() {
     super("GoogleTranslate");
   }

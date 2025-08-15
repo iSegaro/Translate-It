@@ -18,6 +18,9 @@ import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 
 
 export class GeminiProvider extends BaseProvider {
+  static type = "api";
+  static description = "Google Gemini AI";
+  static displayName = "Google Gemini";
   constructor() {
     super("Gemini");
   }

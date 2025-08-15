@@ -5,8 +5,82 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { getTranslationApiAsync } from '@/config.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
+
+// --- Constants for Menu Item IDs ---
+const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
+const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
+const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
+const HELP_MENU_ID = "open-help-page";
+const API_PROVIDER_PARENT_ID = "api-provider-parent";
+const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
+const COMMAND_NAME = "toggle-select-element";
+
+// --- Get API Providers from Registry ---
+async function getApiProviders() {
+  try {
+    const { providerRegistry } = await import('@/providers/core/ProviderRegistry.js');
+    return Array.from(providerRegistry.providers.entries()).map(([id, ProviderClass]) => ({
+      id,
+      defaultTitle: ProviderClass.displayName || id
+    }));
+  } catch (error) {
+    logger.error("Failed to get providers dynamically, using fallback:", error);
+    return [];
+  }
+}
+
+// ▼▼▼ تابع کمکی برای غیرفعال کردن حالت انتخاب المنت ▼▼▼
+/**
+ * Sends a message to all tabs to deactivate the "Select Element" mode.
+ * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
+ */
+async function deactivateSelectElementModeInAllTabs() {
+  try {
+    const tabs = await browser.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        // We send the message but don't wait for a response.
+        // A try-catch block handles cases where content scripts aren't injected (e.g., on special pages).
+        browser.tabs
+          .sendMessage(tab.id, {
+            action: "TOGGLE_SELECT_ELEMENT_MODE",
+            data: false, // `false` signals deactivation
+          })
+          .catch(() => {
+            // It's normal for this to fail on tabs without the content script; ignore the error.
+          });
+      }
+    }
+    logger.debug(
+      "Sent deactivation signal for Select Element mode to all tabs."
+    );
+  } catch (e) {
+    logger.error("Error trying to deactivate select element mode in all tabs:", e);
+  }
+}
+
+/**
+ * Helper function to focus or create a tab
+ */
+async function focusOrCreateTab(url) {
+  try {
+    const tabs = await browser.tabs.query({ url });
+    if (tabs.length > 0) {
+      await browser.tabs.update(tabs[0].id, { active: true });
+      await browser.windows.update(tabs[0].windowId, { focused: true });
+    } else {
+      await browser.tabs.create({ url });
+    }
+  } catch (error) {
+    logger.error("Failed to focus or create tab:", error);
+    // Fallback: just create a new tab
+    await browser.tabs.create({ url });
+  }
+}
 
 /**
  * Context Menu Manager
@@ -17,6 +91,7 @@ export class ContextMenuManager {
     this.browser = null;
     this.initialized = false;
     this.createdMenus = new Set();
+    this.storageListener = null;
   }
 
   /**
@@ -33,6 +108,9 @@ export class ContextMenuManager {
       // Set up default context menus
       await this.setupDefaultMenus();
 
+      // Register storage listener only (click listener is handled globally)
+      this.registerStorageListener();
+
       this.initialized = true;
       logger.debug("✅ Context menu manager initialized");
     } catch (error) {
@@ -45,61 +123,104 @@ export class ContextMenuManager {
    * Set up default context menus
    * @private
    */
+  // Prevent concurrent menu setup
+  _menuSetupLock = false;
   async setupDefaultMenus() {
+    if (this._menuSetupLock) {
+      logger.warn("setupDefaultMenus called concurrently, skipping.");
+      return;
+    }
+    this._menuSetupLock = true;
     try {
-      // Clear existing menus first
-      await this.clearAllMenus();
+      // Clear existing menus first and wait for completion
+      await browser.contextMenus.removeAll();
+      this.createdMenus.clear();
 
-      // Main translation menu
-      await this.createMenu({
-        id: "translate-selection",
-        title: 'Translate "%s"',
-        contexts: ["selection"],
-        documentUrlPatterns: ["http://*/*", "https://*/*"],
-      });
+      // Get the currently active API to set the 'checked' state
+      const currentApi = await getTranslationApiAsync();
 
-      // Translate page menu
-      await this.createMenu({
-        id: "translate-page",
-        title: "Translate this page",
-        contexts: ["page"],
-        documentUrlPatterns: ["http://*/*", "https://*/*"],
-      });
+      // --- 1. Create Page Context Menu ---
+      try {
+        let pageMenuTitle =
+          (await getTranslationString("context_menu_translate_with_selection")) ||
+          "Translate Element";
+        const commands = await browser.commands.getAll();
+        const command = commands.find((c) => c.name === COMMAND_NAME);
+        if (command && command.shortcut) {
+          pageMenuTitle = `${pageMenuTitle} (${command.shortcut})`;
+        }
+        await this.createMenu({
+          id: PAGE_CONTEXT_MENU_ID,
+          title: pageMenuTitle,
+          contexts: ["page", "selection", "link", "image", "video", "audio"],
+        });
+        logger.debug(
+          `Page context menu created with title: "${pageMenuTitle}"`
+        );
+      } catch (e) {
+        logger.error("Error creating page context menu:", e);
+      }
 
-      // Element selection mode
-      await this.createMenu({
-        id: "select-element-mode",
-        title: "Select element to translate",
-        contexts: ["page"],
-        documentUrlPatterns: ["http://*/*", "https://*/*"],
-      });
+      // --- 2. Create Action (Browser Action) Context Menus ---
+      try {
+        // --- Options Menu ---
+        await this.createMenu({
+          id: ACTION_CONTEXT_MENU_OPTIONS_ID,
+          title: (await getTranslationString("context_menu_options")) || "Options",
+          contexts: ["action"],
+        });
 
-      // Separator
-      await this.createMenu({
-        id: "separator1",
-        type: "separator",
-        contexts: ["selection", "page"],
-      });
+        // --- API Provider Parent Menu ---
+        await this.createMenu({
+          id: API_PROVIDER_PARENT_ID,
+          title:
+            (await getTranslationString("context_menu_api_provider")) ||
+            "API Provider",
+          contexts: ["action"],
+        });
 
-      // Screen capture menu
-      await this.createMenu({
-        id: "capture-screen",
-        title: "Capture and translate screen area",
-        contexts: ["page"],
-        documentUrlPatterns: ["http://*/*", "https://*/*"],
-      });
+        // --- API Provider Sub-Menus (Radio Buttons) ---
+        const apiProviders = await getApiProviders();
+        for (const provider of apiProviders) {
+          await this.createMenu({
+            id: `${API_PROVIDER_ITEM_ID_PREFIX}${provider.id}`,
+            parentId: API_PROVIDER_PARENT_ID,
+            title: provider.defaultTitle,
+            type: "radio",
+            checked: provider.id === currentApi,
+            contexts: ["action"],
+          });
+        }
+        logger.debug(
+          `API Provider sub-menus created. Current API: ${currentApi}`
+        );
 
-      // Options menu
-      await this.createMenu({
-        id: "open-options",
-        title: "Translation settings",
-        contexts: ["action"],
-      });
+        // --- Other Action Menus ---
+        await this.createMenu({
+          id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+          title:
+            (await getTranslationString("context_menu_shortcuts")) ||
+            "Manage Shortcuts",
+          contexts: ["action"],
+        });
+
+        await this.createMenu({
+          id: HELP_MENU_ID,
+          title:
+            (await getTranslationString("context_menu_help")) || "Help & Support",
+          contexts: ["action"],
+        });
+        logger.debug("Action context menus created successfully.");
+      } catch (e) {
+        logger.error("Error creating action context menus:", e);
+      }
 
       logger.debug("✅ Default context menus created");
     } catch (error) {
       logger.error("❌ Failed to setup default menus:", error);
       throw error;
+    } finally {
+      this._menuSetupLock = false;
     }
   }
 
@@ -198,7 +319,80 @@ export class ContextMenuManager {
     try {
       logger.debug(`📋 Context menu clicked: ${info.menuItemId}`);
 
+      // --- شناسایی و مدیریت کلیک روی منوی آیکون افزونه (Action Context) ---
+      const isApiProviderClick = info.menuItemId.startsWith(
+        API_PROVIDER_ITEM_ID_PREFIX
+      );
+      const isStaticActionClick = [
+        ACTION_CONTEXT_MENU_OPTIONS_ID,
+        ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+        HELP_MENU_ID,
+      ].includes(info.menuItemId);
+
+      // اگر روی هر کدام از آیتم‌های منوی آیکون افزونه کلیک شد، ابتدا حالت انتخاب را غیرفعال کن
+      if (isApiProviderClick || isStaticActionClick) {
+        await deactivateSelectElementModeInAllTabs();
+      }
+
+      // --- Handler for API Provider selection ---
+      if (isApiProviderClick) {
+        const newApiId = info.menuItemId.replace(API_PROVIDER_ITEM_ID_PREFIX, "");
+        try {
+          await browser.storage.local.set({ TRANSLATION_API: newApiId });
+          logger.debug(`API Provider changed to: ${newApiId}`);
+          // Refresh context menus to update radio button states
+          await this.setupDefaultMenus();
+        } catch (e) {
+          logger.error(`Error setting new API provider:`, e);
+        }
+        return; // Stop further processing
+      }
+
+      // --- Handle specific menu items ---
       switch (info.menuItemId) {
+        case PAGE_CONTEXT_MENU_ID:
+          if (tab && tab.id) {
+            // این بخش فقط حالت انتخاب را فعال می‌کند و تحت تاثیر منطق غیرفعال کردن قرار نمی‌گیرد
+            browser.tabs
+              .sendMessage(tab.id, {
+                action: "TOGGLE_SELECT_ELEMENT_MODE",
+                data: true,
+              })
+              .catch((err) => {
+                logger.error(
+                  `Could not send message to tab ${tab.id}:`,
+                  err.message
+                );
+              });
+          }
+          break;
+
+        case ACTION_CONTEXT_MENU_OPTIONS_ID:
+          await focusOrCreateTab(browser.runtime.getURL("options.html"));
+          break;
+
+        case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
+          try {
+            const browserInfo = await browser.runtime.getBrowserInfo();
+            const url =
+              browserInfo.name === "Firefox" ?
+                browser.runtime.getURL("options.html#help=shortcut")
+              : "chrome://extensions/shortcuts";
+            await browser.tabs.create({ url });
+          } catch (e) {
+            logger.error(
+              "Could not determine browser type, opening for Chrome as default.",
+              e
+            );
+            await browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+          }
+          break;
+
+        case HELP_MENU_ID:
+          await focusOrCreateTab(browser.runtime.getURL("options.html#help"));
+          break;
+
+        // Legacy menu handlers (keeping for compatibility)
         case "translate-selection":
           await this.handleTranslateSelection(info, tab);
           break;
@@ -330,6 +524,24 @@ export class ContextMenuManager {
   }
 
   /**
+   * Register storage change listener to sync context menus
+   */
+  registerStorageListener() {
+    if (browser?.storage?.onChanged) {
+      this.storageListener = (changes, areaName) => {
+        if (areaName === "local" && changes.TRANSLATION_API) {
+          logger.debug(
+            "TRANSLATION_API setting changed in storage. Rebuilding context menus for synchronization."
+          );
+          this.setupDefaultMenus();
+        }
+      };
+      browser.storage.onChanged.addListener(this.storageListener);
+      logger.debug("📋 Storage change listener registered");
+    }
+  }
+
+  /**
    * Check if context menu manager is available
    * @returns {boolean}
    */
@@ -366,6 +578,12 @@ export class ContextMenuManager {
 
     try {
       await this.clearAllMenus();
+      
+      // Remove storage listener
+      if (this.storageListener && browser?.storage?.onChanged) {
+        browser.storage.onChanged.removeListener(this.storageListener);
+        this.storageListener = null;
+      }
     } catch (error) {
       logger.error("❌ Error during context menu cleanup:", error);
     }
