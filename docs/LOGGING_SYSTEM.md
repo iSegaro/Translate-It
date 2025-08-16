@@ -443,7 +443,225 @@ The logging system provides:
 - **Test Helper**: `__resetLoggingSystemForTests()` clears cache and restores defaults
 - **Import Strategy**: Logger core only imports LOG_LEVELS to minimize circular dependencies
 
+## Cross-World Communication for Console Debugging
+
+### Problem: Manifest V3 Isolated Worlds
+In Manifest V3 extensions, content scripts run in **isolated worlds** separate from the main page context. This creates challenges when trying to expose debugging interfaces that can be accessed from the browser's Console tab.
+
+### Failed Approaches ❌
+
+1. **Direct Window Property Assignment**
+   ```javascript
+   // ❌ DOESN'T WORK - Not accessible from Console
+   window.__MyDebugInterface = debugObject;
+   ```
+   **Why it fails**: Console runs in main world, content script runs in isolated world.
+
+2. **Script Tag Injection**
+   ```javascript
+   // ❌ DOESN'T WORK - CSP restrictions
+   const script = document.createElement('script');
+   script.textContent = `window.__MyDebugInterface = ${JSON.stringify(interface)};`;
+   document.head.appendChild(script);
+   ```
+   **Why it fails**: Content Security Policy (CSP) blocks inline scripts.
+
+3. **globalThis Assignment**
+   ```javascript
+   // ❌ DOESN'T WORK - Still isolated
+   globalThis.__MyDebugInterface = debugObject;
+   ```
+   **Why it fails**: Still within isolated world context.
+
+4. **document.documentElement.dataset**
+   ```javascript
+   // ❌ DOESN'T WORK - Limited data types
+   document.documentElement.dataset.debugInterface = JSON.stringify(interface);
+   ```
+   **Why it fails**: Can only pass serialized data, not functions.
+
+### Working Solution ✅: PostMessage Communication
+
+The **only reliable solution** for Manifest V3 is using `window.postMessage()` for cross-world communication:
+
+#### Implementation Pattern
+```javascript
+// In Content Script (Isolated World)
+class MyManager {
+  setupDebugInterface() {
+    // Listen for commands from main world (Console)
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      
+      const { type, ...params } = event.data;
+      
+      if (type === 'MY_DEBUG_COMMAND') {
+        this.handleDebugCommand(params);
+        
+        // Send response back to main world
+        window.postMessage({
+          type: 'MY_DEBUG_RESPONSE',
+          result: 'Command executed successfully'
+        }, '*');
+      }
+    });
+    
+    // Display available commands in Console
+    this.displayConsoleHelp();
+  }
+  
+  displayConsoleHelp() {
+    console.log('\n🚀 Debug Commands Available:');
+    console.log('===============================================');
+    console.log('window.postMessage({type:"MY_DEBUG_COMMAND",param:"value"},"*")');
+    console.log('===============================================\n');
+  }
+}
+```
+
+#### Console Usage
+```javascript
+// Commands that work in Browser Console:
+window.postMessage({type:'MY_DEBUG_COMMAND', param:'value'}, '*')
+
+// Listen for responses:
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'MY_DEBUG_RESPONSE') {
+    console.log('Response:', event.data.result);
+  }
+});
+```
+
+### Best Practices for PostMessage Debugging
+
+1. **Use Unique Message Types**
+   ```javascript
+   // Good: Namespace your messages
+   window.postMessage({type:'TRANSLATE_IT_SET_MODE', mode:'simple'}, '*')
+   
+   // Avoid: Generic types
+   window.postMessage({type:'SET_MODE', mode:'simple'}, '*')
+   ```
+
+2. **Provide Console Help**
+   ```javascript
+   const createConsoleHelpers = () => {
+     console.log('\n🚀 MyExtension Debug Mode');
+     console.log('===============================================');
+     console.log('Available commands:');
+     console.log('window.postMessage({type:"MY_COMMAND",value:"test"},"*")');
+     console.log('===============================================\n');
+   };
+   ```
+
+3. **Handle Responses Gracefully**
+   ```javascript
+   // Set up response listener
+   window.addEventListener('message', (event) => {
+     if (event.source !== window) return;
+     if (event.data.type === 'MY_RESPONSE') {
+       console.log('✅ Success:', event.data.result);
+     }
+   });
+   ```
+
+4. **Validate Message Structure**
+   ```javascript
+   window.addEventListener('message', (event) => {
+     if (event.source !== window) return;
+     
+     const { type, ...params } = event.data;
+     
+     // Validate expected message types
+     if (!type || !type.startsWith('MY_EXTENSION_')) return;
+     
+     this.handleCommand(type, params);
+   });
+   ```
+
+### Security Considerations
+
+1. **Always Check Event Source**
+   ```javascript
+   window.addEventListener('message', (event) => {
+     if (event.source !== window) return; // IMPORTANT: Only accept same-window messages
+     // ... handle message
+   });
+   ```
+
+2. **Validate Message Types**
+   ```javascript
+   const ALLOWED_TYPES = [
+     'MY_EXTENSION_COMMAND_1',
+     'MY_EXTENSION_COMMAND_2'
+   ];
+   
+   if (!ALLOWED_TYPES.includes(type)) return;
+   ```
+
+3. **Sanitize Parameters**
+   ```javascript
+   if (type === 'MY_COMMAND' && typeof params.value === 'string') {
+     this.handleCommand(params.value);
+   }
+   ```
+
+### Real-World Example: SelectElementManager
+
+```javascript
+// Content Script Implementation
+setupPostMessageInterface() {
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    
+    const { type, mode } = event.data;
+    
+    if (type === 'TRANSLATE_IT_SET_MODE' && mode) {
+      this.setMode(mode);
+    } else if (type === 'TRANSLATE_IT_GET_MODE') {
+      const currentMode = this.getMode();
+      window.postMessage({
+        type: 'TRANSLATE_IT_MODE_RESPONSE',
+        mode: currentMode
+      }, '*');
+    }
+  });
+  
+  // Display help in Console
+  console.log('\n🚀 TranslateIt Select Manager - Debug Mode');
+  console.log('===============================================');
+  console.log('Commands:');
+  console.log('window.postMessage({type:"TRANSLATE_IT_SET_MODE",mode:"smart"},"*")');
+  console.log('window.postMessage({type:"TRANSLATE_IT_GET_MODE"},"*")');
+  console.log('===============================================\n');
+}
+```
+
+```javascript
+// Console Usage
+window.postMessage({type:'TRANSLATE_IT_SET_MODE',mode:'smart'},'*')
+window.postMessage({type:'TRANSLATE_IT_GET_MODE'},'*')
+
+// Listen for responses
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'TRANSLATE_IT_MODE_RESPONSE') {
+    console.log('Current mode:', event.data.mode);
+  }
+});
+```
+
+### Key Insights
+
+1. **PostMessage is the ONLY reliable solution** for Manifest V3 cross-world communication
+2. **Always provide Console help** showing available commands
+3. **Use unique message types** to avoid conflicts with other extensions/scripts  
+4. **Validate all incoming messages** for security
+5. **Handle responses** to provide feedback to Console users
+6. **Keep it simple** - complex debug interfaces become maintenance burdens
+
+This pattern enables powerful debugging capabilities while respecting Manifest V3 security constraints.
+
 ---
 
-**📅 Last Updated:** August 15, 2025 - Migration Completed  
+**📅 Last Updated:** August 16, 2025 - Added Cross-World Communication Guide  
 **📊 Status:** ✅ Production Ready - 100% Modern Logging API
