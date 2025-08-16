@@ -8,6 +8,7 @@ import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/messaging/core/MessagingCore.js";
+import { useHistory } from "@/composables/useHistory.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
@@ -30,6 +31,9 @@ export function useSidepanelTranslation() {
 
   // Store
   const settingsStore = useSettingsStore();
+  
+  // History
+  const { addToHistory } = useHistory();
 
 
   // Computed
@@ -179,6 +183,16 @@ export function useSidepanelTranslation() {
               provider: message.data.provider,
               timestamp: message.data.timestamp,
             };
+            
+            // Add to history
+            addToHistory({
+              sourceText: message.data.originalText,
+              translatedText: message.data.translatedText,
+              sourceLanguage: message.data.sourceLanguage || settingsStore.settings.SOURCE_LANGUAGE,
+              targetLanguage: message.data.targetLanguage || settingsStore.settings.TARGET_LANGUAGE,
+              provider: message.data.provider,
+              timestamp: message.data.timestamp || Date.now()
+            });
           } else {
             // UNEXPECTED case - handle gracefully
             logger.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);

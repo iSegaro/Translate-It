@@ -338,6 +338,7 @@ watch(() => props.isVisible, async (visible) => {
     historyPanel.value.classList.toggle('active', visible)
     
     if (visible) {
+      // Force reload history when panel becomes visible
       await loadHistory()
       await nextTick()
       renderHistoryItems()
