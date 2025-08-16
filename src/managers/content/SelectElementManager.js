@@ -15,7 +15,7 @@ import { generateContentMessageId } from "../../utils/messaging/messageId.js";
 import { 
   SELECT_ELEMENT_MODES, 
   SELECT_ELEMENT_DEFAULTS,
-  SelectElementValidation 
+  SelectElementValidation
 } from "../../constants/SelectElementModes.js";
 
 /**
@@ -136,6 +136,11 @@ export class SelectElementManager {
       // Clear caches when mode changes
       this.elementValidationCache = new WeakMap();
       this.textContentCache = new WeakMap();
+      
+      // Update background color for the new mode (only if active)
+      if (this.state.isActive) {
+        this.updateBackgroundStyle();
+      }
       
       const trigger = this.state.isCtrlPressed ? '(Ctrl key)' : '(manual/base)';
       const displayName = SelectElementValidation.getDisplayName(mode);
@@ -1948,6 +1953,9 @@ export class SelectElementManager {
         "AIWritingCompanion-disable-links"
       );
     }
+
+    // Add dynamic background style based on current mode
+    this.updateBackgroundStyle();
   }
 
   /**
@@ -1956,6 +1964,27 @@ export class SelectElementManager {
   removeGlobalStyles() {
     // Remove the CSS class that disables crosshair cursor and hover effects
     taggleLinks(false);
+    
+    // Remove simple-mode class
+    document.documentElement.classList.remove('simple-mode');
+  }
+  
+  /**
+   * Update background style based on current mode using CSS classes
+   */
+  updateBackgroundStyle() {
+    const isSimpleMode = this.config.mode === SELECT_ELEMENT_MODES.SIMPLE;
+    
+    // Toggle the simple-mode class on documentElement
+    document.documentElement.classList.toggle('simple-mode', isSimpleMode);
+    
+    const modeDisplay = SelectElementValidation.getDisplayName(this.config.mode);
+    const modeEmoji = SelectElementValidation.getModeEmoji(this.config.mode);
+    
+    this.logger.debug(`${modeEmoji} Background style updated for ${modeDisplay}`, {
+      mode: this.config.mode,
+      isSimpleMode: isSimpleMode
+    });
   }
 
   /**

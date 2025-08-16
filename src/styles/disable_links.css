@@ -32,6 +32,13 @@
   transition: all 0.1s ease !important;
 }
 
+/* Simple mode styling (light blue) when Ctrl is pressed */
+.AIWritingCompanion-disable-links.simple-mode *:hover {
+  background-color: rgba(173, 216, 230, 0.3) !important;
+  outline: 2px solid #4a90e2 !important;
+  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5) !important;
+}
+
 /* Prevent highlighting on body and html elements */
 .AIWritingCompanion-disable-links body:hover,
 .AIWritingCompanion-disable-links html:hover {
@@ -58,6 +65,25 @@
   background-color: rgba(255, 215, 0, 0.2) !important;
   outline: 2px dashed #ffaa00 !important;
   outline-offset: 2px !important;
+}
+
+/* Simple mode styling for text elements */
+.AIWritingCompanion-disable-links.simple-mode p:hover,
+.AIWritingCompanion-disable-links.simple-mode div:hover,
+.AIWritingCompanion-disable-links.simple-mode span:hover,
+.AIWritingCompanion-disable-links.simple-mode h1:hover,
+.AIWritingCompanion-disable-links.simple-mode h2:hover,
+.AIWritingCompanion-disable-links.simple-mode h3:hover,
+.AIWritingCompanion-disable-links.simple-mode h4:hover,
+.AIWritingCompanion-disable-links.simple-mode h5:hover,
+.AIWritingCompanion-disable-links.simple-mode h6:hover,
+.AIWritingCompanion-disable-links.simple-mode li:hover,
+.AIWritingCompanion-disable-links.simple-mode td:hover,
+.AIWritingCompanion-disable-links.simple-mode th:hover,
+.AIWritingCompanion-disable-links.simple-mode article:hover,
+.AIWritingCompanion-disable-links.simple-mode section:hover {
+  background-color: rgba(173, 216, 230, 0.2) !important;
+  outline: 2px dashed #4a90e2 !important;
 }
 
 /* Special styling for input elements */
