@@ -412,7 +412,10 @@ export class TranslationEngine {
           for (let i = 0; i < batch.length; i++) {
             const idx = batch[i];
             const translatedText = parts[i]?.trim() || segments[idx];
-            const isActuallyTranslated = translatedText !== segments[idx]; // Check if text actually changed
+            // For same-language translations or when content doesn't change, still consider it successful
+            const isActuallyTranslated = translatedText !== segments[idx] || 
+                                       sourceLanguage === targetLanguage ||
+                                       sourceLanguage === 'auto'; // Auto-detect may result in same language
             
             results[idx] = translatedText;
             translationStatus[idx] = isActuallyTranslated;
@@ -421,7 +424,8 @@ export class TranslationEngine {
             const cacheKey = this.generateCacheKey({
               text: segments[idx], provider, sourceLanguage, targetLanguage, mode
             });
-            this.cache.set(cacheKey, { translatedText: isActuallyTranslated ? translatedText : null, cachedAt: Date.now() });
+            // Always cache the result if the API call was successful
+            this.cache.set(cacheKey, { translatedText: translatedText, cachedAt: Date.now() });
           }
           return;
         }
@@ -438,15 +442,20 @@ export class TranslationEngine {
         try {
           const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode);
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
-          const isActuallyTranslated = translatedText !== segments[idx]; // Check if text actually changed
+          // For same-language translations or when content doesn't change, still consider it successful
+          const isActuallyTranslated = translatedText !== segments[idx] || 
+                                       sourceLanguage === targetLanguage ||
+                                       sourceLanguage === 'auto'; // Auto-detect may result in same language
           
           // Cache result
           const cacheKey = this.generateCacheKey({
             text: segments[idx], provider, sourceLanguage, targetLanguage, mode
           });
-          this.cache.set(cacheKey, { translatedText: isActuallyTranslated ? translatedText : null, cachedAt: Date.now() });
-          
-          return { idx, result: translatedText, success: isActuallyTranslated };
+          // Always cache the result if the API call was successful
+          this.cache.set(cacheKey, { translatedText: translatedText, cachedAt: Date.now() });
+
+          logger.debug(`isActuallyTranslated: ${isActuallyTranslated}`);
+          return { idx, result: translatedText, success: true }; // API call succeeded
         } catch {
           attempt++;
           if (attempt < INDIVIDUAL_RETRY) {
@@ -462,7 +471,8 @@ export class TranslationEngine {
     const individualResults = await Promise.all(individualPromises);
     individualResults.forEach(({ idx, result, success }) => {
       results[idx] = result;
-      translationStatus[idx] = success || false;
+      // Mark as successful if API call succeeded, regardless of text change
+      translationStatus[idx] = success;
     });
   }
 
