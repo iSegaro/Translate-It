@@ -34,7 +34,26 @@
       <!-- Sticky Header Section -->
       <div class="sticky-header">
         <PopupHeader />
-        <LanguageControls :disabled="!canTranslateFromForm" />
+        <div class="language-controls">
+          <!-- Provider Selector -->
+          <ProviderSelector
+            mode="split"
+            :disabled="!canTranslateFromForm"
+            @translate="handleTranslate"
+            @provider-change="handleProviderChange"
+          />
+
+          <!-- Language Selector -->
+          <LanguageSelector
+            v-model:source-language="sourceLanguage"
+            v-model:target-language="targetLanguage"
+            :source-title="$i18n('popup_source_language_title') || 'زبان مبدا'"
+            :target-title="$i18n('popup_target_language_title') || 'زبان مقصد'"
+            :swap-title="$i18n('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
+            :swap-alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
+            :auto-detect-label="'Auto-Detect'"
+          />
+        </div>
       </div>
       
       <!-- Scrollable Content Section -->
@@ -53,13 +72,19 @@
       </div>
       
       <!-- Development Toggle -->
-            <div
+      <div
         v-if="isDevelopment"
         class="enhanced-version-toggle"
         @click="toggleEnhancedVersion"
       >
-        <Icon icon="fa6-solid:toggle-on" v-if="useEnhancedVersion" />
-        <Icon icon="fa6-solid:toggle-off" v-else />
+        <Icon
+          v-if="useEnhancedVersion"
+          icon="fa6-solid:toggle-on"
+        />
+        <Icon
+          v-else
+          icon="fa6-solid:toggle-off"
+        />
         <span>{{ useEnhancedVersion ? 'Enhanced' : 'Classic' }}</span>
       </div>
     </template>
@@ -73,7 +98,8 @@ import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
-import LanguageControls from '@/components/popup/LanguageControls.vue'
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
 import EnhancedTranslationForm from '@/components/popup/EnhancedTranslationFormClassic.vue'
 import { Icon } from '@iconify/vue'
@@ -81,6 +107,7 @@ import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { AUTO_DETECT_VALUE } from '@/constants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Stores & Composables
@@ -95,6 +122,33 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const canTranslateFromForm = ref(false)
 
+// Language state management
+const sourceLanguage = computed({
+  get: () => settingsStore.settings.SOURCE_LANGUAGE || AUTO_DETECT_VALUE,
+  set: async (value) => {
+    try {
+      logger.info("[PopupApp] 🌍 Source language changed to:", value);
+      await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
+    } catch (error) {
+      logger.error("[PopupApp] ❌ Failed to update source language:", error);
+      await handleError(error, 'popup-source-language')
+    }
+  }
+})
+
+const targetLanguage = computed({
+  get: () => settingsStore.settings.TARGET_LANGUAGE || 'English',
+  set: async (value) => {
+    try {
+      logger.info("[PopupApp] 🌍 Target language changed to:", value);
+      await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', value)
+    } catch (error) {
+      logger.error("[PopupApp] ❌ Failed to update target language:", error);
+      await handleError(error, 'popup-target-language')
+    }
+  }
+})
+
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
 const isDevelopment = computed(() => {
@@ -102,6 +156,21 @@ const isDevelopment = computed(() => {
          window.location.hostname === 'localhost' ||
          localStorage.getItem('dev-mode') === 'true'
 })
+
+// Event Handlers
+const handleTranslate = (data) => {
+  logger.debug("[PopupApp] 🎯 Translate button clicked from ProviderSelector");
+  // Emit to translation forms
+  const event = new CustomEvent('translate-request', { detail: data })
+  document.dispatchEvent(event)
+}
+
+const handleProviderChange = (provider) => {
+  logger.info("[PopupApp] 🔄 Provider changed to:", provider);
+  // Emit to translation forms
+  const event = new CustomEvent('provider-changed', { detail: { provider } })
+  document.dispatchEvent(event)
+}
 
 // Methods
 const toggleEnhancedVersion = () => {
@@ -129,7 +198,7 @@ onMounted(async () => {
     
     // Step 3: Test background connection with simple ping
     try {
-      const response = await sendMessage({ action: 'ping', data: { from: 'popup' } })
+      await sendMessage({ action: 'ping', data: { from: 'popup' } })
     } catch (err) {
       const isSilent = await handleError(err, 'popup-connection-test', { silent: true })
       if (!isSilent) {
@@ -308,5 +377,16 @@ const retryLoading = () => {
     font-size: 12px;
     color: var(--color-primary);
   }
+}
+
+.language-controls {
+  display: flex;
+  align-items: center;
+  padding: 3px 12px;
+  margin: 0;
+  gap: 4px;
+  background: var(--language-controls-bg-color);
+  min-height: 36px;
+  box-sizing: border-box;
 }
 </style>
