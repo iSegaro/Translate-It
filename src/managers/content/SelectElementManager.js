@@ -29,7 +29,7 @@ export class SelectElementManager {
     this.overlayElements = new Set();
     this.currentHighlighted = null;
     this.browser = null;
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'SelectElement');
     this.translatedElements = new Set(); // Track translated elements for revert
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
