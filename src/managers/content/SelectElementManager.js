@@ -34,6 +34,18 @@ export class SelectElementManager {
     this.isProcessingClick = false; // Prevent multiple rapid clicks
     this.lastClickTime = 0; // Debounce timer
     this.escapeAbortController = null; // For background ESC key handling
+    
+    // Cache for element validation to improve performance
+    this.elementValidationCache = new WeakMap();
+    this.textContentCache = new WeakMap();
+    
+    // Configuration for text validation
+    this.config = {
+      minTextLength: 8,        // Minimum text length to consider for translation
+      minWordCount: 2,         // Minimum word count for meaningful content
+      maxElementArea: 50000,   // Maximum element area for container validation
+      maxAncestors: 5          // Maximum ancestors to check when finding best element
+    };
 
     // Create proper state structure like OLD system
     this.state = {
@@ -56,8 +68,109 @@ export class SelectElementManager {
     this.abortController = null;
     this.pendingTranslation = null; // For waiting for TRANSLATION_RESULT_UPDATE
     this.statusNotification = null; // Track status notification for dismissal (like OLD system)
+    this.selectionProcessing = false; // true while an element's translation is being processed
+    this.requestedCancel = false; // set when ESC pressed before pending translation created
+    
+    // Lifecycle tracing for messageIds
+    this.tracing = true; // enable by default for now; can be toggled
+    this.messageLifecycle = new Map();
+
+    // Expose tracing map for devtools inspection
+    try {
+      Object.defineProperty(window, '__TranslateItTracing', {
+        configurable: true,
+        enumerable: false,
+        get: () => this.messageLifecycle,
+      });
+    } catch {
+      // ignore if window not writable in some contexts
+    }
 
     this.logger.init('Select element manager initialized');
+  }
+
+  /**
+   * Update configuration for text validation
+   * @param {Object} newConfig - Configuration object
+   */
+  updateConfig(newConfig) {
+    this.config = { ...this.config, ...newConfig };
+    
+    // Clear caches when config changes
+    this.elementValidationCache = new WeakMap();
+    this.textContentCache = new WeakMap();
+    
+    this.logger.debug('Configuration updated:', this.config);
+  }
+
+  /**
+   * Get current configuration
+   * @returns {Object} Current configuration
+   */
+  getConfig() {
+    return { ...this.config };
+  }
+
+  /**
+   * Debug method to analyze why an element is or isn't valid
+   * @param {HTMLElement} element - Element to analyze
+   * @returns {Object} Analysis result
+   */
+  analyzeElement(element) {
+    const analysis = {
+      element: element,
+      tagName: element.tagName,
+      isValid: false,
+      reasons: [],
+      textContent: element.textContent?.trim() || '',
+      textLength: (element.textContent?.trim() || '').length,
+      hasChildren: element.children.length > 0,
+      area: element.offsetWidth * element.offsetHeight
+    };
+
+    // Check each validation step
+    const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
+    if (invalidTags.includes(element.tagName)) {
+      analysis.reasons.push('Invalid tag type');
+      return analysis;
+    }
+
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+      analysis.reasons.push('Element not visible');
+      return analysis;
+    }
+
+    const isTextInput = element.tagName === "INPUT" && (element.type === "text" || element.type === "textarea");
+    const isTextArea = element.tagName === "TEXTAREA";
+    
+    if (isTextInput || isTextArea) {
+      const value = element.value || "";
+      analysis.textContent = value;
+      analysis.textLength = value.length;
+      
+      if (!this.isValidTextContent(value.trim())) {
+        analysis.reasons.push('Input value not valid for translation');
+      } else {
+        analysis.isValid = true;
+        analysis.reasons.push('Valid input element');
+      }
+    } else {
+      if (!this.hasValidTextContent(element)) {
+        analysis.reasons.push('No valid text content found');
+      } else {
+        analysis.isValid = true;
+        analysis.reasons.push('Valid text element');
+      }
+    }
+
+    // Additional analysis for container elements
+    if (element.children.length > 0) {
+      analysis.childCount = element.children.length;
+      analysis.isContainer = true;
+    }
+
+    return analysis;
   }
 
   /**
@@ -596,18 +709,95 @@ export class SelectElementManager {
 
     const element = event.target;
 
-    // Skip non-text elements
-    if (!this.isValidTextElement(element)) return;
+    // Find the best element to highlight (may be different from event.target)
+    const bestElement = this.findBestTextElement(element);
+    
+    if (!bestElement) return;
 
     // Skip if already highlighted
-    if (element === this.currentHighlighted) return;
+    if (bestElement === this.currentHighlighted) return;
 
     // Clear previous highlight
     this.clearHighlight();
 
-    // Highlight current element
-    this.highlightElement(element);
-    this.currentHighlighted = element;
+    // Highlight best element
+    this.highlightElement(bestElement);
+    this.currentHighlighted = bestElement;
+  }
+
+  /**
+   * Find the best element to highlight for translation
+   * This may walk up the DOM tree to find a more suitable parent
+   */
+  findBestTextElement(startElement) {
+    let element = startElement;
+    let bestCandidate = null;
+    let maxAncestors = this.config.maxAncestors; // Limit how far up we go
+    
+    // Walk up the DOM tree to find the best element
+    while (element && element !== document.body && maxAncestors-- > 0) {
+      if (this.isValidTextElement(element)) {
+        // If this is a leaf element or has good immediate text, prefer it
+        if (this.isLeafTextElement(element) || this.getImmediateTextContent(element)) {
+          bestCandidate = element;
+          break;
+        }
+        
+        // Otherwise, keep it as a candidate but continue looking
+        if (!bestCandidate) {
+          bestCandidate = element;
+        }
+      }
+      
+      element = element.parentElement;
+    }
+    
+    // If we found a candidate, do a final check to see if we should prefer a child
+    if (bestCandidate) {
+      const betterChild = this.findBetterChildElement(bestCandidate, startElement);
+      if (betterChild) {
+        bestCandidate = betterChild;
+      }
+    }
+    
+    return bestCandidate;
+  }
+
+  /**
+   * Check if there's a better child element to select instead of the parent
+   */
+  findBetterChildElement(parentElement, originalElement) {
+    // If parent is too big and has a smaller child with good content, prefer the child
+    const parentArea = parentElement.offsetWidth * parentElement.offsetHeight;
+    
+    // Only look for better children in large parents
+    if (parentArea < 10000) return null;
+    
+    const children = Array.from(parentElement.children);
+    
+    for (const child of children) {
+      // Check if this child contains the original element or is close to it
+      if (child.contains(originalElement) || child === originalElement) {
+        if (this.isValidTextElement(child)) {
+          const childArea = child.offsetWidth * child.offsetHeight;
+          const childText = child.textContent?.trim() || "";
+          const parentText = parentElement.textContent?.trim() || "";
+          
+          // Prefer child if:
+          // 1. It's significantly smaller than parent
+          // 2. It contains a good portion of the parent's text
+          // 3. It has meaningful content
+          const areaRatio = childArea / parentArea;
+          const textRatio = childText.length / parentText.length;
+          
+          if (areaRatio < 0.7 && textRatio > 0.3 && this.isValidTextContent(childText)) {
+            return child;
+          }
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -657,46 +847,58 @@ export class SelectElementManager {
 
     const element = event.target;
 
+    // Try to find a better element if current one is not valid
+    let targetElement = element;
     if (!this.isValidTextElement(element)) {
-      this.logger.warn("Invalid element for translation");
-      await this.showErrorNotification(
-        "Please select an element that contains text"
-      );
-    this.isProcessingClick = false;
-    this.selectionProcessing = false; // true while an element's translation is being processed
-    this.requestedCancel = false; // set when ESC pressed before pending translation created
-    // Lifecycle tracing for messageIds
-    this.tracing = true; // enable by default for now; can be toggled
-    this.messageLifecycle = new Map();
-
-    // Expose tracing map for devtools inspection
-    try {
-      Object.defineProperty(window, '__TranslateItTracing', {
-        configurable: true,
-        enumerable: false,
-        get: () => this.messageLifecycle,
-      });
-    } catch {
-      // ignore if window not writable in some contexts
-    }
-      return;
+      // Try to find a better element nearby
+      targetElement = this.findBestTextElement(element);
+      
+      if (!targetElement) {
+        this.logger.warn("Invalid element for translation", {
+          tagName: element.tagName,
+          className: element.className,
+          textContent: (element.textContent || "").substring(0, 50)
+        });
+        
+        // Try extracting text anyway to see what we get
+        const extractedText = this.extractTextFromElement(element);
+        this.logger.debug("Extracted text from invalid element:", extractedText);
+        
+        if (extractedText && extractedText.trim().length > 0) {
+          this.logger.info("Found text in 'invalid' element, proceeding with translation");
+          targetElement = element; // Use original element
+        } else {
+          await this.showErrorNotification(
+            "Please select an element that contains text"
+          );
+          this.isProcessingClick = false;
+          return;
+        }
+      }
     }
 
     this.logger.info("Element selected", element);
 
     try {
-      // Quick check if element has text before expensive processing
-      const quickText = this.extractTextFromElement(element);
-      if (!quickText || quickText.trim().length === 0) {
-        this.logger.warn("No text found in selected element");
+      // Extract text from the target element
+      const extractedText = this.extractTextFromElement(targetElement);
+      if (!extractedText || extractedText.trim().length === 0) {
+        this.logger.warn("No text found in selected element", {
+          element: targetElement,
+          tagName: targetElement.tagName,
+          textContent: (targetElement.textContent || "").substring(0, 50)
+        });
         await this.showNoTextNotification();
         this.isProcessingClick = false;
         return;
       }
 
-      this.logger.debug(
-        "[SelectElementManager] Text found:",
-        quickText.substring(0, 100) + "..."
+      this.logger.info(
+        "[SelectElementManager] Text extracted successfully:",
+        {
+          length: extractedText.length,
+          preview: extractedText.substring(0, 100) + (extractedText.length > 100 ? "..." : "")
+        }
       );
 
       // Mark that we're processing this selection and keep manager active
@@ -709,7 +911,7 @@ export class SelectElementManager {
 
       // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
-      this.processSelectedElement(element).catch(error => {
+      this.processSelectedElement(targetElement).catch(error => {
         this.logger.error("Background translation failed", error);
       });
     } catch (error) {
@@ -825,22 +1027,176 @@ export class SelectElementManager {
    * Check if element is valid for text extraction
    */
   isValidTextElement(element) {
-    // Skip script, style, and other non-text elements
-    const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
-    if (invalidTags.includes(element.tagName)) return false;
+    // Check cache first
+    if (this.elementValidationCache.has(element)) {
+      return this.elementValidationCache.get(element);
+    }
+    
+    let isValid = false;
+    
+    try {
+      // Skip script, style, and other non-text elements
+      const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
+      if (invalidTags.includes(element.tagName)) {
+        isValid = false;
+      } else {
+        // Skip invisible elements
+        const style = window.getComputedStyle(element);
+        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+          isValid = false;
+        } else {
+          // Handle input elements separately
+          const isTextInput = element.tagName === "INPUT" && (element.type === "text" || element.type === "textarea");
+          const isTextArea = element.tagName === "TEXTAREA";
+          
+          if (isTextInput || isTextArea) {
+            const value = element.value || "";
+            isValid = this.isValidTextContent(value.trim());
+          } else {
+            // For regular elements, check if they contain meaningful text
+            isValid = this.hasValidTextContent(element);
+          }
+        }
+      }
+    } catch (error) {
+      // If any error occurs during validation, assume invalid
+      this.logger.debug("Error validating element:", error);
+      isValid = false;
+    }
+    
+    // Cache the result
+    this.elementValidationCache.set(element, isValid);
+    return isValid;
+  }
 
-    // Skip invisible elements
-    const style = window.getComputedStyle(element);
-    if (style.display === "none" || style.visibility === "hidden") return false;
-    if (style.opacity === "0") return false;
+  /**
+   * Check if text content is meaningful and worth translating
+   */
+  isValidTextContent(text) {
+    if (!text || text.length === 0) return false;
+    
+    // Minimum length requirement (configurable)
+    if (text.length < this.config.minTextLength) return false;
 
-    // Must have text content or be a text input
-    const hasText =
-      element.textContent && element.textContent.trim().length > 0;
-    const isTextInput = element.tagName === "INPUT" && element.type === "text";
-    const isTextArea = element.tagName === "TEXTAREA";
+    // Skip pure numbers, symbols, or whitespace
+    const onlyNumbersSymbols = /^[\d\s\p{P}\p{S}]+$/u.test(text);
+    if (onlyNumbersSymbols) return false;
 
-    return hasText || isTextInput || isTextArea;
+    // Skip URLs and email addresses
+    const urlPattern = /^https?:\/\/|www\.|@.*\./;
+    if (urlPattern.test(text)) return false;
+
+    // Skip single words that are likely UI elements
+    const words = text.trim().split(/\s+/);
+    if (words.length === 1) {
+      const word = words[0].toLowerCase();
+      const commonUIWords = [
+        'ok', 'cancel', 'yes', 'no', 'submit', 'reset', 'login', 'logout',
+        'menu', 'home', 'back', 'next', 'prev', 'previous', 'continue',
+        'skip', 'done', 'finish', 'close', 'open', 'save', 'edit', 'delete',
+        'search', 'filter', 'sort', 'view', 'hide', 'show', 'toggle'
+      ];
+      if (commonUIWords.includes(word)) return false;
+    }
+
+    // Check for minimum word count for meaningful content
+    if (words.length < this.config.minWordCount) return false;
+
+    return true;
+  }
+
+  /**
+   * Check if element has valid text content using smart detection
+   */
+  hasValidTextContent(element) {
+    // Get immediate text content (not from children)
+    const immediateText = this.getImmediateTextContent(element);
+    
+    // If element has meaningful immediate text, it's valid
+    if (this.isValidTextContent(immediateText)) {
+      return true;
+    }
+
+    // Check if it's a leaf element with valid text
+    if (this.isLeafTextElement(element)) {
+      const leafText = element.textContent?.trim() || "";
+      return this.isValidTextContent(leafText);
+    }
+
+    // For container elements, be more selective
+    return this.isValidContainerElement(element);
+  }
+
+  /**
+   * Get immediate text content of element (excluding children)
+   */
+  getImmediateTextContent(element) {
+    let text = "";
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      }
+    }
+    return text.trim();
+  }
+
+  /**
+   * Check if element is a leaf element with text
+   */
+  isLeafTextElement(element) {
+    // Consider elements with no child elements (only text nodes) as leaf elements
+    const hasChildElements = Array.from(element.children).length > 0;
+    if (hasChildElements) return false;
+
+    // Check common leaf text elements
+    const leafTags = ['P', 'SPAN', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
+                     'LI', 'TD', 'TH', 'LABEL', 'A', 'STRONG', 'EM', 'B', 'I'];
+    
+    return leafTags.includes(element.tagName);
+  }
+
+  /**
+   * Check if container element is valid for translation
+   */
+  isValidContainerElement(element) {
+    // Skip common navigation and UI containers
+    const skipContainers = ['NAV', 'HEADER', 'FOOTER', 'ASIDE', 'MENU'];
+    if (skipContainers.includes(element.tagName)) return false;
+
+    // Skip elements with common UI class names
+    const className = element.className || "";
+    const uiClassPatterns = [
+      /nav/i, /menu/i, /header/i, /footer/i, /sidebar/i, /toolbar/i,
+      /btn/i, /button/i, /icon/i, /logo/i, /badge/i, /tag/i,
+      /pagination/i, /breadcrumb/i, /dropdown/i, /modal/i
+    ];
+    
+    if (uiClassPatterns.some(pattern => pattern.test(className))) {
+      return false;
+    }
+
+    // Check if container has a reasonable amount of meaningful text
+    const totalText = element.textContent?.trim() || "";
+    if (!this.isValidTextContent(totalText)) return false;
+
+    // Check text density - avoid containers that are mostly whitespace/structure
+    const textLength = totalText.length;
+    const elementArea = element.offsetWidth * element.offsetHeight;
+    
+    // Skip very large containers with little text (likely layout containers)
+    if (elementArea > this.config.maxElementArea && textLength < 100) return false;
+
+    // Check if most of the text comes from a single child (prefer the child instead)
+    const children = Array.from(element.children);
+    if (children.length === 1) {
+      const childText = children[0].textContent?.trim() || "";
+      const textRatio = childText.length / textLength;
+      
+      // If child contains most of the text, prefer the child
+      if (textRatio > 0.8) return false;
+    }
+
+    return true;
   }
 
   /**
@@ -885,28 +1241,99 @@ export class SelectElementManager {
    * Extract text from selected element
    */
   extractTextFromElement(element) {
+    this.logger.debug("[extractTextFromElement] Starting extraction for:", {
+      tagName: element.tagName,
+      className: element.className,
+      id: element.id
+    });
+
     // Handle input elements
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
-      return element.value;
+      const value = element.value || "";
+      this.logger.debug("[extractTextFromElement] Input element, value:", value);
+      return value;
     }
 
-    // Handle regular elements
+    // Try multiple extraction methods in order of preference
+    let extractedText = "";
+    
+    // Method 1: Try immediate text content first (for leaf elements)
+    const immediateText = this.getImmediateTextContent(element);
+    if (immediateText && this.isValidTextContent(immediateText)) {
+      extractedText = immediateText;
+      this.logger.debug("[extractTextFromElement] Using immediate text:", extractedText);
+    }
+    
+    // Method 2: If no immediate text, try simple textContent
+    if (!extractedText) {
+      const simpleText = (element.textContent || "").trim();
+      if (simpleText && this.isValidTextContent(simpleText)) {
+        extractedText = simpleText;
+        this.logger.debug("[extractTextFromElement] Using simple textContent:", extractedText);
+      }
+    }
+    
+    // Method 3: If still no text, try innerText (respects visibility)
+    if (!extractedText && element.innerText) {
+      const innerText = element.innerText.trim();
+      if (innerText && this.isValidTextContent(innerText)) {
+        extractedText = innerText;
+        this.logger.debug("[extractTextFromElement] Using innerText:", extractedText);
+      }
+    }
+    
+    // Method 4: Use tree walker as last resort with relaxed filtering
+    if (!extractedText) {
+      extractedText = this.extractTextWithTreeWalker(element);
+      this.logger.debug("[extractTextFromElement] Using tree walker:", extractedText);
+    }
+    
+    // Final fallback: just get any text content without validation
+    if (!extractedText) {
+      const fallbackText = (element.textContent || "").trim();
+      if (fallbackText.length > 0) {
+        extractedText = fallbackText;
+        this.logger.debug("[extractTextFromElement] Using fallback text:", extractedText);
+      }
+    }
+
+    this.logger.debug("[extractTextFromElement] Final extracted text:", {
+      length: extractedText.length,
+      text: extractedText.substring(0, 100) + (extractedText.length > 100 ? '...' : '')
+    });
+
+    return extractedText;
+  }
+
+  /**
+   * Extract text using tree walker with relaxed filtering
+   */
+  extractTextWithTreeWalker(element) {
     let text = "";
 
-    // Try to get visible text content
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         // Skip text in hidden elements
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
 
-        const style = window.getComputedStyle(parent);
-        if (style.display === "none" || style.visibility === "hidden") {
-          return NodeFilter.FILTER_REJECT;
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // If getComputedStyle fails, accept the node
         }
 
         // Skip empty text nodes
-        if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
+        const textContent = node.textContent.trim();
+        if (!textContent) return NodeFilter.FILTER_REJECT;
+
+        // Skip text from script or style tags
+        if (parent.closest('script, style, noscript')) {
+          return NodeFilter.FILTER_REJECT;
+        }
 
         return NodeFilter.FILTER_ACCEPT;
       },
@@ -914,7 +1341,10 @@ export class SelectElementManager {
 
     let node;
     while ((node = walker.nextNode())) {
-      text += node.textContent + " ";
+      const nodeText = node.textContent.trim();
+      if (nodeText) {
+        text += nodeText + " ";
+      }
     }
 
     return text.trim();
@@ -1583,6 +2013,10 @@ export class SelectElementManager {
     this.state.originalTexts.clear();
     this.translatedElements.clear();
     this.currentHighlighted = null;
+    
+    // Clear caches
+    this.elementValidationCache = new WeakMap();
+    this.textContentCache = new WeakMap();
   }
 }
 
