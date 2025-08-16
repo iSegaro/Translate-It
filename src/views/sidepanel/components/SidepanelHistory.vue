@@ -2,6 +2,7 @@
   <div
     id="historyPanel"
     class="history-panel"
+    :class="{ active: isVisible }"
   >
     <div class="history-header">
       <h3 :data-i18n="$i18n('SIDEPANEL_HISTORY_TITLE')">
@@ -182,14 +183,12 @@ const {
 
 const { showVisualFeedback } = useUI()
 
-// Template refs
-const historyPanel = ref(null)
-const historyList = ref(null)
-
 // Local state
 const isClosing = ref(false)
 
 // Computed
+const isVisible = computed(() => props.isVisible)
+
 const formattedHistoryItems = computed(() => {
   return sortedHistoryItems.value.map((item, index) => {
     // Handle different field names from different sources (background uses originalText)
@@ -290,59 +289,25 @@ const renderHistoryItems = () => {
   logger.debug('[SidepanelHistory] Finished rendering', formattedHistoryItems.value.length, 'items')
 }
 
-// Setup event listeners
-const setupEventListeners = () => {
-  const closeBtn = document.getElementById('closeHistoryBtn')
-  if (closeBtn) {
-    closeBtn.addEventListener('click', handleClose)
-  }
-
-  const clearAllBtn = document.getElementById('clearAllHistoryBtn')
-  if (clearAllBtn) {
-    clearAllBtn.addEventListener('click', handleClearAllHistory)
-  }
-}
-
-// Cleanup event listeners
-const cleanupEventListeners = () => {
-  const closeBtn = document.getElementById('closeHistoryBtn')
-  if (closeBtn) {
-    closeBtn.removeEventListener('click', handleClose)
-  }
-
-  const clearAllBtn = document.getElementById('clearAllHistoryBtn')
-  if (clearAllBtn) {
-    clearAllBtn.removeEventListener('click', handleClearAllHistory)  
-  }
-}
-
 // Initialize component
 const initialize = async () => {
   try {
-    historyPanel.value = document.getElementById('historyPanel')
-    historyList.value = document.getElementById('historyList')
-    
-    setupEventListeners()
     await loadHistory()
     renderHistoryItems()
     
-  logger.debug('[SidepanelHistory] Component initialized')
+    logger.debug('[SidepanelHistory] Component initialized')
   } catch (error) {
     await handleError(error, 'sidepanel-history-init')
   }
 }
 
 // Watch for visibility changes
-watch(() => props.isVisible, async (visible) => {
-  if (historyPanel.value) {
-    historyPanel.value.classList.toggle('active', visible)
-    
-    if (visible) {
-      // Force reload history when panel becomes visible
-      await loadHistory()
-      await nextTick()
-      renderHistoryItems()
-    }
+watch(isVisible, async (visible) => {
+  if (visible) {
+    // Force reload history when panel becomes visible
+    await loadHistory()
+    await nextTick()
+    renderHistoryItems()
   }
 })
 
@@ -367,7 +332,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cleanupEventListeners()
+  // No cleanup needed, Vue handles event listeners automatically
 });
 </script>
 
