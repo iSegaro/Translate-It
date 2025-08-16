@@ -110,8 +110,21 @@ const handleClearFields = () => {
 }
 
 // Handle history item selection
-const handleHistoryItemSelect = () => {
-  // This will be handled by the main content component
+const handleHistoryItemSelect = (historyData) => {
+  logger.debug('[SidepanelLayout] History item selected:', historyData)
+  
+  // Update translation store with the selected history item
+  translationStore.currentTranslation = {
+    sourceText: historyData.sourceText,
+    translatedText: historyData.translatedText,
+    sourceLanguage: historyData.sourceLanguage,
+    targetLanguage: historyData.targetLanguage,
+    timestamp: Date.now()
+  }
+  
+  // Close history panel after selection
+  isHistoryVisible.value = false
+  closeHistoryPanel()
 }
 
 

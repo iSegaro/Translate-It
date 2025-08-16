@@ -62,13 +62,13 @@
           </div>
           <div class="history-item-content">
             <div class="source-text">
-              {{ truncateText(item.sourceText) }}
+              {{ truncateText(item.sourceText) || '[No source text]' }}
             </div>
             <div class="arrow">
               ↓
             </div>
             <div class="translated-text">
-              {{ item.markdownContent ? item.markdownContent : truncateText(item.translatedText) }}
+              {{ truncateText(item.translatedText) || '[No translation]' }}
             </div>
           </div>
         </div>
@@ -112,9 +112,46 @@ const getLanguageNameByCode = (code) => {
   return lang?.name || code
 }
 
+// Extract text content from various data types
+const extractTextContent = (content) => {
+  if (!content) return ''
+  
+  // For current history format, content is already string
+  if (typeof content === 'string') {
+    return content
+  }
+  
+  // Convert numbers to string
+  if (typeof content === 'number') {
+    return String(content)
+  }
+  
+  // Handle legacy DOM elements (if any exist)
+  if (content && typeof content === 'object' && 'textContent' in content) {
+    return content.textContent || ''
+  }
+  
+  // Handle objects with text properties
+  if (content && typeof content === 'object' && 'text' in content) {
+    return content.text
+  }
+  
+  // Fallback: convert to string
+  return String(content || '')
+}
+
 // Truncate long text for display
 const truncateText = (text, maxLength = 100) => {
   if (!text) return ''
+  
+  // For dictionary results, extract just the main translation (first line)
+  if (text.includes('\n**')) {
+    const firstLine = text.split('\n')[0].trim()
+    if (firstLine) {
+      return firstLine.length > maxLength ? firstLine.substring(0, maxLength) + '...' : firstLine
+    }
+  }
+  
   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
 }
 
@@ -154,14 +191,26 @@ const isClosing = ref(false)
 
 // Computed
 const formattedHistoryItems = computed(() => {
-  return sortedHistoryItems.value.map((item, index) => ({
-    ...item,
-    index,
-    formattedTime: formatTime(item.timestamp),
-    sourceLanguageName: getLanguageNameByCode(item.sourceLanguage) || item.sourceLanguage,
-    targetLanguageName: getLanguageNameByCode(item.targetLanguage) || item.targetLanguage,
-    markdownContent: createMarkdownContent(item.translatedText)
-  }))
+  return sortedHistoryItems.value.map((item, index) => {
+    // Handle different field names from different sources (background uses originalText)
+    const rawSourceText = item.sourceText || item.originalText || ''
+    const rawTranslatedText = item.translatedText || ''
+    
+    const processedSourceText = extractTextContent(rawSourceText)
+    const processedTranslatedText = extractTextContent(rawTranslatedText)
+    
+    return {
+      ...item,
+      index,
+      formattedTime: formatTime(item.timestamp),
+      sourceLanguageName: getLanguageNameByCode(item.sourceLanguage) || item.sourceLanguage,
+      targetLanguageName: getLanguageNameByCode(item.targetLanguage) || item.targetLanguage,
+      markdownContent: createMarkdownContent(processedTranslatedText),
+      // Ensure we have normalized field names
+      sourceText: processedSourceText,
+      translatedText: processedTranslatedText
+    }
+  })
 })
 
 // Handle close button click
@@ -185,7 +234,7 @@ const handleClearAllHistory = async () => {
     if (cleared) {
       const button = document.getElementById('clearAllHistoryBtn')
       showVisualFeedback(button, 'success')
-  logger.debug('[SidepanelHistory] All history cleared')
+      logger.debug('[SidepanelHistory] All history cleared')
     }
   } catch (error) {
     await handleError(error, 'sidepanel-history-clear-all')
@@ -196,12 +245,15 @@ const handleClearAllHistory = async () => {
 
 // Handle history item click
 const handleHistoryItemClick = (item) => {
-  emit('selectHistoryItem', {
-    sourceText: item.sourceText,
-    translatedText: item.translatedText,
+  const historyData = {
+    sourceText: item.sourceText, // Already processed in formattedHistoryItems
+    translatedText: item.translatedText, // Full translation including dictionary
     sourceLanguage: item.sourceLanguage,
     targetLanguage: item.targetLanguage
-  })
+  }
+  
+  emit('selectHistoryItem', historyData)
+  logger.debug('[SidepanelHistory] History item selected:', historyData)
   
   // Visual feedback
   const itemElement = document.querySelector(`[data-history-index="${item.index}"]`)
@@ -315,7 +367,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupEventListeners()
-})</script>
+});
+</script>
 
 <style lang="scss" scoped>
 @use "@/assets/styles/variables.scss" as *;

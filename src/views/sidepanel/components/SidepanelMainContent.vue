@@ -85,6 +85,7 @@ import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.j
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { useTranslationStore } from "@/store/modules/translation.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -105,6 +106,9 @@ const { handleError } = useErrorHandler();
 
 // Languages composable
 const languages = useLanguages();
+
+// Translation Store
+const translationStore = useTranslationStore();
 
 // Translation Composable
 const translation = useSidepanelTranslation();
@@ -172,6 +176,40 @@ watch(
       logger.info("🌍 Target language changed:", oldValue, "→", newValue);
     }
   }
+);
+
+// Watch for translation store changes (when history item is selected)
+watch(
+  () => translationStore.currentTranslation,
+  (newTranslation) => {
+    if (newTranslation && newTranslation.sourceText && newTranslation.translatedText) {
+      logger.debug("🔄 Updating fields from translation store:", newTranslation);
+      
+      // Update source and translated text
+      sourceText.value = newTranslation.sourceText;
+      translatedText.value = newTranslation.translatedText;
+      
+      // Update language selectors if language info is available
+      if (newTranslation.sourceLanguage) {
+        const sourceDisplayName = getLanguageDisplayName(newTranslation.sourceLanguage);
+        if (sourceDisplayName) {
+          sourceLang.value = sourceDisplayName;
+        }
+      }
+      
+      if (newTranslation.targetLanguage) {
+        const targetDisplayName = getLanguageDisplayName(newTranslation.targetLanguage);
+        if (targetDisplayName) {
+          targetLang.value = targetDisplayName;
+        }
+      }
+      
+      // Clear any existing errors
+      translationError.value = "";
+      isTranslating.value = false;
+    }
+  },
+  { deep: true }
 );
 
 // Watch for source text changes
