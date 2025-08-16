@@ -269,7 +269,7 @@ export function revertAllTranslations(context = {}) {
         context.translatedElements.delete(container);
         
         // Remove related entries from originalTexts
-        for (const [key, value] of context.originalTexts.entries()) {
+        for (const [key] of context.originalTexts.entries()) {
           if (key.startsWith(uniqueId)) {
             context.originalTexts.delete(key);
           }

@@ -13,7 +13,7 @@
 
 <script setup>
 // Props
-const props = defineProps({
+defineProps({
   layout: {
     type: String,
     default: 'horizontal',

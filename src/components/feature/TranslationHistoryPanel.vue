@@ -479,7 +479,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -497,7 +496,6 @@ const emit = defineEmits(['retranslate', 'copy', 'tts', 'export'])
 
 // Store
 const translationStore = useTranslationStore()
-const { handleError } = useErrorHandler()
 
 // State
 const isLoading = ref(false)
@@ -759,10 +757,6 @@ const bulkExport = () => {
   clearSelection()
 }
 
-const onBulkCopied = () => {
-  showFeedback('All selected translations copied to clipboard')
-  logger.debug('[TranslationHistoryPanel] Bulk copy completed')
-}
 
 const bulkDelete = () => {
   if (confirm(`Are you sure you want to delete ${selectedItems.value.length} translations?`)) {

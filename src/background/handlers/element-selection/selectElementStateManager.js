@@ -1,7 +1,6 @@
 import browser from 'webextension-polyfill';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts, MessageFormat } from '@/messaging/core/MessagingCore.js';
-import { generateBackgroundMessageId } from '@/utils/messaging/messageId.js';
 
 // In-memory per-tab select element state
 const selectElementStateByTab = new Map();
@@ -65,7 +64,7 @@ try {
                   MessagingContexts.BACKGROUND
                 );
                 await browser.tabs.sendMessage(_lastActiveTabId, message);
-              } catch (e) {
+              } catch {
                 // ignore if sendMessage fails
               }
               // clear in-memory state

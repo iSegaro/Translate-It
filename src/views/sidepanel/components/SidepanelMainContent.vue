@@ -3,9 +3,8 @@
     <form @submit.prevent="handleTranslationSubmit">
       <div class="controls-container">
         <LanguageSelector
-          v-model:sourceLanguage="sourceLang"
-          v-model:targetLanguage="targetLang"
-          :disabled="isTranslating"
+          v-model:source-language="sourceLang"
+          v-model:target-language="targetLang"
           :auto-detect-label="'Auto-Detect'"
           :source-title="'Source Language'"
           :target-title="'Target Language'"
@@ -76,14 +75,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useTTSSmart } from "@/composables/useTTSSmart.js";
-import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
+
+
 import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
-import { useI18n } from "@/composables/useI18n.js";
+
 import { useHistory } from "@/composables/useHistory.js";
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
-import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode } from "@/utils/i18n/languages.js";
+import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
@@ -99,11 +98,10 @@ import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 
 
 // browser API, TTS, Background Warmup, Select Element, and i18n
-const tts = useTTSSmart();
 
-const selectElement = useSelectElementTranslation();
+
+
 const { handleError } = useErrorHandler();
-const { t } = useI18n();
 
 // Languages composable
 const languages = useLanguages();
@@ -119,8 +117,7 @@ const {
   translationError,
   canTranslate,
   triggerTranslation,
-  loadLastTranslation,
-  lastTranslation
+  loadLastTranslation
 } = translation;
 
 // Local UI state (not related to translation)
@@ -131,46 +128,7 @@ const targetLang = ref('Persian');
 
 const historyComposable = useHistory();
 
-// Language lists - get from useLanguages composable 
-const targetLanguages = computed(() => languages.targetLanguages.value || []);
-const sourceLanguagesFiltered = computed(() => {
-  // Get all languages except auto-detect (since we handle it separately)
-  return (languages.allLanguages.value || []).filter(lang => lang.code !== 'auto');
-});
 
-// Computed properties for UI state
-const hasSourceContent = computed(() => {
-  return sourceText.value.trim().length > 0;
-});
-
-const hasTranslationContent = computed(() => {
-  try {
-    const translated = translatedText?.value || "";
-    const error = translationError?.value || "";
-    return (translated + error).trim().length > 0;
-  } catch (err) {
-  logger.warn('Error in hasTranslationContent computed:', err);
-    return false;
-  }
-});
-
-// Select Element computed properties
-const isSelecting = computed(() => {
-  try {
-    return selectElement?.isActivating?.value || false;
-  } catch (err) {
-  logger.warn('Error in isSelecting computed:', err);
-    return false;
-  }
-});
-const isSelectElementActivating = computed(() => {
-  try {
-    return selectElement?.isActivating?.value || false;
-  } catch (err) {
-  logger.warn('Error in isSelectElementActivating computed:', err);
-    return false;
-  }
-});
 
 const targetLanguageValue = computed(() => targetLang.value || 'Persian');
 
@@ -272,70 +230,15 @@ const handleTranslationSubmit = async () => {
   }
 };
 
-// Copy source text to clipboard
-const copySourceText = async () => {
-  try {
-    logger.debug("📋 Copying source text to clipboard...");
-    await navigator.clipboard.writeText(sourceText.value);
-    logger.info("✅ Source text copied to clipboard");
-  } catch (error) {
-    logger.error("❌ Failed to copy source text:", error);
-    await handleError(error, 'SidepanelMainContent-copy-source');
-  }
+// Event Handlers
+const handleSourceTextInput = (event) => {
+  logger.debug("[SidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
 };
 
-// Copy translated text to clipboard  
-const copyTranslatedText = async () => {
-  try {
-    logger.debug("📋 Copying translated text to clipboard...");
-    await navigator.clipboard.writeText(translatedText.value);
-    logger.info("✅ Translated text copied to clipboard");
-  } catch (error) {
-    logger.error("❌ Failed to copy translated text:", error);
-    await handleError(error, 'SidepanelMainContent-copy-translation');
-  }
-};// Listen for focus events to handle any UI updates if needed
+
+
 const handleFocus = () => {
   // Focus handling can be added here if needed
-};
-
-// Handle source text input to update toolbar visibility
-const handleSourceTextInput = () => {
-  // This is called on input events - reactive hasSourceContent will automatically handle toolbar visibility
-};
-
-// Speak source text using TTS
-const speakSourceText = async () => {
-  try {
-    logger.debug("🎤 Starting TTS for source text...");
-    const sourceLanguage = getLanguageCode(sourceLang.value) || AUTO_DETECT_VALUE;
-    const langCode = getLanguageCodeForTTS(sourceLang.value || sourceLanguage);
-    
-    logger.debug("🌍 TTS language:", { sourceLanguage, langCode });
-    logger.debug("📝 Speaking text:", sourceText.value?.substring(0, 50) + "...");
-    
-    await tts.speak(sourceText.value, langCode);
-    logger.info("✅ Source text TTS completed");
-  } catch (error) {
-    logger.error("❌ Source text TTS failed:", error);
-  }
-};
-
-// Speak translation text using TTS
-const speakTranslationText = async () => {
-  try {
-    logger.debug("🎤 Starting TTS for translated text...");
-    const targetLanguageCode = getLanguageCode(targetLang.value) || AUTO_DETECT_VALUE;
-    const langCode = getLanguageCodeForTTS(targetLang.value || targetLanguageCode);
-    
-    logger.debug("🌍 TTS language:", { targetLanguage: targetLang.value, langCode });
-    logger.debug("📝 Speaking text:", translatedText.value?.substring(0, 50) + "...");
-    
-    await tts.speak(translatedText.value, langCode);
-    logger.info("✅ Translated text TTS completed");
-  } catch (error) {
-    logger.error("❌ Translated text TTS failed:", error);
-  }
 };
 
 // Lifecycle - setup event listeners

@@ -47,8 +47,6 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
@@ -147,21 +145,12 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: 'auto'
-  },
-  
-  // Language for TTS
-  targetLanguage: {
-    type: String,
-    default: 'auto'
   }
 })
 
 // Refs
 const contentRef = ref(null)
 const showFadeIn = ref(false)
-
-// Composables
-const { handleError } = useErrorHandler()
 
 // Computed
 const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)

@@ -16,12 +16,18 @@
       :src="iconSrc" 
       :alt="iconAlt"
       class="button-icon"
-    />
-    <span v-if="showLabel" class="button-label">{{ label }}</span>
+    >
+    <span
+      v-if="showLabel"
+      class="button-label"
+    >{{ label }}</span>
     
     <!-- Success feedback -->
     <Transition name="feedback">
-      <div v-if="showFeedback" class="copy-feedback">
+      <div
+        v-if="showFeedback"
+        class="copy-feedback"
+      >
         ✓ {{ feedbackText }}
       </div>
     </Transition>

@@ -143,7 +143,9 @@ export class FrameRegistry {
     if (this.debugCrossFrame) {
       try {
         this.logger.debug(`[XF] ${message}`, meta || {});
-      } catch {}
+      } catch {
+        // Ignore logging errors
+      }
     }
   }
 

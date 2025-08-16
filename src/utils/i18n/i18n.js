@@ -162,7 +162,7 @@ function localizeContainer(container, translations) {
     const titleKey = item.getAttribute("data-i18n-title");
     const titleTranslation =
       translations?.[titleKey]?.message ||
-      getbrowser().i18n.getMessage(titleKey);
+      browser.i18n.getMessage(titleKey);
     item.setAttribute("title", titleTranslation);
   });
 
@@ -184,7 +184,7 @@ function localizeContainer(container, translations) {
   markdownItems.forEach((item) => {
     const key = item.getAttribute("data-i18n-markdown");
     const markdownString =
-      translations?.[key]?.message || getbrowser().i18n.getMessage(key);
+      translations?.[key]?.message || browser.i18n.getMessage(key);
 
     if (markdownString) {
       // Use our custom markdown parser

@@ -99,7 +99,6 @@ import { useHistory } from '@/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { languageList } from '@/utils/i18n/languages.js'
-import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');

@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, afterEach } from "vitest";
 
 // Mock browser extension APIs
 const mockbrowser = {

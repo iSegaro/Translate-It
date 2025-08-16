@@ -66,7 +66,7 @@ export class TextSelectionManager {
       if (window.translateItNewSelectManager || (window.selectElementManagerInstance && window.selectElementManagerInstance.isActive)) {
         return;
       }
-    } catch {
+    } catch (error) {
       // If check fails, continue with normal flow
       this.logger.warn("[TextSelectionManager] Failed to check local select element state:", error);
     }

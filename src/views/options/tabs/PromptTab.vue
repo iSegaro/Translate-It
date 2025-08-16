@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/core/validation.js'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'

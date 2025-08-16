@@ -81,7 +81,7 @@ export default class TranslationHandler {
 
   @logMethod
   reinitialize() {
-  logger.debug('Reinitializing state after update...');
+  this.logger.debug('Reinitializing state after update...');
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
   }
@@ -120,7 +120,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-  logger.error('Error handling failed:', error);
+  this.logger.error('Error handling failed:', error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
@@ -142,7 +142,7 @@ export default class TranslationHandler {
 
   async handleCtrlSlash() {
     // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
-  logger.debug('Ctrl+/ handling delegated to ShortcutManager');
+  this.logger.debug('Ctrl+/ handling delegated to ShortcutManager');
   }
 
   async handleEditableElement(event) {

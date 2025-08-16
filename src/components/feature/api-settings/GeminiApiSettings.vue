@@ -82,10 +82,10 @@ const geminiThinking = computed({
   set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_ENABLED', value)
 })
 
-const geminiCustomUrl = computed({
-  get: () => settingsStore.settings?.API_URL || '',
-  set: (value) => settingsStore.updateSettingLocally('API_URL', value)
-})
+// const geminiCustomUrl = computed({
+//   get: () => settingsStore.settings?.API_URL || '',
+//   set: (value) => settingsStore.updateSettingLocally('API_URL', value)
+// })
 
 // Get model options from CONFIG to maintain consistency
 const geminiModelOptions = ref(

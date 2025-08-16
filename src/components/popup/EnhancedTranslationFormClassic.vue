@@ -43,7 +43,10 @@
     <div class="enhanced-result-section">
       <div class="result-container">
         <!-- Loading State -->
-        <div v-if="isTranslating" class="loading-overlay">
+        <div
+          v-if="isTranslating"
+          class="loading-overlay"
+        >
           <div class="loading-spinner">
             <div class="spinner" />
           </div>
@@ -51,9 +54,16 @@
         </div>
         
         <!-- Error State -->
-        <div v-else-if="translationError" class="error-content">
-          <div class="error-icon">⚠️</div>
-          <div class="error-text">{{ translationError }}</div>
+        <div
+          v-else-if="translationError"
+          class="error-content"
+        >
+          <div class="error-icon">
+            ⚠️
+          </div>
+          <div class="error-text">
+            {{ translationError }}
+          </div>
         </div>
         
         <!-- Translation Result -->
@@ -88,7 +98,10 @@
     </div>
 
     <!-- Status Bar -->
-    <div v-if="statusMessage" class="status-bar">
+    <div
+      v-if="statusMessage"
+      class="status-bar"
+    >
       <span :class="['status-message', statusType]">{{ statusMessage }}</span>
     </div>
   </form>
@@ -203,7 +216,7 @@ const handleTranslate = async () => {
 }
 
 // Action Handlers
-const handleSourceTextCopied = (text) => {
+const handleSourceTextCopied = () => {
   logger.debug("[EnhancedTranslationForm] Source text copied")
   showStatus("Source text copied to clipboard!", "success", 2000)
 }
@@ -229,17 +242,17 @@ const handleSourceTextPasted = (event) => {
   }
 }
 
-const handleSourceTTSSpeaking = (event) => {
+const handleSourceTTSSpeaking = () => {
   logger.debug("[EnhancedTranslationForm] Playing source TTS")
   showStatus("Playing source text...", "info", 0)
 }
 
-const handleTranslationCopied = (text) => {
+const handleTranslationCopied = () => {
   logger.debug("[EnhancedTranslationForm] Translation copied")
   showStatus("Translation copied to clipboard!", "success", 2000)
 }
 
-const handleTranslationTTSSpeaking = (event) => {
+const handleTranslationTTSSpeaking = () => {
   logger.debug("[EnhancedTranslationForm] Playing translation TTS")
   showStatus("Playing translation...", "info", 0)
 }
@@ -291,7 +304,7 @@ onMounted(async () => {
   // Event listeners for external actions
   document.addEventListener('clear-storage', clearAll)
   document.addEventListener('revert-translation', revertTranslation)
-  document.addEventListener('translate-request', (event) => {
+  document.addEventListener('translate-request', (_event) => {
     if (sourceText.value.trim()) {
       handleTranslate()
     }

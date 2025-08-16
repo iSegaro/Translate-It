@@ -221,15 +221,27 @@ export function useSelectElementTranslation() {
         try {
           // Always attempt to deactivate select mode when ESC pressed in sidepanel
           // This ensures content script is instructed even if shared state is out-of-sync.
-          deactivateSelectMode().catch(() => {});
-        } catch {}
+          deactivateSelectMode().catch(() => {
+            // Ignore deactivation errors
+          });
+        } catch {
+          // Ignore errors during deactivation
+        }
       }
     };
-    try { window.addEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch {}
+    try { 
+      window.addEventListener('keydown', _sidepanelEscHandler, { capture: true }) 
+    } catch {
+      // Ignore errors when adding event listener
+    }
   });
 
   onUnmounted(() => {
-    try { window.removeEventListener('keydown', _sidepanelEscHandler, { capture: true }) } catch {}
+    try { 
+      window.removeEventListener('keydown', _sidepanelEscHandler, { capture: true }) 
+    } catch {
+      // Ignore errors when removing event listener
+    }
   });
 
   onUnmounted(() => {

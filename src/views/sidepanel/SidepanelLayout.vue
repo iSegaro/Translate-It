@@ -30,8 +30,14 @@
       class="enhanced-version-toggle"
       @click="toggleEnhancedVersion"
     >
-      <Icon icon="fa6-solid:toggle-on" v-if="useEnhancedVersion" />
-      <Icon icon="fa6-solid:toggle-off" v-else />
+      <Icon
+        v-if="useEnhancedVersion"
+        icon="fa6-solid:toggle-on"
+      />
+      <Icon
+        v-else
+        icon="fa6-solid:toggle-off"
+      />
       <span>{{ useEnhancedVersion ? 'Enhanced' : 'Classic' }}</span>
     </div>
   </div>
@@ -104,13 +110,13 @@ const handleClearFields = () => {
 }
 
 // Handle history item selection
-const handleHistoryItemSelect = (item) => {
+const handleHistoryItemSelect = () => {
   // This will be handled by the main content component
 }
 
 
 // Handle sidepanel click to deactivate select element mode
-const handleSidepanelClick = async (event) => {
+const handleSidepanelClick = async () => {
   // Only deactivate if select mode is active
   if (isSelectModeActive.value) {
     try {

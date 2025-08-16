@@ -121,7 +121,7 @@ export class ContentScriptCaptureManager {
    * Basic image cropping (fallback implementation)
    * @private
    */
-  async cropImageBasic(imageData, area) {
+  async cropImageBasic(imageData) {
     try {
       // This is a basic implementation
       // In a real scenario, this would be done in a content script or offscreen document

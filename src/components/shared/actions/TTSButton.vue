@@ -17,14 +17,20 @@
       :alt="iconAlt"
       class="button-icon"
       :class="{ 'spinning': isPlaying }"
-    />
-    <span v-if="showLabel" class="button-label">{{ dynamicLabel }}</span>
+    >
+    <span
+      v-if="showLabel"
+      class="button-label"
+    >{{ dynamicLabel }}</span>
     
     <!-- Playing indicator -->
-    <div v-if="isPlaying && showPlayingIndicator" class="playing-indicator">
-      <div class="wave"></div>
-      <div class="wave"></div>
-      <div class="wave"></div>
+    <div
+      v-if="isPlaying && showPlayingIndicator"
+      class="playing-indicator"
+    >
+      <div class="wave" />
+      <div class="wave" />
+      <div class="wave" />
     </div>
   </button>
 </template>

@@ -118,7 +118,7 @@ export class DragHandler {
   /**
    * Handle mouse up event (end drag)
    */
-  _onMouseUp(e) {
+  _onMouseUp() {
     if (!this.isDragging) return;
 
     this.isDragging = false;

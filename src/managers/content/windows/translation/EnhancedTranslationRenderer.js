@@ -3,7 +3,6 @@
 import browser from "webextension-polyfill";
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
-import { WindowsConfig } from "../core/WindowsConfig.js";
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "../../../../config.js";
 

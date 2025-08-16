@@ -77,7 +77,6 @@ const {
   translatedText,
   isTranslating,
   translationError,
-  hasTranslation,
   canTranslate,
   triggerTranslation,
   clearTranslation,

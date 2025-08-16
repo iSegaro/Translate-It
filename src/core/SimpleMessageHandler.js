@@ -4,9 +4,9 @@
  * Enhanced with context-aware routing for MessagingStandards integration
  */
 import browser from "webextension-polyfill";
-import { MessagingContexts } from "../messaging/core/MessagingCore";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { MessageContexts } from '@/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SimpleMessageHandler');
 
@@ -287,7 +287,7 @@ class SimpleMessageHandler {
       routingEnabled: this.routingEnabled,
       initialized: this.initialized,
       handlers: Array.from(this.handlers.keys()),
-      contextHandlers: Array.from(this.contextHandlers.keys())
+      contextHandlerKeys: Array.from(this.contextHandlers.keys())
     };
   }
 

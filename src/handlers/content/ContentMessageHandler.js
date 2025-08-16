@@ -109,7 +109,7 @@ export class ContentMessageHandler {
    * @param {Object} sender - Sender object
    * @returns {Promise<Object>} Handler result
    */
-  async handleTTSSpeak(message, sender) {
+  async handleTTSSpeak(message) {
     this.logger.debug('Processing TTS speak request:', message);
 
     try {
@@ -187,7 +187,7 @@ export class ContentMessageHandler {
         }, 15000); // 15 second timeout
 
         // Clear timeout when speech ends or errors
-        utterance.onend = (event) => {
+        utterance.onend = () => {
           clearTimeout(timeout);
           this.logger.debug('TTS speech ended successfully');
           resolveOnce({ success: true });

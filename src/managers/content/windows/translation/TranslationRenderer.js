@@ -2,7 +2,6 @@
 
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
-import { WindowsConfig } from "../core/WindowsConfig.js";
 import { createTranslationRenderer } from "../../../../utils/rendering/TranslationRenderer.js";
 import { TranslationMode, CONFIG } from "../../../../config.js";
 
@@ -258,7 +257,7 @@ export class TranslationRenderer {
 
     const textNodes = [];
     let node;
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
       textNodes.push(node);
     }
 

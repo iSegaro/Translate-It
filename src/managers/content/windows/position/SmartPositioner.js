@@ -102,7 +102,7 @@ export class SmartPositioner {
   /**
    * DISABLED: No adjustment for fixed elements to avoid displacement
    */
-  adjustForFixedElements(x, y, width, height, topWindow) {
+  adjustForFixedElements(x, y) {
     // Simply return original Y position - no adjustment
     this.logger.debug('Fixed element adjustment disabled - using original Y position', {
       originalY: y,

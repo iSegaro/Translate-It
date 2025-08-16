@@ -39,7 +39,7 @@ export class FirefoxSidebarManager {
    * @param {number} tabId - Tab ID (may not be used in Firefox sidebar)
    * @returns {Promise<void>}
    */
-  async open(tabId) {
+  async open() {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -79,7 +79,7 @@ export class FirefoxSidebarManager {
    * @param {number} tabId - Tab ID
    * @param {string} behavior - Panel behavior
    */
-  async setPanelBehavior(tabId, behavior = "enabled") {
+  async setPanelBehavior() {
     // Firefox sidebar behavior is controlled by manifest
     // This is a no-op but we'll log for consistency
     logger.debug(`📋 Firefox sidebar behavior is always enabled (no-op)`);

@@ -347,11 +347,11 @@ export class WindowsManager {
       this.smartPositioner.applyInitialStyles(this.displayElement, position);
       
       // Create popup container
-      const { shadowRoot, container } = this.factory.createPopupContainer(this.displayElement);
+      const { container } = this.factory.createPopupContainer(this.displayElement);
       this.innerContainer = container;
       
       // Add loading animation
-      const loadingElement = this.translationRenderer.renderLoading(this.innerContainer);
+      this.translationRenderer.renderLoading(this.innerContainer);
       
       // Append to document
       document.body.appendChild(this.displayElement);
@@ -427,7 +427,7 @@ export class WindowsManager {
   /**
    * Handle cross-frame outside click
    */
-  _handleCrossFrameOutsideClick(event) {
+  _handleCrossFrameOutsideClick() {
     if (this.state.hasActiveElements) {
       this.dismiss(true);
     }
@@ -436,7 +436,7 @@ export class WindowsManager {
   /**
    * Handle outside click
    */
-  _handleOutsideClick(event) {
+  _handleOutsideClick() {
     if (this.state.shouldPreventDismissal) return;
     this.dismiss(true);
   }
@@ -444,7 +444,7 @@ export class WindowsManager {
   /**
    * Handle icon click
    */
-  _handleIconClick(event) {
+  _handleIconClick() {
     const context = this.clickManager.handleIconClick(this.state.iconClickContext);
     if (!context) return;
 
@@ -472,7 +472,7 @@ export class WindowsManager {
   /**
    * Handle window creation request from iframe
    */
-  async _handleWindowCreationRequest(data, sourceWindow) {
+  async _handleWindowCreationRequest(data) {
     if (this.crossFrameManager.isInIframe) return;
 
     try {

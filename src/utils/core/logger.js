@@ -176,7 +176,7 @@ export function createLogger(component, subComponent = null) {
           const formatted = formatMessage(loggerName, DEBUG_LEVEL, produced, undefined);
           console.log(...formatted);
         }
-      } catch (e) {
+      } catch {
         // Swallow to avoid breaking app due to logging
       }
     },
@@ -221,7 +221,9 @@ export function createLogger(component, subComponent = null) {
           const formatted = formatMessage(loggerName, INFO_LEVEL, produced, undefined);
           console.info(...formatted);
         }
-      } catch (_) {}
+      } catch {
+        // Ignore console logging errors
+      }
     },
   };
   return Object.freeze(loggerApi);
@@ -236,7 +238,7 @@ export function getLogger(component, subComponent) {
 try {
   if (!globalThis.getLogger) globalThis.getLogger = getLogger;
   if (!globalThis.logME) globalThis.logME = (...a) => { if (isDevelopment) console.log('[logME]', ...a); };
-} catch(_) { /* ignore global assignment issues */ }
+} catch { /* ignore global assignment issues */ }
 
 /**
  * Update log level for a component or globally

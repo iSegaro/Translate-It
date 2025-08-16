@@ -28,7 +28,7 @@ export class BaseProvider {
    * @param {string} translateMode - Translation mode
    * @returns {Promise<string>} - Translated text
    */
-  async translate(text, sourceLang, targetLang, translateMode) {
+  async translate() {
     throw new Error(`translate method must be implemented by ${this.constructor.name}`);
   }
 
@@ -40,7 +40,7 @@ export class BaseProvider {
    * @param {string} translateMode - Translation mode
    * @returns {Promise<string>} - Translated text extracted from image
    */
-  async translateImage(_imageData, _sourceLang, _targetLang, _translateMode) {
+  async translateImage() {
     throw new Error(`translateImage method not supported by ${this.constructor.name}`);
   }
 

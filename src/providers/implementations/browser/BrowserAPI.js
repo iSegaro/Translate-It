@@ -159,8 +159,7 @@ export class browserTranslateProvider extends BaseProvider {
         logger.info('browser.i18n.detectLanguage swapping result:', detectionResult);
         if (detectionResult?.languages && detectionResult.languages.length > 0) {
           detectedLangCode = detectionResult.languages[0].language.split("-")[0];
-          const percentage = detectionResult.languages[0].percentage || 0;
-          logger.info('Detected language for swapping: ${detectedLangCode} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
+          logger.info('Detected language for swapping: ${detectedLangCode}');
         }
       } catch (i18nError) {
         logger.error('browser.i18n.detectLanguage failed for swapping:', i18nError);
@@ -197,8 +196,8 @@ export class browserTranslateProvider extends BaseProvider {
           return [targetLang, sourceLang];
         }
       }
-    } catch (error) {
-      logger.error('Language detection for swapping failed:', error);
+    } catch {
+      logger.error('Language detection for swapping failed:');
       // Regex fallback
       const targetLangCode = this._getLangCode(targetLang);
       if (isPersianText(text) && (targetLangCode === "fa")) {
@@ -237,7 +236,7 @@ export class browserTranslateProvider extends BaseProvider {
         }
       }
     } catch (error) {
-      logger.error('LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage');
+      logger.error(`LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage`);
     }
 
     // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
@@ -248,8 +247,7 @@ export class browserTranslateProvider extends BaseProvider {
       
       if (detectionResult?.languages && detectionResult.languages.length > 0) {
         const detectedLang = detectionResult.languages[0].language.split("-")[0];
-        const percentage = detectionResult.languages[0].percentage || 0;
-        logger.info('Language detected using browser.i18n.detectLanguage: ${detectedLang} (${percentage}% confidence, reliable: ${detectionResult.isReliable})');
+        logger.info('Language detected using browser.i18n.detectLanguage: ${detectedLang}');
         return detectedLang;
       } else {
         logger.info('browser.i18n.detectLanguage result empty');
@@ -293,14 +291,12 @@ export class browserTranslateProvider extends BaseProvider {
     }
 
     // Create new translator with progress monitoring
-    const providerName = this.providerName; // Capture this context for callback
     const translator = await globalThis.Translator.create({
       sourceLanguage: sourceLang,
       targetLanguage: targetLang,
       monitor(monitor) {
-        monitor.addEventListener("downloadprogress", (e) => {
-          const progress = Math.floor(e.loaded * 100);
-          logger.debug('Language pack download: ${progress}%');
+        monitor.addEventListener("downloadprogress", () => {
+          logger.debug('Language pack download');
         });
       },
     });
@@ -449,8 +445,8 @@ export class browserTranslateProvider extends BaseProvider {
     if (this.detector) {
       try {
         this.detector.destroy();
-      } catch (error) {
-        logger.error('Error destroying detector:', error);
+      } catch {
+        logger.error('Error destroying detector:');
       }
       this.detector = null;
     }
@@ -460,8 +456,8 @@ export class browserTranslateProvider extends BaseProvider {
       if (this.translators[key]) {
         try {
           this.translators[key].destroy();
-        } catch (error) {
-          logger.error('Error destroying translator ${key}:', error);
+        } catch {
+          logger.error('Error destroying translator ${key}:');
         }
         delete this.translators[key];
       }

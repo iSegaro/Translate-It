@@ -145,7 +145,7 @@ export class CaptureManager {
    * @private
    * @deprecated Use processAreaCaptureImage instead
    */
-  async _handleAreaSelection(_selectionData) {
+  async _handleAreaSelection() {
   logger.debug('Legacy area selection handler called - this should not happen');
   logger.debug('Image cropping should be handled in content script now');
     throw this._createError(
@@ -341,8 +341,7 @@ export class CaptureManager {
    */
   async _displayTranslationResult(
     translationResult,
-    captureData,
-    _extractionMetadata = {},
+    captureData
   ) {
     try {
   logger.info('Requesting result display in content script');

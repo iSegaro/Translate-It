@@ -1,7 +1,8 @@
 import browser from "webextension-polyfill";
-import { MessagingContexts, MessageFormat, MessageActions } from '../messaging/core/MessagingCore.js';
+import { MessagingContexts, MessageFormat } from '../messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { simpleMessageHandler } from '../core/SimpleMessageHandler.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
 
 
@@ -26,7 +27,7 @@ async function handleCommand(tab, action, data = {}) {
 async function handleBackgroundCommand(action, data = {}) {
   try {
     logger.debug(action, 'background command triggered');
-        await messenger.sendMessage({ action, data: { ...data, source: 'keyboard_shortcut' } });
+        await simpleMessageHandler.sendMessage({ action, data: { ...data, source: 'keyboard_shortcut' } });
   logger.debug(action, 'background command sent');
   } catch (error) {
     logger.error('Error handling background command', action, error);
@@ -36,7 +37,7 @@ async function handleBackgroundCommand(action, data = {}) {
 async function handleOptionsCommand() {
   try {
     logger.debug('Options command triggered');
-        await messenger.sendMessage({ action: 'openOptionsPage' });
+        await simpleMessageHandler.sendMessage({ action: 'openOptionsPage' });
   } catch (error) {
     logger.error('Error handling options command:', error);
     }

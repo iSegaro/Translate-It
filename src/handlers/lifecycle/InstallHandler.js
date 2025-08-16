@@ -98,7 +98,7 @@ async function performLegacyMigration(existingData) {
     await storageManager.set(migratedData);
 
     logger.init('Legacy migration completed successfully:');
-    migrationLog.forEach((entry) => logger.debug('- ${entry}'));
+    migrationLog.forEach(() => logger.debug('- '));
 
     return {
       success: true,

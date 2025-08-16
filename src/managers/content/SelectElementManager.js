@@ -282,7 +282,7 @@ export class SelectElementManager {
       try {
         translatedData = JSON.parse(translatedText);
         originalData = JSON.parse(originalText);
-      } catch (e) {
+      } catch {
         // Not JSON format, cache as-is
         translationCache.set(originalText.trim(), translatedText.trim());
         this.logger.debug('Cached simple text translation');

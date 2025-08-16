@@ -25,7 +25,7 @@ export class MessageRouter {
   _handleCrossFrameMessage(event) {
     if (!event.data || !event.data.type) return;
 
-    const { type, data } = event;
+    const { data } = event;
 
     switch (data.type) {
       case WindowsConfig.CROSS_FRAME.REGISTER_FRAME:
@@ -194,7 +194,7 @@ export class MessageRouter {
 
       // Broadcast to all child frames
       this._broadcastToAllIframes(message);
-    } catch (error) {
+    } catch {
       // Silently ignore errors in cross-frame communication
     }
   }
@@ -259,7 +259,7 @@ export class MessageRouter {
       if (window.top && window.top !== window.parent) {
         window.top.postMessage(message, '*');
       }
-    } catch (error) {
+    } catch {
       // Silently ignore CORS errors
     }
   }
@@ -272,7 +272,7 @@ export class MessageRouter {
     frames.forEach((frame) => {
       try {
         frame.contentWindow?.postMessage(message, '*');
-      } catch (error) {
+      } catch {
         // Silently ignore CORS errors
       }
     });

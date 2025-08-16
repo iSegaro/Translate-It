@@ -217,7 +217,7 @@ export class PositionCalculator {
           } else {
             break;
           }
-        } catch (error) {
+        } catch {
           // Cross-origin restriction
           break;
         }

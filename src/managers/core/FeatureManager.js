@@ -1,6 +1,5 @@
 // src/core/FeatureManager.js
 
-import browser from "webextension-polyfill";
 import { CONFIG } from "../../config.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';

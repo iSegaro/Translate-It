@@ -149,7 +149,7 @@ async function handleScreenCapture(info, tab) {
 /**
  * Handle open options context menu
  */
-async function handleOpenOptions(info, tab) {
+async function handleOpenOptions() {
   try {
     logger.debug('Open options menu clicked');
 
@@ -238,7 +238,7 @@ export async function handleContextMenuEvent(info, tab) {
     } else if (menuItemId === "screen-capture") {
       await handleScreenCapture(info, tab);
     } else if (menuItemId === "open-options") {
-      await handleOpenOptions(info, tab);
+      await handleOpenOptions();
     } else if (menuItemId === "exclude-page") {
       await handlePageExclusion(info, tab, true);
     } else if (menuItemId === "include-page") {

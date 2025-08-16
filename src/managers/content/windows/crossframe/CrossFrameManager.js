@@ -124,7 +124,9 @@ export class CrossFrameManager {
           // Tag the event as relay
           try { 
             Object.defineProperty(e, '__translateItRelay', { value: true, enumerable: false }); 
-          } catch {}
+          } catch {
+            // Ignore property definition errors
+          }
           this._broadcastOutsideClick(e);
         };
         
@@ -208,7 +210,9 @@ export class CrossFrameManager {
     if (this.debugCrossFrame) {
       try {
         this.logger.debug(`[XF] ${message}`, meta || {});
-      } catch {}
+      } catch {
+        // Ignore logging errors
+      }
     }
   }
 

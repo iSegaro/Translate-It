@@ -491,7 +491,7 @@ const copySubtitle = async (subtitle) => {
   }
 }
 
-const playSubtitle = (subtitle) => {
+const playSubtitle = async (subtitle) => {
   if (!subtitle.translated || !window.speechSynthesis) return
 
   try {

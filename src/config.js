@@ -384,7 +384,7 @@ export const getDebugModeAsync = async () => {
   try {
     const errorHandler = ErrorHandler.getInstance();
     errorHandler.setDebugMode(debugMode);
-  } catch (e) {
+  } catch {
     // Ignore errors during ErrorHandler setup
   }
   return debugMode;

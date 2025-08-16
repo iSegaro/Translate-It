@@ -59,9 +59,7 @@ const {
   availableProviders,
   currentProvider,
   selectProvider,
-  createProviderItems,
-  getProviderIconUrl,
-  closeDropdown: closeApiDropdownComposable // Use the composable's close method
+  createProviderItems
 } = useApiProvider()
 
 const { showVisualFeedback } = useUI()

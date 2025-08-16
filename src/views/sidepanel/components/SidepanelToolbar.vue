@@ -78,11 +78,11 @@
 </template>
 
 <script setup>
-import { useMessaging } from '@/messaging/composables/useMessaging.js';
+
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useUI } from '@/composables/useUI.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 
 // Lazy logger to avoid initialization order issues
@@ -113,8 +113,7 @@ const emit = defineEmits(['historyToggle', 'clear-fields'])
 
 // Composables
 const { showVisualFeedback } = useUI()
-const { isSelectModeActive, toggleSelectElement, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
-const { sendMessage } = useMessaging('sidepanel')
+const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
 const { handleError, handleConnectionError } = useErrorHandler()
 
 // Debounce logic

@@ -33,7 +33,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { getScopedLogger } from '@/utils/core/logger.js';

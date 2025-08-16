@@ -212,7 +212,7 @@ class LifecycleManager {
       const { ErrorHandler } = await import(
         "../../error-management/ErrorHandler.js"
       );
-      const errorHandler = new ErrorHandler();
+      new ErrorHandler();
 
       // TTS error handling now integrated into handleGoogleTTS directly
 

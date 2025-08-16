@@ -72,7 +72,7 @@ export function useSidepanelTranslation() {
       
       // Send direct message to background using browser.runtime.sendMessage 
       // (bypassing UnifiedMessenger to avoid timeout issues)
-      const messageResult = await browser.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: MessageActions.TRANSLATE,
         messageId: messageId,
         context: 'sidepanel',

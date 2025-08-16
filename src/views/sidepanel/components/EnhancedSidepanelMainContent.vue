@@ -3,9 +3,8 @@
     <form @submit.prevent="handleTranslationSubmit">
       <div class="controls-container">
         <LanguageSelector
-          v-model:sourceLanguage="sourceLang"
-          v-model:targetLanguage="targetLang"
-          :disabled="isTranslating"
+          v-model:source-language="sourceLang"
+          v-model:target-language="targetLang"
           :auto-detect-label="'Auto-Detect'"
           :source-title="'Source Language'"
           :target-title="'Target Language'"
@@ -77,7 +76,10 @@
         <label class="input-label">{{ t("TRANSLATION", "Translation") }}:</label>
         <div class="result-container">
           <!-- Loading State -->
-          <div v-if="isTranslating" class="loading-overlay">
+          <div
+            v-if="isTranslating"
+            class="loading-overlay"
+          >
             <div class="loading-spinner">
               <div class="spinner" />
             </div>
@@ -85,9 +87,16 @@
           </div>
           
           <!-- Error State -->
-          <div v-else-if="translationError" class="error-content">
-            <div class="error-icon">⚠️</div>
-            <div class="error-text">{{ translationError }}</div>
+          <div
+            v-else-if="translationError"
+            class="error-content"
+          >
+            <div class="error-icon">
+              ⚠️
+            </div>
+            <div class="error-text">
+              {{ translationError }}
+            </div>
           </div>
           
           <!-- Translation Result -->
@@ -123,23 +132,26 @@
     </form>
 
     <!-- Status Bar -->
-    <div v-if="statusMessage" class="status-bar">
+    <div
+      v-if="statusMessage"
+      class="status-bar"
+    >
       <span :class="['status-message', statusType]">{{ statusMessage }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
-import { useTTSSmart } from "@/composables/useTTSSmart.js";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
+
 import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
 import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
-import { useHistory } from "@/composables/useHistory.js";
+
 import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
-import { getLanguageCodeForTTS, getLanguageDisplayName, getLanguageCode } from "@/utils/i18n/languages.js";
-import { useLanguages } from "@/composables/useLanguages.js";
+import { getLanguageCode } from "@/utils/i18n/languages.js";
+
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { marked } from 'marked';
 
@@ -155,12 +167,9 @@ import ActionToolbar from "@/components/shared/actions/ActionToolbar.vue";
 
 
 // Composables
-const tts = useTTSSmart();
 const selectElement = useSelectElementTranslation();
 const { handleError } = useErrorHandler();
 const { t } = useI18n();
-const { addToHistory } = useHistory();
-const { languages } = useLanguages();
 
 // Translation composable
 const {
@@ -171,7 +180,6 @@ const {
   hasTranslation,
   canTranslate,
   triggerTranslation,
-  clearTranslation,
   loadLastTranslation
 } = useSidepanelTranslation();
 
@@ -244,7 +252,7 @@ const handleTranslationSubmit = async () => {
 };
 
 // Action Handlers
-const handleSourceTextCopied = (text) => {
+const handleSourceTextCopied = () => {
   logger.debug("[EnhancedSidepanelMainContent] Source text copied");
   showStatus("Source text copied to clipboard!", "success", 2000);
 };
@@ -270,24 +278,24 @@ const handleSourceTextPasted = (event) => {
   }
 };
 
-const handleSourceTTSSpeaking = (event) => {
+const handleSourceTTSSpeaking = () => {
   logger.debug("[EnhancedSidepanelMainContent] Playing source TTS");
   showStatus("Playing source text...", "info", 0);
 };
 
-const handleTranslationCopied = (text) => {
+const handleTranslationCopied = () => {
   logger.debug("[EnhancedSidepanelMainContent] Translation copied");
   showStatus("Translation copied to clipboard!", "success", 2000);
 };
 
-const handleTranslationTTSSpeaking = (event) => {
+const handleTranslationTTSSpeaking = () => {
   logger.debug("[EnhancedSidepanelMainContent] Playing translation TTS");
   showStatus("Playing translation...", "info", 0);
 };
 
 const handleActionFailed = (event) => {
   logger.error("[EnhancedSidepanelMainContent] Action failed:", event);
-  showStatus(`${event.action} failed: ${event.error.message}`, "error", 3000);
+  showStatus(`Action failed: ${event.error.message}`, "error", 3000);
 };
 
 // Status Management

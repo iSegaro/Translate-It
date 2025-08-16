@@ -4,7 +4,7 @@ class ValidationService {
     try {
       new URL(url);
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -15,10 +15,7 @@ class ValidationService {
 
   isValidEmail(email) {
     // Basic email validation regex
-    const emailRegex = /^[^
-@]+@[^
-@]+\.[^
-@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
 

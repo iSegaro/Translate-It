@@ -207,7 +207,11 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       // Lazy read manifest version (avoid hardcoding); fallback to undefined if runtime not available.
       let version;
-      try { version = browser.runtime.getManifest()?.version; } catch(_) {}
+      try { 
+        version = browser.runtime.getManifest()?.version; 
+      } catch {
+        // Browser runtime not available, use undefined
+      }
       const exportData = {
         ...settings.value,
         _exported: true,
@@ -298,7 +302,12 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const markMigrationComplete = async (fromVersion = 'legacy') => {
     try {
-      let version; try { version = browser.runtime.getManifest()?.version; } catch(_) {}
+      let version; 
+      try { 
+        version = browser.runtime.getManifest()?.version; 
+      } catch {
+        // Browser runtime not available, use undefined
+      }
       Object.assign(settings.value, {
         VUE_MIGRATED: true,
         MIGRATION_DATE: new Date().toISOString(),

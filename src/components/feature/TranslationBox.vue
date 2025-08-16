@@ -107,10 +107,9 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useSettingsStore } from '@/store/core/settings'
-import { useTranslationStore } from '@/store/modules/translation'
 import { useExtensionAPI } from '@/composables/useExtensionAPI'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -134,7 +133,6 @@ const emit = defineEmits(['translate', 'clear'])
 
 // Stores & Composables
 const settingsStore = useSettingsStore()
-const translationStore = useTranslationStore()
 const { sendMessage } = useExtensionAPI()
 const { sourceLanguages, targetLanguages } = useLanguages()
 const { handleError } = useErrorHandler()
@@ -146,6 +144,42 @@ const translatedText = ref('')
 const fromLanguage = ref('auto')
 const toLanguage = ref('en')
 const isTranslating = ref(false)
+
+const canTranslate = computed(() => {
+  return sourceText.value.trim().length > 0 && !isTranslating.value
+})
+
+const translate = async () => {
+  if (!canTranslate.value) return
+
+  isTranslating.value = true
+  translatedText.value = ''
+  emit('translate', {
+    text: sourceText.value,
+    from: fromLanguage.value,
+    to: toLanguage.value
+  })
+
+  try {
+    const response = await sendMessage('TRANSLATE_TEXT', {
+      text: sourceText.value,
+      sourceLang: fromLanguage.value,
+      targetLang: toLanguage.value,
+      provider: settingsStore.selectedProvider
+    })
+    
+    if (response.error) {
+      throw new Error(response.error)
+    }
+
+    translatedText.value = response.translation
+  } catch (error) {
+    await handleError(error, 'translation-box-translate')
+    translatedText.value = 'Error: Could not translate'
+  } finally {
+    isTranslating.value = false
+  }
+}
 
 // Available languages based on context
 const handleInput = () => {

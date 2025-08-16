@@ -2,7 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
 import browser from "webextension-polyfill";
-import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
+import { MessageFormat } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -216,7 +216,7 @@ class ContentScriptVueBridge {
       if (!captureResponse.success) throw new Error(captureResponse.error || "Failed to capture screen");
 
       if (detectText) {
-        const analysisResponse = await this.messenger.sendMessage({ action: CAPTURE_FULL_SCREEN.ANALYZE_IMAGE_TEXT, data: { imageData: captureResponse.data.imageData } });
+        const analysisResponse = await this.messenger.sendMessage({ action: MessageActions.PROCESS_IMAGE_OCR, data: { imageData: captureResponse.data.imageData } });
         if (analysisResponse.success && analysisResponse.data.textRegions?.length > 0) {
           await this.showTextRegionSelector(captureResponse.data.imageData, analysisResponse.data.textRegions, autoTranslate);
           sendResponse({ success: true, mode: "text-regions" });
@@ -289,7 +289,7 @@ class ContentScriptVueBridge {
     }
   }
 
-  cropImage = async (imageData, region) => {
+  cropImage = async (imageData) => {
     return imageData;
   }
 

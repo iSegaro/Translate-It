@@ -14,7 +14,7 @@ export function useBackgroundWarmup() {
     if (warmupPromise) return warmupPromise;
 
     warmupInProgress.value = true;
-    warmupPromise = new Promise(async (resolveOuter) => {
+    warmupPromise = (async () => {
       for (let i = 0; i < 5; i++) {
         try {
           const response = await messenger.sendMessage({
@@ -24,8 +24,7 @@ export function useBackgroundWarmup() {
           if (response && response.success) {
             isWarmedUp.value = true;
             warmupInProgress.value = false;
-            resolveOuter(true);
-            return;
+            return true;
           }
         } catch {
           // Ignore errors and retry
@@ -34,8 +33,8 @@ export function useBackgroundWarmup() {
       }
       isWarmedUp.value = true; // Assume ready after all attempts
       warmupInProgress.value = false;
-      resolveOuter(false);
-    });
+      return false;
+    })();
 
     return warmupPromise;
   };

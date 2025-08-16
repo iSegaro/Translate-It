@@ -202,7 +202,7 @@ class StorageCore {
     // Handle Vue reactive objects (Proxy) or regular objects
     const plainObj = {};
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         plainObj[key] = this._convertToPlainObject(obj[key]);
       }
     }

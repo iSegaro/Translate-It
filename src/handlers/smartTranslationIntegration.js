@@ -25,22 +25,6 @@ function dismissPendingTranslationNotification(context = 'unknown') {
   }
 }
 
-function hasActiveElementTextSelection() {
-  try {
-    const activeElement = document.activeElement;
-    if (!activeElement) return false;
-    if (activeElement.isContentEditable) {
-      const selection = window.getSelection();
-      return selection && !selection.isCollapsed && selection.toString().trim().length > 0;
-    } else if (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA") {
-      return activeElement.selectionStart !== activeElement.selectionEnd;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId }) {
   logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
   
@@ -395,13 +379,13 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
 
 export async function handleTranslationError(error, mode = 'field') {
   logger.error('Handling translation error for mode:', mode, error);
-  
+  let errorMessage;
   try {
     // Dismiss any pending notifications
     dismissPendingTranslationNotification('handleTranslationError');
-    
+
     // Show in-page error notification using NotificationManager
-    const errorMessage = error?.message || error || 'Translation failed';
+    errorMessage = error?.message || error || 'Translation failed';
     
     // Import NotificationManager dynamically
     const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
@@ -416,7 +400,7 @@ export async function handleTranslationError(error, mode = 'field') {
     // Fallback: Try simple alert for critical errors
     try {
       logger.error('Translation Error:', errorMessage);
-    } catch (fallbackError) {
+    } catch {
       // Silent fallback
     }
   }
