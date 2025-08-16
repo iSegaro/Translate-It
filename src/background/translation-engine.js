@@ -116,15 +116,18 @@ export class TranslationEngine {
     try {
       let result;
 
-      // Context-specific optimizations
+      // Context-specific optimizations (but all will include history except SelectElement)
       if (context === "popup") {
         result = await this.translateWithPriority(data);
       } else if (context === "selection") {
         result = await this.translateWithCache(data);
-      } else if (context === "sidepanel") {
-        result = await this.translateWithHistory(data);
       } else {
         result = await this.executeTranslation(data);
+      }
+
+      // Centralized history addition for all modes except SelectElement
+      if (result.success && data.mode !== 'SelectElement') {
+        await this.addToHistory(data, result);
       }
 
       // Result logging is handled by handleTranslate
@@ -189,17 +192,6 @@ export class TranslationEngine {
     return result;
   }
 
-  /**
-   * Execute translation with history tracking (for sidepanel)
-   */
-  async translateWithHistory(data) {
-    const result = await this.executeTranslation(data);
-
-    // Add to history for sidepanel
-    this.addToHistory(data, result);
-
-    return result;
-  }
 
   /**
    * Core translation execution logic
@@ -530,27 +522,35 @@ export class TranslationEngine {
   /**
    * Add translation to history
    */
-  addToHistory(data, result) {
-    const historyItem = {
-      id: Date.now().toString(),
-      originalText: data.text,
-      translatedText: result.translatedText,
-      provider: data.provider,
-      sourceLanguage: data.sourceLanguage,
-      targetLanguage: data.targetLanguage,
-      timestamp: Date.now(),
-      mode: data.mode,
-    };
+  async addToHistory(data, result) {
+    try {
+      const historyItem = {
+        sourceText: data.text,
+        translatedText: result.translatedText,
+        sourceLanguage: data.sourceLanguage,
+        targetLanguage: data.targetLanguage,
+        timestamp: Date.now(),
+      };
 
-    this.history.unshift(historyItem);
-
-    // Limit history size
-    if (this.history.length > 50) {
-      this.history = this.history.slice(0, 50);
+      // Load current history from storage (same key as useHistory composable)
+      const currentData = await storageManager.get(['translationHistory']);
+      const currentHistory = currentData.translationHistory || [];
+      
+      // Add new item to the beginning and limit size
+      const newHistory = [historyItem, ...currentHistory].slice(0, 100);
+      
+      // Save back to storage using the same key as useHistory
+      await storageManager.set({
+        translationHistory: newHistory,
+      });
+      
+      // Update local cache
+      this.history = newHistory;
+      
+      logger.debug("[TranslationEngine] Added to history:", data.text.substring(0, 50) + "...");
+    } catch (error) {
+      logger.error("[TranslationEngine] Failed to save history:", error);
     }
-
-    // Optionally save to storage
-    this.saveHistoryToStorage();
   }
 
   /**

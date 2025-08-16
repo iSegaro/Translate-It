@@ -6,6 +6,7 @@ import { SimpleMarkdown } from "@/utils/text/markdown.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import browser from "webextension-polyfill";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useHistory');
 
@@ -29,13 +30,14 @@ export function useHistory() {
     return [...historyItems.value].reverse();
   });
 
-  // Load history from settings store
+  // Load history directly from storage (not from settings store)
   const loadHistory = async () => {
     isLoading.value = true;
     try {
-      await settingsStore.loadSettings(); // Ensure settings are loaded
-      historyItems.value = settingsStore.settings.translationHistory || [];
-      logger.info(`Loaded ${historyItems.value.length} history items`);
+      // Load directly from browser storage to get the latest data
+      const result = await browser.storage.local.get(['translationHistory']);
+      historyItems.value = result.translationHistory || [];
+      logger.info(`Loaded ${historyItems.value.length} history items directly from storage`);
     } catch (error) {
       logger.error("Error loading history", error);
       historyError.value = "Failed to load history";
@@ -63,11 +65,10 @@ export function useHistory() {
       );
       historyItems.value = newHistory;
 
-      // Save to storage via settings store
-      await settingsStore.updateSettingAndPersist(
-        "translationHistory",
-        newHistory,
-      );
+      // Save directly to browser storage (same as Translation Engine)
+      await browser.storage.local.set({
+        translationHistory: newHistory,
+      });
 
       logger.info("Added to history:", translationData.sourceText, "Translated:", translationData.translatedText);
     } catch (error) {
@@ -84,10 +85,10 @@ export function useHistory() {
         newHistory.splice(index, 1);
         historyItems.value = newHistory;
 
-        await settingsStore.updateSettingAndPersist(
-          "translationHistory",
-          newHistory,
-        );
+        // Save directly to browser storage
+        await browser.storage.local.set({
+          translationHistory: newHistory,
+        });
 
         logger.info("Deleted history item at index:", index);
       }
@@ -109,7 +110,10 @@ export function useHistory() {
       if (userConfirmed) {
         historyItems.value = [];
 
-        await settingsStore.updateSettingAndPersist("translationHistory", []);
+        // Save directly to browser storage
+        await browser.storage.local.set({
+          translationHistory: [],
+        });
 
         logger.info("Cleared all history");
         return true;
@@ -187,13 +191,26 @@ export function useHistory() {
     { deep: true },
   );
 
+  // Storage change listener for real-time updates
+  const storageListener = (changes, area) => {
+    if (area === 'local' && 'translationHistory' in changes) {
+      const newHistory = changes.translationHistory.newValue || [];
+      historyItems.value = newHistory;
+      logger.debug("History updated from storage change listener");
+    }
+  };
+
   // Lifecycle
   onMounted(() => {
     loadHistory();
+    
+    // Listen for storage changes for real-time updates
+    browser.storage.onChanged.addListener(storageListener);
   });
 
   onUnmounted(() => {
-    // No specific cleanup needed as we are watching settingsStore
+    // Remove storage listener
+    browser.storage.onChanged.removeListener(storageListener);
   });
 
   return {
