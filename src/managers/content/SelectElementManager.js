@@ -12,6 +12,11 @@ import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "../../utils/messaging/messageId.js";
+import { 
+  SELECT_ELEMENT_MODES, 
+  SELECT_ELEMENT_DEFAULTS,
+  SelectElementValidation 
+} from "../../constants/SelectElementModes.js";
 
 /**
  * SelectElementManager - Vue-compatible element selection system
@@ -41,15 +46,19 @@ export class SelectElementManager {
     
     // Configuration for text validation
     this.config = {
-      minTextLength: 8,        // Minimum text length to consider for translation
-      minWordCount: 2,         // Minimum word count for meaningful content
-      maxElementArea: 50000,   // Maximum element area for container validation
-      maxAncestors: 5          // Maximum ancestors to check when finding best element
+      mode: SELECT_ELEMENT_DEFAULTS.MODE,           // Current validation mode
+      baseMode: SELECT_ELEMENT_DEFAULTS.BASE_MODE, // Base mode when Ctrl is not pressed
+      minTextLength: SELECT_ELEMENT_DEFAULTS.MIN_TEXT_LENGTH,        // Minimum text length to consider for translation
+      minWordCount: SELECT_ELEMENT_DEFAULTS.MIN_WORD_COUNT,         // Minimum word count for meaningful content
+      maxElementArea: SELECT_ELEMENT_DEFAULTS.MAX_ELEMENT_AREA,   // Maximum element area for container validation
+      maxAncestors: SELECT_ELEMENT_DEFAULTS.MAX_ANCESTORS          // Maximum ancestors to check when finding best element
     };
 
     // Create proper state structure like OLD system
     this.state = {
-      originalTexts: new Map() // This matches the OLD system structure
+      originalTexts: new Map(), // This matches the OLD system structure
+      isCtrlPressed: false,     // Track Ctrl key state
+      isActive: false          // Track if select element mode is active
     };
 
     // Service instances
@@ -112,6 +121,40 @@ export class SelectElementManager {
   }
 
   /**
+   * Switch between simple and smart modes
+   * @param {SelectElementMode} mode - Validation mode
+   */
+  setMode(mode) {
+    if (SelectElementValidation.isValidMode(mode)) {
+      this.config.mode = mode;
+      
+      // If not triggered by Ctrl key, update base mode too
+      if (!this.state.isCtrlPressed) {
+        this.config.baseMode = mode;
+      }
+      
+      // Clear caches when mode changes
+      this.elementValidationCache = new WeakMap();
+      this.textContentCache = new WeakMap();
+      
+      const trigger = this.state.isCtrlPressed ? '(Ctrl key)' : '(manual/base)';
+      const displayName = SelectElementValidation.getDisplayName(mode);
+      this.logger.info(`[SelectElementManager] Mode switched to: ${displayName} ${trigger}`);
+    } else {
+      const validModes = SelectElementValidation.getAllModes().join(', ');
+      this.logger.warn(`[SelectElementManager] Invalid mode: ${mode}. Valid modes: ${validModes}`);
+    }
+  }
+
+  /**
+   * Get current mode
+   * @returns {string} Current mode
+   */
+  getMode() {
+    return this.config.mode;
+  }
+
+  /**
    * Debug method to analyze why an element is or isn't valid
    * @param {HTMLElement} element - Element to analyze
    * @returns {Object} Analysis result
@@ -125,10 +168,20 @@ export class SelectElementManager {
       textContent: element.textContent?.trim() || '',
       textLength: (element.textContent?.trim() || '').length,
       hasChildren: element.children.length > 0,
-      area: element.offsetWidth * element.offsetHeight
+      area: element.offsetWidth * element.offsetHeight,
+      mode: this.config.mode
     };
 
-    // Check each validation step
+    // Test both modes for comparison
+    const simpleValid = this.isValidTextElement_Simple(element);
+    const smartValid = this.isValidTextElement_Smart(element);
+    
+    analysis.simpleMode = { isValid: simpleValid };
+    analysis.smartMode = { isValid: smartValid };
+    analysis.currentMode = { isValid: this.isValidTextElement(element) };
+    
+
+    // Check each validation step for current mode
     const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
     if (invalidTags.includes(element.tagName)) {
       analysis.reasons.push('Invalid tag type');
@@ -149,18 +202,18 @@ export class SelectElementManager {
       analysis.textContent = value;
       analysis.textLength = value.length;
       
-      if (!this.isValidTextContent(value.trim())) {
-        analysis.reasons.push('Input value not valid for translation');
-      } else {
+      if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE || this.isValidTextContent(value.trim())) {
         analysis.isValid = true;
         analysis.reasons.push('Valid input element');
+      } else {
+        analysis.reasons.push('Input value not valid for translation');
       }
     } else {
-      if (!this.hasValidTextContent(element)) {
-        analysis.reasons.push('No valid text content found');
-      } else {
+      if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE || this.hasValidTextContent(element)) {
         analysis.isValid = true;
         analysis.reasons.push('Valid text element');
+      } else {
+        analysis.reasons.push('No valid text content found');
       }
     }
 
@@ -180,6 +233,7 @@ export class SelectElementManager {
     try {
       this.browser = browser;
       this.setupMessageListener();
+      this.setupKeyboardListeners();
 
       // Initialize services
       this.notificationManager.initialize();
@@ -192,6 +246,43 @@ export class SelectElementManager {
         context: "select-element-manager-init",
       });
     }
+  }
+
+  /**
+   * Setup keyboard listeners for Ctrl key dynamic mode switching
+   */
+  setupKeyboardListeners() {
+    // Listen for keydown events
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Control' && !this.state.isCtrlPressed && this.state.isActive) {
+        this.state.isCtrlPressed = true;
+        this.setMode(SELECT_ELEMENT_MODES.SIMPLE);
+        const emoji = SelectElementValidation.getModeEmoji(SELECT_ELEMENT_MODES.SIMPLE);
+        this.logger.info(`${emoji} Ctrl pressed: Dynamic switch to ${SelectElementValidation.getDisplayName(SELECT_ELEMENT_MODES.SIMPLE)}`);
+      }
+    }, true);
+
+    // Listen for keyup events
+    document.addEventListener('keyup', (event) => {
+      if (event.key === 'Control' && this.state.isCtrlPressed && this.state.isActive) {
+        this.state.isCtrlPressed = false;
+        this.setMode(this.config.baseMode);
+        const emoji = SelectElementValidation.getModeEmoji(this.config.baseMode);
+        const displayName = SelectElementValidation.getDisplayName(this.config.baseMode);
+        this.logger.info(`${emoji} Ctrl released: Dynamic switch back to ${displayName}`);
+      }
+    }, true);
+
+    // Handle window blur (when user switches to another window/tab while holding Ctrl)
+    window.addEventListener('blur', () => {
+      if (this.state.isCtrlPressed && this.state.isActive) {
+        this.state.isCtrlPressed = false;
+        this.setMode(this.config.baseMode);
+        const emoji = SelectElementValidation.getModeEmoji(this.config.baseMode);
+        const displayName = SelectElementValidation.getDisplayName(this.config.baseMode);
+        this.logger.info(`🌫️ Window blur: Auto-reset to ${displayName}`);
+      }
+    });
   }
 
   /**
@@ -537,6 +628,10 @@ export class SelectElementManager {
     this.logger.operation("Activating select element mode");
 
     this.isActive = true;
+    this.state.isActive = true;
+    
+    // Reset mode to base mode on activation
+    this.setMode(this.config.baseMode);
     this.abortController = new globalThis.AbortController();
 
     // Add event listeners with abort signal
@@ -588,6 +683,8 @@ export class SelectElementManager {
     this.logger.operation("Deactivating select element UI (keeping translation processing)");
 
     this.isActive = false;
+    this.state.isActive = false;
+    this.state.isCtrlPressed = false;
 
     // Remove most event listeners but keep ESC key handling for cancellation
     if (this.abortController) {
@@ -634,6 +731,8 @@ export class SelectElementManager {
     this.logger.operation("Deactivating select element mode");
 
     const wasActive = this.isActive;
+    this.state.isActive = false;
+    this.state.isCtrlPressed = false;
 
     // Cancel ongoing translations for full deactivation
     if (this.pendingTranslation) {
@@ -847,37 +946,48 @@ export class SelectElementManager {
 
     const element = event.target;
 
-    // Try to find a better element if current one is not valid
+    // Determine target element based on mode
     let targetElement = element;
-    if (!this.isValidTextElement(element)) {
-      // Try to find a better element nearby
-      targetElement = this.findBestTextElement(element);
-      
-      if (!targetElement) {
-        this.logger.warn("Invalid element for translation", {
-          tagName: element.tagName,
-          className: element.className,
-          textContent: (element.textContent || "").substring(0, 50)
-        });
+    
+    if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE) {
+      // Simple mode: directly use clicked element like OLD system
+      this.logger.debug("[handleClick] Simple mode: using clicked element directly");
+      targetElement = element;
+    } else {
+      // Smart mode: try to find better element
+      if (!this.isValidTextElement(element)) {
+        // Try to find a better element nearby
+        targetElement = this.findBestTextElement(element);
         
-        // Try extracting text anyway to see what we get
-        const extractedText = this.extractTextFromElement(element);
-        this.logger.debug("Extracted text from invalid element:", extractedText);
-        
-        if (extractedText && extractedText.trim().length > 0) {
-          this.logger.info("Found text in 'invalid' element, proceeding with translation");
-          targetElement = element; // Use original element
-        } else {
-          await this.showErrorNotification(
-            "Please select an element that contains text"
-          );
-          this.isProcessingClick = false;
-          return;
+        if (!targetElement) {
+          this.logger.warn("Invalid element for translation", {
+            tagName: element.tagName,
+            className: element.className,
+            textContent: (element.textContent || "").substring(0, 50)
+          });
+          
+          // Try extracting text anyway to see what we get
+          const extractedText = this.extractTextFromElement(element);
+          this.logger.debug("Extracted text from invalid element:", extractedText);
+          
+          if (extractedText && extractedText.trim().length > 0) {
+            this.logger.info("Found text in 'invalid' element, proceeding with translation");
+            targetElement = element; // Use original element
+          } else {
+            await this.showErrorNotification(
+              "Please select an element that contains text"
+            );
+            this.isProcessingClick = false;
+            return;
+          }
         }
       }
     }
 
-    this.logger.info("Element selected", element);
+    const currentMode = this.state.isCtrlPressed ? SELECT_ELEMENT_MODES.SIMPLE : SELECT_ELEMENT_MODES.SMART;
+    const modeEmoji = SelectElementValidation.getModeEmoji(currentMode);
+    const modeIndicator = `${modeEmoji} ${currentMode.toUpperCase()}`;
+    this.logger.info(`Element selected (${modeIndicator} mode):`, element);
 
     try {
       // Extract text from the target element
@@ -1035,28 +1145,16 @@ export class SelectElementManager {
     let isValid = false;
     
     try {
-      // Skip script, style, and other non-text elements
-      const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
-      if (invalidTags.includes(element.tagName)) {
-        isValid = false;
+      if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE) {
+        // Simple mode - like OLD system: just check basic validity
+        isValid = this.isValidTextElement_Simple(element);
+      } else if (this.config.mode === SELECT_ELEMENT_MODES.SMART) {
+        // Smart mode - enhanced validation
+        isValid = this.isValidTextElement_Smart(element);
       } else {
-        // Skip invisible elements
-        const style = window.getComputedStyle(element);
-        if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
-          isValid = false;
-        } else {
-          // Handle input elements separately
-          const isTextInput = element.tagName === "INPUT" && (element.type === "text" || element.type === "textarea");
-          const isTextArea = element.tagName === "TEXTAREA";
-          
-          if (isTextInput || isTextArea) {
-            const value = element.value || "";
-            isValid = this.isValidTextContent(value.trim());
-          } else {
-            // For regular elements, check if they contain meaningful text
-            isValid = this.hasValidTextContent(element);
-          }
-        }
+        // Fallback to simple mode for unknown modes
+        this.logger.warn(`Unknown validation mode: ${this.config.mode}, falling back to simple`);
+        isValid = this.isValidTextElement_Simple(element);
       }
     } catch (error) {
       // If any error occurs during validation, assume invalid
@@ -1067,6 +1165,54 @@ export class SelectElementManager {
     // Cache the result
     this.elementValidationCache.set(element, isValid);
     return isValid;
+  }
+
+  /**
+   * Simple validation like OLD system - minimal checks
+   */
+  isValidTextElement_Simple(element) {
+    // Skip script, style, and other non-text elements
+    const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
+    if (invalidTags.includes(element.tagName)) return false;
+
+    // Skip invisible elements
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (style.opacity === "0") return false;
+
+    // Must have text content or be a text input
+    const hasText = element.textContent && element.textContent.trim().length > 0;
+    const isTextInput = element.tagName === "INPUT" && element.type === "text";
+    const isTextArea = element.tagName === "TEXTAREA";
+
+    return hasText || isTextInput || isTextArea;
+  }
+
+  /**
+   * Smart validation with enhanced checks
+   */
+  isValidTextElement_Smart(element) {
+    // Skip script, style, and other non-text elements
+    const invalidTags = ["SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK"];
+    if (invalidTags.includes(element.tagName)) return false;
+
+    // Skip invisible elements
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+      return false;
+    }
+
+    // Handle input elements separately
+    const isTextInput = element.tagName === "INPUT" && (element.type === "text" || element.type === "textarea");
+    const isTextArea = element.tagName === "TEXTAREA";
+    
+    if (isTextInput || isTextArea) {
+      const value = element.value || "";
+      return this.isValidTextContent(value.trim());
+    }
+
+    // For regular elements, check if they contain meaningful text
+    return this.hasValidTextContent(element);
   }
 
   /**
@@ -1203,8 +1349,11 @@ export class SelectElementManager {
    * Highlight element - uses OLD system CSS only (no extra classes)
    */
   highlightElement(element) {
+    const currentMode = this.state.isCtrlPressed ? SELECT_ELEMENT_MODES.SIMPLE : SELECT_ELEMENT_MODES.SMART;
+    const modeEmoji = SelectElementValidation.getModeEmoji(currentMode);
+    const modeIndicator = `${modeEmoji} ${currentMode.toUpperCase()}`;
     this.logger.debug(
-      "[SelectElementManager] Highlighting element:",
+      `[SelectElementManager] Highlighting element (${modeIndicator}):`,
       element.tagName,
       element.className
     );
@@ -1241,10 +1390,14 @@ export class SelectElementManager {
    * Extract text from selected element
    */
   extractTextFromElement(element) {
-    this.logger.debug("[extractTextFromElement] Starting extraction for:", {
+    const currentMode = this.state.isCtrlPressed ? SELECT_ELEMENT_MODES.SIMPLE : SELECT_ELEMENT_MODES.SMART;
+    const modeEmoji = SelectElementValidation.getModeEmoji(currentMode);
+    const modeIndicator = `${modeEmoji} ${currentMode.toUpperCase()}`;
+    this.logger.debug(`[extractTextFromElement] Starting extraction (${modeIndicator}):`, {
       tagName: element.tagName,
       className: element.className,
-      id: element.id
+      id: element.id,
+      mode: this.config.mode
     });
 
     // Handle input elements
@@ -1254,14 +1407,45 @@ export class SelectElementManager {
       return value;
     }
 
-    // Try multiple extraction methods in order of preference
+    let extractedText = "";
+    
+    if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE) {
+      // Simple mode - like OLD system
+      extractedText = this.extractTextFromElement_Simple(element);
+    } else {
+      // Smart mode - multiple extraction methods
+      extractedText = this.extractTextFromElement_Smart(element);
+    }
+
+    this.logger.debug("[extractTextFromElement] Final extracted text:", {
+      length: extractedText.length,
+      text: extractedText.substring(0, 100) + (extractedText.length > 100 ? '...' : '')
+    });
+
+    return extractedText;
+  }
+
+  /**
+   * Simple text extraction like OLD system
+   */
+  extractTextFromElement_Simple(element) {
+    // Just use textContent.trim() like OLD system
+    const text = (element.textContent || "").trim();
+    this.logger.debug("[extractTextFromElement_Simple] Extracted:", text);
+    return text;
+  }
+
+  /**
+   * Smart text extraction with multiple methods
+   */
+  extractTextFromElement_Smart(element) {
     let extractedText = "";
     
     // Method 1: Try immediate text content first (for leaf elements)
     const immediateText = this.getImmediateTextContent(element);
     if (immediateText && this.isValidTextContent(immediateText)) {
       extractedText = immediateText;
-      this.logger.debug("[extractTextFromElement] Using immediate text:", extractedText);
+      this.logger.debug("[extractTextFromElement_Smart] Using immediate text:", extractedText);
     }
     
     // Method 2: If no immediate text, try simple textContent
@@ -1269,7 +1453,7 @@ export class SelectElementManager {
       const simpleText = (element.textContent || "").trim();
       if (simpleText && this.isValidTextContent(simpleText)) {
         extractedText = simpleText;
-        this.logger.debug("[extractTextFromElement] Using simple textContent:", extractedText);
+        this.logger.debug("[extractTextFromElement_Smart] Using simple textContent:", extractedText);
       }
     }
     
@@ -1278,14 +1462,14 @@ export class SelectElementManager {
       const innerText = element.innerText.trim();
       if (innerText && this.isValidTextContent(innerText)) {
         extractedText = innerText;
-        this.logger.debug("[extractTextFromElement] Using innerText:", extractedText);
+        this.logger.debug("[extractTextFromElement_Smart] Using innerText:", extractedText);
       }
     }
     
     // Method 4: Use tree walker as last resort with relaxed filtering
     if (!extractedText) {
       extractedText = this.extractTextWithTreeWalker(element);
-      this.logger.debug("[extractTextFromElement] Using tree walker:", extractedText);
+      this.logger.debug("[extractTextFromElement_Smart] Using tree walker:", extractedText);
     }
     
     // Final fallback: just get any text content without validation
@@ -1293,14 +1477,9 @@ export class SelectElementManager {
       const fallbackText = (element.textContent || "").trim();
       if (fallbackText.length > 0) {
         extractedText = fallbackText;
-        this.logger.debug("[extractTextFromElement] Using fallback text:", extractedText);
+        this.logger.debug("[extractTextFromElement_Smart] Using fallback text:", extractedText);
       }
     }
-
-    this.logger.debug("[extractTextFromElement] Final extracted text:", {
-      length: extractedText.length,
-      text: extractedText.substring(0, 100) + (extractedText.length > 100 ? '...' : '')
-    });
 
     return extractedText;
   }
