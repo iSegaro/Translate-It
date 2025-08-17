@@ -121,7 +121,10 @@ const {
   translationError,
   canTranslate,
   triggerTranslation,
-  loadLastTranslation
+  loadLastTranslation,
+  clearTranslation,
+  _setTranslationResult,
+  _setSourceText
 } = translation;
 
 // Local UI state (not related to translation)
@@ -150,8 +153,7 @@ watch(
         lastItem.sourceText.trim() === sourceText.value.trim() &&
         (translatedText.value === "" || translatedText.value === null)
       ) {
-        translatedText.value = lastItem.translatedText;
-        translationError.value = ""; // Clear any potential Firefox bug error message
+        _setTranslationResult(lastItem.translatedText);
         isTranslating.value = false;
       }
     }
@@ -185,9 +187,9 @@ watch(
     if (newTranslation && newTranslation.sourceText && newTranslation.translatedText) {
       logger.debug("🔄 Updating fields from translation store:", newTranslation);
       
-      // Update source and translated text
-      sourceText.value = newTranslation.sourceText;
-      translatedText.value = newTranslation.translatedText;
+      // Update source and translated text using internal methods
+      _setSourceText(newTranslation.sourceText);
+      _setTranslationResult(newTranslation.translatedText);
       
       // Update language selectors if language info is available
       if (newTranslation.sourceLanguage) {
@@ -275,10 +277,9 @@ const handleSourceTextInput = (event) => {
 
 const handleClearFields = async () => {
   logger.debug("🧹 Clear fields event received");
-  // Clear text fields
-  sourceText.value = "";
-  translatedText.value = "";
-  translationError.value = "";
+  
+  // Use translation composable's clear method
+  clearTranslation();
   
   // Reset languages to saved settings
   try {
