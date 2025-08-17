@@ -11,9 +11,8 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 
 import { isPersianText } from "@/utils/text/textDetection.js";
-// import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
+import { getLanguageCode } from "@/utils/i18n/languages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-const getLanguageCode = (lang) => lang;
 
 // (logger already imported above)
 

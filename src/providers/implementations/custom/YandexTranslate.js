@@ -7,9 +7,8 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
 
 import { isPersianText } from "@/utils/text/textDetection.js";
-// import { AUTO_DETECT_VALUE, getLanguageCode } from "tts-utils";
-const AUTO_DETECT_VALUE = 'auto';
-const getLanguageCode = (lang) => lang;
+import { getLanguageCode } from "@/utils/i18n/languages.js";
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/config.js";
 
