@@ -194,13 +194,18 @@ export function useSelectElementTranslation() {
       _tabsActivatedHandler = async (activeInfo) => {
         try {
           _currentTabId = activeInfo.tabId;
-          const { selection } = useMessaging('sidepanel');
-          const response = await selection.getSelectionState();
+          // Query background directly for select element state
+          const response = await browser.runtime.sendMessage({
+            action: MessageActions.GET_SELECT_ELEMENT_STATE,
+            context: 'sidepanel',
+            timestamp: Date.now()
+          });
           if (response && response.success) {
             sharedIsSelectModeActive.value = !!response.active;
+            logger.debug('Select element state refreshed on tab change:', response.active);
           }
-        } catch {
-          // ignore
+        } catch (err) {
+          logger.debug('Failed to refresh select element state on tab change:', err);
         }
       };
       browser.tabs.onActivated.addListener(_tabsActivatedHandler);
