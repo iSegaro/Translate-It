@@ -2,7 +2,6 @@
 
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
-// import { isExtensionContextValid } from "../../../utils/core/helpers.js"; // Removed - using ExtensionContextManager instead
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
 import { WindowsFactory } from "./core/WindowsFactory.js";
@@ -19,7 +18,6 @@ import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
-import { getErrorMessage } from "../../../error-management/ErrorMessages.js";
 import ExtensionContextManager from "../../../utils/core/extensionContext.js";
 
 /**

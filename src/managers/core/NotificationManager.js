@@ -1,7 +1,5 @@
 // src/managers/NotificationManager.js
 
-import browser from "webextension-polyfill";
-// import { isExtensionContextValid } from "../../utils/core/helpers.js"; // Removed - using ExtensionContextManager instead
 import { getScopedLogger } from "../../utils/core/logger.js";
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { parseBoolean, getTranslationString } from "../../utils/i18n/i18n.js";

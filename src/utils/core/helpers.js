@@ -67,14 +67,6 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
   return false;
 };
 
-export const isExtensionContextValid = async () => {
-  try {
-    return !!browser?.runtime?.id && !!browser?.storage?.local;
-  } catch {
-    return false;
-  }
-};
-
 export const openOptionsPage = (anchor = null) => {
   browser.runtime
     .sendMessage({
