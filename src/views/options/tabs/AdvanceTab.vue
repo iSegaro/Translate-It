@@ -3,13 +3,17 @@
     <h2>{{ $i18n('advance_section_title') || 'Advanced Settings' }}</h2>
     
     <div class="setting-group">
-      <label>{{ $i18n('advance_dev_api_mode_label') || 'Use Dev API Mode' }}</label>
-      <BaseCheckbox v-model="useMock" />
+      <BaseCheckbox
+        v-model="useMock"
+        :label="$i18n('advance_dev_api_mode_label') || 'Use Dev API Mode'"
+      />
     </div>
     
     <div class="setting-group">
-      <label>{{ $i18n('advance_debug_mode_label') || 'Debug Mode' }}</label>
-      <BaseCheckbox v-model="debugMode" />
+      <BaseCheckbox
+        v-model="debugMode"
+        :label="$i18n('advance_debug_mode_label') || 'Debug Mode'"
+      />
     </div>
     
     <div class="setting-group">

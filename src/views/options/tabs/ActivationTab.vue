@@ -4,8 +4,10 @@
 
     <!-- Extension Enable/Disable -->
     <div class="setting-group extension-enabled-group">
-      <label>{{ $i18n('extension_enabled_label') || 'Enable Extension' }}</label>
-      <BaseCheckbox v-model="extensionEnabled" />
+      <BaseCheckbox
+        v-model="extensionEnabled"
+        :label="$i18n('extension_enabled_label') || 'Enable Extension'"
+      />
       <span class="setting-description">
         {{ $i18n('extension_enabled_description') || 'Enable or disable the entire extension functionality except Popup.' }}
       </span>
@@ -14,10 +16,10 @@
     <!-- Text Field Translation -->
     <BaseFieldset :legend="$i18n('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
-        <label>{{ $i18n('translate_on_text_fields_label') || 'Enable translation on text fields' }}</label>
         <BaseCheckbox
           v-model="translateOnTextFields"
           :disabled="!extensionEnabled"
+          :label="$i18n('translate_on_text_fields_label') || 'Enable translation on text fields'"
         />
         <span class="setting-description">
           {{ $i18n('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
@@ -25,10 +27,10 @@
       </div>
 
       <div class="setting-group">
-        <label>{{ $i18n('enable_shortcut_for_text_fields_label') || 'Enable Ctrl+/ shortcut for text fields' }}</label>
         <BaseCheckbox
           v-model="enableShortcutForTextFields"
           :disabled="!extensionEnabled"
+          :label="$i18n('enable_shortcut_for_text_fields_label') || 'Enable Ctrl+/ shortcut for text fields'"
         />
         <span class="setting-description">
           {{ $i18n('enable_shortcut_for_text_fields_description') || 'Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field.' }}
@@ -55,10 +57,10 @@
         </div>
 
         <div class="setting-group sub-setting-group">
-          <label>{{ $i18n('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)' }}</label>
           <BaseCheckbox 
             v-model="replaceOnSpecialSites" 
             :disabled="!extensionEnabled || textFieldMode !== 'copy'"
+            :label="$i18n('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
           />
         </div>
       </div>
@@ -67,10 +69,10 @@
     <!-- On-Page Selection -->
     <BaseFieldset :legend="$i18n('activation_group_page_selection_title') || 'On-Page Selection'">
       <div class="setting-group">
-        <label>{{ $i18n('translate_with_select_element_label') || 'Enable translation via select element' }}</label>
         <BaseCheckbox
           v-model="translateWithSelectElement"
           :disabled="!extensionEnabled"
+          :label="$i18n('translate_with_select_element_label') || 'Enable translation via select element'"
         />
         <span class="setting-description">
           {{ $i18n('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
@@ -78,10 +80,10 @@
       </div>
 
       <div class="setting-group">
-        <label>{{ $i18n('translate_on_text_selection_label') || 'Enable translation on text selection' }}</label>
         <BaseCheckbox
           v-model="translateOnTextSelection"
           :disabled="!extensionEnabled"
+          :label="$i18n('translate_on_text_selection_label') || 'Enable translation on text selection'"
         />
         <span class="setting-description">
           {{ $i18n('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
@@ -108,10 +110,10 @@
         </div>
 
         <div class="setting-group sub-setting-group">
-          <label>{{ $i18n('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation' }}</label>
           <BaseCheckbox 
             v-model="requireCtrlForTextSelection" 
             :disabled="!extensionEnabled || !translateOnTextSelection || selectionTranslationMode !== 'immediate'"
+            :label="$i18n('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
           />
         </div>
       </div>
@@ -120,10 +122,10 @@
     <!-- Dictionary Mode -->
     <BaseFieldset :legend="$i18n('activation_group_dictionary_title') || 'Dictionary Mode'">
       <div class="setting-group">
-        <label>{{ $i18n('enable_dictionary_translation_label') || 'Enable Dictionary Translation' }}</label>
         <BaseCheckbox
           v-model="enableDictionary"
           :disabled="!extensionEnabled"
+          :label="$i18n('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
         />
         <span class="setting-description">
           {{ $i18n('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
@@ -134,10 +136,10 @@
     <!-- Video Subtitle -->
     <BaseFieldset :legend="$i18n('activation_group_subtitle_title') || 'Video Subtitle'">
       <div class="setting-group">
-        <label>{{ $i18n('enable_subtitle_translation_label') || 'Enable Subtitle Translation' }}</label>
         <BaseCheckbox
           v-model="enableSubtitle"
           :disabled="!extensionEnabled"
+          :label="$i18n('enable_subtitle_translation_label') || 'Enable Subtitle Translation'"
         />
         <span class="setting-description">
           {{ $i18n('enable_subtitle_translation_description') || 'وقتی که فعال باشد، در سایت یوتوب برای ویدیوهایی که زیرنویس وجود دارد ترجمه اتفاق می افتد و جایگزین زیرنویس پیش‌فرض یوتوب می شود.' }}
@@ -145,10 +147,10 @@
       </div>
 
       <div class="setting-group">
-        <label>{{ $i18n('icon_subtitle_translation_label') || 'Show Subtitle Icon' }}</label>
         <BaseCheckbox
           v-model="iconSubtitle"
           :disabled="!extensionEnabled"
+          :label="$i18n('icon_subtitle_translation_label') || 'Show Subtitle Icon'"
         />
         <span class="setting-description">
           {{ $i18n('icon_subtitle_translation_description') || 'نمایش ایکون ترجمه زیرنویس در نوار پخش‌کننده یوتوب.' }}

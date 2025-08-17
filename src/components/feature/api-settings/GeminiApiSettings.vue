@@ -35,10 +35,10 @@
       v-if="geminiModel !== 'custom' && isThinkingSupported"
       class="setting-group"
     >
-      <label>{{ $i18n('gemini_thinking_label') || 'Enable Thinking Mode' }}</label>
       <BaseCheckbox 
         v-model="geminiThinking" 
         :disabled="!isThinkingControllable"
+        :label="$i18n('gemini_thinking_label') || 'Enable Thinking Mode'"
       />
       <span class="setting-description">
         {{ $i18n('gemini_thinking_description') || thinkingDescription }}

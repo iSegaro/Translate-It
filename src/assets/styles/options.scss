@@ -189,22 +189,12 @@ section {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
-  
+
   &:last-child {
     border-bottom: none;
     margin-bottom: 0;
-  }
-  
-  label {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
-    margin-bottom: 0;
-    flex-grow: 1;
-    min-width: 200px;
   }
 }
 
