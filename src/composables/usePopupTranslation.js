@@ -60,25 +60,27 @@ export function usePopupTranslation() {
         mode = TranslationMode.Dictionary_Translation;
       }
       
-      // Send direct message to background using browser.runtime.sendMessage 
-      // (bypassing UnifiedMessenger to avoid timeout issues)
-      browserAPI.sendMessage({
-        action: MessageActions.TRANSLATE,
-        messageId: messageId,
-        context: 'popup',
-        timestamp: Date.now(),
-        data: {
-          text: sourceText.value,
-          provider: currentProvider,
-          sourceLanguage: sourceLanguage,
-          targetLanguage: targetLanguage,
-          mode: mode,
-          options: {}
-        }
-      }).catch(error => {
-        logger.error("Failed to send translation request", error);
+      // Send translation request using reliable messaging (retries + port fallback)
+      try {
+        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
+        await sendReliable({
+          action: MessageActions.TRANSLATE,
+          messageId: messageId,
+          context: 'popup',
+          timestamp: Date.now(),
+          data: {
+            text: sourceText.value,
+            provider: currentProvider,
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage,
+            mode: mode,
+            options: {}
+          }
+        })
+      } catch (error) {
+        logger.error("Failed to send translation request (reliable)", error);
         errorManager.handleError(error);
-      });
+      }
 
       logger.operation('Translation request sent. Waiting for result...');
       

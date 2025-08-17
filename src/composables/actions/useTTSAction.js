@@ -122,12 +122,10 @@ export function useTTSAction() {
    */
   const speakUnified = async (text, language) => {
     try {
-      const response = await browserAPI.sendMessage({
+      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
+      const response = await sendReliable({
         action: MessageActions.GOOGLE_TTS_SPEAK,
-        data: {
-          text: text.trim(),
-          language: language
-        }
+        data: { text: text.trim(), language }
       })
 
       if (response?.success) {

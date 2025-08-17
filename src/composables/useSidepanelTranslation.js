@@ -73,30 +73,32 @@ export function useSidepanelTranslation() {
         mode = TranslationMode.Dictionary_Translation;
       }
       
-      // Send direct message to background using browser.runtime.sendMessage 
-      // (bypassing UnifiedMessenger to avoid timeout issues)
-      await browser.runtime.sendMessage({
-        action: MessageActions.TRANSLATE,
-        messageId: messageId,
-        context: 'sidepanel',
-        timestamp: Date.now(),
-        data: {
-          text: sourceText.value,
-          provider: currentProvider,
-          sourceLanguage: sourceLanguage,
-          targetLanguage: targetLanguage,
-          mode: mode,
-          options: {}
-        }
-      }).catch(error => {
-        logger.error("Failed to send translation request", error);
+      // Send translation request using reliable messenger (retries + port fallback)
+      try {
+        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
+        await sendReliable({
+          action: MessageActions.TRANSLATE,
+          messageId: messageId,
+          context: 'sidepanel',
+          timestamp: Date.now(),
+          data: {
+            text: sourceText.value,
+            provider: currentProvider,
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage,
+            mode: mode,
+            options: {}
+          }
+        })
+      } catch (error) {
+        logger.error("Failed to send translation request (reliable)", error);
         // Clean up pending request and reset loading state if message sending fails
         pendingRequests.value.delete(messageId);
         isTranslating.value = false;
         loadingStartTime.value = null;
         errorManager.handleError("Failed to send translation request");
         return null;
-      });
+      }
 
       return true;
 
