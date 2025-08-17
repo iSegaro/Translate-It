@@ -67,7 +67,7 @@ export class TranslationHandler {
       this.logger.debug("Sending translation request", payload);
 
       // Send translation request using reliable messenger (retries + port fallback)
-      await sendReliable({
+      const ackOrResult = await sendReliable({
         action: MessageActions.TRANSLATE,
         context: 'content',
         messageId: messageId,
@@ -81,7 +81,17 @@ export class TranslationHandler {
         }
       })
 
-      // Wait for result
+      // If sendReliable returned a RESULT directly (port fallback), use it
+      if (ackOrResult && (ackOrResult.type === 'RESULT' || ackOrResult.result)) {
+        const final = ackOrResult.result || ackOrResult
+        if (!final || !final.translatedText) {
+          throw new Error('Translation failed: No translated text received')
+        }
+        this.logger.operation("Translation completed successfully (via port fallback)");
+        return { translatedText: final.translatedText }
+      }
+
+      // Otherwise wait for the translation result via messaging (TRANSLATION_RESULT_UPDATE)
       const result = await resultPromise;
       
       if (!result?.translatedText) {
