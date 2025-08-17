@@ -78,6 +78,16 @@ const handleStorageChange = (changes, areaName) => {
   }
 };
 
+// System theme change listener for auto mode
+const handleSystemThemeChange = (event) => {
+  const currentTheme = settingsStore.settings.THEME
+  if (currentTheme === 'auto') {
+    const systemTheme = event.matches ? 'dark' : 'light'
+    logger.debug('System theme changed in auto mode:', systemTheme)
+    applyTheme('auto').catch(error => logger.error('Failed to apply auto theme:', error))
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
   logger.debug('🚀 SidepanelApp mounting...')
@@ -105,6 +115,10 @@ onMounted(async () => {
     
     // Step 5: Add storage change listener for immediate theme updates
     browser.storage.onChanged.addListener(handleStorageChange)
+    
+    // Step 6: Add system theme change listener for auto mode
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    mediaQuery.addEventListener('change', handleSystemThemeChange)
   } catch (error) {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
@@ -130,6 +144,10 @@ watch(() => settingsStore.settings.THEME, async (newTheme) => {
 onUnmounted(() => {
   browser.runtime.onMessage.removeListener(handleMessage);
   browser.storage.onChanged.removeListener(handleStorageChange);
+  
+  // Remove system theme listener
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  mediaQuery.removeEventListener('change', handleSystemThemeChange);
 });
 
 const retryLoading = () => {

@@ -18,6 +18,8 @@ export class ThemeManager {
     this.themeChangeListener = null;
     this.boundHandleThemeChange = null;
     this.boundHandleStorageChange = null;
+    this.boundHandleSystemThemeChange = null;
+    this.systemMediaQuery = null;
   }
 
   /**
@@ -87,6 +89,11 @@ export class ThemeManager {
     this.boundHandleStorageChange = this._handleBrowserStorageChange.bind(this);
     browser.storage.onChanged.addListener(this.boundHandleStorageChange);
     
+    // Setup system theme change listener for auto mode
+    this.boundHandleSystemThemeChange = this._handleSystemThemeChange.bind(this);
+    this.systemMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    this.systemMediaQuery.addEventListener('change', this.boundHandleSystemThemeChange);
+    
     this.logger.debug('Theme change listeners added');
   }
 
@@ -104,6 +111,12 @@ export class ThemeManager {
       this.boundHandleStorageChange = null;
     }
     
+    if (this.boundHandleSystemThemeChange && this.systemMediaQuery) {
+      this.systemMediaQuery.removeEventListener('change', this.boundHandleSystemThemeChange);
+      this.boundHandleSystemThemeChange = null;
+      this.systemMediaQuery = null;
+    }
+    
     this.logger.debug('Theme change listeners removed');
   }
 
@@ -119,6 +132,31 @@ export class ThemeManager {
       }
     }
   }
+
+  /**
+   * Handle system theme changes (prefers-color-scheme)
+   * Only acts when the user's theme preference is 'auto'.
+   */
+  async _handleSystemThemeChange(event) {
+    try {
+      // Only react when user preference is 'auto'
+      const storedTheme = await getThemeAsync();
+      if (storedTheme !== 'auto') return;
+
+      const systemTheme = event && typeof event.matches === 'boolean'
+        ? (event.matches ? 'dark' : 'light')
+        : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+      this.logger.debug('System theme changed, user preference is auto, applying:', systemTheme);
+
+      // Update internal theme and apply to elements. We pass 'auto' so
+      // resolution logic handles current system preference consistently.
+      await this._updateTheme('auto');
+    } catch (err) {
+      this.logger.error('Failed handling system theme change:', err);
+    }
+  }
+
 
   /**
    * Handle theme change event (from storage manager)
