@@ -2,10 +2,10 @@
 
 import NotificationManager from "../managers/core/NotificationManager.js";
 import { openOptionsPage } from "../utils/core/helpers.js";
-import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
+import ExtensionContextManager from '../utils/core/extensionContext.js';
 const logger = getScopedLogger('Error', 'ErrorHandler');
 
 let _instance = null; // Singleton instance
@@ -90,6 +90,15 @@ export class ErrorHandler {
     this.handling = true;
     try {
       const raw = err instanceof Error ? err.message : String(err);
+      
+      // Use ExtensionContextManager for unified context error detection
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
+        return err; // Handle silently
+      }
+      
+      // For non-context errors, continue with normal error handling
+      const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
       
@@ -166,7 +175,22 @@ export class ErrorHandler {
   // Get error message for UI display without showing toast
   async getErrorForUI(err, context = 'ui') {
     try {
+      // Handle context errors with ExtensionContextManager
+      if (ExtensionContextManager.isContextError(err)) {
+        const { matchErrorToType } = await import('./ErrorMatcher.js');
+        const type = matchErrorToType(err instanceof Error ? err.message : String(err));
+        return {
+          message: ExtensionContextManager.getContextErrorMessage(type),
+          type: type,
+          context: context,
+          timestamp: Date.now(),
+          canRetry: false,
+          needsSettings: false
+        };
+      }
+
       const raw = err instanceof Error ? err.message : String(err);
+      const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
       

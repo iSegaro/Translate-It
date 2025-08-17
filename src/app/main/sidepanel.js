@@ -5,7 +5,8 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { setupWindowErrorHandlers, setupBrowserAPIGlobals, isExtensionContextValid } from '@/error-management/windowErrorHandlers.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'
+import ExtensionContextManager from '@/utils/core/extensionContext.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
@@ -20,7 +21,7 @@ async function initializeApp() {
     setupWindowErrorHandlers('sidepanel')
     
     // Check extension context validity
-    if (!isExtensionContextValid()) {
+    if (!ExtensionContextManager.isValidSync()) {
       throw new Error('Browser runtime not available - extension context may be invalid')
     }
 

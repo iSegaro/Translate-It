@@ -1,0 +1,205 @@
+// src/utils/core/extensionContext.js
+// Centralized Extension Context Management
+
+import browser from 'webextension-polyfill';
+import { ErrorTypes } from '../../error-management/ErrorTypes.js';
+import { matchErrorToType } from '../../error-management/ErrorMatcher.js';
+import { getScopedLogger } from './logger.js';
+import { LOG_COMPONENTS } from './logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
+
+/**
+ * Centralized manager for extension context validation and error handling
+ * Single source of truth for all extension context related operations
+ */
+export class ExtensionContextManager {
+  
+  /**
+   * Synchronous extension context validation (fast check)
+   * @returns {boolean} True if extension context is valid
+   */
+  static isValidSync() {
+    try {
+      return !!(browser?.runtime?.getURL);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Asynchronous extension context validation (comprehensive check)
+   * @returns {Promise<boolean>} True if extension context is valid
+   */
+  static async isValidAsync() {
+    try {
+      return !!(browser?.runtime?.id && browser?.storage?.local);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if an error is related to extension context invalidation
+   * @param {Error|string} error - Error to check
+   * @returns {boolean} True if error is context-related
+   */
+  static isContextError(error) {
+    const errorType = matchErrorToType(error?.message || error);
+    return errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || 
+           errorType === ErrorTypes.CONTEXT;
+  }
+
+  /**
+   * Handle context errors with appropriate logging and response
+   * @param {Error|string} error - The context error
+   * @param {string} context - Context where error occurred
+   * @param {Object} options - Handling options
+   */
+  static handleContextError(error, context = 'unknown', options = {}) {
+    const {
+      logLevel = 'debug',
+      silent = true,
+      fallbackAction = null
+    } = options;
+
+    const message = error?.message || error;
+    
+    // Always use debug level for context errors to avoid console spam
+    logger.debug(`Extension context invalidated in ${context} - handled silently:`, message);
+
+    // Execute fallback action if provided
+    if (fallbackAction && typeof fallbackAction === 'function') {
+      try {
+        fallbackAction();
+      } catch (fallbackError) {
+        logger.warn(`Fallback action failed in ${context}:`, fallbackError);
+      }
+    }
+
+    return { handled: true, silent };
+  }
+
+  /**
+   * Create a safe wrapper for context-sensitive operations
+   * @param {Function} operation - Operation to wrap
+   * @param {Object} options - Wrapper options
+   * @returns {Function} Wrapped operation
+   */
+  static createSafeWrapper(operation, options = {}) {
+    const {
+      context = 'operation',
+      fallbackValue = null,
+      validateAsync = false
+    } = options;
+
+    return async function wrappedOperation(...args) {
+      try {
+        // Check context validity before operation
+        const isValid = validateAsync 
+          ? await ExtensionContextManager.isValidAsync()
+          : ExtensionContextManager.isValidSync();
+
+        if (!isValid) {
+          ExtensionContextManager.handleContextError(
+            'Extension context invalid before operation',
+            context
+          );
+          return fallbackValue;
+        }
+
+        // Execute operation
+        return await operation(...args);
+        
+      } catch (error) {
+        if (ExtensionContextManager.isContextError(error)) {
+          ExtensionContextManager.handleContextError(error, context);
+          return fallbackValue;
+        }
+        // Re-throw non-context errors
+        throw error;
+      }
+    };
+  }
+
+  /**
+   * Safe wrapper for browser.runtime.sendMessage calls
+   * @param {Object} message - Message to send
+   * @param {string} context - Context identifier
+   * @returns {Promise} Safe message sending promise
+   */
+  static async safeSendMessage(message, context = 'messaging') {
+    return ExtensionContextManager.createSafeWrapper(
+      async (msg) => {
+        return browser.runtime.sendMessage(msg);
+      },
+      { 
+        context: `sendMessage-${context}`,
+        fallbackValue: null,
+        validateAsync: false
+      }
+    )(message);
+  }
+
+  /**
+   * Safe wrapper for i18n operations
+   * @param {Function} i18nOperation - i18n operation to execute
+   * @param {string} context - Context identifier  
+   * @param {*} fallbackValue - Value to return on context error
+   * @returns {Promise} Safe i18n operation
+   */
+  static async safeI18nOperation(i18nOperation, context = 'i18n', fallbackValue = null) {
+    return ExtensionContextManager.createSafeWrapper(
+      i18nOperation,
+      {
+        context: `i18n-${context}`,
+        fallbackValue,
+        validateAsync: false
+      }
+    )();
+  }
+
+  /**
+   * Safe wrapper for storage operations
+   * @param {Function} storageOperation - Storage operation to execute
+   * @param {string} context - Context identifier
+   * @param {*} fallbackValue - Value to return on context error
+   * @returns {Promise} Safe storage operation
+   */
+  static async safeStorageOperation(storageOperation, context = 'storage', fallbackValue = null) {
+    return ExtensionContextManager.createSafeWrapper(
+      storageOperation,
+      {
+        context: `storage-${context}`,
+        fallbackValue,
+        validateAsync: true
+      }
+    )();
+  }
+
+  /**
+   * Get appropriate error message for context errors with fallback
+   * @param {string} errorType - Error type
+   * @param {Object} fallbackMessages - Fallback messages map
+   * @returns {string} Error message
+   */
+  static getContextErrorMessage(errorType, fallbackMessages = {}) {
+    const defaultMessages = {
+      [ErrorTypes.EXTENSION_CONTEXT_INVALIDATED]: 'Extension reloaded, please refresh page',
+      [ErrorTypes.CONTEXT]: 'Extension context lost',
+      [ErrorTypes.UNKNOWN]: 'An unknown error occurred'
+    };
+
+    const messages = { ...defaultMessages, ...fallbackMessages };
+    return messages[errorType] || messages[ErrorTypes.UNKNOWN];
+  }
+}
+
+// Convenience exports for backward compatibility
+export const isExtensionContextValid = ExtensionContextManager.isValidSync;
+export const isExtensionContextValidAsync = ExtensionContextManager.isValidAsync;
+export const isContextError = ExtensionContextManager.isContextError;
+export const handleContextError = ExtensionContextManager.handleContextError;
+
+// Default export
+export default ExtensionContextManager;

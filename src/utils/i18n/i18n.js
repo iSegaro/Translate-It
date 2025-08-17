@@ -10,6 +10,7 @@ import { SimpleMarkdown } from "../text/markdown.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import ExtensionContextManager from '../core/extensionContext.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'i18n');
 
 
@@ -44,7 +45,12 @@ async function loadTranslationsForLanguageCached(lang) {
     translationsCache.set(lang, translations);
     return translations;
   } catch (error) {
-    logger.error(`Error loading translations for "${lang}":`, error);
+    // Use ExtensionContextManager for unified error handling
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, `loadTranslations-${lang}`);
+    } else {
+      logger.error(`Error loading translations for "${lang}":`, error);
+    }
     return null;
   }
 }

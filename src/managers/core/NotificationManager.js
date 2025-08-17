@@ -1,11 +1,12 @@
 // src/managers/NotificationManager.js
 
 import browser from "webextension-polyfill";
-import { isExtensionContextValid } from "../../utils/core/helpers.js";
+// import { isExtensionContextValid } from "../../utils/core/helpers.js"; // Removed - using ExtensionContextManager instead
 import { getScopedLogger } from "../../utils/core/logger.js";
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { parseBoolean, getTranslationString } from "../../utils/i18n/i18n.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
+import ExtensionContextManager from "../../utils/core/extensionContext.js";
 
 const SAFE_ICONS = {
   ICON_TRANSLATION: "🌐",
@@ -173,22 +174,19 @@ export default class NotificationManager {
   async _applyAlignment() {
     if (!this.container) return;
 
-    try {
-      const rtlMsg = await getTranslationString("IsRTL");
-      const isRTL = parseBoolean(rtlMsg);
+    // Use ExtensionContextManager for safe i18n operation
+    const rtlMsg = await ExtensionContextManager.safeI18nOperation(
+      () => getTranslationString("IsRTL"),
+      'notification-alignment',
+      "false" // Default to LTR
+    );
+    
+    const isRTL = parseBoolean(rtlMsg);
 
-      this.container.style.right = "20px"; // isRTL ? "auto" : "20px";
-      this.container.style.left = "auto"; //isRTL ? "20px" : "auto";
-      this.container.style.direction = isRTL ? "rtl" : "ltr";
-      this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
-    } catch (error) {
-      // Fallback to default LTR styles
-      this.container.style.right = "20px";
-      this.container.style.left = "auto";
-      this.container.style.direction = "ltr";
-      this.container.style.textAlign = "left";
-      this.logger.warn('Alignment application failed, using defaults', error);
-    }
+    this.container.style.right = "20px"; // isRTL ? "auto" : "20px";
+    this.container.style.left = "auto"; //isRTL ? "20px" : "auto";
+    this.container.style.direction = isRTL ? "rtl" : "ltr";
+    this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
   }
 
   /**
@@ -212,15 +210,11 @@ export default class NotificationManager {
 
     // Step 3: Fallback to a background script notification if in-page is not available or failed.
     this.logger.debug('In-page notification not available, using background fallback', { message: msg });
-    if (await isExtensionContextValid()) {
-      browser.runtime
-        .sendMessage({
-          action: "show_os_notification",
-          payload: { message: msg, title: cfg.title, type: type },
-        })
-        .catch((error) => {
-          this.logger.error('Could not send notification to background script', error);
-        });
+    if (ExtensionContextManager.isValidSync()) {
+      ExtensionContextManager.safeSendMessage({
+        action: "show_os_notification",
+        payload: { message: msg, title: cfg.title, type: type },
+      }, 'notification-fallback');
     }
 
     return null; // No DOM node to return when using the fallback.

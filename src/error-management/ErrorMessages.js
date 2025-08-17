@@ -2,6 +2,7 @@
 
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { ErrorTypes } from "./ErrorTypes.js";
+import ExtensionContextManager from '../utils/core/extensionContext.js';
 
 export const errorMessages = {
   // Validation errors
@@ -68,17 +69,33 @@ export const errorMessages = {
 /**
  * Returns a localized message for a given error type.
  * It prefixes the type with 'ERRORS_' when looking up in translations.
+ * 
+ * @param {string} type - Error type
+ * @param {boolean} skipI18n - Skip i18n lookup (for extension context errors)
  */
-export async function getErrorMessage(type) {
-  // construct translation key (e.g. 'ERRORS_API_KEY_MISSING')
-  const translationKey = type?.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
-  // attempt to get localized string
-  let msg = await getTranslationString(translationKey);
-  // fallback to default message or unknown
-  if (!msg || !msg.trim()) {
-    msg = errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
+export async function getErrorMessage(type, skipI18n = false) {
+  // Use ExtensionContextManager for context errors
+  if (skipI18n || ExtensionContextManager.isContextError({ message: type })) {
+    return ExtensionContextManager.getContextErrorMessage(type, errorMessages);
   }
-  return msg;
+  
+  try {
+    // Use ExtensionContextManager for safe i18n operations
+    const translationKey = type?.startsWith("ERRORS_") ? type : `ERRORS_${type}`;
+    
+    const msg = await ExtensionContextManager.safeI18nOperation(
+      () => getTranslationString(translationKey),
+      `getErrorMessage-${type}`,
+      errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]
+    );
+    
+    // Return the result (either translated string or fallback)
+    return msg && msg.trim() ? msg : (errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]);
+    
+  } catch (i18nError) {
+    // If i18n fails (e.g., extension context invalidated), fall back to English
+    return errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
+  }
 }
 
 /**

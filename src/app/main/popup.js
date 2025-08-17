@@ -3,7 +3,8 @@ import { pinia } from '@/store'
 import PopupApp from '@/views/popup/PopupApp.vue'
 import '@/main.scss'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { setupWindowErrorHandlers, setupBrowserAPIGlobals, isExtensionContextValid } from '@/error-management/windowErrorHandlers.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'
+import ExtensionContextManager from '@/utils/core/extensionContext.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 
 const logger = getScopedLogger('UI', 'popup');
@@ -15,7 +16,7 @@ async function initializeApp() {
     setupWindowErrorHandlers('popup')
     
     // Check extension context validity
-    if (!isExtensionContextValid()) {
+    if (!ExtensionContextManager.isValidSync()) {
       throw new Error('Browser runtime not available - extension context may be invalid')
     }
     

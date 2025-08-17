@@ -1,5 +1,6 @@
 import { ErrorHandler } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import ExtensionContextManager from "../utils/core/extensionContext.js";
 import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCore.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
@@ -80,9 +81,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       MessagingContexts.CONTENT
     );
     
-    browser.runtime.sendMessage(translationMessage).catch(sendError => {
-      logger.warn('Translation request send failed (background may be unreachable):', sendError.message);
-    });
+    // Use ExtensionContextManager for safe message sending
+    ExtensionContextManager.safeSendMessage(translationMessage, 'smartTranslation');
     
     logger.debug('Translation request dispatched (fire-and-forget)');
     

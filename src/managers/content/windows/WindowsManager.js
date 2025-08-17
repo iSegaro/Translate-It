@@ -2,7 +2,7 @@
 
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
-import { isExtensionContextValid } from "../../../utils/core/helpers.js";
+// import { isExtensionContextValid } from "../../../utils/core/helpers.js"; // Removed - using ExtensionContextManager instead
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
 import { WindowsFactory } from "./core/WindowsFactory.js";
@@ -20,7 +20,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import { getErrorMessage } from "../../../error-management/ErrorMessages.js";
-import { matchErrorToType } from "../../../error-management/ErrorMatcher.js";
+import ExtensionContextManager from "../../../utils/core/extensionContext.js";
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -187,7 +187,7 @@ export class WindowsManager {
    * Show translation UI (icon or window based on settings)
    */
   async show(selectedText, position) {
-    if (!isExtensionContextValid()) {
+    if (!ExtensionContextManager.isValidSync()) {
       this.logger.warn('Extension context invalid, aborting show()');
       return;
     }
@@ -236,7 +236,7 @@ export class WindowsManager {
    * Show translate icon
    */
   async _showIcon(selectedText, position) {
-    if (!isExtensionContextValid()) {
+    if (!ExtensionContextManager.isValidSync()) {
       this.logger.warn('Extension context invalid, cannot create icon');
       return;
     }
@@ -292,7 +292,13 @@ export class WindowsManager {
       
       this.logger.debug('Icon created and animated successfully');
     } catch (error) {
-      this.logger.error('Error creating translate icon:', error);
+      // Use ExtensionContextManager for unified error handling
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'icon-creation');
+      } else {
+        this.logger.error('Error creating translate icon:', error);
+      }
+      
       this._handleError(error, 'icon-creation');
     }
   }
@@ -301,7 +307,7 @@ export class WindowsManager {
    * Show translation window
    */
   async _showWindow(selectedText, position) {
-    if (!isExtensionContextValid() || !selectedText) return;
+    if (!ExtensionContextManager.isValidSync() || !selectedText) return;
 
     this.logger.debug('_showWindow called', {
       isInIframe: this.crossFrameManager.isInIframe,
@@ -530,13 +536,13 @@ export class WindowsManager {
    * Handle translation error
    */
   async _handleTranslationError(error) {
-    const errorType = matchErrorToType(error.message || error);
-    const localizedErrorMessage = await getErrorMessage(errorType);
+    // Use ErrorHandler which now integrates ExtensionContextManager
+    const errorInfo = await this.translationHandler.errorHandler.getErrorForUI(error, 'windows-manager-translate');
     
-    this.logger.error(`Translation error - Type: ${errorType}, Message: ${localizedErrorMessage}`);
+    this.logger.error(`Translation error - Type: ${errorInfo.type}, Message: ${errorInfo.message}`);
     
     if (this.innerContainer) {
-      this.translationRenderer.renderError(this.innerContainer, localizedErrorMessage);
+      this.translationRenderer.renderError(this.innerContainer, errorInfo.message);
       setTimeout(() => this.dismiss(true), WindowsConfig.TIMEOUTS.ERROR_DISPLAY);
     } else {
       this.dismiss(false);
@@ -544,7 +550,7 @@ export class WindowsManager {
     
     // Use centralized error handler
     await this.translationHandler.errorHandler.handle(error, {
-      type: errorType,
+      type: errorInfo.type,
       context: "windows-manager-translate",
       isSilent: true
     });
@@ -554,7 +560,13 @@ export class WindowsManager {
    * Handle general errors
    */
   _handleError(error, context) {
-    this.logger.error(`Error in ${context}:`, error);
+    // Use ExtensionContextManager for context error detection
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, context);
+    } else {
+      this.logger.error(`Error in ${context}:`, error);
+    }
+    
     if (this.translationHandler.errorHandler) {
       this.translationHandler.errorHandler.handle(error, { context });
     }

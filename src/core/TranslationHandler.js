@@ -12,7 +12,7 @@ import NotificationManager from "../managers/core/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/core/debounce.js";
 import { state, TranslationMode, CONFIG } from "../config.js";
-import { logMethod, isExtensionContextValid} from "../utils/core/helpers.js";
+import { logMethod } from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "../error-management/ErrorHandler.js";
@@ -20,6 +20,7 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "../managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
+import ExtensionContextManager from "../utils/core/extensionContext.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -153,7 +154,7 @@ export default class TranslationHandler {
   async processTranslation_with_CtrlSlash(params) {
     let statusNotification = null;
     try {
-      if (!isExtensionContextValid()) {
+      if (!ExtensionContextManager.isValidSync()) {
         if (!params.target) {
           this.errorHandler.handle(new Error(ErrorTypes.CONTEXT), {
             type: ErrorTypes.CONTEXT,
@@ -165,11 +166,14 @@ export default class TranslationHandler {
         }
       }
 
-      statusNotification = await this.notifier.show(
-        (await getTranslationString("STATUS_TRANSLATING_CTRLSLASH")) ||
-          "(translating...)",
-        "status",
+      // Use ExtensionContextManager for safe i18n operation
+      const statusMessage = await ExtensionContextManager.safeI18nOperation(
+        () => getTranslationString("STATUS_TRANSLATING_CTRLSLASH"),
+        'processTranslation-status',
+        "(translating...)"
       );
+      
+      statusNotification = await this.notifier.show(statusMessage, "status");
 
       state.translateMode = params.selectionRange
         ? TranslationMode.SelectElement
