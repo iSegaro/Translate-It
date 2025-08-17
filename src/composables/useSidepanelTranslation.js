@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import browser from "webextension-polyfill";
+import { useTranslationError } from "@/composables/useTranslationError.js";
 import { generateMessageId } from "../utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
@@ -18,7 +19,6 @@ export function useSidepanelTranslation() {
   const sourceText = ref("");
   const translatedText = ref("");
   const isTranslating = ref(false);
-  const translationError = ref("");
   const lastTranslation = ref(null);
   
   // Track pending requests to avoid race conditions
@@ -30,6 +30,9 @@ export function useSidepanelTranslation() {
 
   // Store
   const settingsStore = useSettingsStore();
+  
+  // Error management
+  const errorManager = useTranslationError('sidepanel');
 
 
   // Computed
@@ -46,7 +49,7 @@ export function useSidepanelTranslation() {
       // Set loading state and clear previous results
       isTranslating.value = true;
       loadingStartTime.value = Date.now(); // Track when loading started
-      translationError.value = "";
+      errorManager.clearError(); // Clear previous errors
       translatedText.value = ""; // Clear previous translation - SAME AS POPUP
 
       // Force UI update using nextTick to ensure spinner is shown
@@ -91,7 +94,7 @@ export function useSidepanelTranslation() {
         pendingRequests.value.delete(messageId);
         isTranslating.value = false;
         loadingStartTime.value = null;
-        translationError.value = "Failed to send translation request";
+        errorManager.handleError("Failed to send translation request");
         return null;
       });
 
@@ -99,7 +102,7 @@ export function useSidepanelTranslation() {
 
     } catch (error) {
       logger.error("[useSidepanelTranslation] Translation error:", error);
-      translationError.value = error.message || "Translation failed";
+      await errorManager.handleError(error);
       isTranslating.value = false; // Ensure loading state is reset on immediate error
       loadingStartTime.value = null;
       return false;
@@ -109,7 +112,7 @@ export function useSidepanelTranslation() {
   const clearTranslation = () => {
     sourceText.value = "";
     translatedText.value = "";
-    translationError.value = "";
+    errorManager.clearError();
     lastTranslation.value = null;
   };
 
@@ -118,6 +121,16 @@ export function useSidepanelTranslation() {
       sourceText.value = lastTranslation.value.source;
       translatedText.value = lastTranslation.value.target;
     }
+  };
+
+  // Internal methods for specific UI operations (history, store integration)
+  const _setTranslationResult = (text) => {
+    translatedText.value = text;
+    errorManager.clearError();
+  };
+
+  const _setSourceText = (text) => {
+    sourceText.value = text;
   };
 
   // Listen for translation result updates from background script
@@ -165,14 +178,16 @@ export function useSidepanelTranslation() {
           isTranslating.value = false;
           
           if (message.data.success === false && message.data.error) {
-            // ERROR case - display error message and clear translation
-            translationError.value = message.data.error.message || "Translation failed";
+            // ERROR case - handle error with new error management system
+            // Extract error message from error object
+            const errorMessage = message.data.error?.message || message.data.error?.type || message.data.error || "Translation failed";
+            errorManager.handleError(errorMessage);
             translatedText.value = ""; // Clear any previous translation
             lastTranslation.value = null; // Clear last translation on error
           } else if (message.data.success !== false && message.data.translatedText) {
             // SUCCESS case - display translation and clear error
             translatedText.value = message.data.translatedText;
-            translationError.value = ""; // Clear any previous error
+            errorManager.clearError(); // Clear any previous error
             lastTranslation.value = {
               source: message.data.originalText,
               target: message.data.translatedText,
@@ -183,7 +198,7 @@ export function useSidepanelTranslation() {
           } else {
             // UNEXPECTED case - handle gracefully
             logger.warn("[useSidepanelTranslation] Unexpected message data structure:", message.data);
-            translationError.value = "Unexpected response format";
+            errorManager.handleError("Unexpected response format");
             translatedText.value = "";
           }
         });
@@ -206,14 +221,27 @@ export function useSidepanelTranslation() {
     sourceText,
     translatedText,
     isTranslating,
-    translationError,
     hasTranslation,
     canTranslate,
     lastTranslation,
+
+    // Error management (from errorManager)
+    translationError: errorManager.errorMessage,
+    hasError: errorManager.hasError,
+    canRetry: errorManager.canRetry,
+    canOpenSettings: errorManager.canOpenSettings,
 
     // Methods
     triggerTranslation,
     clearTranslation,
     loadLastTranslation,
+    
+    // Internal methods (prefixed with _ to indicate internal use)
+    _setTranslationResult,
+    _setSourceText,
+    
+    // Error methods
+    getRetryCallback: errorManager.getRetryCallback,
+    getSettingsCallback: errorManager.getSettingsCallback,
   };
 }

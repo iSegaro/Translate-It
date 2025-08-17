@@ -91,6 +91,48 @@ export function useErrorHandler() {
   }
   
   /**
+   * Handle translation-specific errors with context awareness
+   * @param {Error|string} error - Translation error
+   * @param {string} context - Translation context (popup/sidepanel/content)
+   * @param {Object} options - Additional options
+   */
+  const handleTranslationError = async (error, context = 'translation', options = {}) => {
+    const enhancedOptions = {
+      showToast: false, // Default: don't show toast for translation errors
+      showInUI: true,   // Default: show in UI fields
+      errorLevel: context === 'content' ? 'simplified' : 'detailed',
+      component: 'translation',
+      ...options
+    }
+    
+    await handleError(error, `translation-${context}`, enhancedOptions)
+  }
+
+  /**
+   * Get error information for UI display without handling
+   * @param {Error|string} error - Error to process
+   * @param {string} context - Context where error occurred
+   * @returns {Object} Error information for UI
+   */
+  const getErrorForDisplay = async (error, context = 'ui') => {
+    const errorHandler = ErrorHandler.getInstance()
+    return await errorHandler.getErrorForUI(error, context)
+  }
+
+  /**
+   * Handle errors that should only show toast notifications
+   * @param {Error|string} error - Error to handle
+   * @param {string} context - Context of the error
+   */
+  const handleToastOnlyError = async (error, context = 'toast') => {
+    await handleError(error, context, {
+      showToast: true,
+      showInUI: false,
+      errorLevel: 'generic'
+    })
+  }
+
+  /**
    * Check if an error should be handled silently
    * @param {Error|string} error - Error to check
    * @returns {boolean} True if error should be silent
@@ -104,12 +146,34 @@ export function useErrorHandler() {
     
     return silentErrors.includes(errorType)
   }
+
+  /**
+   * Check if an error is retryable
+   * @param {Error|string} error - Error to check
+   * @returns {boolean} True if error can be retried
+   */
+  const isRetryableError = (error) => {
+    const errorType = matchErrorToType(error?.message || error)
+    const retryableErrors = [
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.HTTP_ERROR,
+      ErrorTypes.MODEL_OVERLOADED,
+      ErrorTypes.TRANSLATION_FAILED,
+      ErrorTypes.SERVER_ERROR
+    ]
+    
+    return retryableErrors.includes(errorType)
+  }
   
   return {
     handleError,
     handleConnectionError,
+    handleTranslationError,
+    handleToastOnlyError,
     withErrorHandling,
+    getErrorForDisplay,
     isSilentError,
+    isRetryableError,
     isHandlingError
   }
 }

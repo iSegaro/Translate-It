@@ -62,6 +62,7 @@ export class ErrorHandler {
     this.handling = false;
     this.openOptionsPageCallback = null; // Property to hold the callback
     this.debugMode = false; // Debug mode state
+    this.errorListeners = new Set(); // For UI error state listeners
     _instance = this; // Set singleton instance
   }
 
@@ -92,17 +93,44 @@ export class ErrorHandler {
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
       
+      // Enhanced metadata with defaults
+      const enhancedMeta = {
+        type: type,
+        context: 'unknown',
+        component: null,
+        showToast: true,
+        showInUI: false,
+        errorLevel: 'generic',
+        timestamp: Date.now(),
+        ...meta
+      };
+      
       // Use instance debug mode instead of importing from config to avoid circular dependency
       if (this.debugMode && !SUPPRESS_CONSOLE.has(type)) {
         logger.error(`[${type}] ${raw}`, err.stack);
       }
       if (SILENT.has(type)) return err;
 
-      const action = OPEN_SETTINGS.has(type)
-        ? () => this.openOptionsPageCallback?.() || openOptionsPage("api")
-        : undefined;
+      // Notify UI error listeners if enabled
+      if (enhancedMeta.showInUI) {
+        this._notifyUIErrorListeners({
+          message: msg,
+          type: type,
+          context: enhancedMeta.context,
+          errorLevel: enhancedMeta.errorLevel,
+          timestamp: enhancedMeta.timestamp
+        });
+      }
 
-      this._notifyUser(msg, meta.type || ErrorTypes.SERVICE, action);
+      // Show toast notification if enabled  
+      if (enhancedMeta.showToast) {
+        const action = OPEN_SETTINGS.has(type)
+          ? () => this.openOptionsPageCallback?.() || openOptionsPage("api")
+          : undefined;
+
+        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE, action);
+      }
+      
       return err;
     } finally {
       this.handling = false;
@@ -113,6 +141,66 @@ export class ErrorHandler {
     logger.error(
       `[ErrorHandler] ${error.name}: ${error.message}\nContext: ${meta.context}\nType: ${meta.type}\nStack: ${error.stack}`,
     );
+  }
+
+  // UI Error Listener Management
+  addUIErrorListener(listener) {
+    this.errorListeners.add(listener);
+    return () => this.errorListeners.delete(listener);
+  }
+
+  removeUIErrorListener(listener) {
+    this.errorListeners.delete(listener);
+  }
+
+  _notifyUIErrorListeners(errorData) {
+    this.errorListeners.forEach(listener => {
+      try {
+        listener(errorData);
+      } catch (err) {
+        logger.error('Error in UI error listener:', err);
+      }
+    });
+  }
+
+  // Get error message for UI display without showing toast
+  async getErrorForUI(err, context = 'ui') {
+    try {
+      const raw = err instanceof Error ? err.message : String(err);
+      const type = matchErrorToType(raw);
+      const msg = await getErrorMessage(type);
+      
+      return {
+        message: msg,
+        type: type,
+        context: context,
+        timestamp: Date.now(),
+        canRetry: this._canRetryError(type),
+        needsSettings: OPEN_SETTINGS.has(type)
+      };
+    } catch (error) {
+      logger.error('Failed to get error for UI:', error);
+      return {
+        message: 'An unknown error occurred',
+        type: ErrorTypes.UNKNOWN,
+        context: context,
+        timestamp: Date.now(),
+        canRetry: false,
+        needsSettings: false
+      };
+    }
+  }
+
+  // Check if error type supports retry
+  _canRetryError(type) {
+    const retryableErrors = new Set([
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.HTTP_ERROR,
+      ErrorTypes.MODEL_OVERLOADED,
+      ErrorTypes.TRANSLATION_FAILED,
+      ErrorTypes.SERVER_ERROR
+    ]);
+    return retryableErrors.has(type);
   }
 
   _notifyUser(message, type, action) {

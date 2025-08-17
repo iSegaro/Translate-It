@@ -79,6 +79,24 @@ const props = defineProps({
     default: ''
   },
   
+  // Enhanced error props
+  canRetry: {
+    type: Boolean,
+    default: false
+  },
+  canOpenSettings: {
+    type: Boolean,
+    default: false
+  },
+  onRetry: {
+    type: Function,
+    default: null
+  },
+  onOpenSettings: {
+    type: Function,
+    default: null
+  },
+  
   // Display options
   mode: {
     type: String,
@@ -158,7 +176,26 @@ const hasError = computed(() => !!props.error && !props.isLoading)
 
 const renderedContent = computed(() => {
   if (props.error) {
-    return `<div class="error-message">⚠️ ${props.error}</div>`
+    const errorActions = []
+    
+    // Add retry action if available
+    if (props.canRetry && props.onRetry) {
+      errorActions.push(`<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`)
+    }
+    
+    // Add settings action if available
+    if (props.canOpenSettings && props.onOpenSettings) {
+      errorActions.push(`<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`)
+    }
+    
+    const actionsHtml = errorActions.length > 0 
+      ? `<div class="error-actions">${errorActions.join('')}</div>`
+      : ''
+    
+    return `<div class="error-message">
+      <div class="error-text">⚠️ ${props.error}</div>
+      ${actionsHtml}
+    </div>`
   }
   
   if (props.isLoading) {
@@ -206,6 +243,25 @@ watch(() => props.error, (newError) => {
     }
   })
 })
+
+// Error action handlers
+const handleRetry = () => {
+  if (props.onRetry) {
+    props.onRetry()
+  }
+}
+
+const handleSettings = () => {
+  if (props.onOpenSettings) {
+    props.onOpenSettings()
+  }
+}
+
+// Make handlers globally accessible for onclick handlers
+if (typeof window !== 'undefined') {
+  window.handleRetry = handleRetry
+  window.handleSettings = handleSettings
+}
 
 // Setup dynamic height for different modes
 onMounted(() => {
@@ -337,10 +393,72 @@ onMounted(() => {
 .translation-content :deep(.error-message) {
   color: #dc3545;
   font-style: italic;
-  padding: 8px;
+  padding: 12px;
   border-left: 3px solid #dc3545;
   background-color: rgba(220, 53, 69, 0.1);
-  border-radius: 3px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.translation-content :deep(.error-text) {
+  margin-bottom: 8px;
+}
+
+.translation-content :deep(.error-actions) {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.translation-content :deep(.error-action) {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+}
+
+.translation-content :deep(.error-action:hover) {
+  background: #c82333;
+}
+
+.translation-content :deep(.error-action.retry-btn) {
+  background: #007bff;
+}
+
+.translation-content :deep(.error-action.retry-btn:hover) {
+  background: #0056b3;
+}
+
+.translation-content :deep(.error-action.settings-btn) {
+  background: #6c757d;
+}
+
+.translation-content :deep(.error-action.settings-btn:hover) {
+  background: #5a6268;
+}
+
+/* Responsive error actions for different modes */
+.popup-mode .translation-content :deep(.error-actions) {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popup-mode .translation-content :deep(.error-action) {
+  font-size: 10px;
+  padding: 3px 6px;
+}
+
+.selection-mode .translation-content :deep(.error-actions) {
+  display: none; /* Hide actions in selection mode to keep it minimal */
 }
 
 .translation-content :deep(.loading-message) {

@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
+import { useTranslationError } from "@/composables/useTranslationError.js";
 import { generateMessageId } from "../utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
@@ -15,15 +16,16 @@ export function usePopupTranslation() {
   const sourceText = ref("");
   const translatedText = ref("");
   const isTranslating = ref(false);
-  const translationError = ref("");
   const lastTranslation = ref(null);
 
   // Store
   const settingsStore = useSettingsStore();
 
-
   // Browser API
   const browserAPI = useBrowserAPI();
+  
+  // Error management
+  const errorManager = useTranslationError('popup');
 
   // Computed
   const hasTranslation = computed(() => Boolean(translatedText.value?.trim()));
@@ -36,7 +38,7 @@ export function usePopupTranslation() {
     if (!canTranslate.value) return false;
 
     isTranslating.value = true;
-    translationError.value = "";
+    errorManager.clearError(); // Clear previous errors
     translatedText.value = ""; // Clear previous translation
 
     try {
@@ -75,6 +77,7 @@ export function usePopupTranslation() {
         }
       }).catch(error => {
         logger.error("Failed to send translation request", error);
+        errorManager.handleError(error);
       });
 
       logger.operation('Translation request sent. Waiting for result...');
@@ -82,7 +85,7 @@ export function usePopupTranslation() {
       return true; // Indicate successful initiation
     } catch (error) {
       logger.error('Translation error', error);
-      translationError.value = error.message || "Translation failed";
+      await errorManager.handleError(error);
       isTranslating.value = false; // Ensure loading state is reset on immediate error
       return false; // Indicate failure
     }
@@ -91,7 +94,7 @@ export function usePopupTranslation() {
   const clearTranslation = () => {
     sourceText.value = "";
     translatedText.value = "";
-    translationError.value = "";
+    errorManager.clearError();
     lastTranslation.value = null;
   };
 
@@ -115,17 +118,18 @@ export function usePopupTranslation() {
         isTranslating.value = false;
         
         if (message.data.success === false && message.data.error) {
-          // ERROR case - display error message and clear translation
+          // ERROR case - handle error with new error management system
           logger.error('Translation error received', message.data.error);
-          translationError.value = message.data.error.message || "Translation failed";
+          // Extract error message from error object
+          const errorMessage = message.data.error?.message || message.data.error?.type || message.data.error || "Translation failed";
+          errorManager.handleError(errorMessage);
           translatedText.value = ""; // Clear any previous translation
           lastTranslation.value = null; // Clear last translation on error
-          logger.debug('Error state updated:', translationError.value);
         } else if (message.data.success !== false && message.data.translatedText) {
           // SUCCESS case - display translation and clear error
           logger.info('Translation success received');
           translatedText.value = message.data.translatedText;
-          translationError.value = ""; // Clear any previous error
+          errorManager.clearError(); // Clear any previous error
           lastTranslation.value = {
             source: message.data.originalText,
             target: message.data.translatedText,
@@ -136,7 +140,7 @@ export function usePopupTranslation() {
         } else {
           // UNEXPECTED case - handle gracefully
           logger.warn('Unexpected message data structure:', message.data);
-          translationError.value = "Unexpected response format";
+          errorManager.handleError("Unexpected response format");
           translatedText.value = "";
         }
       } else {
@@ -156,14 +160,23 @@ export function usePopupTranslation() {
     sourceText,
     translatedText,
     isTranslating,
-    translationError,
     hasTranslation,
     canTranslate,
     lastTranslation,
 
+    // Error management (from errorManager)
+    translationError: errorManager.errorMessage,
+    hasError: errorManager.hasError,
+    canRetry: errorManager.canRetry,
+    canOpenSettings: errorManager.canOpenSettings,
+    
     // Methods
     triggerTranslation,
     clearTranslation,
     loadLastTranslation,
+    
+    // Error methods
+    getRetryCallback: errorManager.getRetryCallback,
+    getSettingsCallback: errorManager.getSettingsCallback,
   };
 }
