@@ -130,9 +130,16 @@ export class ExtensionContextManager {
    * @returns {Promise} Safe message sending promise
    */
   static async safeSendMessage(message, context = 'messaging') {
+    // Use reliable messaging (with retries and port fallback) where available
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
-        return browser.runtime.sendMessage(msg);
+        try {
+          const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+          return await sendReliable(msg);
+        } catch (err) {
+          // Fallback to direct runtime.sendMessage if reliable module not available
+          return browser.runtime.sendMessage(msg);
+        }
       },
       { 
         context: `sendMessage-${context}`,
