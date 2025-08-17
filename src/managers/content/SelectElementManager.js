@@ -283,7 +283,6 @@ export class SelectElementManager {
       if (this.state.isCtrlPressed && this.state.isActive) {
         this.state.isCtrlPressed = false;
         this.setMode(this.config.baseMode);
-        const emoji = SelectElementValidation.getModeEmoji(this.config.baseMode);
         const displayName = SelectElementValidation.getDisplayName(this.config.baseMode);
         this.logger.info(`🌫️ Window blur: Auto-reset to ${displayName}`);
       }
