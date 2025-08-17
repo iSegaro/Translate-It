@@ -639,7 +639,7 @@ export class WindowsManager {
    * Clean up window
    */
   async _cleanupWindow(withFadeOut) {
-    this.themeManager.removeThemeChangeListener();
+    // Note: Don't remove theme listeners here - keep them for future windows
     this.clickManager.removeOutsideClickListener();
     this.dragHandler.removeDragHandlers();
     
