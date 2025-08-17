@@ -135,6 +135,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
@@ -230,7 +231,7 @@ const translateText = async () => {
   
   try {
     // Send message to background script for translation
-    const response = await browser.runtime.sendMessage({
+    const response = await sendReliable({
       action: MessageActions.TRANSLATE_TEXT,
       data: {
         text: sourceText.value,

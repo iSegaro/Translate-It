@@ -6,6 +6,7 @@ import { getScopedLogger } from "../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
 import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
 import { MessageActions } from "../messaging/core/MessageActions.js";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 
 // Import CSS styles for content script functionality
 import "../styles/disable_links.css";
@@ -26,7 +27,7 @@ if (!access.isAccessible) {
 
     // Check if current page is excluded before initializing
     try {
-      const response = await browser.runtime.sendMessage({
+      const response = await sendReliable({
         action: MessageActions.IS_Current_Page_Excluded,
         data: { url: window.location.href }
       });

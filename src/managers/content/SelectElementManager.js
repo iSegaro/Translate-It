@@ -676,7 +676,8 @@ export class SelectElementManager {
     this.disablePageInteractions();
     // Notify background about activation so it can keep per-tab state
     try {
-      await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: true } });
+      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+      await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: true } });
       this.logger.debug('Notified background: select element activated');
     } catch (err) {
       this.logger.warn('Failed to notify background about activation', err);
@@ -724,7 +725,8 @@ export class SelectElementManager {
 
     // Notify background about deactivation so it can keep per-tab state
     try {
-      await this.browser.runtime.sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
+      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+      await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
       this.logger.debug('Notified background: select element deactivated (UI only)');
     } catch (err) {
       this.logger.warn('Failed to notify background about deactivation', err);

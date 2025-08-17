@@ -3,6 +3,7 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -23,10 +24,9 @@ export function useDirectMessage() {
 
       logger.debug("Sending direct message:", message);
 
-      // Direct call without Promise.race or timeout wrapper
-      const response = await browser.runtime.sendMessage(message);
-
-      logger.debug("Direct response received:", response);
+      // Use reliable sender which applies retries and port fallback
+      const response = await sendReliable(message);
+      logger.debug("Direct response received (reliable):", response);
       return response;
     } catch (error) {
       logger.error("Direct message failed", error);

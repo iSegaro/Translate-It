@@ -3,6 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts, MessageActions } from "../../../messaging/core/MessagingCore.js";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
@@ -113,13 +114,10 @@ export class OffscreenCaptureManager {
           MessagingContexts.CAPTURE_MANAGER
         );
         
-        const response = await browser.runtime.sendMessage(message);
+        const response = await sendReliable(message);
 
         if (!response || !response.success) {
-          throw new Error(
-            response?.error ||
-              "Failed to process capture in offscreen document",
-          );
+          throw new Error(response?.error || "Failed to process capture in offscreen document");
         }
 
         return response.processedData;
@@ -154,12 +152,10 @@ export class OffscreenCaptureManager {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await browser.runtime.sendMessage(message);
+      const response = await sendReliable(message);
 
       if (!response || !response.success) {
-        throw new Error(
-          response?.error || "Failed to crop image in offscreen document",
-        );
+        throw new Error(response?.error || "Failed to crop image in offscreen document");
       }
 
       logger.debug("📸 Screen area captured and cropped");
@@ -195,7 +191,7 @@ export class OffscreenCaptureManager {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await browser.runtime.sendMessage(message);
+      const response = await sendReliable(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "OCR processing failed");

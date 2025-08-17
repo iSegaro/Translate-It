@@ -3,6 +3,7 @@ import { MessageFormat, MessagingContexts } from '../core/MessagingCore.js'
 import { MessageActions } from '../core/MessageActions.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 
@@ -32,10 +33,17 @@ export function useMessaging(context) {
    */
   const sendMessage = async (message) => {
     try {
-      return await browser.runtime.sendMessage(message);
+      // Prefer the reliable messenger which implements retries and port fallback
+      return await sendReliable(message);
     } catch (error) {
-  logger.error('Send failed:', error);
-      throw error;
+      logger.error('Send failed (reliable fallback):', error);
+      // Fall back to direct sendMessage as a last resort
+      try {
+        return await browser.runtime.sendMessage(message);
+      } catch (err) {
+        logger.error('Direct sendMessage also failed:', err);
+        throw err;
+      }
     }
   };
 

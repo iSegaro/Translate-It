@@ -5,6 +5,7 @@ import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 
 /**
  * Manages Text-to-Speech functionality for WindowsManager
@@ -29,8 +30,8 @@ export class TTSManager {
       // Detect language
       const language = this.detectSimpleLanguage(text) || "en";
       
-      // Send to background service
-      await browser.runtime.sendMessage({
+      // Send to background service (use reliable messenger)
+      await sendReliable({
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
