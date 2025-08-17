@@ -34,13 +34,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
+import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
@@ -66,6 +67,17 @@ const handleMessage = (message) => {
   }
 };
 
+// Storage change listener for immediate theme updates
+const handleStorageChange = (changes, areaName) => {
+  if (areaName === 'local' && changes.THEME) {
+    const newTheme = changes.THEME.newValue
+    if (newTheme) {
+      logger.debug('Theme changed from storage:', newTheme)
+      applyTheme(newTheme).catch(error => logger.error('Failed to apply theme:', error))
+    }
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
   logger.debug('🚀 SidepanelApp mounting...')
@@ -83,8 +95,16 @@ onMounted(async () => {
     ])
     logger.debug('✅ Settings store loaded')
 
-    // Step 3: Add message listener
+    // Step 3: Apply theme
+    const settings = settingsStore.settings
+    logger.debug('Applying initial theme:', settings.THEME)
+    await applyTheme(settings.THEME)
+
+    // Step 4: Add message listener
     browser.runtime.onMessage.addListener(handleMessage)
+    
+    // Step 5: Add storage change listener for immediate theme updates
+    browser.storage.onChanged.addListener(handleStorageChange)
   } catch (error) {
     await handleError(error, 'SidepanelApp-init')
     hasError.value = true
@@ -95,8 +115,21 @@ onMounted(async () => {
   }
 })
 
+// Watch for theme changes and apply them immediately
+watch(() => settingsStore.settings.THEME, async (newTheme) => {
+  if (newTheme) {
+    logger.debug('Theme changed from settings store:', newTheme)
+    try {
+      await applyTheme(newTheme)
+    } catch (error) {
+      logger.error('Failed to apply theme:', error)
+    }
+  }
+}, { immediate: false })
+
 onUnmounted(() => {
   browser.runtime.onMessage.removeListener(handleMessage);
+  browser.storage.onChanged.removeListener(handleStorageChange);
 });
 
 const retryLoading = () => {
