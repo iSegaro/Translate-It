@@ -370,12 +370,18 @@ export class ContentMessageHandler {
     const noActionModes = [
       TranslationMode.Popup_Translate,
       TranslationMode.Sidepanel_Translate,
+      TranslationMode.Selection,
       TranslationMode.Subtitle,
       TranslationMode.ScreenCapture,
+      TranslationMode.Select_Element,
+      TranslationMode.Field,
       'popup',
       'sidepanel',
+      'selection',
       'subtitle', 
-      'screen_capture'
+      'screen_capture',
+      'select_element',
+      'field'
     ];
     
     if (noActionModes.includes(translationMode)) {
