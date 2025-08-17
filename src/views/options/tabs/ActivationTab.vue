@@ -58,7 +58,7 @@
           <label>{{ $i18n('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)' }}</label>
           <BaseCheckbox 
             v-model="replaceOnSpecialSites" 
-            :disabled="!extensionEnabled || textFieldMode !== 'replace'"
+            :disabled="!extensionEnabled || textFieldMode !== 'copy'"
           />
         </div>
       </div>
