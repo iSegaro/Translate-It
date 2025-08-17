@@ -44,7 +44,27 @@
 ### Integration & Content
 - **`src/content-scripts/`**: اسکریپت‌های صفحه وب
 - **`src/managers/`**: مدیریت‌کننده‌های سیستم - lifecycle، element selection
-- **`docs/`**: مستندات کامل - ARCHITECTURE، TRANSLATION_SYSTEM، TTS_SYSTEM و...
+
+## مستندات موجود
+مستندات جامع در پوشه `docs/` برای درک عمیق هر سیستم:
+
+### مستندات اصلی
+- **`docs/ARCHITECTURE.md`**: معماری کامل پروژه و integration guide
+- **`docs/MessagingSystem.md`**: سیستم پیام‌رسانی بین کامپوننت‌ها
+- **`docs/TRANSLATION_SYSTEM.md`**: موتور ترجمه و provider ها
+- **`docs/ERROR_MANAGEMENT_SYSTEM.md`**: مدیریت خطا و context safety
+- **`docs/STORAGE_MANAGER.md`**: مدیریت storage با caching
+- **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
+
+### مستندات ویژگی‌ها  
+- **`docs/WINDOWS_MANAGER.md`**: مدیریت UI و cross-frame communication
+- **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
+- **`docs/TTS_SYSTEM.md`**: سیستم text-to-speech
+
+### منابع اضافی
+- **`docs/Images/`**: تصاویر و diagram های معماری
+- **`docs/Introduce.mp4`**: ویدئوی معرفی
+- **`docs/HowToGet-APIKey.mp4`**: راهنمای تنظیم API
 
 ## مشخصات فنی
 - **Manifest V3**: استاندارد جدید مرورگرها
