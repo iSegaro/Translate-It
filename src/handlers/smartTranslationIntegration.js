@@ -428,8 +428,34 @@ export async function handleTranslationError(error, mode = 'field') {
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    browser.runtime.sendMessage({ action: MessageActions.SHOW_NOTIFICATION_SIMPLE, data: { message: await getTranslationString("STATUS_SMART_TRANSLATE_COPIED"), type: 'success' } });
+    
+    // Show success notification using NotificationManager
+    try {
+      const successMessage = await getTranslationString("STATUS_SMARTTRANSLATE_COPIED") || "متن ترجمه شده در حافظه کپی شد";
+      
+      // Import NotificationManager dynamically
+      const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
+      const notificationManager = new NotificationManager();
+      
+      await notificationManager.show(successMessage, 'success');
+    } catch (notificationError) {
+      logger.error('Failed to show clipboard success notification:', notificationError);
+    }
   } catch (error) {
+    // Handle clipboard error
+    try {
+      const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
+      
+      // Import NotificationManager dynamically
+      const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
+      const notificationManager = new NotificationManager();
+      
+      await notificationManager.show(errorMessage, 'error');
+    } catch (notificationError) {
+      logger.error('Failed to show clipboard error notification:', notificationError);
+    }
+    
+    // Also send error to background for logging
     browser.runtime.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } });
   }
 }

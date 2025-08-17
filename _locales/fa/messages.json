@@ -394,6 +394,9 @@
   "STATUS_SMARTTRANSLATE_COPIED": {
     "message": "ترجمه در کلیپ‌بورد کپی شد (Ctrl+V)."
   },
+  "STATUS_SMART_TRANSLATE_COPY_ERROR": {
+    "message": "خطا در کپی کردن متن ترجمه شده"
+  },
   "SIDEPANEL_API_PROVIDER_TOOLTIP": {
     "message": "ارایه دهنده سرویس"
   },

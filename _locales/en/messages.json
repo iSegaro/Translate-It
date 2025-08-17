@@ -382,6 +382,9 @@
   "STATUS_SMART_TRANSLATE_COPIED": {
     "message": "Translation copied to clipboard (Ctrl+V)."
   },
+  "STATUS_SMART_TRANSLATE_COPY_ERROR": {
+    "message": "Error copying translated text to clipboard"
+  },
 
   "SIDEPANEL_API_PROVIDER_TOOLTIP": {
     "message": "Change API Provider"
