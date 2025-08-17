@@ -1,6 +1,7 @@
 // src/managers/content/windows/translation/TranslationHandler.js
 
 import browser from "webextension-polyfill";
+import { sendReliable } from "@/messaging/core/ReliableMessaging.js"
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
@@ -65,8 +66,8 @@ export class TranslationHandler {
 
       this.logger.debug("Sending translation request", payload);
 
-      // Send translation request
-      browser.runtime.sendMessage({
+      // Send translation request using reliable messenger (retries + port fallback)
+      await sendReliable({
         action: MessageActions.TRANSLATE,
         context: 'content',
         messageId: messageId,
@@ -78,7 +79,7 @@ export class TranslationHandler {
           mode: payload.mode,
           options: payload.options
         }
-      });
+      })
 
       // Wait for result
       const result = await resultPromise;
