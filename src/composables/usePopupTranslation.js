@@ -105,18 +105,20 @@ export function usePopupTranslation() {
     }
   };
 
+  // Listener reference for cleanup
+  let popupMessageListener = null
+
   // Listen for translation result updates from background script
   onMounted(() => {
-    browserAPI.onMessage.addListener((message) => {
+    // Register a named listener so we can remove it on unmount
+    popupMessageListener = (message) => {
       logger.debug('Raw message received by listener:', message);
-      if (
-        message.action === MessageActions.TRANSLATION_RESULT_UPDATE
-      ) {
+      if (message.action === MessageActions.TRANSLATION_RESULT_UPDATE) {
         logger.debug('Received TRANSLATION_RESULT_UPDATE:', message);
-        
+
         // Always reset loading state when receiving any result
         isTranslating.value = false;
-        
+
         if (message.data.success === false && message.data.error) {
           // ERROR case - handle error with new error management system
           logger.error('Translation error received', message.data.error);
@@ -146,13 +148,21 @@ export function usePopupTranslation() {
       } else {
         logger.debug('Message filtered out. Action:', message.action, 'Context:', message.context);
       }
-    });
+    };
+
+    browserAPI.onMessage.addListener(popupMessageListener);
   });
 
   // Clean up listener on unmount
   onUnmounted(() => {
-    // No specific cleanup needed for browser.runtime.onMessage.addListener
-    // as it's managed by the browser's lifecycle for extension pages.
+    // Remove the popup message listener to avoid duplicate handlers on remount
+    try {
+      if (typeof popupMessageListener === 'function') {
+        browserAPI.onMessage.removeListener(popupMessageListener);
+      }
+    } catch (err) {
+      logger.warn('Failed to remove popup message listener on unmount:', err);
+    }
   });
 
   return {
