@@ -198,6 +198,17 @@ export default class NotificationManager {
 
     const cfg = this.map[type] || this.map.info;
     const finalDur = dur ?? cfg.dur;
+    
+    // Debug logging for status type notifications
+    if (type === "status") {
+      this.logger.debug('Showing status notification:', { 
+        message: msg, 
+        messageType: typeof msg, 
+        messageLength: msg?.length,
+        isEmpty: !msg || msg.trim() === '',
+        cfg 
+      });
+    }
 
     // Step 2: Attempt to show the notification in-page if possible.
     if (this.canShowInPage) {
@@ -280,6 +291,17 @@ export default class NotificationManager {
 
     const msgSpan = document.createElement("span");
     msgSpan.textContent = message;
+    
+    // Debug for status notifications
+    if (cfg.cls === "AIWC-status") {
+      this.logger.debug('Creating status toast elements:', {
+        message,
+        messageLength: message?.length,
+        iconText: cfg.icon,
+        msgSpanText: msgSpan.textContent,
+        msgSpanTextLength: msgSpan.textContent?.length
+      });
+    }
 
     n.appendChild(iconSpan);
     n.appendChild(msgSpan);
