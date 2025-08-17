@@ -199,7 +199,7 @@ const handleKeydown = () => {
   color: white;
   border: none;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   display: flex;

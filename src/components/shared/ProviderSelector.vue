@@ -536,7 +536,7 @@ onUnmounted(() => {
 
 .translate-main-area span {
   color: var(--text-color);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -613,7 +613,7 @@ onUnmounted(() => {
 }
 
 .popup-wrapper .translate-main-area span {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -646,7 +646,7 @@ onUnmounted(() => {
 }
 
 .sidepanel-wrapper .translate-main-area span {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 

@@ -242,13 +242,13 @@ onMounted(async () => {
 
 .language-select {
   flex: 1;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg-textbox-color, #ffffff);
   color: var(--text-color, #212529);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   box-sizing: border-box;
   min-width: 0;
@@ -272,16 +272,16 @@ onMounted(async () => {
 
 .swap-button {
   flex-shrink: 0;
-  padding: 4px;
+  padding: 6px;
   border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg-textbox-color, #ffffff);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  width: 32px;
+  width: 36px;
   height: 100%;
   box-sizing: border-box;
 }
@@ -340,11 +340,11 @@ onMounted(async () => {
 }
 
 .popup-wrapper .language-select {
-  padding: 0 8px;
-  font-size: 12px;
-  min-width: 80px;
-  height: 28px;
-  line-height: 2.7;
+  padding: 6px 10px;
+  font-size: 14px;
+  min-width: 90px;
+  height: 32px;
+  line-height: 1.4;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -352,34 +352,34 @@ onMounted(async () => {
 }
 
 .popup-wrapper .swap-button {
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
 }
 
 .popup-wrapper .swap-button img {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .sidepanel-wrapper .language-controls {
-  height: 36px !important;
+  height: 40px !important;
   align-items: center !important;
-  padding: 3px 0 !important;
+  padding: 4px 0 !important;
   margin: 2px 0 4px 0 !important;
-  gap: 4px !important;
+  gap: 6px !important;
   box-sizing: border-box !important;
   background: transparent !important;
   flex: none !important;
 }
 
 .sidepanel-wrapper .language-select {
-  padding: 0 8px;
-  font-size: 12px;
-  height: 28px;
-  line-height: 2.7;
-  min-width: 80px;
-  max-width: 140px;
+  padding: 6px 10px;
+  font-size: 14px;
+  height: 32px;
+  line-height: 1.4;
+  min-width: 90px;
+  max-width: 150px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -387,13 +387,13 @@ onMounted(async () => {
 }
 
 .sidepanel-wrapper .swap-button {
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
 }
 
 .sidepanel-wrapper .swap-button img {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 </style>
