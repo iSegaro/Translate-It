@@ -46,6 +46,9 @@
     "message": "افزونه {appName} باموفقیت به نسخه {version} به‌روزرسانی شد."
   },
 
+  "ERRORS_TRANSLATION_TIMEOUT": { "message": "ترجمه با زمان‌انتظار مواجه شد. لطفاً دوباره تلاش کنید." },
+
+
   "options_page_title": { "message": "تنظیمات" },
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
   "options_changelog_loading": { "message": "در حال بارگذاری تغییرات..." },

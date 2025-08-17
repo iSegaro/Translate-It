@@ -76,6 +76,10 @@ export function matchErrorToType(rawOrError = "") {
   //--- این بخش به عنوان فال‌بک برای مواردی که کد وضعیت در دسترس نیست، حفظ می‌شود --- //
 
   // Common string-based matching
+  // Handle explicit timeout cases as a distinct translation timeout error
+  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('time out'))
+    return ErrorTypes.TRANSLATION_TIMEOUT;
+
   if (msg.includes("text is empty")) return ErrorTypes.TEXT_EMPTY;
   if (msg.includes("prompt is invalid")) return ErrorTypes.PROMPT_INVALID;
   if (msg.includes("text is too long") || msg.includes("too long"))

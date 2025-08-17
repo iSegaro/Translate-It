@@ -222,6 +222,7 @@ export class ErrorHandler {
       ErrorTypes.HTTP_ERROR,
       ErrorTypes.MODEL_OVERLOADED,
       ErrorTypes.TRANSLATION_FAILED,
+      ErrorTypes.TRANSLATION_TIMEOUT,
       ErrorTypes.SERVER_ERROR
     ]);
     return retryableErrors.has(type);

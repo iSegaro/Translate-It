@@ -93,6 +93,8 @@
     "message": "{appName} has been successfully updated to version {version}."
   },
 
+  "ERRORS_TRANSLATION_TIMEOUT": { "message": "Translation timed out. Please try again." },
+
   "languages_section_title": { "message": "Languages" },
   "source_language_label": { "message": "Source Language" },
   "target_language_label": { "message": "Target Language" },
