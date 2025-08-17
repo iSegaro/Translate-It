@@ -19,7 +19,16 @@ const errorHandler = new ErrorHandler();
  * @param {Object} sender - The sender object.
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleTranslate(message, sender) {
+export async function handleTranslate(message, sender, sendResponse) {
+  // Send immediate ACK to sender to indicate request received
+  try {
+    if (typeof sendResponse === 'function') {
+      try { sendResponse({ ack: true, messageId: message.messageId }) } catch (e) { /* ignore */ }
+    }
+  } catch (e) {
+    // ignore
+  }
+
   logger.info(`[Handler:TRANSLATE] 🔄 Starting: "${message.data?.text?.slice(0, 30)}..." → ${message.data?.provider} → ${message.data?.targetLanguage}`);
 
   try {
