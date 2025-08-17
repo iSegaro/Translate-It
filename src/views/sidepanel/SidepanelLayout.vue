@@ -105,8 +105,13 @@ watch(isHistoryVisible, (newVal) => {
 
 // Handle clear fields event from toolbar
 const handleClearFields = () => {
+  // Clear translation store
   translationStore.currentTranslation = null;
   translationStore.clearError();
+  
+  // Emit clear-fields event to main content component
+  const event = new CustomEvent('clear-fields')
+  document.dispatchEvent(event)
 }
 
 // Handle history item selection

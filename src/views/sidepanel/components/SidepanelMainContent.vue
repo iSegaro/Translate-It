@@ -273,6 +273,25 @@ const handleSourceTextInput = (event) => {
   logger.debug("[SidepanelMainContent] Source text changed:", event.target.value.substring(0, 30) + "...");
 };
 
+const handleClearFields = async () => {
+  logger.debug("🧹 Clear fields event received");
+  // Clear text fields
+  sourceText.value = "";
+  translatedText.value = "";
+  translationError.value = "";
+  
+  // Reset languages to saved settings
+  try {
+    const savedSource = await getSourceLanguageAsync()
+    const savedTarget = await getTargetLanguageAsync()
+    sourceLang.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || AUTO_DETECT_VALUE
+    targetLang.value = getLanguageDisplayName(savedTarget) || 'Farsi'
+    logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget);
+  } catch (error) {
+    logger.error("❌ Failed to reset languages:", error);
+  }
+};
+
 
 
 const handleFocus = () => {
@@ -305,6 +324,9 @@ onMounted(async () => {
   logger.debug("Adding focus listeners...");
     document.addEventListener("focus", handleFocus, true);
     window.addEventListener("focus", handleFocus);
+    
+    // Add clear fields listener
+    document.addEventListener('clear-fields', handleClearFields);
 
     // Initialize translation data
   logger.debug("Loading last translation...");
@@ -320,6 +342,7 @@ onUnmounted(() => {
   // Clean up event listeners
   document.removeEventListener("focus", handleFocus, true);
   window.removeEventListener("focus", handleFocus);
+  document.removeEventListener('clear-fields', handleClearFields);
 
   // Cancel any pending translation request
   if (currentAbortController.value) {

@@ -108,6 +108,8 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
+import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Stores & Composables
@@ -122,32 +124,9 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const canTranslateFromForm = ref(false)
 
-// Language state management
-const sourceLanguage = computed({
-  get: () => settingsStore.settings.SOURCE_LANGUAGE || AUTO_DETECT_VALUE,
-  set: async (value) => {
-    try {
-      logger.info("[PopupApp] 🌍 Source language changed to:", value);
-      await settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', value)
-    } catch (error) {
-      logger.error("[PopupApp] ❌ Failed to update source language:", error);
-      await handleError(error, 'popup-source-language')
-    }
-  }
-})
-
-const targetLanguage = computed({
-  get: () => settingsStore.settings.TARGET_LANGUAGE || 'English',
-  set: async (value) => {
-    try {
-      logger.info("[PopupApp] 🌍 Target language changed to:", value);
-      await settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', value)
-    } catch (error) {
-      logger.error("[PopupApp] ❌ Failed to update target language:", error);
-      await handleError(error, 'popup-target-language')
-    }
-  }
-})
+// Language state management - matching sidepanel approach
+const sourceLanguage = ref(AUTO_DETECT_VALUE)
+const targetLanguage = ref('Farsi')
 
 // Enhanced version toggle
 const useEnhancedVersion = ref(false) // Default to original version
@@ -215,6 +194,33 @@ onMounted(async () => {
     if (savedVersion !== null) {
       useEnhancedVersion.value = savedVersion === 'true'
     }
+    
+    // Initialize language refs with saved settings (matching sidepanel approach)
+    try {
+      const savedSource = await getSourceLanguageAsync()
+      const savedTarget = await getTargetLanguageAsync()
+      sourceLanguage.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || AUTO_DETECT_VALUE
+      targetLanguage.value = getLanguageDisplayName(savedTarget) || 'Farsi'
+      logger.debug("✅ Languages initialized from settings:", savedSource, "→", savedTarget)
+    } catch (err) {
+      logger.warn("Error loading language settings:", err)
+      sourceLanguage.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect'
+      targetLanguage.value = 'English'
+    }
+    
+    // Add clear-storage event listener to reset languages (matching sidepanel approach)
+    document.addEventListener('clear-storage', async () => {
+      logger.debug("🔄 Clear storage event - resetting languages to saved settings");
+      try {
+        const savedSource = await getSourceLanguageAsync()
+        const savedTarget = await getTargetLanguageAsync()
+        sourceLanguage.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect'
+        targetLanguage.value = getLanguageDisplayName(savedTarget) || 'English'
+        logger.debug("✅ Languages reset to saved settings:", savedSource, "→", savedTarget)
+      } catch (error) {
+        logger.error("❌ Failed to reset languages:", error)
+      }
+    })
     
     logger.debug('[PopupApp] Popup initialized successfully', {
       useEnhancedVersion: useEnhancedVersion.value,
