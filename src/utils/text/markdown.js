@@ -127,23 +127,13 @@ export class SimpleMarkdown {
       }
       // Label formatting (e.g., "نوع: اسم" or "Definition: Noun")
       else if (this._isLabelLine(trimmed)) {
-        if (listItems.length > 0) {
-          // Finish any pending list
-          this._finishSection(container, currentSection, listItems);
-          currentSection = null;
-          listItems = [];
-        }
-
-        if (!currentSection || currentSection.tagName !== "P") {
-          this._finishSection(container, currentSection, []);
-          currentSection = document.createElement("p");
-          listItems = [];
-        }
-
-        if (currentSection.textContent) {
-          currentSection.appendChild(document.createTextNode(" "));
-        }
+        // Always finish current section before starting a label line
+        this._finishSection(container, currentSection, listItems);
+        
+        // Create a new paragraph specifically for this label
+        currentSection = document.createElement("p");
         currentSection.appendChild(this._parseLabelLine(trimmed));
+        listItems = [];
       }
       // Regular paragraphs
       else if (trimmed) {
@@ -181,10 +171,19 @@ export class SimpleMarkdown {
   }
 
   static _isLabelLine(text) {
-    // Pattern to match label lines like "نوع: اسم", "Definition: something", "مترادف: word, word"
-    // Look for word characters (including Arabic/Persian) followed by colon and space
-    const labelPattern = /^[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\s*:\s+.+$/;
-    return labelPattern.test(text.trim());
+    // Pattern to match label lines like:
+    // - "**noun:** test, experiment" (markdown bold)
+    // - "**adjective:** probational" (markdown bold)
+    // - "نوع: اسم", "Definition: something", "مترادف: word, word" (regular labels)
+    const trimmedText = text.trim();
+    
+    // Check for markdown bold labels like **noun:** or **adjective:**
+    const markdownLabelPattern = /^\*\*[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\*\*\s*:\s+.+$/;
+    
+    // Check for regular labels like "noun:" or "نوع:"
+    const regularLabelPattern = /^[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\s*:\s+.+$/;
+    
+    return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
   }
 
   static _parseLabelLine(text) {
@@ -197,12 +196,24 @@ export class SimpleMarkdown {
       return span;
     }
     
-    // Create bold label part
-    const label = text.substring(0, colonIndex).trim();
+    // Get label and content parts
+    const labelPart = text.substring(0, colonIndex).trim();
     const content = text.substring(colonIndex + 1).trim();
     
-    const labelElement = document.createElement("strong");
-    labelElement.textContent = label;
+    // Check if label is already in markdown bold format (**label**)
+    const markdownBoldPattern = /^\*\*(.*?)\*\*$/;
+    const markdownMatch = labelPart.match(markdownBoldPattern);
+    
+    let labelElement;
+    if (markdownMatch) {
+      // Extract the text from **text** format
+      labelElement = document.createElement("strong");
+      labelElement.textContent = markdownMatch[1];
+    } else {
+      // Regular label - make it bold
+      labelElement = document.createElement("strong");
+      labelElement.textContent = labelPart;
+    }
     
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
