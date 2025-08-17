@@ -97,6 +97,11 @@ class LifecycleManager {
       'translateText': Handlers.handleTranslateText,
       'revertTranslation': Handlers.handleRevertTranslation,
       
+      // Subtitle handlers
+      'subtitleTranslate': Handlers.handleSubtitleTranslate,
+      'subtitleToggle': Handlers.handleSubtitleToggle,
+      'subtitleStatus': Handlers.handleSubtitleStatus,
+      
       // TTS handlers
       'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
       

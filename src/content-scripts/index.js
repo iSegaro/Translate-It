@@ -47,6 +47,7 @@ if (!access.isAccessible) {
     const { SelectElementManager } = await import("../managers/content/SelectElementManager.js");
     const { contentMessageHandler } = await import("../handlers/content/ContentMessageHandler.js");
     const { shortcutManager } = await import("../managers/content/shortcuts/ShortcutManager.js");
+    const { initializeSubtitleHandler } = await import("../managers/content/SubtitleInitializer.js");
 
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
@@ -56,6 +57,9 @@ if (!access.isAccessible) {
     // Store instances globally for handlers to access
     window.translationHandlerInstance = translationHandler;
     window.selectElementManagerInstance = selectElementManager;
+
+    // Initialize subtitle handler conditionally
+    await initializeSubtitleHandler(translationHandler);
 
     // Initialize all systems
     selectElementManager.initialize();

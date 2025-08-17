@@ -1,4 +1,4 @@
-import { MessagingContexts, MessageFormat, MessageActions } from "../messaging/core/MessagingCore.js";
+import { MessagingContexts, MessageFormat } from "../messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "../subtitle/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
@@ -8,7 +8,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'subtitle');
 import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
-import { storageManager } from "@/storage/core/StorageCore.js";
 import browser from "webextension-polyfill";
 
 // removed legacy createLogger import
@@ -122,10 +121,23 @@ export class SubtitleHandler {
 
   async toggleSubtitleSetting() {
     try {
-      const key = "ENABLE_SUBTITLE_TRANSLATION";
       const settings = await getSettingsAsync();
-      await storageManager.set({ [key]: !(settings[key] ?? true) });
-      if (this.site === "youtube") this.updateYouTubeButtonState(!(settings[key] ?? true));
+      const newValue = !(settings.ENABLE_SUBTITLE_TRANSLATION ?? true);
+      
+      const message = MessageFormat.create(
+        'subtitleToggle',
+        { 
+          enabled: newValue,
+          site: this.site
+        },
+        MessagingContexts.CONTENT
+      );
+      
+      const response = await browser.runtime.sendMessage(message);
+      
+      if (response.success && this.site === "youtube") {
+        this.updateYouTubeButtonState(newValue);
+      }
     } catch (error) {
       const errorType = matchErrorToType(error);
       if (errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
@@ -167,8 +179,13 @@ export class SubtitleHandler {
         translate: async (text, mode) => {
           try {
             const message = MessageFormat.create(
-              MessageActions.TRANSLATE,
-              { text, translationMode: mode },
+              'subtitleTranslate',
+              { 
+                text, 
+                translationMode: mode,
+                sourceLanguage: 'auto',
+                targetLanguage: 'fa'
+              },
               MessagingContexts.CONTENT
             );
             

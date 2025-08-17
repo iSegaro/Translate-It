@@ -233,12 +233,12 @@ const enableDictionary = computed({
 })
 
 const enableSubtitle = computed({
-  get: () => settingsStore.settings?.ENABLE_SUBTITLE_TRANSLATION || false,
+  get: () => settingsStore.settings?.ENABLE_SUBTITLE_TRANSLATION ?? true,
   set: (value) => settingsStore.updateSettingLocally('ENABLE_SUBTITLE_TRANSLATION', value)
 })
 
 const iconSubtitle = computed({
-  get: () => settingsStore.settings?.SHOW_SUBTITLE_ICON || false,
+  get: () => settingsStore.settings?.SHOW_SUBTITLE_ICON ?? true,
   set: (value) => settingsStore.updateSettingLocally('SHOW_SUBTITLE_ICON', value)
 })
 </script>
