@@ -12,18 +12,31 @@ import { MessageActions } from "../messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 
-// Helper function to dismiss pending translation notification
+// Helper function to dismiss pending translation notification and clear timeout
 function dismissPendingTranslationNotification(context = 'unknown') {
   if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
     try {
       window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
-      window.pendingTranslationStatusNode = null;
-      window.pendingTranslationNotifier = null;
+      clearPendingNotificationData(context);
       logger.debug('Status notification dismissed', { context });
     } catch (notifierError) {
       logger.error('Failed to dismiss notification', { context, error: notifierError });
     }
   }
+}
+
+// Helper function to clear pending notification data and timeout
+function clearPendingNotificationData(context = 'cleanup') {
+  window.pendingTranslationStatusNode = null;
+  window.pendingTranslationNotifier = null;
+  
+  // Clear timeout if it exists
+  if (window.pendingTranslationDismissTimeout) {
+    clearTimeout(window.pendingTranslationDismissTimeout);
+    window.pendingTranslationDismissTimeout = null;
+  }
+  
+  logger.debug('Pending notification data cleared', { context });
 }
 
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId }) {
@@ -82,7 +95,14 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     );
     
     // Use ExtensionContextManager for safe message sending
-    ExtensionContextManager.safeSendMessage(translationMessage, 'smartTranslation');
+    const messageResult = await ExtensionContextManager.safeSendMessage(translationMessage, 'smartTranslation');
+    
+    if (messageResult === null) {
+      // Extension context is invalid, dismiss the notification
+      logger.debug('Translation request failed - extension context invalid, dismissing notification');
+      dismissPendingTranslationNotification('translateFieldViaSmartHandler-context-invalid');
+      return;
+    }
     
     logger.debug('Translation request dispatched (fire-and-forget)');
     
@@ -161,8 +181,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         });
         
         window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
-        window.pendingTranslationStatusNode = null;
-        window.pendingTranslationNotifier = null;
+        clearPendingNotificationData('applyTranslationToTextField-success');
         logger.debug('Status notification dismissed successfully');
       } catch (notifierError) {
         logger.error('Failed to dismiss notification', notifierError);

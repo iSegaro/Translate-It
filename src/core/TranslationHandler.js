@@ -11,7 +11,7 @@ import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "../managers/core/NotificationManager.js";
 import IconManager from "../managers/IconManager.js";
 import { debounce } from "../utils/core/debounce.js";
-import { state, TranslationMode, CONFIG } from "../config.js";
+import { state, TranslationMode, CONFIG, getTimeoutAsync } from "../config.js";
 import { logMethod } from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
@@ -170,7 +170,7 @@ export default class TranslationHandler {
       const statusMessage = await ExtensionContextManager.safeI18nOperation(
         () => getTranslationString("STATUS_TRANSLATING_CTRLSLASH"),
         'processTranslation-status',
-        "(translating...)"
+        "translating..."
       );
       
       statusNotification = await this.notifier.show(statusMessage, "status");
@@ -183,6 +183,20 @@ export default class TranslationHandler {
       if (typeof window !== 'undefined') {
         window.pendingTranslationStatusNode = statusNotification;
         window.pendingTranslationNotifier = this.notifier;
+        
+        // Set fallback timeout to dismiss notification if translation takes too long or fails silently
+        const translationTimeout = await getTimeoutAsync();
+        this.logger.debug('Translation timeout from config:', translationTimeout);
+        const dismissTimeout = setTimeout(() => {
+          if (window.pendingTranslationStatusNode === statusNotification) {
+            this.logger.debug('Translation timeout reached, dismissing status notification');
+            this.notifier.dismiss(statusNotification);
+            window.pendingTranslationStatusNode = null;
+            window.pendingTranslationNotifier = null;
+          }
+        }, translationTimeout);
+        
+        window.pendingTranslationDismissTimeout = dismissTimeout;
       }
       
       //ارسال دقیق target برای جلوگیری از undefined
@@ -204,6 +218,14 @@ export default class TranslationHandler {
 
       if (statusNotification) {
         this.notifier.dismiss(statusNotification);
+        
+        // Clear timeout if it exists  
+        if (typeof window !== 'undefined' && window.pendingTranslationDismissTimeout) {
+          clearTimeout(window.pendingTranslationDismissTimeout);
+          window.pendingTranslationDismissTimeout = null;
+          window.pendingTranslationStatusNode = null;
+          window.pendingTranslationNotifier = null;
+        }
       }
 
       if (handlerError.isFinal || handlerError.suppressSecondary) return;
