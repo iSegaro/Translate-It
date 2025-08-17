@@ -6,6 +6,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
 import { getThemeAsync } from "../../../../config.js";
 import { getResolvedUserTheme } from "../../../../utils/ui/theme.js";
 import { storageManager } from "../../../../storage/core/StorageCore.js";
+import browser from "webextension-polyfill";
 
 /**
  * Manages theme application and changes for WindowsManager
@@ -16,6 +17,7 @@ export class ThemeManager {
     this.currentTheme = 'light';
     this.themeChangeListener = null;
     this.boundHandleThemeChange = null;
+    this.boundHandleStorageChange = null;
   }
 
   /**
@@ -77,10 +79,15 @@ export class ThemeManager {
   setupThemeChangeListener() {
     if (this.themeChangeListener) return; // Already setup
 
+    // Setup storage manager listener (existing)
     this.boundHandleThemeChange = this._handleThemeChange.bind(this);
     storageManager.on("change:THEME", this.boundHandleThemeChange);
     
-    this.logger.debug('Theme change listener added');
+    // Setup direct browser storage listener for immediate updates
+    this.boundHandleStorageChange = this._handleBrowserStorageChange.bind(this);
+    browser.storage.onChanged.addListener(this.boundHandleStorageChange);
+    
+    this.logger.debug('Theme change listeners added');
   }
 
   /**
@@ -90,20 +97,46 @@ export class ThemeManager {
     if (this.boundHandleThemeChange) {
       storageManager.off("change:THEME", this.boundHandleThemeChange);
       this.boundHandleThemeChange = null;
-      this.logger.debug('Theme change listener removed');
+    }
+    
+    if (this.boundHandleStorageChange) {
+      browser.storage.onChanged.removeListener(this.boundHandleStorageChange);
+      this.boundHandleStorageChange = null;
+    }
+    
+    this.logger.debug('Theme change listeners removed');
+  }
+
+  /**
+   * Handle browser storage change event (immediate updates)
+   */
+  async _handleBrowserStorageChange(changes, areaName) {
+    if (areaName === 'local' && changes.THEME) {
+      const newTheme = changes.THEME.newValue;
+      if (newTheme) {
+        this.logger.debug('Theme changed from browser storage:', newTheme);
+        await this._updateTheme(newTheme);
+      }
     }
   }
 
   /**
-   * Handle theme change event
+   * Handle theme change event (from storage manager)
    */
   async _handleThemeChange({ newValue }) {
     if (!newValue) return;
+    this.logger.debug('Theme changed from storage manager:', newValue);
+    await this._updateTheme(newValue);
+  }
 
+  /**
+   * Update theme implementation
+   */
+  async _updateTheme(newThemeValue) {
     const previousTheme = this.currentTheme;
-    this.currentTheme = getResolvedUserTheme(newValue);
+    this.currentTheme = getResolvedUserTheme(newThemeValue);
     
-    this.logger.debug('Theme changed', { 
+    this.logger.debug('Theme updated', { 
       from: previousTheme, 
       to: this.currentTheme 
     });
