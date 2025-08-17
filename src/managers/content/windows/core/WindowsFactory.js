@@ -109,7 +109,7 @@ export class WindowsFactory {
     let iconUrl;
     try {
       iconUrl = browser.runtime.getURL("icons/extension_icon_32.png");
-    } catch (error) {
+    } catch {
       // If extension context is invalidated, throw error to prevent icon creation
       this.logger.debug('Extension context invalidated during icon creation, cannot create icon');
       throw new Error("Extension context invalidated.");
@@ -163,7 +163,7 @@ export class WindowsFactory {
     const icon = document.createElement("img");
     try {
       icon.src = browser.runtime.getURL("icons/speaker.png");
-    } catch (error) {
+    } catch {
       // If extension context is invalidated, throw error to prevent icon creation
       this.logger.debug('Extension context invalidated during TTS icon creation, cannot create icon');
       throw new Error("Extension context invalidated.");
@@ -181,7 +181,7 @@ export class WindowsFactory {
     const icon = document.createElement("img");
     try {
       icon.src = browser.runtime.getURL("icons/copy.png");
-    } catch (error) {
+    } catch {
       // If extension context is invalidated, throw error to prevent icon creation
       this.logger.debug('Extension context invalidated during copy icon creation, cannot create icon');
       throw new Error("Extension context invalidated.");

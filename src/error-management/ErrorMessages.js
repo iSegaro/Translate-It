@@ -92,7 +92,7 @@ export async function getErrorMessage(type, skipI18n = false) {
     // Return the result (either translated string or fallback)
     return msg && msg.trim() ? msg : (errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN]);
     
-  } catch (i18nError) {
+  } catch {
     // If i18n fails (e.g., extension context invalidated), fall back to English
     return errorMessages[type] || errorMessages[ErrorTypes.UNKNOWN];
   }

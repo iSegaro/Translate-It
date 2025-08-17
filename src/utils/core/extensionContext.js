@@ -60,7 +60,6 @@ export class ExtensionContextManager {
    */
   static handleContextError(error, context = 'unknown', options = {}) {
     const {
-      logLevel = 'debug',
       silent = true,
       fallbackAction = null
     } = options;

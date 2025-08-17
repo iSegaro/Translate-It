@@ -170,7 +170,7 @@ export class EnhancedTranslationRenderer {
     const icon = document.createElement('img');
     try {
       icon.src = browser.runtime.getURL('copy.png');
-    } catch (error) {
+    } catch {
       // If extension context is invalidated, throw error to prevent icon creation
       this.logger.debug('Extension context invalidated during copy icon creation, cannot create icon');
       throw new Error("Extension context invalidated.");
@@ -245,7 +245,7 @@ export class EnhancedTranslationRenderer {
     const icon = document.createElement('img');
     try {
       icon.src = browser.runtime.getURL('speaker.png');
-    } catch (error) {
+    } catch {
       // If extension context is invalidated, throw error to prevent icon creation
       this.logger.debug('Extension context invalidated during TTS icon creation, cannot create icon');
       throw new Error("Extension context invalidated.");
