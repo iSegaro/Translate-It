@@ -66,6 +66,7 @@ export function useMessaging(context) {
 
   return {
     sendMessage,
+    sendReliable,
     createMessage,
     sendFireAndForget,
     
@@ -74,3 +75,7 @@ export function useMessaging(context) {
     MessagingContexts,
   }
 }
+
+// Export sendReliable for non-Vue modules
+import { sendReliable as _sendReliable } from '@/messaging/core/ReliableMessaging.js'
+export const sendReliable = _sendReliable
