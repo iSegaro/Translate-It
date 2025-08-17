@@ -102,7 +102,7 @@ export class OptionsValidator {
 
     // Check for required placeholders
     const trimmedTemplate = template.trim();
-    const requiredPlaceholders = ["$_{TEXT}"];
+    const requiredPlaceholders = ["$_{SOURCE}", "$_{TARGET}"];
     const missingPlaceholders = [];
 
     requiredPlaceholders.forEach((placeholder) => {
