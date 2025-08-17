@@ -53,13 +53,14 @@
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/core/validation.js'
+import { CONFIG } from '@/config.js'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
 const settingsStore = useSettingsStore()
 const { validatePromptTemplate: validate, getFirstError, clearErrors } = useValidation()
 
-// Default prompt template
-const DEFAULT_PROMPT = 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}'
+// Default prompt template from config
+const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
 
 // Validation
 const validationError = ref('')
