@@ -117,7 +117,7 @@ const props = defineProps({
   // Size and styling
   size: {
     type: String,
-    default: 'medium',
+    default: 'small',
     validator: (value) => ['small', 'medium', 'large'].includes(value)
   },
   variant: {
@@ -253,7 +253,7 @@ const handleTTSFailed = (error) => {
 .toolbar-left,
 .toolbar-right {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
   flex-shrink: 1;
   min-width: 0;
@@ -344,7 +344,7 @@ const handleTTSFailed = (error) => {
 .mode-output {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
-  padding: 2px;
+  padding: 1px;
 }
 
 .mode-inline {
@@ -363,7 +363,7 @@ const handleTTSFailed = (error) => {
 .mode-sidepanel {
   background: transparent;
   border-radius: 4px;
-  padding: 2px 12px;
+  padding: 1px 8px;
   max-width: 100%;
   box-sizing: border-box;
 }

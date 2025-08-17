@@ -174,14 +174,14 @@ const handleCopy = async () => {
 
 /* Size variants */
 .size-small {
-  padding: 4px;
-  min-width: 24px;
-  min-height: 24px;
+  padding: 2px;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 .size-small .button-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .size-medium {
