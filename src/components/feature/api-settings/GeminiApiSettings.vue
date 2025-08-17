@@ -44,16 +44,6 @@
         {{ $i18n('gemini_thinking_description') || thinkingDescription }}
       </span>
     </div>
-    <div
-      v-if="geminiModel === 'custom'"
-      class="setting-group"
-    >
-      <label>{{ $i18n('gemini_custom_model_label') || 'Custom Model Name' }}</label>
-      <BaseInput
-        v-model="geminiCustomModel"
-        :placeholder="$i18n('gemini_custom_model_placeholder') || 'Enter custom model name (e.g., gemini-2.0-flash-custom)'"
-      />
-    </div>
   </div>
 </template>
 

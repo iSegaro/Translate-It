@@ -52,8 +52,7 @@ export const CONFIG = {
     { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: true } },
     { value: "gemini-2.5-flash-lite-preview", name: "Gemini 2.5 Flash-Lite Preview", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent", thinking: { supported: true, controllable: true, defaultEnabled: false } },
     { value: "gemini-2.0-flash", name: "Gemini 2.0 Flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
-    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } },
-    { value: "custom", name: "Custom URL", url: "", thinking: { supported: false, controllable: false, defaultEnabled: false } }
+    { value: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent", thinking: { supported: false, controllable: false, defaultEnabled: false } }
   ],
   GOOGLE_TRANSLATE_URL: "https://translate.googleapis.com/translate_a/single", // Google Translate URL
   WEBAI_API_URL: "http://localhost:6969/translate",
