@@ -287,6 +287,16 @@ export class SelectElementManager {
         this.logger.info(`🌫️ Window blur: Auto-reset to ${displayName}`);
       }
     });
+
+    // Handle tab visibility change (when user switches to another tab)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state.isActive) {
+        this.logger.info('🔄 Tab became hidden: Deactivating select element mode');
+        this.deactivate().catch(error => {
+          this.logger.warn('Error deactivating on tab hidden:', error);
+        });
+      }
+    });
   }
 
   /**
