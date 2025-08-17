@@ -257,6 +257,7 @@ const handleTTSFailed = (error) => {
   align-items: center;
   flex-shrink: 1;
   min-width: 0;
+  overflow: visible;
 }
 
 .toolbar-left {
@@ -366,6 +367,7 @@ const handleTTSFailed = (error) => {
   padding: 1px 8px;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .mode-sidepanel.position-top-right,

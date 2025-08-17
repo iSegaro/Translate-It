@@ -19,6 +19,7 @@
       :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
       class="display-toolbar"
       :show-copy="showCopyButton"
+      :show-paste="false"
       :show-tts="showTTSButton"
     />
     
@@ -299,7 +300,7 @@ onMounted(() => {
   background-color: var(--bg-secondary, #ffffff);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .translation-display.selection-mode {
@@ -349,6 +350,14 @@ onMounted(() => {
   padding: 42px 14px 12px 14px;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.sidepanel-mode {
+  overflow: visible;
+}
+
+.sidepanel-mode .display-toolbar {
+  overflow: visible;
 }
 
 /* Selection window adjustments */
@@ -614,6 +623,11 @@ html[dir="rtl"] .selection-mode .display-toolbar {
 
 .sidepanel-mode .display-toolbar {
   background: rgba(0, 0, 0, 0.02);
+  overflow: visible;
+}
+
+.sidepanel-mode .display-toolbar .action-button {
+  overflow: visible;
 }
 
 .selection-mode .display-toolbar {
