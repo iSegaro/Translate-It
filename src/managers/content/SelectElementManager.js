@@ -1628,10 +1628,19 @@ export class SelectElementManager {
             { messageId: messageId }
           );
           
-          // Fire and forget - let SmartTranslation system handle the result
-          browser.runtime.sendMessage(message).catch(error => {
-            this.logger.warn('Translation message send failed:', error);
-          });
+          // Fire and forget via reliable messenger - let SmartTranslation system handle the result
+          try {
+            const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+            // We don't need the result here; rely on TRANSLATION_RESULT_UPDATE
+            await sendReliable(message).catch(err => {
+              this.logger.warn('Translation message send failed (reliable):', err);
+            });
+          } catch (err) {
+            // Fallback to runtime.sendMessage if import fails
+            browser.runtime.sendMessage(message).catch(error => {
+              this.logger.warn('Translation message send failed (fallback):', error);
+            });
+          }
           
           this.logger.debug("[SelectElementManager] Field translation request sent, letting ContentMessageHandler process result");
           
@@ -1734,23 +1743,42 @@ export class SelectElementManager {
       
       this.logger.debug("Sending translation request with payload", payload);
       
-      // Send direct message to background (no UnifiedMessenger to avoid timeout)
-      browser.runtime.sendMessage({
-        action: MessageActions.TRANSLATE,
-        messageId: messageId,
-        context: 'event-handler',
-        timestamp: Date.now(),
-        data: {
-          text: payload.text,
-          provider: payload.provider,
-          sourceLanguage: payload.from,
-          targetLanguage: payload.to,
-          mode: payload.mode,
-          options: payload.options
-        }
-      }).catch(error => {
-        this.logger.error("Failed to send translation request", error);
-      });
+      // Send direct message to background using reliable messenger
+      try {
+        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+        await sendReliable({
+          action: MessageActions.TRANSLATE,
+          messageId: messageId,
+          context: 'event-handler',
+          timestamp: Date.now(),
+          data: {
+            text: payload.text,
+            provider: payload.provider,
+            sourceLanguage: payload.from,
+            targetLanguage: payload.to,
+            mode: payload.mode,
+            options: payload.options
+          }
+        })
+      } catch (err) {
+        // Fallback to runtime.sendMessage if reliable not available
+        browser.runtime.sendMessage({
+          action: MessageActions.TRANSLATE,
+          messageId: messageId,
+          context: 'event-handler',
+          timestamp: Date.now(),
+          data: {
+            text: payload.text,
+            provider: payload.provider,
+            sourceLanguage: payload.from,
+            targetLanguage: payload.to,
+            mode: payload.mode,
+            options: payload.options
+          }
+        }).catch(error => {
+          this.logger.error("Failed to send translation request (fallback)", error);
+        });
+      }
 
       this.logger.info("Translation request accepted, waiting for result...");
       this.logLifecycle(messageId, 'SENT', { provider: payload.provider });
