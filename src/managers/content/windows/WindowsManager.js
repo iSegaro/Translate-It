@@ -182,7 +182,9 @@ export class WindowsManager {
   }
 
   /**
-   * Show translation UI (icon or window based on settings)
+   * Show translation window or icon for selected text
+   * @param {string} selectedText - Selected text to translate
+   * @param {Object} position - Position to show window/icon
    */
   async show(selectedText, position) {
     if (!ExtensionContextManager.isValidSync()) {
@@ -204,8 +206,22 @@ export class WindowsManager {
     this.dismiss(false);
     if (!selectedText) return;
 
-    const settings = await getSettingsAsync();
-    const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    let settings;
+    let selectionTranslationMode;
+    
+    try {
+      settings = await getSettingsAsync();
+      selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    } catch (error) {
+      // If extension context is invalidated, use fallback values
+      if (ExtensionContextManager.isContextError(error)) {
+        this.logger.debug('Extension context invalidated, using fallback settings for window display');
+        selectionTranslationMode = CONFIG.selectionTranslationMode;
+      } else {
+        // Re-throw non-context errors
+        throw error;
+      }
+    }
 
     this.logger.debug('Selection translation mode', { mode: selectionTranslationMode });
 
@@ -293,11 +309,12 @@ export class WindowsManager {
       // Use ExtensionContextManager for unified error handling
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'icon-creation');
+        // Don't call _handleError for context errors to prevent side effects
+        return;
       } else {
         this.logger.error('Error creating translate icon:', error);
+        this._handleError(error, 'icon-creation');
       }
-      
-      this._handleError(error, 'icon-creation');
     }
   }
 
@@ -580,11 +597,13 @@ export class WindowsManager {
   }
 
   /**
-   * Dismiss windows and icons
+   * Dismiss the current window/icon
+   * @param {boolean} withFadeOut - Whether to animate the dismissal
    */
   dismiss(withFadeOut = true) {
-    // Clear text selection only when dismissing icon mode
-    if (this.state.isIconMode) {
+    // Clear text selection only when dismissing icon mode AND extension context is valid
+    // This prevents clearing text selection when extension context is invalidated
+    if (this.state.isIconMode && ExtensionContextManager.isValidSync()) {
       this._clearTextSelection();
     }
 

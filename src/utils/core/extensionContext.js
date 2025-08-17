@@ -21,7 +21,9 @@ export class ExtensionContextManager {
    */
   static isValidSync() {
     try {
-      return !!(browser?.runtime?.getURL);
+      // Test if browser.runtime.getURL actually works (not just exists)
+      browser.runtime.getURL("test");
+      return true;
     } catch {
       return false;
     }

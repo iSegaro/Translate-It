@@ -168,7 +168,13 @@ export class EnhancedTranslationRenderer {
 
     // Create copy icon
     const icon = document.createElement('img');
-    icon.src = browser.runtime.getURL('copy.png');
+    try {
+      icon.src = browser.runtime.getURL('copy.png');
+    } catch (error) {
+      // If extension context is invalidated, throw error to prevent icon creation
+      this.logger.debug('Extension context invalidated during copy icon creation, cannot create icon');
+      throw new Error("Extension context invalidated.");
+    }
     icon.alt = 'Copy';
     icon.style.cssText = `
       width: 16px;
@@ -237,7 +243,13 @@ export class EnhancedTranslationRenderer {
 
     // Create TTS icon
     const icon = document.createElement('img');
-    icon.src = browser.runtime.getURL('speaker.png');
+    try {
+      icon.src = browser.runtime.getURL('speaker.png');
+    } catch (error) {
+      // If extension context is invalidated, throw error to prevent icon creation
+      this.logger.debug('Extension context invalidated during TTS icon creation, cannot create icon');
+      throw new Error("Extension context invalidated.");
+    }
     icon.alt = type === 'source' ? 'Listen to source' : 'Listen to translation';
     icon.style.cssText = `
       width: 16px;

@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "../../config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 import { WindowsConfig } from "./windows/core/WindowsConfig.js";
+import { ExtensionContextManager } from "../../utils/core/extensionContext.js";
 
 export class TextSelectionManager {
   constructor(options = {}) {
@@ -91,9 +92,22 @@ export class TextSelectionManager {
 
       if (!this.selectionTimeoutId) {
         // ۱. خواندن تنظیمات حالت ترجمه برای تعیین میزان تأخیر لازم
-        const settings = await getSettingsAsync();
-        const selectionTranslationMode =
-          settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+        let settings;
+        let selectionTranslationMode;
+        
+        try {
+          settings = await getSettingsAsync();
+          selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+        } catch (error) {
+          // If extension context is invalidated, don't process text selection
+          if (ExtensionContextManager.isContextError(error)) {
+            this.logger.debug('Extension context invalidated, skipping text selection processing - RETURNING EARLY');
+            return;
+          } else {
+            // Re-throw non-context errors
+            throw error;
+          }
+        }
 
         // ۲. تعیین مقدار تأخیر بر اساس حالت انتخاب شده
         //    - برای حالت آیکون (onClick)، تأخیر کمتر (10ms)
@@ -114,9 +128,22 @@ export class TextSelectionManager {
       }
     } else {
       // **IMPORTANT**: When no text is selected (outside click), always allow dismissal
-      const settings = await getSettingsAsync();
-      const selectionTranslationMode =
-        settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      let settings;
+      let selectionTranslationMode;
+      
+      try {
+        settings = await getSettingsAsync();
+        selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      } catch (error) {
+        // If extension context is invalidated, don't process dismissal logic
+        if (ExtensionContextManager.isContextError(error)) {
+          this.logger.debug('Extension context invalidated, skipping dismissal logic');
+          return;
+        } else {
+          // Re-throw non-context errors
+          throw error;
+        }
+      }
 
       if (selectionTranslationMode === "onClick") {
         // In onClick mode, outside clicks should still dismiss windows
@@ -156,6 +183,12 @@ export class TextSelectionManager {
   async processSelectedText(selectedText) {
     this.logger.debug('processSelectedText called', { text: selectedText.substring(0, 50) + '...' });
     
+    // Check if extension context is valid before processing
+    if (!ExtensionContextManager.isValidSync()) {
+      this.logger.debug('Extension context invalid, skipping processSelectedText to preserve text selection');
+      return;
+    }
+    
     // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
     // This prevents conflicts with text field icon creation during the transition
     if (state && state.preventTextFieldIconCreation === true) {
@@ -171,8 +204,22 @@ export class TextSelectionManager {
   const rect = range.getBoundingClientRect();
 
   // Read current selection translation mode to decide how to place the icon/window
-  const settings = await getSettingsAsync();
-  const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+  let settings;
+  let selectionTranslationMode;
+  
+  try {
+    settings = await getSettingsAsync();
+    selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+  } catch (error) {
+    // If extension context is invalidated, don't process text selection
+    if (ExtensionContextManager.isContextError(error)) {
+      this.logger.debug('Extension context invalidated, skipping text selection processing in processSelectedText - RETURNING EARLY');
+      return;
+    } else {
+      // Re-throw non-context errors
+      throw error;
+    }
+  }
       
       this.logger.debug('Selection rect DEBUG', {
         rect: {
@@ -252,6 +299,12 @@ export class TextSelectionManager {
 
     // نمایش پاپ آپ با متن و موقعیت جدید
     if (this.selectionWindows) {
+      // Check if extension context is valid before showing window/icon
+      if (!ExtensionContextManager.isValidSync()) {
+        this.logger.debug('Extension context invalid, skipping window/icon creation to preserve text selection');
+        return;
+      }
+      
       this.logger.debug('📢 Calling selectionWindows.show()', { 
         text: selectedText.substring(0, 30) + '...',
         position,
@@ -303,9 +356,22 @@ export class TextSelectionManager {
    * @returns {Promise<boolean>} Whether Ctrl requirement is satisfied
    */
   async shouldProcessTextSelection(event) {
-    const settings = await getSettingsAsync();
-    const selectionTranslationMode =
-      settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    let settings;
+    let selectionTranslationMode;
+    
+    try {
+      settings = await getSettingsAsync();
+      selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+    } catch (error) {
+      // If extension context is invalidated, use fallback values to preserve text selection
+      if (ExtensionContextManager.isContextError(error)) {
+        this.logger.debug('Extension context invalidated, using fallback settings for Ctrl check');
+        selectionTranslationMode = CONFIG.selectionTranslationMode;
+      } else {
+        // Re-throw non-context errors
+        throw error;
+      }
+    }
 
     // فقط در حالت immediate باید Ctrl را چک کنیم
     if (selectionTranslationMode === "immediate") {

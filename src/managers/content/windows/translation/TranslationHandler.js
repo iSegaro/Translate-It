@@ -8,6 +8,7 @@ import { MessageActions } from "../../../../messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "../../../../utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "../../../../config.js";
+import { ExtensionContextManager } from "../../../../utils/core/extensionContext.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -23,7 +24,25 @@ export class TranslationHandler {
    */
   async performTranslation(selectedText, options = {}) {
     try {
-      const settings = await getSettingsAsync();
+      let settings;
+      
+      try {
+        settings = await getSettingsAsync();
+      } catch (error) {
+        // If extension context is invalidated, use fallback values
+        if (ExtensionContextManager.isContextError(error)) {
+          this.logger.debug('Extension context invalidated, using fallback settings for translation');
+          settings = {
+            SOURCE_LANGUAGE: 'auto',
+            TARGET_LANGUAGE: 'fa',
+            TRANSLATION_API: 'google'
+          };
+        } else {
+          // Re-throw non-context errors
+          throw error;
+        }
+      }
+      
       const translationMode = determineTranslationMode(selectedText, TranslationMode.Selection);
       
       // Generate unique messageId
