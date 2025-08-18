@@ -460,8 +460,8 @@ async function copyToClipboard(text) {
       const { sendReliable } = await import('../messaging/core/ReliableMessaging.js');
       await sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
     } catch (e) {
-      // Fallback to runtime.sendMessage if reliable module not available
-      try { browser.runtime.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }); } catch {}
+      // Could not send error to background via reliable messenger; log locally
+      logger.debug('Could not send clipboard error to background via sendReliable:', e);
     }
   }
 }

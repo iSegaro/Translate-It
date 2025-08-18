@@ -36,14 +36,10 @@ export function useMessaging(context) {
       // Prefer the reliable messenger which implements retries and port fallback
       return await sendReliable(message);
     } catch (error) {
-      logger.error('Send failed (reliable fallback):', error);
-      // Fall back to direct sendMessage as a last resort
-      try {
-        return await browser.runtime.sendMessage(message);
-      } catch (err) {
-        logger.error('Direct sendMessage also failed:', err);
-        throw err;
-      }
+      logger.error('sendMessage failed via sendReliable:', error);
+      // Do not fallback to direct runtime.sendMessage here to avoid duplicating
+      // unreliable behavior; surface the error to callers so they can decide.
+      throw error;
     }
   };
 
@@ -66,9 +62,10 @@ export function useMessaging(context) {
    */
   const sendFireAndForget = (action, data, options = {}) => {
     const message = createMessage(action, data, options);
-    browser.runtime.sendMessage(message).catch(error => {
+    // Fire-and-forget via reliable messenger
+    sendReliable(message).catch(error => {
       // Silently ignore send errors for fire-and-forget
-      console.debug(`[useMessaging:${context}] Fire-and-forget failed:`, error);
+      console.debug(`[useMessaging:${context}] Fire-and-forget failed (reliable):`, error);
     });
   };
 
@@ -84,6 +81,5 @@ export function useMessaging(context) {
   }
 }
 
-// Export sendReliable for non-Vue modules
-import { sendReliable as _sendReliable } from '@/messaging/core/ReliableMessaging.js'
-export const sendReliable = _sendReliable
+// Export sendReliable for non-Vue modules (already imported at top)
+export { sendReliable }

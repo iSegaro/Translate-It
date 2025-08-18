@@ -137,8 +137,9 @@ export class ExtensionContextManager {
           const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
           return await sendReliable(msg);
         } catch (err) {
-          // Fallback to direct runtime.sendMessage if reliable module not available
-          return browser.runtime.sendMessage(msg);
+          // If reliable messaging is not available, surface the error to caller.
+          logger.debug('sendReliable not available in safeSendMessage:', err);
+          throw err;
         }
       },
       { 
