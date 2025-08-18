@@ -35,22 +35,25 @@ browser.runtime.onConnect.addListener((port) => {
         // Immediate ACK
         try { port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) } catch (e) {}
 
-        // Handle TRANSLATE action directly via translationEngine
-        if (msg && msg.action === 'TRANSLATE') {
-          if (backgroundService && backgroundService.translationEngine) {
-            const result = await backgroundService.translationEngine.handleTranslateMessage(msg, null);
-            // Send final result
-            try {
-              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
-            } catch (e) {
-              logger.error('[Background] Failed to post RESULT to port', e);
-            }
-          } else {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: 'Translation engine unavailable' } });
+        const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
+
+        if (handler) {
+          const result = await handler(msg, port.sender);
+          try {
+            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
+          } catch (e) {
+            logger.error('[Background] Failed to post RESULT to port', e);
           }
+        } else {
+          port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
         }
       } catch (err) {
         logger.error('[Background] Error handling port message:', err);
+        try {
+          port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: err.message } });
+        } catch (e) {
+          logger.error('[Background] Failed to post error RESULT to port', e);
+        }
       }
     });
 
