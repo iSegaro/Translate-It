@@ -28,11 +28,12 @@ const _registerSelectStateListener = async () => {
 
   // Initialize from background via messaging
   try {
-    const { sendMessage, MessageActions } = useMessaging('sidepanel');
-    const response = await sendMessage(MessageActions.GET_SELECT_ELEMENT_STATE);
-    if (response && response.success) {
-      sharedIsSelectModeActive.value = !!response.active;
-      _currentTabId = response.tabId;
+    const { sendMessage, createMessage, MessageActions } = useMessaging('sidepanel');
+    const message = createMessage(MessageActions.GET_SELECT_ELEMENT_STATE);
+    const response = await sendMessage(message);
+    if (response && response.result && response.result.success) {
+      sharedIsSelectModeActive.value = !!response.result.active;
+      _currentTabId = response.result.tabId;
     }
   } catch (err) {
     logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
@@ -201,9 +202,9 @@ export function useSelectElementTranslation() {
             context: 'sidepanel',
             timestamp: Date.now()
           });
-          if (response && response.success) {
-            sharedIsSelectModeActive.value = !!response.active;
-            logger.debug('Select element state refreshed on tab change:', response.active);
+          if (response && response.result && response.result.success) {
+            sharedIsSelectModeActive.value = !!response.result.active;
+            logger.debug('Select element state refreshed on tab change:', response.result.active);
           }
         } catch (err) {
           logger.debug('Failed to refresh select element state on tab change:', err);
