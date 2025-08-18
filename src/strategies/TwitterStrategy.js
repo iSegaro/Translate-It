@@ -115,10 +115,10 @@ export default class TwitterStrategy extends PlatformStrategy {
         '[data-testid="SearchBox_Search_Input"]',
       );
       if (searchInput && element.contains(searchInput)) {
-        await this.applyVisualFeedback(searchInput);
         searchInput.value = translatedText;
+        await this.applyVisualFeedback(searchInput);
+        // this.applyTextDirection(searchInput, translatedText);
         searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-        this.applyTextDirection(searchInput, translatedText);
         return true;
       }
 
@@ -127,11 +127,11 @@ export default class TwitterStrategy extends PlatformStrategy {
         const dmField = element.closest('[data-testid="dmComposerTextInput"]');
         if (dmField) {
           dmField.focus();
-          await this.applyVisualFeedback(dmField);
           this.clearTweetField(dmField);
           await delay(50);
           await this.pasteText(dmField, translatedText);
-          this.applyTextDirection(dmField, translatedText);
+          await this.applyVisualFeedback(dmField);
+          // this.applyTextDirection(dmField, translatedText);
           return true;
         }
       }
@@ -141,15 +141,15 @@ export default class TwitterStrategy extends PlatformStrategy {
         const tweetField = element.closest('[data-testid="tweetTextarea_0"]');
         if (tweetField) {
           tweetField.focus();
-          await this.applyVisualFeedback(tweetField);
-
+          
           // ابتدا فیلد را پاک می‌کنیم
           this.clearTweetField(tweetField);
           await delay(50); // تاخیر کوتاه برای پردازش رویداد clear
-
+          
           // متن جدید را paste می‌کنیم
           await this.pasteText(tweetField, translatedText);
-          this.applyTextDirection(tweetField, translatedText);
+          await this.applyVisualFeedback(tweetField);
+          // this.applyTextDirection(tweetField, translatedText);
 
           logger.init('Tweet field updated successfully.');
           return true; // گزارش موفقیت
