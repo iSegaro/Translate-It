@@ -67,10 +67,9 @@ export const loadTranslationFeatures = async () => {
 }
 
 export const loadAdvancedFeatures = async () => {
-  const [capture, tts, history] = await Promise.all([
+  const [capture, history] = await Promise.all([
     import('@/store/modules/capture.js'),
-    import('@/store/modules/tts.js'),
     import('@/store/modules/history.js')
   ])
-  return { capture, tts, history }
+  return { capture, history }
 }

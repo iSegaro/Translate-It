@@ -50,22 +50,32 @@ class SimpleMessageHandler {
           handler(message, sender, sendResponse);
           return true; // Keep message channel open
         } else {
-          // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
-          handler(message, sender).then((result) => {
-            try {
-              sendResponse(result);
-            } catch (sendError) {
-              logger.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
-            }
-          }).catch((error) => {
-            logger.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
-            try {
-              sendResponse({ success: false, error: error.message || 'Handler error' });
-            } catch (sendError) {
-              logger.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
-            }
-          });
-          return true; // Keep message channel open for async response
+          // For TRANSLATE action, send immediate ACK and process asynchronously
+          if (action === 'TRANSLATE') {
+            sendResponse({ ack: true, messageId: message.messageId });
+            // Process asynchronously without waiting for result in sendMessage path
+            handler(message, sender).catch((error) => {
+              logger.error(`[SimpleMessageHandler] Async handler error for ${action}:`, error);
+            });
+            return false; // Don't keep channel open
+          } else {
+            // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
+            handler(message, sender).then((result) => {
+              try {
+                sendResponse(result);
+              } catch (sendError) {
+                logger.error(`[SimpleMessageHandler] sendResponse failed for ${action}:`, sendError);
+              }
+            }).catch((error) => {
+              logger.error(`[SimpleMessageHandler] Promise rejected for ${action}:`, error);
+              try {
+                sendResponse({ success: false, error: error.message || 'Handler error' });
+              } catch (sendError) {
+                logger.error(`[SimpleMessageHandler] sendResponse failed for error case:`, sendError);
+              }
+            });
+            return true; // Keep message channel open for async response
+          }
         }
       } else {
         logger.debug(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);

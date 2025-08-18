@@ -182,13 +182,30 @@ export async function handleTranslate(message, sender, sendResponse) {
         logger.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
       });
     } else {
-      logger.debug("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via reliable messenger (fallback).");
-      sendReliable(updateMessage).catch(error => {
-        logger.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via reliable messenger (fallback):', error);
-      });
+      // For requests from sidepanel/popup without tab context, 
+      // the response will be sent via the port that called this handler
+      logger.debug("[Handler:TRANSLATE] No tab ID found in sender - response will be handled by port or original caller");
     }
 
-    return MessageFormat.createSuccessResponse("Translation request processed in background.", message.messageId);
+    // Return the actual translation result for port-based requests
+    if (result.success) {
+      return {
+        success: true,
+        messageId: message.messageId,
+        translatedText: result.translatedText,
+        sourceLanguage: result.sourceLanguage,
+        targetLanguage: result.targetLanguage,
+        provider: result.provider || message.data.provider,
+        timestamp: Date.now()
+      };
+    } else {
+      return {
+        success: false,
+        messageId: message.messageId,
+        error: result.error,
+        timestamp: Date.now()
+      };
+    }
 
   } catch (translationError) {
     logger.error('[Handler:TRANSLATE] Translation error:', translationError);

@@ -29,11 +29,21 @@ import browser from 'webextension-polyfill'
 browser.runtime.onConnect.addListener((port) => {
   try {
     logger.debug('[Background] Port connected:', port.name);
+    
+    // Only handle ports we recognize
+    if (!port.name || (!port.name.includes('reliable-messaging') && !port.name.includes('translation'))) {
+      logger.debug('[Background] Ignoring unrecognized port:', port.name);
+      return;
+    }
     port.onMessage.addListener(async (msg) => {
       try {
         logger.debug('[Background] Port message received:', msg && msg.action, msg && msg.messageId);
         // Immediate ACK
-        try { port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) } catch (e) {}
+        try { 
+          port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) 
+        } catch (e) {
+          logger.error('[Background] Failed to send ACK:', e);
+        }
 
         const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
 
@@ -45,7 +55,11 @@ browser.runtime.onConnect.addListener((port) => {
             logger.error('[Background] Failed to post RESULT to port', e);
           }
         } else {
-          port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+          try {
+            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+          } catch (e) {
+            logger.error('[Background] Failed to send no-handler RESULT:', e);
+          }
         }
       } catch (err) {
         logger.error('[Background] Error handling port message:', err);

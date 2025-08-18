@@ -32,8 +32,13 @@ export async function sendReliable(message, opts = {}) {
       logger.debug('sendReliable: attempt', attempt + 1, 'messageId', message.messageId)
       const res = await promiseTimeout(browser.runtime.sendMessage(message), ackTimeout)
       logger.debug('sendReliable: runtime.sendMessage response', res)
-      // Consider any response a form of ACK; optionally check messageId
-      if (res && (res.ack || res.success || res.messageId)) {
+      // For ACK-only responses, we need to wait for the actual result
+      if (res && res.ack && !res.success && !res.translatedText) {
+        logger.debug('sendReliable: received ACK via sendMessage, continue to port fallback for result')
+        break; // break from retry loop to go to port fallback
+      }
+      // For complete responses (with actual data), return immediately
+      if (res && (res.success || res.translatedText || res.error)) {
         return res
       }
       // if no actionable response, continue to retry
@@ -56,42 +61,59 @@ export async function sendReliable(message, opts = {}) {
 
     return await new Promise((resolve, reject) => {
       const to = setTimeout(() => {
-        try { port.disconnect() } catch {}
+        cleanup()
         reject(new Error('no-response'))
       }, totalTimeout)
 
-    let ackReceived = false
-    const onMsg = (m) => {
-      try {
-        if (!m) return
-        if (m.messageId && m.messageId !== message.messageId) return
+      let ackReceived = false
+      let isResolved = false
 
-        // ACK handling: mark and keep waiting for final RESULT
-        if (m.type === 'ACK' || m.ack) {
-          logger.debug('sendReliable: received ACK via port', m)
-          ackReceived = true
-          return
-        }
-
-        // RESULT handling: resolve with final payload
-        if (m.type === 'RESULT' || m.result) {
-          clearTimeout(to)
-          try { port.onMessage.removeListener(onMsg) } catch {}
-          try { port.disconnect() } catch {}
-          resolve(m)
-          return
-        }
-      } catch (err) {
-        logger.error('sendReliable port onMessage handler error', err)
+      const cleanup = () => {
+        if (isResolved) return
+        isResolved = true
+        clearTimeout(to)
+        try { port.onMessage.removeListener(onMsg) } catch {}
+        try { port.onDisconnect.removeListener(onDisconnect) } catch {}
+        try { port.disconnect() } catch {}
       }
-    }
+
+      const onMsg = (m) => {
+        try {
+          if (!m) return
+          if (m.messageId && m.messageId !== message.messageId) return
+
+          // ACK handling: mark and keep waiting for final RESULT
+          if (m.type === 'ACK' || m.ack) {
+            logger.debug('sendReliable: received ACK via port', m)
+            ackReceived = true
+            return
+          }
+
+          // RESULT handling: resolve with final payload
+          if (m.type === 'RESULT' || m.result) {
+            cleanup()
+            resolve(m)
+            return
+          }
+        } catch (err) {
+          logger.error('sendReliable port onMessage handler error', err)
+        }
+      }
+
+      const onDisconnect = () => {
+        logger.debug('sendReliable: port disconnected unexpectedly')
+        if (!isResolved) {
+          cleanup()
+          reject(new Error('port-disconnected'))
+        }
+      }
 
       try {
         port.onMessage.addListener(onMsg)
+        port.onDisconnect.addListener(onDisconnect)
         port.postMessage(message)
       } catch (err) {
-        clearTimeout(to)
-        try { port.disconnect() } catch {}
+        cleanup()
         reject(err)
       }
     })

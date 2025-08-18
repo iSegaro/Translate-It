@@ -76,7 +76,7 @@ export function useSidepanelTranslation() {
       // Send translation request using reliable messenger (retries + port fallback)
       try {
         const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
-        await sendReliable({
+        const response = await sendReliable({
           action: MessageActions.TRANSLATE,
           messageId: messageId,
           context: 'sidepanel',
@@ -90,6 +90,35 @@ export function useSidepanelTranslation() {
             options: {}
           }
         })
+        
+        // Handle the response directly
+        if (response && response.result && response.result.success) {
+          const result = response.result;
+          translatedText.value = result.translatedText;
+          lastTranslation.value = {
+            text: sourceText.value,
+            translatedText: result.translatedText,
+            sourceLanguage: result.sourceLanguage,
+            targetLanguage: result.targetLanguage,
+            provider: result.provider,
+            timestamp: result.timestamp
+          };
+          pendingRequests.value.delete(messageId);
+          
+          // Ensure minimum loading duration
+          const elapsed = Date.now() - loadingStartTime.value;
+          const remaining = Math.max(0, MINIMUM_LOADING_DURATION - elapsed);
+          
+          setTimeout(() => {
+            isTranslating.value = false;
+            loadingStartTime.value = null;
+          }, remaining);
+          
+          logger.debug("[useSidepanelTranslation] Translation successful:", result.translatedText);
+          return true;
+        } else {
+          throw new Error(response?.result?.error || 'Translation failed');
+        }
       } catch (error) {
         logger.error("Failed to send translation request (reliable)", error);
         // Clean up pending request and reset loading state if message sending fails
