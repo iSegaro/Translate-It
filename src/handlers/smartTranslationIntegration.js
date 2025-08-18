@@ -456,12 +456,12 @@ async function copyToClipboard(text) {
     }
     
     // Also send error to background for logging
-    try:
+    try {
       const { sendReliable } = await import('../messaging/core/ReliableMessaging.js');
-      sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
-    } catch {
+      await sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
+    } catch (e) {
       // Fallback to runtime.sendMessage if reliable module not available
-      browser.runtime.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } });
+      try { browser.runtime.sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }); } catch {}
     }
   }
 }

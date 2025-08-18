@@ -3,6 +3,9 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 export default class PlatformStrategy {
+  // ردیابی افکت‌های بصری فعال برای هر المان
+  static activeEffects = new WeakMap();
+
   constructor(notifier = null, errorHandler = null) {
     this.notifier = notifier;
     this.errorHandler = errorHandler;
@@ -41,6 +44,25 @@ export default class PlatformStrategy {
       element.isConnected &&
       (this.isInputElement(element) || element.hasAttribute("contenteditable"))
     );
+  }
+
+  /**
+   * تابع delay با پشتیبانی از AbortSignal برای لغو
+   */
+  delay(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('Aborted'));
+        return;
+      }
+
+      const timeoutId = setTimeout(resolve, ms);
+      
+      signal?.addEventListener('abort', () => {
+        clearTimeout(timeoutId);
+        reject(new Error('Aborted'));
+      });
+    });
   }
 
   async applyVisualFeedback(element) {
