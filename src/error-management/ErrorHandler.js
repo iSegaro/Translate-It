@@ -4,6 +4,7 @@ import NotificationManager from "../managers/core/NotificationManager.js";
 import { openOptionsPage } from "../utils/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
+import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import ExtensionContextManager from '../utils/core/extensionContext.js';
 const logger = getScopedLogger('Error', 'ErrorHandler');
@@ -102,16 +103,22 @@ export class ErrorHandler {
       const type = matchErrorToType(raw);
       const msg = await getErrorMessage(type);
       
-      // Enhanced metadata with defaults
+      // Get context-aware display strategy
+      const displayStrategy = getErrorDisplayStrategy(meta.context || 'unknown', type);
+      
+      // Enhanced metadata with context-aware defaults
       const enhancedMeta = {
         type: type,
-        context: 'unknown',
+        context: meta.context || 'unknown',
         component: null,
-        showToast: true,
-        showInUI: false,
-        errorLevel: 'generic',
+        showToast: displayStrategy.showToast,
+        showInUI: displayStrategy.showInUI,
+        errorLevel: displayStrategy.errorLevel || 'generic',
         timestamp: Date.now(),
-        ...meta
+        // Allow meta to override strategy defaults if explicitly set
+        ...meta,
+        // But preserve strategy-based showToast unless explicitly overridden with isSilent
+        ...(meta.isSilent !== undefined && { showToast: !meta.isSilent })
       };
       
       // Use instance debug mode instead of importing from config to avoid circular dependency

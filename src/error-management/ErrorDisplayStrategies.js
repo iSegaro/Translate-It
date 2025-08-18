@@ -45,6 +45,24 @@ export const ErrorDisplayStrategies = {
     supportSettings: false  // No settings access from selection
   },
 
+  // Windows Manager context - errors shown in window UI only
+  'windows-manager': {
+    showToast: false,       // No toast - errors shown in translation window
+    showInUI: true,
+    errorLevel: 'detailed', // Show detailed errors in UI
+    supportRetry: false,    // Retry handled by re-selecting text
+    supportSettings: false // No settings access from windows
+  },
+
+  // Windows Manager translate context (specific to translation errors)
+  'windows-manager-translate': {
+    showToast: false,       // No toast - errors shown in translation window
+    showInUI: true,
+    errorLevel: 'detailed', // Show detailed errors in UI
+    supportRetry: false,    // Retry handled by re-selecting text
+    supportSettings: false // No settings access from windows
+  },
+
   // Background/service context - toast notifications for user awareness
   background: {
     showToast: true,
