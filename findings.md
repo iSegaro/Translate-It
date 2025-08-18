@@ -132,3 +132,9 @@ Date:
 - `src/managers/content/SelectElementManager.js`
 
 All of the above now prefer `sendReliable` for outgoing messages to the background, or use `sendReliable` when sending updates; in a few places we kept a final fallback to `browser.runtime.sendMessage` inside a try/catch where `sendReliable` may not be importable in unusual build/runtime contexts.
+
+## Changes in this update
+- Fixed listener leak in `src/composables/usePopupTranslation.js` by registering a named listener and removing it in `onUnmounted`.
+- Removed final fallbacks that called `browser.runtime.sendMessage` as a last resort; now code prefers `sendReliable` and surfaces errors to callers instead of attempting direct `sendMessage`.
+
+These changes make the messaging more consistent and avoid reintroducing the unreliable behavior that `sendReliable` is intended to mitigate.
