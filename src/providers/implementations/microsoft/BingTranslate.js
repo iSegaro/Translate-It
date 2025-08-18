@@ -1,15 +1,13 @@
 // src/providers/implementations/BingTranslateProvider.js
-import browser from 'webextension-polyfill';
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 
-import { isPersianText } from "@/utils/text/textDetection.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
+import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
-import { TranslationMode, getSourceLanguageAsync } from "@/config.js";
+import { TranslationMode } from "@/config.js";
 
 // (logger already defined)
 
@@ -174,27 +172,6 @@ export class BingTranslateProvider extends BaseProvider {
     super("BingTranslate");
   }
 
-  /**
-   * Normalize various language input forms into canonical values.
-   * - Maps many display names (e.g. "English", "Farsi") to codes where possible
-   * - Maps common auto-detect aliases ("Auto-Detect", "autodetect", "detect") to `AUTO_DETECT_VALUE`
-   * @param {string} lang
-   * @returns {string} normalized language string (e.g. 'auto', 'en', 'fa' or other code/name)
-   */
-  _normalizeLangValue(lang) {
-    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
-    const raw = lang.trim();
-    if (!raw) return AUTO_DETECT_VALUE;
-
-    const lower = raw.toLowerCase();
-
-    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
-    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
-
-    if (langNameToCodeMap[lower]) return langNameToCodeMap[lower];
-
-    return lower;
-  }
 
   /**
    * Check if JSON mode is being used
@@ -221,7 +198,7 @@ export class BingTranslateProvider extends BaseProvider {
    */
   _getLangCode(lang) {
     // Normalize incoming language value first
-    const normalized = this._normalizeLangValue(lang);
+    const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return "auto-detect";
 
     if (bingLangCode[normalized]) return bingLangCode[normalized];
@@ -287,111 +264,15 @@ export class BingTranslateProvider extends BaseProvider {
     }
   }
 
-  /**
-   * Apply language swapping logic similar to Google Translate and browser Translate
-   * @param {string} text - Text for detection
-   * @param {string} sourceLang - Source language
-   * @param {string} targetLang - Target language
-   * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
-   */
-  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
-    try {
-      // Use browser.i18n.detectLanguage for detection (similar to other providers)
-      const detectionResult = await browser.i18n.detectLanguage(text);
-      if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
-        const mainDetection = detectionResult.languages[0];
-        const detectedLangCode = mainDetection.language.split("-")[0];
-        // Normalize inputs to avoid display labels
-        const targetNorm = this._normalizeLangValue(targetLang);
-        const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
-
-        if (detectedLangCode === targetLangCode) {
-          // Apply same priority logic as GoogleTranslate
-          let newTargetLang;
-          
-          if (sourceNorm !== AUTO_DETECT_VALUE) {
-            // sourceLang is specific, use it
-            newTargetLang = sourceNorm;
-          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-            // sourceLang is auto, but originalSourceLang is specific
-            newTargetLang = originalSourceLang;
-          } else {
-            // Both sourceLang and originalSourceLang are auto
-            // Check if detected language is different from originalTargetLang
-            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-            if (detectedLangCode !== originalTargetLangCode) {
-              // Detected lang != config target lang -> translate to config target lang
-              newTargetLang = originalTargetLang;
-            } else {
-              // Detected lang == config target lang -> fallback to English
-              newTargetLang = 'English';
-            }
-          }
-          
-          logger.debug(`Bing: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
-          return [targetNorm, newTargetLang];
-        }
-      } else {
-        // Regex fallback for Persian text
-        const targetNorm = this._normalizeLangValue(targetLang);
-        const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
-        if (
-          isPersianText(text) &&
-          (targetLangCode === "fa" || targetLangCode === "ar")
-        ) {
-          // Same priority logic as detection-based swapping
-          let newTargetLang;
-          
-          if (sourceNorm !== AUTO_DETECT_VALUE) {
-            // sourceLang is specific, use it
-            newTargetLang = sourceNorm;
-          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-            // sourceLang is auto, but originalSourceLang is specific
-            newTargetLang = originalSourceLang;
-          } else {
-            // Both sourceLang and originalSourceLang are auto
-            // Check if Persian text and target language is different from originalTargetLang
-            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-            if ("fa" !== originalTargetLangCode) {
-              // Persian text but config target is not Persian -> translate to config target lang
-              newTargetLang = originalTargetLang;
-            } else {
-              // Persian text and config target is also Persian -> fallback to English
-              newTargetLang = 'English';
-            }
-          }
-          
-          logger.debug(`Bing: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
-          return [targetNorm, newTargetLang];
-        }
-      }
-    } catch (error) {
-      logger.error('Language detection failed:', error);
-      // Regex fallback
-      const targetNorm = this._normalizeLangValue(targetLang);
-      const sourceNorm = this._normalizeLangValue(sourceLang);
-      const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
-      const origNorm = this._normalizeLangValue(originalSourceLang);
-      if (
-        isPersianText(text) &&
-        (targetLangCode === "fa" || targetLangCode === "ar")
-      ) {
-        const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-        return [targetNorm, newTargetLang];
-      }
-    }
-
-    // No swapping needed
-    return [sourceLang, targetLang];
-  }
 
   async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // Language Detection and Swapping (similar to Google Translate and browser Translate)
-    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang, originalTargetLang);
+    // Language detection and swapping using centralized service
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
+      { providerName: 'BingTranslate', useRegexFallback: true }
+    );
 
     // Set auto-detect for Field and Subtitle modes after language detection
     if (translateMode === TranslationMode.Field) {

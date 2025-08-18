@@ -1,5 +1,4 @@
 // src/core/providers/GoogleTranslateProvider.js
-import browser from 'webextension-polyfill';
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import { 
   getGoogleTranslateUrlAsync,
@@ -10,8 +9,7 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 
-import { isPersianText } from "@/utils/text/textDetection.js";
-import { getLanguageCode } from "@/utils/i18n/languages.js";
+import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 // (logger already imported above)
@@ -153,103 +151,15 @@ export class GoogleTranslateProvider extends BaseProvider {
     return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
   }
 
-  /**
-   * Normalize various language input forms into canonical values.
-   * @param {string} lang
-   * @returns {string} normalized language string
-   */
-  _normalizeLangValue(lang) {
-    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
-    const raw = lang.trim();
-    if (!raw) return AUTO_DETECT_VALUE;
-
-    const lower = raw.toLowerCase();
-    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
-    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
-
-    return lower;
-  }
 
   async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
-    // برای همه حالت‌ها، ابتدا language detection و swapping انجام می‌دهیم
-    try {
-      const detectionResult = await browser.i18n.detectLanguage(text);
-      if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
-        const mainDetection = detectionResult.languages[0];
-        const detectedLangCode = mainDetection.language.split("-")[0];
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-
-        if (detectedLangCode === targetLangCode) {
-          // Detected language matches target, need to swap
-          let newTargetLang;
-          
-          // Priority logic:
-          // 1. If sourceLang is specific (not auto) -> use sourceLang
-          // 2. If sourceLang is auto but originalSourceLang is specific (not auto) -> use originalSourceLang  
-          // 3. If both are auto -> check originalTargetLang vs detected language
-          // 4. Final fallback -> English
-          
-          if (sourceLang !== AUTO_DETECT_VALUE) {
-            // sourceLang is specific, use it
-            newTargetLang = sourceLang;
-          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-            // sourceLang is auto, but originalSourceLang is specific
-            newTargetLang = originalSourceLang;
-          } else {
-            // Both sourceLang and originalSourceLang are auto
-            // Check if detected language is different from originalTargetLang
-            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-            if (detectedLangCode !== originalTargetLangCode) {
-              // Detected lang != config target lang -> translate to config target lang
-              newTargetLang = originalTargetLang;
-            } else {
-              // Detected lang == config target lang -> fallback to English
-              newTargetLang = 'English';
-            }
-          }
-          
-          logger.debug(`Google: Language swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
-          [sourceLang, targetLang] = [targetLang, newTargetLang];
-        }
-      } else {
-        // Regex fallback
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-        if (
-          isPersianText(text) &&
-          (targetLangCode === "fa" || targetLangCode === "ar")
-        ) {
-          // Same priority logic as detection-based swapping
-          let newTargetLang;
-          
-          if (sourceLang !== AUTO_DETECT_VALUE) {
-            // sourceLang is specific, use it
-            newTargetLang = sourceLang;
-          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-            // sourceLang is auto, but originalSourceLang is specific
-            newTargetLang = originalSourceLang;
-          } else {
-            // Both sourceLang and originalSourceLang are auto
-            // Check if Persian text and target language is different from originalTargetLang
-            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
-            if ("fa" !== originalTargetLangCode) {
-              // Persian text but config target is not Persian -> translate to config target lang
-              newTargetLang = originalTargetLang;
-            } else {
-              // Persian text and config target is also Persian -> fallback to English
-              newTargetLang = 'English';
-            }
-          }
-          
-          logger.debug(`Google: Language swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
-          [sourceLang, targetLang] = [targetLang, newTargetLang];
-        }
-      }
-    } catch (e) {
-      logger.error('Language detection failed:', e);
-    }
+    // Language detection and swapping using centralized service
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
+      { providerName: 'GoogleTranslate', useRegexFallback: true }
+    );
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
     if (translateMode === TranslationMode.Field) {
@@ -260,7 +170,6 @@ export class GoogleTranslateProvider extends BaseProvider {
     if (translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
     }
-    // ▲▲▲ پایان منطق اختصاصی Google Translate ▲▲▲
 
     // --- JSON Mode Detection ---
     let isJsonMode = false;

@@ -15,7 +15,7 @@ export class CustomProvider extends BaseProvider {
     super("Custom");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiUrl, apiKey, model] = await Promise.all([
