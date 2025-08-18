@@ -162,7 +162,8 @@ const toggleEnhancedVersion = () => {
 }
 
 // Lifecycle
-onMounted(async () => {
+onMounted(() => {
+  const initialize = async () => {
   try {
     // Step 1: Set loading text
     loadingText.value = browser.i18n.getMessage('popup_loading') || 'Loading Popup...'
@@ -175,21 +176,11 @@ onMounted(async () => {
       )
     ])
     
-    // Step 3: Test background connection with simple ping
-    try {
-      await sendMessage({ action: 'ping', data: { from: 'popup' } })
-    } catch (err) {
-      const isSilent = await handleError(err, 'popup-connection-test', { silent: true })
-      if (!isSilent) {
-        // Only warn for non-context errors
-      }
-    }
-    
-    // Step 4: Apply theme
+    // Step 3: Apply theme
     const settings = settingsStore.settings
     await applyTheme(settings.THEME)
     
-    // Step 5: Check for saved version preference
+    // Step 4: Check for saved version preference
     const savedVersion = localStorage.getItem('popup-enhanced-version')
     if (savedVersion !== null) {
       useEnhancedVersion.value = savedVersion === 'true'
@@ -236,6 +227,8 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  }
+  initialize()
 })
 
 const retryLoading = () => {
