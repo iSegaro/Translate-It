@@ -46,7 +46,7 @@ class SimpleMessageHandler {
       if (handler) {
         // For TRANSLATE action, send immediate ACK only - let port fallback handle processing
         if (action === 'TRANSLATE') {
-          logger.debug('[SimpleMessageHandler] TRANSLATE action detected - sending ACK only, skipping handler execution');
+          logger.debug('[SimpleMessageHandler] TRANSLATE action detected - sending ACK only, NOT executing handler');
           sendResponse({ ack: true, messageId: message.messageId });
           // Don't process here - let port fallback handle the actual translation to avoid duplicate processing
           return false; // Don't keep channel open

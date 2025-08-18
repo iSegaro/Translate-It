@@ -156,7 +156,7 @@ export class browserTranslateProvider extends BaseProvider {
         }
       }
     } catch (error) {
-      logger.error(`LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage`);
+      logger.warn(`LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage`);
     }
 
     // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
@@ -229,6 +229,7 @@ export class browserTranslateProvider extends BaseProvider {
   }
 
   async translate(text, sourceLang, targetLang, _translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+    logger.debug(`[BrowserAPI] translate called (ENTRY): ${text?.slice(0, 30)}... | ${sourceLang} → ${targetLang}`);
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
