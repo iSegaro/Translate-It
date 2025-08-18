@@ -54,7 +54,6 @@ export default class PlatformStrategy {
   async applyVisualFeedback(element) {
     if (!element || !element.style) return;
 
-
     // تولید شناسه منحصر به فرد برای این افکت
     const effectId = Date.now() + Math.random();
     
