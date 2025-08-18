@@ -3,7 +3,7 @@
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 
 export default class PlatformStrategy {
-  // ردیابی افکت‌های بصری فعال برای هر المان
+  // فلگ ساده برای ردیابی افکت‌های فعال
   static activeEffects = new WeakMap();
 
   constructor(notifier = null, errorHandler = null) {
@@ -38,6 +38,10 @@ export default class PlatformStrategy {
     return document.querySelector(selectors);
   }
 
+  isInputElement(element) {
+    return element && (element.tagName === "INPUT" || element.tagName === "TEXTAREA");
+  }
+
   validateField(element) {
     return (
       element &&
@@ -46,52 +50,66 @@ export default class PlatformStrategy {
     );
   }
 
-  /**
-   * تابع delay با پشتیبانی از AbortSignal برای لغو
-   */
-  delay(ms, signal) {
-    return new Promise((resolve, reject) => {
-      if (signal?.aborted) {
-        reject(new Error('Aborted'));
-        return;
-      }
-
-      const timeoutId = setTimeout(resolve, ms);
-      
-      signal?.addEventListener('abort', () => {
-        clearTimeout(timeoutId);
-        reject(new Error('Aborted'));
-      });
-    });
-  }
 
   async applyVisualFeedback(element) {
-    if (!element || !element.style) return; // بررسی بیشتر برای اطمینان
+    if (!element || !element.style) return;
+
+
+    // تولید شناسه منحصر به فرد برای این افکت
+    const effectId = Date.now() + Math.random();
+    
+    // لغو افکت قبلی اگر وجود دارد
+    const previousEffect = PlatformStrategy.activeEffects.get(element);
+    if (previousEffect) {
+      previousEffect.cancelled = true;
+      // بازگرداندن فوری استایل‌ها به حالت اولیه
+      element.style.backgroundColor = previousEffect.originalBackground;
+      element.style.transition = previousEffect.originalTransition;
+    }
 
     const originalBackgroundColor = element.style.backgroundColor;
     const originalTransition = element.style.transition;
+    
+    // ذخیره اطلاعات افکت فعال
+    const effectInfo = {
+      id: effectId,
+      cancelled: false,
+      originalBackground: originalBackgroundColor,
+      originalTransition: originalTransition
+    };
+    PlatformStrategy.activeEffects.set(element, effectInfo);
 
     try {
-      element.style.transition = "background-color 0.3s ease"; // زمان انتقال
-      element.style.backgroundColor = "#d4f8d4"; // رنگ سبز برای نشان دادن پردازش/موفقیت
+      // اعمال انیمیشن سبز
+      element.style.transition = "background-color 0.3s ease";
+      element.style.backgroundColor = "#d4f8d4";
 
-      // منتظر میمونه تا رنگ سبز قابل مشاهده باشد و سپس به حالت اولیه بازمیگردد
-      await new Promise((resolve) => setTimeout(resolve, 300)); // مدت زمان نمایش رنگ سبز
-
+      // انتظار برای نمایش رنگ سبز
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // بررسی لغو شدن
+      if (effectInfo.cancelled) return;
+      
+      // بازگشت به رنگ اولیه
       element.style.backgroundColor = originalBackgroundColor;
-
-      // منتظر میمونه تا انیمیشن بازگشت به پایان برسد
-      await new Promise((resolve) => setTimeout(resolve, 300)); // باید با زمان transition هماهنگ باشد
+      
+      // انتظار برای تکمیل انیمیشن fadeout  
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
     } catch (error) {
-      // در صورت بروز خطا، سعی میکنه استایل‌ها را فوراً به حالت اولیه بازگردند
+      // در صورت خطا، استایل‌ها را فوراً بازگردان
       element.style.backgroundColor = originalBackgroundColor;
       this.errorHandler?.handle(error, {
         type: ErrorTypes.UI,
         context: "platform-strategy-animation",
       });
     } finally {
-      // همیشه ویژگی transition اصلی را بازمی‌گرداند
-      element.style.transition = originalTransition;
+      // پاکسازی نهایی فقط اگر این همان افکت فعلی است
+      const currentEffect = PlatformStrategy.activeEffects.get(element);
+      if (currentEffect && currentEffect.id === effectId) {
+        element.style.transition = originalTransition;
+        PlatformStrategy.activeEffects.delete(element);
+      }
     }
   }
 
