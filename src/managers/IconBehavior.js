@@ -67,6 +67,12 @@ export default function setupIconBehavior(
       const platform = detectPlatform(target);
       const text = strategies[platform].extractText(target);
       if (!text) return;
+      
+      // Dismiss all existing status notifications before showing new one
+      if (notifier && typeof notifier.dismissAll === 'function') {
+        notifier.dismissAll();
+      }
+      
       statusNode = await notifier.show(
         (await getTranslationString("STATUS_TRANSLATING_ICON")) ||
           "Translating...",

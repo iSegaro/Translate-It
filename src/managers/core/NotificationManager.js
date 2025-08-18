@@ -67,6 +67,7 @@ export default class NotificationManager {
 
     this.container = null;
     this.canShowInPage = false;
+    this.activeNotifications = new Set(); // Track all active notification nodes
 
     _instance = this; // Set singleton instance
     this.initialize(); // Initialize on construction
@@ -256,6 +257,8 @@ export default class NotificationManager {
           } else {
             this.logger.debug('Notification node no longer has parentNode');
           }
+          // Remove from active notifications set
+          this.activeNotifications.delete(node);
         } catch (removeError) {
           this.logger.error('Error removing notification node', removeError);
         }
@@ -263,6 +266,21 @@ export default class NotificationManager {
     } catch (error) {
       this.logger.error('Error dismissing notification', error);
     }
+  }
+
+  /**
+   * Dismiss all active notifications
+   */
+  dismissAll() {
+    this.logger.debug('Dismissing all active notifications', { 
+      count: this.activeNotifications.size 
+    });
+    
+    // Create a copy of the set to avoid modification during iteration
+    const notifications = Array.from(this.activeNotifications);
+    notifications.forEach(node => {
+      this.dismiss(node);
+    });
   }
 
   _toastInPage(message, cfg, auto, dur, onClick) {
@@ -320,6 +338,9 @@ export default class NotificationManager {
     }
 
     this.container.appendChild(n);
+    
+    // Add to active notifications set
+    this.activeNotifications.add(n);
 
     setTimeout(() => {
       n.style.opacity = "1";
@@ -335,6 +356,8 @@ export default class NotificationManager {
 
   reset() {
     this.canShowInPage = false;
+    // Clear all active notifications
+    this.activeNotifications.clear();
     if (this.container) {
       try {
         this.container.remove();

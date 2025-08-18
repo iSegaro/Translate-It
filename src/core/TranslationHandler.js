@@ -173,6 +173,11 @@ export default class TranslationHandler {
         "translating..."
       );
       
+      // Dismiss all existing status notifications before showing new one
+      if (this.notifier && typeof this.notifier.dismissAll === 'function') {
+        this.notifier.dismissAll();
+      }
+      
       statusNotification = await this.notifier.show(statusMessage, "status");
 
       state.translateMode = params.selectionRange

@@ -2208,6 +2208,11 @@ export class SelectElementManager {
       const { getTranslationString } = await import("../../utils/i18n/i18n.js");
       const statusMessage = (await getTranslationString("STATUS_TRANSLATING_SELECT_ELEMENT")) || message;
       
+      // Dismiss all existing status notifications before showing new one
+      if (this.notificationManager && typeof this.notificationManager.dismissAll === 'function') {
+        this.notificationManager.dismissAll();
+      }
+      
       // Create persistent notification (false = not auto-dismiss)
       this.statusNotification = await this.notificationManager.show(statusMessage, "status", false);
       this.logger.debug("Status notification created", statusMessage);
