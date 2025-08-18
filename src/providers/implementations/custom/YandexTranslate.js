@@ -178,6 +178,7 @@ export class YandexTranslateProvider extends BaseProvider {
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
+  static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
 
   constructor() {
     super("YandexTranslate");
@@ -302,6 +303,59 @@ export class YandexTranslateProvider extends BaseProvider {
     return [sourceLang, targetLang];
   }
 
+  /**
+   * Detects the language of a given text using Yandex API.
+   * This implementation mirrors the `translate` method's API usage style.
+   * @param {string} text - The text to detect the language of.
+   * @param {string[]} [hintLangs=[]] - A list of language codes to hint to the detector.
+   * @returns {Promise<string|undefined>} - The detected language code (e.g., 'en') or undefined if detection fails.
+   */
+  async detect(text, hintLangs = []) {
+    logger.debug(`Yandex: Detecting language for text: "${text.substring(0, 50)}"...`);
+
+    const uuid = this._generateUuid();
+    const url = new URL(YandexTranslateProvider.detectUrl);
+    url.searchParams.set("id", `${uuid}-0-0`);
+    url.searchParams.set("srv", "android"); // Using 'android' service like in translate method
+
+    const formData = new URLSearchParams({
+      text: text,
+      options: "1", // from curl
+    });
+
+    if (hintLangs.length > 0) {
+      formData.append('hint', hintLangs.map(l => this._getLangCode(l)).join(','));
+    }
+
+    try {
+      const result = await this._executeApiCall({
+        url: url.toString(),
+        fetchOptions: {
+          method: "POST", // Assuming POST works like for translate
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": navigator.userAgent,
+          },
+          body: formData,
+        },
+        extractResponse: (data) => {
+          if (data && data.code === 200 && data.lang) {
+            logger.debug(`Yandex: Detected language: ${data.lang}`);
+            return { detectedLang: data.lang };
+          }
+          logger.error("Yandex detect API returned invalid response:", data);
+          return undefined;
+        },
+        context: `${this.providerName.toLowerCase()}-detect`,
+      });
+
+      return result?.detectedLang;
+    } catch (error) {
+      logger.error("Yandex language detection failed:", error);
+      throw error;
+    }
+  }
+
   async translate(text, sourceLang, targetLang, translateMode = null) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
@@ -383,7 +437,7 @@ export class YandexTranslateProvider extends BaseProvider {
             continue;
           }
 
-          logger.debug(`Processing segment ${i+1}/${textsToTranslate.length}: "${textToTranslate.substring(0, 50)}..." with lang=${lang}`);
+          logger.debug(`Processing segment ${i+1}/${textsToTranslate.length}: "${textToTranslate.substring(0, 50)}"... with lang=${lang}`);
 
           const uuid = this._generateUuid();
           const formData = new URLSearchParams({
