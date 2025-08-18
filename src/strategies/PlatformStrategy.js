@@ -80,21 +80,21 @@ export default class PlatformStrategy {
 
     try {
       // اعمال انیمیشن سبز
-      element.style.transition = "background-color 0.3s ease";
+      element.style.transition = "background-color 0.2s ease";
       element.style.backgroundColor = "#d4f8d4";
 
       // انتظار برای نمایش رنگ سبز
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // بررسی لغو شدن
       if (effectInfo.cancelled) return;
       
       // بازگشت به رنگ اولیه
       element.style.backgroundColor = originalBackgroundColor;
-      
-      // انتظار برای تکمیل انیمیشن fadeout  
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+
+      // انتظار برای تکمیل انیمیشن fadeout
+      await new Promise(resolve => setTimeout(resolve, 200));
+
     } catch (error) {
       // در صورت خطا، استایل‌ها را فوراً بازگردان
       element.style.backgroundColor = originalBackgroundColor;
