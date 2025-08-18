@@ -725,9 +725,10 @@ export default class NotificationManager {
     });
     this.pendingTimeouts.clear();
     
-    // Clear all active notifications and queue
+    // Clear all tracking structures
     this.activeNotifications.clear();
     this.notificationQueue.length = 0; // Clear queue
+    this.rateLimitTracker.length = 0; // Clear rate limit tracker
     
     if (this.container) {
       try {
@@ -747,6 +748,20 @@ export default class NotificationManager {
     return {
       canShowInPage: this.canShowInPage || containerExists,
       containerAvailable: containerExists,
+    };
+  }
+
+  /**
+   * Get current notification system status
+   */
+  getStatus() {
+    return {
+      visible: this.activeNotifications.size,
+      queued: this.notificationQueue.length,
+      maxVisible: CONFIG.QUEUE.MAX_VISIBLE,
+      maxQueue: CONFIG.QUEUE.MAX_QUEUE_SIZE,
+      recentRequests: this.rateLimitTracker.length,
+      canShowMore: this._getVisibleCount() < CONFIG.QUEUE.MAX_VISIBLE
     };
   }
 }
