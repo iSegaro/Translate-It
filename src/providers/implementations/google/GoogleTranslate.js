@@ -153,7 +153,24 @@ export class GoogleTranslateProvider extends BaseProvider {
     return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null) {
+  /**
+   * Normalize various language input forms into canonical values.
+   * @param {string} lang
+   * @returns {string} normalized language string
+   */
+  _normalizeLangValue(lang) {
+    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
+    const raw = lang.trim();
+    if (!raw) return AUTO_DETECT_VALUE;
+
+    const lower = raw.toLowerCase();
+    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
+    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
+
+    return lower;
+  }
+
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // ▼▼▼ منطق اختصاصی Google Translate ▼▼▼
@@ -166,8 +183,36 @@ export class GoogleTranslateProvider extends BaseProvider {
         const targetLangCode = getLanguageCode(targetLang).split("-")[0];
 
         if (detectedLangCode === targetLangCode) {
-          // زبان‌ها را جابجا کن
-          [sourceLang, targetLang] = [targetLang, sourceLang];
+          // Detected language matches target, need to swap
+          let newTargetLang;
+          
+          // Priority logic:
+          // 1. If sourceLang is specific (not auto) -> use sourceLang
+          // 2. If sourceLang is auto but originalSourceLang is specific (not auto) -> use originalSourceLang  
+          // 3. If both are auto -> check originalTargetLang vs detected language
+          // 4. Final fallback -> English
+          
+          if (sourceLang !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceLang;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if detected language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if (detectedLangCode !== originalTargetLangCode) {
+              // Detected lang != config target lang -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Detected lang == config target lang -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Google: Language swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+          [sourceLang, targetLang] = [targetLang, newTargetLang];
         }
       } else {
         // Regex fallback
@@ -176,7 +221,30 @@ export class GoogleTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          [sourceLang, targetLang] = [targetLang, sourceLang];
+          // Same priority logic as detection-based swapping
+          let newTargetLang;
+          
+          if (sourceLang !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceLang;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if Persian text and target language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if ("fa" !== originalTargetLangCode) {
+              // Persian text but config target is not Persian -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Persian text and config target is also Persian -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Google: Language swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+          [sourceLang, targetLang] = [targetLang, newTargetLang];
         }
       }
     } catch (e) {

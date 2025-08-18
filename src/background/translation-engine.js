@@ -9,6 +9,7 @@ import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
 
@@ -212,6 +213,12 @@ export class TranslationEngine {
       );
     }
 
+    // Get original source and target languages from config for language swapping logic
+    const [originalSourceLang, originalTargetLang] = await Promise.all([
+      getSourceLanguageAsync(),
+      getTargetLanguageAsync()
+    ]);
+
     // Pre-check for JSON mode optimization
     const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
     const providerClass = providerInstance?.constructor;
@@ -220,7 +227,7 @@ export class TranslationEngine {
     // For unreliable providers in JSON mode, use optimized strategy directly
     if (isSelectJson && !providerReliableJson) {
       logger.debug('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
-      return await this.executeOptimizedJsonTranslation(data, providerInstance);
+      return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang);
     }
 
     // Standard translation for reliable providers or non-JSON mode
@@ -231,12 +238,14 @@ export class TranslationEngine {
         sourceLanguage,
         targetLanguage,
         mode,
+        originalSourceLang,
+        originalTargetLang
       );
     } catch (initialError) {
       // Final fallback for SelectElement JSON
       if (isSelectJson && !providerReliableJson) {
         logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
-        return await this.executeOptimizedJsonTranslation(data, providerInstance);
+        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang);
       }
       throw initialError;
     }
@@ -258,7 +267,7 @@ export class TranslationEngine {
   /**
    * Optimized JSON translation for unreliable providers
    */
-  async executeOptimizedJsonTranslation(data, providerInstance) {
+  async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang) {
     const { text, provider, sourceLanguage, targetLanguage, mode } = data;
     
     let originalJson;
@@ -325,7 +334,7 @@ export class TranslationEngine {
           
           const batch = batches[idx];
           await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
-            provider, sourceLanguage, targetLanguage, mode
+            provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
           });
         }
       });
@@ -396,13 +405,13 @@ export class TranslationEngine {
    * Process a single batch with fallback strategy
    */
   async processBatch(batch, segments, results, translationStatus, providerInstance, config) {
-    const { provider, sourceLanguage, targetLanguage, mode } = config;
+    const { provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang } = config;
     const DELIMITER = "\n\n---\n\n";
     
     // Try batch translation first (most efficient)
     try {
       const batchText = batch.map(idx => segments[idx]).join(DELIMITER);
-      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode);
+      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang);
       
       if (typeof batchResult === 'string') {
         const parts = batchResult.split(DELIMITER);
@@ -440,7 +449,7 @@ export class TranslationEngine {
       let attempt = 0;
       while (attempt < INDIVIDUAL_RETRY) {
         try {
-          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode);
+          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang);
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
           // For same-language translations or when content doesn't change, still consider it successful
           const isActuallyTranslated = translatedText !== segments[idx] || 

@@ -294,7 +294,7 @@ export class BingTranslateProvider extends BaseProvider {
    * @param {string} targetLang - Target language
    * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
    */
-  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English') {
+  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     try {
       // Use browser.i18n.detectLanguage for detection (similar to other providers)
       const detectionResult = await browser.i18n.detectLanguage(text);
@@ -307,10 +307,29 @@ export class BingTranslateProvider extends BaseProvider {
         const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
 
         if (detectedLangCode === targetLangCode) {
-          // Swap languages; when source was 'auto' we must ensure new target is a real language
-          const origNorm = this._normalizeLangValue(originalSourceLang);
-          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-          logger.debug(`Languages swapped: ${detectedLangCode} → ${targetLangCode}`);
+          // Apply same priority logic as GoogleTranslate
+          let newTargetLang;
+          
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceNorm;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if detected language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if (detectedLangCode !== originalTargetLangCode) {
+              // Detected lang != config target lang -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Detected lang == config target lang -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Bing: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
           return [targetNorm, newTargetLang];
         }
       } else {
@@ -322,9 +341,29 @@ export class BingTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          const origNorm = this._normalizeLangValue(originalSourceLang);
-          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-          logger.debug('Languages swapped using regex fallback');
+          // Same priority logic as detection-based swapping
+          let newTargetLang;
+          
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceNorm;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if Persian text and target language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if ("fa" !== originalTargetLangCode) {
+              // Persian text but config target is not Persian -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Persian text and config target is also Persian -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Bing: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
           return [targetNorm, newTargetLang];
         }
       }
@@ -348,11 +387,11 @@ export class BingTranslateProvider extends BaseProvider {
     return [sourceLang, targetLang];
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null) {
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // Language Detection and Swapping (similar to Google Translate and browser Translate)
-    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang);
+    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang, originalTargetLang);
 
     // Set auto-detect for Field and Subtitle modes after language detection
     if (translateMode === TranslationMode.Field) {

@@ -268,7 +268,7 @@ export class YandexTranslateProvider extends BaseProvider {
    * @param {string} originalSourceLang - Original source language before any modifications
    * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
    */
-  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English') {
+  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     try {
       // Use browser.i18n.detectLanguage for detection (similar to other providers)
       const detectionResult = await browser.i18n.detectLanguage(text);
@@ -281,14 +281,31 @@ export class YandexTranslateProvider extends BaseProvider {
         const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
         const sourceLangCode = getLanguageCode(sourceNorm).split("-")[0];
 
-        // Only swap if detected language matches target AND source is different from detected
-        if (detectedLangCode === targetLangCode && sourceLangCode !== detectedLangCode) {
-          // For Yandex: when swapping, target becomes the original source language (not 'auto')
-          // Normalize originalSourceLang as well to avoid display labels
-          const origNorm = this._normalizeLangValue(originalSourceLang);
-          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-          console.log(`🚨 LANGUAGE SWAPPING: detected=${detectedLangCode} matches target=${targetLangCode}, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
-          logger.debug(`Languages swapped: detected=${detectedLangCode}, source=${sourceLangCode} → target=${targetLangCode}, swapping to source=${targetLangCode} target=${newTargetLang}`);
+        // Only swap if detected language matches target
+        if (detectedLangCode === targetLangCode) {
+          // Apply same priority logic as other providers
+          let newTargetLang;
+          
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceNorm;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if detected language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if (detectedLangCode !== originalTargetLangCode) {
+              // Detected lang != config target lang -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Detected lang == config target lang -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Yandex: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
           return [targetNorm, newTargetLang];
         }
         
@@ -301,17 +318,34 @@ export class YandexTranslateProvider extends BaseProvider {
         const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
         const sourceLangCode = getLanguageCode(sourceNorm).split("-")[0];
 
-        // Only swap Persian text if source is not already Persian/Arabic and target is Persian/Arabic
+        // Only swap Persian text if target is Persian/Arabic
         if (
           isPersianText(text) &&
-          (targetLangCode === "fa" || targetLangCode === "ar") &&
-          sourceLangCode !== "fa" && sourceLangCode !== "ar"
+          (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
-          // For Yandex: when swapping, target becomes the original source language (not 'auto')
-          const origNorm = this._normalizeLangValue(originalSourceLang);
-          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-          console.log(`🚨 REGEX FALLBACK SWAPPING: Persian text detected, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
-          logger.debug(`Languages swapped using regex fallback: Persian text detected, source=${sourceLangCode} → target=${newTargetLang}`);
+          // Same priority logic as detection-based swapping
+          let newTargetLang;
+          
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceNorm;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if Persian text and target language is different from originalTargetLang
+            const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+            if ("fa" !== originalTargetLangCode) {
+              // Persian text but config target is not Persian -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Persian text and config target is also Persian -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Yandex: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
           return [targetNorm, newTargetLang];
         }
       }
@@ -325,14 +359,25 @@ export class YandexTranslateProvider extends BaseProvider {
       
       if (
         isPersianText(text) &&
-        (targetLangCode === "fa" || targetLangCode === "ar") &&
-        sourceLangCode !== "fa" && sourceLangCode !== "ar"
+        (targetLangCode === "fa" || targetLangCode === "ar")
       ) {
-        // For Yandex: when swapping, target becomes the original source language (not 'auto')
-        const origNorm = this._normalizeLangValue(originalSourceLang);
-        const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
-        console.log(`🚨 ERROR FALLBACK SWAPPING: Persian text detected, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
-        logger.debug(`Languages swapped in error fallback: Persian text, source=${sourceLangCode} → target=${newTargetLang}`);
+        // Same priority logic as other error fallbacks
+        let newTargetLang;
+        
+        if (sourceNorm !== AUTO_DETECT_VALUE) {
+          newTargetLang = sourceNorm;
+        } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+          newTargetLang = originalSourceLang;
+        } else {
+          const originalTargetLangCode = getLanguageCode(originalTargetLang).split("-")[0];
+          if ("fa" !== originalTargetLangCode) {
+            newTargetLang = originalTargetLang;
+          } else {
+            newTargetLang = 'English';
+          }
+        }
+        
+        logger.debug(`Yandex: Languages swapped in error fallback from ${targetLang} to ${newTargetLang}`);
         return [targetNorm, newTargetLang];
       }
     }
@@ -395,30 +440,11 @@ export class YandexTranslateProvider extends BaseProvider {
     }
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null) {
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    console.log(`🚨 YANDEX TRANSLATE ENTRY: source=${sourceLang}, target=${targetLang}, mode=${translateMode}, textPreview=${text.substring(0, 50)}`);
-    logger.debug(`🚨 YANDEX TRANSLATE ENTRY: source=${sourceLang}, target=${targetLang}, mode=${translateMode}, textPreview=${text.substring(0, 50)}`);
-
     // Language Detection and Swapping (similar to Google Translate and browser Translate)
-    // Apply for all modes to ensure proper language detection
-    console.log(`🚨 APPLYING LANGUAGE SWAPPING FOR ALL MODES`);
-    // Fetch the default source language from settings
-    let defaultSourceLang = await getSourceLanguageAsync();
-    // Normalize stored config value so variants like 'Auto-Detect' are treated as 'auto'
-    if (!defaultSourceLang || this._normalizeLangValue(defaultSourceLang) === AUTO_DETECT_VALUE) {
-      defaultSourceLang = 'English'; // Default to English if setting is 'auto' or not set
-    }
-
-    // Store original source language before any modifications for proper swapping
-    // If sourceLang is 'auto', we need a fallback language for swapping
-    const originalSourceLang = sourceLang === AUTO_DETECT_VALUE ? defaultSourceLang : sourceLang;
-    console.log(`🚨 ORIGINAL SOURCE LANG: ${originalSourceLang} (from sourceLang=${sourceLang}, config=${defaultSourceLang})`);
-    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang);
-    
-    console.log(`🚨 YANDEX AFTER SWAPPING: source=${sourceLang}, target=${targetLang}`);
-    logger.debug(`🚨 YANDEX AFTER SWAPPING: source=${sourceLang}, target=${targetLang}`);
+    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang, originalTargetLang);
 
     // Set auto-detect for Field and Subtitle modes after language detection
     if (translateMode === TranslationMode.Field) {

@@ -16,7 +16,7 @@ export class OpenRouterProvider extends BaseProvider {
     super("OpenRouter");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode) {
+  async translate(text, sourceLang, targetLang, translateMode, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiKey, model] = await Promise.all([

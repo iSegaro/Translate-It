@@ -14,7 +14,7 @@ export class WebAIProvider extends BaseProvider {
     super("WebAI");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode) {
+  async translate(text, sourceLang, targetLang, translateMode, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiUrl, apiModel] = await Promise.all([

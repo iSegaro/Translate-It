@@ -111,6 +111,23 @@ export class browserTranslateProvider extends BaseProvider {
   }
 
   /**
+   * Normalize various language input forms into canonical values.
+   * @param {string} lang
+   * @returns {string} normalized language string
+   */
+  _normalizeLangValue(lang) {
+    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
+    const raw = lang.trim();
+    if (!raw) return AUTO_DETECT_VALUE;
+
+    const lower = raw.toLowerCase();
+    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
+    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
+
+    return lower;
+  }
+
+  /**
    * Convert language name to BCP 47 code
    * @param {string} lang - Language name or code
    * @returns {string} - BCP 47 language code
@@ -176,7 +193,7 @@ export class browserTranslateProvider extends BaseProvider {
    * @param {string} targetLang - Target language  
    * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
    */
-  async _applyLanguageSwapping(text, sourceLang, targetLang) {
+  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     try {
       const detectedLangCode = await this._detectLanguageForSwapping(text, targetLang);
       
@@ -184,24 +201,85 @@ export class browserTranslateProvider extends BaseProvider {
       if (detectedLangCode) {
         const targetLangCode = this._getLangCode(targetLang);
         if (detectedLangCode === targetLangCode) {
-          // Swap languages similar to Google Translate
-          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
-          return [targetLang, sourceLang];
+          // Apply same priority logic as other providers
+          let newTargetLang;
+          
+          const sourceNorm = this._normalizeLangValue(sourceLang);
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceLang;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if detected language is different from originalTargetLang
+            const originalTargetLangCode = this._getLangCode(originalTargetLang);
+            if (detectedLangCode !== originalTargetLangCode) {
+              // Detected lang != config target lang -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Detected lang == config target lang -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Browser: Languages swapped from ${targetLang} to ${newTargetLang} (detected: ${detectedLangCode}, originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+          return [targetLang, newTargetLang];
         }
       } else {
         // Final regex fallback for Persian text
         const targetLangCode = this._getLangCode(targetLang);
         if (isPersianText(text) && (targetLangCode === "fa")) {
-          logger.debug('Languages swapped using regex fallback');
-          return [targetLang, sourceLang];
+          // Same priority logic as detection-based swapping
+          let newTargetLang;
+          
+          const sourceNorm = this._normalizeLangValue(sourceLang);
+          if (sourceNorm !== AUTO_DETECT_VALUE) {
+            // sourceLang is specific, use it
+            newTargetLang = sourceLang;
+          } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+            // sourceLang is auto, but originalSourceLang is specific
+            newTargetLang = originalSourceLang;
+          } else {
+            // Both sourceLang and originalSourceLang are auto
+            // Check if Persian text and target language is different from originalTargetLang
+            const originalTargetLangCode = this._getLangCode(originalTargetLang);
+            if ("fa" !== originalTargetLangCode) {
+              // Persian text but config target is not Persian -> translate to config target lang
+              newTargetLang = originalTargetLang;
+            } else {
+              // Persian text and config target is also Persian -> fallback to English
+              newTargetLang = 'English';
+            }
+          }
+          
+          logger.debug(`Browser: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+          return [targetLang, newTargetLang];
         }
       }
-    } catch {
-      logger.error('Language detection for swapping failed:');
-      // Regex fallback
+    } catch (error) {
+      logger.error('Language detection for swapping failed:', error);
+      // Regex fallback with same priority logic
       const targetLangCode = this._getLangCode(targetLang);
       if (isPersianText(text) && (targetLangCode === "fa")) {
-        return [targetLang, sourceLang];
+        let newTargetLang;
+        
+        const sourceNorm = this._normalizeLangValue(sourceLang);
+        if (sourceNorm !== AUTO_DETECT_VALUE) {
+          newTargetLang = sourceLang;
+        } else if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+          newTargetLang = originalSourceLang;
+        } else {
+          const originalTargetLangCode = this._getLangCode(originalTargetLang);
+          if ("fa" !== originalTargetLangCode) {
+            newTargetLang = originalTargetLang;
+          } else {
+            newTargetLang = 'English';
+          }
+        }
+        
+        return [targetLang, newTargetLang];
       }
     }
 
@@ -306,7 +384,7 @@ export class browserTranslateProvider extends BaseProvider {
     return translator;
   }
 
-  async translate(text, sourceLang, targetLang, _translateMode = null) {
+  async translate(text, sourceLang, targetLang, _translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
@@ -318,7 +396,7 @@ export class browserTranslateProvider extends BaseProvider {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // --- Language Detection and Swapping (similar to Google Translate) ---
-    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang);
+    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang, originalTargetLang);
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
     if (_translateMode === TranslationMode.Field) {

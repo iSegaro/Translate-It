@@ -20,7 +20,7 @@ export class OpenAIProvider extends BaseProvider {
     super("OpenAI");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode) {
+  async translate(text, sourceLang, targetLang, translateMode, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiKey, apiUrl, model] = await Promise.all([
