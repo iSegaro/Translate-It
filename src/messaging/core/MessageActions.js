@@ -43,11 +43,6 @@ export class MessageActions {
   
   // TTS actions
   static GOOGLE_TTS_SPEAK = 'GOOGLE_TTS_SPEAK';
-  static TTS_SPEAK = 'TTS_SPEAK';
-  static TTS_STOP = 'TTS_STOP';
-  static TTS_PAUSE = 'TTS_PAUSE';
-  static TTS_RESUME = 'TTS_RESUME';
-  // Legacy TTS actions - removed, using GOOGLE_TTS_SPEAK instead
   static PLAY_OFFSCREEN_AUDIO = 'playOffscreenAudio';
   
   // Capture actions
