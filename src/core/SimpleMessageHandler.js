@@ -44,21 +44,20 @@ class SimpleMessageHandler {
       const handler = this.getHandlerForMessage(action, context);
       
       if (handler) {
+        // For TRANSLATE action, send immediate ACK only - let port fallback handle processing
+        if (action === 'TRANSLATE') {
+          logger.debug('[SimpleMessageHandler] TRANSLATE action detected - sending ACK only, skipping handler execution');
+          sendResponse({ ack: true, messageId: message.messageId });
+          // Don't process here - let port fallback handle the actual translation to avoid duplicate processing
+          return false; // Don't keep channel open
+        }
+        
         // Check if handler uses callback pattern (3+ parameters)
         if (handler.length >= 3) {
           // Call handler directly with callback - it will handle sendResponse
           handler(message, sender, sendResponse);
           return true; // Keep message channel open
         } else {
-          // For TRANSLATE action, send immediate ACK and process asynchronously
-          if (action === 'TRANSLATE') {
-            sendResponse({ ack: true, messageId: message.messageId });
-            // Process asynchronously without waiting for result in sendMessage path
-            handler(message, sender).catch((error) => {
-              logger.error(`[SimpleMessageHandler] Async handler error for ${action}:`, error);
-            });
-            return false; // Don't keep channel open
-          } else {
             // For Promise-based handlers, handle Promise manually for Firefox MV3 compatibility
             handler(message, sender).then((result) => {
               try {
@@ -75,7 +74,6 @@ class SimpleMessageHandler {
               }
             });
             return true; // Keep message channel open for async response
-          }
         }
       } else {
         logger.debug(`[SimpleMessageHandler] No handler for action: ${action}${context ? ` (context: ${context})` : ''}`);
