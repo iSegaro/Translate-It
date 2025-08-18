@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { parseBoolean, getTranslationString } from "../../utils/i18n/i18n.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import ExtensionContextManager from "../../utils/core/extensionContext.js";
+import { getTimeoutAsync } from "../../config.js";
 
 const SAFE_ICONS = {
   ICON_TRANSLATION: "🌐",
@@ -35,6 +36,11 @@ const CONFIG = {
     BORDER_RADIUS: "6px",
     PADDING: "10px 15px",
     FONT_SIZE: "14px"
+  },
+  PROGRESS: {
+    HEIGHT: "3px",
+    BACKGROUND: "linear-gradient(90deg, #4CAF50, #2196F3)",
+    BACKGROUND_TRACK: "rgba(255,255,255,0.3)"
   },
   QUEUE: {
     MAX_VISIBLE: 5,
@@ -163,6 +169,46 @@ export default class NotificationManager {
   }
 
   /**
+   * Create progress bar element for status notifications
+   */
+  async _createProgressBar(duration) {
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'notification-progress-container';
+    
+    Object.assign(progressContainer.style, {
+      position: 'absolute',
+      bottom: '0',
+      left: '0',
+      right: '0',
+      height: CONFIG.PROGRESS.HEIGHT,
+      background: CONFIG.PROGRESS.BACKGROUND_TRACK,
+      borderRadius: `0 0 ${CONFIG.NOTIFICATION.BORDER_RADIUS} ${CONFIG.NOTIFICATION.BORDER_RADIUS}`,
+      overflow: 'hidden'
+    });
+    
+    const progressBar = document.createElement('div');
+    progressBar.className = 'notification-progress-bar';
+    
+    Object.assign(progressBar.style, {
+      height: '100%',
+      width: '100%',
+      background: CONFIG.PROGRESS.BACKGROUND,
+      transformOrigin: 'left',
+      transform: 'scaleX(1)',
+      transition: `transform ${duration}ms linear`
+    });
+    
+    progressContainer.appendChild(progressBar);
+    
+    // Start animation
+    requestAnimationFrame(() => {
+      progressBar.style.transform = 'scaleX(0)';
+    });
+    
+    return { container: progressContainer, bar: progressBar };
+  }
+
+  /**
    * Create notification element with proper styling
    */
   _createNotificationElement(cfg, onClick) {
@@ -185,7 +231,9 @@ export default class NotificationManager {
       transition: `opacity ${CONFIG.ANIMATION.DURATION} ease, transform ${CONFIG.ANIMATION.DURATION} ease`,
       pointerEvents: "auto",
       maxWidth: CONFIG.NOTIFICATION.MAX_WIDTH,
-      wordWrap: "break-word"
+      wordWrap: "break-word",
+      position: "relative", // برای progress bar
+      overflow: "hidden" // برای progress bar
     };
     
     Object.assign(n.style, baseStyles);
@@ -444,7 +492,7 @@ export default class NotificationManager {
   /**
    * Process next notification from queue
    */
-  _processQueue() {
+  async _processQueue() {
     if (this.notificationQueue.length === 0) return;
     if (this._getVisibleCount() >= CONFIG.QUEUE.MAX_VISIBLE) return;
 
@@ -455,7 +503,7 @@ export default class NotificationManager {
     });
     
     // Process the notification immediately
-    this._showImmediate(
+    await this._showImmediate(
       nextNotification.msg,
       nextNotification.type,
       nextNotification.auto,
@@ -529,7 +577,7 @@ export default class NotificationManager {
     // Step 2: Attempt to show the notification in-page if possible.
     if (this.canShowInPage) {
       try {
-        return this._toastInPage(msg, cfg, auto, finalDur, onClick);
+        return await this._toastInPage(msg, cfg, auto, finalDur, onClick);
       } catch (err) {
         this.logger.warn('In-page notification failed, using fallback', err);
       }
@@ -564,6 +612,9 @@ export default class NotificationManager {
 
     // Clear any pending timeout for this node
     this._clearNodeTimeout(node);
+    
+    // Stop progress bar animation if exists
+    this._stopProgressBar(node);
 
     try {
       this.logger.debug('Setting notification opacity to 0');
@@ -604,14 +655,46 @@ export default class NotificationManager {
   }
 
   /**
+   * Stop progress bar animation for a node
+   */
+  _stopProgressBar(node) {
+    if (node._progressBar && node._progressBar.bar) {
+      try {
+        // Stop the animation by getting current transform and setting it as final
+        const currentTransform = window.getComputedStyle(node._progressBar.bar).transform;
+        node._progressBar.bar.style.transition = 'none';
+        node._progressBar.bar.style.transform = currentTransform;
+      } catch (error) {
+        this.logger.debug('Failed to stop progress bar animation', error);
+      }
+    }
+  }
+
+  /**
    * Clean up node from all tracking structures
    */
   _cleanupNode(node) {
     this.activeNotifications.delete(node);
     this._clearNodeTimeout(node);
     
+    // Clean up progress bar if exists
+    if (node._progressBar) {
+      try {
+        node._progressBar.bar.style.transition = 'none';
+        delete node._progressBar;
+      } catch (error) {
+        this.logger.debug('Progress bar cleanup error (non-critical)', error);
+      }
+    }
+    
     // Process next item from queue when space becomes available
-    setTimeout(() => this._processQueue(), 50);
+    setTimeout(async () => {
+      try {
+        await this._processQueue();
+      } catch (error) {
+        this.logger.error('Error processing queue after cleanup', error);
+      }
+    }, 50);
   }
 
   /**
@@ -629,7 +712,7 @@ export default class NotificationManager {
     });
   }
 
-  _toastInPage(message, cfg, auto, dur, onClick) {
+  async _toastInPage(message, cfg, auto, dur, onClick) {
     // This internal method remains largely the same, but it's now called more safely.
     if (!this.container) return null; // Extra safety guard
 
@@ -659,6 +742,22 @@ export default class NotificationManager {
 
     n.appendChild(iconSpan);
     n.appendChild(msgSpan);
+
+    // Add progress bar for status notifications
+    if (cfg.cls === "AIWC-status") {
+      try {
+        const timeout = await getTimeoutAsync();
+        const progressBarElements = await this._createProgressBar(timeout);
+        n.appendChild(progressBarElements.container);
+        
+        // Store progress bar reference for potential cleanup
+        n._progressBar = progressBarElements;
+        
+        this.logger.debug('Progress bar added to status notification', { timeout });
+      } catch (error) {
+        this.logger.warn('Failed to add progress bar to status notification', error);
+      }
+    }
 
     if (onClick) {
       n.addEventListener(
