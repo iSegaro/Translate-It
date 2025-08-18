@@ -105,7 +105,7 @@ export default class ChatGPTStrategy extends PlatformStrategy {
 
       this.applyBaseStyling(element, translated);
       setCursorToEnd(element);
-      this.applyVisualFeedback(element);
+      await this.applyVisualFeedback(element);
       return true;
     } catch (error) {
       this.errorHandler.handle(error, {

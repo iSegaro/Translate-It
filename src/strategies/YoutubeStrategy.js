@@ -85,7 +85,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
         const success = await smartTextReplacement(element, translatedText);
 
         if (success) {
-          this.applyVisualFeedback(element);
+          await this.applyVisualFeedback(element);
           this.applyTextDirection(element, translatedText);
 
           // تاخیر هوشمند برای اطمینان از پردازش کامل
@@ -124,12 +124,12 @@ export default class YoutubeStrategy extends PlatformStrategy {
               element.appendChild(node);
             });
 
-            this.applyVisualFeedback(element);
+            await this.applyVisualFeedback(element);
             this.applyTextDirection(element, htmlText);
           } else {
             // برای input و textarea از \n استفاده کنید
             element.value = translatedText;
-            this.applyVisualFeedback(element);
+            await this.applyVisualFeedback(element);
             this.applyTextDirection(element, translatedText);
           }
         }
@@ -158,7 +158,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
         element.textContent = "";
       }
 
-      this.applyVisualFeedback(element);
+      await this.applyVisualFeedback(element);
     } catch (error) {
       const handlerError = this.errorHandler.handle(error, {
         type: ErrorTypes.UI,

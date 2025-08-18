@@ -75,7 +75,7 @@ export default class MediumStrategy extends PlatformStrategy {
 
         element.dispatchEvent(new Event("input", { bubbles: true }));
         element.dispatchEvent(new Event("change", { bubbles: true }));
-        this.applyVisualFeedback(element);
+        await this.applyVisualFeedback(element);
         return true;
       }
 
@@ -102,7 +102,7 @@ export default class MediumStrategy extends PlatformStrategy {
 
           // ارسال رویدادهای لازم
           this.triggerStateUpdate(mediumField);
-          this.applyVisualFeedback(mediumField);
+          await this.applyVisualFeedback(mediumField);
           return true;
         }
       } else {
@@ -113,7 +113,7 @@ export default class MediumStrategy extends PlatformStrategy {
         );
         if (success) {
           this.triggerStateUpdate(mediumField);
-          this.applyVisualFeedback(mediumField);
+          await this.applyVisualFeedback(mediumField);
           return true;
         }
       }

@@ -28,7 +28,7 @@ export default class InstagramStrategy extends PlatformStrategy {
         await this.clearContent(element);
         await this.pasteText(element, translatedText);
         this.triggerStateUpdate(element);
-        this.applyVisualFeedback(element);
+        await this.applyVisualFeedback(element);
       } else if (element.isContentEditable) {
         const trustedHTML = filterXSS(translatedText, {
           whiteList: {
@@ -56,11 +56,11 @@ export default class InstagramStrategy extends PlatformStrategy {
         });
 
         this.applyTextDirection(element, translatedText);
-        this.applyVisualFeedback(element);
+        await this.applyVisualFeedback(element);
       } else {
         element.value = translatedText;
         this.applyTextDirection(element, translatedText);
-        this.applyVisualFeedback(element);
+        await this.applyVisualFeedback(element);
       }
 
       return true;

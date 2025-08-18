@@ -115,7 +115,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         '[data-testid="SearchBox_Search_Input"]',
       );
       if (searchInput && element.contains(searchInput)) {
-        this.applyVisualFeedback(searchInput);
+        await this.applyVisualFeedback(searchInput);
         searchInput.value = translatedText;
         searchInput.dispatchEvent(new Event("input", { bubbles: true }));
         this.applyTextDirection(searchInput, translatedText);
@@ -127,7 +127,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         const dmField = element.closest('[data-testid="dmComposerTextInput"]');
         if (dmField) {
           dmField.focus();
-          this.applyVisualFeedback(dmField);
+          await this.applyVisualFeedback(dmField);
           this.clearTweetField(dmField);
           await delay(50);
           await this.pasteText(dmField, translatedText);
@@ -141,7 +141,7 @@ export default class TwitterStrategy extends PlatformStrategy {
         const tweetField = element.closest('[data-testid="tweetTextarea_0"]');
         if (tweetField) {
           tweetField.focus();
-          this.applyVisualFeedback(tweetField);
+          await this.applyVisualFeedback(tweetField);
 
           // ابتدا فیلد را پاک می‌کنیم
           this.clearTweetField(tweetField);

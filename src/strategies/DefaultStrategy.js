@@ -127,7 +127,7 @@ export default class DefaultStrategy extends PlatformStrategy {
           textLength: translatedText.length,
         });
 
-        this.applyVisualFeedback(element);
+        await this.applyVisualFeedback(element);
 
         // بررسی وجود انتخاب متن
         const hasSelection = this._hasTextSelection(element);

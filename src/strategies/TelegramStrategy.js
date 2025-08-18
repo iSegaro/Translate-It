@@ -181,7 +181,7 @@ export default class TelegramStrategy extends PlatformStrategy {
       await this.safeFocus(telegramField);
 
       // 4. منطق به‌روزرسانی یکپارچه
-      this.applyVisualFeedback(document.getElementById("message-input-text"));
+      await this.applyVisualFeedback(document.getElementById("message-input-text"));
       if (this.isInputField(telegramField)) {
         telegramField.value = translatedText;
         telegramField.setAttribute(
