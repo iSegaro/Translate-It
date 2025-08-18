@@ -117,22 +117,29 @@ export function useSidepanelTranslation() {
           logger.debug("[useSidepanelTranslation] Translation successful:", result.translatedText);
           return true;
         } else {
-          throw new Error(response?.result?.error || 'Translation failed');
+          // Extract the actual error message from the response
+          const errorMessage = response?.result?.error?.message || 
+                              response?.result?.error || 
+                              response?.error?.message || 
+                              response?.error || 
+                              'Translation failed';
+          throw new Error(errorMessage);
         }
       } catch (error) {
-        logger.error("Failed to send translation request (reliable)", error);
+        logger.debug("Translation request failed:", error?.message || error);
         // Clean up pending request and reset loading state if message sending fails
         pendingRequests.value.delete(messageId);
         isTranslating.value = false;
         loadingStartTime.value = null;
-        errorManager.handleError("Failed to send translation request");
+        // Pass the actual error message instead of a generic one
+        errorManager.handleError(error?.message || error || "Failed to send translation request");
         return null;
       }
 
       return true;
 
     } catch (error) {
-      logger.error("[useSidepanelTranslation] Translation error:", error);
+      logger.debug("[useSidepanelTranslation] Translation error:", error?.message || error);
       await errorManager.handleError(error);
       isTranslating.value = false; // Ensure loading state is reset on immediate error
       loadingStartTime.value = null;

@@ -68,7 +68,7 @@ export async function handleTranslate(message, sender, sendResponse) {
     if (result.success) {
       logger.info(`[Handler:TRANSLATE] ✅ Success: "${result.translatedText?.slice(0, 50)}..."`);
     } else {
-      logger.error(`[Handler:TRANSLATE] ❌ Failed: ${result.error || 'Unknown error'}`);
+      logger.debug(`[Handler:TRANSLATE] ❌ Failed: ${result.error?.message || result.error || 'Unknown error'}`);
     }
 
     // Send TRANSLATION_RESULT_UPDATE for ALL cases (success AND error) due to Firefox MV3 issues
@@ -156,7 +156,7 @@ export async function handleTranslate(message, sender, sendResponse) {
       );
     } else {
       // ERROR case - send error information
-      logger.debug('[Handler:TRANSLATE] Translation failed, sending error update:', result.error);
+      logger.debug('[Handler:TRANSLATE] Sending error response to caller');
       
       updateMessage = MessageFormat.create(
         MessageActions.TRANSLATION_RESULT_UPDATE,
@@ -208,8 +208,7 @@ export async function handleTranslate(message, sender, sendResponse) {
     }
 
   } catch (translationError) {
-    logger.error('[Handler:TRANSLATE] Translation error:', translationError);
-    logger.error('[Handler:TRANSLATE] Error stack:', translationError.stack);
+    logger.debug('[Handler:TRANSLATE] Caught error from translation engine:', translationError.message);
 
     errorHandler.handle(translationError, {
       type: ErrorTypes.TRANSLATION,

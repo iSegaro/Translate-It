@@ -148,8 +148,8 @@ export class TranslationEngine {
 
       return result;
     } catch (error) {
-      logger.error("[TranslationEngine] Translation error:", error);
-      logger.error("[TranslationEngine] Error stack:", error.stack);
+      // Don't log here - error already logged by provider
+      logger.debug("[TranslationEngine] Translation failed, formatting error response");
       return this.formatError(error, context);
     }
   }
@@ -608,7 +608,7 @@ export class TranslationEngine {
     return {
       success: false,
       error: {
-        type: "TRANSLATION_ERROR",
+        type: error.type || "TRANSLATION_ERROR",
         message: error.message || "Translation failed",
         context: context || "unknown",
         timestamp: Date.now(),

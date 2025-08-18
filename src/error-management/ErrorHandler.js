@@ -192,7 +192,15 @@ export class ErrorHandler {
       const raw = err instanceof Error ? err.message : String(err);
       const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
-      const msg = await getErrorMessage(type);
+      // Try to get localized message, fallback to original message if fails
+      let msg;
+      try {
+        msg = await getErrorMessage(type);
+      } catch (msgError) {
+        logger.warn('Failed to get localized error message, using original:', msgError);
+        // Use original error message as fallback
+        msg = raw || 'An error occurred';
+      }
       
       return {
         message: msg,
@@ -204,8 +212,13 @@ export class ErrorHandler {
       };
     } catch (error) {
       logger.error('Failed to get error for UI:', error);
+      
+      // Preserve original error message in fallback
+      const originalMessage = err instanceof Error ? err.message : String(err);
+      const fallbackMessage = originalMessage || 'An unknown error occurred';
+      
       return {
-        message: 'An unknown error occurred',
+        message: fallbackMessage,
         type: ErrorTypes.UNKNOWN,
         context: context,
         timestamp: Date.now(),
