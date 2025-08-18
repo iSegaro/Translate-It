@@ -565,12 +565,10 @@ export class WindowsManager {
                            !originalMessage.includes('Translation failed: No translated text') ? 
                            originalMessage : errorInfo.message;
       
-      // Render error with retry and close functionality
+      // Render error message without buttons
       this.translationRenderer.renderError(
         this.innerContainer, 
-        displayMessage,
-        () => this._retryTranslation(), // onRetry callback
-        () => this.dismiss(true) // onClose callback
+        displayMessage
       );
       
       // Don't auto-close window - let user decide via buttons
@@ -587,43 +585,6 @@ export class WindowsManager {
     });
   }
 
-  /**
-   * Retry translation with same text
-   */
-  async _retryTranslation() {
-    if (!this.state.originalText || !this.innerContainer) {
-      this.logger.warn('Cannot retry: missing original text or container');
-      return;
-    }
-
-    this.logger.debug('🔄 Retrying translation', { text: this.state.originalText.substring(0, 20) + '...' });
-    
-    try {
-      // Show loading state
-      this.translationRenderer.renderLoading(this.innerContainer);
-      
-      // Perform translation again
-      const result = await this.translationHandler.performTranslation(this.state.originalText);
-      
-      if (this.state.isTranslationCancelled || !this.innerContainer) {
-        this.logger.debug('Translation cancelled during retry');
-        return;
-      }
-      
-      // Render successful translation
-      this._renderTranslationContent(result.translatedText, this.state.originalText);
-      
-      this.logger.debug('✅ Translation retry successful');
-      
-    } catch (retryError) {
-      // Don't log error here as _handleTranslationError will log it with full details
-      
-      if (this.state.isTranslationCancelled || !this.innerContainer) return;
-      
-      // Show error again
-      await this._handleTranslationError(retryError);
-    }
-  }
 
   /**
    * Handle general errors
