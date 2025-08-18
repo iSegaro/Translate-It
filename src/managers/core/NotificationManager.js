@@ -16,6 +16,31 @@ const SAFE_ICONS = {
   ICON_REVERT: "↩️",
 };
 
+// Configuration constants
+const CONFIG = {
+  CONTAINER_ID: "AIWritingCompanion-notifications",
+  Z_INDEX: "2147483646",
+  POSITION: {
+    TOP: "20px",
+    RIGHT: "20px",
+    GAP: "10px"
+  },
+  ANIMATION: {
+    DURATION: "0.3s",
+    FADE_DELAY: 10,
+    DISMISS_DELAY: 500
+  },
+  NOTIFICATION: {
+    MAX_WIDTH: "300px",
+    BORDER_RADIUS: "6px",
+    PADDING: "10px 15px",
+    FONT_SIZE: "14px"
+  }
+};
+
+// Valid notification types
+const VALID_TYPES = ['error', 'warning', 'success', 'info', 'status', 'revert'];
+
 let _instance = null; // Singleton instance
 
 export default class NotificationManager {
@@ -68,6 +93,7 @@ export default class NotificationManager {
     this.container = null;
     this.canShowInPage = false;
     this.activeNotifications = new Set(); // Track all active notification nodes
+    this.pendingTimeouts = new Map(); // Track timeouts for cleanup
 
     _instance = this; // Set singleton instance
     this.initialize(); // Initialize on construction
@@ -82,6 +108,60 @@ export default class NotificationManager {
 
   initialize() {
     this._setupLocaleListener();
+  }
+
+  /**
+   * Create notification container with proper styling
+   */
+  _createContainer() {
+    const el = document.createElement("div");
+    el.id = CONFIG.CONTAINER_ID;
+    
+    Object.assign(el.style, {
+      position: "fixed",
+      top: CONFIG.POSITION.TOP,
+      right: CONFIG.POSITION.RIGHT,
+      left: "auto",
+      zIndex: CONFIG.Z_INDEX,
+      display: "flex",
+      flexDirection: "column",
+      gap: CONFIG.POSITION.GAP,
+      pointerEvents: "none",
+      direction: "ltr",
+      textAlign: "left",
+    });
+    
+    return el;
+  }
+
+  /**
+   * Create notification element with proper styling
+   */
+  _createNotificationElement(cfg, onClick) {
+    const n = document.createElement("div");
+    n.className = `AIWC-notification ${cfg.cls}`;
+    
+    const baseStyles = {
+      background: "#fff",
+      color: "#333",
+      padding: CONFIG.NOTIFICATION.PADDING,
+      borderRadius: CONFIG.NOTIFICATION.BORDER_RADIUS,
+      fontSize: CONFIG.NOTIFICATION.FONT_SIZE,
+      border: "1px solid #ddd",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+      display: "flex",
+      alignItems: "center",
+      cursor: onClick ? "pointer" : "default",
+      opacity: "0",
+      transform: "translateY(10px)",
+      transition: `opacity ${CONFIG.ANIMATION.DURATION} ease, transform ${CONFIG.ANIMATION.DURATION} ease`,
+      pointerEvents: "auto",
+      maxWidth: CONFIG.NOTIFICATION.MAX_WIDTH,
+      wordWrap: "break-word"
+    };
+    
+    Object.assign(n.style, baseStyles);
+    return n;
   }
 
   /**
@@ -108,8 +188,7 @@ export default class NotificationManager {
     }
 
     try {
-      const id = "AIWritingCompanion-notifications";
-      let el = document.getElementById(id);
+      let el = document.getElementById(CONFIG.CONTAINER_ID);
       if (el) {
         this.container = el;
         this.canShowInPage = true;
@@ -118,21 +197,7 @@ export default class NotificationManager {
         return;
       }
 
-      el = document.createElement("div");
-      el.id = id;
-      Object.assign(el.style, {
-        position: "fixed",
-        top: "20px",
-        right: "20px",
-        left: "auto",
-        zIndex: "2147483646",
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        pointerEvents: "none",
-        direction: "ltr",
-        textAlign: "left",
-      });
+      el = this._createContainer();
 
       // [REFACTOR] The critical DOM manipulation now happens here, just-in-time.
       document.body.appendChild(el);
@@ -182,24 +247,47 @@ export default class NotificationManager {
     
     const isRTL = parseBoolean(rtlMsg);
 
-    this.container.style.right = "20px"; // isRTL ? "auto" : "20px";
-    this.container.style.left = "auto"; //isRTL ? "20px" : "auto";
+    // Apply proper RTL/LTR positioning and styling
+    this.container.style.right = isRTL ? "auto" : CONFIG.POSITION.RIGHT;
+    this.container.style.left = isRTL ? CONFIG.POSITION.RIGHT : "auto";
     this.container.style.direction = isRTL ? "rtl" : "ltr";
-    this.container.style.textAlign = "right"; // isRTL ? "right" : "left";
+    this.container.style.textAlign = isRTL ? "right" : "left";
+    
+    this.logger.debug('Applied alignment', { isRTL });
   }
 
   /**
-   * [The `show` method now ensures the container exists before attempting to display a notification.
+   * Validate notification type
+   */
+  _validateType(type) {
+    if (!VALID_TYPES.includes(type)) {
+      this.logger.warn(`Invalid notification type: ${type}, falling back to 'info'`);
+      return 'info';
+    }
+    return type;
+  }
+
+  /**
+   * Show notification with proper validation and error handling
    */
   async show(msg, type = "info", auto = true, dur = null, onClick) {
+    // Validate inputs
+    if (!msg || typeof msg !== 'string' || msg.trim() === '') {
+      this.logger.warn('Empty or invalid message provided');
+      return null;
+    }
+
+    // Validate and sanitize type
+    const validType = this._validateType(type);
+    
     // Step 1: Ensure the container is ready for in-page notifications.
     this._ensureContainerExists();
 
-    const cfg = this.map[type] || this.map.info;
+    const cfg = this.map[validType];
     const finalDur = dur ?? cfg.dur;
     
     // Debug logging for status type notifications
-    if (type === "status") {
+    if (validType === "status") {
       this.logger.debug('Showing status notification:', { 
         message: msg, 
         messageType: typeof msg, 
@@ -223,7 +311,7 @@ export default class NotificationManager {
     if (ExtensionContextManager.isValidSync()) {
       ExtensionContextManager.safeSendMessage({
         action: "show_os_notification",
-        payload: { message: msg, title: cfg.title, type: type },
+        payload: { message: msg, title: cfg.title, type: validType },
       }, 'notification-fallback');
     }
 
@@ -245,10 +333,14 @@ export default class NotificationManager {
       return;
     }
 
+    // Clear any pending timeout for this node
+    this._clearNodeTimeout(node);
+
     try {
       this.logger.debug('Setting notification opacity to 0');
       node.style.opacity = "0";
-      setTimeout(() => {
+      
+      const timeoutId = setTimeout(() => {
         try {
           if (node.parentNode) {
             this.logger.debug('Removing notification node from DOM');
@@ -257,15 +349,37 @@ export default class NotificationManager {
           } else {
             this.logger.debug('Notification node no longer has parentNode');
           }
-          // Remove from active notifications set
-          this.activeNotifications.delete(node);
+          // Remove from tracking
+          this._cleanupNode(node);
         } catch (removeError) {
           this.logger.error('Error removing notification node', removeError);
         }
-      }, 500);
+      }, CONFIG.ANIMATION.DISMISS_DELAY);
+      
+      // Track this timeout for cleanup
+      this.pendingTimeouts.set(node, timeoutId);
     } catch (error) {
       this.logger.error('Error dismissing notification', error);
     }
+  }
+
+  /**
+   * Clear timeout for a specific node
+   */
+  _clearNodeTimeout(node) {
+    const timeoutId = this.pendingTimeouts.get(node);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.pendingTimeouts.delete(node);
+    }
+  }
+
+  /**
+   * Clean up node from all tracking structures
+   */
+  _cleanupNode(node) {
+    this.activeNotifications.delete(node);
+    this._clearNodeTimeout(node);
   }
 
   /**
@@ -287,15 +401,7 @@ export default class NotificationManager {
     // This internal method remains largely the same, but it's now called more safely.
     if (!this.container) return null; // Extra safety guard
 
-    const n = document.createElement("div");
-    n.className = `AIWC-notification ${cfg.cls}`;
-    n.style.cssText = `
-      background: #fff; color: #333; padding: 10px 15px; border-radius: 6px;
-      font-size: 14px; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      display: flex; align-items: center; cursor: ${onClick ? "pointer" : "default"};
-      opacity: 0; transform: translateY(10px); transition: opacity 0.3s ease, transform 0.3s ease;
-      pointer-events: auto; max-width: 300px; word-wrap: break-word;
-    `;
+    const n = this._createNotificationElement(cfg, onClick);
 
     // ✅ DOM-safe API instead replace:
     const iconSpan = document.createElement("span");
@@ -342,22 +448,54 @@ export default class NotificationManager {
     // Add to active notifications set
     this.activeNotifications.add(n);
 
-    setTimeout(() => {
-      n.style.opacity = "1";
-      n.style.transform = "translateY(0)";
-    }, 10);
+    // Trigger entrance animation
+    this._animateIn(n);
 
+    // Set auto-dismiss for non-status notifications
     if (auto && cfg.cls !== "AIWC-status") {
-      setTimeout(() => this.dismiss(n), dur);
+      this._scheduleAutoDismiss(n, dur);
     }
 
     return n;
   }
 
+  /**
+   * Animate notification entrance
+   */
+  _animateIn(node) {
+    // Use requestAnimationFrame for smoother animation
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        node.style.opacity = "1";
+        node.style.transform = "translateY(0)";
+      });
+    });
+  }
+
+  /**
+   * Schedule auto-dismiss for a notification
+   */
+  _scheduleAutoDismiss(node, duration) {
+    const timeoutId = setTimeout(() => {
+      this.dismiss(node);
+    }, duration);
+    
+    // Track this timeout
+    this.pendingTimeouts.set(node, timeoutId);
+  }
+
   reset() {
     this.canShowInPage = false;
+    
+    // Clear all pending timeouts to prevent memory leaks
+    this.pendingTimeouts.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    this.pendingTimeouts.clear();
+    
     // Clear all active notifications
     this.activeNotifications.clear();
+    
     if (this.container) {
       try {
         this.container.remove();
