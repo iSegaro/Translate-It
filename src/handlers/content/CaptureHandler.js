@@ -12,6 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Capture');
 import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "../../messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 
 // removed legacy createLogger import
 
@@ -49,7 +50,7 @@ export class ContentCaptureHandler {
         MessagingContexts.CONTENT
       );
       
-      const fullCaptureResponse = await browser.runtime.sendMessage(fullCaptureMessage);
+      const fullCaptureResponse = await sendReliable(fullCaptureMessage);
       if (!fullCaptureResponse || fullCaptureResponse.error) throw new Error(fullCaptureResponse.error || "Failed to capture full screen");
       
       const croppedImageData = await cropImageData(fullCaptureResponse.imageData, selectionData);
@@ -64,7 +65,7 @@ export class ContentCaptureHandler {
         MessagingContexts.CONTENT
       );
       
-      await browser.runtime.sendMessage(ocrMessage);
+      await sendReliable(ocrMessage);
       if (this.screenSelector) this.screenSelector.cleanup();
     } catch (error) {
       this.handleCaptureError(error, "area-completion");

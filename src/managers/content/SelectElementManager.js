@@ -11,6 +11,7 @@ import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { generateContentMessageId } from "../../utils/messaging/messageId.js";
 import { 
   SELECT_ELEMENT_MODES, 
@@ -1639,8 +1640,8 @@ export class SelectElementManager {
             });
           } catch (err) {
             // Fallback to runtime.sendMessage if import fails
-            browser.runtime.sendMessage(message).catch(error => {
-              this.logger.warn('Translation message send failed (fallback):', error);
+            sendReliable(message).catch(error => {
+              this.logger.warn('Translation message send failed (reliable fallback):', error);
             });
           }
           
@@ -1764,7 +1765,7 @@ export class SelectElementManager {
         })
       } catch (err) {
         // Fallback to runtime.sendMessage if reliable not available
-        browser.runtime.sendMessage({
+        sendReliable({
           action: MessageActions.TRANSLATE,
           messageId: messageId,
           context: 'event-handler',

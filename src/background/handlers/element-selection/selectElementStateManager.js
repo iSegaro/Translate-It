@@ -1,4 +1,5 @@
 import browser from 'webextension-polyfill';
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts, MessageFormat } from '@/messaging/core/MessagingCore.js';
 
@@ -17,7 +18,7 @@ function setStateForTab(tabId, active) {
       { tabId, active },
       MessagingContexts.BACKGROUND
     );
-    browser.runtime.sendMessage(message).catch(() => {});
+    sendReliable(message).catch(() => {});
   } catch {
     // ignore
   }

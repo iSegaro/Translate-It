@@ -3,6 +3,7 @@ import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 import { MessageFormat } from '../../../messaging/core/MessagingCore.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
@@ -181,9 +182,9 @@ export async function handleTranslate(message, sender, sendResponse) {
         logger.error(`[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message to tab ${targetTabId}:`, error);
       });
     } else {
-      logger.debug("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via runtime.sendMessage (fallback).");
-      browser.runtime.sendMessage(updateMessage).catch(error => {
-        logger.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via runtime.sendMessage (fallback):', error);
+      logger.debug("[Handler:TRANSLATE] No tab ID found in sender, sending TRANSLATION_RESULT_UPDATE via reliable messenger (fallback).");
+      sendReliable(updateMessage).catch(error => {
+        logger.error('[Handler:TRANSLATE] Failed to send TRANSLATION_RESULT_UPDATE message via reliable messenger (fallback):', error);
       });
     }
 
