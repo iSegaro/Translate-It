@@ -9,7 +9,7 @@ import { isPersianText } from "@/utils/text/textDetection.js";
 import { getLanguageCode } from "@/utils/i18n/languages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
-import { TranslationMode } from "@/config.js";
+import { TranslationMode, getSourceLanguageAsync } from "@/config.js";
 
 // (logger already defined)
 
@@ -294,7 +294,7 @@ export class BingTranslateProvider extends BaseProvider {
    * @param {string} targetLang - Target language
    * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
    */
-  async _applyLanguageSwapping(text, sourceLang, targetLang) {
+  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English') {
     try {
       // Use browser.i18n.detectLanguage for detection (similar to other providers)
       const detectionResult = await browser.i18n.detectLanguage(text);
@@ -307,9 +307,11 @@ export class BingTranslateProvider extends BaseProvider {
         const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
 
         if (detectedLangCode === targetLangCode) {
-          // Swap languages; return normalized values so downstream _getLangCode works reliably
+          // Swap languages; when source was 'auto' we must ensure new target is a real language
+          const origNorm = this._normalizeLangValue(originalSourceLang);
+          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
           logger.debug(`Languages swapped: ${detectedLangCode} → ${targetLangCode}`);
-          return [targetNorm, sourceNorm];
+          return [targetNorm, newTargetLang];
         }
       } else {
         // Regex fallback for Persian text
@@ -320,8 +322,10 @@ export class BingTranslateProvider extends BaseProvider {
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
+          const origNorm = this._normalizeLangValue(originalSourceLang);
+          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
           logger.debug('Languages swapped using regex fallback');
-          return [targetNorm, sourceNorm];
+          return [targetNorm, newTargetLang];
         }
       }
     } catch (error) {
@@ -330,11 +334,13 @@ export class BingTranslateProvider extends BaseProvider {
       const targetNorm = this._normalizeLangValue(targetLang);
       const sourceNorm = this._normalizeLangValue(sourceLang);
       const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+      const origNorm = this._normalizeLangValue(originalSourceLang);
       if (
         isPersianText(text) &&
         (targetLangCode === "fa" || targetLangCode === "ar")
       ) {
-        return [targetNorm, sourceNorm];
+        const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
+        return [targetNorm, newTargetLang];
       }
     }
 
