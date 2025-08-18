@@ -3,7 +3,6 @@
 
 import { ref } from 'vue'
 import { getScopedLogger } from '@/utils/core/logger.js'
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { getLanguageCodeForTTS } from '@/utils/i18n/languages.js'
@@ -123,6 +122,7 @@ export function useTTSAction() {
    */
   const speakUnified = async (text, language) => {
     try {
+      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
       const response = await sendReliable({
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: { text: text.trim(), language }

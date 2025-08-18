@@ -6,7 +6,6 @@ import { ErrorTypes } from '../../error-management/ErrorTypes.js';
 import { matchErrorToType } from '../../error-management/ErrorMatcher.js';
 import { getScopedLogger } from './logger.js';
 import { LOG_COMPONENTS } from './logConstants.js';
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
 
@@ -134,8 +133,9 @@ export class ExtensionContextManager {
     // Use reliable messaging (with retries and port fallback) where available
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
-        // Use statically imported sendReliable to ensure availability at runtime.
+        // Use dynamically imported sendReliable to avoid circular dependency.
         try {
+          const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
           return await sendReliable(msg);
         } catch (err) {
           logger.debug('sendReliable failed in safeSendMessage:', err);

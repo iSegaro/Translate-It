@@ -11,7 +11,6 @@ import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { generateContentMessageId } from "../../utils/messaging/messageId.js";
 import { 
   SELECT_ELEMENT_MODES, 
@@ -1748,6 +1747,7 @@ export class SelectElementManager {
       
       // Send direct message to background using reliable messenger
       try {
+        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
         await sendReliable({
           action: MessageActions.TRANSLATE,
           messageId: messageId,
@@ -1764,22 +1764,25 @@ export class SelectElementManager {
         })
       } catch (err) {
         // Fallback to runtime.sendMessage if reliable not available
-        sendReliable({
-          action: MessageActions.TRANSLATE,
-          messageId: messageId,
-          context: 'event-handler',
-          timestamp: Date.now(),
-          data: {
-            text: payload.text,
-            provider: payload.provider,
-            sourceLanguage: payload.from,
-            targetLanguage: payload.to,
-            mode: payload.mode,
-            options: payload.options
-          }
-        }).catch(error => {
+        try {
+          const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+          await sendReliable({
+            action: MessageActions.TRANSLATE,
+            messageId: messageId,
+            context: 'event-handler',
+            timestamp: Date.now(),
+            data: {
+              text: payload.text,
+              provider: payload.provider,
+              sourceLanguage: payload.from,
+              targetLanguage: payload.to,
+              mode: payload.mode,
+              options: payload.options
+            }
+          });
+        } catch (error) {
           this.logger.error("Failed to send translation request (fallback)", error);
-        });
+        }
       }
 
       this.logger.info("Translation request accepted, waiting for result...");
