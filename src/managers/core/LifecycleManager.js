@@ -7,6 +7,7 @@ import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // Th
 import * as Handlers from "../../background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { addBrowserSpecificHandlers } from '@/utils/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
@@ -104,7 +105,6 @@ class LifecycleManager {
       
       // TTS handlers
       'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
-      'OFFSCREEN_READY': Handlers.handleOffscreenReady,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
@@ -146,6 +146,9 @@ class LifecycleManager {
       'getExtensionInfo': Handlers.handleGetExtensionInfo,
       'logError': Handlers.handleLogError
     };
+    
+    // Add browser-specific handlers
+    addBrowserSpecificHandlers(handlerMappings, Handlers);
     
     // Validate handler mappings
     this.validateHandlerMappings(handlerMappings);

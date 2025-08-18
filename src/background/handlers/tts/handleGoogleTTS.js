@@ -4,6 +4,7 @@
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { initializebrowserAPI } from '@/composables/useBrowserAPI.js';
+import { isChromium } from '@/utils/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
 
@@ -56,13 +57,13 @@ export const handleGoogleTTSSpeak = async (request) => {
  * @returns {Promise}
  */
 const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
-  const isChrome = /chrome/i.test(navigator.userAgent || '') && !/edge/i.test(navigator.userAgent || '');
+  const isChromiumBrowser = isChromium();
   
-  logger.debug('[GoogleTTSHandler] 🔍 Browser detection:', { isChrome, userAgent: navigator.userAgent });
+  logger.debug('[GoogleTTSHandler] 🔍 Browser detection:', { isChromium: isChromiumBrowser, userAgent: navigator.userAgent });
   
-  if (isChrome) {
-    logger.debug('[GoogleTTSHandler] 🟢 Using Chrome offscreen document method');
-    // Chrome: use offscreen document
+  if (isChromiumBrowser) {
+    logger.debug('[GoogleTTSHandler] 🟢 Using Chromium offscreen document method');
+    // Chromium-based browsers: use offscreen document
     return await playWithOffscreenDocument(ttsUrl);
   } else {
     logger.debug('[GoogleTTSHandler] 🟠 Using Firefox direct audio method');
@@ -72,7 +73,7 @@ const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
 };
 
 /**
- * Play via offscreen document (Chrome)
+ * Play via offscreen document (Chromium-based browsers)
  * @param {string} ttsUrl - Google TTS URL
  * @returns {Promise}
  */
