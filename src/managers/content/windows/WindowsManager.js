@@ -551,24 +551,78 @@ export class WindowsManager {
    * Handle translation error
    */
   async _handleTranslationError(error) {
-    // Use ErrorHandler which now integrates ExtensionContextManager
+    // Get the original error message, preserve specific details
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    
+    // Use ErrorHandler for type detection and centralized logging
     const errorInfo = await this.translationHandler.errorHandler.getErrorForUI(error, 'windows-manager-translate');
     
-    this.logger.error(`Translation error - Type: ${errorInfo.type}, Message: ${errorInfo.message}`);
+    this.logger.error(`Translation error - Type: ${errorInfo.type}, Original: ${originalMessage}, Processed: ${errorInfo.message}`);
     
     if (this.innerContainer) {
-      this.translationRenderer.renderError(this.innerContainer, errorInfo.message);
-      setTimeout(() => this.dismiss(true), WindowsConfig.TIMEOUTS.ERROR_DISPLAY);
+      // Use the original specific error message instead of the generic one
+      const displayMessage = originalMessage && originalMessage.length > 10 && 
+                           !originalMessage.includes('Translation failed: No translated text') ? 
+                           originalMessage : errorInfo.message;
+      
+      // Render error with retry and close functionality
+      this.translationRenderer.renderError(
+        this.innerContainer, 
+        displayMessage,
+        () => this._retryTranslation(), // onRetry callback
+        () => this.dismiss(true) // onClose callback
+      );
+      
+      // Don't auto-close window - let user decide via buttons
+      // setTimeout(() => this.dismiss(true), WindowsConfig.TIMEOUTS.ERROR_DISPLAY);
     } else {
       this.dismiss(false);
     }
     
-    // Use centralized error handler
+    // Use centralized error handler but keep silent to avoid double notifications
     await this.translationHandler.errorHandler.handle(error, {
       type: errorInfo.type,
       context: "windows-manager-translate",
       isSilent: true
     });
+  }
+
+  /**
+   * Retry translation with same text
+   */
+  async _retryTranslation() {
+    if (!this.state.originalText || !this.innerContainer) {
+      this.logger.warn('Cannot retry: missing original text or container');
+      return;
+    }
+
+    this.logger.debug('🔄 Retrying translation', { text: this.state.originalText.substring(0, 20) + '...' });
+    
+    try {
+      // Show loading state
+      this.translationRenderer.renderLoading(this.innerContainer);
+      
+      // Perform translation again
+      const result = await this.translationHandler.performTranslation(this.state.originalText);
+      
+      if (this.state.isTranslationCancelled || !this.innerContainer) {
+        this.logger.debug('Translation cancelled during retry');
+        return;
+      }
+      
+      // Render successful translation
+      this._renderTranslationContent(result.translatedText, this.state.originalText);
+      
+      this.logger.debug('✅ Translation retry successful');
+      
+    } catch (retryError) {
+      // Don't log error here as _handleTranslationError will log it with full details
+      
+      if (this.state.isTranslationCancelled || !this.innerContainer) return;
+      
+      // Show error again
+      await this._handleTranslationError(retryError);
+    }
   }
 
   /**

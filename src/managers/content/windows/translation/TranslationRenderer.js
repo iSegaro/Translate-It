@@ -162,16 +162,118 @@ export class TranslationRenderer {
   }
 
   /**
-   * Render error message
+   * Render error message with retry functionality
    */
-  renderError(container, errorMessage) {
+  renderError(container, errorMessage, onRetry = null, onClose = null) {
     if (!container) return;
 
     container.textContent = "";
-    const errorElement = this.factory.createErrorElement(CONFIG.ICON_ERROR + errorMessage);
-    container.appendChild(errorElement);
     
-    this.logger.debug('Error message rendered', { errorMessage });
+    // Create error container
+    const errorContainer = document.createElement('div');
+    errorContainer.className = 'error-display-container';
+    errorContainer.style.cssText = `
+      padding: 12px;
+      border-left: 3px solid #dc3545;
+      background-color: rgba(220, 53, 69, 0.1);
+      border-radius: 6px;
+      line-height: 1.4;
+      color: #dc3545;
+      font-size: 14px;
+      margin: 8px;
+    `;
+    
+    // Error message text
+    const errorText = document.createElement('div');
+    errorText.className = 'error-text';
+    errorText.textContent = errorMessage;
+    errorText.style.marginBottom = '12px';
+    errorContainer.appendChild(errorText);
+    
+    // Error actions container
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'error-actions';
+    actionsContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    `;
+    
+    // Retry button
+    if (onRetry) {
+      const retryButton = document.createElement('button');
+      retryButton.className = 'error-action retry-btn';
+      retryButton.innerHTML = '🔄 Try Again';
+      retryButton.style.cssText = `
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: background-color 0.2s ease;
+        font-weight: 500;
+      `;
+      
+      retryButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.logger.debug('🔄 Retry button clicked');
+        if (onRetry) onRetry();
+      });
+      
+      retryButton.addEventListener('mouseenter', () => {
+        retryButton.style.backgroundColor = '#0056b3';
+      });
+      
+      retryButton.addEventListener('mouseleave', () => {
+        retryButton.style.backgroundColor = '#007bff';
+      });
+      
+      actionsContainer.appendChild(retryButton);
+    }
+    
+    // Close button
+    const closeButton = document.createElement('button');
+    closeButton.className = 'error-action close-btn';
+    closeButton.innerHTML = '✕ Close';
+    closeButton.style.cssText = `
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background-color 0.2s ease;
+      font-weight: 500;
+    `;
+    
+    closeButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.logger.debug('✕ Close button clicked from error display');
+      if (onClose) onClose();
+    });
+    
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.backgroundColor = '#5a6268';
+    });
+    
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.backgroundColor = '#6c757d';
+    });
+    
+    actionsContainer.appendChild(closeButton);
+    errorContainer.appendChild(actionsContainer);
+    container.appendChild(errorContainer);
+    
+    this.logger.debug('Enhanced error message rendered', { errorMessage });
   }
 
   /**

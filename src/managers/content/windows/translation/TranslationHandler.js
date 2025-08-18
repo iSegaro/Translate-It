@@ -83,9 +83,21 @@ export class TranslationHandler {
       })
 
       // If sendReliable returned a RESULT directly (port fallback), use it
+      this.logger.debug("sendReliable returned:", ackOrResult);
+      
       if (ackOrResult && (ackOrResult.type === 'RESULT' || ackOrResult.result)) {
         const final = ackOrResult.result || ackOrResult
+        this.logger.debug("Port fallback detected, final result:", final);
+        
+        // Check for error in port fallback result
+        if (final.success === false && final.error) {
+          this.logger.debug("Port fallback detected error, will be handled by WindowsManager:", final.error);
+          const errorMessage = final.error.message || final.error || 'Translation failed';
+          throw new Error(errorMessage);
+        }
+        
         if (!final || !final.translatedText) {
+          this.logger.error("Port fallback result has no translatedText:", final);
           throw new Error('Translation failed: No translated text received')
         }
         this.logger.operation("Translation completed successfully (via port fallback)");
@@ -93,17 +105,29 @@ export class TranslationHandler {
       }
 
       // Otherwise wait for the translation result via messaging (TRANSLATION_RESULT_UPDATE)
-      const result = await resultPromise;
-      
-      if (!result?.translatedText) {
-        throw new Error('Translation failed: No translated text received');
+      try {
+        const result = await resultPromise;
+        
+        this.logger.debug("resultPromise resolved with:", result);
+        
+        // If we reach here successfully, the result should be valid
+        if (!result?.translatedText) {
+          this.logger.error("resultPromise resolved but no translatedText - this should not happen");
+          throw new Error('Translation failed: No translated text received');
+        }
+
+        this.logger.operation("Translation completed successfully");
+        return result;
+      } catch (resultError) {
+        // Preserve the specific error message from resultPromise
+        this.logger.error("resultPromise was rejected with error:", resultError.message);
+        this.logger.debug("Full error object:", resultError);
+        throw resultError; // Re-throw the original error from messageListener
       }
 
-      this.logger.operation("Translation completed successfully");
-      return result;
-
     } catch (error) {
-      this.logger.error("Translation failed:", error);
+      // Don't log here as error is already logged in port fallback or messageListener
+      // Final error logging will be done in WindowsManager._handleTranslationError
       throw error;
     }
   }
@@ -134,15 +158,18 @@ export class TranslationHandler {
           this.activeRequests.delete(messageId);
           browser.runtime.onMessage.removeListener(messageListener);
           
-          if (message.data?.success === false && message.data?.error) {
-            this.logger.error("Translation error received", message.data.error);
-            const errorMessage = message.data.error.message || 'Translation failed';
-            reject(new Error(errorMessage));
+          // Check for error first - error can be in data.error or directly in data
+          if (message.data?.error || (message.data?.type && message.data?.message)) {
+            // Don't log error here - let port fallback handle logging to avoid duplicate error logs
+            // This prevents uncaught promise rejection when both messageListener and port fallback process the same error
+            this.logger.debug("Error detected in messageListener, will be handled by port fallback mechanism");
+            return; // Exit without resolving/rejecting - let port fallback handle it
           } else if (message.data?.translatedText) {
             this.logger.operation("Translation success received");
             resolve({ translatedText: message.data.translatedText });
           } else {
-            this.logger.error("Unexpected message data", message.data);
+            this.logger.error("Unexpected message data - no error and no translatedText", message.data);
+            // If no error object but also no translatedText, it's still an error
             reject(new Error('No translated text in result'));
           }
         }

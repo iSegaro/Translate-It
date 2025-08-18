@@ -396,16 +396,129 @@ export class EnhancedTranslationRenderer {
   }
 
   /**
-   * Render error message - same as original
+   * Render error message with retry functionality
    */
-  renderError(container, errorMessage) {
+  renderError(container, errorMessage, onRetry = null, onClose = null) {
     if (!container) return;
 
     container.textContent = "";
-    const errorElement = this.factory.createErrorElement(CONFIG.ICON_ERROR + errorMessage);
-    container.appendChild(errorElement);
     
-    this.logger.debug('Error message rendered', { errorMessage });
+    // Create error container
+    const errorContainer = document.createElement('div');
+    errorContainer.className = 'error-display-container enhanced';
+    errorContainer.style.cssText = `
+      padding: 12px;
+      border-left: 3px solid #dc3545;
+      background-color: rgba(220, 53, 69, 0.1);
+      border-radius: 6px;
+      line-height: 1.4;
+      color: #dc3545;
+      font-size: 14px;
+      margin: 8px;
+      position: relative;
+    `;
+    
+    // Error message text
+    const errorText = document.createElement('div');
+    errorText.className = 'error-text';
+    errorText.textContent = errorMessage;
+    errorText.style.marginBottom = '12px';
+    errorContainer.appendChild(errorText);
+    
+    // Error actions container
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'error-actions';
+    actionsContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    `;
+    
+    // Retry button with enhanced styling
+    if (onRetry) {
+      const retryButton = document.createElement('button');
+      retryButton.className = 'error-action retry-btn enhanced';
+      retryButton.innerHTML = '🔄 Try Again';
+      retryButton.style.cssText = `
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+      `;
+      
+      retryButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.logger.debug('🔄 Enhanced retry button clicked');
+        if (onRetry) onRetry();
+      });
+      
+      retryButton.addEventListener('mouseenter', () => {
+        retryButton.style.background = 'linear-gradient(135deg, #0056b3, #003d82)';
+        retryButton.style.transform = 'translateY(-1px)';
+        retryButton.style.boxShadow = '0 4px 8px rgba(0, 123, 255, 0.4)';
+      });
+      
+      retryButton.addEventListener('mouseleave', () => {
+        retryButton.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+        retryButton.style.transform = 'translateY(0)';
+        retryButton.style.boxShadow = '0 2px 4px rgba(0, 123, 255, 0.3)';
+      });
+      
+      actionsContainer.appendChild(retryButton);
+    }
+    
+    // Close button with enhanced styling
+    const closeButton = document.createElement('button');
+    closeButton.className = 'error-action close-btn enhanced';
+    closeButton.innerHTML = '✕ Close';
+    closeButton.style.cssText = `
+      background: linear-gradient(135deg, #6c757d, #5a6268);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+    `;
+    
+    closeButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.logger.debug('✕ Enhanced close button clicked from error display');
+      if (onClose) onClose();
+    });
+    
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.background = 'linear-gradient(135deg, #5a6268, #495057)';
+      closeButton.style.transform = 'translateY(-1px)';
+      closeButton.style.boxShadow = '0 4px 8px rgba(108, 117, 125, 0.4)';
+    });
+    
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.background = 'linear-gradient(135deg, #6c757d, #5a6268)';
+      closeButton.style.transform = 'translateY(0)';
+      closeButton.style.boxShadow = '0 2px 4px rgba(108, 117, 125, 0.3)';
+    });
+    
+    actionsContainer.appendChild(closeButton);
+    errorContainer.appendChild(actionsContainer);
+    container.appendChild(errorContainer);
+    
+    this.logger.debug('Enhanced error message rendered with enhanced styling', { errorMessage });
   }
 
   /**
