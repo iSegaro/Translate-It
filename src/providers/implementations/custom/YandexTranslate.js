@@ -185,6 +185,31 @@ export class YandexTranslateProvider extends BaseProvider {
   }
 
   /**
+   * Normalize various language input forms into canonical values.
+   * - Maps many display names (e.g. "English", "Farsi") to codes where possible
+   * - Maps common auto-detect aliases ("Auto-Detect", "autodetect", "detect") to `AUTO_DETECT_VALUE`
+   * @param {string} lang
+   * @returns {string} normalized language string (e.g. 'auto', 'en', 'fa' or other code/name)
+   */
+  _normalizeLangValue(lang) {
+    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
+    const raw = lang.trim();
+    if (!raw) return AUTO_DETECT_VALUE;
+
+    const lower = raw.toLowerCase();
+
+    // Common aliases for automatic detection
+    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
+    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
+
+    // If caller passed a display name that exists in our name->code map, return that code
+    if (langNameToCodeMap[lower]) return langNameToCodeMap[lower];
+
+    // Otherwise return the lowercased form (may already be a code like 'en' or 'fa')
+    return lower;
+  }
+
+  /**
    * Check if JSON mode is being used
    * @param {Object} obj - Object to check
    * @returns {boolean} - True if specific JSON format
@@ -208,14 +233,17 @@ export class YandexTranslateProvider extends BaseProvider {
    * @returns {string} - Yandex language code
    */
   _getLangCode(lang) {
-    if (!lang || typeof lang !== "string") return "auto";
-    if (lang === AUTO_DETECT_VALUE) return "auto";
-    
-    const lowerCaseLang = lang.toLowerCase();
-    // First try direct mapping
-    const mappedCode = langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
-    // Then convert to Yandex format
-    return yandexLangCode[mappedCode] || mappedCode;
+    // Normalize incoming language value first (handles 'Auto-Detect', display names, etc.)
+    const normalized = this._normalizeLangValue(lang);
+    if (normalized === AUTO_DETECT_VALUE) return 'auto';
+
+    // If normalization produced a known Yandex key, prefer that
+    if (yandexLangCode[normalized]) return yandexLangCode[normalized];
+
+    // As a fallback, if normalization produced a value present in the name map, use that
+    // (Note: _normalizeLangValue already maps display names to codes, but keep safe guard)
+    const mapped = langNameToCodeMap[normalized] || normalized;
+    return yandexLangCode[mapped] || mapped;
   }
 
   /**
@@ -247,25 +275,32 @@ export class YandexTranslateProvider extends BaseProvider {
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-        const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
+        // Normalize incoming params to avoid display labels like 'Auto-Detect'
+        const targetNorm = this._normalizeLangValue(targetLang);
+        const sourceNorm = this._normalizeLangValue(sourceLang);
+        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+        const sourceLangCode = getLanguageCode(sourceNorm).split("-")[0];
 
         // Only swap if detected language matches target AND source is different from detected
         if (detectedLangCode === targetLangCode && sourceLangCode !== detectedLangCode) {
           // For Yandex: when swapping, target becomes the original source language (not 'auto')
-          const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
-          console.log(`🚨 LANGUAGE SWAPPING: detected=${detectedLangCode} matches target=${targetLangCode}, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+          // Normalize originalSourceLang as well to avoid display labels
+          const origNorm = this._normalizeLangValue(originalSourceLang);
+          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
+          console.log(`🚨 LANGUAGE SWAPPING: detected=${detectedLangCode} matches target=${targetLangCode}, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
           logger.debug(`Languages swapped: detected=${detectedLangCode}, source=${sourceLangCode} → target=${targetLangCode}, swapping to source=${targetLangCode} target=${newTargetLang}`);
-          return [targetLang, newTargetLang];
+          return [targetNorm, newTargetLang];
         }
         
         // Log when no swapping occurs for debugging
         logger.debug(`No language swapping: detected=${detectedLangCode}, source=${sourceLangCode}, target=${targetLangCode}`);
       } else {
         // Enhanced regex fallback for Persian text with better logic
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-        const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
-        
+        const targetNorm = this._normalizeLangValue(targetLang);
+        const sourceNorm = this._normalizeLangValue(sourceLang);
+        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+        const sourceLangCode = getLanguageCode(sourceNorm).split("-")[0];
+
         // Only swap Persian text if source is not already Persian/Arabic and target is Persian/Arabic
         if (
           isPersianText(text) &&
@@ -273,17 +308,20 @@ export class YandexTranslateProvider extends BaseProvider {
           sourceLangCode !== "fa" && sourceLangCode !== "ar"
         ) {
           // For Yandex: when swapping, target becomes the original source language (not 'auto')
-          const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
-          console.log(`🚨 REGEX FALLBACK SWAPPING: Persian text detected, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+          const origNorm = this._normalizeLangValue(originalSourceLang);
+          const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
+          console.log(`🚨 REGEX FALLBACK SWAPPING: Persian text detected, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
           logger.debug(`Languages swapped using regex fallback: Persian text detected, source=${sourceLangCode} → target=${newTargetLang}`);
-          return [targetLang, newTargetLang];
+          return [targetNorm, newTargetLang];
         }
       }
     } catch (error) {
       logger.error('Language detection failed:', error);
       // Enhanced regex fallback with same logic as above
-      const targetLangCode = getLanguageCode(targetLang).split("-")[0];
-      const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
+      const targetNorm = this._normalizeLangValue(targetLang);
+      const sourceNorm = this._normalizeLangValue(sourceLang);
+      const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
+      const sourceLangCode = getLanguageCode(sourceNorm).split("-")[0];
       
       if (
         isPersianText(text) &&
@@ -291,10 +329,11 @@ export class YandexTranslateProvider extends BaseProvider {
         sourceLangCode !== "fa" && sourceLangCode !== "ar"
       ) {
         // For Yandex: when swapping, target becomes the original source language (not 'auto')
-        const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
-        console.log(`🚨 ERROR FALLBACK SWAPPING: Persian text detected, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+        const origNorm = this._normalizeLangValue(originalSourceLang);
+        const newTargetLang = sourceNorm === AUTO_DETECT_VALUE ? origNorm : sourceNorm;
+        console.log(`🚨 ERROR FALLBACK SWAPPING: Persian text detected, swapping source=${sourceNorm} ↔ target=${newTargetLang}`);
         logger.debug(`Languages swapped in error fallback: Persian text, source=${sourceLangCode} → target=${newTargetLang}`);
-        return [targetLang, newTargetLang];
+        return [targetNorm, newTargetLang];
       }
     }
 
@@ -310,7 +349,7 @@ export class YandexTranslateProvider extends BaseProvider {
    * @param {string[]} [hintLangs=[]] - A list of language codes to hint to the detector.
    * @returns {Promise<string|undefined>} - The detected language code (e.g., 'en') or undefined if detection fails.
    */
-  async detect(text, hintLangs = []) {
+  async detect_with_yandex(text, hintLangs = []) {
     logger.debug(`Yandex: Detecting language for text: "${text.substring(0, 50)}"...`);
 
     const uuid = this._generateUuid();
@@ -367,7 +406,8 @@ export class YandexTranslateProvider extends BaseProvider {
     console.log(`🚨 APPLYING LANGUAGE SWAPPING FOR ALL MODES`);
     // Fetch the default source language from settings
     let defaultSourceLang = await getSourceLanguageAsync();
-    if (!defaultSourceLang || defaultSourceLang.toLowerCase() === 'auto') {
+    // Normalize stored config value so variants like 'Auto-Detect' are treated as 'auto'
+    if (!defaultSourceLang || this._normalizeLangValue(defaultSourceLang) === AUTO_DETECT_VALUE) {
       defaultSourceLang = 'English'; // Default to English if setting is 'auto' or not set
     }
 
