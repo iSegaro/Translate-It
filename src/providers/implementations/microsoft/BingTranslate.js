@@ -175,6 +175,28 @@ export class BingTranslateProvider extends BaseProvider {
   }
 
   /**
+   * Normalize various language input forms into canonical values.
+   * - Maps many display names (e.g. "English", "Farsi") to codes where possible
+   * - Maps common auto-detect aliases ("Auto-Detect", "autodetect", "detect") to `AUTO_DETECT_VALUE`
+   * @param {string} lang
+   * @returns {string} normalized language string (e.g. 'auto', 'en', 'fa' or other code/name)
+   */
+  _normalizeLangValue(lang) {
+    if (!lang || typeof lang !== 'string') return AUTO_DETECT_VALUE;
+    const raw = lang.trim();
+    if (!raw) return AUTO_DETECT_VALUE;
+
+    const lower = raw.toLowerCase();
+
+    const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
+    if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
+
+    if (langNameToCodeMap[lower]) return langNameToCodeMap[lower];
+
+    return lower;
+  }
+
+  /**
    * Check if JSON mode is being used
    * @param {Object} obj - Object to check
    * @returns {boolean} - True if specific JSON format
@@ -198,14 +220,14 @@ export class BingTranslateProvider extends BaseProvider {
    * @returns {string} - Bing language code
    */
   _getLangCode(lang) {
-    if (!lang || typeof lang !== "string") return "auto-detect";
-    if (lang === AUTO_DETECT_VALUE) return "auto-detect";
-    
-    const lowerCaseLang = lang.toLowerCase();
-    // First try direct mapping
-    const mappedCode = langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
-    // Then convert to Bing format
-    return bingLangCode[mappedCode] || mappedCode;
+    // Normalize incoming language value first
+    const normalized = this._normalizeLangValue(lang);
+    if (normalized === AUTO_DETECT_VALUE) return "auto-detect";
+
+    if (bingLangCode[normalized]) return bingLangCode[normalized];
+
+    const mapped = langNameToCodeMap[normalized] || normalized;
+    return bingLangCode[mapped] || mapped;
   }
 
   /**
@@ -279,33 +301,40 @@ export class BingTranslateProvider extends BaseProvider {
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+        // Normalize inputs to avoid display labels
+        const targetNorm = this._normalizeLangValue(targetLang);
+        const sourceNorm = this._normalizeLangValue(sourceLang);
+        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
 
         if (detectedLangCode === targetLangCode) {
-          // Swap languages
-          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
-          return [targetLang, sourceLang];
+          // Swap languages; return normalized values so downstream _getLangCode works reliably
+          logger.debug(`Languages swapped: ${detectedLangCode} → ${targetLangCode}`);
+          return [targetNorm, sourceNorm];
         }
       } else {
         // Regex fallback for Persian text
-        const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+        const targetNorm = this._normalizeLangValue(targetLang);
+        const sourceNorm = this._normalizeLangValue(sourceLang);
+        const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
         if (
           isPersianText(text) &&
           (targetLangCode === "fa" || targetLangCode === "ar")
         ) {
           logger.debug('Languages swapped using regex fallback');
-          return [targetLang, sourceLang];
+          return [targetNorm, sourceNorm];
         }
       }
     } catch (error) {
       logger.error('Language detection failed:', error);
       // Regex fallback
-      const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+      const targetNorm = this._normalizeLangValue(targetLang);
+      const sourceNorm = this._normalizeLangValue(sourceLang);
+      const targetLangCode = getLanguageCode(targetNorm).split("-")[0];
       if (
         isPersianText(text) &&
         (targetLangCode === "fa" || targetLangCode === "ar")
       ) {
-        return [targetLang, sourceLang];
+        return [targetNorm, sourceNorm];
       }
     }
 
