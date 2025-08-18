@@ -120,3 +120,15 @@ These changes aim to reduce message drops when the service worker is asleep or s
 
 ## Date of migration update
 Date: 
+
+
+### Additional files migrated in this update
+- `src/handlers/context-menu-handler.js`
+- `src/handlers/content/CaptureHandler.js`
+- `src/handlers/smartTranslationIntegration.js`
+- `src/handlers/subtitleHandler.js`
+- `src/background/handlers/translation/handleTranslate.js`
+- `src/background/handlers/element-selection/selectElementStateManager.js`
+- `src/managers/content/SelectElementManager.js`
+
+All of the above now prefer `sendReliable` for outgoing messages to the background, or use `sendReliable` when sending updates; in a few places we kept a final fallback to `browser.runtime.sendMessage` inside a try/catch where `sendReliable` may not be importable in unusual build/runtime contexts.
