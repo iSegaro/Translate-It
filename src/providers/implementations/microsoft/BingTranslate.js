@@ -394,6 +394,12 @@ export class BingTranslateProvider extends BaseProvider {
 
       // Prepare request body
       const textToTranslate = textsToTranslate.join(TEXT_DELIMITER);
+      logger.debug('Bing: Preparing request', {
+        fromLang: sl,
+        to: tl,
+        textLength: textToTranslate.length,
+        isJsonMode,
+      });
       const formData = new URLSearchParams({
         text: textToTranslate,
         fromLang: sl,
