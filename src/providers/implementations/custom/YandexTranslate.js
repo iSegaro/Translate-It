@@ -10,7 +10,7 @@ import { isPersianText } from "@/utils/text/textDetection.js";
 import { getLanguageCode } from "@/utils/i18n/languages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
-import { TranslationMode } from "@/config.js";
+import { TranslationMode, getSourceLanguageAsync } from "@/config.js";
 
 
 
@@ -365,10 +365,16 @@ export class YandexTranslateProvider extends BaseProvider {
     // Language Detection and Swapping (similar to Google Translate and browser Translate)
     // Apply for all modes to ensure proper language detection
     console.log(`🚨 APPLYING LANGUAGE SWAPPING FOR ALL MODES`);
+    // Fetch the default source language from settings
+    let defaultSourceLang = await getSourceLanguageAsync();
+    if (!defaultSourceLang || defaultSourceLang.toLowerCase() === 'auto') {
+      defaultSourceLang = 'English'; // Default to English if setting is 'auto' or not set
+    }
+
     // Store original source language before any modifications for proper swapping
     // If sourceLang is 'auto', we need a fallback language for swapping
-    const originalSourceLang = sourceLang === AUTO_DETECT_VALUE ? 'English' : sourceLang;
-    console.log(`🚨 ORIGINAL SOURCE LANG: ${originalSourceLang} (from sourceLang=${sourceLang})`);
+    const originalSourceLang = sourceLang === AUTO_DETECT_VALUE ? defaultSourceLang : sourceLang;
+    console.log(`🚨 ORIGINAL SOURCE LANG: ${originalSourceLang} (from sourceLang=${sourceLang}, config=${defaultSourceLang})`);
     [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang);
     
     console.log(`🚨 YANDEX AFTER SWAPPING: source=${sourceLang}, target=${targetLang}`);
