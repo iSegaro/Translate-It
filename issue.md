@@ -140,9 +140,45 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) =>{
 - در `useMessaging` لاگ کنید: attempts, channel used (sendMessage/port), ack times, final response times و error stack.
 - در بک‌گراند لاگ کنید: onConnect, onDisconnect, message received, ack sent، result sent.
 
-9) نتیجه‌گیری و پیشنهاد من
+9) نتیجه‌گیری، کار انجام‌شده و وضعیت فعلی
 - پیشنهاد من شروع با Stage A: اضافه کردن ACK و `sendMessage` wrapper با retries. این تغییر کم‌ریسک است و به‌سرعت اثربخش خواهد بود.
-- اگر بعد از آن هنوز مواردی از پیام‌های گم‌شده مشاهده شد، مرحلهٔ بعدی فعال کردن پورت به‌عنوان fallback یا مسیر اصلی است.
+- در پروژه بخشی از مرحلهٔ A و بعضی از تغییرات Stage B پیاده‌سازی شده‌اند: ماژول `ReliableMessaging` موجود استفاده شده و چندین فایلِ مصرف‌کننده به مسیر قابل‌اطمینان مهاجرت داده شدند (دیدگاه کامل در `findings.md`).
+- اگر بعد از این مهاجرت هنوز مواردی از پیام‌های گم‌شده مشاهده شد، مرحلهٔ بعدی فعال کردن پورت به‌عنوان مسیر اصلی (یا اضافه کردن queue-backed persistence) خواهد بود.
 
 ---
-این سند آمادهٔ تبدیل به issue در tracker یا PR است. اگر مایل باشید می‌توانم یک patch برای `useMessaging` و نمونهٔ تغییر background (ACK) آماده کنم و تست‌های دستی را اجرا نمایم.
+این سند آمادهٔ تبدیل به issue در tracker یا PR است. تغییراتی در `useMessaging` و چند کامپوننت و manager اعمال شده تا مسیر قابل‌اطمینان (`sendReliable`) استفاده شود؛ لطفاً برای ادامهٔ کار و اجرای تست‌ها اطلاع دهید.
+
+10) Audit Plan (پیش از پیاده‌سازی بیشتر)
+
+هدف: پیدا کردن دقیق محل‌های آسیب‌پذیر در پیام‌رسانی، شناسایی listener leak ها، تایید رفتار ACK/port و تولید یک گزارش عملی برای اصلاحات بعدی.
+
+قدم‌ها (قابل اجرا):
+- 10.1 Static scan: تمام فایل‌هایی که `runtime.sendMessage`, `runtime.onMessage`, `runtime.connect`, `port.postMessage`, `onMessage.addListener` را صدا می‌زنند فهرست می‌شوند.
+  - خروجی: فهرستی از فایل‌ها/خط‌ها با توضیح مختصر (مثلاً "sendMessage used without retry")
+
+- 10.2 Listener lifecycle audit: برای هر listener ثبت‌شده بررسی می‌کنیم که در unmount/cleanup حتماً removeListener فراخوانی شده باشد.
+  - تمرکز روی فایل‌های Vue composables و component هایی که از `browser.runtime.onMessage.addListener` استفاده کرده‌اند.
+  - خروجی: لیستی از موارد نیازمند اصلاح (با فایل و خط پیشنهادی برای removeListener)
+
+- 10.3 ACK/Response behavior: بررسی کنیم که handlerهای بک‌گراند برای پیام‌های حساس (TRANSLATE و موارد مشابه) ACK فوری ارسال کنند یا نه.
+  - بررسی `handleTranslate`, `handleTranslateText`, `translation-engine` و هر handler مرتبط.
+  - خروجی: تایید/رد اینکه هر handler فوراً ack می‌دهد و اگر نه، نقاطی که باید اضافه شود.
+
+- 10.4 Port usage audit: شناسایی تمام نقاطی که از `runtime.connect`/port استفاده شده و بررسی مدیریت disconnect/reconnect و cleanup.
+  - خروجی: مواردی که نیاز به اضافه کردن `onDisconnect` یا `port.disconnect()` دارند.
+
+- 10.5 Timeout and retry configuration: بازبینی مقادیر timeout (WindowsConfig.TIMEOUTS و مقادیر در ReliableMessaging) و تایید اینکه مقادیر معقول هستند.
+  - خروجی: پیشنهادهایی برای تنظیمات ackTimeout/retries/totalTimeout بر اساس نتایج لاگ‌ها.
+
+- 10.6 Integration smoke tests: طراحی سناریوهای دستی که قبلاً ذکر شد (service worker asleep, sendMessage reject, delayed result, tab close) و اجرای آن‌ها.
+  - خروجی: نتایج و لاگ‌های مرتبط با هر سناریو.
+
+- 10.7 Report و next steps: جمع‌آوری یافته‌ها و تولید یک patch-list (فایل‌ها و خطوط پیشنهادی) که برای اصلاح باید انجام شود.
+
+اعتبارات و خروجی‌ها
+- خروجی نهایی: یک issue.md آپدیت‌شده (این فایل) با بخش "Findings" و لیست تغییرات پیشنهادی + تست سناریوها و log snapshots.
+- مدت زمان تقریبی: 2–4 ساعت برای audit کامل و اجرای smoke tests (بسته به پیچیدگی و رفتار محیط تست).
+
+
+
+**Findings report**: see `findings.md` for the full audit output and recommended patches.
