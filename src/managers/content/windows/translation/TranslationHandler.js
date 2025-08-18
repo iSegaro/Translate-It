@@ -10,6 +10,7 @@ import { generateTranslationMessageId } from "../../../../utils/messaging/messag
 import { determineTranslationMode } from "../../../../utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "../../../../config.js";
 import { ExtensionContextManager } from "../../../../utils/core/extensionContext.js";
+import { AUTO_DETECT_VALUE } from "../../../../constants.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -45,18 +46,18 @@ export class TranslationHandler {
       }
       
       const translationMode = determineTranslationMode(selectedText, TranslationMode.Selection);
-      
+
       // Generate unique messageId
       const messageId = generateTranslationMessageId('content');
       this.logger.debug(`Generated messageId: ${messageId}`);
 
       // Create promise for result
       const resultPromise = this._createTranslationPromise(messageId);
-      
-      // Prepare payload
+
+      // Prepare payload (force source language to 'auto')
       const payload = {
         text: selectedText,
-        from: settings.SOURCE_LANGUAGE || 'auto',
+        from: AUTO_DETECT_VALUE,
         to: settings.TARGET_LANGUAGE || 'fa',
         provider: settings.TRANSLATION_API || 'google',
         messageId: messageId,
