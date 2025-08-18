@@ -231,12 +231,15 @@ export class YandexTranslateProvider extends BaseProvider {
 
   /**
    * Apply language swapping logic similar to Google Translate and browser Translate
+   * Fixed: Only swap when detected language matches target AND source is different
+   * IMPORTANT: For Yandex, when swapping, target should NOT be 'auto' (causes HTTP 400)
    * @param {string} text - Text for detection
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
+   * @param {string} originalSourceLang - Original source language before any modifications
    * @returns {Promise<[string, string]>} - [finalSourceLang, finalTargetLang]
    */
-  async _applyLanguageSwapping(text, sourceLang, targetLang) {
+  async _applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English') {
     try {
       // Use browser.i18n.detectLanguage for detection (similar to other providers)
       const detectionResult = await browser.i18n.detectLanguage(text);
@@ -244,44 +247,78 @@ export class YandexTranslateProvider extends BaseProvider {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
         const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+        const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
 
-        if (detectedLangCode === targetLangCode) {
-          // Swap languages
-          logger.debug('Languages swapped: ${detectedLangCode} → ${targetLangCode}');
-          return [targetLang, sourceLang];
+        // Only swap if detected language matches target AND source is different from detected
+        if (detectedLangCode === targetLangCode && sourceLangCode !== detectedLangCode) {
+          // For Yandex: when swapping, target becomes the original source language (not 'auto')
+          const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
+          console.log(`🚨 LANGUAGE SWAPPING: detected=${detectedLangCode} matches target=${targetLangCode}, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+          logger.debug(`Languages swapped: detected=${detectedLangCode}, source=${sourceLangCode} → target=${targetLangCode}, swapping to source=${targetLangCode} target=${newTargetLang}`);
+          return [targetLang, newTargetLang];
         }
+        
+        // Log when no swapping occurs for debugging
+        logger.debug(`No language swapping: detected=${detectedLangCode}, source=${sourceLangCode}, target=${targetLangCode}`);
       } else {
-        // Regex fallback for Persian text
+        // Enhanced regex fallback for Persian text with better logic
         const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+        const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
+        
+        // Only swap Persian text if source is not already Persian/Arabic and target is Persian/Arabic
         if (
           isPersianText(text) &&
-          (targetLangCode === "fa" || targetLangCode === "ar")
+          (targetLangCode === "fa" || targetLangCode === "ar") &&
+          sourceLangCode !== "fa" && sourceLangCode !== "ar"
         ) {
-          logger.debug('Languages swapped using regex fallback');
-          return [targetLang, sourceLang];
+          // For Yandex: when swapping, target becomes the original source language (not 'auto')
+          const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
+          console.log(`🚨 REGEX FALLBACK SWAPPING: Persian text detected, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+          logger.debug(`Languages swapped using regex fallback: Persian text detected, source=${sourceLangCode} → target=${newTargetLang}`);
+          return [targetLang, newTargetLang];
         }
       }
     } catch (error) {
       logger.error('Language detection failed:', error);
-      // Regex fallback
+      // Enhanced regex fallback with same logic as above
       const targetLangCode = getLanguageCode(targetLang).split("-")[0];
+      const sourceLangCode = getLanguageCode(sourceLang).split("-")[0];
+      
       if (
         isPersianText(text) &&
-        (targetLangCode === "fa" || targetLangCode === "ar")
+        (targetLangCode === "fa" || targetLangCode === "ar") &&
+        sourceLangCode !== "fa" && sourceLangCode !== "ar"
       ) {
-        return [targetLang, sourceLang];
+        // For Yandex: when swapping, target becomes the original source language (not 'auto')
+        const newTargetLang = sourceLang === AUTO_DETECT_VALUE ? originalSourceLang : sourceLang;
+        console.log(`🚨 ERROR FALLBACK SWAPPING: Persian text detected, swapping source=${sourceLang} ↔ target=${newTargetLang}`);
+        logger.debug(`Languages swapped in error fallback: Persian text, source=${sourceLangCode} → target=${newTargetLang}`);
+        return [targetLang, newTargetLang];
       }
     }
 
     // No swapping needed
+    logger.debug(`No language swapping applied: source=${sourceLang}, target=${targetLang}`);
     return [sourceLang, targetLang];
   }
 
   async translate(text, sourceLang, targetLang, translateMode = null) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
+    console.log(`🚨 YANDEX TRANSLATE ENTRY: source=${sourceLang}, target=${targetLang}, mode=${translateMode}, textPreview=${text.substring(0, 50)}`);
+    logger.debug(`🚨 YANDEX TRANSLATE ENTRY: source=${sourceLang}, target=${targetLang}, mode=${translateMode}, textPreview=${text.substring(0, 50)}`);
+
     // Language Detection and Swapping (similar to Google Translate and browser Translate)
-    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang);
+    // Apply for all modes to ensure proper language detection
+    console.log(`🚨 APPLYING LANGUAGE SWAPPING FOR ALL MODES`);
+    // Store original source language before any modifications for proper swapping
+    // If sourceLang is 'auto', we need a fallback language for swapping
+    const originalSourceLang = sourceLang === AUTO_DETECT_VALUE ? 'English' : sourceLang;
+    console.log(`🚨 ORIGINAL SOURCE LANG: ${originalSourceLang} (from sourceLang=${sourceLang})`);
+    [sourceLang, targetLang] = await this._applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang);
+    
+    console.log(`🚨 YANDEX AFTER SWAPPING: source=${sourceLang}, target=${targetLang}`);
+    logger.debug(`🚨 YANDEX AFTER SWAPPING: source=${sourceLang}, target=${targetLang}`);
 
     // Set auto-detect for Field and Subtitle modes after language detection
     if (translateMode === TranslationMode.Field) {
@@ -296,10 +333,21 @@ export class YandexTranslateProvider extends BaseProvider {
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
-    // Skip if same language
-    if (sl === tl) return text;
+    // Skip if same language after conversion
+    if (sl === tl) {
+      logger.debug(`Yandex: Same language detected after conversion: ${sl} === ${tl}, returning original text`);
+      return text;
+    }
 
-    // JSON Mode Detection
+    // Additional check: if source and target are both Persian/Arabic, return original text
+    if ((sl === "fa" || sl === "ar") && (tl === "fa" || tl === "ar")) {
+      logger.debug(`Yandex: Both source and target are Persian/Arabic: ${sl} → ${tl}, returning original text`);
+      return text;
+    }
+
+    logger.debug(`Yandex: Proceeding with translation: ${sl} → ${tl}`);
+
+    // JSON Mode Detection - Fix for Yandex API compatibility
     let isJsonMode = false;
     let originalJsonStruct;
     let textsToTranslate = [text];
@@ -310,6 +358,7 @@ export class YandexTranslateProvider extends BaseProvider {
         isJsonMode = true;
         originalJsonStruct = parsed;
         textsToTranslate = originalJsonStruct.map((item) => item.text);
+        logger.debug('JSON mode detected, extracting texts for translation:', textsToTranslate.length);
       }
     } catch {
       // Not a valid JSON, proceed in plain text mode.
@@ -318,78 +367,142 @@ export class YandexTranslateProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-translate`;
 
     try {
-      // Generate UUID for request
-      const uuid = this._generateUuid();
-      const textToTranslate = textsToTranslate.join(TEXT_DELIMITER);
-      
       // Build language parameter
       const lang = sl === "auto" ? tl : `${sl}-${tl}`;
+      logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
 
-      // Prepare request body
-      const formData = new URLSearchParams({
-        lang: lang,
-        text: textToTranslate,
-      });
-
-      // Build URL with query parameters
-      const url = new URL(YandexTranslateProvider.mainUrl);
-      url.searchParams.set("id", `${uuid}-0-0`);
-      url.searchParams.set("srv", "android");
-
-      const result = await this._executeApiCall({
-        url: url.toString(),
-        fetchOptions: {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": navigator.userAgent,
-          },
-          body: formData,
-        },
-        extractResponse: (data) => {
-          // Check for valid Yandex response structure
-          if (!data || data.code !== 200) {
-            return undefined;
-          }
-
-          // Extract translation data
-          if (!data.text || !Array.isArray(data.text) || data.text.length === 0) {
-            return undefined;
-          }
-
-          const targetText = data.text[0];
-          if (!targetText) {
-            return undefined;
-          }
-
-          // Extract detected language if available
-          let detectedLang = "";
-          if (data.lang && typeof data.lang === "string") {
-            detectedLang = data.lang.split("-")[0];
-          }
-
-          return {
-            targetText,
-            detectedLang,
-            transliteration: "", // Yandex doesn't provide transliteration in this API
-          };
-        },
-        context: context,
-      });
-
-      // Response Processing
+      // Handle JSON mode with individual requests for better reliability
       if (isJsonMode) {
-        const translatedParts = result.targetText.split(TEXT_DELIMITER);
-        if (translatedParts.length !== originalJsonStruct.length) {
-          logger.error('JSON reconstruction failed due to segment mismatch.');
-          return result.targetText; // Fallback to raw translated text
+        logger.debug(`Processing JSON mode with individual translation requests: ${textsToTranslate.length} segments`);
+        
+        const translatedTexts = [];
+        for (let i = 0; i < textsToTranslate.length; i++) {
+          const textToTranslate = textsToTranslate[i];
+          if (!textToTranslate.trim()) {
+            translatedTexts.push('');
+            continue;
+          }
+
+          logger.debug(`Processing segment ${i+1}/${textsToTranslate.length}: "${textToTranslate.substring(0, 50)}..." with lang=${lang}`);
+
+          const uuid = this._generateUuid();
+          const formData = new URLSearchParams({
+            lang: lang,
+            text: textToTranslate,
+          });
+
+          const url = new URL(YandexTranslateProvider.mainUrl);
+          url.searchParams.set("id", `${uuid}-0-0`);
+          url.searchParams.set("srv", "android");
+
+          const result = await this._executeApiCall({
+            url: url.toString(),
+            fetchOptions: {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": navigator.userAgent,
+              },
+              body: formData,
+            },
+            extractResponse: (data) => {
+              if (!data || data.code !== 200) {
+                logger.error(`Yandex API returned invalid response for segment ${i}:`, data);
+                return undefined;
+              }
+
+              if (!data.text || !Array.isArray(data.text) || data.text.length === 0) {
+                logger.error(`Yandex API returned no translation text for segment ${i}:`, data);
+                return undefined;
+              }
+
+              const targetText = data.text[0];
+              if (!targetText) {
+                logger.error(`Yandex API returned empty translation for segment ${i}:`, data.text);
+                return undefined;
+              }
+
+              return { targetText };
+            },
+            context: `${context}-segment-${i}`,
+          });
+
+          translatedTexts.push(result.targetText);
         }
+
+        // Reconstruct JSON with translated texts
         const translatedJson = originalJsonStruct.map((item, index) => ({
           ...item,
-          text: translatedParts[index]?.trim() || "",
+          text: translatedTexts[index] || "",
         }));
+
+        logger.debug('JSON mode translation completed successfully');
         return JSON.stringify(translatedJson, null, 2);
       } else {
+        // Handle single text translation
+        const uuid = this._generateUuid();
+        const textToTranslate = textsToTranslate[0];
+        
+        const formData = new URLSearchParams({
+          lang: lang,
+          text: textToTranslate,
+        });
+
+        const url = new URL(YandexTranslateProvider.mainUrl);
+        url.searchParams.set("id", `${uuid}-0-0`);
+        url.searchParams.set("srv", "android");
+
+        logger.debug('Yandex API request:', {
+          url: url.toString(),
+          lang: lang,
+          textLength: textToTranslate.length,
+          isJsonMode: false
+        });
+
+        const result = await this._executeApiCall({
+          url: url.toString(),
+          fetchOptions: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "User-Agent": navigator.userAgent,
+            },
+            body: formData,
+          },
+          extractResponse: (data) => {
+            // Check for valid Yandex response structure
+            if (!data || data.code !== 200) {
+              logger.error('Yandex API returned invalid response:', data);
+              return undefined;
+            }
+
+            // Extract translation data
+            if (!data.text || !Array.isArray(data.text) || data.text.length === 0) {
+              logger.error('Yandex API returned no translation text:', data);
+              return undefined;
+            }
+
+            const targetText = data.text[0];
+            if (!targetText) {
+              logger.error('Yandex API returned empty translation:', data.text);
+              return undefined;
+            }
+
+            // Extract detected language if available
+            let detectedLang = "";
+            if (data.lang && typeof data.lang === "string") {
+              detectedLang = data.lang.split("-")[0];
+            }
+
+            return {
+              targetText,
+              detectedLang,
+              transliteration: "", // Yandex doesn't provide transliteration in this API
+            };
+          },
+          context: context,
+        });
+
         return result.targetText;
       }
     } catch (error) {
