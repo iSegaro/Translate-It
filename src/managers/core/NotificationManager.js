@@ -35,11 +35,37 @@ const CONFIG = {
     BORDER_RADIUS: "6px",
     PADDING: "10px 15px",
     FONT_SIZE: "14px"
+  },
+  QUEUE: {
+    MAX_VISIBLE: 5,
+    MAX_QUEUE_SIZE: 20,
+    PRIORITY_ORDER: ['error', 'warning', 'success', 'status', 'info', 'revert']
   }
 };
 
 // Valid notification types
 const VALID_TYPES = ['error', 'warning', 'success', 'info', 'status', 'revert'];
+
+// Validation rules
+const VALIDATION_RULES = {
+  MESSAGE: {
+    MIN_LENGTH: 1,
+    MAX_LENGTH: 500,
+    FORBIDDEN_PATTERNS: [
+      /<script[^>]*>.*?<\/script>/gi,
+      /javascript:/gi,
+      /data:text\/html/gi,
+      /vbscript:/gi,
+      /on\w+\s*=/gi, // onclick, onload, etc.
+    ],
+    DANGEROUS_CHARS: ['<', '>', '"', "'", '&']
+  },
+  RATE_LIMIT: {
+    MAX_PER_SECOND: 5,
+    MAX_PER_MINUTE: 30,
+    WINDOW_SIZE: 1000 // ms
+  }
+};
 
 let _instance = null; // Singleton instance
 
@@ -94,6 +120,8 @@ export default class NotificationManager {
     this.canShowInPage = false;
     this.activeNotifications = new Set(); // Track all active notification nodes
     this.pendingTimeouts = new Map(); // Track timeouts for cleanup
+    this.notificationQueue = []; // Queue for pending notifications
+    this.rateLimitTracker = []; // Track notification timestamps for rate limiting
 
     _instance = this; // Set singleton instance
     this.initialize(); // Initialize on construction
@@ -268,26 +296,227 @@ export default class NotificationManager {
   }
 
   /**
+   * Enhanced message validation with security checks
+   */
+  _validateMessage(msg) {
+    // Basic checks
+    if (!msg || typeof msg !== 'string') {
+      return { 
+        valid: false, 
+        error: 'Message must be a non-empty string',
+        sanitized: ''
+      };
+    }
+
+    const trimmed = msg.trim();
+    
+    // Length validation
+    if (trimmed.length < VALIDATION_RULES.MESSAGE.MIN_LENGTH) {
+      return { 
+        valid: false, 
+        error: 'Message too short',
+        sanitized: trimmed
+      };
+    }
+
+    if (trimmed.length > VALIDATION_RULES.MESSAGE.MAX_LENGTH) {
+      return { 
+        valid: false, 
+        error: `Message too long (max ${VALIDATION_RULES.MESSAGE.MAX_LENGTH} characters)`,
+        sanitized: trimmed.substring(0, VALIDATION_RULES.MESSAGE.MAX_LENGTH)
+      };
+    }
+
+    // Security validation - check for dangerous patterns
+    for (const pattern of VALIDATION_RULES.MESSAGE.FORBIDDEN_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        this.logger.warn('Potentially malicious content detected in notification message');
+        return { 
+          valid: false, 
+          error: 'Invalid content detected',
+          sanitized: trimmed.replace(pattern, '[REMOVED]')
+        };
+      }
+    }
+
+    // Sanitize dangerous characters
+    let sanitized = trimmed;
+    for (const char of VALIDATION_RULES.MESSAGE.DANGEROUS_CHARS) {
+      const entityMap = {
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '&': '&amp;'
+      };
+      sanitized = sanitized.replace(new RegExp(`\\${char}`, 'g'), entityMap[char] || char);
+    }
+
+    return { 
+      valid: true, 
+      error: null,
+      sanitized 
+    };
+  }
+
+  /**
+   * Check rate limiting
+   */
+  _checkRateLimit() {
+    const now = Date.now();
+    
+    // Clean old entries (older than 1 minute)
+    this.rateLimitTracker = this.rateLimitTracker.filter(
+      timestamp => now - timestamp < 60000
+    );
+
+    // Check per-second rate limit
+    const recentEntries = this.rateLimitTracker.filter(
+      timestamp => now - timestamp < VALIDATION_RULES.RATE_LIMIT.WINDOW_SIZE
+    );
+
+    if (recentEntries.length >= VALIDATION_RULES.RATE_LIMIT.MAX_PER_SECOND) {
+      this.logger.warn('Rate limit exceeded (per second)', { 
+        current: recentEntries.length,
+        limit: VALIDATION_RULES.RATE_LIMIT.MAX_PER_SECOND
+      });
+      return { allowed: false, reason: 'Rate limit exceeded (too fast)' };
+    }
+
+    // Check per-minute rate limit
+    if (this.rateLimitTracker.length >= VALIDATION_RULES.RATE_LIMIT.MAX_PER_MINUTE) {
+      this.logger.warn('Rate limit exceeded (per minute)', { 
+        current: this.rateLimitTracker.length,
+        limit: VALIDATION_RULES.RATE_LIMIT.MAX_PER_MINUTE
+      });
+      return { allowed: false, reason: 'Rate limit exceeded (too many notifications)' };
+    }
+
+    // Record this request
+    this.rateLimitTracker.push(now);
+    return { allowed: true };
+  }
+
+  /**
+   * Get visible notification count
+   */
+  _getVisibleCount() {
+    return this.activeNotifications.size;
+  }
+
+  /**
+   * Get priority weight for notification type
+   */
+  _getPriority(type) {
+    const index = CONFIG.QUEUE.PRIORITY_ORDER.indexOf(type);
+    return index === -1 ? CONFIG.QUEUE.PRIORITY_ORDER.length : index;
+  }
+
+  /**
+   * Add notification to queue with priority sorting
+   */
+  _enqueueNotification(notificationData) {
+    // Prevent queue overflow
+    if (this.notificationQueue.length >= CONFIG.QUEUE.MAX_QUEUE_SIZE) {
+      this.logger.warn('Notification queue full, dropping oldest notification');
+      this.notificationQueue.shift(); // Remove oldest
+    }
+
+    // Insert with priority sorting (lower index = higher priority)
+    const newPriority = this._getPriority(notificationData.type);
+    let insertIndex = this.notificationQueue.length;
+    
+    for (let i = 0; i < this.notificationQueue.length; i++) {
+      if (this._getPriority(this.notificationQueue[i].type) > newPriority) {
+        insertIndex = i;
+        break;
+      }
+    }
+    
+    this.notificationQueue.splice(insertIndex, 0, notificationData);
+    this.logger.debug('Notification queued', { 
+      type: notificationData.type, 
+      queueSize: this.notificationQueue.length,
+      priority: newPriority 
+    });
+  }
+
+  /**
+   * Process next notification from queue
+   */
+  _processQueue() {
+    if (this.notificationQueue.length === 0) return;
+    if (this._getVisibleCount() >= CONFIG.QUEUE.MAX_VISIBLE) return;
+
+    const nextNotification = this.notificationQueue.shift();
+    this.logger.debug('Processing queued notification', { 
+      type: nextNotification.type,
+      remainingQueue: this.notificationQueue.length 
+    });
+    
+    // Process the notification immediately
+    this._showImmediate(
+      nextNotification.msg,
+      nextNotification.type,
+      nextNotification.auto,
+      nextNotification.dur,
+      nextNotification.onClick
+    );
+  }
+
+  /**
    * Show notification with proper validation and error handling
    */
   async show(msg, type = "info", auto = true, dur = null, onClick) {
-    // Validate inputs
-    if (!msg || typeof msg !== 'string' || msg.trim() === '') {
-      this.logger.warn('Empty or invalid message provided');
+    // Enhanced message validation
+    const messageValidation = this._validateMessage(msg);
+    if (!messageValidation.valid) {
+      this.logger.warn('Message validation failed:', messageValidation.error);
+      return null;
+    }
+
+    // Check rate limiting
+    const rateLimitCheck = this._checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      this.logger.warn('Notification blocked by rate limiting:', rateLimitCheck.reason);
       return null;
     }
 
     // Validate and sanitize type
     const validType = this._validateType(type);
     
+    // Use sanitized message
+    const sanitizedMessage = messageValidation.sanitized;
+    
+    // Check if we can show immediately or need to queue
+    if (this._getVisibleCount() >= CONFIG.QUEUE.MAX_VISIBLE) {
+      // Add to queue
+      this._enqueueNotification({
+        msg: sanitizedMessage,
+        type: validType,
+        auto,
+        dur,
+        onClick
+      });
+      return null; // Queued notification doesn't return a node immediately
+    }
+
+    // Show immediately
+    return this._showImmediate(sanitizedMessage, validType, auto, dur, onClick);
+  }
+
+  /**
+   * Show notification immediately without queue check
+   */
+  async _showImmediate(msg, type, auto = true, dur = null, onClick) {
     // Step 1: Ensure the container is ready for in-page notifications.
     this._ensureContainerExists();
 
-    const cfg = this.map[validType];
+    const cfg = this.map[type];
     const finalDur = dur ?? cfg.dur;
     
     // Debug logging for status type notifications
-    if (validType === "status") {
+    if (type === "status") {
       this.logger.debug('Showing status notification:', { 
         message: msg, 
         messageType: typeof msg, 
@@ -311,7 +540,7 @@ export default class NotificationManager {
     if (ExtensionContextManager.isValidSync()) {
       ExtensionContextManager.safeSendMessage({
         action: "show_os_notification",
-        payload: { message: msg, title: cfg.title, type: validType },
+        payload: { message: msg, title: cfg.title, type: type },
       }, 'notification-fallback');
     }
 
@@ -380,6 +609,9 @@ export default class NotificationManager {
   _cleanupNode(node) {
     this.activeNotifications.delete(node);
     this._clearNodeTimeout(node);
+    
+    // Process next item from queue when space becomes available
+    setTimeout(() => this._processQueue(), 50);
   }
 
   /**
@@ -493,8 +725,9 @@ export default class NotificationManager {
     });
     this.pendingTimeouts.clear();
     
-    // Clear all active notifications
+    // Clear all active notifications and queue
     this.activeNotifications.clear();
+    this.notificationQueue.length = 0; // Clear queue
     
     if (this.container) {
       try {

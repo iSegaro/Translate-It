@@ -1748,7 +1748,6 @@ export class SelectElementManager {
       
       // Send direct message to background using reliable messenger
       try {
-        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
         await sendReliable({
           action: MessageActions.TRANSLATE,
           messageId: messageId,

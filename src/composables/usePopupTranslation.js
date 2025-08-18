@@ -9,6 +9,7 @@ import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
+import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 const logger = getScopedLogger('UI', 'usePopupTranslation');
 
 export function usePopupTranslation() {
@@ -62,7 +63,6 @@ export function usePopupTranslation() {
       
       // Send translation request using reliable messaging (retries + port fallback)
       try {
-        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
         await sendReliable({
           action: MessageActions.TRANSLATE,
           messageId: messageId,
