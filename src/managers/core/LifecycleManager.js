@@ -104,6 +104,7 @@ class LifecycleManager {
       
       // TTS handlers
       'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
+      'OFFSCREEN_READY': Handlers.handleOffscreenReady,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,

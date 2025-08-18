@@ -7,6 +7,9 @@ import { initializebrowserAPI } from '@/composables/useBrowserAPI.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
 
+// Use a global promise to ensure offscreen document is created only once.
+let offscreenDocumentPromise = null;
+
 /**
  * Handle Google TTS requests from content scripts
  * @param {Object} request - Request object
@@ -74,47 +77,13 @@ const playGoogleTTSWithBrowserDetection = async (ttsUrl) => {
  * @returns {Promise}
  */
 const playWithOffscreenDocument = async (ttsUrl) => {
-  try {
-    const browserAPI = await initializebrowserAPI();
-    
-    // Always recreate offscreen document to ensure latest code (debugging)
-    const existingContexts = await browserAPI.runtime.getContexts({
-      contextTypes: ['OFFSCREEN_DOCUMENT']
-    });
+  const OFFSCREEN_DOCUMENT_PATH = 'html/offscreen.html';
 
-    // Force close existing offscreen document 
-    if (existingContexts.length > 0) {
-      try {
-        await browserAPI.offscreen.closeDocument();
-        logger.debug('[GoogleTTSHandler] Closed existing offscreen document');
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait a bit
-      } catch (error) {
-        logger.debug('[GoogleTTSHandler] Could not close offscreen document:', error.message);
-      }
-    }
-
-    // Create new offscreen document
-    {
-      await browserAPI.offscreen.createDocument({
-        url: 'html/offscreen.html',
-        reasons: ['AUDIO_PLAYBACK'],
-        justification: 'Play Google TTS audio'
-      });
-      logger.debug('[GoogleTTSHandler] Created offscreen document for TTS');
-      
-      // Simple delay to allow offscreen to initialize - skip problematic readiness check
-      await new Promise(resolve => setTimeout(resolve, 200)); // 200ms is sufficient
-      logger.debug('[GoogleTTSHandler] Offscreen document initialization delay completed');
-    }
-
-    // Send to offscreen
-    logger.debug('[GoogleTTSHandler] Sending to offscreen:', ttsUrl);
-    
+  // This function sends the message and handles the response, including timeouts.
+  const sendMessageAndGetResponse = (browserAPI) => {
     return new Promise((resolve, reject) => {
-      // Add timeout to handle response timing issues
       const responseTimeout = setTimeout(() => {
         logger.warn('[GoogleTTSHandler] Offscreen response timeout - but audio might have started playing');
-        // Don't reject immediately, wait for more debug messages
         setTimeout(() => {
           logger.error('[GoogleTTSHandler] Final timeout - assuming failure');
           reject(new Error('Offscreen TTS response timeout'));
@@ -129,11 +98,8 @@ const playWithOffscreenDocument = async (ttsUrl) => {
         clearTimeout(responseTimeout);
         logger.debug('[GoogleTTSHandler] Offscreen response received:', response);
         
-        // Handle empty response (should not happen with MV3 workaround, but keep as fallback)
         if (response === undefined || response === null || (typeof response === 'object' && Object.keys(response).length === 0)) {
           logger.info('[GoogleTTSHandler] Using MV3 workaround for empty response');
-          
-          // MV3 Workaround: Wait a bit and assume success since we know audio starts playing
           setTimeout(() => {
             logger.debug('[GoogleTTSHandler] MV3 workaround completed successfully');
             resolve({ success: true, workaround: 'mv3-timing-fix' });
@@ -153,11 +119,85 @@ const playWithOffscreenDocument = async (ttsUrl) => {
         reject(err);
       });
     });
+  };
+
+  // This function ensures that the offscreen document is created only once.
+  const setupOffscreenDocument = async (browserAPI) => {
+    try {
+      logger.debug('[GoogleTTSHandler] Starting setupOffscreenDocument...');
+      
+      // Check if offscreen API is available
+      if (!browserAPI.offscreen) {
+        logger.error('[GoogleTTSHandler] Offscreen API not available!');
+        throw new Error('Offscreen API not available');
+      }
+      
+      logger.debug('[GoogleTTSHandler] Offscreen API available, checking hasDocument...');
+      const hasDocument = await browserAPI.offscreen.hasDocument();
+      logger.debug('[GoogleTTSHandler] Checking if offscreen document exists:', hasDocument);
+      
+      if (hasDocument) {
+          logger.debug('[GoogleTTSHandler] Offscreen document already exists.');
+          return;
+      }
+
+      logger.debug('[GoogleTTSHandler] No offscreen document found. Creating new one...');
+      await browserAPI.offscreen.createDocument({
+        url: OFFSCREEN_DOCUMENT_PATH,
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: 'Play Google TTS audio'
+      });
+      logger.debug('[GoogleTTSHandler] Offscreen document created successfully.');
+    } catch (error) {
+      logger.error('[GoogleTTSHandler] Error in setupOffscreenDocument:', error);
+      throw error;
+    }
+  };
+
+  try {
+    const browserAPI = await initializebrowserAPI();
+    
+    logger.debug('[GoogleTTSHandler] Initializing offscreen document setup...');
+    
+    // Check if we have an existing promise but offscreen document doesn't actually exist
+    if (offscreenDocumentPromise) {
+      try {
+        const hasDocument = await browserAPI.offscreen.hasDocument();
+        logger.debug('[GoogleTTSHandler] Checking existing promise - hasDocument:', hasDocument);
+        
+        if (!hasDocument) {
+          logger.debug('[GoogleTTSHandler] Existing promise but no offscreen document - resetting promise...');
+          offscreenDocumentPromise = null;
+        }
+      } catch (error) {
+        logger.warn('[GoogleTTSHandler] Error checking existing offscreen document - resetting promise:', error);
+        offscreenDocumentPromise = null;
+      }
+    }
+    
+    // Use the promise to ensure setup is only called once.
+    if (!offscreenDocumentPromise) {
+      logger.debug('[GoogleTTSHandler] Creating new offscreen document promise...');
+      offscreenDocumentPromise = setupOffscreenDocument(browserAPI);
+    } else {
+      logger.debug('[GoogleTTSHandler] Using existing offscreen document promise...');
+    }
+    
+    logger.debug('[GoogleTTSHandler] Waiting for offscreen document setup...');
+    await offscreenDocumentPromise;
+    logger.debug('[GoogleTTSHandler] Offscreen document setup completed.');
+
+    logger.debug('[GoogleTTSHandler] Sending to offscreen:', ttsUrl);
+    return await sendMessageAndGetResponse(browserAPI);
+
   } catch (error) {
     logger.error('[GoogleTTSHandler] Offscreen document error:', error);
+    // Reset the promise on error so we can try again.
+    offscreenDocumentPromise = null;
     throw error;
   }
 };
+
 
 /**
  * Play Google TTS audio directly (Firefox background context)
