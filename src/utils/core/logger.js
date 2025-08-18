@@ -9,7 +9,7 @@
  * - Easy to disable/enable per component
  */
 
-import { LOG_LEVELS } from "./logConstants.js";
+import { LOG_LEVELS } from '@/utils/core/logConstants.js';
 
 // Development environment detection
 const isDevelopment = process.env.NODE_ENV === "development";
