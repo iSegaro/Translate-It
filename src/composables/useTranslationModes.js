@@ -324,14 +324,29 @@ export function useSelectElementTranslation() {
   };
 
   const toggleSelectElement = async () => {
-    if (isSelectModeActive.value) {
-      const result = await deactivateSelectMode();
-      // state will be updated via storage listener when content script actually deactivates
-      return result;
-    } else {
-      const result = await activateSelectMode();
-      // state will be updated via storage listener when content script actually activates
-      return result;
+    const originalState = isSelectModeActive.value;
+    // Optimistically update the UI for a smoother experience
+    sharedIsSelectModeActive.value = !originalState;
+
+    try {
+      let success = false;
+      if (sharedIsSelectModeActive.value) {
+        // If we are activating
+        success = await activateSelectMode();
+      } else {
+        // If we are deactivating
+        success = await deactivateSelectMode();
+      }
+
+      // If the action failed, revert the optimistic update
+      if (!success) {
+        sharedIsSelectModeActive.value = originalState;
+        logger.warn('Select element toggle failed, reverting UI state.');
+      }
+    } catch (err) {
+      // Revert on any unexpected errors as well
+      sharedIsSelectModeActive.value = originalState;
+      logger.error('An unexpected error occurred during toggleSelectElement:', err);
     }
   };
 
