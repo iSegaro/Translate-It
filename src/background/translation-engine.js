@@ -242,7 +242,12 @@ export class TranslationEngine {
         originalTargetLang
       );
     } catch (initialError) {
-      // Final fallback for SelectElement JSON
+      // For language pair not supported errors, don't use fallback - show error to user
+      if (initialError.message && initialError.message.includes('Translation not available')) {
+        throw initialError;
+      }
+      
+      // Final fallback for SelectElement JSON (only for other types of errors)
       if (isSelectJson && !providerReliableJson) {
         logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
         return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang);
@@ -454,13 +459,9 @@ export class TranslationEngine {
         errorMessages.push(errorMessage);
       }
 
-      // If the error indicates an unsupported language pair, don't retry individually.
+      // If the error indicates an unsupported language pair, don't retry individually - throw the error to show to user
       if (errorMessage && errorMessage.includes('Translation not available')) {
-        batch.forEach(idx => {
-          results[idx] = segments[idx];
-          translationStatus[idx] = false;
-        });
-        return;
+        throw batchError; // Re-throw to show error to user instead of silent fallback
       }
     }
     
@@ -491,6 +492,11 @@ export class TranslationEngine {
           const errorMessage = individualError instanceof Error ? individualError.message : String(individualError);
           if (errorMessage && !errorMessages.includes(errorMessage)) {
             errorMessages.push(errorMessage);
+          }
+          
+          // If it's a language pair error, don't retry - just throw it
+          if (errorMessage && errorMessage.includes('Translation not available')) {
+            throw individualError;
           }
           
           attempt++;
