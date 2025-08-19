@@ -346,9 +346,9 @@ export class SelectElementManager {
 
       try {
         if (shouldActivate) {
-          await this.activate();
+          this.activate();
         } else {
-          await this.deactivate();
+          this.deactivate();
         }
         // Send success response to background
         const response = { success: true, isActive: this.isActive };
