@@ -186,11 +186,11 @@ export class TabPermissionChecker {
         timestamp: Date.now()
       };
       
-      if (isRestricted) {
-        this.logger.info(`[TabPermissionChecker] Tab ${tabId} access restricted:`, result);
-      } else {
-        this.logger.debug(`[TabPermissionChecker] Tab ${tabId} is accessible:`, result);
-      }
+      // if (isRestricted) {
+      //   this.logger.info(`[TabPermissionChecker] Tab ${tabId} access restricted:`, result);
+      // } else {
+      //   this.logger.debug(`[TabPermissionChecker] Tab ${tabId} is accessible:`, result);
+      // }
       
       return result;
     } catch (error) {
