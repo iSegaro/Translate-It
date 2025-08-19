@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessagingContexts, MessageFormat } from '@/messaging/core/MessagingCore.js';
+import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
 
 // In-memory per-tab select element state
 const selectElementStateByTab = new Map();
@@ -10,18 +10,30 @@ function setStateForTab(tabId, active) {
   if (!tabId) return;
   selectElementStateByTab.set(tabId, { active: !!active, updatedAt: Date.now() });
 
-  // Notify interested parties via runtime message (background -> tabs)
-  try {
-    // Broadcast state change using standardized message envelope so receivers can validate
-    const message = MessageFormat.create(
-      MessageActions.SELECT_ELEMENT_STATE_CHANGED,
-      { tabId, active },
-      MessagingContexts.BACKGROUND
-    );
-    sendReliable(message).catch(() => {});
-  } catch {
-    // ignore
-  }
+  // Notify all accessible tabs about the state change
+  (async () => {
+    try {
+      const accessibleTabs = await tabPermissionChecker.getAccessibleTabs({});
+      const message = MessageFormat.create(
+        MessageActions.SELECT_ELEMENT_STATE_CHANGED,
+        { tabId, active },
+        MessagingContexts.BACKGROUND
+      );
+
+      for (const tab of accessibleTabs) {
+        // Don't send to the tab that initiated the change, as it already knows.
+        if (tab.id === tabId) continue;
+
+        try {
+          await browser.tabs.sendMessage(tab.id, message);
+        } catch (error) {
+          // Ignore errors for tabs that might have been closed or are otherwise unavailable.
+        }
+      }
+    } catch (error) {
+      // Ignore errors in the broadcasting process
+    }
+  })();
 }
 
 function getStateForTab(tabId) {
