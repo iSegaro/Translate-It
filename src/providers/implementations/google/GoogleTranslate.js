@@ -15,7 +15,8 @@ import { AUTO_DETECT_VALUE } from "@/constants.js";
 // (logger already imported above)
 
 
-const TEXT_DELIMITER = "\n\n---\n\n";
+
+
 
 // A simple map for converting full language names to Google Translate's codes.
 const langNameToCodeMap = {
@@ -88,6 +89,9 @@ export class GoogleTranslateProvider extends BaseProvider {
   static type = "free";
   static description = "Free Google Translate service";
   static displayName = "Google Translate";
+  static reliableJsonMode = true;
+  static CHAR_LIMIT = 1500;
+  static CHUNK_SIZE = 20;
   constructor() {
     super("GoogleTranslate");
   }
@@ -155,23 +159,15 @@ export class GoogleTranslateProvider extends BaseProvider {
   async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
-    // Language detection and swapping using centralized service
     [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
       text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
       { providerName: 'GoogleTranslate', useRegexFallback: true }
     );
 
-    // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (translateMode === TranslationMode.Field) {
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
     }
 
-    // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
-
-    // --- JSON Mode Detection ---
     let isJsonMode = false;
     let originalJsonStruct;
     let textsToTranslate = [text];
@@ -188,99 +184,92 @@ export class GoogleTranslateProvider extends BaseProvider {
       // Not a valid JSON, proceed in plain text mode.
     }
 
-    // --- URL Construction ---
-    const apiUrl = await getGoogleTranslateUrlAsync();
-    const sl =
-      sourceLang === AUTO_DETECT_VALUE ? "auto" : this._getLangCode(sourceLang);
+    const sl = sourceLang === AUTO_DETECT_VALUE ? "auto" : this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
     if (sl === tl && !isJsonMode) return text;
 
-    const url = new URL(apiUrl);
-
-    // بررسی تنظیمات دیکشنری - در Field mode هرگز دیکشنری نباشد
     const isDictionaryEnabled = await getEnableDictionaryAsync();
-    const shouldIncludeDictionary =
-      isDictionaryEnabled &&
-      translateMode !== TranslationMode.Field &&
-      translateMode !== TranslationMode.Subtitle;
+    const shouldIncludeDictionary = isDictionaryEnabled && translateMode !== TranslationMode.Field && translateMode !== TranslationMode.Subtitle;
 
-    // ساخت query string دستی برای پشتیبانی از چندین dt
-    const queryParams = [
-      `client=gtx`,
-      `sl=${sl}`,
-      `tl=${tl}`,
-      `dt=t`, // Translation text
-    ];
-
-    // فقط در صورت فعال بودن دیکشنری و غیرفیلد بودن translateMode، پارامتر bd اضافه شود
-    if (shouldIncludeDictionary) {
-      queryParams.push(`dt=bd`); // Dictionary data
-    }
-
-    queryParams.push(
-      `q=${encodeURIComponent(textsToTranslate.join(TEXT_DELIMITER))}`
-    );
-    url.search = queryParams.join("&");
-
-    // --- API Call using the centralized handler ---
-    const result = await this._executeApiCall({
-      url: url.toString(),
-      fetchOptions: { method: "GET" },
-      extractResponse: (data) => {
-        // Check for valid Google Translate response structure
-        if (!data?.[0]) {
-          // Returning undefined will trigger an API_RESPONSE_INVALID error in _executeApiCall
-          return undefined;
-        }
-
-        // Extract main translation
-        const translatedText = data[0]
-          .map((segment) => segment[0] || "")
-          .join("");
-
-        // Extract dictionary data if available and enabled (but never in Field mode)
-        let candidateText = "";
-        if (shouldIncludeDictionary && data[1]) {
-          // data[1] contains dictionary information
-          candidateText = data[1]
-            .map((dict) => {
-              const pos = dict[0] || ""; // Part of speech
-              const terms = dict[1] || []; // Alternative translations
-              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-            })
-            .join("");
-        }
-
-        return {
-          resultText: translatedText,
-          candidateText: candidateText.trim(),
-        };
-      },
-      context: context,
-    });
-
-    // --- Response Processing ---
-    if (isJsonMode) {
-      const translatedParts = result.resultText.split(TEXT_DELIMITER);
-      if (translatedParts.length !== originalJsonStruct.length) {
-        logger.error('Google Translate: JSON reconstruction failed due to segment mismatch.');
-        return result.resultText; // Fallback to returning the raw translated text
+    const _translateJsonChunk = async (chunk) => {
+      const apiUrl = await getGoogleTranslateUrlAsync();
+      const url = new URL(apiUrl);
+      const queryParams = [
+        `client=gtx`,
+        `sl=${sl}`,
+        `tl=${tl}`,
+        `dt=t`,
+      ];
+      if (shouldIncludeDictionary) {
+        queryParams.push(`dt=bd`);
       }
+      
+      const textToTranslate = chunk.join('\n');
+      queryParams.push(`q=${encodeURIComponent(textToTranslate)}`);
+
+      url.search = queryParams.join("&");
+
+      const result = await this._executeApiCall({
+        url: url.toString(),
+        fetchOptions: { method: "GET" },
+        extractResponse: (data) => {
+          if (!data?.[0]) {
+            return { translatedSegments: chunk.map(() => ''), candidateText: '' };
+          }
+          const translatedText = data[0].map((segment) => segment[0] || "").join('');
+          const translatedSegments = translatedText.split('\n');
+
+          if (translatedSegments.length !== chunk.length) {
+            return { translatedSegments: chunk.map(() => ''), candidateText: '' };
+          }
+
+          let candidateText = "";
+          if (shouldIncludeDictionary && data[1]) {
+            candidateText = data[1].map((dict) => {
+              const pos = dict[0] || "";
+              const terms = dict[1] || [];
+              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+            }).join("");
+          }
+          return {
+            translatedSegments,
+            candidateText: candidateText.trim(),
+          };
+        },
+        context: `${context}-chunk`
+      });
+      return result || { translatedSegments: chunk.map(() => ''), candidateText: '' };
+    };
+
+    if (isJsonMode) {
+      const translatedSegments = await this._processInBatches(
+        textsToTranslate,
+        async (chunk) => {
+          const { translatedSegments } = await _translateJsonChunk(chunk);
+          return translatedSegments;
+        },
+        {
+          CHUNK_SIZE: GoogleTranslateProvider.CHUNK_SIZE,
+          CHAR_LIMIT: GoogleTranslateProvider.CHAR_LIMIT,
+        }
+      );
+
+      const flattenedSegments = translatedSegments.flat();
+
       const translatedJson = originalJsonStruct.map((item, index) => ({
         ...item,
-        text: translatedParts[index]?.trim() || "",
+        text: flattenedSegments[index] || "",
       }));
       return JSON.stringify(translatedJson, null, 2);
     } else {
-      // Return both translation and dictionary data
-      if (result.candidateText) {
-        const formattedDictionary = this._formatDictionaryAsMarkdown(
-          result.candidateText
-        );
-        return `${result.resultText}\n\n${formattedDictionary}`;
+      const { translatedSegments, candidateText } = await _translateJsonChunk(textsToTranslate);
+      const resultText = translatedSegments.join('');
+      if (candidateText) {
+        const formattedDictionary = this._formatDictionaryAsMarkdown(candidateText);
+        return `${resultText}\n\n${formattedDictionary}`;
       }
-      return result.resultText;
+      return resultText;
     }
   }
 }
