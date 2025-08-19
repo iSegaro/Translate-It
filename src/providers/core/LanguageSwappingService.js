@@ -73,7 +73,7 @@ export class LanguageSwappingService {
           return [targetNorm, newTargetLang];
         }
         
-        logger.debug(`${providerName}: No language swapping: detected=${detectedLangCode}, source=${sourceLangCode}, target=${targetLangCode}`);
+        logger.debug(`${providerName}: No language swapping: detected=${detectedLangCode}, source=${sourceNorm}, target=${targetLangCode}`);
       } else if (useRegexFallback) {
         return this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
       }
