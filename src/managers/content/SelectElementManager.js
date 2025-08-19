@@ -7,6 +7,7 @@ import { taggleLinks } from "@/utils/core/helpers.js";
 import { ErrorHandler } from "../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../error-management/ErrorTypes.js";
 import { getScopedLogger } from "../../utils/core/logger.js";
+import { getTimeoutAsync } from "../../config.js";
 import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
 import { MessageFormat, MessagingContexts } from "../../messaging/core/MessagingCore.js";
@@ -540,7 +541,8 @@ export class SelectElementManager {
    * @param {number} timeout - Timeout in milliseconds (default: 25 seconds for better UX)
    * @returns {Promise<Object>} Translation result promise
    */
-  setupTranslationWaiting(messageId, timeout = 25000) {
+  async setupTranslationWaiting(messageId) {
+    const timeout = await getTimeoutAsync();
     this.logger.debug(`Setting up translation waiting for messageId: ${messageId}, timeout: ${timeout}ms`);
     
     return new Promise((resolve, reject) => {
@@ -724,8 +726,8 @@ export class SelectElementManager {
    * @param {string} messageId - Original message ID from TRANSLATE request
    * @returns {Promise<Object>} Translation result
    */
-  async waitForTranslationResult(messageId, timeout = 30000) {
-    return this.setupTranslationWaiting(messageId, timeout);
+  async waitForTranslationResult(messageId) {
+    return this.setupTranslationWaiting(messageId);
   }
 
   /**
@@ -1124,6 +1126,15 @@ export class SelectElementManager {
       // Deactivate select element mode immediately after click (UI only)
       this.logger.operation("Deactivating select element mode after element selection");
       await this.deactivateUIOnly();
+
+      // Notify background that selection mode is deactivating to sync UI
+      try {
+        const { sendReliable } = await import('../../messaging/core/ReliableMessaging.js');
+        await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
+        this.logger.debug('Notified background: select element deactivated on click for UI sync');
+      } catch (err) {
+        this.logger.warn('Failed to notify background about deactivation on click', err);
+      }
 
       // Process element with full text extraction (in background)
       // Note: Translation continues in background, user can continue browsing
@@ -1797,6 +1808,10 @@ export class SelectElementManager {
       // If only cached translations exist
       if (!textsToTranslate.length && cachedTranslations.size) {
         this.logger.info("Using only cached translations");
+
+        // Dismiss the "Translating..." status notification shown on click
+        await this.dismissStatusNotification();
+
         const context = {
           state: this.state,  // Use proper state structure
           IconManager: null,  // Vue system doesn't use IconManager
@@ -1888,10 +1903,9 @@ export class SelectElementManager {
           }
         })
       } catch (err) {
-        // Fallback to runtime.sendMessage if reliable not available
+        this.logger.warn("sendReliable failed, falling back to browser.runtime.sendMessage", err);
         try {
-          const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
-          await sendReliable({
+          const message = {
             action: MessageActions.TRANSLATE,
             messageId: messageId,
             context: 'event-handler',
@@ -1904,9 +1918,11 @@ export class SelectElementManager {
               mode: payload.mode,
               options: payload.options
             }
-          });
+          };
+          await browser.runtime.sendMessage(message);
         } catch (error) {
           this.logger.error("Failed to send translation request (fallback)", error);
+          throw error; // Re-throw to be caught by the outer catch block
         }
       }
 
