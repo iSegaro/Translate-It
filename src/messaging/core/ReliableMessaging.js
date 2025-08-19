@@ -43,7 +43,7 @@ export async function sendReliable(message, opts = {}) {
       }
       // if no actionable response, continue to retry
     } catch (err) {
-      logger.warn('sendReliable: sendMessage attempt failed', attempt + 1, err && err.message)
+      logger.debug('sendReliable: sendMessage attempt failed', attempt + 1, err && err.message)
       // fallthrough to retry/backoff
     }
 
