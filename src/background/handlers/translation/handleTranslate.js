@@ -210,11 +210,14 @@ export async function handleTranslate(message, sender, sendResponse) {
   } catch (translationError) {
     logger.debug('[Handler:TRANSLATE] Caught error from translation engine:', translationError.message);
 
-    errorHandler.handle(translationError, {
-      type: ErrorTypes.TRANSLATION,
-      context: "handleTranslate",
-      messageData: message
-    });
+    // Don't show error notification for user cancellations
+    if (translationError.type !== ErrorTypes.USER_CANCELLED) {
+      errorHandler.handle(translationError, {
+        type: ErrorTypes.TRANSLATION,
+        context: "handleTranslate",
+        messageData: message
+      });
+    }
 
     const errorResponse = MessageFormat.createErrorResponse(
       translationError,

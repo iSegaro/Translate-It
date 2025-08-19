@@ -575,7 +575,9 @@ export class SelectElementManager {
           this.logger.debug(`Requested cancel detected - cancelling pending translation for ${messageId}`);
           // Reset flag before cancelling to avoid recursion
           this.requestedCancel = false;
-          this.cancelPendingTranslation(messageId);
+          (async () => {
+            await this.cancelPendingTranslation(messageId);
+          })();
         } catch (err) {
           this.logger.warn('Error while auto-cancelling pending translation', err);
         }
@@ -677,25 +679,39 @@ export class SelectElementManager {
    * Cancel pending translation (for error cases)
    * @param {string} messageId - Message ID to cancel
    */
-  cancelPendingTranslation(messageId) {
+  async cancelPendingTranslation(messageId) {
     if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
       this.logger.debug(`Cancelling pending translation for messageId: ${messageId}`);
 
       // Log lifecycle: cancel requested
       this.logLifecycle(messageId, 'CANCEL_REQUESTED');
 
+      // Notify background to cancel the translation task
+      try {
+        const { sendReliable } = await import('../../messaging/core/ReliableMessaging.js');
+        await sendReliable({
+          action: 'CANCEL_TRANSLATION',
+          data: { messageId: messageId }
+        });
+        this.logger.debug(`Sent CANCEL_TRANSLATION to background for messageId: ${messageId}`);
+      } catch (err) {
+        this.logger.warn('Failed to send CANCEL_TRANSLATION message', err);
+      }
+
       // Clear timeout if present
-      if (this.pendingTranslation.timeoutId) {
+      if (this.pendingTranslation && this.pendingTranslation.timeoutId) {
         try { clearTimeout(this.pendingTranslation.timeoutId); } catch { /* ignore */ }
       }
 
       // Resolve the pending promise with a cancel result instead of rejecting it.
-      try {
-        this.pendingTranslation.resolve({ cancelled: true, messageId });
-        this.logLifecycle(messageId, 'CANCELLED');
-      } catch (e) {
-        // If resolve throws for any reason, swallow to avoid unhandled exceptions
-        this.logger.warn('Warning: resolving pending translation failed', e);
+      if (this.pendingTranslation && this.pendingTranslation.resolve) {
+        try {
+          this.pendingTranslation.resolve({ cancelled: true, messageId });
+          this.logLifecycle(messageId, 'CANCELLED');
+        } catch (e) {
+          // If resolve throws for any reason, swallow to avoid unhandled exceptions
+          this.logger.warn('Warning: resolving pending translation failed', e);
+        }
       }
 
       this.pendingTranslation = null;
@@ -1185,7 +1201,7 @@ export class SelectElementManager {
         try {
           const pendingId = this.pendingTranslation.originalMessageId;
           this.logger.debug(`ESC pressed - cancelling pending translation for ${pendingId}`);
-          this.cancelPendingTranslation(pendingId);
+          await this.cancelPendingTranslation(pendingId);
           // Allow microtask queue to settle so pendingTranslation resolution is processed
           await Promise.resolve();
         } catch (err) {

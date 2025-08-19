@@ -265,7 +265,7 @@ export class BingTranslateProvider extends BaseProvider {
   }
 
 
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi', abortController = null) {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // Language detection and swapping using centralized service
@@ -309,8 +309,26 @@ export class BingTranslateProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-translate`;
 
     try {
+      // Check if translation was cancelled before starting
+      if (abortController && abortController.signal.aborted) {
+        logger.debug('Bing translation cancelled before starting');
+        const err = new Error('Translation cancelled by user');
+        err.type = ErrorTypes.USER_CANCELLED;
+        err.context = context;
+        throw err;
+      }
+
       // Get access token
       const { token, key, IG, IID } = await this._getBingAccessToken();
+
+      // Check again after getting token
+      if (abortController && abortController.signal.aborted) {
+        logger.debug('Bing translation cancelled after getting token');
+        const err = new Error('Translation cancelled by user');
+        err.type = ErrorTypes.USER_CANCELLED;
+        err.context = context;
+        throw err;
+      }
 
       // Prepare request body
       const textToTranslate = textsToTranslate.join(TEXT_DELIMITER);
@@ -319,6 +337,7 @@ export class BingTranslateProvider extends BaseProvider {
         to: tl,
         textLength: textToTranslate.length,
         isJsonMode,
+        hasAbortController: !!abortController
       });
       const formData = new URLSearchParams({
         text: textToTranslate,
@@ -382,6 +401,7 @@ export class BingTranslateProvider extends BaseProvider {
           };
         },
         context: context,
+        abortController: abortController,
       });
 
       // Response Processing

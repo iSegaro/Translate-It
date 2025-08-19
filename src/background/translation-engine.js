@@ -19,6 +19,7 @@ export class TranslationEngine {
     this.cache = new Map();
     this.history = [];
     this.factory = new ProviderFactory();
+    this.activeTranslations = new Map(); // Track active translations for cancellation
   }
 
   /**
@@ -68,6 +69,14 @@ export class TranslationEngine {
     let context = request.context;
     let data = request.data;
 
+    // Track this translation for cancellation
+    const messageId = request.messageId;
+    if (messageId) {
+      const abortController = new AbortController();
+      this.activeTranslations.set(messageId, abortController);
+      logger.debug(`[TranslationEngine] Tracking translation: ${messageId}`);
+    }
+
     // Handle different input formats
     if (!context || !data) {
       // Legacy format: request contains translation data directly
@@ -113,6 +122,10 @@ export class TranslationEngine {
     }
 
     // Data normalized successfully
+    // Store messageId in data for later retrieval
+    if (messageId) {
+      data.messageId = messageId;
+    }
 
     try {
       let result;
@@ -151,6 +164,13 @@ export class TranslationEngine {
       // Don't log here - error already logged by provider
       logger.debug("[TranslationEngine] Translation failed, formatting error response");
       return this.formatError(error, context);
+    } finally {
+      // Clean up tracking regardless of success or failure
+      const messageId = request.messageId;
+      if (messageId && this.activeTranslations.has(messageId)) {
+        this.activeTranslations.delete(messageId);
+        logger.debug(`[TranslationEngine] Stopped tracking translation: ${messageId}`);
+      }
     }
   }
 
@@ -227,19 +247,30 @@ export class TranslationEngine {
     // For unreliable providers in JSON mode, use optimized strategy directly
     if (isSelectJson && !providerReliableJson) {
       logger.debug('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
-      return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang);
+      return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId);
     }
 
     // Standard translation for reliable providers or non-JSON mode
     let result;
     try {
+      // Get abort controller for this translation
+      const messageId = data.messageId;
+      const abortController = messageId ? this.activeTranslations.get(messageId) : null;
+      
+      logger.debug(`[TranslationEngine] Standard translation call:`, {
+        provider,
+        messageId,
+        hasAbortController: !!abortController
+      });
+      
       result = await providerInstance.translate(
         text,
         sourceLanguage,
         targetLanguage,
         mode,
         originalSourceLang,
-        originalTargetLang
+        originalTargetLang,
+        abortController
       );
     } catch (initialError) {
       //TODO: این منطق در جای دیگری هم مثل WindowsManager وجود دارد که بهتر است به Error Management منتقل شود
@@ -252,7 +283,7 @@ export class TranslationEngine {
       // Final fallback for SelectElement JSON (only for other types of errors)
       if (isSelectJson && !providerReliableJson) {
         logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
-        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang);
+        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId);
       }
       throw initialError;
     }
@@ -274,7 +305,7 @@ export class TranslationEngine {
   /**
    * Optimized JSON translation for unreliable providers
    */
-  async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang) {
+  async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, messageId = null) {
     const { text, provider, sourceLanguage, targetLanguage, mode } = data;
     
     let originalJson;
@@ -292,7 +323,13 @@ export class TranslationEngine {
     const results = new Array(segments.length);
     const translationStatus = new Array(segments.length).fill(false); // Track which segments were actually translated
     const errorMessages = []; // Collect actual error messages
-    const sharedState = { shouldStopDueToLanguagePairError: false, languagePairError: null }; // Shared state to stop other batches
+    const sharedState = { 
+      shouldStopDueToLanguagePairError: false, 
+      languagePairError: null,
+      batchFailureCount: 0, // Track batch failures for early exit
+      maxBatchFailures: provider === 'BingTranslate' ? 3 : 5, // Lower threshold for Bing
+      isCancelled: false // Global cancellation flag
+    }; // Shared state to stop other batches
     
     // Smart cache-first approach
     let cacheHits = 0;
@@ -329,8 +366,9 @@ export class TranslationEngine {
 
     // Only translate uncached segments
     if (uncachedIndices.length > 0) {
-      const BATCH_SIZE = 8; // Optimized batch size
-      const MAX_CONCURRENT = 2; // Reduced concurrency for better stability
+      // Bing-specific optimization: smaller batches for better reliability
+      const BATCH_SIZE = provider === 'BingTranslate' ? 3 : 8; // Reduced batch size for Bing
+      const MAX_CONCURRENT = provider === 'BingTranslate' ? 1 : 2; // Sequential processing for Bing
       
       // Process in batches with intelligent grouping
       const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
@@ -341,16 +379,37 @@ export class TranslationEngine {
           const idx = batchIndex++;
           if (idx >= batches.length) break;
           
-          // Check if we should stop due to language pair error
+          // Check if we should stop due to language pair error or too many batch failures
           if (sharedState.shouldStopDueToLanguagePairError) {
             logger.debug(`[TranslationEngine] Skipping batch ${idx} due to language pair error`);
             break;
           }
           
+          if (sharedState.batchFailureCount >= sharedState.maxBatchFailures) {
+            logger.debug(`[TranslationEngine] Early exit: too many batch failures (${sharedState.batchFailureCount})`);
+            break;
+          }
+
+          // Get abort controller for this translation
+          const abortController = messageId ? this.activeTranslations.get(messageId) : null;
+          
+          // Check if translation was cancelled (both AbortController and shared state)
+          if (abortController && abortController.signal.aborted) {
+            logger.debug(`[TranslationEngine] Translation was cancelled via AbortController, skipping batch ${idx}`);
+            sharedState.isCancelled = true;
+            break;
+          }
+          
+          if (sharedState.isCancelled) {
+            logger.debug(`[TranslationEngine] Translation was cancelled via shared state, skipping batch ${idx}`);
+            break;
+          }
+          
           const batch = batches[idx];
+          
           await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
             provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
-          }, errorMessages, sharedState);
+          }, errorMessages, sharedState, abortController);
         }
       });
 
@@ -430,7 +489,7 @@ export class TranslationEngine {
   /**
    * Process a single batch with fallback strategy
    */
-  async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = [], sharedState = null) {
+  async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = [], sharedState = null, abortController = null) {
     const { provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang } = config;
     const DELIMITER = "\n\n---\n\n";
     
@@ -439,11 +498,28 @@ export class TranslationEngine {
       logger.debug('[TranslationEngine] Batch stopped due to language pair error in another batch');
       return;
     }
+
+    // Check if translation was cancelled before starting batch (both AbortController and shared state)
+    if (abortController && abortController.signal.aborted) {
+      logger.debug('[TranslationEngine] Batch cancelled before starting (AbortController)');
+      if (sharedState) sharedState.isCancelled = true;
+      return;
+    }
+    
+    if (sharedState && sharedState.isCancelled) {
+      logger.debug('[TranslationEngine] Batch cancelled before starting (shared state)');
+      return;
+    }
+    
+    // Add request throttling for Bing provider
+    if (provider === 'BingTranslate') {
+      await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between requests
+    }
     
     // Try batch translation first (most efficient)
     try {
       const batchText = batch.map(idx => segments[idx]).join(DELIMITER);
-      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang);
+      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang, abortController);
       
       if (typeof batchResult === 'string') {
         const parts = batchResult.split(DELIMITER);
@@ -473,10 +549,23 @@ export class TranslationEngine {
       }
     } catch (batchError) {
       logger.debug(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
+      
+      // Track batch failures for early exit
+      if (sharedState) {
+        sharedState.batchFailureCount++;
+      }
+      
       // Capture specific error message
       const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
       if (errorMessage && !errorMessages.includes(errorMessage)) {
         errorMessages.push(errorMessage);
+      }
+
+      // If translation was cancelled by user, stop all processing
+      if (errorMessage && errorMessage.includes('Translation cancelled by user')) {
+        logger.debug('[TranslationEngine] User cancellation detected - stopping all batches');
+        if (sharedState) sharedState.isCancelled = true;
+        throw batchError; // Re-throw to stop translation completely
       }
 
       // If the error indicates an unsupported language pair, mark shared state and exit early
@@ -493,9 +582,15 @@ export class TranslationEngine {
     // Fallback to individual translations (with minimal retry)
     const INDIVIDUAL_RETRY = 2;
     const individualPromises = batch.map(async (idx) => {
-      // Check if we should stop due to language pair error before starting individual translation
+      // Check if we should stop due to language pair error or cancellation before starting individual translation
       if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
         logger.debug('[TranslationEngine] Individual translation stopped due to language pair error');
+        return { idx, result: segments[idx], success: false };
+      }
+
+      // If no abort controller is provided or it's already aborted, skip individual translation
+      if (!abortController || abortController.signal.aborted) {
+        logger.debug('[TranslationEngine] Individual translation cancelled - no valid abort controller');
         return { idx, result: segments[idx], success: false };
       }
       
@@ -506,8 +601,20 @@ export class TranslationEngine {
           logger.debug('[TranslationEngine] Individual translation retry stopped due to language pair error');
           return { idx, result: segments[idx], success: false };
         }
+
+        // If abort controller is missing or aborted, stop retry loop
+        if (!abortController || abortController.signal.aborted) {
+          logger.debug('[TranslationEngine] Individual translation retry cancelled - no valid abort controller');
+          return { idx, result: segments[idx], success: false };
+        }
+        
         try {
-          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang);
+          // Add throttling for Bing individual requests as well
+          if (config.provider === 'BingTranslate' && attempt > 0) {
+            await new Promise(resolve => setTimeout(resolve, 300 * attempt)); // Increasing delay for retries
+          }
+          
+          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang, abortController);
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
           // For same-language translations or when content doesn't change, still consider it successful
           const isActuallyTranslated = translatedText !== segments[idx] || 
@@ -528,6 +635,12 @@ export class TranslationEngine {
           const errorMessage = individualError instanceof Error ? individualError.message : String(individualError);
           if (errorMessage && !errorMessages.includes(errorMessage)) {
             errorMessages.push(errorMessage);
+          }
+          
+          // If translation was cancelled by user, stop all processing
+          if (errorMessage && errorMessage.includes('Translation cancelled by user')) {
+            logger.debug('[TranslationEngine] User cancellation detected in individual translation');
+            return { idx, result: segments[idx], success: false };
           }
           
           // If it's a language pair error, mark shared state and throw
@@ -727,6 +840,22 @@ export class TranslationEngine {
       size: this.cache.size,
       providers: this.providers.size,
     };
+  }
+
+  /**
+   * Cancel active translation by message ID
+   */
+  cancelTranslation(messageId) {
+    logger.debug(`[TranslationEngine] Cancel request for: ${messageId}, active: ${Array.from(this.activeTranslations.keys())}`);
+    if (this.activeTranslations.has(messageId)) {
+      const abortController = this.activeTranslations.get(messageId);
+      abortController.abort();
+      this.activeTranslations.delete(messageId);
+      logger.debug(`[TranslationEngine] Successfully cancelled translation: ${messageId}`);
+      return true;
+    }
+    logger.debug(`[TranslationEngine] No active translation found for: ${messageId}`);
+    return false;
   }
 
   /**

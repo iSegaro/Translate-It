@@ -19,6 +19,7 @@ export * from "./lifecycle/handleBackgroundReloadExtension.js";
 export * from "./translation/handleTranslate.js";
 export * from "./translation/handleTranslateText.js";
 export * from "./translation/handleRevertTranslation.js";
+export * from "./translation/handleCancelTranslation.js";
 
 // TTS handlers
 export * from "./tts/handleGoogleTTS.js";

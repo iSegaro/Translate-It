@@ -26,6 +26,9 @@ export class BaseProvider {
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
+   * @param {string} originalSourceLang - Original source language
+   * @param {string} originalTargetLang - Original target language
+   * @param {AbortController} abortController - Optional abort controller for cancellation
    * @returns {Promise<string>} - Translated text
    */
   async translate() {
@@ -51,16 +54,26 @@ export class BaseProvider {
    * @param {RequestInit} params.fetchOptions - Fetch options
    * @param {Function} params.extractResponse - Function to extract/transform JSON + status
    * @param {string} params.context - Context for error reporting
+   * @param {AbortController} params.abortController - Optional abort controller for cancellation
    * @returns {Promise<any>} - Transformed result
    * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
    */
-  async _executeApiCall({ url, fetchOptions, extractResponse, context }) {
+  async _executeApiCall({ url, fetchOptions, extractResponse, context, abortController }) {
   logger.debug(`_executeApiCall starting for context: ${context}`);
   logger.debug(`_executeApiCall URL: ${url}`);
     logger.debug('_executeApiCall fetchOptions:', fetchOptions);
 
     try {
-      const response = await fetch(url, fetchOptions);
+      // Add abort signal if provided
+      const finalFetchOptions = { ...fetchOptions };
+      if (abortController) {
+        finalFetchOptions.signal = abortController.signal;
+        logger.debug(`[${this.providerName}] Adding abort signal to request:`, { context, hasSignal: !!abortController.signal });
+      } else {
+        logger.debug(`[${this.providerName}] No abort controller provided for context:`, context);
+      }
+      
+      const response = await fetch(url, finalFetchOptions);
   logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
@@ -116,6 +129,15 @@ export class BaseProvider {
   logger.init(`_executeApiCall success for context: ${context}`);
       return result;
     } catch (err) {
+      // Handle abort errors (cancellation)
+      if (err.name === 'AbortError') {
+        const abortErr = new Error('Translation cancelled by user');
+        abortErr.type = ErrorTypes.USER_CANCELLED;
+        abortErr.context = context;
+        logger.debug(`[${this.providerName}] Request cancelled for context: ${context}`);
+        throw abortErr;
+      }
+      
       // Handle fetch network errors (e.g., offline)
       if (err instanceof TypeError && /NetworkError/.test(err.message)) {
         const networkErr = new Error(err.message);

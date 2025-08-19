@@ -97,6 +97,7 @@ class LifecycleManager {
       'TRANSLATE': Handlers.handleTranslate,
       'translateText': Handlers.handleTranslateText,
       'revertTranslation': Handlers.handleRevertTranslation,
+      'CANCEL_TRANSLATION': Handlers.handleCancelTranslation,
       
       // Subtitle handlers
       'subtitleTranslate': Handlers.handleSubtitleTranslate,
