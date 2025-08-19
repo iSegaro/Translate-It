@@ -1227,6 +1227,14 @@ export class SelectElementManager {
       try {
         if (this.isActive) {
           await this.deactivate();
+          // After organic deactivation, NOTIFY THE BACKGROUND so other UIs can sync
+          try {
+            const { sendReliable } = await import('../../messaging/core/ReliableMessaging.js');
+            await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
+            this.logger.debug('Notified background: select element deactivated via ESC key');
+          } catch (err) {
+            this.logger.warn('Failed to notify background about ESC deactivation', err);
+          }
         }
       } catch (err) {
         this.logger.warn('Error while deactivating on ESC', err);
