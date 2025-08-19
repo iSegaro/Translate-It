@@ -71,10 +71,16 @@ export function separateCachedAndNewTexts(originalTextsMap) {
  * جمع‌آوری تمام گره‌های متنی در یک المان و ایجاد نگاشت از متن اصلی به گره‌ها.
  *
  * @param {HTMLElement} targetElement المانی که باید گره‌های متنی آن جمع‌آوری شود.
+ * @param {boolean} useIntelligentGrouping آیا از گروه‌بندی هوشمند استفاده شود
  * @returns {{textNodes: Node[], originalTextsMap: Map<string, Node[]>}}
  * آرایه‌ای از گره‌های متنی و نگاشتی از متن اصلی به لیست گره‌های متنی.
  */
-export function collectTextNodes(targetElement) {
+export function collectTextNodes(targetElement, useIntelligentGrouping = true) {
+  if (useIntelligentGrouping) {
+    return collectTextNodesOptimized(targetElement);
+  }
+  
+  // Original implementation for backward compatibility
   const walker = document.createTreeWalker(
     targetElement,
     NodeFilter.SHOW_TEXT,
@@ -99,6 +105,110 @@ export function collectTextNodes(targetElement) {
     }
   }
 
+  return { textNodes, originalTextsMap };
+}
+
+/**
+ * نسخه بهینه‌شده جمع‌آوری گره‌های متنی با گروه‌بندی هوشمند
+ * این تابع متن‌های کوچک مجاور را ترکیب می‌کند و micro-segments را فیلتر می‌کند
+ */
+function collectTextNodesOptimized(targetElement) {
+  const walker = document.createTreeWalker(
+    targetElement,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
+
+  const allTextNodes = [];
+  const textSegments = [];
+  let node;
+
+  // First pass: collect all text nodes and their context
+  while ((node = walker.nextNode())) {
+    const trimmedText = node.textContent.trim();
+    if (trimmedText) {
+      const parentTag = node.parentElement?.tagName?.toLowerCase() || 'unknown';
+      const isBlockElement = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'article', 'section'].includes(parentTag);
+      
+      allTextNodes.push(node);
+      textSegments.push({
+        node,
+        text: trimmedText,
+        parentTag,
+        isBlockElement,
+        length: trimmedText.length
+      });
+    }
+  }
+
+  // Second pass: intelligent grouping
+  const textNodes = [];
+  const originalTextsMap = new Map();
+  const processedNodes = new Set();
+  
+  for (let i = 0; i < textSegments.length; i++) {
+    if (processedNodes.has(textSegments[i].node)) continue;
+    
+    const segment = textSegments[i];
+    
+    // Skip micro-segments unless they're standalone
+    if (segment.length < 10 && textSegments.length > 1) {
+      // Check if it can be merged with adjacent segments
+      const canMerge = i > 0 && !textSegments[i-1].isBlockElement && 
+                      textSegments[i-1].parentTag === segment.parentTag;
+      
+      if (!canMerge) {
+        // Skip very small standalone segments
+        logger.debug(`Skipping micro-segment: "${segment.text}"`);
+        continue;
+      }
+    }
+    
+    // Group adjacent text nodes from same parent or similar context
+    const groupedNodes = [segment.node];
+    const groupedTexts = [segment.text];
+    processedNodes.add(segment.node);
+    
+    // Look for adjacent nodes to group (up to 3 nodes or 200 characters)
+    let totalLength = segment.length;
+    for (let j = i + 1; j < Math.min(i + 4, textSegments.length) && totalLength < 200; j++) {
+      const nextSegment = textSegments[j];
+      
+      if (processedNodes.has(nextSegment.node)) continue;
+      
+      // Group if same parent type and not block elements
+      if (!segment.isBlockElement && !nextSegment.isBlockElement &&
+          (segment.parentTag === nextSegment.parentTag || 
+           ['span', 'a', 'strong', 'em', 'b', 'i'].includes(nextSegment.parentTag))) {
+        
+        groupedNodes.push(nextSegment.node);
+        groupedTexts.push(nextSegment.text);
+        processedNodes.add(nextSegment.node);
+        totalLength += nextSegment.length;
+      } else {
+        break;
+      }
+    }
+    
+    // Create combined text for the group
+    const combinedText = groupedTexts.join(' ').trim();
+    
+    if (combinedText.length > 0) {
+      textNodes.push(...groupedNodes);
+      
+      if (originalTextsMap.has(combinedText)) {
+        originalTextsMap.get(combinedText).push(...groupedNodes);
+      } else {
+        originalTextsMap.set(combinedText, [...groupedNodes]);
+      }
+      
+      logger.debug(`Grouped ${groupedNodes.length} nodes into: "${combinedText.substring(0, 50)}..."`);
+    }
+  }
+
+  logger.debug(`Text extraction optimization: ${allTextNodes.length} → ${textNodes.length} nodes (${Math.round((1 - textNodes.length/allTextNodes.length) * 100)}% reduction)`);
+  
   return { textNodes, originalTextsMap };
 }
 
@@ -379,23 +489,61 @@ export function parseAndCleanTranslationResponse(
   }
 }
 
-export function expandTextsForTranslation(textsToTranslate) {
+export function expandTextsForTranslation(textsToTranslate, useOptimization = true) {
+  if (!useOptimization) {
+    // Original implementation for backward compatibility
+    const expandedTexts = [];
+    const originMapping = [];
+    const originalToExpandedIndices = new Map();
+
+    textsToTranslate.forEach((originalText, originalIndex) => {
+      const segments = originalText.split("\n");
+      const currentExpandedIndices = [];
+
+      segments.forEach((segment, segmentIndex) => {
+        expandedTexts.push(segment);
+        originMapping.push({ originalIndex, segmentIndex });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      });
+      originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
+    });
+
+    return { expandedTexts, originMapping, originalToExpandedIndices };
+  }
+
+  // Optimized implementation: less aggressive splitting
   const expandedTexts = [];
   const originMapping = [];
   const originalToExpandedIndices = new Map();
 
   textsToTranslate.forEach((originalText, originalIndex) => {
-    const segments = originalText.split("\n");
+    // Only split on double newlines or when text is very long
+    const segments = originalText.length > 500 
+      ? originalText.split(/\n\n+/) // Split only on multiple newlines
+      : [originalText]; // Keep short texts intact
+    
     const currentExpandedIndices = [];
 
     segments.forEach((segment, segmentIndex) => {
-      expandedTexts.push(segment);
-      originMapping.push({ originalIndex, segmentIndex });
-      currentExpandedIndices.push(expandedTexts.length - 1);
+      const trimmedSegment = segment.trim();
+      if (trimmedSegment.length > 5) { // Skip very short segments
+        expandedTexts.push(trimmedSegment);
+        originMapping.push({ originalIndex, segmentIndex });
+        currentExpandedIndices.push(expandedTexts.length - 1);
+      }
     });
+    
+    // If no segments were added (all were too short), add the original
+    if (currentExpandedIndices.length === 0) {
+      expandedTexts.push(originalText);
+      originMapping.push({ originalIndex, segmentIndex: 0 });
+      currentExpandedIndices.push(expandedTexts.length - 1);
+    }
+    
     originalToExpandedIndices.set(originalIndex, currentExpandedIndices);
   });
 
+  logger.debug(`Text expansion optimization: ${textsToTranslate.length} → ${expandedTexts.length} segments`);
   return { expandedTexts, originMapping, originalToExpandedIndices };
 }
 
