@@ -242,6 +242,8 @@ export class TranslationEngine {
         originalTargetLang
       );
     } catch (initialError) {
+      //TODO: این منطق در جای دیگری هم مثل WindowsManager وجود دارد که بهتر است به Error Management منتقل شود
+      // اگر خطا مربوط به عدم پشتیبانی از جفت زبان ها باشد، باید به کاربر نشان داده شود
       // For language pair not supported errors, don't use fallback - show error to user
       if (initialError.message && initialError.message.includes('Translation not available')) {
         throw initialError;
@@ -290,6 +292,7 @@ export class TranslationEngine {
     const results = new Array(segments.length);
     const translationStatus = new Array(segments.length).fill(false); // Track which segments were actually translated
     const errorMessages = []; // Collect actual error messages
+    const sharedState = { shouldStopDueToLanguagePairError: false, languagePairError: null }; // Shared state to stop other batches
     
     // Smart cache-first approach
     let cacheHits = 0;
@@ -338,10 +341,16 @@ export class TranslationEngine {
           const idx = batchIndex++;
           if (idx >= batches.length) break;
           
+          // Check if we should stop due to language pair error
+          if (sharedState.shouldStopDueToLanguagePairError) {
+            logger.debug(`[TranslationEngine] Skipping batch ${idx} due to language pair error`);
+            break;
+          }
+          
           const batch = batches[idx];
           await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
             provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
-          }, errorMessages);
+          }, errorMessages, sharedState);
         }
       });
 
@@ -350,6 +359,11 @@ export class TranslationEngine {
 
     // Check if any translation actually succeeded
     const anyTranslationSucceeded = translationStatus.some(status => status === true);
+    
+    // Check if we stopped due to language pair error
+    if (sharedState.shouldStopDueToLanguagePairError && sharedState.languagePairError) {
+      throw sharedState.languagePairError;
+    }
     
     if (!anyTranslationSucceeded && uncachedIndices.length > 0) {
       // No translations succeeded and there were segments to translate
@@ -416,9 +430,15 @@ export class TranslationEngine {
   /**
    * Process a single batch with fallback strategy
    */
-  async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = []) {
+  async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = [], sharedState = null) {
     const { provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang } = config;
     const DELIMITER = "\n\n---\n\n";
+    
+    // Check if we should stop due to language pair error before starting
+    if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
+      logger.debug('[TranslationEngine] Batch stopped due to language pair error in another batch');
+      return;
+    }
     
     // Try batch translation first (most efficient)
     try {
@@ -459,8 +479,13 @@ export class TranslationEngine {
         errorMessages.push(errorMessage);
       }
 
-      // If the error indicates an unsupported language pair, don't retry individually - throw the error to show to user
+      // If the error indicates an unsupported language pair, mark shared state and exit early
       if (errorMessage && errorMessage.includes('Translation not available')) {
+        if (sharedState) {
+          sharedState.shouldStopDueToLanguagePairError = true;
+          sharedState.languagePairError = batchError;
+          logger.debug('[TranslationEngine] Language pair error detected - stopping all batches');
+        }
         throw batchError; // Re-throw to show error to user instead of silent fallback
       }
     }
@@ -468,8 +493,19 @@ export class TranslationEngine {
     // Fallback to individual translations (with minimal retry)
     const INDIVIDUAL_RETRY = 2;
     const individualPromises = batch.map(async (idx) => {
+      // Check if we should stop due to language pair error before starting individual translation
+      if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
+        logger.debug('[TranslationEngine] Individual translation stopped due to language pair error');
+        return { idx, result: segments[idx], success: false };
+      }
+      
       let attempt = 0;
       while (attempt < INDIVIDUAL_RETRY) {
+        // Check again inside the retry loop
+        if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
+          logger.debug('[TranslationEngine] Individual translation retry stopped due to language pair error');
+          return { idx, result: segments[idx], success: false };
+        }
         try {
           const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang);
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
@@ -494,8 +530,13 @@ export class TranslationEngine {
             errorMessages.push(errorMessage);
           }
           
-          // If it's a language pair error, don't retry - just throw it
+          // If it's a language pair error, mark shared state and throw
           if (errorMessage && errorMessage.includes('Translation not available')) {
+            if (sharedState) {
+              sharedState.shouldStopDueToLanguagePairError = true;
+              sharedState.languagePairError = individualError;
+              logger.debug('[TranslationEngine] Language pair error detected in individual translation - stopping all batches');
+            }
             throw individualError;
           }
           
