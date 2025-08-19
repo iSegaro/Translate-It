@@ -142,7 +142,7 @@ export async function sendReliable(message, opts = {}) {
   // Fallback to port-based messaging
   try {
     if (allAttemptsFailed) {
-      logger.warn('sendReliable: all runtime.sendMessage attempts failed, falling back to port', {
+      logger.info('sendReliable: all runtime.sendMessage attempts failed, falling back to port', {
         messageId: message.messageId,
         lastError: lastError?.message
       })
