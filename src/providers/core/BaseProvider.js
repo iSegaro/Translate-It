@@ -237,4 +237,55 @@ export class BaseProvider {
       translationMode: options.translationMode || "",
     };
   }
+
+  /**
+   * Processes an array of text segments in batches, respecting provider-specific limits.
+   * @param {Array<string>} segments - The array of text segments to translate.
+   * @param {Function} translateChunk - A function that takes a chunk (an array of strings) and translates it.
+   * @param {Object} limits - An object with `CHUNK_SIZE` and `CHAR_LIMIT`.
+   * @returns {Promise<Array<string>>} - A promise that resolves to an array of translated segments.
+   */
+  async _processInBatches(segments, translateChunk, limits) {
+    const { CHUNK_SIZE, CHAR_LIMIT } = limits;
+    const chunks = [];
+    let currentChunk = [];
+    let currentCharCount = 0;
+
+    for (const segment of segments) {
+      const segmentLength = segment.length;
+
+      if (segmentLength > CHAR_LIMIT) {
+        // If a single segment is too long, process it in its own chunk.
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk);
+          currentChunk = [];
+          currentCharCount = 0;
+        }
+        chunks.push([segment]);
+        continue;
+      }
+
+      if (
+        currentChunk.length > 0 &&
+        (currentChunk.length >= CHUNK_SIZE ||
+          currentCharCount + segmentLength > CHAR_LIMIT)
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCharCount = 0;
+      }
+
+      currentChunk.push(segment);
+      currentCharCount += segmentLength;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    const chunkPromises = chunks.map(chunk => translateChunk(chunk));
+    const translatedChunks = await Promise.all(chunkPromises);
+
+    return translatedChunks.flat();
+  }
 }
