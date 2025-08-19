@@ -168,6 +168,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
 import browser from 'webextension-polyfill'
@@ -195,6 +196,7 @@ const emit = defineEmits(['translate', 'provider-change'])
 // Stores
 const settingsStore = useSettingsStore()
 const { handleError } = useErrorHandler()
+const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // State
 const isDropdownOpen = ref(false)
@@ -246,6 +248,11 @@ const handleTranslate = () => {
 }
 
 const toggleDropdown = () => {
+  // Deactivate select element mode if it's active when user interacts with this control
+  if (isSelectModeActive.value) {
+    deactivateSelectMode();
+  }
+
   logger.debug('🔧 Provider selector dropdown toggled!', {
     currentState: isDropdownOpen.value,
     newState: !isDropdownOpen.value,

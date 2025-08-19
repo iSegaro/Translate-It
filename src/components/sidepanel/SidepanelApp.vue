@@ -144,8 +144,8 @@ const showApiProviderDropdown = computed(() => state.showApiProviderDropdown)
 const handleContainerClick = (event) => {
   // If select element mode is active, deactivate it
   if (isSelectModeActive.value) {
-    // But not if the click is on the toolbar itself
-    if (event.target.closest('.side-toolbar')) {
+    // But not if the click is on the toggle button itself
+    if (event.target.closest('#select-element-toggle-button')) {
       return;
     }
     logger.debug('Deactivating select element mode due to sidepanel click');

@@ -3,6 +3,7 @@
     <div class="toolbar-group">
       <!-- Select Element Button -->
       <button
+        id="select-element-toggle-button"
         class="toolbar-button"
         :disabled="isSelectElementActivating || isReverting"
         :class="{ 

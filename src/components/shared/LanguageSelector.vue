@@ -6,6 +6,7 @@
       class="language-select"
       :title="targetTitle"
       :disabled="disabled"
+      @click="handleDropdownClick"
     >
       <option
         v-for="language in targetLanguages"
@@ -35,6 +36,7 @@
       class="language-select"
       :title="sourceTitle"
       :disabled="disabled"
+      @click="handleDropdownClick"
     >
       <option value="Auto-Detect">
         {{ autoDetectLabel }}
@@ -55,6 +57,7 @@ import { computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { CONFIG } from '@/config.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
@@ -110,6 +113,7 @@ const emit = defineEmits([
 const languages = useLanguages()
 const settingsStore = useSettingsStore()
 const { handleError } = useErrorHandler()
+const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // Computed
 const sourceLanguage = computed({
@@ -188,6 +192,12 @@ const handleSwapLanguages = () => {
     newSource: newSourceValue,
     newTarget: newTargetValue
   })
+}
+
+const handleDropdownClick = () => {
+  if (isSelectModeActive.value) {
+    deactivateSelectMode();
+  }
 }
 
 // Initialize languages
