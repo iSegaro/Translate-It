@@ -15,23 +15,29 @@ import { MessageActions } from "@/messaging/core/MessageActions.js";
 // removed legacy createLogger import
 
 
+import { handleActivateSelectElementMode } from "../background/handlers/element-selection/handleActivateSelectElementMode.js";
+
 /**
  * Handle translate element context menu
  */
 async function handleTranslateElement(info, tab) {
   try {
-  logger.debug('Translate element menu clicked');
+    logger.debug('Translate element menu clicked, activating select mode via central handler');
 
-    // Send message to content script to translate selected element
-    await browser.tabs.sendMessage(tab.id, {
-      action: MessageActions.CONTEXT_MENU_TRANSLATE_ELEMENT,
-      info,
-      timestamp: Date.now(),
-    });
+    // Construct message and sender objects to pass to the central handler
+    const message = {
+      action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      context: 'context-menu',
+      data: { active: true, tabId: tab.id }
+    };
+    const sender = { tab };
 
-  logger.debug('Translate element message sent to content script');
+    // Call the central handler to ensure state is managed correctly
+    await handleActivateSelectElementMode(message, sender);
+
+    logger.debug('Select element mode activation requested via central handler');
   } catch (error) {
-  logger.error('Error handling translate element:', error);
+    logger.error('Error handling translate element:', error);
   }
 }
 

@@ -8,6 +8,7 @@ import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { handleActivateSelectElementMode } from '../background/handlers/element-selection/handleActivateSelectElementMode.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
@@ -335,6 +336,27 @@ export class ContextMenuManager {
   }
 
   /**
+   * Helper to activate select element mode via the central handler
+   * @param {Object} tab - The tab to activate the mode in
+   */
+  async _activateSelectElement(tab) {
+    if (!tab || !tab.id) return;
+
+    try {
+      logger.debug(`Activating select mode for tab ${tab.id} via central handler`);
+      const message = {
+        action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+        context: 'context-menu',
+        data: { active: true, tabId: tab.id }
+      };
+      const sender = { tab };
+      await handleActivateSelectElementMode(message, sender);
+    } catch (error) {
+      logger.error(`Could not activate select element mode for tab ${tab.id}:`, error);
+    }
+  }
+
+  /**
    * Handle context menu click
    * @param {Object} info - Click information
    * @param {Object} tab - Tab information
@@ -375,45 +397,12 @@ export class ContextMenuManager {
       // --- Handle specific menu items ---
       switch (info.menuItemId) {
         case PAGE_CONTEXT_MENU_ID:
-          if (tab && tab.id) {
-            // Activate select element mode with proper message format
-            browser.tabs
-              .sendMessage(tab.id, MessageFormat.create(
-                MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-                { pageUrl: tab.url },
-                'context-menu'
-              ))
-              .catch((err) => {
-                logger.error(
-                  `Could not send message to tab ${tab.id}:`,
-                  err.message
-                );
-              });
-          }
+          await this._activateSelectElement(tab);
           break;
 
         case ACTION_TRANSLATE_ELEMENT_ID:
-          try {
-            // Get active tab for browser action context
-            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-            if (activeTab && activeTab.id) {
-              // Activate select element mode with proper message format
-              browser.tabs
-                .sendMessage(activeTab.id, MessageFormat.create(
-                  MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-                  { pageUrl: activeTab.url },
-                  'context-menu'
-                ))
-                .catch((err) => {
-                  logger.error(
-                    `Could not send message to tab ${activeTab.id}:`,
-                    err.message
-                  );
-                });
-            }
-          } catch (error) {
-            logger.error("Failed to get active tab for translate element action:", error);
-          }
+          const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+          await this._activateSelectElement(activeTab);
           break;
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:
