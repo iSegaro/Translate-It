@@ -152,17 +152,25 @@ function collectTextNodesOptimized(targetElement) {
     
     const segment = textSegments[i];
     
-    // Skip micro-segments unless they're standalone
-    if (segment.length < 10 && textSegments.length > 1) {
+    // Skip micro-segments unless they're standalone or contain important content
+    if (segment.length < 3 && textSegments.length > 1) {
       // Check if it can be merged with adjacent segments
       const canMerge = i > 0 && !textSegments[i-1].isBlockElement && 
                       textSegments[i-1].parentTag === segment.parentTag;
       
       if (!canMerge) {
-        // Skip very small standalone segments
+        // Skip very small standalone segments (< 3 chars)
         logger.debug(`Skipping micro-segment: "${segment.text}"`);
         continue;
       }
+    }
+    
+    // Keep segments with meaningful content even if short
+    const hasImportantContent = /[a-zA-Z\u0600-\u06FF\u4e00-\u9fff]{2,}/.test(segment.text) || 
+                               segment.text.length >= 5;
+    if (!hasImportantContent && segment.length < 5 && textSegments.length > 1) {
+      logger.debug(`Skipping low-content micro-segment: "${segment.text}"`);
+      continue;
     }
     
     // Group adjacent text nodes from same parent or similar context
@@ -170,18 +178,20 @@ function collectTextNodesOptimized(targetElement) {
     const groupedTexts = [segment.text];
     processedNodes.add(segment.node);
     
-    // Look for adjacent nodes to group (up to 3 nodes or 200 characters)
+    // Look for adjacent nodes to group (up to 2 nodes or 100 characters for better precision)
     let totalLength = segment.length;
-    for (let j = i + 1; j < Math.min(i + 4, textSegments.length) && totalLength < 200; j++) {
+    for (let j = i + 1; j < Math.min(i + 3, textSegments.length) && totalLength < 100; j++) {
       const nextSegment = textSegments[j];
       
       if (processedNodes.has(nextSegment.node)) continue;
       
-      // Group if same parent type and not block elements
-      if (!segment.isBlockElement && !nextSegment.isBlockElement &&
-          (segment.parentTag === nextSegment.parentTag || 
-           ['span', 'a', 'strong', 'em', 'b', 'i'].includes(nextSegment.parentTag))) {
-        
+      // More conservative grouping - only for very similar contexts
+      const canGroup = !segment.isBlockElement && !nextSegment.isBlockElement &&
+          segment.parentTag === nextSegment.parentTag &&
+          // Avoid grouping if either segment is already substantial
+          segment.length < 50 && nextSegment.length < 50;
+      
+      if (canGroup) {
         groupedNodes.push(nextSegment.node);
         groupedTexts.push(nextSegment.text);
         processedNodes.add(nextSegment.node);
@@ -336,6 +346,9 @@ export async function revertTranslations(context) {
         // قبل از جایگزینی، بازیابی استایل‌های اصلی المان پدر
         const parentElement = container.parentNode;
         restoreOriginalParentStyles(parentElement);
+
+        // Remove translation-related CSS classes
+        container.classList.remove('aiwc-translated-text', 'aiwc-rtl-text', 'aiwc-ltr-text');
 
         // ایجاد گره متنی اصلی
         const originalTextNode = document.createTextNode(originalText);

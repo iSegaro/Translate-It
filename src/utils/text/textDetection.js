@@ -49,22 +49,24 @@ export const correctTextDirection = (element, text) => {
 
   const isRtl = shouldApplyRtl(textToCheck);
   const direction = isRtl ? "rtl" : "ltr";
-  // استفاده از "start" یا "end" برای textAlign می‌تواند گزینه بهتری باشد،
-  // اما "left" و "right" رایج هستند.
-  const textAlign = isRtl ? "right" : "left"; // یا "start"
 
-  if (element.style) {
-    element.style.direction = direction;
-    element.style.textAlign = textAlign;
-  } else {
-    // این حالت ممکن است برای spanها کمتر رایج باشد اما برای استحکام کد خوب است
-    element.setAttribute(
-      "style",
-      `direction: ${direction}; text-align: ${textAlign};`,
-    );
-  }
-  // بسیار مهم: ویژگی 'dir' را برای مدیریت صحیح bidi توسط مرورگر تنظیم می شود
+  // Only set the dir attribute and let CSS inherit from it
+  // This prevents conflicts between CSS direction and dir attribute
   element.setAttribute("dir", direction);
+  
+  // Remove any conflicting inline styles to prevent override issues
+  if (element.style) {
+    element.style.removeProperty('direction');
+    element.style.removeProperty('text-align');
+  }
+  
+  // Add CSS class for styling instead of inline styles
+  element.classList.add('aiwc-translated-text');
+  if (isRtl) {
+    element.classList.add('aiwc-rtl-text');
+  } else {
+    element.classList.add('aiwc-ltr-text');
+  }
 };
 
 export async function detectTextLanguage(text) {
