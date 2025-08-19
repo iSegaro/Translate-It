@@ -5,6 +5,70 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ReliableMessaging')
 
+// Circuit breaker for preventing excessive retry attempts
+class CircuitBreaker {
+  constructor(options = {}) {
+    this.failureThreshold = options.failureThreshold || 5
+    this.resetTimeout = options.resetTimeout || 60000 // 1 minute
+    this.state = 'CLOSED' // CLOSED, OPEN, HALF_OPEN
+    this.failureCount = 0
+    this.lastFailureTime = null
+    this.successCount = 0
+  }
+
+  canExecute() {
+    if (this.state === 'CLOSED') return true
+    if (this.state === 'OPEN') {
+      const timeSinceLastFailure = Date.now() - this.lastFailureTime
+      if (timeSinceLastFailure >= this.resetTimeout) {
+        this.state = 'HALF_OPEN'
+        this.successCount = 0
+        logger.debug('Circuit breaker: transitioning to HALF_OPEN state')
+        return true
+      }
+      return false
+    }
+    if (this.state === 'HALF_OPEN') return true
+    return false
+  }
+
+  onSuccess() {
+    this.failureCount = 0
+    if (this.state === 'HALF_OPEN') {
+      this.successCount++
+      if (this.successCount >= 2) { // Require 2 successes to close
+        this.state = 'CLOSED'
+        logger.debug('Circuit breaker: transitioning to CLOSED state after successful requests')
+      }
+    }
+  }
+
+  onFailure() {
+    this.failureCount++
+    this.lastFailureTime = Date.now()
+    
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN'
+      logger.warn(`Circuit breaker: OPENED due to ${this.failureCount} consecutive failures`)
+    }
+  }
+
+  getState() {
+    return {
+      state: this.state,
+      failureCount: this.failureCount,
+      lastFailureTime: this.lastFailureTime,
+      successCount: this.successCount
+    }
+  }
+}
+
+// Global circuit breaker instance
+const circuitBreaker = new CircuitBreaker({
+  failureThreshold: 3, // More aggressive for translation failures
+  resetTimeout: 30000  // 30 seconds
+})
+
 function promiseTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout')), ms)
@@ -22,9 +86,23 @@ export async function sendReliable(message, opts = {}) {
   const {
     ackTimeout = 1000,
     retries = 2,
-    backoff = [300, 1000],
+    backoff = [300, 1000, 2000], // Enhanced backoff strategy
     totalTimeout = 12000,
   } = opts
+
+  // Check circuit breaker before attempting
+  if (!circuitBreaker.canExecute()) {
+    const state = circuitBreaker.getState()
+    logger.warn('Circuit breaker is OPEN, rejecting request', { 
+      messageId: message.messageId,
+      failureCount: state.failureCount,
+      timeSinceLastFailure: Date.now() - state.lastFailureTime
+    })
+    throw new Error('Circuit breaker is open - too many recent failures')
+  }
+
+  let lastError = null
+  let allAttemptsFailed = true
 
   // Try runtime.sendMessage with retries, expect immediate response as ACK
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -32,36 +110,52 @@ export async function sendReliable(message, opts = {}) {
       logger.debug('sendReliable: attempt', attempt + 1, 'messageId', message.messageId)
       const res = await promiseTimeout(browser.runtime.sendMessage(message), ackTimeout)
       logger.debug('sendReliable: runtime.sendMessage response', res)
+      
       // For ACK-only responses, we need to wait for the actual result
       if (res && res.ack && !res.success && !res.translatedText) {
         logger.debug('sendReliable: received ACK via sendMessage, continue to port fallback for result')
+        allAttemptsFailed = false
         break; // break from retry loop to go to port fallback
       }
       // For complete responses (with actual data), return immediately
       if (res && (res.success || res.translatedText || res.error)) {
+        circuitBreaker.onSuccess()
         return res
       }
       // if no actionable response, continue to retry
     } catch (err) {
-      logger.debug('sendReliable: sendMessage attempt failed', attempt + 1, err && err.message)
-      // fallthrough to retry/backoff
+      lastError = err
+      const logLevel = attempt === retries ? 'warn' : 'debug'
+      logger[logLevel]('sendReliable: sendMessage attempt failed', attempt + 1, err && err.message)
     }
 
-    // backoff if more attempts remain
+    // Enhanced exponential backoff if more attempts remain
     if (attempt < retries) {
-      const wait = backoff[Math.min(attempt, backoff.length - 1)] || 500
+      const baseWait = backoff[Math.min(attempt, backoff.length - 1)] || 500
+      const jitter = Math.random() * 200 // Add jitter to prevent thundering herd
+      const wait = baseWait + jitter
+      logger.debug(`sendReliable: waiting ${Math.round(wait)}ms before next attempt`)
       await new Promise(r => setTimeout(r, wait))
     }
   }
 
   // Fallback to port-based messaging
   try {
-    logger.debug('sendReliable: falling back to port', message.messageId)
+    if (allAttemptsFailed) {
+      logger.warn('sendReliable: all runtime.sendMessage attempts failed, falling back to port', {
+        messageId: message.messageId,
+        lastError: lastError?.message
+      })
+    } else {
+      logger.debug('sendReliable: falling back to port', message.messageId)
+    }
+    
     const port = browser.runtime.connect({ name: 'reliable-messaging' })
 
     return await new Promise((resolve, reject) => {
       const to = setTimeout(() => {
         cleanup()
+        circuitBreaker.onFailure()
         reject(new Error('no-response'))
       }, totalTimeout)
 
@@ -92,6 +186,7 @@ export async function sendReliable(message, opts = {}) {
           // RESULT handling: resolve with final payload
           if (m.type === 'RESULT' || m.result) {
             cleanup()
+            circuitBreaker.onSuccess()
             resolve(m)
             return
           }
@@ -104,6 +199,7 @@ export async function sendReliable(message, opts = {}) {
         logger.debug('sendReliable: port disconnected unexpectedly')
         if (!isResolved) {
           cleanup()
+          circuitBreaker.onFailure()
           reject(new Error('port-disconnected'))
         }
       }
@@ -114,13 +210,30 @@ export async function sendReliable(message, opts = {}) {
         port.postMessage(message)
       } catch (err) {
         cleanup()
+        circuitBreaker.onFailure()
         reject(err)
       }
     })
   } catch (err) {
     logger.error('sendReliable: port fallback failed', err)
-    throw err
+    circuitBreaker.onFailure()
+    
+    // Add debugging information to the error
+    const enhancedError = new Error(`ReliableMessaging failed: ${err.message}`)
+    enhancedError.originalError = err
+    enhancedError.circuitBreakerState = circuitBreaker.getState()
+    enhancedError.messageId = message.messageId
+    
+    throw enhancedError
   }
 }
 
-export default { sendReliable }
+// Export circuit breaker state for debugging
+export function getMessagingStats() {
+  return {
+    circuitBreaker: circuitBreaker.getState(),
+    timestamp: Date.now()
+  }
+}
+
+export default { sendReliable, getMessagingStats }

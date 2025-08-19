@@ -44,6 +44,14 @@ export class SelectElementManager {
     this.elementValidationCache = new WeakMap();
     this.textContentCache = new WeakMap();
     
+    // Retry and failure tracking
+    this.failureTracker = new Map(); // Track failed translation attempts
+    this.retryConfig = {
+      maxRetries: 2,
+      retryDelay: [1000, 2000, 5000], // Progressive delay
+      failureCooldown: 60000, // 1 minute cooldown for failed texts
+    };
+    
     // Configuration for text validation
     this.config = {
       mode: SELECT_ELEMENT_DEFAULTS.MODE,           // Current validation mode
@@ -529,10 +537,10 @@ export class SelectElementManager {
   /**
    * Setup translation waiting before sending request to avoid race condition
    * @param {string} messageId - Message ID to wait for
-   * @param {number} timeout - Timeout in milliseconds (default: 10 seconds for long translations)
+   * @param {number} timeout - Timeout in milliseconds (default: 25 seconds for better UX)
    * @returns {Promise<Object>} Translation result promise
    */
-  setupTranslationWaiting(messageId, timeout = 30000) {
+  setupTranslationWaiting(messageId, timeout = 25000) {
     this.logger.debug(`Setting up translation waiting for messageId: ${messageId}, timeout: ${timeout}ms`);
     
     return new Promise((resolve, reject) => {
@@ -590,6 +598,96 @@ export class SelectElementManager {
         }
       }
     });
+  }
+
+  /**
+   * Check if text should be retried based on failure history
+   * @param {string} textHash - Hash of the text content
+   * @returns {boolean} Whether retry is allowed
+   */
+  canRetryText(textHash) {
+    const failure = this.failureTracker.get(textHash);
+    if (!failure) return true;
+    
+    const timeSinceLastFailure = Date.now() - failure.lastAttempt;
+    if (timeSinceLastFailure < this.retryConfig.failureCooldown) {
+      this.logger.debug('Text is in cooldown period', {
+        textHash,
+        timeSince: timeSinceLastFailure,
+        cooldown: this.retryConfig.failureCooldown
+      });
+      return false;
+    }
+    
+    return failure.attempts < this.retryConfig.maxRetries;
+  }
+
+  /**
+   * Record translation failure for a text
+   * @param {string} textHash - Hash of the text content
+   * @param {Error} error - The error that occurred
+   */
+  recordTranslationFailure(textHash, error) {
+    const existing = this.failureTracker.get(textHash) || { attempts: 0 };
+    existing.attempts++;
+    existing.lastAttempt = Date.now();
+    existing.lastError = error.message;
+    
+    this.failureTracker.set(textHash, existing);
+    this.logger.debug('Recorded translation failure', {
+      textHash,
+      attempts: existing.attempts,
+      error: error.message
+    });
+    
+    // Clean up old entries periodically
+    if (Math.random() < 0.1) { // 10% chance to clean up
+      this.cleanupFailureTracker();
+    }
+  }
+
+  /**
+   * Record translation success for a text (reset failure count)
+   * @param {string} textHash - Hash of the text content
+   */
+  recordTranslationSuccess(textHash) {
+    this.failureTracker.delete(textHash);
+  }
+
+  /**
+   * Clean up old failure tracking entries
+   */
+  cleanupFailureTracker() {
+    const cutoff = Date.now() - (this.retryConfig.failureCooldown * 2);
+    let cleaned = 0;
+    
+    for (const [textHash, failure] of this.failureTracker.entries()) {
+      if (failure.lastAttempt < cutoff) {
+        this.failureTracker.delete(textHash);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      this.logger.debug(`Cleaned up ${cleaned} old failure tracking entries`);
+    }
+  }
+
+  /**
+   * Generate hash for text content
+   * @param {string} text - Text to hash
+   * @returns {string} Simple hash
+   */
+  generateTextHash(text) {
+    if (!text) return '';
+    // Simple hash function for tracking purposes
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(36);
   }
 
   /**
@@ -945,20 +1043,23 @@ export class SelectElementManager {
     event.stopPropagation();
     event.stopImmediatePropagation(); // Prevent other handlers
 
-    // Prevent multiple rapid clicks or processing
+    // Enhanced debouncing to prevent rapid clicks
     if (this.isProcessingClick) {
       this.logger.debug("Already processing click, ignoring");
       return;
     }
 
-    // Add a small debounce to prevent double clicks
-    if (this.lastClickTime && Date.now() - this.lastClickTime < 100) {
-      this.logger.debug("Double click detected, ignoring");
+    const currentTime = Date.now();
+    // Increased debounce time for better UX
+    if (this.lastClickTime && currentTime - this.lastClickTime < 200) {
+      this.logger.debug("Double click detected, ignoring", {
+        timeDiff: currentTime - this.lastClickTime
+      });
       return;
     }
 
     this.isProcessingClick = true;
-    this.lastClickTime = Date.now();
+    this.lastClickTime = currentTime;
 
     const element = event.target;
 
@@ -1556,8 +1657,31 @@ export class SelectElementManager {
 
     // messageId is declared in outer scope so finally block can reference it
     let messageId = null;
+    let textHash = null;
 
     try {
+      // Pre-check: validate element and extract basic text first
+      const basicText = this.extractTextFromElement(element);
+      if (!basicText || basicText.trim().length === 0) {
+        await this.showNoTextNotification();
+        return { status: "empty", reason: "no_text_found" };
+      }
+
+      // Generate hash for failure tracking
+      textHash = this.generateTextHash(basicText.trim());
+      
+      // Check if this text should be retried
+      if (!this.canRetryText(textHash)) {
+        const failure = this.failureTracker.get(textHash);
+        await this.showWarningNotification(
+          `Translation skipped - too many recent failures (${failure.attempts}/${this.retryConfig.maxRetries})`
+        );
+        return { 
+          status: "skipped", 
+          reason: "failure_cooldown",
+          attempts: failure.attempts 
+        };
+      }
       // Import all required functions from advanced text extraction
       const {
         collectTextNodes,
@@ -1694,8 +1818,9 @@ export class SelectElementManager {
         return { status: "skip", reason: "no_new_texts" };
       }
 
-      // 3) Show status notification (like OLD system)
-      await this.showStatusNotification("در حال ترجمه…");
+      // 3) Show enhanced status notification with progress indicator
+      const statusMessage = `در حال ترجمه ${textsToTranslate.length} قطعه متن...`;
+      await this.showStatusNotification(statusMessage);
 
       // 3) Expand texts for translation (same as OLD)
       const { expandedTexts, originMapping } =
@@ -1706,10 +1831,17 @@ export class SelectElementManager {
         expandedTexts.map((t) => ({ text: t }))
       );
 
-      if (jsonPayload.length > 20_000) {
-        const message = `متن انتخابی بسیار بزرگ است (${jsonPayload.length} بایت)`; // Persian like OLD system
+      // Enhanced payload size checking with user-friendly messages
+      if (jsonPayload.length > 50_000) {
+        const sizeKB = Math.round(jsonPayload.length / 1024);
+        const message = `متن انتخابی بسیار بزرگ است (${sizeKB} KB) - لطفا متن کوچکتری انتخاب کنید`;
         await this.showErrorNotification(message);
-        return { status: "error", reason: "payload_large", message };
+        return { status: "error", reason: "payload_too_large", message, sizeBytes: jsonPayload.length };
+      }
+      
+      if (jsonPayload.length > 25_000) {
+        const sizeKB = Math.round(jsonPayload.length / 1024);
+        await this.showWarningNotification(`متن بزرگ انتخاب شده (${sizeKB} KB) - ترجمه ممکن است کمی طول بکشد`);
       }
 
       this.logger.debug(
@@ -1933,6 +2065,11 @@ export class SelectElementManager {
 
       applyTranslationsToNodes(textNodes, allTranslations, context);
 
+      // Record success for failure tracking
+      if (textHash) {
+        this.recordTranslationSuccess(textHash);
+      }
+
       // Log applied
       this.logLifecycle(messageId, 'APPLIED', { translatedCount: newTranslations.size });
 
@@ -1950,6 +2087,11 @@ export class SelectElementManager {
         fromCache: cachedTranslations.size,
       };
     } catch (error) {
+      // Record failure for tracking if we have textHash
+      if (textHash) {
+        this.recordTranslationFailure(textHash, error);
+      }
+
       // Dismiss status notification on error (like OLD system)
       await this.dismissStatusNotification();
 
@@ -1958,16 +2100,35 @@ export class SelectElementManager {
         error
       );
 
-      await this.errorHandler.handle(error, {
+      // Enhanced error handling with more context
+      const errorContext = {
         type: ErrorTypes.UI,
         context: "select-element-advanced-extraction",
-      });
+        elementTag: element?.tagName,
+        elementId: element?.id,
+        elementClass: element?.className,
+        textHash: textHash,
+        messageId: messageId
+      };
 
-      await this.showErrorNotification(error.message);
+      await this.errorHandler.handle(error, errorContext);
+
+      // More user-friendly error messages
+      let userMessage = error.message;
+      if (error.message.includes('Circuit breaker')) {
+        userMessage = 'Translation service temporarily unavailable - please try again later';
+      } else if (error.message.includes('no-response')) {
+        userMessage = 'Translation timed out - please try again';
+      } else if (error.message.includes('timeout')) {
+        userMessage = 'Request took too long - try selecting smaller text';
+      }
+
+      await this.showErrorNotification(userMessage);
       return {
         status: "error",
         reason: "exception",
         message: error.message,
+        userMessage: userMessage,
       };
     } finally {
       // Ensure status notification is dismissed in finally block (like OLD system)
@@ -2263,7 +2424,7 @@ export class SelectElementManager {
    * Cleanup - remove all listeners and overlays
    */
   async cleanup() {
-    this.logger.info("Cleaning up");
+    this.logger.info("Cleaning up SelectElement manager");
 
     // Revert any active translations
     if (this.translatedElements.size > 0) {
@@ -2278,14 +2439,62 @@ export class SelectElementManager {
       this.messageListener = null;
     }
 
+    // Clear all tracking structures
     this.overlayElements.clear();
     this.state.originalTexts.clear();
     this.translatedElements.clear();
     this.currentHighlighted = null;
     
-    // Clear caches
+    // Clear caches and failure tracking
     this.elementValidationCache = new WeakMap();
     this.textContentCache = new WeakMap();
+    this.failureTracker.clear();
+    
+    // Clear lifecycle tracking
+    this.messageLifecycle.clear();
+    
+    // Cancel any pending operations
+    if (this.pendingTranslation) {
+      try {
+        this.cancelPendingTranslation(this.pendingTranslation.originalMessageId);
+      } catch (error) {
+        this.logger.warn('Error canceling pending translation during cleanup:', error);
+      }
+    }
+    
+    this.logger.info("SelectElement cleanup completed");
+  }
+
+  /**
+   * Get performance and debugging information
+   */
+  getDebugInfo() {
+    return {
+      isActive: this.isActive,
+      isProcessingClick: this.isProcessingClick,
+      selectionProcessing: this.selectionProcessing,
+      translatedElements: this.translatedElements.size,
+      originalTexts: this.state.originalTexts.size,
+      failureTracker: {
+        size: this.failureTracker.size,
+        entries: Array.from(this.failureTracker.entries()).map(([hash, failure]) => ({
+          hash,
+          attempts: failure.attempts,
+          lastAttempt: new Date(failure.lastAttempt).toISOString(),
+          lastError: failure.lastError
+        }))
+      },
+      pendingTranslation: this.pendingTranslation ? {
+        messageId: this.pendingTranslation.originalMessageId,
+        startTime: new Date(this.pendingTranslation.startTime).toISOString()
+      } : null,
+      cacheStats: {
+        elementValidation: this.elementValidationCache,
+        textContent: this.textContentCache
+      },
+      config: this.config,
+      retryConfig: this.retryConfig
+    };
   }
 }
 

@@ -170,42 +170,78 @@ export default class NotificationManager {
 
   /**
    * Create progress bar element for status notifications
+   * Enhanced with better error handling and fallback timeout
    */
-  async _createProgressBar(duration) {
-    const progressContainer = document.createElement('div');
-    progressContainer.className = 'notification-progress-container';
+  async _createProgressBar(duration = null) {
+    let finalDuration = duration;
     
-    Object.assign(progressContainer.style, {
-      position: 'absolute',
-      bottom: '0',
-      left: '0',
-      right: '0',
-      height: CONFIG.PROGRESS.HEIGHT,
-      background: CONFIG.PROGRESS.BACKGROUND_TRACK,
-      borderRadius: `0 0 ${CONFIG.NOTIFICATION.BORDER_RADIUS} ${CONFIG.NOTIFICATION.BORDER_RADIUS}`,
-      overflow: 'hidden'
-    });
+    // Enhanced fallback timeout with multiple attempts
+    if (!finalDuration) {
+      try {
+        finalDuration = await getTimeoutAsync();
+        this.logger.debug('Retrieved timeout from config:', finalDuration);
+      } catch (error) {
+        this.logger.warn('Failed to get timeout from config, using fallback:', error.message);
+        finalDuration = 15000; // Fallback timeout
+      }
+    }
     
-    const progressBar = document.createElement('div');
-    progressBar.className = 'notification-progress-bar';
-    
-    Object.assign(progressBar.style, {
-      height: '100%',
-      width: '100%',
-      background: CONFIG.PROGRESS.BACKGROUND,
-      transformOrigin: 'left',
-      transform: 'scaleX(1)',
-      transition: `transform ${duration}ms linear`
-    });
-    
-    progressContainer.appendChild(progressBar);
-    
-    // Start animation
-    requestAnimationFrame(() => {
-      progressBar.style.transform = 'scaleX(0)';
-    });
-    
-    return { container: progressContainer, bar: progressBar };
+    // Ensure we have a valid duration
+    if (!finalDuration || finalDuration < 1000) {
+      this.logger.warn('Invalid duration, using safe default:', finalDuration);
+      finalDuration = 15000;
+    }
+
+    try {
+      const progressContainer = document.createElement('div');
+      progressContainer.className = 'notification-progress-container';
+      
+      Object.assign(progressContainer.style, {
+        position: 'absolute',
+        bottom: '0',
+        left: '0',
+        right: '0',
+        height: CONFIG.PROGRESS.HEIGHT,
+        background: CONFIG.PROGRESS.BACKGROUND_TRACK,
+        borderRadius: `0 0 ${CONFIG.NOTIFICATION.BORDER_RADIUS} ${CONFIG.NOTIFICATION.BORDER_RADIUS}`,
+        overflow: 'hidden'
+      });
+      
+      const progressBar = document.createElement('div');
+      progressBar.className = 'notification-progress-bar';
+      
+      Object.assign(progressBar.style, {
+        height: '100%',
+        width: '100%',
+        background: CONFIG.PROGRESS.BACKGROUND,
+        transformOrigin: 'left',
+        transform: 'scaleX(1)',
+        transition: `transform ${finalDuration}ms linear`
+      });
+      
+      progressContainer.appendChild(progressBar);
+      
+      // Enhanced animation start with error handling
+      const startAnimation = () => {
+        try {
+          progressBar.style.transform = 'scaleX(0)';
+          this.logger.debug('Progress bar animation started', { duration: finalDuration });
+        } catch (error) {
+          this.logger.warn('Failed to start progress bar animation:', error.message);
+        }
+      };
+      
+      // Use double requestAnimationFrame for better reliability
+      requestAnimationFrame(() => {
+        requestAnimationFrame(startAnimation);
+      });
+      
+      return { container: progressContainer, bar: progressBar, duration: finalDuration };
+    } catch (error) {
+      this.logger.error('Failed to create progress bar:', error.message);
+      // Return null instead of throwing to prevent notification failure
+      return null;
+    }
   }
 
   /**
@@ -664,10 +700,32 @@ export default class NotificationManager {
         const currentTransform = window.getComputedStyle(node._progressBar.bar).transform;
         node._progressBar.bar.style.transition = 'none';
         node._progressBar.bar.style.transform = currentTransform;
+        
+        this.logger.debug('Progress bar animation stopped', {
+          finalTransform: currentTransform,
+          nodeHasProgressBar: !!node._progressBar
+        });
       } catch (error) {
-        this.logger.debug('Failed to stop progress bar animation', error);
+        this.logger.debug('Failed to stop progress bar animation:', error.message);
       }
     }
+  }
+
+  /**
+   * Get progress bar debugging information
+   */
+  _getProgressBarDebugInfo() {
+    const activeWithProgress = Array.from(this.activeNotifications).filter(n => n._progressBar);
+    return {
+      totalActive: this.activeNotifications.size,
+      withProgressBar: activeWithProgress.length,
+      progressBarDetails: activeWithProgress.map(n => ({
+        className: n.className,
+        hasContainer: !!n._progressBar.container,
+        hasBar: !!n._progressBar.bar,
+        duration: n._progressBar.duration
+      }))
+    };
   }
 
   /**
@@ -743,19 +801,46 @@ export default class NotificationManager {
     n.appendChild(iconSpan);
     n.appendChild(msgSpan);
 
-    // Add progress bar for status notifications
+    // Add progress bar for status notifications with enhanced error handling
     if (cfg.cls === "AIWC-status") {
+      let progressBarAdded = false;
+      
       try {
-        const timeout = await getTimeoutAsync();
-        const progressBarElements = await this._createProgressBar(timeout);
-        n.appendChild(progressBarElements.container);
+        // Attempt to create progress bar with retry mechanism
+        let progressBarElements = await this._createProgressBar();
         
-        // Store progress bar reference for potential cleanup
-        n._progressBar = progressBarElements;
+        // Retry once if creation failed
+        if (!progressBarElements) {
+          this.logger.warn('First progress bar creation failed, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+          progressBarElements = await this._createProgressBar(15000); // Use fallback timeout
+        }
         
-        this.logger.debug('Progress bar added to status notification', { timeout });
+        if (progressBarElements && progressBarElements.container) {
+          n.appendChild(progressBarElements.container);
+          n._progressBar = progressBarElements;
+          progressBarAdded = true;
+          
+          this.logger.debug('Progress bar successfully added to status notification', { 
+            timeout: progressBarElements.duration,
+            retryUsed: !progressBarElements
+          });
+        } else {
+          throw new Error('Progress bar creation returned null');
+        }
       } catch (error) {
-        this.logger.warn('Failed to add progress bar to status notification', error);
+        this.logger.warn('Failed to add progress bar to status notification:', {
+          error: error.message,
+          willShowWithoutProgressBar: true
+        });
+        
+        // Show notification without progress bar instead of failing completely
+        // This ensures the user still gets feedback even if progress bar fails
+      }
+      
+      // Ensure we log the final state for debugging
+      if (!progressBarAdded) {
+        this.logger.info('Status notification will be shown without progress bar due to creation failure');
       }
     }
 
@@ -860,7 +945,8 @@ export default class NotificationManager {
       maxVisible: CONFIG.QUEUE.MAX_VISIBLE,
       maxQueue: CONFIG.QUEUE.MAX_QUEUE_SIZE,
       recentRequests: this.rateLimitTracker.length,
-      canShowMore: this._getVisibleCount() < CONFIG.QUEUE.MAX_VISIBLE
+      canShowMore: this._getVisibleCount() < CONFIG.QUEUE.MAX_VISIBLE,
+      progressBarInfo: this._getProgressBarDebugInfo()
     };
   }
 }
