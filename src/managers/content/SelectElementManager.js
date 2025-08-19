@@ -1118,6 +1118,9 @@ export class SelectElementManager {
       // so ESC can cancel the in-flight translation.
       this.selectionProcessing = true;
 
+      // Show status notification immediately for better UX
+      this.showStatusNotification("در حال ترجمه...");
+
       // Deactivate select element mode immediately after click (UI only)
       this.logger.operation("Deactivating select element mode after element selection");
       await this.deactivateUIOnly();
@@ -1811,10 +1814,6 @@ export class SelectElementManager {
       if (!textsToTranslate.length) {
         return { status: "skip", reason: "no_new_texts" };
       }
-
-      // 3) Show enhanced status notification with progress indicator
-      const statusMessage = `در حال ترجمه ${textsToTranslate.length} قطعه متن...`;
-      await this.showStatusNotification(statusMessage);
 
       // 3) Expand texts for translation (same as OLD)
       const { expandedTexts, originMapping } =
