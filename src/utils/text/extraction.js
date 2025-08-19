@@ -76,15 +76,34 @@ export function separateCachedAndNewTexts(originalTextsMap) {
  * آرایه‌ای از گره‌های متنی و نگاشتی از متن اصلی به لیست گره‌های متنی.
  */
 export function collectTextNodes(targetElement, useIntelligentGrouping = true) {
+  // For large elements (our typical use case now), always use optimized version
   if (useIntelligentGrouping) {
     return collectTextNodesOptimized(targetElement);
   }
   
-  // Original implementation for backward compatibility
+  // Original implementation for backward compatibility (but improved)
   const walker = document.createTreeWalker(
     targetElement,
     NodeFilter.SHOW_TEXT,
-    null,
+    {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        // Skip hidden elements
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden") {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // If getComputedStyle fails, accept the node
+        }
+
+        // Accept all visible text nodes
+        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    },
     false,
   );
 
@@ -94,9 +113,9 @@ export function collectTextNodes(targetElement, useIntelligentGrouping = true) {
 
   while ((node = walker.nextNode())) {
     const trimmedText = node.textContent.trim();
-    textNodes.push(node);
-
     if (trimmedText) {
+      textNodes.push(node);
+
       if (originalTextsMap.has(trimmedText)) {
         originalTextsMap.get(trimmedText).push(node);
       } else {
@@ -116,7 +135,30 @@ function collectTextNodesOptimized(targetElement) {
   const walker = document.createTreeWalker(
     targetElement,
     NodeFilter.SHOW_TEXT,
-    null,
+    {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        // Skip hidden elements
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // If getComputedStyle fails, accept the node
+        }
+
+        // Skip script/style content
+        if (parent.closest('script, style, noscript, [aria-hidden="true"]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        // Accept all visible text nodes for comprehensive extraction
+        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    },
     false,
   );
 
@@ -124,7 +166,7 @@ function collectTextNodesOptimized(targetElement) {
   const textSegments = [];
   let node;
 
-  // First pass: collect all text nodes and their context
+  // First pass: collect all visible text nodes and their context
   while ((node = walker.nextNode())) {
     const trimmedText = node.textContent.trim();
     if (trimmedText) {
@@ -152,24 +194,18 @@ function collectTextNodesOptimized(targetElement) {
     
     const segment = textSegments[i];
     
-    // Skip micro-segments unless they're standalone or contain important content
-    if (segment.length < 3 && textSegments.length > 1) {
-      // Check if it can be merged with adjacent segments
-      const canMerge = i > 0 && !textSegments[i-1].isBlockElement && 
-                      textSegments[i-1].parentTag === segment.parentTag;
-      
-      if (!canMerge) {
-        // Skip very small standalone segments (< 3 chars)
-        logger.debug(`Skipping micro-segment: "${segment.text}"`);
-        continue;
-      }
+    // For large parent elements, be less aggressive with filtering to preserve all content
+    // Only skip truly meaningless segments (< 2 chars)
+    if (segment.length < 2) {
+      logger.debug(`Skipping tiny segment: "${segment.text}"`);
+      continue;
     }
     
-    // Keep segments with meaningful content even if short
-    const hasImportantContent = /[a-zA-Z\u0600-\u06FF\u4e00-\u9fff]{2,}/.test(segment.text) || 
-                               segment.text.length >= 5;
-    if (!hasImportantContent && segment.length < 5 && textSegments.length > 1) {
-      logger.debug(`Skipping low-content micro-segment: "${segment.text}"`);
+    // Keep more content for large containers - only filter obvious noise
+    const hasAnyContent = /[a-zA-Z\u0600-\u06FF\u4e00-\u9fff]/.test(segment.text) || 
+                         segment.text.length >= 3;
+    if (!hasAnyContent) {
+      logger.debug(`Skipping no-content segment: "${segment.text}"`);
       continue;
     }
     

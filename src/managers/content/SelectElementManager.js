@@ -906,7 +906,7 @@ export class SelectElementManager {
   }
 
   /**
-   * Handle mouse over event - highlight element
+   * Handle mouse over event - highlight main container only
    */
   handleMouseOver(event) {
     // Allow ESC to cancel even if we've deactivated normal select mode but a
@@ -927,12 +927,15 @@ export class SelectElementManager {
     // Skip if already highlighted
     if (bestElement === this.currentHighlighted) return;
 
-    // Clear previous highlight
+    // Clear previous highlight first
     this.clearHighlight();
 
-    // Highlight best element
+    // Highlight only the main container - not children
     this.highlightElement(bestElement);
     this.currentHighlighted = bestElement;
+    
+    // Prevent event from highlighting child elements
+    event.stopPropagation();
   }
 
   /**
@@ -1759,63 +1762,54 @@ export class SelectElementManager {
   }
 
   /**
-   * Smart text extraction with multiple methods and better fallback handling
+   * Smart text extraction optimized for large parent elements
    */
   extractTextFromElement_Smart(element) {
     let extractedText = "";
     
-    // Method 1: For container elements, prefer full textContent
-    if (element.children.length > 0) {
-      const fullText = (element.textContent || "").trim();
-      if (fullText && fullText.length >= 10) {
-        extractedText = fullText;
-        this.logger.debug("[extractTextFromElement_Smart] Using full container text:", extractedText.substring(0, 100));
+    // Priority Method: For large container elements, ALWAYS use full textContent
+    // This ensures we get ALL text from the highlighted parent element
+    const fullText = (element.textContent || "").trim();
+    if (fullText && fullText.length > 0) {
+      extractedText = fullText;
+      this.logger.debug("[extractTextFromElement_Smart] Using full element text:", {
+        elementType: `${element.tagName}.${element.className}`,
+        textLength: extractedText.length,
+        preview: extractedText.substring(0, 200) + (extractedText.length > 200 ? '...' : '')
+      });
+      return extractedText;
+    }
+    
+    // Fallback 1: Try innerText if textContent failed
+    if (!extractedText && element.innerText) {
+      const innerText = element.innerText.trim();
+      if (innerText && innerText.length > 0) {
+        extractedText = innerText;
+        this.logger.debug("[extractTextFromElement_Smart] Using innerText fallback:", extractedText.substring(0, 100));
         return extractedText;
       }
     }
     
-    // Method 2: Try immediate text content first (for leaf elements)
-    const immediateText = this.getImmediateTextContent(element);
-    if (immediateText && this.isValidTextContent(immediateText)) {
-      extractedText = immediateText;
-      this.logger.debug("[extractTextFromElement_Smart] Using immediate text:", extractedText);
-    }
-    
-    // Method 3: If no immediate text, try simple textContent with relaxed validation
-    if (!extractedText) {
-      const simpleText = (element.textContent || "").trim();
-      if (simpleText && simpleText.length >= 3) {
-        extractedText = simpleText;
-        this.logger.debug("[extractTextFromElement_Smart] Using simple textContent:", extractedText.substring(0, 100));
-      }
-    }
-    
-    // Method 4: If still no text, try innerText (respects visibility)
-    if (!extractedText && element.innerText) {
-      const innerText = element.innerText.trim();
-      if (innerText && innerText.length >= 3) {
-        extractedText = innerText;
-        this.logger.debug("[extractTextFromElement_Smart] Using innerText:", extractedText.substring(0, 100));
-      }
-    }
-    
-    // Method 5: Use tree walker as fallback with relaxed filtering
+    // Fallback 2: Tree walker for complex structures
     if (!extractedText) {
       extractedText = this.extractTextWithTreeWalker(element);
-      this.logger.debug("[extractTextFromElement_Smart] Using tree walker:", extractedText.substring(0, 100));
+      this.logger.debug("[extractTextFromElement_Smart] Using tree walker fallback:", extractedText.substring(0, 100));
     }
     
-    // Final cleanup: ensure we have some meaningful text
-    if (extractedText && extractedText.length < 3) {
-      this.logger.debug("[extractTextFromElement_Smart] Text too short, clearing:", extractedText);
-      extractedText = "";
+    // Fallback 3: Try immediate text content for leaf elements
+    if (!extractedText) {
+      const immediateText = this.getImmediateTextContent(element);
+      if (immediateText && immediateText.length > 0) {
+        extractedText = immediateText;
+        this.logger.debug("[extractTextFromElement_Smart] Using immediate text fallback:", extractedText);
+      }
     }
 
     return extractedText;
   }
 
   /**
-   * Extract text using tree walker with relaxed filtering
+   * Extract text using tree walker optimized for large container elements
    */
   extractTextWithTreeWalker(element) {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
@@ -1826,19 +1820,19 @@ export class SelectElementManager {
 
         try {
           const style = window.getComputedStyle(parent);
-          if (style.display === "none" || style.visibility === "hidden") {
+          if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
             return NodeFilter.FILTER_REJECT;
           }
         } catch {
           // If getComputedStyle fails, accept the node
         }
 
-        // Accept any non-empty text nodes (relaxed filtering)
+        // Accept all non-empty text nodes - we want comprehensive text extraction
         const textContent = node.textContent.trim();
         if (!textContent) return NodeFilter.FILTER_REJECT;
 
-        // Skip text from script or style tags
-        if (parent.closest('script, style, noscript')) {
+        // Skip text from script, style, or other non-content tags
+        if (parent.closest('script, style, noscript, code[hidden], [aria-hidden="true"]')) {
           return NodeFilter.FILTER_REJECT;
         }
 
@@ -1848,15 +1842,39 @@ export class SelectElementManager {
 
     let node;
     const textParts = [];
+    const processedParents = new Set();
+    
     while ((node = walker.nextNode())) {
       const nodeText = node.textContent.trim();
       if (nodeText) {
-        // Preserve structure by adding space only when necessary
+        const parent = node.parentElement;
+        const parentKey = `${parent.tagName}_${parent.className}_${parent.id}`;
+        
+        // For large containers, preserve line breaks and paragraph structure
+        if (['P', 'DIV', 'LI', 'TD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(parent.tagName)) {
+          if (!processedParents.has(parentKey)) {
+            if (textParts.length > 0) textParts.push('\n');
+            processedParents.add(parentKey);
+          }
+        }
+        
         textParts.push(nodeText);
+        
+        // Add space after inline elements
+        if (['SPAN', 'A', 'STRONG', 'EM', 'B', 'I'].includes(parent.tagName)) {
+          textParts.push(' ');
+        }
       }
     }
 
-    return textParts.join(" ").trim();
+    const result = textParts.join('').replace(/\s+/g, ' ').trim();
+    this.logger.debug("[extractTextWithTreeWalker] Processed text nodes:", {
+      nodeCount: textParts.length,
+      resultLength: result.length,
+      preview: result.substring(0, 200) + (result.length > 200 ? '...' : '')
+    });
+    
+    return result;
   }
 
   /**

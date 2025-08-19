@@ -23,17 +23,14 @@
   text-decoration: none !important;
 }
 
-/* Visual highlighting for hoverable elements with text content - border only */
+/* Disable automatic hover highlighting - let JS handle highlighting */
 .AIWritingCompanion-disable-links *:hover {
-  outline: 2px solid #ffaa00 !important;
-  outline-offset: 1px !important;
-  transition: outline 0.1s ease !important;
+  /* Remove automatic highlighting to prevent sub-element highlighting */
 }
 
-/* Simple mode styling (light blue) when Ctrl is pressed - border only */
+/* Disable simple mode hover highlighting - let JS handle highlighting */
 .AIWritingCompanion-disable-links.simple-mode *:hover {
-  outline: 2px solid #4a90e2 !important;
-  outline-offset: 1px !important;
+  /* Remove automatic highlighting to prevent sub-element highlighting */
 }
 
 /* Prevent highlighting on body and html elements */
@@ -42,7 +39,7 @@
   outline: none !important;
 }
 
-/* More specific highlighting for text-containing elements - border only */
+/* Disable specific element hover highlighting - let JS handle highlighting */
 .AIWritingCompanion-disable-links p:hover,
 .AIWritingCompanion-disable-links div:hover,
 .AIWritingCompanion-disable-links span:hover,
@@ -57,11 +54,10 @@
 .AIWritingCompanion-disable-links th:hover,
 .AIWritingCompanion-disable-links article:hover,
 .AIWritingCompanion-disable-links section:hover {
-  outline: 2px dashed #ffaa00 !important;
-  outline-offset: 1px !important;
+  /* Remove automatic highlighting to prevent sub-element highlighting */
 }
 
-/* Simple mode styling for text elements - border only */
+/* Disable simple mode element hover highlighting - let JS handle highlighting */
 .AIWritingCompanion-disable-links.simple-mode p:hover,
 .AIWritingCompanion-disable-links.simple-mode div:hover,
 .AIWritingCompanion-disable-links.simple-mode span:hover,
@@ -76,23 +72,27 @@
 .AIWritingCompanion-disable-links.simple-mode th:hover,
 .AIWritingCompanion-disable-links.simple-mode article:hover,
 .AIWritingCompanion-disable-links.simple-mode section:hover {
-  outline: 2px dashed #4a90e2 !important;
-  outline-offset: 1px !important;
+  /* Remove automatic highlighting to prevent sub-element highlighting */
 }
 
-/* Special styling for input elements - border only */
+/* Keep input element highlighting for user feedback */
 .AIWritingCompanion-disable-links input:hover,
 .AIWritingCompanion-disable-links textarea:hover {
   outline: 2px solid #4a90e2 !important;
   outline-offset: 1px !important;
 }
 
-/* Additional highlighting for actively tracked elements - border only */
+/* JS-controlled highlighting for selected main containers */
 .translate-it-element-highlighted {
   outline: 3px solid #ff8800 !important;
   outline-offset: 2px !important;
   z-index: 999999 !important;
   position: relative !important;
+}
+
+/* Prevent child elements from being highlighted when parent is highlighted */
+.translate-it-element-highlighted * {
+  outline: none !important;
 }
 
 /* ==========================================================================
