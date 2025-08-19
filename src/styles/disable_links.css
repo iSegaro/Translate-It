@@ -23,31 +23,26 @@
   text-decoration: none !important;
 }
 
-/* Visual highlighting for hoverable elements with text content */
+/* Visual highlighting for hoverable elements with text content - border only */
 .AIWritingCompanion-disable-links *:hover {
-  background-color: rgba(255, 215, 0, 0.3) !important;
   outline: 2px solid #ffaa00 !important;
   outline-offset: 1px !important;
-  box-shadow: 0 0 5px rgba(255, 170, 0, 0.5) !important;
-  transition: all 0.1s ease !important;
+  transition: outline 0.1s ease !important;
 }
 
-/* Simple mode styling (light blue) when Ctrl is pressed */
+/* Simple mode styling (light blue) when Ctrl is pressed - border only */
 .AIWritingCompanion-disable-links.simple-mode *:hover {
-  background-color: rgba(173, 216, 230, 0.3) !important;
   outline: 2px solid #4a90e2 !important;
-  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5) !important;
+  outline-offset: 1px !important;
 }
 
 /* Prevent highlighting on body and html elements */
 .AIWritingCompanion-disable-links body:hover,
 .AIWritingCompanion-disable-links html:hover {
-  background-color: transparent !important;
   outline: none !important;
-  box-shadow: none !important;
 }
 
-/* More specific highlighting for text-containing elements */
+/* More specific highlighting for text-containing elements - border only */
 .AIWritingCompanion-disable-links p:hover,
 .AIWritingCompanion-disable-links div:hover,
 .AIWritingCompanion-disable-links span:hover,
@@ -62,12 +57,11 @@
 .AIWritingCompanion-disable-links th:hover,
 .AIWritingCompanion-disable-links article:hover,
 .AIWritingCompanion-disable-links section:hover {
-  background-color: rgba(255, 215, 0, 0.2) !important;
   outline: 2px dashed #ffaa00 !important;
-  outline-offset: 2px !important;
+  outline-offset: 1px !important;
 }
 
-/* Simple mode styling for text elements */
+/* Simple mode styling for text elements - border only */
 .AIWritingCompanion-disable-links.simple-mode p:hover,
 .AIWritingCompanion-disable-links.simple-mode div:hover,
 .AIWritingCompanion-disable-links.simple-mode span:hover,
@@ -82,24 +76,21 @@
 .AIWritingCompanion-disable-links.simple-mode th:hover,
 .AIWritingCompanion-disable-links.simple-mode article:hover,
 .AIWritingCompanion-disable-links.simple-mode section:hover {
-  background-color: rgba(173, 216, 230, 0.2) !important;
   outline: 2px dashed #4a90e2 !important;
+  outline-offset: 1px !important;
 }
 
-/* Special styling for input elements */
+/* Special styling for input elements - border only */
 .AIWritingCompanion-disable-links input:hover,
 .AIWritingCompanion-disable-links textarea:hover {
-  background-color: rgba(173, 216, 230, 0.3) !important;
   outline: 2px solid #4a90e2 !important;
   outline-offset: 1px !important;
 }
 
-/* Additional highlighting for actively tracked elements */
+/* Additional highlighting for actively tracked elements - border only */
 .translate-it-element-highlighted {
-  background-color: rgba(255, 215, 0, 0.4) !important;
   outline: 3px solid #ff8800 !important;
   outline-offset: 2px !important;
-  box-shadow: 0 0 8px rgba(255, 136, 0, 0.6) !important;
   z-index: 999999 !important;
   position: relative !important;
 }
