@@ -53,22 +53,14 @@ export class SelectElementManager {
       failureCooldown: 60000, // 1 minute cooldown for failed texts
     };
     
-    // Configuration for text validation and highlighting
+    // Configuration for text validation
     this.config = {
       mode: SELECT_ELEMENT_DEFAULTS.MODE,           // Current validation mode
       baseMode: SELECT_ELEMENT_DEFAULTS.BASE_MODE, // Base mode when Ctrl is not pressed
       minTextLength: SELECT_ELEMENT_DEFAULTS.MIN_TEXT_LENGTH,        // Minimum text length to consider for translation
       minWordCount: SELECT_ELEMENT_DEFAULTS.MIN_WORD_COUNT,         // Minimum word count for meaningful content
       maxElementArea: SELECT_ELEMENT_DEFAULTS.MAX_ELEMENT_AREA,   // Maximum element area for container validation
-      maxAncestors: SELECT_ELEMENT_DEFAULTS.MAX_ANCESTORS,         // Maximum ancestors to check when finding best element
-      
-      // Enhanced highlighting configuration - much larger thresholds for bigger selections
-      minHighlightArea: 50000,      // Minimum area (px^2) for highlight - much larger for big blocks
-      minHighlightWidth: 200,       // Minimum width (px) for highlight
-      minHighlightHeight: 100,      // Minimum height (px) for highlight  
-      preferredMinArea: 80000,      // Preferred minimum area for excellent user experience
-      maxChildSearchDepth: 2,       // Reduced depth to prefer larger parents
-      parentSizeMultiplier: 1.5     // Lower multiplier to more easily prefer larger parents
+      maxAncestors: SELECT_ELEMENT_DEFAULTS.MAX_ANCESTORS          // Maximum ancestors to check when finding best element
     };
 
     // Create proper state structure like OLD system
@@ -808,8 +800,8 @@ export class SelectElementManager {
     // Re-add ESC key handling for background translation cancellation
     this.setupEscapeKeyListener();
 
-    // Clean up highlights - comprehensive cleanup
-    this.cleanupAllHighlights();
+    // Clean up highlights
+    this.clearHighlight();
     this.clearOverlays();
 
     // Remove global styles
@@ -906,7 +898,7 @@ export class SelectElementManager {
   }
 
   /**
-   * Handle mouse over event - highlight main container only
+   * Handle mouse over event - highlight element
    */
   handleMouseOver(event) {
     // Allow ESC to cancel even if we've deactivated normal select mode but a
@@ -918,284 +910,103 @@ export class SelectElementManager {
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
     
-    // Only highlight if we have a valid element that meets our enhanced requirements
-    if (!bestElement || !this.meetsMinimumHighlightRequirements(bestElement)) {
-      this.clearHighlight();
-      return;
-    }
+    if (!bestElement) return;
 
     // Skip if already highlighted
     if (bestElement === this.currentHighlighted) return;
 
-    // Clear previous highlight first
+    // Clear previous highlight
     this.clearHighlight();
 
-    // Highlight only the main container - not children
+    // Highlight best element
     this.highlightElement(bestElement);
     this.currentHighlighted = bestElement;
-    
-    // Prevent event from highlighting child elements
-    event.stopPropagation();
   }
 
   /**
    * Find the best element to highlight for translation
-   * Enhanced to prefer larger, more meaningful text blocks
+   * This may walk up the DOM tree to find a more suitable parent
    */
   findBestTextElement(startElement) {
     let element = startElement;
     let bestCandidate = null;
-    let bestScore = 0;
     let maxAncestors = this.config.maxAncestors;
+    const minArea = 4000; // حداقل area برای بخش کاربردی (مثلا توییت)
+    const maxArea = 120000; // حداکثر area برای جلوگیری از انتخاب کل صفحه یا ستون بزرگ
+    const minTextLength = 20; // حداقل طول متن برای کاربردی بودن
+    const minWordCount = 3; // حداقل تعداد کلمه
 
-    // Walk up the DOM tree to find the best element
+    // اگر المنت فعلی خودش شرایط مناسب را دارد، همان را انتخاب کن
     while (element && element !== document.body && maxAncestors-- > 0) {
       if (this.isValidTextElement(element)) {
-        const score = this.calculateElementScore(element);
-        
-        // Only consider elements that meet minimum requirements
-        if (this.meetsMinimumHighlightRequirements(element)) {
-          if (score > bestScore) {
-            bestCandidate = element;
-            bestScore = score;
-          }
-        }
-      }
-      element = element.parentElement;
-    }
+        const area = element.offsetWidth * element.offsetHeight;
+        const text = element.textContent?.trim() || "";
+        const wordCount = text.split(/\s+/).length;
 
-    // If no candidate meets requirements, try to find a suitable parent
-    if (!bestCandidate) {
-      bestCandidate = this.findSuitableParent(startElement);
-    }
-
-    // Final optimization: check if we should prefer a better child
-    if (bestCandidate) {
-      const optimizedCandidate = this.optimizeElementSelection(bestCandidate, startElement);
-      if (optimizedCandidate) {
-        bestCandidate = optimizedCandidate;
-      }
-    }
-
-    return bestCandidate;
-  }
-
-  /**
-   * Calculate a score for element suitability based on size, content, and structure
-   */
-  calculateElementScore(element) {
-    const rect = element.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    const textContent = element.textContent?.trim() || "";
-    const textLength = textContent.length;
-    
-    // Heavy emphasis on larger areas - exponential scaling for bigger elements
-    let score = Math.min(area / 500, 200); // Higher cap and lower divisor for bigger bonus
-    
-    // Extra bonus for very large areas
-    if (area > 100000) score += 50;
-    else if (area > 80000) score += 30;
-    else if (area > 60000) score += 20;
-    
-    // Significant bonus for substantial text content
-    if (textLength > 500) score += 60;
-    else if (textLength > 200) score += 40;
-    else if (textLength > 100) score += 25;
-    else if (textLength > 50) score += 10;
-    
-    // Strong preference for container block-level elements
-    const tagName = element.tagName.toLowerCase();
-    if (['div', 'article', 'section', 'main', 'content'].includes(tagName)) {
-      score += 40; // Increased bonus for containers
-    } else if (['p', 'li', 'td', 'blockquote'].includes(tagName)) {
-      score += 25;
-    } else if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
-      score += 15;
-    }
-    
-    // Less penalty for aspect ratio to allow wider containers
-    const aspectRatio = rect.width / rect.height;
-    if (aspectRatio > 15 || aspectRatio < 0.05) {
-      score -= 15; // Reduced penalty
-    }
-    
-    // Bigger bonus for elements with substantial immediate text
-    const immediateText = this.getImmediateTextContent(element);
-    if (immediateText && immediateText.length > 100) {
-      score += 40;
-    } else if (immediateText && immediateText.length > 50) {
-      score += 20;
-    }
-    
-    return score;
-  }
-
-  /**
-   * Check if element meets minimum requirements for highlighting
-   */
-  meetsMinimumHighlightRequirements(element) {
-    const rect = element.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    const textLength = element.textContent?.trim().length || 0;
-    
-    // Much stricter requirements for bigger selections only
-    return area >= this.config.minHighlightArea &&
-           rect.width >= this.config.minHighlightWidth &&
-           rect.height >= this.config.minHighlightHeight &&
-           textLength >= 30 && // Increased minimum text length
-           // Additional check: element should have substantial visible content
-           this.hasSubstantialContent(element);
-  }
-
-  /**
-   * Check if element has substantial content worth translating
-   */
-  hasSubstantialContent(element) {
-    const textContent = element.textContent?.trim() || "";
-    
-    // Must have decent amount of text
-    if (textContent.length < 30) return false;
-    
-    // Should have multiple words
-    const words = textContent.split(/\s+/).filter(word => word.length > 1);
-    if (words.length < 5) return false;
-    
-    // Prefer elements that are likely to be content containers
-    const tagName = element.tagName.toLowerCase();
-    const isContentTag = ['div', 'p', 'article', 'section', 'main', 'li', 'td', 'blockquote'].includes(tagName);
-    
-    // More lenient for content tags, stricter for others
-    return isContentTag ? textContent.length >= 30 : textContent.length >= 80;
-  }
-
-  /**
-   * Find a suitable parent when no immediate candidate is found
-   */
-  findSuitableParent(startElement) {
-    let element = startElement;
-    let attempts = 0;
-    const maxAttempts = 12; // More attempts to find bigger parents
-    let bestCandidate = null;
-    let bestScore = 0;
-    
-    // Keep going up to find the biggest suitable parent
-    while (element && element !== document.body && attempts++ < maxAttempts) {
-      element = element.parentElement;
-      if (element && this.meetsMinimumHighlightRequirements(element)) {
-        const score = this.calculateElementScore(element);
-        // Always prefer the bigger/better parent
-        if (score > bestScore) {
+        // فقط اگر اندازه مناسب و متن کافی دارد
+        if (
+          area >= minArea && area <= maxArea &&
+          text.length >= minTextLength &&
+          wordCount >= minWordCount
+        ) {
           bestCandidate = element;
-          bestScore = score;
+          break;
+        }
+        // اگر خیلی کوچک یا خیلی بزرگ بود، به والد برو
+        if (!bestCandidate && area > minArea && area < maxArea) {
+          bestCandidate = element;
         }
       }
+      element = element.parentElement;
     }
-    
-    return bestCandidate;
-  }
 
-  /**
-   * Optimize element selection by checking for better children or parents
-   */
-  optimizeElementSelection(candidate, originalElement) {
-    // First check if parent would be better (prioritize going up for bigger selections)
-    const parent = candidate.parentElement;
-    if (parent && parent !== document.body) {
-      const candidateScore = this.calculateElementScore(candidate);
-      const parentScore = this.calculateElementScore(parent);
-      
-      // More aggressive parent preference - easier threshold
-      if (parentScore > candidateScore * this.config.parentSizeMultiplier && 
-          this.meetsMinimumHighlightRequirements(parent)) {
-        const parentArea = parent.getBoundingClientRect().width * parent.getBoundingClientRect().height;
-        // Allow much larger parents (increased from 100k to 500k)
-        if (parentArea < 500000) {
-          return parent;
-        }
-      }
-    }
-    
-    // Only check for better children if parent wasn't suitable
-    // and current candidate is very large
-    const candidateArea = candidate.getBoundingClientRect().width * candidate.getBoundingClientRect().height;
-    if (candidateArea > this.config.preferredMinArea * 2) {
-      const betterChild = this.findBetterChildElement(candidate, originalElement);
+    // اگر کاندیدا پیدا شد، بررسی کن که آیا فرزند بهتری وجود دارد
+    if (bestCandidate) {
+      const betterChild = this.findBetterChildElement(bestCandidate, startElement);
       if (betterChild) {
-        return betterChild;
+        bestCandidate = betterChild;
       }
+      return bestCandidate;
     }
-    
-    return candidate;
+    // اگر هیچ کاندیدا پیدا نشد، همان المنت فعلی را هایلایت کن (برای اطمینان از بازخورد کاربر)
+    return startElement;
   }
 
   /**
    * Check if there's a better child element to select instead of the parent
    */
   findBetterChildElement(parentElement, originalElement) {
-    const parentScore = this.calculateElementScore(parentElement);
-    const parentArea = parentElement.getBoundingClientRect().width * parentElement.getBoundingClientRect().height;
+    // If parent is too big and has a smaller child with good content, prefer the child
+    const parentArea = parentElement.offsetWidth * parentElement.offsetHeight;
     
-    // Only look for better children in reasonably large parents
-    if (parentArea < this.config.preferredMinArea) return null;
+    // Only look for better children in large parents
+    if (parentArea < 10000) return null;
     
-    let bestChild = null;
-    let bestChildScore = 0;
+    const children = Array.from(parentElement.children);
     
-    // Search through children (with depth limit)
-    const searchDepth = this.config.maxChildSearchDepth;
-    const candidateChildren = this.findCandidateChildren(parentElement, originalElement, searchDepth);
-    
-    for (const child of candidateChildren) {
-      if (this.isValidTextElement(child)) {
-        const childScore = this.calculateElementScore(child);
-        const childArea = child.getBoundingClientRect().width * child.getBoundingClientRect().height;
-        
-        // Prefer child if:
-        // 1. It has a good score
-        // 2. It meets minimum requirements
-        // 3. It's not too much smaller than parent (maintains meaningful size)
-        const areaRatio = childArea / parentArea;
-        
-        if (childScore > bestChildScore && 
-            this.meetsMinimumHighlightRequirements(child) &&
-            areaRatio > 0.2 && // Not too small compared to parent
-            childScore > parentScore * 0.8) { // Competitive score
+    for (const child of children) {
+      // Check if this child contains the original element or is close to it
+      if (child.contains(originalElement) || child === originalElement) {
+        if (this.isValidTextElement(child)) {
+          const childArea = child.offsetWidth * child.offsetHeight;
+          const childText = child.textContent?.trim() || "";
+          const parentText = parentElement.textContent?.trim() || "";
           
-          bestChild = child;
-          bestChildScore = childScore;
+          // Prefer child if:
+          // 1. It's significantly smaller than parent
+          // 2. It contains a good portion of the parent's text
+          // 3. It has meaningful content
+          const areaRatio = childArea / parentArea;
+          const textRatio = childText.length / parentText.length;
+          
+          if (areaRatio < 0.7 && textRatio > 0.3 && this.isValidTextContent(childText)) {
+            return child;
+          }
         }
       }
     }
     
-    return bestChild;
-  }
-
-  /**
-   * Find candidate child elements that contain or are near the original element
-   */
-  findCandidateChildren(parentElement, originalElement, maxDepth) {
-    const candidates = [];
-    
-    const collectCandidates = (element, depth) => {
-      if (depth > maxDepth) return;
-      
-      for (const child of element.children) {
-        // Include child if it contains original element or has meaningful content
-        if (child.contains(originalElement) || 
-            child === originalElement ||
-            (child.textContent?.trim().length || 0) > 30) {
-          candidates.push(child);
-        }
-        
-        // Recursively search deeper
-        if (depth < maxDepth) {
-          collectCandidates(child, depth + 1);
-        }
-      }
-    };
-    
-    collectCandidates(parentElement, 0);
-    return candidates;
+    return null;
   }
 
   /**
@@ -1246,22 +1057,45 @@ export class SelectElementManager {
     this.isProcessingClick = true;
     this.lastClickTime = currentTime;
 
-    // Always use the currently highlighted element for translation, if available
     const element = event.target;
-    let targetElement = this.currentHighlighted;
-    // If currentHighlighted is not valid, fallback to event.target
-    if (!targetElement || !(targetElement instanceof HTMLElement)) {
+
+    // Determine target element based on mode
+    let targetElement = element;
+    
+    if (this.config.mode === SELECT_ELEMENT_MODES.SIMPLE) {
+      // Simple mode: directly use clicked element like OLD system
+      this.logger.debug("[handleClick] Simple mode: using clicked element directly");
       targetElement = element;
-      this.logger.debug("[handleClick] No valid highlight, using clicked element", targetElement);
     } else {
-      this.logger.debug("[handleClick] Using highlighted element for translation", targetElement);
+      // Smart mode: try to find better element
+      if (!this.isValidTextElement(element)) {
+        // Try to find a better element nearby
+        targetElement = this.findBestTextElement(element);
+        
+        if (!targetElement) {
+          this.logger.warn("Invalid element for translation", {
+            tagName: element.tagName,
+            className: element.className,
+            textContent: (element.textContent || "").substring(0, 50)
+          });
+          
+          // Try extracting text anyway to see what we get
+          const extractedText = this.extractTextFromElement(element);
+          this.logger.debug("Extracted text from invalid element:", extractedText);
+          
+          if (extractedText && extractedText.trim().length > 0) {
+            this.logger.info("Found text in 'invalid' element, proceeding with translation");
+            targetElement = element; // Use original element
+          } else {
+            await this.showErrorNotification(
+              "Please select an element that contains text"
+            );
+            this.isProcessingClick = false;
+            return;
+          }
+        }
+      }
     }
-    // Debug: log tagName, className, and text preview
-    this.logger.debug("[handleClick] Selected element for translation", {
-      tagName: targetElement?.tagName,
-      className: targetElement?.className,
-      textPreview: (targetElement?.textContent || "").substring(0, 100)
-    });
 
     const currentMode = this.state.isCtrlPressed ? SELECT_ELEMENT_MODES.SIMPLE : SELECT_ELEMENT_MODES.SMART;
     const modeEmoji = SelectElementValidation.getModeEmoji(currentMode);
@@ -1657,47 +1491,22 @@ export class SelectElementManager {
       element.className
     );
 
-    // Remove highlight from previous element
-    if (this.currentHighlighted && this.currentHighlighted !== element) {
-      this.currentHighlighted.style.backgroundColor = '';
-      this.currentHighlighted.classList.remove('translate-it-element-highlighted');
+    // اعمال کلاس هایلایت برای بوردر واضح
+    if (element) {
+      element.classList.add('translate-it-element-highlighted');
+      this.currentHighlighted = element;
     }
-
-    // Apply highlighting using CSS class instead of inline background
-    element.classList.add('translate-it-element-highlighted');
-    this.currentHighlighted = element;
   }
 
   /**
    * Clear current highlight
    */
   clearHighlight() {
+    // حذف کلاس هایلایت از المنت فعلی
     if (this.currentHighlighted) {
-      // Remove both inline styles and CSS classes
-      this.currentHighlighted.style.backgroundColor = '';
       this.currentHighlighted.classList.remove('translate-it-element-highlighted');
       this.currentHighlighted = null;
     }
-  }
-
-  /**
-   * Clean up all highlighting artifacts from the page
-   */
-  cleanupAllHighlights() {
-    // Remove all yellow background styles that might be stuck
-    const elementsWithYellowBg = document.querySelectorAll('*[style*="background-color: yellow"], *[style*="backgroundColor: yellow"]');
-    elementsWithYellowBg.forEach(element => {
-      element.style.backgroundColor = '';
-    });
-
-    // Remove all highlight classes
-    const highlightedElements = document.querySelectorAll('.translate-it-element-highlighted');
-    highlightedElements.forEach(element => {
-      element.classList.remove('translate-it-element-highlighted');
-    });
-
-    // Clear current reference
-    this.currentHighlighted = null;
   }
 
   /**
@@ -1762,46 +1571,48 @@ export class SelectElementManager {
   }
 
   /**
-   * Smart text extraction optimized for large parent elements
+   * Smart text extraction with multiple methods
    */
   extractTextFromElement_Smart(element) {
     let extractedText = "";
     
-    // Priority Method: For large container elements, ALWAYS use full textContent
-    // This ensures we get ALL text from the highlighted parent element
-    const fullText = (element.textContent || "").trim();
-    if (fullText && fullText.length > 0) {
-      extractedText = fullText;
-      this.logger.debug("[extractTextFromElement_Smart] Using full element text:", {
-        elementType: `${element.tagName}.${element.className}`,
-        textLength: extractedText.length,
-        preview: extractedText.substring(0, 200) + (extractedText.length > 200 ? '...' : '')
-      });
-      return extractedText;
+    // Method 1: Try immediate text content first (for leaf elements)
+    const immediateText = this.getImmediateTextContent(element);
+    if (immediateText && this.isValidTextContent(immediateText)) {
+      extractedText = immediateText;
+      this.logger.debug("[extractTextFromElement_Smart] Using immediate text:", extractedText);
     }
     
-    // Fallback 1: Try innerText if textContent failed
-    if (!extractedText && element.innerText) {
-      const innerText = element.innerText.trim();
-      if (innerText && innerText.length > 0) {
-        extractedText = innerText;
-        this.logger.debug("[extractTextFromElement_Smart] Using innerText fallback:", extractedText.substring(0, 100));
-        return extractedText;
+    // Method 2: If no immediate text, try simple textContent
+    if (!extractedText) {
+      const simpleText = (element.textContent || "").trim();
+      if (simpleText && this.isValidTextContent(simpleText)) {
+        extractedText = simpleText;
+        this.logger.debug("[extractTextFromElement_Smart] Using simple textContent:", extractedText);
       }
     }
     
-    // Fallback 2: Tree walker for complex structures
-    if (!extractedText) {
-      extractedText = this.extractTextWithTreeWalker(element);
-      this.logger.debug("[extractTextFromElement_Smart] Using tree walker fallback:", extractedText.substring(0, 100));
+    // Method 3: If still no text, try innerText (respects visibility)
+    if (!extractedText && element.innerText) {
+      const innerText = element.innerText.trim();
+      if (innerText && this.isValidTextContent(innerText)) {
+        extractedText = innerText;
+        this.logger.debug("[extractTextFromElement_Smart] Using innerText:", extractedText);
+      }
     }
     
-    // Fallback 3: Try immediate text content for leaf elements
+    // Method 4: Use tree walker as last resort with relaxed filtering
     if (!extractedText) {
-      const immediateText = this.getImmediateTextContent(element);
-      if (immediateText && immediateText.length > 0) {
-        extractedText = immediateText;
-        this.logger.debug("[extractTextFromElement_Smart] Using immediate text fallback:", extractedText);
+      extractedText = this.extractTextWithTreeWalker(element);
+      this.logger.debug("[extractTextFromElement_Smart] Using tree walker:", extractedText);
+    }
+    
+    // Final fallback: just get any text content without validation
+    if (!extractedText) {
+      const fallbackText = (element.textContent || "").trim();
+      if (fallbackText.length > 0) {
+        extractedText = fallbackText;
+        this.logger.debug("[extractTextFromElement_Smart] Using fallback text:", extractedText);
       }
     }
 
@@ -1809,9 +1620,11 @@ export class SelectElementManager {
   }
 
   /**
-   * Extract text using tree walker optimized for large container elements
+   * Extract text using tree walker with relaxed filtering
    */
   extractTextWithTreeWalker(element) {
+    let text = "";
+
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         // Skip text in hidden elements
@@ -1820,19 +1633,19 @@ export class SelectElementManager {
 
         try {
           const style = window.getComputedStyle(parent);
-          if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+          if (style.display === "none" || style.visibility === "hidden") {
             return NodeFilter.FILTER_REJECT;
           }
         } catch {
           // If getComputedStyle fails, accept the node
         }
 
-        // Accept all non-empty text nodes - we want comprehensive text extraction
+        // Skip empty text nodes
         const textContent = node.textContent.trim();
         if (!textContent) return NodeFilter.FILTER_REJECT;
 
-        // Skip text from script, style, or other non-content tags
-        if (parent.closest('script, style, noscript, code[hidden], [aria-hidden="true"]')) {
+        // Skip text from script or style tags
+        if (parent.closest('script, style, noscript')) {
           return NodeFilter.FILTER_REJECT;
         }
 
@@ -1841,40 +1654,14 @@ export class SelectElementManager {
     });
 
     let node;
-    const textParts = [];
-    const processedParents = new Set();
-    
     while ((node = walker.nextNode())) {
       const nodeText = node.textContent.trim();
       if (nodeText) {
-        const parent = node.parentElement;
-        const parentKey = `${parent.tagName}_${parent.className}_${parent.id}`;
-        
-        // For large containers, preserve line breaks and paragraph structure
-        if (['P', 'DIV', 'LI', 'TD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(parent.tagName)) {
-          if (!processedParents.has(parentKey)) {
-            if (textParts.length > 0) textParts.push('\n');
-            processedParents.add(parentKey);
-          }
-        }
-        
-        textParts.push(nodeText);
-        
-        // Add space after inline elements
-        if (['SPAN', 'A', 'STRONG', 'EM', 'B', 'I'].includes(parent.tagName)) {
-          textParts.push(' ');
-        }
+        text += nodeText + " ";
       }
     }
 
-    const result = textParts.join('').replace(/\s+/g, ' ').trim();
-    this.logger.debug("[extractTextWithTreeWalker] Processed text nodes:", {
-      nodeCount: textParts.length,
-      resultLength: result.length,
-      preview: result.substring(0, 200) + (result.length > 200 ? '...' : '')
-    });
-    
-    return result;
+    return text.trim();
   }
 
   /**
@@ -1993,9 +1780,9 @@ export class SelectElementManager {
               this.logger.warn('Translation message send failed (reliable):', err);
             });
           } catch (err) {
-            // Fallback to browser.runtime.sendMessage if import fails
-            this.browser.runtime.sendMessage(message).catch(error => {
-              this.logger.warn('Translation message send failed (browser fallback):', error);
+            // Fallback to runtime.sendMessage if import fails
+            sendReliable(message).catch(error => {
+              this.logger.warn('Translation message send failed (reliable fallback):', error);
             });
           }
           
