@@ -32,7 +32,7 @@ export const CONFIG = {
   SOURCE_LANGUAGE: "English",
   TARGET_LANGUAGE: "Farsi",
   THEME: "auto",
-  TIMEOUT: 15000,
+  TIMEOUT: 30000,
   selectionTranslationMode: "onClick", // "immediate",
   COPY_REPLACE: "copy", // "replace",
   REPLACE_SPECIAL_SITES: true,
