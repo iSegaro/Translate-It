@@ -453,6 +453,15 @@ export class TranslationEngine {
       if (errorMessage && !errorMessages.includes(errorMessage)) {
         errorMessages.push(errorMessage);
       }
+
+      // If the error indicates an unsupported language pair, don't retry individually.
+      if (errorMessage && errorMessage.includes('Translation not available')) {
+        batch.forEach(idx => {
+          results[idx] = segments[idx];
+          translationStatus[idx] = false;
+        });
+        return;
+      }
     }
     
     // Fallback to individual translations (with minimal retry)
