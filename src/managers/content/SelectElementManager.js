@@ -554,33 +554,14 @@ export class SelectElementManager {
         startTime: Date.now()
       };
       
-      // Set timeout - but allow late results to still be processed
+      // Set timeout to show a warning, but don't resolve the promise.
       const timeoutId = setTimeout(() => {
         if (this.pendingTranslation && this.pendingTranslation.originalMessageId === messageId) {
           const elapsed = Date.now() - this.pendingTranslation.startTime;
-          this.logger.warn(`Translation timeout after ${elapsed}ms for messageId: ${messageId}`);
-          this.logger.warn('Translation may still complete in background...');
-          
-          // Dismiss status notification on timeout
-          if (this.statusNotification) {
-            try {
-              this.notificationManager.dismiss(this.statusNotification);
-              this.statusNotification = null;
-              this.logger.debug('Status notification dismissed due to timeout');
-            } catch (dismissError) {
-              this.logger.warn('Failed to dismiss status notification on timeout', dismissError);
-            }
-          }
-          
-          // Don't completely reject - just resolve with timeout error but keep listening
-          resolve({
-            success: false,
-            error: `Translation timeout after ${Math.round(elapsed/1000)}s. Translation may continue in background.`,
-            timeout: true
-          });
-          
-          // Don't clear pendingTranslation - allow late results to still be processed
-          // this.pendingTranslation = null;
+          this.logger.warn(`Translation is taking longer than expected after ${elapsed}ms for messageId: ${messageId}`);
+          this.showWarningNotification("Translation is taking longer than expected, but is still in progress...");
+          // We don't resolve or reject here. We let the translation continue in the background.
+          // The status notification will remain until the final result is received.
         }
       }, timeout);
       
