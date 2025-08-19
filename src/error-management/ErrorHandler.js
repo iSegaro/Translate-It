@@ -199,10 +199,23 @@ export class ErrorHandler {
       const raw = err instanceof Error ? err.message : String(err);
       const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
-      // Try to get localized message, fallback to original message if fails
+      // Try to get localized message, but prefer specific original messages
       let msg;
       try {
-        msg = await getErrorMessage(type);
+        const localizedMsg = await getErrorMessage(type);
+        
+        // Prefer the original message if it's more specific and descriptive
+        // This ensures specific provider errors are shown to the user
+        if (raw && raw.length > 20 && 
+            (raw.includes('Translation not available') || 
+             raw.includes('not supported') || 
+             raw.includes('API Key') ||
+             raw.includes('quota') ||
+             raw.includes('limit'))) {
+          msg = raw;
+        } else {
+          msg = localizedMsg || raw || 'An error occurred';
+        }
       } catch (msgError) {
         logger.warn('Failed to get localized error message, using original:', msgError);
         // Use original error message as fallback

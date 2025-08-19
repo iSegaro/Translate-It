@@ -284,6 +284,7 @@ export class TranslationEngine {
     const segments = originalJson.map(item => item.text);
     const results = new Array(segments.length);
     const translationStatus = new Array(segments.length).fill(false); // Track which segments were actually translated
+    const errorMessages = []; // Collect actual error messages
     
     // Smart cache-first approach
     let cacheHits = 0;
@@ -335,7 +336,7 @@ export class TranslationEngine {
           const batch = batches[idx];
           await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
             provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
-          });
+          }, errorMessages);
         }
       });
 
@@ -347,7 +348,13 @@ export class TranslationEngine {
     
     if (!anyTranslationSucceeded && uncachedIndices.length > 0) {
       // No translations succeeded and there were segments to translate
-      throw new Error(`Translation failed for all segments. Provider ${provider} is unreachable or returned errors.`);
+      // Use the most recent/specific error message if available
+      const specificError = errorMessages.length > 0 ? errorMessages[errorMessages.length - 1] : null;
+      if (specificError) {
+        throw new Error(specificError);
+      } else {
+        throw new Error(`Translation failed for all segments. Provider ${provider} is unreachable or returned errors.`);
+      }
     }
 
     // Reconstruct JSON with translated texts
@@ -404,7 +411,7 @@ export class TranslationEngine {
   /**
    * Process a single batch with fallback strategy
    */
-  async processBatch(batch, segments, results, translationStatus, providerInstance, config) {
+  async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = []) {
     const { provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang } = config;
     const DELIMITER = "\n\n---\n\n";
     
@@ -441,6 +448,11 @@ export class TranslationEngine {
       }
     } catch (batchError) {
       logger.debug(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
+      // Capture specific error message
+      const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
+      if (errorMessage && !errorMessages.includes(errorMessage)) {
+        errorMessages.push(errorMessage);
+      }
     }
     
     // Fallback to individual translations (with minimal retry)
@@ -465,7 +477,13 @@ export class TranslationEngine {
 
           logger.debug(`isActuallyTranslated: ${isActuallyTranslated}`);
           return { idx, result: translatedText, success: true }; // API call succeeded
-        } catch {
+        } catch (individualError) {
+          // Capture specific error message
+          const errorMessage = individualError instanceof Error ? individualError.message : String(individualError);
+          if (errorMessage && !errorMessages.includes(errorMessage)) {
+            errorMessages.push(errorMessage);
+          }
+          
           attempt++;
           if (attempt < INDIVIDUAL_RETRY) {
             await new Promise(resolve => setTimeout(resolve, 100 * attempt));

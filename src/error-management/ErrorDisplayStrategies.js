@@ -63,6 +63,16 @@ export const ErrorDisplayStrategies = {
     supportSettings: false // No settings access from windows
   },
 
+  // Select Element context - show toast for user awareness since no permanent UI
+  'select-element': {
+    showToast: true,        // Show toast since no permanent error UI
+    showInUI: false,
+    errorLevel: 'detailed', // Show specific error details in toast
+    defaultDuration: 6000,  // Longer duration for reading
+    supportRetry: false,    // Retry handled by re-selecting element
+    supportSettings: true   // Allow settings access for config errors
+  },
+
   // Background/service context - toast notifications for user awareness
   background: {
     showToast: true,

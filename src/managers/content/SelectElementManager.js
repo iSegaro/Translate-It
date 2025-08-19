@@ -1828,7 +1828,13 @@ export class SelectElementManager {
           return { status: "timeout", reason: "timeout", message: msg };
         } else {
           this.logger.error("Translation result failed", { msg, rawError });
-          await this.showErrorNotification(msg);
+          // Use centralized error handling instead of direct notification
+          // Use msg instead of rawError to ensure we get the specific error message
+          const translationError = new Error(msg);
+          await this.errorHandler.handle(translationError, {
+            context: "select-element"
+            // Let ErrorHandler auto-detect the type from the error message
+          });
           return { status: "error", reason: "backend_error", message: msg, rawError };
         }
       }
@@ -1842,7 +1848,11 @@ export class SelectElementManager {
           "[SelectElementManager] Empty translation response:",
           translationResult
         );
-        await this.showErrorNotification(message);
+        // Use centralized error handling instead of direct notification
+        await this.errorHandler.handle(new Error(message), {
+          context: "select-element"
+          // Let ErrorHandler auto-detect the type from the error message
+        });
         return { status: "error", reason: "empty_translation", message };
       }
 
@@ -1885,7 +1895,11 @@ export class SelectElementManager {
 
       if (!translatedData || !translatedData.length) {
         const message = "(فرمت پاسخ نامعتبر است.)"; // Persian like OLD system
-        await this.showErrorNotification(message);
+        // Use centralized error handling instead of direct notification
+        await this.errorHandler.handle(new Error(message), {
+          context: "select-element"
+          // Let ErrorHandler auto-detect the type from the error message
+        });
         return { status: "error", reason: "api_error", message };
       }
 
