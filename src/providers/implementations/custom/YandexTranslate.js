@@ -171,8 +171,11 @@ export class YandexTranslateProvider extends BaseProvider {
   static type = "free";
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
+  static reliableJsonMode = true;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
+  static CHAR_LIMIT = 2000;
+  static CHUNK_SIZE = 50;
 
   constructor() {
     super("YandexTranslate");
@@ -338,29 +341,15 @@ export class YandexTranslateProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-translate`;
 
     try {
-      // Build language parameter
       const lang = sl === "auto" ? tl : `${sl}-${tl}`;
       logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
 
-      // Handle JSON mode with individual requests for better reliability
       if (isJsonMode) {
-        logger.debug(`Processing JSON mode with individual translation requests: ${textsToTranslate.length} segments`);
-        
-        const translatedTexts = [];
-        for (let i = 0; i < textsToTranslate.length; i++) {
-          const textToTranslate = textsToTranslate[i];
-          if (!textToTranslate.trim()) {
-            translatedTexts.push('');
-            continue;
-          }
-
-          logger.debug(`Processing segment ${i+1}/${textsToTranslate.length}: "${textToTranslate.substring(0, 50)}"... with lang=${lang}`);
-
+        const translateChunk = async (chunk) => {
           const uuid = this._generateUuid();
-          const formData = new URLSearchParams({
-            lang: lang,
-            text: textToTranslate,
-          });
+          const formData = new URLSearchParams();
+          formData.append('lang', lang);
+          chunk.forEach(text => formData.append('text', text || ''));
 
           const url = new URL(YandexTranslateProvider.mainUrl);
           url.searchParams.set("id", `${uuid}-0-0`);
@@ -377,40 +366,35 @@ export class YandexTranslateProvider extends BaseProvider {
               body: formData,
             },
             extractResponse: (data) => {
-              if (!data || data.code !== 200) {
-                logger.error(`Yandex API returned invalid response for segment ${i}:`, data);
-                return undefined;
+              if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text)) {
+                logger.error('Yandex API returned invalid response for a chunk', data);
+                return chunk.map(() => ''); // Return empty strings for the chunk on error
               }
-
-              if (!data.text || !Array.isArray(data.text) || data.text.length === 0) {
-                logger.error(`Yandex API returned no translation text for segment ${i}:`, data);
-                return undefined;
-              }
-
-              const targetText = data.text[0];
-              if (!targetText) {
-                logger.error(`Yandex API returned empty translation for segment ${i}:`, data.text);
-                return undefined;
-              }
-
-              return { targetText };
+              return data.text;
             },
-            context: `${context}-segment-${i}`,
+            context: `${context}-chunk`,
           });
+          return result || chunk.map(() => '');
+        };
 
-          translatedTexts.push(result.targetText);
-        }
+        const translatedSegments = await this._processInBatches(
+          textsToTranslate,
+          translateChunk,
+          {
+            CHUNK_SIZE: YandexTranslateProvider.CHUNK_SIZE,
+            CHAR_LIMIT: YandexTranslateProvider.CHAR_LIMIT,
+          }
+        );
 
-        // Reconstruct JSON with translated texts
         const translatedJson = originalJsonStruct.map((item, index) => ({
           ...item,
-          text: translatedTexts[index] || "",
+          text: translatedSegments[index] || "",
         }));
 
-        logger.debug('JSON mode translation completed successfully');
         return JSON.stringify(translatedJson, null, 2);
+
       } else {
-        // Handle single text translation
+        // Handle single text translation (existing logic)
         const uuid = this._generateUuid();
         const textToTranslate = textsToTranslate[0];
         
@@ -423,13 +407,6 @@ export class YandexTranslateProvider extends BaseProvider {
         url.searchParams.set("id", `${uuid}-0-0`);
         url.searchParams.set("srv", "android");
 
-        logger.debug('Yandex API request:', {
-          url: url.toString(),
-          lang: lang,
-          textLength: textToTranslate.length,
-          isJsonMode: false
-        });
-
         const result = await this._executeApiCall({
           url: url.toString(),
           fetchOptions: {
@@ -441,49 +418,31 @@ export class YandexTranslateProvider extends BaseProvider {
             body: formData,
           },
           extractResponse: (data) => {
-            // Check for valid Yandex response structure
-            if (!data || data.code !== 200) {
-              logger.error('Yandex API returned invalid response:', data);
+            if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length === 0) {
               return undefined;
             }
-
-            // Extract translation data
-            if (!data.text || !Array.isArray(data.text) || data.text.length === 0) {
-              logger.error('Yandex API returned no translation text:', data);
-              return undefined;
-            }
-
             const targetText = data.text[0];
             if (!targetText) {
-              logger.error('Yandex API returned empty translation:', data.text);
               return undefined;
             }
-
-            // Extract detected language if available
             let detectedLang = "";
             if (data.lang && typeof data.lang === "string") {
               detectedLang = data.lang.split("-")[0];
             }
-
             return {
               targetText,
               detectedLang,
-              transliteration: "", // Yandex doesn't provide transliteration in this API
+              transliteration: "",
             };
           },
           context: context,
         });
-
         return result.targetText;
       }
     } catch (error) {
-      // Enhanced error handling
       if (error.type) {
-        // Error already has type from _executeApiCall
         throw error;
       }
-
-      // Handle Yandex-specific errors
       if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
         error.type = ErrorTypes.API_QUOTA_EXCEEDED;
         error.context = `${this.providerName.toLowerCase()}-quota-exceeded`;
@@ -494,7 +453,6 @@ export class YandexTranslateProvider extends BaseProvider {
         error.type = ErrorTypes.API;
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
       }
-
       logger.error('Translation error:', error);
       throw error;
     }
