@@ -1,5 +1,8 @@
 <template>
-  <div class="sidepanel-container">
+  <div 
+    class="sidepanel-container"
+    @click="handleContainerClick"
+  >
     <!-- Side Toolbar -->
     <SideToolbar
       @select-element="handleSelectElement"
@@ -86,7 +89,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from
 import SideToolbar from './SideToolbar.vue'
 import TranslationForm from './TranslationForm.vue'
 import TranslationResult from './TranslationResult.vue'
-import { useSidepanelTranslation } from '@/composables/useTranslationModes.js'
+import { useSidepanelTranslation, useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useHistory } from '@/composables/useHistory.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
@@ -103,6 +106,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 // Composables
 const sidepanelTranslation = useSidepanelTranslation()
+const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 const settingsStore = useSettingsStore()
 const history = useHistory()
 const browserAPI = useBrowserAPI()
@@ -137,6 +141,18 @@ const showApiProviderDropdown = computed(() => state.showApiProviderDropdown)
 
 
 // Event Handlers
+const handleContainerClick = (event) => {
+  // If select element mode is active, deactivate it
+  if (isSelectModeActive.value) {
+    // But not if the click is on the toolbar itself
+    if (event.target.closest('.side-toolbar')) {
+      return;
+    }
+    logger.debug('Deactivating select element mode due to sidepanel click');
+    deactivateSelectMode();
+  }
+}
+
 const handleTranslate = async (data) => {
   logger.debug('Translation requested:', data)
   

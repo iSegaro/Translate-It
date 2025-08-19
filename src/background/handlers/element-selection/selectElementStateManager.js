@@ -10,28 +10,18 @@ function setStateForTab(tabId, active) {
   if (!tabId) return;
   selectElementStateByTab.set(tabId, { active: !!active, updatedAt: Date.now() });
 
-  // Notify all accessible tabs about the state change
+  // Notify all parts of the extension about the state change
   (async () => {
     try {
-      const accessibleTabs = await tabPermissionChecker.getAccessibleTabs({});
       const message = MessageFormat.create(
         MessageActions.SELECT_ELEMENT_STATE_CHANGED,
         { tabId, active },
         MessagingContexts.BACKGROUND
       );
-
-      for (const tab of accessibleTabs) {
-        // Don't send to the tab that initiated the change, as it already knows.
-        if (tab.id === tabId) continue;
-
-        try {
-          await browser.tabs.sendMessage(tab.id, message);
-        } catch (error) {
-          // Ignore errors for tabs that might have been closed or are otherwise unavailable.
-        }
-      }
+      // Use runtime.sendMessage to broadcast to all parts of the extension (sidepanel, content scripts, etc.)
+      await browser.runtime.sendMessage(message);
     } catch (error) {
-      // Ignore errors in the broadcasting process
+      // Ignore errors if no listeners are available
     }
   })();
 }

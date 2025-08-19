@@ -7,6 +7,7 @@ import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
+import { setStateForTab } from './selectElementStateManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleActivateSelectElementMode');
 
@@ -116,6 +117,9 @@ export async function handleActivateSelectElementMode(message, sender) {
         response
       };
     }
+    
+    // If successful, update the central state, which will broadcast to all UIs
+    setStateForTab(targetTabId, isActivating);
     
     logger.info(`✅ [activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
     

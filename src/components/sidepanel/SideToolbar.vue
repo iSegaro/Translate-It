@@ -129,7 +129,7 @@ const { t } = useI18n()
 
 // State
 const isSelectElementActivating = computed(() => selectElement.isActivating.value)
-const isSelecting = computed(() => selectElement.isActivating.value)
+const isSelecting = computed(() => selectElement.isSelectModeActive.value)
 const isReverting = computed(() => sidepanelActions.isProcessing.value)
 
 // API provider icon

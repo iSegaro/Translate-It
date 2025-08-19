@@ -772,14 +772,7 @@ export class SelectElementManager {
 
     // Disable page interactions
     this.disablePageInteractions();
-    // Notify background about activation so it can keep per-tab state
-    try {
-      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
-      await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: true } });
-      this.logger.debug('Notified background: select element activated');
-    } catch (err) {
-      this.logger.warn('Failed to notify background about activation', err);
-    }
+    
 
     this.logger.operation("Select element mode activated");
   }
@@ -821,14 +814,7 @@ export class SelectElementManager {
     // Clear NEW select manager flag
     window.translateItNewSelectManager = false;
 
-    // Notify background about deactivation so it can keep per-tab state
-    try {
-      const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
-      await sendReliable({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { activate: false } });
-      this.logger.debug('Notified background: select element deactivated (UI only)');
-    } catch (err) {
-      this.logger.warn('Failed to notify background about deactivation', err);
-    }
+    
 
     this.logger.operation("Select element UI deactivated (translation continues)");
   }

@@ -190,29 +190,29 @@ export function useSelectElementTranslation() {
     _selectStateSubscriberCount++;
     if (_selectStateSubscriberCount === 1) {
       _registerSelectStateListener();
-    }
-    // Listen to tab activation changes so we can refresh current tab state
-    try {
-      _tabsActivatedHandler = async (activeInfo) => {
-        try {
-          _currentTabId = activeInfo.tabId;
-          // Query background directly for select element state
-          const response = await sendReliable({
-            action: MessageActions.GET_SELECT_ELEMENT_STATE,
-            context: 'sidepanel',
-            timestamp: Date.now()
-          });
-          if (response && response.result && response.result.success) {
-            sharedIsSelectModeActive.value = !!response.result.active;
-            logger.debug('Select element state refreshed on tab change:', response.result.active);
+      // Also register the tab activation listener only once
+      try {
+        _tabsActivatedHandler = async (activeInfo) => {
+          try {
+            _currentTabId = activeInfo.tabId;
+            // Query background directly for select element state for the new tab
+            const response = await sendReliable({
+              action: MessageActions.GET_SELECT_ELEMENT_STATE,
+              context: 'sidepanel',
+              timestamp: Date.now()
+            });
+            if (response && response.success) {
+              sharedIsSelectModeActive.value = !!response.active;
+              logger.debug('Select element state refreshed on tab change:', response.active);
+            }
+          } catch (err) {
+            logger.debug('Failed to refresh select element state on tab change:', err);
           }
-        } catch (err) {
-          logger.debug('Failed to refresh select element state on tab change:', err);
-        }
-      };
-      browser.tabs.onActivated.addListener(_tabsActivatedHandler);
-    } catch {
-      // ignore if tabs API not available
+        };
+        browser.tabs.onActivated.addListener(_tabsActivatedHandler);
+      } catch {
+        // ignore if tabs API not available
+      }
     }
   });
 
@@ -255,14 +255,15 @@ export function useSelectElementTranslation() {
     _selectStateSubscriberCount = Math.max(0, _selectStateSubscriberCount - 1);
     if (_selectStateSubscriberCount === 0) {
       _unregisterSelectStateListener();
-    }
-    try {
-      if (_tabsActivatedHandler) {
-        browser.tabs.onActivated.removeListener(_tabsActivatedHandler);
-        _tabsActivatedHandler = null;
+      // Also unregister the tab activation listener
+      try {
+        if (_tabsActivatedHandler) {
+          browser.tabs.onActivated.removeListener(_tabsActivatedHandler);
+          _tabsActivatedHandler = null;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
   });
 
