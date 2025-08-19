@@ -184,77 +184,23 @@ function collectTextNodesOptimized(targetElement) {
     }
   }
 
-  // Second pass: intelligent grouping
+  // اصلاح: حذف گروه‌بندی و فیلترهای غیرضروری، استخراج همه گره‌های متنی قابل مشاهده
   const textNodes = [];
   const originalTextsMap = new Map();
-  const processedNodes = new Set();
-  
-  for (let i = 0; i < textSegments.length; i++) {
-    if (processedNodes.has(textSegments[i].node)) continue;
-    
-    const segment = textSegments[i];
-    
-    // For large parent elements, be less aggressive with filtering to preserve all content
-    // Only skip truly meaningless segments (< 2 chars)
-    if (segment.length < 2) {
-      logger.debug(`Skipping tiny segment: "${segment.text}"`);
+  for (const segment of textSegments) {
+    // فقط حذف گره‌هایی که واقعا بی‌معنی هستند (کمتر از 2 کاراکتر و فقط whitespace)
+    if (segment.length < 2 || !segment.text.trim()) {
+      logger.debug(`Skipping tiny/empty segment: "${segment.text}"`);
       continue;
     }
-    
-    // Keep more content for large containers - only filter obvious noise
-    const hasAnyContent = /[a-zA-Z\u0600-\u06FF\u4e00-\u9fff]/.test(segment.text) || 
-                         segment.text.length >= 3;
-    if (!hasAnyContent) {
-      logger.debug(`Skipping no-content segment: "${segment.text}"`);
-      continue;
-    }
-    
-    // Group adjacent text nodes from same parent or similar context
-    const groupedNodes = [segment.node];
-    const groupedTexts = [segment.text];
-    processedNodes.add(segment.node);
-    
-    // Look for adjacent nodes to group (up to 2 nodes or 100 characters for better precision)
-    let totalLength = segment.length;
-    for (let j = i + 1; j < Math.min(i + 3, textSegments.length) && totalLength < 100; j++) {
-      const nextSegment = textSegments[j];
-      
-      if (processedNodes.has(nextSegment.node)) continue;
-      
-      // More conservative grouping - only for very similar contexts
-      const canGroup = !segment.isBlockElement && !nextSegment.isBlockElement &&
-          segment.parentTag === nextSegment.parentTag &&
-          // Avoid grouping if either segment is already substantial
-          segment.length < 50 && nextSegment.length < 50;
-      
-      if (canGroup) {
-        groupedNodes.push(nextSegment.node);
-        groupedTexts.push(nextSegment.text);
-        processedNodes.add(nextSegment.node);
-        totalLength += nextSegment.length;
-      } else {
-        break;
-      }
-    }
-    
-    // Create combined text for the group
-    const combinedText = groupedTexts.join(' ').trim();
-    
-    if (combinedText.length > 0) {
-      textNodes.push(...groupedNodes);
-      
-      if (originalTextsMap.has(combinedText)) {
-        originalTextsMap.get(combinedText).push(...groupedNodes);
-      } else {
-        originalTextsMap.set(combinedText, [...groupedNodes]);
-      }
-      
-      logger.debug(`Grouped ${groupedNodes.length} nodes into: "${combinedText.substring(0, 50)}..."`);
+    textNodes.push(segment.node);
+    if (originalTextsMap.has(segment.text)) {
+      originalTextsMap.get(segment.text).push(segment.node);
+    } else {
+      originalTextsMap.set(segment.text, [segment.node]);
     }
   }
-
-  logger.debug(`Text extraction optimization: ${allTextNodes.length} → ${textNodes.length} nodes (${Math.round((1 - textNodes.length/allTextNodes.length) * 100)}% reduction)`);
-  
+  logger.debug(`Text extraction (no grouping): ${allTextNodes.length} → ${textNodes.length} nodes`);
   return { textNodes, originalTextsMap };
 }
 
