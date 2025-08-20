@@ -90,7 +90,7 @@ export class GoogleTranslateProvider extends BaseProvider {
   static description = "Free Google Translate service";
   static displayName = "Google Translate";
   static reliableJsonMode = true;
-  static CHAR_LIMIT = 1500;
+  static CHAR_LIMIT = 3900;
   static CHUNK_SIZE = 20;
   constructor() {
     super("GoogleTranslate");

@@ -163,6 +163,8 @@ export class BingTranslateProvider extends BaseProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
+  static CHAR_LIMIT = 1000;
+  static CHUNK_SIZE = 20;
 
   constructor() {
     super("BingTranslate");
