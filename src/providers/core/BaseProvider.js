@@ -3,12 +3,15 @@
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { TranslationMode } from "@/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseProvider');
 
 /**
- * Base class for all translation providers
- * Provides common functionality like error handling, API calls, and validation
+ * Base class for all translation providers.
+ * Provides a centralized translation workflow, error handling, and common utilities.
  */
 export class BaseProvider {
   constructor(providerName) {
@@ -21,18 +24,117 @@ export class BaseProvider {
   static reliableJsonMode = false;
 
   /**
-   * Abstract method - must be implemented by subclasses
-   * @param {string} text - Text to translate
+   * Orchestrates the entire translation process.
+   * This method handles language swapping, JSON mode detection, batching, and result formatting.
+   * Subclasses should NOT override this method. Instead, they must implement `_batchTranslate` and `_getLangCode`.
+   * @param {string} text - Text to translate (can be plain text or a specific JSON string)
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
-   * @param {string} originalSourceLang - Original source language
-   * @param {string} originalTargetLang - Original target language
+   * @param {string} originalSourceLang - Original source language before any swapping
+   * @param {string} originalTargetLang - Original target language before any swapping
    * @param {AbortController} abortController - Optional abort controller for cancellation
-   * @returns {Promise<string>} - Translated text
+   * @returns {Promise<string|null>} - Translated text or null if no translation was needed
    */
-  async translate() {
-    throw new Error(`translate method must be implemented by ${this.constructor.name}`);
+  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi', abortController = null) {
+    if (this._isSameLanguage(sourceLang, targetLang)) return null;
+
+    // 1. Language swapping and normalization
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
+      { providerName: this.providerName, useRegexFallback: true }
+    );
+
+    // 2. Adjust source language for specific modes after detection
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
+      sourceLang = AUTO_DETECT_VALUE;
+    }
+
+    // 3. Convert to provider-specific language codes
+    const sl = this._getLangCode(sourceLang);
+    const tl = this._getLangCode(targetLang);
+
+    if (sl === tl) return text;
+
+    // 4. JSON Mode Detection
+    let isJsonMode = false;
+    let originalJsonStruct;
+    let textsToTranslate = [text];
+
+    try {
+      const parsed = JSON.parse(text);
+      if (this._isSpecificTextJsonFormat(parsed)) {
+        isJsonMode = true;
+        originalJsonStruct = parsed;
+        textsToTranslate = originalJsonStruct.map((item) => item.text || '');
+        logger.debug(`[${this.providerName}] JSON mode detected with ${textsToTranslate.length} segments.`);
+      }
+    } catch {
+      // Not a valid JSON, proceed in plain text mode.
+    }
+
+    // 5. Perform batch translation using the subclass implementation
+    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, abortController);
+
+    // 6. Reconstruct the final output
+    if (isJsonMode) {
+      if (translatedSegments.length !== originalJsonStruct.length) {
+        logger.error(`[${this.providerName}] JSON reconstruction failed due to segment mismatch.`);
+        // Fallback: return a simple join of translated segments
+        return translatedSegments.join('\n');
+      }
+      const translatedJson = originalJsonStruct.map((item, index) => ({
+        ...item,
+        text: translatedSegments[index] || "",
+      }));
+      return JSON.stringify(translatedJson, null, 2);
+    } else {
+      // For plain text, there's only one segment
+      return translatedSegments[0];
+    }
+  }
+
+  /**
+   * Abstract method for batch translating an array of texts.
+   * Each provider MUST implement this method to handle its specific API logic for batching requests.
+   * @param {string[]} texts - An array of strings to be translated.
+   * @param {string} sourceLang - Provider-specific source language code.
+   * @param {string} targetLang - Provider-specific target language code.
+   * @param {AbortController} abortController - Optional abort controller for cancellation.
+   * @returns {Promise<string[]>} - A promise that resolves to an array of translated strings.
+   * @protected
+   */
+  async _batchTranslate(texts, sourceLang, targetLang, abortController) {
+    throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`);
+  }
+
+  /**
+   * Abstract method for converting a language name/code to the provider's specific code.
+   * @param {string} lang - The language name or standard code (e.g., 'English', 'en', 'auto').
+   * @returns {string} The provider-specific language code.
+   * @protected
+   */
+  _getLangCode(lang) {
+    throw new Error(`_getLangCode method must be implemented by ${this.constructor.name}`);
+  }
+
+  /**
+   * Checks if the input is a JSON object in the specific format `[{ text: "..." }]`.
+   * @param {*} obj - The object to check.
+   * @returns {boolean} - True if it matches the format.
+   * @protected
+   */
+  _isSpecificTextJsonFormat(obj) {
+    return (
+      Array.isArray(obj) &&
+      obj.length > 0 &&
+      obj.every(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.text === "string"
+      )
+    );
   }
 
   /**
@@ -59,66 +161,45 @@ export class BaseProvider {
    * @throws {Error} - With properties: type, statusCode (for HTTP/API), context
    */
   async _executeApiCall({ url, fetchOptions, extractResponse, context, abortController }) {
-  logger.debug(`_executeApiCall starting for context: ${context}`);
-  logger.debug(`_executeApiCall URL: ${url}`);
+    logger.debug(`_executeApiCall starting for context: ${context}`);
+    logger.debug(`_executeApiCall URL: ${url}`);
     logger.debug('_executeApiCall fetchOptions:', fetchOptions);
 
     try {
-      // Add abort signal if provided
       const finalFetchOptions = { ...fetchOptions };
       if (abortController) {
         finalFetchOptions.signal = abortController.signal;
-        logger.debug(`[${this.providerName}] Adding abort signal to request:`, { context, hasSignal: !!abortController.signal });
-      } else {
-        logger.debug(`[${this.providerName}] No abort controller provided for context:`, context);
       }
       
       const response = await fetch(url, finalFetchOptions);
-  logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
+      logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
-        // Extract error details if available
         let body = {};
         try {
           body = await response.json();
         } catch (jsonError) {
-          logger.error(`[${this.providerName}] Failed to parse error response JSON:`, jsonError);
+          // Ignore if body is not JSON
         }
-        // Use detail or error.message or statusText, fallback to HTTP status
-        const msg =
-          body.detail ||
-          body.error?.message ||
-          response.statusText ||
-          `HTTP ${response.status}`;
-
+        const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
         logger.error(`[${this.providerName}] _executeApiCall HTTP error:`, {
           status: response.status,
-          statusText: response.statusText,
-          body: body,
           message: msg,
           url: url
         });
         const err = new Error(msg);
-        // Mark as HTTP error (status codes 4xx/5xx)
         err.type = ErrorTypes.HTTP_ERROR;
         err.statusCode = response.status;
         err.context = context;
         throw err;
       }
 
-      // Parse successful response
       const data = await response.json();
-  logger.debug('_executeApiCall raw response data:', data);
-      logger.debug('_executeApiCall response data:', data);
+      logger.debug('_executeApiCall raw response data:', data);
 
       const result = extractResponse(data, response.status);
-      logger.info('_executeApiCall extracted result:', result);
-
       if (result === undefined) {
-        logger.error(
-          `[${this.providerName}] _executeApiCall result is undefined - treating as invalid response. Raw data:`,
-          data
-        );
+        logger.error(`[${this.providerName}] _executeApiCall result is undefined. Raw data:`, data);
         const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
         err.type = ErrorTypes.API;
         err.statusCode = response.status;
@@ -126,10 +207,9 @@ export class BaseProvider {
         throw err;
       }
 
-  logger.init(`_executeApiCall success for context: ${context}`);
+      logger.init(`_executeApiCall success for context: ${context}`);
       return result;
     } catch (err) {
-      // Handle abort errors (cancellation)
       if (err.name === 'AbortError') {
         const abortErr = new Error('Translation cancelled by user');
         abortErr.type = ErrorTypes.USER_CANCELLED;
@@ -138,14 +218,12 @@ export class BaseProvider {
         throw abortErr;
       }
       
-      // Handle fetch network errors (e.g., offline)
       if (err instanceof TypeError && /NetworkError/.test(err.message)) {
         const networkErr = new Error(err.message);
         networkErr.type = ErrorTypes.NETWORK_ERROR;
         networkErr.context = context;
         throw networkErr;
       }
-      // Rethrow existing HTTP/API errors or others
       throw err;
     }
   }
@@ -160,8 +238,8 @@ export class BaseProvider {
   _validateConfig(config, requiredFields, context) {
     for (const field of requiredFields) {
       if (!config[field]) {
-        const errorType = field.toLowerCase().includes('key') 
-          ? ErrorTypes.API_KEY_MISSING 
+        const errorType = field.toLowerCase().includes('key')
+          ? ErrorTypes.API_KEY_MISSING
           : field.toLowerCase().includes('url')
           ? ErrorTypes.API_URL_MISSING
           : field.toLowerCase().includes('model')
@@ -204,41 +282,6 @@ export class BaseProvider {
   }
 
   /**
-   * Utility method to build message payload for debugging
-   * @param {Object} options - API call options
-   * @returns {Object} - Message payload information
-   */
-  _buildMessagePayload(options) {
-    let promptText = "";
-    try {
-      const bodyObj = JSON.parse(options.fetchOptions.body);
-      if (
-        bodyObj.contents &&
-        Array.isArray(bodyObj.contents) &&
-        bodyObj.contents[0].parts
-      ) {
-        promptText = bodyObj.contents[0].parts[0].text;
-      } else if (bodyObj.message) {
-        promptText = bodyObj.message;
-      } else if (
-        bodyObj.messages &&
-        Array.isArray(bodyObj.messages) &&
-        bodyObj.messages[0].content
-      ) {
-        promptText = bodyObj.messages[0].content;
-      }
-    } catch {
-      // leave promptText empty
-    }
-    return {
-      promptText,
-      sourceLanguage: options.sourceLanguage || "auto",
-      targetLanguage: options.targetLanguage || "auto",
-      translationMode: options.translationMode || "",
-    };
-  }
-
-  /**
    * Processes an array of text segments in batches, respecting provider-specific limits.
    * @param {Array<string>} segments - The array of text segments to translate.
    * @param {Function} translateChunk - A function that takes a chunk (an array of strings) and translates it.
@@ -255,7 +298,6 @@ export class BaseProvider {
       const segmentLength = segment.length;
 
       if (segmentLength > CHAR_LIMIT) {
-        // If a single segment is too long, process it in its own chunk.
         if (currentChunk.length > 0) {
           chunks.push(currentChunk);
           currentChunk = [];
