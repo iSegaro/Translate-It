@@ -2,8 +2,7 @@
 import { BaseProvider } from "@/providers/core/BaseProvider.js";
 import {
   getGoogleTranslateUrlAsync,
-  getEnableDictionaryAsync,
-  TranslationMode
+  getEnableDictionaryAsync
 } from "@/config.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -11,8 +10,8 @@ import { LanguageSwappingService } from "@/providers/core/LanguageSwappingServic
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
+const RELIABLE_DELIMITER = '\n\n---\n\n';
 
-// A simple map for converting full language names to Google Translate's codes.
 const langNameToCodeMap = {
   afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh", chinese: "zh", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", thai: "th", turkish: "tr", ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi",
 };
@@ -23,7 +22,6 @@ export class GoogleTranslateProvider extends BaseProvider {
   static displayName = "Google Translate";
   static reliableJsonMode = true;
   static CHAR_LIMIT = 3900;
-  static CHUNK_SIZE = 20;
 
   constructor() {
     super("GoogleTranslate");
@@ -38,42 +36,65 @@ export class GoogleTranslateProvider extends BaseProvider {
   async _batchTranslate(texts, sl, tl, abortController = null) {
     const context = `${this.providerName.toLowerCase()}-translate`;
     const isDictionaryEnabled = await getEnableDictionaryAsync();
-    // Note: translateMode is not available here, so we make a conservative guess.
-    // Dictionary is less useful for batch/JSON mode, so we can disable it.
     const shouldIncludeDictionary = isDictionaryEnabled && texts.length === 1;
 
-    const translateChunk = async (chunk) => {
+    const chunks = [];
+    let currentChunk = [];
+    let currentCharCount = 0;
+
+    for (const text of texts) {
+      const prospectiveCharCount = currentCharCount + text.length + RELIABLE_DELIMITER.length;
+      if (currentChunk.length > 0 && prospectiveCharCount > GoogleTranslateProvider.CHAR_LIMIT) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCharCount = 0;
+      }
+      currentChunk.push(text);
+      currentCharCount += text.length + RELIABLE_DELIMITER.length;
+    }
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    const chunkPromises = chunks.map(async (chunk) => {
       const apiUrl = await getGoogleTranslateUrlAsync();
-      const url = new URL(apiUrl);
-      const queryParams = [
-        `client=gtx`,
-        `sl=${sl}`,
-        `tl=${tl}`,
-        `dt=t`,
-      ];
-      if (shouldIncludeDictionary) {
-        queryParams.push(`dt=bd`);
+      const queryParams = new URLSearchParams({
+        client: 'gtx',
+        sl: sl,
+        tl: tl,
+        dt: 't',
+      });
+
+      if (shouldIncludeDictionary && chunk.length === 1) {
+        queryParams.append('dt', 'bd');
       }
 
-      const textToTranslate = chunk.join('\n');
-      queryParams.push(`q=${encodeURIComponent(textToTranslate)}`);
-
-      url.search = queryParams.join("&");
+      const textToTranslate = chunk.join(RELIABLE_DELIMITER);
+      const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
       const result = await this._executeApiCall({
-        url: url.toString(),
-        fetchOptions: { method: "GET" },
+        url: `${apiUrl}?${queryParams.toString()}`,
+        fetchOptions: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          },
+          body: requestBody,
+        },
         extractResponse: (data) => {
-          if (!data?.[0]) {
+          if (!data?.[0]?.[0]?.[0]) {
             return { translatedSegments: chunk.map(() => ''), candidateText: '' };
           }
-          const translatedText = data[0].map((segment) => segment[0] || "").join('');
-          const translatedSegments = translatedText.split('\n');
+
+          const translatedText = data[0].map(segment => segment[0]).join('');
+          const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
 
           if (translatedSegments.length !== chunk.length) {
-            logger.warn("[Google] Translated segment count mismatch.", { expected: chunk.length, got: translatedSegments.length });
-            // Fallback: return empty strings to avoid crashing the reconstruction.
-            return { translatedSegments: chunk.map(() => ''), candidateText: '' };
+            logger.warn("[Google] Translated segment count mismatch after splitting.", { 
+              expected: chunk.length, 
+              got: translatedSegments.length 
+            });
+            return { translatedSegments: [translatedText], candidateText: '' };
           }
 
           let candidateText = "";
@@ -84,6 +105,7 @@ export class GoogleTranslateProvider extends BaseProvider {
               return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
             }).join("");
           }
+
           return {
             translatedSegments,
             candidateText: candidateText.trim(),
@@ -93,29 +115,22 @@ export class GoogleTranslateProvider extends BaseProvider {
         abortController,
       });
       return result || { translatedSegments: chunk.map(() => ''), candidateText: '' };
-    };
+    });
 
-    // Since Google Translate can take a single large query, we can process all texts in one go if under limit.
-    // However, for simplicity and consistency, we use the batching logic.
-    const allTranslated = await this._processInBatches(
-      texts,
-      async (chunk) => {
-        const { translatedSegments } = await translateChunk(chunk);
-        return translatedSegments;
-      },
-      {
-        CHUNK_SIZE: GoogleTranslateProvider.CHUNK_SIZE,
-        CHAR_LIMIT: GoogleTranslateProvider.CHAR_LIMIT,
-      }
-    );
+    const translatedChunks = await Promise.all(chunkPromises);
+    const allTranslated = translatedChunks.flatMap(chunk => chunk.translatedSegments);
 
-    // Handle dictionary for single, non-JSON translations
-    if (texts.length === 1) {
-      const { candidateText } = await translateChunk(texts);
-      if (candidateText) {
-        const formattedDictionary = this._formatDictionaryAsMarkdown(candidateText);
+    if (texts.length !== allTranslated.length) {
+        logger.error("[Google] Final translated text count does not match original count.",{
+            original: texts.length,
+            translated: allTranslated.length
+        });
+        return texts;
+    }
+
+    if (texts.length === 1 && translatedChunks[0]?.candidateText) {
+        const formattedDictionary = this._formatDictionaryAsMarkdown(translatedChunks[0].candidateText);
         return [`${allTranslated[0]}\n\n${formattedDictionary}`];
-      }
     }
 
     return allTranslated;
