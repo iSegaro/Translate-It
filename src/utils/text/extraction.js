@@ -132,6 +132,7 @@ export function collectTextNodes(targetElement, useIntelligentGrouping = true) {
  * این تابع متن‌های کوچک مجاور را ترکیب می‌کند و micro-segments را فیلتر می‌کند
  */
 function collectTextNodesOptimized(targetElement) {
+  // Always extract all visible text nodes in subtree, in DOM order
   const walker = document.createTreeWalker(
     targetElement,
     NodeFilter.SHOW_TEXT,
@@ -155,52 +156,28 @@ function collectTextNodesOptimized(targetElement) {
           return NodeFilter.FILTER_REJECT;
         }
 
-        // Accept all visible text nodes for comprehensive extraction
+        // Accept all visible text nodes
         return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       }
     },
     false,
   );
 
-  const allTextNodes = [];
-  const textSegments = [];
+  const textNodes = [];
+  const originalTextsMap = new Map();
   let node;
-
-  // First pass: collect all visible text nodes and their context
   while ((node = walker.nextNode())) {
     const trimmedText = node.textContent.trim();
     if (trimmedText) {
-      const parentTag = node.parentElement?.tagName?.toLowerCase() || 'unknown';
-      const isBlockElement = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'article', 'section'].includes(parentTag);
-      
-      allTextNodes.push(node);
-      textSegments.push({
-        node,
-        text: trimmedText,
-        parentTag,
-        isBlockElement,
-        length: trimmedText.length
-      });
+      textNodes.push(node);
+      if (originalTextsMap.has(trimmedText)) {
+        originalTextsMap.get(trimmedText).push(node);
+      } else {
+        originalTextsMap.set(trimmedText, [node]);
+      }
     }
   }
-
-  // اصلاح: حذف گروه‌بندی و فیلترهای غیرضروری، استخراج همه گره‌های متنی قابل مشاهده
-  const textNodes = [];
-  const originalTextsMap = new Map();
-  for (const segment of textSegments) {
-    // فقط حذف گره‌هایی که واقعا بی‌معنی هستند (کمتر از 2 کاراکتر و فقط whitespace)
-    if (segment.length < 2 || !segment.text.trim()) {
-      logger.debug(`Skipping tiny/empty segment: "${segment.text}"`);
-      continue;
-    }
-    textNodes.push(segment.node);
-    if (originalTextsMap.has(segment.text)) {
-      originalTextsMap.get(segment.text).push(segment.node);
-    } else {
-      originalTextsMap.set(segment.text, [segment.node]);
-    }
-  }
-  logger.debug(`Text extraction (no grouping): ${allTextNodes.length} → ${textNodes.length} nodes`);
+  logger.debug(`Text extraction (optimized): ${textNodes.length} nodes`);
   return { textNodes, originalTextsMap };
 }
 
