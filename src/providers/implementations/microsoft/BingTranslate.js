@@ -162,14 +162,99 @@ export class BingTranslateProvider extends BaseProvider {
   static type = "free";
   static description = "Bing Translator";
   static displayName = "Microsoft Bing";
-  // Mark that Bing's JSON-mode output may be unreliable/variable
   static reliableJsonMode = false;
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
+  static CHAR_LIMIT = 1500;
+  static CHUNK_SIZE = 20;
 
   constructor() {
     super("BingTranslate");
+  }
+
+  /**
+   * ترجمه یک chunk از متن‌ها (برای batch translation)
+   * @param {string[]} chunk - لیست متن‌ها برای ترجمه
+   * @param {string} sl - کد زبان مبدا
+   * @param {string} tl - کد زبان مقصد
+   * @param {Object} tokenData - اطلاعات توکن Bing
+   * @param {Object} [abortController] - کنترلر لغو درخواست
+   * @returns {Promise<string[]>} - لیست ترجمه شده
+   */
+  async _translateChunk(chunk, sl, tl, tokenData, abortController = null) {
+    const textToTranslate = chunk.join(TEXT_DELIMITER);
+    const formData = new URLSearchParams({
+      text: textToTranslate,
+      fromLang: sl,
+      to: tl,
+      token: tokenData.token,
+      key: tokenData.key,
+    });
+
+    const url = new URL(BingTranslateProvider.bingBaseUrl);
+    url.searchParams.set("IG", tokenData.IG);
+    url.searchParams.set("IID", tokenData.IID && tokenData.IID.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
+    url.searchParams.set("isVertical", "1");
+
+    const result = await this._executeApiCall({
+      url: url.toString(),
+      fetchOptions: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": navigator.userAgent,
+        },
+        body: formData,
+      },
+      extractResponse: (data) => {
+        if (!data || !Array.isArray(data) || !data[0]) {
+          return chunk.map(() => "");
+        }
+        const translationData = data[0];
+        if (!translationData.translations || !Array.isArray(translationData.translations)) {
+          return chunk.map(() => "");
+        }
+        const targetText = translationData.translations[0]?.text;
+        if (!targetText) {
+          return chunk.map(() => "");
+        }
+        // تقسیم ترجمه به بخش‌های جداگانه
+        return targetText.split(TEXT_DELIMITER).map(t => t.trim());
+      },
+      context: `${this.providerName.toLowerCase()}-chunk-translate`,
+      abortController: abortController,
+    });
+    return result || chunk.map(() => "");
+  }
+
+  /**
+   * ترجمه به صورت batch و مدیریت JSON/Plain
+   */
+  async _batchTranslate(textsToTranslate, sl, tl, tokenData, abortController = null) {
+    // محدودیت کاراکتر و سایز chunk از static property
+    const CHUNK_SIZE = BingTranslateProvider.CHUNK_SIZE;
+    const CHAR_LIMIT = BingTranslateProvider.CHAR_LIMIT;
+    let batches = [];
+    let currentBatch = [];
+    let currentLen = 0;
+    for (let txt of textsToTranslate) {
+      if (currentBatch.length >= CHUNK_SIZE || currentLen + txt.length > CHAR_LIMIT) {
+        batches.push(currentBatch);
+        currentBatch = [];
+        currentLen = 0;
+      }
+      currentBatch.push(txt);
+      currentLen += txt.length;
+    }
+    if (currentBatch.length) batches.push(currentBatch);
+
+    let results = [];
+    for (let batch of batches) {
+      const translated = await this._translateChunk(batch, sl, tl, tokenData, abortController);
+      results.push(...translated);
+    }
+    return results;
   }
 
 
@@ -197,14 +282,19 @@ export class BingTranslateProvider extends BaseProvider {
    * @returns {string} - Bing language code
    */
   _getLangCode(lang) {
-    // Normalize incoming language value first
+    if (!lang || typeof lang !== "string") return "auto-detect";
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
+    // ابتدا بررسی مقدار auto-detect
     if (normalized === AUTO_DETECT_VALUE) return "auto-detect";
-
+    // ابتدا بررسی کد مستقیم
     if (bingLangCode[normalized]) return bingLangCode[normalized];
-
-    const mapped = langNameToCodeMap[normalized] || normalized;
-    return bingLangCode[mapped] || mapped;
+    // سپس بررسی نام زبان
+    const lower = normalized.toLowerCase();
+    if (langNameToCodeMap[lower] && bingLangCode[langNameToCodeMap[lower]]) {
+      return bingLangCode[langNameToCodeMap[lower]];
+    }
+    // در نهایت مقدار ورودی را بازگردان
+    return normalized;
   }
 
   /**
@@ -219,28 +309,30 @@ export class BingTranslateProvider extends BaseProvider {
         Date.now() - BingTranslateProvider.bingAccessToken.tokenTs >
           BingTranslateProvider.bingAccessToken.tokenExpiryInterval
       ) {
-        logger.debug('Fetching new Bing access token');
-        
+        logger.debug('[Bing] Fetching new access token...');
         const response = await fetch(BingTranslateProvider.bingTokenUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch token page: ${response.status}`);
+          logger.error(`[Bing] Token page fetch failed: ${response.status}`);
+          const err = new Error(`Failed to fetch token page: ${response.status}`);
+          err.type = ErrorTypes.API_KEY_MISSING;
+          err.context = `${this.providerName.toLowerCase()}-token-fetch`;
+          throw err;
         }
-        
         const data = await response.text();
-        
         // Extract token data using regex patterns from the example
         const igMatch = data.match(/IG:"([^"]+)"/);
         const iidMatch = data.match(/data-iid="([^"]+)"/);
         const paramsMatch = data.match(/params_AbusePreventionHelper\s?=\s?([^\]]+\])/);
-        
         if (!igMatch || !iidMatch || !paramsMatch) {
-          throw new Error("Failed to extract token parameters from Bing translator page");
+          logger.error('[Bing] Token extraction failed.');
+          const err = new Error("Failed to extract token parameters from Bing translator page");
+          err.type = ErrorTypes.API_KEY_MISSING;
+          err.context = `${this.providerName.toLowerCase()}-token-extract`;
+          throw err;
         }
-        
         const IG = igMatch[1];
         const IID = iidMatch[1];
         const [_key, _token, interval] = JSON.parse(paramsMatch[1]);
-        
         BingTranslateProvider.bingAccessToken = {
           IG,
           IID,
@@ -250,17 +342,16 @@ export class BingTranslateProvider extends BaseProvider {
           tokenExpiryInterval: interval,
           count: 0,
         };
-        
-        logger.debug('New Bing access token obtained');
+        logger.debug('[Bing] New access token obtained.');
       }
-      
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
-      logger.error('Failed to get Bing access token:', error);
-      const err = new Error(`Failed to get Bing access token: ${error.message}`);
-      err.type = ErrorTypes.API;
-      err.context = `${this.providerName.toLowerCase()}-token-fetch`;
-      throw err;
+      logger.error(`[Bing] Failed to get access token:`, error);
+      if (!error.type) {
+        error.type = ErrorTypes.API;
+        error.context = `${this.providerName.toLowerCase()}-token-fetch`;
+      }
+      throw error;
     }
   }
 
@@ -275,11 +366,7 @@ export class BingTranslateProvider extends BaseProvider {
     );
 
     // Set auto-detect for Field and Subtitle modes after language detection
-    if (translateMode === TranslationMode.Field) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
-
-    if (translateMode === TranslationMode.Subtitle) {
+    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
     }
 
@@ -294,7 +381,6 @@ export class BingTranslateProvider extends BaseProvider {
     let isJsonMode = false;
     let originalJsonStruct;
     let textsToTranslate = [text];
-
     try {
       const parsed = JSON.parse(text);
       if (this._isSpecificTextJsonFormat(parsed)) {
@@ -311,134 +397,55 @@ export class BingTranslateProvider extends BaseProvider {
     try {
       // Check if translation was cancelled before starting
       if (abortController && abortController.signal.aborted) {
-        logger.debug('Bing translation cancelled before starting');
+        logger.debug('[Bing] Translation cancelled before starting');
         const err = new Error('Translation cancelled by user');
         err.type = ErrorTypes.USER_CANCELLED;
         err.context = context;
         throw err;
       }
-
       // Get access token
-      const { token, key, IG, IID } = await this._getBingAccessToken();
-
+      const tokenData = await this._getBingAccessToken();
       // Check again after getting token
       if (abortController && abortController.signal.aborted) {
-        logger.debug('Bing translation cancelled after getting token');
+        logger.debug('[Bing] Translation cancelled after getting token');
         const err = new Error('Translation cancelled by user');
         err.type = ErrorTypes.USER_CANCELLED;
         err.context = context;
         throw err;
       }
-
-      // Prepare request body
-      const textToTranslate = textsToTranslate.join(TEXT_DELIMITER);
-      logger.debug('Bing: Preparing request', {
-        fromLang: sl,
-        to: tl,
-        textLength: textToTranslate.length,
-        isJsonMode,
-        hasAbortController: !!abortController
-      });
-      const formData = new URLSearchParams({
-        text: textToTranslate,
-        fromLang: sl,
-        to: tl,
-        token,
-        key,
-      });
-
-      // Make translation request
-      const url = new URL(BingTranslateProvider.bingBaseUrl);
-      url.searchParams.set("IG", IG);
-      url.searchParams.set("IID", 
-        IID && IID.length ? `${IID}.${BingTranslateProvider.bingAccessToken.count++}` : ""
-      );
-      url.searchParams.set("isVertical", "1");
-
-      const result = await this._executeApiCall({
-        url: url.toString(),
-        fetchOptions: {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": navigator.userAgent,
-          },
-          body: formData,
-        },
-        extractResponse: (data) => {
-          // Check for valid Bing response structure
-          if (!data || !Array.isArray(data) || !data[0]) {
-            return undefined;
-          }
-
-          // Extract translation data
-          const translationData = data[0];
-          if (!translationData.translations || !Array.isArray(translationData.translations)) {
-            return undefined;
-          }
-
-          const targetText = translationData.translations[0]?.text;
-          if (!targetText) {
-            return undefined;
-          }
-
-          // Extract additional data if available
-          let detectedLang = "";
-          let transliteration = "";
-
-          if (translationData.detectedLanguage?.language) {
-            detectedLang = translationData.detectedLanguage.language;
-          }
-
-          if (data[1] && data[1].inputTransliteration) {
-            transliteration = data[1].inputTransliteration;
-          }
-
-          return {
-            targetText,
-            detectedLang,
-            transliteration,
-          };
-        },
-        context: context,
-        abortController: abortController,
-      });
-
-      // Response Processing
+      // ترجمه batch
+      let translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, tokenData, abortController);
       if (isJsonMode) {
-        const translatedParts = result.targetText.split(TEXT_DELIMITER);
-        if (translatedParts.length !== originalJsonStruct.length) {
-          logger.error('JSON reconstruction failed due to segment mismatch.');
-          return result.targetText; // Fallback to raw translated text
+        if (translatedSegments.length !== originalJsonStruct.length) {
+          logger.error('[Bing] JSON reconstruction failed due to segment mismatch.');
+          return translatedSegments.join(TEXT_DELIMITER); // Fallback to raw translated text
         }
         const translatedJson = originalJsonStruct.map((item, index) => ({
           ...item,
-          text: translatedParts[index]?.trim() || "",
+          text: translatedSegments[index] || "",
         }));
         return JSON.stringify(translatedJson, null, 2);
       } else {
-        return result.targetText;
+        return translatedSegments.join(TEXT_DELIMITER);
       }
     } catch (error) {
-      // Enhanced error handling
       if (error.type) {
-        // Error already has type from _executeApiCall or _getBingAccessToken
         throw error;
       }
-
-      // Handle Bing-specific errors
+      // مدیریت خطاهای رایج Bing
       if (error.message?.includes("token") || error.message?.includes("Token")) {
         error.type = ErrorTypes.API_KEY_MISSING;
         error.context = `${this.providerName.toLowerCase()}-token-error`;
+        logger.error('[Bing] API_KEY_MISSING:', error);
       } else if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
         error.type = ErrorTypes.API_QUOTA_EXCEEDED;
         error.context = `${this.providerName.toLowerCase()}-quota-exceeded`;
+        logger.error('[Bing] API_QUOTA_EXCEEDED:', error);
       } else {
         error.type = ErrorTypes.API;
         error.context = `${this.providerName.toLowerCase()}-translation-error`;
+        logger.error('[Bing] API error:', error);
       }
-
-      logger.error('Translation error:', error);
       throw error;
     }
   }
