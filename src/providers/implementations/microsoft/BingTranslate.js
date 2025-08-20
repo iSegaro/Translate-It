@@ -9,9 +9,6 @@ import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/config.js";
 
-// (logger already defined)
-
-
 const TEXT_DELIMITER = "\n\n---\n\n";
 
 // Bing language code mapping (based on the example.js.txt file)
@@ -162,26 +159,15 @@ export class BingTranslateProvider extends BaseProvider {
   static type = "free";
   static description = "Bing Translator";
   static displayName = "Microsoft Bing";
-  static reliableJsonMode = false;
+  static reliableJsonMode = true;
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
-  static CHAR_LIMIT = 1500;
-  static CHUNK_SIZE = 20;
 
   constructor() {
     super("BingTranslate");
   }
 
-  /**
-   * ترجمه یک chunk از متن‌ها (برای batch translation)
-   * @param {string[]} chunk - لیست متن‌ها برای ترجمه
-   * @param {string} sl - کد زبان مبدا
-   * @param {string} tl - کد زبان مقصد
-   * @param {Object} tokenData - اطلاعات توکن Bing
-   * @param {Object} [abortController] - کنترلر لغو درخواست
-   * @returns {Promise<string[]>} - لیست ترجمه شده
-   */
   async _translateChunk(chunk, sl, tl, tokenData, abortController = null) {
     // بررسی لغو درخواست قبل از ارسال
     if (abortController && abortController.signal.aborted) {
@@ -191,101 +177,146 @@ export class BingTranslateProvider extends BaseProvider {
       err.context = `${this.providerName.toLowerCase()}-chunk-cancel`;
       throw err;
     }
-    const textToTranslate = chunk.join(TEXT_DELIMITER);
-    const formData = new URLSearchParams({
-      text: textToTranslate,
-      fromLang: sl,
-      to: tl,
-      token: tokenData.token,
-      key: tokenData.key,
-    });
-    const url = new URL(BingTranslateProvider.bingBaseUrl);
-    url.searchParams.set("IG", tokenData.IG);
-    url.searchParams.set("IID", tokenData.IID && tokenData.IID.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
-    url.searchParams.set("isVertical", "1");
-    const result = await this._executeApiCall({
-      url: url.toString(),
-      fetchOptions: {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": navigator.userAgent,
+
+    try {
+      const textToTranslate = chunk.join(TEXT_DELIMITER);
+      const formData = new URLSearchParams({
+        text: textToTranslate,
+        fromLang: sl,
+        to: tl,
+        token: tokenData.token,
+        key: tokenData.key,
+      });
+      const url = new URL(BingTranslateProvider.bingBaseUrl);
+      url.searchParams.set("IG", tokenData.IG);
+      url.searchParams.set("IID", tokenData.IID && tokenData.IID.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
+      url.searchParams.set("isVertical", "1");
+
+      const result = await this._executeApiCall({
+        url: url.toString(),
+        fetchOptions: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": navigator.userAgent,
+          },
+          body: formData,
+          signal: abortController ? abortController.signal : undefined,
         },
-        body: formData,
-        signal: abortController ? abortController.signal : undefined,
-      },
-      extractResponse: (data) => {
-        if (!data || !Array.isArray(data) || !data[0]) {
-          return chunk.map(() => "");
-        }
-        const translationData = data[0];
-        if (!translationData.translations || !Array.isArray(translationData.translations)) {
-          return chunk.map(() => "");
-        }
-        const targetText = translationData.translations[0]?.text;
-        if (!targetText) {
-          return chunk.map(() => "");
-        }
-        // تقسیم ترجمه به بخش‌های جداگانه
-        return targetText.split(TEXT_DELIMITER).map(t => t.trim());
-      },
-      context: `${this.providerName.toLowerCase()}-chunk-translate`,
-      abortController: abortController,
-    });
-    // بررسی لغو پس از دریافت پاسخ
-    if (abortController && abortController.signal.aborted) {
-      logger.debug('[Bing] Translation chunk cancelled after request');
-      const err = new Error('Translation cancelled by user');
-      err.type = ErrorTypes.USER_CANCELLED;
-      err.context = `${this.providerName.toLowerCase()}-chunk-cancel`;
-      throw err;
+        extractResponse: (data) => {
+          if (data && data.statusCode === 400) {
+            const err = new Error('Bing API returned status 400');
+            err.name = 'BingApiError';
+            throw err;
+          }
+          if (!data || !Array.isArray(data) || !data[0]) {
+            return chunk.map(() => "");
+          }
+          const translationData = data[0];
+          if (!translationData.translations || !Array.isArray(translationData.translations)) {
+            return chunk.map(() => "");
+          }
+          const targetText = translationData.translations[0]?.text;
+          if (!targetText) {
+            return chunk.map(() => "");
+          }
+          // تقسیم ترجمه به بخش‌های جداگانه
+          return targetText.split(TEXT_DELIMITER).map(t => t.trim());
+        },
+        context: `${this.providerName.toLowerCase()}-chunk-translate`,
+        abortController: abortController,
+      });
+
+      if (abortController && abortController.signal.aborted) {
+        logger.debug('[Bing] Translation chunk cancelled after request');
+        const err = new Error('Translation cancelled by user');
+        err.type = ErrorTypes.USER_CANCELLED;
+        err.context = `${this.providerName.toLowerCase()}-chunk-cancel`;
+        throw err;
+      }
+      return result || chunk.map(() => "");
+    } catch (error) {
+      if (error.name === 'BingApiError' || error instanceof SyntaxError) {
+        logger.warn(`[Bing] A batch failed, likely due to content/size. Will attempt to split. Batch size: ${chunk.length}`);
+        return null; // Signal failure to _batchTranslate
+      }
+      throw error;
     }
-    return result || chunk.map(() => "");
   }
 
   /**
    * ترجمه به صورت batch و مدیریت JSON/Plain
    */
   async _batchTranslate(textsToTranslate, sl, tl, tokenData, abortController = null) {
-    // محدودیت کاراکتر و سایز chunk از static property
-    const CHUNK_SIZE = BingTranslateProvider.CHUNK_SIZE;
-    const CHAR_LIMIT = BingTranslateProvider.CHAR_LIMIT;
-    let batches = [];
-    let currentBatch = [];
-    let currentLen = 0;
-    for (let txt of textsToTranslate) {
-      if (currentBatch.length >= CHUNK_SIZE || currentLen + txt.length > CHAR_LIMIT) {
-        batches.push(currentBatch);
-        currentBatch = [];
-        currentLen = 0;
-      }
-      currentBatch.push(txt);
-      currentLen += txt.length;
-    }
-    if (currentBatch.length) batches.push(currentBatch);
+    // Map original texts to objects with index to preserve order
+    const indexedTexts = textsToTranslate.map((text, index) => ({ index, text }));
+    const finalResults = new Array(textsToTranslate.length);
 
-    let results = [];
-    for (let batch of batches) {
-      // بررسی لغو قبل از هر batch
-      if (abortController && abortController.signal.aborted) {
-        logger.debug('[Bing] Batch translation cancelled before chunk');
-        const err = new Error('Translation cancelled by user');
-        err.type = ErrorTypes.USER_CANCELLED;
-        err.context = `${this.providerName.toLowerCase()}-batch-cancel`;
-        throw err;
+    // 1. Create initial batches
+    const initialBatches = [];
+    let currentBatch = [];
+    let currentBatchLen = 0;
+    const charLimit = 1000;
+    const segmentLimit = 25;
+
+    for (const item of indexedTexts) {
+      if (!item.text || !item.text.trim()) {
+        finalResults[item.index] = ""; // Handle empty strings
+        continue;
       }
-      const translated = await this._translateChunk(batch, sl, tl, tokenData, abortController);
-      results.push(...translated);
-      // بررسی لغو بعد از هر chunk
-      if (abortController && abortController.signal.aborted) {
-        logger.debug('[Bing] Batch translation cancelled after chunk');
-        const err = new Error('Translation cancelled by user');
-        err.type = ErrorTypes.USER_CANCELLED;
-        err.context = `${this.providerName.toLowerCase()}-batch-cancel`;
-        throw err;
+      if (item.text.length > charLimit) {
+        if (currentBatch.length > 0) initialBatches.push(currentBatch);
+        initialBatches.push([item]);
+        currentBatch = [];
+        currentBatchLen = 0;
+        continue;
+      }
+      const prospectiveLen = currentBatchLen + item.text.length + (currentBatch.length > 0 ? TEXT_DELIMITER.length : 0);
+      if (currentBatch.length > 0 && (currentBatch.length >= segmentLimit || prospectiveLen > charLimit)) {
+        initialBatches.push(currentBatch);
+        currentBatch = [];
+        currentBatchLen = 0;
+      }
+      currentBatch.push(item);
+      currentBatchLen += item.text.length + (currentBatch.length > 1 ? TEXT_DELIMITER.length : 0);
+    }
+    if (currentBatch.length > 0) initialBatches.push(currentBatch);
+
+    // 2. Process batches with a retry queue
+    const processingQueue = [...initialBatches];
+    while (processingQueue.length > 0) {
+      if (abortController && abortController.signal.aborted) throw new Error("Translation cancelled");
+
+      const batch = processingQueue.shift();
+      const textsOnly = batch.map(item => item.text);
+      const translatedSegments = await this._translateChunk(textsOnly, sl, tl, tokenData, abortController);
+
+      if (translatedSegments !== null) {
+        // Success, place results in correct positions
+        if (translatedSegments.length === batch.length) {
+          batch.forEach((item, i) => {
+            finalResults[item.index] = translatedSegments[i];
+          });
+        } else {
+          // Mismatch, mark all as failed to be safe
+          batch.forEach(item => finalResults[item.index] = item.text);
+        }
+      } else {
+        // Failure, split and re-queue if possible
+        if (batch.length > 1) {
+          const mid = Math.ceil(batch.length / 2);
+          const firstHalf = batch.slice(0, mid);
+          const secondHalf = batch.slice(mid);
+          processingQueue.unshift(secondHalf, firstHalf); // Add to front of queue
+        } else {
+          // A single item failed, cannot split further. Mark as untranslated.
+          const failedItem = batch[0];
+          logger.error(`[Bing] Segment could not be translated: "${failedItem.text.substring(0, 100)}"...`);
+          finalResults[failedItem.index] = failedItem.text; // Return original text
+        }
       }
     }
-    return results;
+    return finalResults;
   }
 
 
