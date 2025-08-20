@@ -174,8 +174,8 @@ export class YandexTranslateProvider extends BaseProvider {
   static reliableJsonMode = true;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
-  static CHAR_LIMIT = 2000;
-  static CHUNK_SIZE = 50;
+  static CHAR_LIMIT = 1500;
+  static CHUNK_SIZE = 20;
 
   constructor() {
     super("YandexTranslate");
