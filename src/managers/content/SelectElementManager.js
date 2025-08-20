@@ -1019,11 +1019,31 @@ export class SelectElementManager {
 
     // Only clear if leaving the highlighted element
     if (element === this.currentHighlighted) {
-      // Small delay to prevent flicker when moving between child elements
       setTimeout(() => {
         if (this.currentHighlighted === element) {
           this.clearHighlight();
           this.currentHighlighted = null;
+
+          // پیدا کردن نزدیک‌ترین sibling یا والد مناسب برای هایلایت
+          let candidate = null;
+          // ابتدا siblings را بررسی کن
+          if (element.parentElement) {
+            const siblings = Array.from(element.parentElement.children).filter((el) => el !== element);
+            for (const sib of siblings) {
+              if (this.isValidTextElement(sib)) {
+                candidate = sib;
+                break;
+              }
+            }
+          }
+          // اگر sibling مناسب نبود، والد را بررسی کن
+          if (!candidate && element.parentElement && this.isValidTextElement(element.parentElement)) {
+            candidate = element.parentElement;
+          }
+          // اگر کاندیدا پیدا شد، هایلایت کن
+          if (candidate) {
+            this.highlightElement(candidate);
+          }
         }
       }, 50);
     }
