@@ -26,7 +26,6 @@ export class YandexTranslateProvider extends BaseProvider {
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
   static CHAR_LIMIT = 10000;
-  static CHUNK_SIZE = 20;
 
   constructor() {
     super("YandexTranslate");
@@ -54,7 +53,24 @@ export class YandexTranslateProvider extends BaseProvider {
       const lang = sl === "auto" ? tl : `${sl}-${tl}`;
       logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
 
-      const translateChunk = async (chunk) => {
+      const chunks = [];
+      let currentChunk = [];
+      let currentCharCount = 0;
+
+      for (const text of texts) {
+        if (currentChunk.length > 0 && currentCharCount + text.length > YandexTranslateProvider.CHAR_LIMIT) {
+          chunks.push(currentChunk);
+          currentChunk = [];
+          currentCharCount = 0;
+        }
+        currentChunk.push(text);
+        currentCharCount += text.length;
+      }
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+      }
+
+      const chunkPromises = chunks.map(async (chunk) => {
         const uuid = this._generateUuid();
         const formData = new URLSearchParams();
         formData.append('lang', lang);
@@ -75,9 +91,9 @@ export class YandexTranslateProvider extends BaseProvider {
             body: formData,
           },
           extractResponse: (data) => {
-            if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text)) {
-              logger.error('Yandex API returned invalid response for a chunk', data);
-              return chunk.map(() => ''); // Return empty strings for the chunk on error
+            if (!data || data.code !== 200 || !data.text || !Array.isArray(data.text) || data.text.length !== chunk.length) {
+              logger.error('Yandex API returned invalid or mismatched response for a chunk', data);
+              return chunk.map(() => '');
             }
             return data.text;
           },
@@ -85,12 +101,10 @@ export class YandexTranslateProvider extends BaseProvider {
           abortController,
         });
         return result || chunk.map(() => '');
-      };
-
-      return await this._processInBatches(texts, translateChunk, {
-        CHUNK_SIZE: YandexTranslateProvider.CHUNK_SIZE,
-        CHAR_LIMIT: YandexTranslateProvider.CHAR_LIMIT,
       });
+
+      const translatedChunks = await Promise.all(chunkPromises);
+      return translatedChunks.flat();
 
     } catch (error) {
       if (error.type) {
