@@ -183,6 +183,14 @@ export class BingTranslateProvider extends BaseProvider {
    * @returns {Promise<string[]>} - لیست ترجمه شده
    */
   async _translateChunk(chunk, sl, tl, tokenData, abortController = null) {
+    // بررسی لغو درخواست قبل از ارسال
+    if (abortController && abortController.signal.aborted) {
+      logger.debug('[Bing] Translation chunk cancelled before request');
+      const err = new Error('Translation cancelled by user');
+      err.type = ErrorTypes.USER_CANCELLED;
+      err.context = `${this.providerName.toLowerCase()}-chunk-cancel`;
+      throw err;
+    }
     const textToTranslate = chunk.join(TEXT_DELIMITER);
     const formData = new URLSearchParams({
       text: textToTranslate,
@@ -191,12 +199,10 @@ export class BingTranslateProvider extends BaseProvider {
       token: tokenData.token,
       key: tokenData.key,
     });
-
     const url = new URL(BingTranslateProvider.bingBaseUrl);
     url.searchParams.set("IG", tokenData.IG);
     url.searchParams.set("IID", tokenData.IID && tokenData.IID.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
     url.searchParams.set("isVertical", "1");
-
     const result = await this._executeApiCall({
       url: url.toString(),
       fetchOptions: {
@@ -206,6 +212,7 @@ export class BingTranslateProvider extends BaseProvider {
           "User-Agent": navigator.userAgent,
         },
         body: formData,
+        signal: abortController ? abortController.signal : undefined,
       },
       extractResponse: (data) => {
         if (!data || !Array.isArray(data) || !data[0]) {
@@ -225,6 +232,14 @@ export class BingTranslateProvider extends BaseProvider {
       context: `${this.providerName.toLowerCase()}-chunk-translate`,
       abortController: abortController,
     });
+    // بررسی لغو پس از دریافت پاسخ
+    if (abortController && abortController.signal.aborted) {
+      logger.debug('[Bing] Translation chunk cancelled after request');
+      const err = new Error('Translation cancelled by user');
+      err.type = ErrorTypes.USER_CANCELLED;
+      err.context = `${this.providerName.toLowerCase()}-chunk-cancel`;
+      throw err;
+    }
     return result || chunk.map(() => "");
   }
 
@@ -251,8 +266,24 @@ export class BingTranslateProvider extends BaseProvider {
 
     let results = [];
     for (let batch of batches) {
+      // بررسی لغو قبل از هر batch
+      if (abortController && abortController.signal.aborted) {
+        logger.debug('[Bing] Batch translation cancelled before chunk');
+        const err = new Error('Translation cancelled by user');
+        err.type = ErrorTypes.USER_CANCELLED;
+        err.context = `${this.providerName.toLowerCase()}-batch-cancel`;
+        throw err;
+      }
       const translated = await this._translateChunk(batch, sl, tl, tokenData, abortController);
       results.push(...translated);
+      // بررسی لغو بعد از هر chunk
+      if (abortController && abortController.signal.aborted) {
+        logger.debug('[Bing] Batch translation cancelled after chunk');
+        const err = new Error('Translation cancelled by user');
+        err.type = ErrorTypes.USER_CANCELLED;
+        err.context = `${this.providerName.toLowerCase()}-batch-cancel`;
+        throw err;
+      }
     }
     return results;
   }
