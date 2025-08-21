@@ -153,13 +153,8 @@ export class SelectElementManager {
   }
 
   async revertTranslations() {
-    this.logger.info("Starting translation revert process");
+    this.logger.info("Starting translation revert process in SelectElementManager");
     const revertedCount = await this.stateManager.revertTranslations();
-    if (revertedCount > 0) {
-      await this.notificationManager.show(`${revertedCount} translation(s) reverted.`, "success");
-    } else {
-      await this.notificationManager.show("No translations to revert.", "info");
-    }
     return revertedCount;
   }
 

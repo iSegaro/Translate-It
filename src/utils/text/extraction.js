@@ -337,19 +337,6 @@ export async function revertTranslations(context) {
     }
   });
 
-  if (successfulReverts > 0) {
-    context.notifier.show(
-      `${successfulReverts} ${(await getTranslationString("STATUS_Revert_Number")) || "(مورد بازگردانی شد)"}`,
-      "revert",
-    );
-  } else if (await IsDebug()) {
-    context.notifier.show(
-      (await getTranslationString("STATUS_REVERT_NOT_FOUND")) ||
-        "(هیچ متنی برای بازگردانی یافت نشد)",
-      "warning",
-    );
-  }
-
   context.IconManager?.cleanup();
   context.state.originalTexts.clear();
 
