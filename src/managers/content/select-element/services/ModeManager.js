@@ -3,7 +3,7 @@
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { CONFIG, KEY_CODES } from "../constants/selectElementConstants.js";
-import { SelectElementValidation } from "../../../constants/SelectElementModes.js";
+import { SelectElementValidation } from "../../../../constants/SelectElementModes.js";
 
 export class ModeManager {
   constructor() {

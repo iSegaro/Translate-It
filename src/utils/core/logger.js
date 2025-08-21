@@ -32,11 +32,11 @@ export function isGlobalDebugEnabled() { return __runtimeDebugOverride; }
 const componentLogLevels = {
   Background: LOG_LEVELS.DEBUG,  // background handlers
   Core: LOG_LEVELS.DEBUG,        // core handlers
-  Content: LOG_LEVELS.INFO,     // Windows Manager and content scripts
   Translation: LOG_LEVELS.DEBUG,
-  Messaging: LOG_LEVELS.DEBUG,
-  Providers: LOG_LEVELS.DEBUG,
-  UI: LOG_LEVELS.INFO,          // UI composables
+  Messaging: LOG_LEVELS.INFO,
+  Providers: LOG_LEVELS.INFO,
+  Content: LOG_LEVELS.DEBUG,     // Windows Manager and content scripts
+  UI: LOG_LEVELS.DEBUG,          // UI composables
   Storage: LOG_LEVELS.WARN,
   Capture: LOG_LEVELS.INFO,
   Error: LOG_LEVELS.INFO,

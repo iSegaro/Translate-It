@@ -240,8 +240,8 @@ src/
 └── 🔧 managers/            # System managers
     ├── core/
     │   └── LifecycleManager.js     # Central message router
-    ├── content/
-    │   └── SelectElementManager.js # Element selection manager
+    ├── content/select-element/
+    │           └── SelectElementManager.js # Element selection manager
     └── browser-specific/   # Browser-specific implementations
         └── tts/                    # TTS implementations
 ```
@@ -862,7 +862,7 @@ export const useTranslationStore = defineStore('translation', {
 
 ### Content Scripts
 - `src/content-scripts/index.js` - Main content script entry
-- `src/managers/content/SelectElementManager.js` - Element selection manager
+- `src/managers/content/select-element/SelectElementManager.js` - Element selection manager
 
 ---
 

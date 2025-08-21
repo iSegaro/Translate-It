@@ -4,12 +4,12 @@ import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { ErrorHandler } from "../../../../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../../../../error-management/ErrorTypes.js";
-import { ErrorMessages } from "../../../../error-management/ErrorMessages.js";
+import { errorMessages as ErrorMessages } from "../../../../error-management/ErrorMessages.js";
 
 export class ErrorHandlingService {
   constructor() {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ErrorHandlingService');
-    this.errorHandler = ErrorHandler;
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   /**
@@ -72,7 +72,7 @@ export class ErrorHandlingService {
     const userMessage = ErrorMessages.NETWORK_ERROR;
     
     // Report to global error handler
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.NETWORK,
       context: context,
       userMessage: userMessage,
@@ -98,7 +98,7 @@ export class ErrorHandlingService {
     }
 
     // Report to global error handler
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.TRANSLATION,
       context: context,
       userMessage: userMessage,
@@ -117,7 +117,7 @@ export class ErrorHandlingService {
   async handleUIError(error, context, showNotification) {
     const userMessage = ErrorMessages.UI_ERROR;
     
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.UI,
       context: context,
       userMessage: userMessage,
@@ -135,7 +135,7 @@ export class ErrorHandlingService {
   async handleIntegrationError(error, context, showNotification) {
     const userMessage = ErrorMessages.INTEGRATION_ERROR;
     
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.INTEGRATION,
       context: context,
       userMessage: userMessage,
@@ -153,7 +153,7 @@ export class ErrorHandlingService {
   async handleConfigError(error, context, showNotification) {
     const userMessage = ErrorMessages.CONFIGURATION_ERROR;
     
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.CONFIG,
       context: context,
       userMessage: userMessage,
@@ -171,7 +171,7 @@ export class ErrorHandlingService {
   async handleUnknownError(error, context, showNotification) {
     const userMessage = ErrorMessages.UNEXPECTED_ERROR;
     
-    await this.errorHandler.report(error, {
+    await this.errorHandler.handle(error, {
       type: ErrorTypes.UNKNOWN,
       context: context,
       userMessage: userMessage,
