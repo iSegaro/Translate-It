@@ -132,12 +132,14 @@ export class SelectElementManager {
         return;
       }
 
+      // Start translation process immediately (don't await)
+      this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes);
+
+      // Deactivate UI after kicking off the translation
       this.logger.info("[SelectElementManager] Text nodes collected for translation");
       await this.deactivateUI();
       await this._notifyDeactivation();
       document.removeEventListener("click", this.handleClick, true); // Force remove listener
-
-      await this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes);
     } catch (error) {
       this.logger.error("Element selection error", error);
       await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-click" });
