@@ -6,6 +6,8 @@ import { getTimeoutAsync } from "../../../../config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "../../../../utils/messaging/messageId.js";
 import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
+import NotificationManager from "../../../core/NotificationManager.js";
+import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
@@ -13,6 +15,8 @@ export class TranslationOrchestrator {
     this.stateManager = stateManager;
     this.translationRequests = new Map();
     this.escapeKeyListener = null;
+    this.notificationManager = new NotificationManager();
+    this.statusNotification = null;
   }
 
   async initialize() {
@@ -22,6 +26,9 @@ export class TranslationOrchestrator {
   async processSelectedElement(element, originalTextsMap, textNodes) {
     this.logger.operation("Starting advanced translation process for selected element");
     const messageId = generateContentMessageId();
+
+    const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
+    this.statusNotification = await this.notificationManager.show(statusMessage, 'status', false);
 
     try {
       const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
@@ -115,6 +122,10 @@ export class TranslationOrchestrator {
       throw error;
     } finally {
       this.removeEscapeKeyListener();
+      if (this.statusNotification) {
+        this.notificationManager.dismiss(this.statusNotification);
+        this.statusNotification = null;
+      }
     }
   }
 
@@ -211,6 +222,10 @@ export class TranslationOrchestrator {
         request.status = 'cancelled';
         request.error = 'Translation cancelled by user';
       }
+    }
+    if (this.statusNotification) {
+      this.notificationManager.dismiss(this.statusNotification);
+      this.statusNotification = null;
     }
     this.removeEscapeKeyListener();
   }
