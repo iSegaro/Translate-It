@@ -3,6 +3,7 @@ import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
 import { TranslationMode } from '../../config.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { RevertHandler } from './RevertHandler.js';
 
 export class ContentMessageHandler {
   constructor() {
@@ -28,6 +29,7 @@ export class ContentMessageHandler {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
+    this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -71,6 +73,12 @@ export class ContentMessageHandler {
     }
     // You can add routing for other translation modes here if needed
     return false;
+  }
+
+  async handleRevertTranslation() {
+    this.logger.debug('Handling revertTranslation action');
+    const revertHandler = new RevertHandler();
+    return await revertHandler.executeRevert();
   }
 }
 
