@@ -4,6 +4,8 @@ import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import NotificationManager from "@/managers/core/NotificationManager.js";
+import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
+import { MessageActions } from "@/messaging/core/MessageActions.js";
 
 // Import services
 import { ElementHighlighter } from "./services/ElementHighlighter.js";
@@ -81,6 +83,7 @@ export class SelectElementManager {
     this.logger.operation("Deactivating select element mode");
     await this.translationOrchestrator.cancelAllTranslations();
     await this.deactivateUI();
+    await this._notifyDeactivation();
   }
 
   async deactivateUI() {
@@ -131,6 +134,7 @@ export class SelectElementManager {
 
       this.logger.info("[SelectElementManager] Text nodes collected for translation");
       await this.deactivateUI();
+      await this._notifyDeactivation();
       document.removeEventListener("click", this.handleClick, true); // Force remove listener
 
       await this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes);
@@ -170,6 +174,18 @@ export class SelectElementManager {
     this.logger.info("SelectElement cleanup completed");
   }
   
+  async _notifyDeactivation() {
+    try {
+      await sendReliable({
+        action: MessageActions.SET_SELECT_ELEMENT_STATE,
+        data: { active: false }
+      });
+      this.logger.debug('Notified background: select element deactivated');
+    } catch (err) {
+      this.logger.warn('Failed to notify background about deactivation', err);
+    }
+  }
+
   async handleTranslationResult(message) {
       return this.translationOrchestrator.handleTranslationResult(message);
   }
