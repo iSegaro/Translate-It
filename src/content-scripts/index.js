@@ -45,7 +45,7 @@ if (!access.isAccessible) {
     const { vueBridge } = await import("../managers/content/VueBridgeManager.js");
     // TTS handler removed - using unified GOOGLE_TTS_SPEAK system
     const { getTranslationHandlerInstance } = await import("../core/InstanceManager.js");
-    const { SelectElementManager } = await import("../managers/content/select-element/SelectElementManager.js");
+    const { selectElementManager } = await import("../managers/content/select-element/SelectElementManager.js");
     const { contentMessageHandler } = await import("../handlers/content/ContentMessageHandler.js");
     const { shortcutManager } = await import("../managers/content/shortcuts/ShortcutManager.js");
     const { initializeSubtitleHandler } = await import("../managers/content/SubtitleInitializer.js");
@@ -53,11 +53,13 @@ if (!access.isAccessible) {
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();
     const eventCoordinator = translationHandler.eventCoordinator; // Use existing instance
-    const selectElementManager = new SelectElementManager();
 
     // Store instances globally for handlers to access
     window.translationHandlerInstance = translationHandler;
     window.selectElementManagerInstance = selectElementManager;
+
+    // Give ContentMessageHandler a reference to SelectElementManager
+    contentMessageHandler.setSelectElementManager(selectElementManager);
 
     // Initialize subtitle handler conditionally
     await initializeSubtitleHandler(translationHandler);

@@ -26,6 +26,7 @@ import SelectionWindows from "../managers/content/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { TextSelectionManager } from "../managers/content/TextSelectionManager.js";
 import { TextFieldManager } from "../managers/content/TextFieldManager.js";
+import { selectElementManager } from "../managers/content/select-element/SelectElementManager.js";
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
@@ -73,6 +74,8 @@ export default class EventCoordinator {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
 
+    this.selectElementManager = selectElementManager;
+
     this.logger.init('EventCoordinator initialized with specialized managers');
   }
 
@@ -93,6 +96,10 @@ export default class EventCoordinator {
    */
   @logMethod
   async handleEvent(event) {
+    if (this.selectElementManager?.isActive) {
+      this.logger.debug('SelectElementManager is active, skipping EventCoordinator handling.');
+      return;
+    }
     try {
       // Note: ESC key handling is managed by:
       // - SelectElementManager (for select mode cancellation)  

@@ -60,30 +60,16 @@ export class RevertHandler {
    * @returns {Promise<number>} Number of reverted translations
    */
   async revertVueTranslations() {
-    let revertedCount = 0;
-    
     try {
-      const { revertAllTranslations } = await import("../../utils/text/detection.js");
-      
-      // Create context for revert
-      const context = {
-        translatedElements: new Set(document.querySelectorAll("span[data-translate-it-original-text]")),
-        originalTexts: new Map()
-      };
-      
-      revertedCount = revertAllTranslations(context);
-      
-      // Also check SelectElementManager for additional reverts
-      const selectElementManager = await this.getSelectElementManager();
-      if (selectElementManager && selectElementManager.translatedElements.size > 0) {
-        const additionalReverts = await selectElementManager.revertTranslations();
-        revertedCount += additionalReverts;
-      }
-      
+      // Import the singleton directly to ensure the correct instance is used
+      const { selectElementManager } = await import("@/managers/content/select-element/SelectElementManager.js");
+      const revertedCount = await selectElementManager.revertTranslations();
+      logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementManager.`);
       return revertedCount;
     } catch (error) {
       logger.error('[RevertHandler] Error in Vue revert:', error);
-      throw error;
+      // Return 0 if this specific revert fails, so legacy can still try
+      return 0;
     }
   }
 
