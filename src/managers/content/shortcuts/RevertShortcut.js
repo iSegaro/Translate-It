@@ -1,5 +1,6 @@
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { selectElementManager } from '@/managers/content/select-element/SelectElementManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertShortcut');
 /**
@@ -19,22 +20,9 @@ export class RevertShortcut {
    * @returns {Promise<boolean>} Whether to execute the shortcut
    */
   async shouldExecute(event) {
-    // Only execute on ESC key
-    if (event.key !== 'Escape' && event.code !== 'Escape') {
-      return false;
-    }
-
-    // Check if there are any translated elements that need reverting
-    const hasVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
-    const hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
-    
-    if (!hasVueTranslations && !hasLegacyTranslations) {
-      logger.debug('[RevertShortcut] No translations found to revert');
-      return false;
-    }
-
-    logger.debug('[RevertShortcut] Found translations to revert via ESC');
-    return true;
+    // This shortcut should always be checked on Escape key press.
+    // The decision to cancel or revert is handled in the execute method.
+    return event.key === 'Escape' || event.code === 'Escape';
   }
 
   /**
@@ -43,8 +31,23 @@ export class RevertShortcut {
    * @returns {Promise<Object>} Execution result
    */
   async execute() {
-    logger.debug('[RevertShortcut] Executing ESC revert shortcut');
+    // Decide whether to CANCEL an in-progress translation or REVERT a completed one.
+    if (window.isTranslationInProgress) {
+      logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
+      await selectElementManager.cancelInProgressTranslation();
+      return { success: true, action: 'cancelled' };
+    }
+
+    logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
     
+    // Check if there are any translations to revert.
+    const hasVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
+    const hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
+    if (!hasVueTranslations && !hasLegacyTranslations) {
+      logger.debug('[RevertShortcut] No translations found to revert');
+      return { success: false, reason: 'no_translations_found' };
+    }
+
     try {
       // Import and use RevertHandler
       const { RevertHandler } = await import('../../../handlers/content/RevertHandler.js');

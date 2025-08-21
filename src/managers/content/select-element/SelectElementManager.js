@@ -35,7 +35,6 @@ export class SelectElementManager {
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
     this.handleClick = this.handleClick.bind(this);
-    this.handleKeyDown = this.handleKeyDown.bind(this);
 
     this.abortController = null;
     
@@ -72,7 +71,6 @@ export class SelectElementManager {
     document.addEventListener("mouseover", this.handleMouseOver, options);
     document.addEventListener("mouseout", this.handleMouseOut, options);
     document.addEventListener("click", this.handleClick, options);
-    document.addEventListener("keydown", this.handleKeyDown, { ...options, passive: false });
     this.elementHighlighter.addGlobalStyles();
     this.elementHighlighter.disablePageInteractions();
     this.logger.operation("Select element mode activated");
@@ -116,6 +114,7 @@ export class SelectElementManager {
 
     if (!this.isActive || this.isProcessingClick) return;
     this.isProcessingClick = true;
+    window.isTranslationInProgress = true; // Set flag immediately
 
     event.preventDefault();
     event.stopPropagation();
@@ -148,14 +147,9 @@ export class SelectElementManager {
     }
   }
 
-  async handleKeyDown(event) {
-    if (!this.isActive) return;
-    if (event.key === KEY_CODES.ESCAPE || event.code === KEY_CODES.ESCAPE) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.logger.operation("ESC pressed - cancelling selection");
-      await this.deactivate();
-    }
+  async cancelInProgressTranslation() {
+    this.logger.operation("Request to cancel in-progress translation received");
+    await this.translationOrchestrator.cancelAllTranslations();
   }
 
   async revertTranslations() {

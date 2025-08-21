@@ -8,6 +8,7 @@ import { generateContentMessageId } from "../../../../utils/messaging/messageId.
 import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
 import NotificationManager from "../../../core/NotificationManager.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
+import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
@@ -102,7 +103,6 @@ export class TranslationOrchestrator {
 
   async setupTranslationWaiting(messageId, element) {
     this.logger.debug("Setting up translation waiting for message:", messageId);
-    this.addEscapeKeyListener();
     const timeout = await getTimeoutAsync() || TRANSLATION_TIMEOUT_FALLBACK;
 
     const timeoutPromise = new Promise((_, reject) => {
@@ -121,7 +121,7 @@ export class TranslationOrchestrator {
       }
       throw error;
     } finally {
-      this.removeEscapeKeyListener();
+      window.isTranslationInProgress = false;
       if (this.statusNotification) {
         this.notificationManager.dismiss(this.statusNotification);
         this.statusNotification = null;
@@ -195,39 +195,25 @@ export class TranslationOrchestrator {
     }
   }
 
-  addEscapeKeyListener() {
-    if (this.escapeKeyListener) return;
-    this.escapeKeyListener = (event) => {
-      if (event.key === 'Escape' || event.code === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        this.logger.operation("ESC pressed during translation - cancelling");
-        this.cancelAllTranslations();
-      }
-    };
-    document.addEventListener('keydown', this.escapeKeyListener, { capture: true });
-  }
-
-  removeEscapeKeyListener() {
-    if (this.escapeKeyListener) {
-      document.removeEventListener('keydown', this.escapeKeyListener, { capture: true });
-      this.escapeKeyListener = null;
-    }
-  }
-
   cancelAllTranslations() {
     this.logger.operation("Cancelling all ongoing translations");
+
     for (const [messageId, request] of this.translationRequests) {
       if (request.status === 'pending') {
         request.status = 'cancelled';
         request.error = 'Translation cancelled by user';
+        
+        // Notify background to cancel the network request
+        sendReliable({
+          action: MessageActions.CANCEL_BACKGROUND_TASK, // Assuming this is the correct action
+          data: { messageId: messageId }
+        }).catch(err => this.logger.warn('Failed to send cancellation message to background', err));
       }
     }
     if (this.statusNotification) {
       this.notificationManager.dismiss(this.statusNotification);
       this.statusNotification = null;
     }
-    this.removeEscapeKeyListener();
   }
 
   async cleanup() {
