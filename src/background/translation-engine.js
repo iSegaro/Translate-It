@@ -376,9 +376,12 @@ export class TranslationEngine {
 
     // Only translate uncached segments
     if (uncachedIndices.length > 0) {
+      const providerClass = providerInstance?.constructor;
+      const isAiProvider = providerClass?.type === 'ai';
+
       // Bing-specific optimization: smaller batches for better reliability
-      const BATCH_SIZE = provider === 'BingTranslate' ? 3 : 8; // Reduced batch size for Bing
-      const MAX_CONCURRENT = provider === 'BingTranslate' ? 1 : 2; // Sequential processing for Bing
+      const BATCH_SIZE = provider === 'BingTranslate' ? 3 : (isAiProvider ? 32 : 8);
+      const MAX_CONCURRENT = provider === 'BingTranslate' ? 1 : (isAiProvider ? 2 : 2);
       
       // Process in batches with intelligent grouping
       const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
@@ -472,7 +475,7 @@ export class TranslationEngine {
     const batches = [];
     let currentBatch = [];
     let currentLength = 0;
-    const MAX_BATCH_CHARS = 1000; // Character limit per batch
+    const MAX_BATCH_CHARS = 8000; // Character limit per batch
     
     for (const idx of indices) {
       const segmentLength = segments[idx].length;
