@@ -14,13 +14,41 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 
+const BATCH_PROMPT_TEMPLATE = `You are an expert translation service. Your task is to translate a batch of texts from auto-detect language to ${'${TARGET_LANG}'}.
+
+You will receive a series of texts separated by a unique delimiter:
+"\n\n---\n\n"
+
+Your response must adhere to these strict rules:
+1.  Translate each text segment individually.
+2.  Preserve the exact number of segments and their order.
+3.  Use the same delimiter "\n\n---\n\n" to separate the translated texts in your output.
+4.  Do NOT add any extra explanations, comments, or markdown.
+5.  Maintain the original tone and formatting for each segment.
+6.  If a segment is a number, a name, or a term that doesn't require translation, return it as is.
+
+Example Input:
+Hello
+\n\n---\n\n
+Goodbye
+
+Example Output (for Farsi):
+سلام
+\n\n---\n\n
+خداحافظ
+
+Now, translate the following texts:
+${'${TEXT}'}`.replace(/\${'${TARGET_LANG}'}/g, "Farsi").replace(/\${'${TEXT}'}/g, "${'${TEXT}'}");
+
 // (logger already defined)
 
 
+
 export class GeminiProvider extends BaseProvider {
-  static type = "api";
+  static type = "ai";
   static description = "Google Gemini AI";
   static displayName = "Google Gemini";
+  static reliableJsonMode = false;
   constructor() {
     super("Gemini");
   }
@@ -53,14 +81,28 @@ export class GeminiProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-  logger.debug('translate input text:', text);
-    const prompt = await buildPrompt(
-      text,
-      sourceLang,
-      targetLang,
-      translateMode
-    );
-  logger.debug('translate built prompt:', prompt);
+    logger.debug('translate input text:', text);
+    
+    let prompt;
+    const BATCH_DELIMITER = "\n\n---\n\n";
+    
+    // Check if this is a batched request from the translation engine
+    if (text.includes(BATCH_DELIMITER)) {
+      logger.debug('Batch translation detected. Using dedicated batch prompt.');
+      prompt = BATCH_PROMPT_TEMPLATE
+        .replace("${TARGET_LANG}", targetLang)
+        .replace("${TEXT}", text);
+    } else {
+      // Use the generic prompt builder for single translations
+      prompt = await buildPrompt(
+        text,
+        sourceLang,
+        targetLang,
+        translateMode
+      );
+    }
+    
+    logger.debug('translate built prompt:', prompt);
 
     // Determine thinking budget based on model and user settings
     let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
@@ -97,7 +139,7 @@ export class GeminiProvider extends BaseProvider {
     };
 
     const context = `${this.providerName.toLowerCase()}-translation`;
-  logger.debug('about to call _executeApiCall with:', {
+    logger.debug('about to call _executeApiCall with:', {
       url: url.replace(/key=[^&]+/, "key=***"),
       context: context,
     });
@@ -111,8 +153,7 @@ export class GeminiProvider extends BaseProvider {
         context: context,
       });
 
-  logger.info('_executeApiCall completed with result:', result
-      );
+      logger.info('_executeApiCall completed with result:', result);
       return result;
     } catch (error) {
       // If thinking-related error occurs, retry without thinking config
@@ -139,13 +180,11 @@ export class GeminiProvider extends BaseProvider {
           context: `${context}-fallback`,
         });
 
-        logger.info('fallback _executeApiCall completed with result:', fallbackResult
-        );
+        logger.info('fallback _executeApiCall completed with result:', fallbackResult);
         return fallbackResult;
       }
 
-      logger.error('_executeApiCall failed with error:', error
-      );
+      logger.error('_executeApiCall failed with error:', error);
       throw error;
     }
   }
