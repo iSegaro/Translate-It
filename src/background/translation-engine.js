@@ -20,6 +20,7 @@ export class TranslationEngine {
     this.history = [];
     this.factory = new ProviderFactory();
     this.activeTranslations = new Map(); // Track active translations for cancellation
+    this.cancelledRequests = new Set(); // Track cancelled request messageIds
   }
 
   /**
@@ -158,19 +159,25 @@ export class TranslationEngine {
           `Translation result missing 'success' property: ${JSON.stringify(result)}`,
         );
       }
+      
+      // Clean up tracking after successful completion
+      if (messageId) {
+        this.activeTranslations.delete(messageId);
+        this.cancelledRequests.delete(messageId);
+        logger.debug(`[TranslationEngine] Stopped tracking translation: ${messageId}`);
+      }
 
       return result;
     } catch (error) {
+      // Clean up tracking on failure
+      if (messageId) {
+        this.activeTranslations.delete(messageId);
+        this.cancelledRequests.delete(messageId);
+        logger.debug(`[TranslationEngine] Stopped tracking translation on error: ${messageId}`);
+      }
       // Don't log here - error already logged by provider
       logger.debug("[TranslationEngine] Translation failed, formatting error response");
       return this.formatError(error, context);
-    } finally {
-      // Clean up tracking regardless of success or failure
-      const messageId = request.messageId;
-      if (messageId && this.activeTranslations.has(messageId)) {
-        this.activeTranslations.delete(messageId);
-        logger.debug(`[TranslationEngine] Stopped tracking translation: ${messageId}`);
-      }
     }
   }
 
@@ -267,10 +274,13 @@ export class TranslationEngine {
         text,
         sourceLanguage,
         targetLanguage,
-        mode,
-        originalSourceLang,
-        originalTargetLang,
-        abortController
+        {
+          mode: mode,
+          originalSourceLang: originalSourceLang,
+          originalTargetLang: originalTargetLang,
+          messageId: data.messageId,
+          engine: this
+        }
       );
     } catch (initialError) {
       //TODO: این منطق در جای دیگری هم مثل WindowsManager وجود دارد که بهتر است به Error Management منتقل شود
@@ -846,16 +856,23 @@ export class TranslationEngine {
    * Cancel active translation by message ID
    */
   cancelTranslation(messageId) {
-    logger.debug(`[TranslationEngine] Cancel request for: ${messageId}, active: ${Array.from(this.activeTranslations.keys())}`);
-    if (this.activeTranslations.has(messageId)) {
-      const abortController = this.activeTranslations.get(messageId);
-      abortController.abort();
-      this.activeTranslations.delete(messageId);
-      logger.debug(`[TranslationEngine] Successfully cancelled translation: ${messageId}`);
+    if (messageId) {
+      logger.debug(`[TranslationEngine] Marking translation as cancelled: ${messageId}`);
+      this.cancelledRequests.add(messageId);
+
+      if (this.activeTranslations.has(messageId)) {
+        const abortController = this.activeTranslations.get(messageId);
+        abortController.abort();
+        logger.debug(`[TranslationEngine] Aborted translation for messageId: ${messageId}`);
+      }
+
       return true;
     }
-    logger.debug(`[TranslationEngine] No active translation found for: ${messageId}`);
     return false;
+  }
+
+  isCancelled(messageId) {
+    return this.cancelledRequests.has(messageId);
   }
 
   /**

@@ -36,7 +36,17 @@ export class BaseProvider {
    * @param {AbortController} abortController - Optional abort controller for cancellation
    * @returns {Promise<string|null>} - Translated text or null if no translation was needed
    */
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi', abortController = null) {
+  async translate(text, sourceLang, targetLang, options) {
+    const {
+      mode: translateMode,
+      originalSourceLang,
+      originalTargetLang,
+      messageId,
+      engine,
+    } = typeof options === 'object' && options !== null ? options : { mode: options };
+
+    const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // 1. Language swapping and normalization
@@ -74,7 +84,7 @@ export class BaseProvider {
     }
 
     // 5. Perform batch translation using the subclass implementation
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, abortController);
+    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, engine, messageId, abortController);
 
     // 6. Reconstruct the final output
     if (isJsonMode) {
@@ -100,11 +110,13 @@ export class BaseProvider {
    * @param {string[]} texts - An array of strings to be translated.
    * @param {string} sourceLang - Provider-specific source language code.
    * @param {string} targetLang - Provider-specific target language code.
+   * @param {object} engine - The translation engine instance.
+   * @param {string} messageId - The message ID for cancellation.
    * @param {AbortController} abortController - Optional abort controller for cancellation.
    * @returns {Promise<string[]>} - A promise that resolves to an array of translated strings.
    * @protected
    */
-  async _batchTranslate(texts, sourceLang, targetLang, abortController) {
+  async _batchTranslate(texts, sourceLang, targetLang, engine, messageId, abortController) {
     throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`);
   }
 

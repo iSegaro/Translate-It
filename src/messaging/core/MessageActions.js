@@ -18,6 +18,7 @@ export class MessageActions {
   static TRANSLATION_RESULT_UPDATE = 'TRANSLATION_RESULT_UPDATE';
   static TRANSLATE_TEXT = 'TRANSLATE_TEXT';
   static TRANSLATE_IMAGE = 'TRANSLATE_IMAGE';
+  static CANCEL_TRANSLATION = 'CANCEL_TRANSLATION';
 
   // Select Element
   static GET_SELECT_ELEMENT_STATE = 'getSelectElementState';

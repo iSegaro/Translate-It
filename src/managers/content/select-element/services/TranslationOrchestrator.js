@@ -205,7 +205,8 @@ export class TranslationOrchestrator {
         
         // Notify background to cancel the network request
         sendReliable({
-          action: MessageActions.CANCEL_BACKGROUND_TASK, // Assuming this is the correct action
+          action: MessageActions.CANCEL_TRANSLATION,
+          messageId: messageId,
           data: { messageId: messageId }
         }).catch(err => this.logger.warn('Failed to send cancellation message to background', err));
       }

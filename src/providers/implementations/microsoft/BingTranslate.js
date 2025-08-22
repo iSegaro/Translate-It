@@ -43,11 +43,12 @@ export class BingTranslateProvider extends BaseProvider {
     return normalized;
   }
 
-  async _batchTranslate(texts, sl, tl, abortController = null) {
+  async _batchTranslate(texts, sl, tl, engine, messageId, abortController) {
+    logger.debug(`[Bing] _batchTranslate: engine is ${engine === this ? 'this' : engine}`);
     try {
-      if (abortController?.signal.aborted) throw new Error("Translation cancelled");
-      const tokenData = await this._getBingAccessToken();
-      if (abortController?.signal.aborted) throw new Error("Translation cancelled");
+      if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
+      const tokenData = await this._getBingAccessToken(engine, messageId, abortController);
+      if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
 
       const indexedTexts = texts.map((text, index) => ({ index, text }));
       const finalResults = new Array(texts.length);
@@ -81,7 +82,8 @@ export class BingTranslateProvider extends BaseProvider {
 
       const processingQueue = [...initialBatches];
       while (processingQueue.length > 0) {
-        if (abortController?.signal.aborted) throw new Error("Translation cancelled");
+        logger.debug(`[Bing] Loop start. Aborted: ${engine.isCancelled(messageId)}`);
+        if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
 
         const batch = processingQueue.shift();
         const textsOnly = batch.map(item => item.text);
@@ -120,7 +122,7 @@ export class BingTranslateProvider extends BaseProvider {
     }
   }
 
-  async _translateChunk(chunk, sl, tl, tokenData, abortController = null) {
+  async _translateChunk(chunk, sl, tl, tokenData, abortController) {
     if (abortController?.signal.aborted) {
       throw new Error('Translation cancelled by user');
     }
@@ -134,6 +136,7 @@ export class BingTranslateProvider extends BaseProvider {
       url.searchParams.set("IID", tokenData.IID?.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
       url.searchParams.set("isVertical", "1");
 
+      logger.debug(`[Bing] _translateChunk execute. Aborted: ${abortController?.signal.aborted}`);
       const result = await this._executeApiCall({
         url: url.toString(),
         fetchOptions: {
@@ -165,11 +168,14 @@ export class BingTranslateProvider extends BaseProvider {
     }
   }
 
-  async _getBingAccessToken() {
+  async _getBingAccessToken(engine, messageId, abortController) {
     try {
+      if (engine.isCancelled(messageId)) {
+        throw new Error('Translation cancelled');
+      }
       if (!BingTranslateProvider.bingAccessToken || Date.now() - BingTranslateProvider.bingAccessToken.tokenTs > BingTranslateProvider.bingAccessToken.tokenExpiryInterval) {
         logger.debug('[Bing] Fetching new access token...');
-        const response = await fetch(BingTranslateProvider.bingTokenUrl);
+        const response = await fetch(BingTranslateProvider.bingTokenUrl, { signal: abortController?.signal });
         if (!response.ok) {
           const err = new Error(`Failed to fetch token page: ${response.status}`);
           err.type = ErrorTypes.API_KEY_MISSING;
