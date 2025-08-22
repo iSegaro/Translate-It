@@ -19,7 +19,7 @@ const langNameToCodeMap = {
 };
 
 export class YandexTranslateProvider extends BaseProvider {
-  static type = "free";
+  static type = "translate";
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
   static reliableJsonMode = true;

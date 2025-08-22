@@ -18,7 +18,7 @@ const langNameToCodeMap = {
 };
 
 export class BingTranslateProvider extends BaseProvider {
-  static type = "free";
+  static type = "translate";
   static description = "Bing Translator";
   static displayName = "Microsoft Bing";
   static reliableJsonMode = true;

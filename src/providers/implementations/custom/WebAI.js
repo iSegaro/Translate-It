@@ -7,7 +7,7 @@ import {
 import { buildPrompt } from "@/utils/promptBuilder.js";
 
 export class WebAIProvider extends BaseProvider {
-  static type = "api";
+  static type = "ai";
   static description = "WebAI service";
   static displayName = "WebAI";
   constructor() {

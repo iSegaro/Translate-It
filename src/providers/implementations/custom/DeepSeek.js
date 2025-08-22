@@ -8,7 +8,7 @@ import {
 import { buildPrompt } from "@/utils/promptBuilder.js";
 
 export class DeepSeekProvider extends BaseProvider {
-  static type = "api";
+  static type = "ai";
   static description = "DeepSeek AI";
   static displayName = "DeepSeek";
   constructor() {

@@ -67,7 +67,7 @@ const langNameToCodeMap = {
 };
 
 export class browserTranslateProvider extends BaseProvider {
-  static type = "browser";
+  static type = "translate";
   static description = "Browser native translation";
   static displayName = "Browser API";
   static detector = null;

@@ -8,7 +8,7 @@ import {
 import { buildPrompt } from "@/utils/promptBuilder.js";
 
 export class CustomProvider extends BaseProvider {
-  static type = "api";
+  static type = "ai";
   static description = "Custom OpenAI compatible";
   static displayName = "Custom Provider";
   constructor() {
