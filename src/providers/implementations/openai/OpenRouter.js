@@ -12,6 +12,7 @@ export class OpenRouterProvider extends BaseProvider {
   static type = "ai";
   static description = "OpenRouter API";
   static displayName = "OpenRouter";
+  static reliableJsonMode = false;
   constructor() {
     super("OpenRouter");
   }
@@ -35,7 +36,7 @@ export class OpenRouterProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      translateMode
+      mode
     );
 
     const fetchOptions = {

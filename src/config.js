@@ -179,6 +179,52 @@ $_{TEXT}
 /*--- End PROMPT_BASE_SELECT ---*/
 
 
+/*--- Start PROMPT_BASE_BATCH ---*/
+  PROMPT_BASE_BATCH: `You are an expert translation service. Your task is to translate a batch of texts from auto-detect language to $_{TARGET}.
+
+You will receive a series of texts separated by a unique delimiter:
+"
+
+---
+
+"
+
+Your response must adhere to these strict rules:
+1.  Translate each text segment individually.
+2.  Preserve the exact number of segments and their order.
+3.  Use the same delimiter "
+
+---
+
+" to separate the translated texts in your output.
+4.  Do NOT add any extra explanations, comments, or markdown.
+5.  Maintain the original tone and formatting for each segment.
+6.  If a segment is a number, a name, or a term that doesn't require translation, return it as is.
+
+Example Input:
+Hello
+
+
+---
+
+
+Goodbye
+
+Example Output (for Farsi):
+سلام
+
+
+---
+
+
+خداحافظ
+
+Now, please translate the following texts:
+$_{TEXT}
+`,
+/*--- End PROMPT_BASE_BATCH ---*/
+
+
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
   PROMPT_BASE_DICTIONARY: `You are a concise dictionary service. Translate the word/phrase into $_{TARGET} and provide only essential information.
 
@@ -473,6 +519,10 @@ export const getPromptPopupTranslateAsync = async () => {
 
 export const getPromptBASESelectAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_SELECT", CONFIG.PROMPT_BASE_SELECT);
+};
+
+export const getPromptBASEBatchAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_BATCH", CONFIG.PROMPT_BASE_BATCH);
 };
 
 export const getPromptBASEFieldAsync = async () => {

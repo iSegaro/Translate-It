@@ -16,6 +16,7 @@ export class OpenAIProvider extends BaseProvider {
   static type = "ai";
   static description = "OpenAI GPT models";
   static displayName = "OpenAI";
+  static reliableJsonMode = false;
   constructor() {
     super("OpenAI");
   }
@@ -40,7 +41,7 @@ export class OpenAIProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      translateMode
+      mode
     );
 
     const fetchOptions = {

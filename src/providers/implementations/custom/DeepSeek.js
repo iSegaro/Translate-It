@@ -11,6 +11,7 @@ export class DeepSeekProvider extends BaseProvider {
   static type = "ai";
   static description = "DeepSeek AI";
   static displayName = "DeepSeek";
+  static reliableJsonMode = false;
   constructor() {
     super("DeepSeek");
   }
@@ -34,7 +35,7 @@ export class DeepSeekProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      translateMode
+      mode
     );
 
     const fetchOptions = {

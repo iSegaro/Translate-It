@@ -10,6 +10,7 @@ export class WebAIProvider extends BaseProvider {
   static type = "ai";
   static description = "WebAI service";
   static displayName = "WebAI";
+  static reliableJsonMode = false;
   constructor() {
     super("WebAI");
   }
@@ -33,7 +34,7 @@ export class WebAIProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      translateMode
+      mode
     );
 
     const fetchOptions = {

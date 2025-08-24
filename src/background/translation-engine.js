@@ -532,7 +532,7 @@ export class TranslationEngine {
     // Try batch translation first (most efficient)
     try {
       const batchText = batch.map(idx => segments[idx]).join(DELIMITER);
-      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang, abortController);
+      const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, { mode, originalSourceLang, originalTargetLang, abortController });
       
       if (typeof batchResult === 'string') {
         const parts = batchResult.split(DELIMITER);
@@ -627,7 +627,7 @@ export class TranslationEngine {
             await new Promise(resolve => setTimeout(resolve, 300 * attempt)); // Increasing delay for retries
           }
           
-          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang, abortController);
+          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLang, { mode, originalSourceLang, originalTargetLang, abortController });
           const translatedText = typeof result === 'string' ? result.trim() : segments[idx];
           // For same-language translations or when content doesn't change, still consider it successful
           const isActuallyTranslated = translatedText !== segments[idx] || 
