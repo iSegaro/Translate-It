@@ -12,11 +12,14 @@ export class DeepSeekProvider extends BaseProvider {
   static description = "DeepSeek AI";
   static displayName = "DeepSeek";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("DeepSeek");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options) {
+    const { mode } = options;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiKey, model] = await Promise.all([
@@ -35,7 +38,8 @@ export class DeepSeekProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode
+      mode,
+      this.constructor.type
     );
 
     const fetchOptions = {

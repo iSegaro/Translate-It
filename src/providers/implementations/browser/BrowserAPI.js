@@ -71,6 +71,8 @@ export class browserTranslateProvider extends BaseProvider {
   static description = "Browser native translation";
   static displayName = "Browser API";
   static detector = null;
+  static reliableJsonMode = true;
+  static supportsDictionary = false;
   static translators = {};
 
   constructor() {

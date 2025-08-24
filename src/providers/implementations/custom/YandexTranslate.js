@@ -23,6 +23,7 @@ export class YandexTranslateProvider extends BaseProvider {
   static description = "Yandex translation service";
   static displayName = "Yandex Translate";
   static reliableJsonMode = true;
+  static supportsDictionary = false;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
   static CHAR_LIMIT = 10000;

@@ -19,6 +19,7 @@ export class GeminiProvider extends BaseProvider {
   static description = "Google Gemini AI";
   static displayName = "Google Gemini";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("Gemini");
   }

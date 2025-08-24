@@ -17,11 +17,14 @@ export class OpenAIProvider extends BaseProvider {
   static description = "OpenAI GPT models";
   static displayName = "OpenAI";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("OpenAI");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options) {
+    const { mode } = options;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiKey, apiUrl, model] = await Promise.all([
@@ -41,7 +44,8 @@ export class OpenAIProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode
+      mode,
+      this.constructor.type
     );
 
     const fetchOptions = {

@@ -22,6 +22,7 @@ export class BingTranslateProvider extends BaseProvider {
   static description = "Bing Translator";
   static displayName = "Microsoft Bing";
   static reliableJsonMode = true;
+  static supportsDictionary = false;
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
@@ -43,7 +44,7 @@ export class BingTranslateProvider extends BaseProvider {
     return normalized;
   }
 
-  async _batchTranslate(texts, sl, tl, engine, messageId, abortController) {
+  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
     logger.debug(`[Bing] _batchTranslate: engine is ${engine === this ? 'this' : engine}`);
     try {
       if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");

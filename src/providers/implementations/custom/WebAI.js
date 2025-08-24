@@ -11,11 +11,14 @@ export class WebAIProvider extends BaseProvider {
   static description = "WebAI service";
   static displayName = "WebAI";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("WebAI");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options) {
+    const { mode } = options;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiUrl, apiModel] = await Promise.all([
@@ -34,7 +37,8 @@ export class WebAIProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode
+      mode,
+      this.constructor.type
     );
 
     const fetchOptions = {

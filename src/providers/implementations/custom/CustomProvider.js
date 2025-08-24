@@ -11,11 +11,15 @@ export class CustomProvider extends BaseProvider {
   static type = "ai";
   static description = "Custom OpenAI compatible";
   static displayName = "Custom Provider";
+  static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("Custom");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options) {
+    const { mode } = options;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiUrl, apiKey, model] = await Promise.all([
@@ -35,7 +39,8 @@ export class CustomProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      translateMode
+      mode,
+      this.constructor.type
     );
 
     const fetchOptions = {

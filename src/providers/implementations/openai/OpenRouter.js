@@ -13,11 +13,14 @@ export class OpenRouterProvider extends BaseProvider {
   static description = "OpenRouter API";
   static displayName = "OpenRouter";
   static reliableJsonMode = false;
+  static supportsDictionary = true;
   constructor() {
     super("OpenRouter");
   }
 
-  async translate(text, sourceLang, targetLang, translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options) {
+    const { mode } = options;
+
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     const [apiKey, model] = await Promise.all([
@@ -36,7 +39,8 @@ export class OpenRouterProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode
+      mode,
+      this.constructor.type
     );
 
     const fetchOptions = {

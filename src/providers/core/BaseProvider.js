@@ -22,6 +22,7 @@ export class BaseProvider {
   // By default providers are considered "not reliably returning JSON-mode"
   // Consumers can opt-in by setting `static reliableJsonMode = true` on the provider class.
   static reliableJsonMode = false;
+  static supportsDictionary = false;
 
   /**
    * Orchestrates the entire translation process.

@@ -21,6 +21,7 @@ export class GoogleTranslateProvider extends BaseProvider {
   static description = "Free Google Translate service";
   static displayName = "Google Translate";
   static reliableJsonMode = true;
+  static supportsDictionary = true;
   static CHAR_LIMIT = 3900;
 
   constructor() {
