@@ -199,7 +199,8 @@ Your response must adhere to these strict rules:
 " to separate the translated texts in your output.
 4.  Do NOT add any extra explanations, comments, or markdown.
 5.  Maintain the original tone and formatting for each segment.
-6.  If a segment is a number, a name, or a term that doesn't require translation, return it as is.
+6.  If translation is unnecessary (e.g., for numbers, hashtags, URLs), **return the original value unchanged.**
+7.  Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
 
 Example Input:
 Hello
