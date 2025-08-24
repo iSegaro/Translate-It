@@ -6,6 +6,7 @@ import {
   getCustomApiModelAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
+import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
 
 export class CustomProvider extends BaseProvider {
   static type = "ai";
@@ -18,9 +19,15 @@ export class CustomProvider extends BaseProvider {
   }
 
   async translate(text, sourceLang, targetLang, options) {
-    const { mode } = options;
+    let { mode, originalSourceLang, originalTargetLang } = options;
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
+
+    // Language swapping
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
+      { providerName: this.providerName, useRegexFallback: true }
+    );
 
     const [apiUrl, apiKey, model] = await Promise.all([
       getCustomApiUrlAsync(),

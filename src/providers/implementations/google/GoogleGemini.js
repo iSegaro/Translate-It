@@ -13,6 +13,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
+import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
 
 export class GeminiProvider extends BaseProvider {
   static type = "ai";
@@ -25,8 +26,14 @@ export class GeminiProvider extends BaseProvider {
   }
 
   async translate(text, sourceLang, targetLang, options) {
-    const { mode, originalSourceLang, originalTargetLang } = options;
+    let { mode, originalSourceLang, originalTargetLang } = options;
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
+
+    // Language swapping
+    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
+      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
+      { providerName: this.providerName, useRegexFallback: true }
+    );
 
     const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
       getApiKeyAsync(),
@@ -57,7 +64,8 @@ export class GeminiProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode
+      mode,
+      this.constructor.type
     );
 
     // Determine thinking budget based on model and user settings
