@@ -6,8 +6,8 @@ import {
 } from "@/config.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
-import { AUTO_DETECT_VALUE } from "@/constants.js";
+
+import { TranslationMode } from "@/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 const RELIABLE_DELIMITER = '\n\n---\n\n';
@@ -33,10 +33,11 @@ export class GoogleTranslateProvider extends BaseProvider {
     return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
   }
 
-  async _batchTranslate(texts, sl, tl, abortController = null) {
+  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController = null) {
     const context = `${this.providerName.toLowerCase()}-translate`;
     const isDictionaryEnabled = await getEnableDictionaryAsync();
-    const shouldIncludeDictionary = isDictionaryEnabled && texts.length === 1;
+    // Dictionary should only be enabled for single-segment translations and NOT in Field mode.
+    const shouldIncludeDictionary = isDictionaryEnabled && texts.length === 1 && translateMode !== TranslationMode.Field;
 
     const chunks = [];
     let currentChunk = [];

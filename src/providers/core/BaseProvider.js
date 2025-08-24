@@ -84,7 +84,7 @@ export class BaseProvider {
     }
 
     // 5. Perform batch translation using the subclass implementation
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, engine, messageId, abortController);
+    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController);
 
     // 6. Reconstruct the final output
     if (isJsonMode) {
@@ -110,13 +110,14 @@ export class BaseProvider {
    * @param {string[]} texts - An array of strings to be translated.
    * @param {string} sourceLang - Provider-specific source language code.
    * @param {string} targetLang - Provider-specific target language code.
+   * @param {string} translateMode - The mode of translation (e.g., 'Field', 'Selection').
    * @param {object} engine - The translation engine instance.
    * @param {string} messageId - The message ID for cancellation.
    * @param {AbortController} abortController - Optional abort controller for cancellation.
    * @returns {Promise<string[]>} - A promise that resolves to an array of translated strings.
    * @protected
    */
-  async _batchTranslate(texts, sourceLang, targetLang, engine, messageId, abortController) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`);
   }
 
