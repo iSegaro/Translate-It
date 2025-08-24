@@ -141,7 +141,7 @@ export class TranslationEngine {
       }
 
       // Centralized history addition for all modes except SelectElement
-      if (result.success && data.mode !== 'SelectElement') {
+      if (result.success && data.mode !== TranslationMode.Select_Element) {
         await this.addToHistory(data, result);
       }
 
