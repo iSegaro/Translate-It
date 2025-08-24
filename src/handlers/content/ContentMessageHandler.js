@@ -4,6 +4,7 @@ import { TranslationMode } from '../../config.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { RevertHandler } from './RevertHandler.js';
+import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 
 export class ContentMessageHandler {
   constructor() {
@@ -68,10 +69,17 @@ export class ContentMessageHandler {
   }
 
   async handleTranslationResult(message) {
-    if (message.data?.translationMode === 'SelectElement' && this.selectElementManager) {
+    const { translationMode, translatedText, originalText } = message.data;
+    this.logger.debug(`Handling translation result for mode: ${translationMode}`);
+
+    if (translationMode === TranslationMode.Select_Element && this.selectElementManager) {
       return this.selectElementManager.handleTranslationResult(message);
+    } else if (translationMode === TranslationMode.Field) {
+      this.logger.debug('Forwarding result to applyTranslationToTextField');
+      return applyTranslationToTextField(translatedText, originalText, translationMode);
     }
-    // You can add routing for other translation modes here if needed
+
+    this.logger.warn(`No handler for translation result mode: ${translationMode}`);
     return false;
   }
 
