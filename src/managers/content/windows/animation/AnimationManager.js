@@ -99,7 +99,7 @@ export class AnimationManager {
 
       // Set up fallback timeout
       const fallbackTimeout = setTimeout(() => {
-        this.logger.warn('Animation fallback timeout triggered');
+        this.logger.debug('Animation fallback timeout triggered');
         resolve();
       }, fadeOutDuration + 50);
 
