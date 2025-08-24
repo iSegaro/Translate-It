@@ -9,7 +9,7 @@ import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
+import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
 
@@ -225,7 +225,8 @@ export class TranslationEngine {
    * Core translation execution logic
    */
   async executeTranslation(data) {
-    const { text, provider, sourceLanguage, targetLanguage, mode } = data;
+    const { text, provider, sourceLanguage, targetLanguage } = data;
+    let { mode } = data;
 
     if (!text || text.trim().length === 0) {
       throw new Error("Text to translate is required");
@@ -240,6 +241,15 @@ export class TranslationEngine {
       );
     }
 
+    const providerClass = providerInstance?.constructor;
+
+    // Downgrade dictionary mode if provider does not support it
+    if (mode === TranslationMode.Dictionary_Translation && !providerClass?.supportsDictionary) {
+      logger.debug(`Provider ${provider} does not support dictionary mode. Downgrading to selection mode.`);
+      mode = TranslationMode.Selection;
+      data.mode = TranslationMode.Selection; // Ensure data object is also updated
+    }
+
     // Get original source and target languages from config for language swapping logic
     const [originalSourceLang, originalTargetLang] = await Promise.all([
       getSourceLanguageAsync(),
@@ -247,8 +257,7 @@ export class TranslationEngine {
     ]);
 
     // Pre-check for JSON mode optimization
-    const isSelectJson = mode === 'SelectElement' && data.options?.rawJsonPayload;
-    const providerClass = providerInstance?.constructor;
+    const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
 
     // For unreliable providers in JSON mode, use optimized strategy directly
