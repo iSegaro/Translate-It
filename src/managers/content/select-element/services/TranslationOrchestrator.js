@@ -2,13 +2,14 @@ import browser from "webextension-polyfill";
 import { applyTranslationsToNodes, expandTextsForTranslation, reassembleTranslations, separateCachedAndNewTexts } from "../../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
-import { getTimeoutAsync } from "../../../../config.js";
+import { getTimeoutAsync, TranslationMode } from "../../../../config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "../../../../utils/messaging/messageId.js";
 import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
 import NotificationManager from "../../../core/NotificationManager.js";
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
+import { AUTO_DETECT_VALUE } from "../../../../constants.js";
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
@@ -81,9 +82,9 @@ export class TranslationOrchestrator {
         data: {
           text: jsonPayload,
           provider,
-          sourceLanguage: 'auto',
+          sourceLanguage: AUTO_DETECT_VALUE,
           targetLanguage,
-          mode: 'SelectElement',
+          mode: TranslationMode.Select_Element,
           options: { rawJsonPayload: true },
         },
         context: 'event-handler',
