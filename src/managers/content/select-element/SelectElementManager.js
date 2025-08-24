@@ -125,8 +125,8 @@ export class SelectElementManager {
     try {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
       if (originalTextsMap.size === 0) {
-        this.logger.warn("No text found in selected element");
-        await this.notificationManager.show("No text found to translate.", "warning");
+        this.logger.info("No text found in selected element");
+        // await this.notificationManager.show("No text found to translate.", "warning");
         this.isProcessingClick = false;
         return;
       }
