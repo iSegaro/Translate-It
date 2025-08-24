@@ -72,14 +72,30 @@ export class ContentMessageHandler {
     const { translationMode, translatedText, originalText } = message.data;
     this.logger.debug(`Handling translation result for mode: ${translationMode}`);
 
-    if (translationMode === TranslationMode.Select_Element && this.selectElementManager) {
-      return this.selectElementManager.handleTranslationResult(message);
-    } else if (translationMode === TranslationMode.Field) {
-      this.logger.debug('Forwarding result to applyTranslationToTextField');
-      return applyTranslationToTextField(translatedText, originalText, translationMode);
+    switch (translationMode) {
+      case TranslationMode.Select_Element:
+      case 'SelectElement': // Handle both enum and hardcoded string for robustness
+        if (this.selectElementManager) {
+          return this.selectElementManager.handleTranslationResult(message);
+        }
+        break;
+
+      case TranslationMode.Field:
+        this.logger.debug('Forwarding result to applyTranslationToTextField');
+        return applyTranslationToTextField(translatedText, originalText, translationMode);
+
+      case TranslationMode.Selection:
+      case TranslationMode.Dictionary_Translation:
+        this.logger.debug(`Displaying result for ${translationMode} mode in notification.`);
+        return true;
+
+      default:
+        this.logger.warn(`No handler for translation result mode: ${translationMode}`);
+        return false;
     }
 
-    this.logger.warn(`No handler for translation result mode: ${translationMode}`);
+    // This part is reached if the 'SelectElement' case is hit but selectElementManager is null
+    this.logger.warn(`Handler for ${translationMode} was not properly configured.`);
     return false;
   }
 
