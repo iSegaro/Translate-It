@@ -69,20 +69,26 @@ export class ContentMessageHandler {
   }
 
   async handleTranslationResult(message) {
-    const { translationMode, translatedText, originalText } = message.data;
-    this.logger.debug(`Handling translation result for mode: ${translationMode}`);
+    const { translationMode, translatedText, originalText, options } = message.data;
+    const toastId = options?.toastId;
+    this.logger.debug(`Handling translation result for mode: ${translationMode}`, {
+      translatedTextLength: translatedText?.length,
+      originalTextLength: originalText?.length,
+      hasToastId: !!toastId
+    });
 
     switch (translationMode) {
       case TranslationMode.Select_Element:
       case 'SelectElement': // Handle both enum and hardcoded string for robustness
         if (this.selectElementManager) {
+          this.logger.debug('Forwarding to SelectElementManager');
           return this.selectElementManager.handleTranslationResult(message);
         }
         break;
 
       case TranslationMode.Field:
         this.logger.debug('Forwarding result to applyTranslationToTextField');
-        return applyTranslationToTextField(translatedText, originalText, translationMode);
+        return applyTranslationToTextField(translatedText, originalText, translationMode, toastId);
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:

@@ -1,7 +1,8 @@
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import NotificationManager from '@/managers/core/NotificationManager.js';
+
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts
@@ -51,13 +52,12 @@ export class RevertHandler {
       logger.debug(`[RevertHandler] Revert completed: ${totalRevertedCount} items reverted using ${finalSystem} system(s)`);
 
       // Show a single, unified notification
-      const notifier = new NotificationManager();
       if (totalRevertedCount > 0) {
         const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
-        notifier.show(message, "revert");
+        pageEventBus.emit('show-notification', { message, type: "revert" });
       } else {
         const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
-        notifier.show(message, "warning");
+        pageEventBus.emit('show-notification', { message, type: "warning" });
       }
 
       return { success: true, revertedCount: totalRevertedCount, system: finalSystem };
@@ -102,7 +102,7 @@ export class RevertHandler {
         state,
         errorHandler: translationHandler?.errorHandler,
         notifier: translationHandler?.notifier,
-        IconManager: translationHandler?.IconManager,
+        // IconManager removed as it doesn't exist in the current architecture
       };
       
       return await revertTranslations(context);

@@ -35,6 +35,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { getTranslationString, parseBoolean } from '@/utils/i18n/i18n.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -45,6 +46,7 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
+
 
 
 // Stores

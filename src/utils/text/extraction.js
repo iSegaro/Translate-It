@@ -337,7 +337,7 @@ export async function revertTranslations(context) {
     }
   });
 
-  context.IconManager?.cleanup();
+  // IconManager cleanup removed as it doesn't exist in the current architecture
   context.state.originalTexts.clear();
 
   return successfulReverts;

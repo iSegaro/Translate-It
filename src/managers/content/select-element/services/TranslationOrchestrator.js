@@ -6,10 +6,11 @@ import { getTimeoutAsync, TranslationMode } from "../../../../config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "../../../../utils/messaging/messageId.js";
 import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
-import NotificationManager from "../../../core/NotificationManager.js";
+
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
 import { AUTO_DETECT_VALUE } from "../../../../constants.js";
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
@@ -17,7 +18,6 @@ export class TranslationOrchestrator {
     this.stateManager = stateManager;
     this.translationRequests = new Map();
     this.escapeKeyListener = null;
-    this.notificationManager = new NotificationManager();
     this.statusNotification = null;
   }
 
@@ -30,7 +30,12 @@ export class TranslationOrchestrator {
     const messageId = generateContentMessageId();
 
     const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
-    this.statusNotification = await this.notificationManager.show(statusMessage, 'status', false);
+    this.statusNotification = `status-${messageId}`;
+    pageEventBus.emit('show-notification', {
+      id: this.statusNotification,
+      message: statusMessage,
+      type: "status",
+    });
 
     try {
       const { textsToTranslate, cachedTranslations } = separateCachedAndNewTexts(originalTextsMap);
@@ -124,7 +129,7 @@ export class TranslationOrchestrator {
     } finally {
       window.isTranslationInProgress = false;
       if (this.statusNotification) {
-        this.notificationManager.dismiss(this.statusNotification);
+        pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
       }
     }
@@ -213,7 +218,7 @@ export class TranslationOrchestrator {
       }
     }
     if (this.statusNotification) {
-      this.notificationManager.dismiss(this.statusNotification);
+      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
       this.statusNotification = null;
     }
   }

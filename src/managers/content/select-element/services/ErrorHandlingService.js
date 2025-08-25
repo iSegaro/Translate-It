@@ -190,11 +190,15 @@ export class ErrorHandlingService {
    */
   async showNotification(message, type = 'error') {
     try {
-      // Import notification manager dynamically to avoid circular dependencies
-      const { default: NotificationManager } = await import('@/managers/core/NotificationManager.js');
-      const notificationManager = new NotificationManager(this.errorHandler);
-      
-      await notificationManager.show(message, type, true, 4000);
+      const ExtensionContextManager = (await import('@/utils/core/extensionContext.js')).default;
+      ExtensionContextManager.safeSendMessage({
+        action: "show_notification",
+        payload: {
+          message,
+          type,
+          duration: 4000,
+        },
+      });
     } catch (notificationError) {
       this.logger.warn('Failed to show notification:', notificationError);
       // Fallback to console log if notifications fail

@@ -3,9 +3,11 @@ import { collectTextNodes } from "../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
-import NotificationManager from "@/managers/core/NotificationManager.js";
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
+
 import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
+import ExtensionContextManager from "@/utils/core/extensionContext.js";
 
 // Import services
 import { ElementHighlighter } from "./services/ElementHighlighter.js";
@@ -50,7 +52,6 @@ export class SelectElementManager {
       await this.translationOrchestrator.initialize();
       await this.modeManager.initialize();
       await this.errorHandlingService.initialize();
-      this.notificationManager = new NotificationManager(this.errorHandlingService.getErrorHandler());
       this.logger.debug('All services initialized');
     } catch (error) {
       this.logger.error("Initialization failed", error);
@@ -65,6 +66,7 @@ export class SelectElementManager {
   async activate() {
     if (this.isActive) return;
     this.logger.operation("Activating select element mode");
+    pageEventBus.emit('select-mode-activated');
     this.isActive = true;
     this.abortController = new AbortController();
     const options = { signal: this.abortController.signal, capture: true };
@@ -79,6 +81,7 @@ export class SelectElementManager {
   async deactivate() {
     if (!this.isActive) return;
     this.logger.operation("Deactivating select element mode");
+    pageEventBus.emit('select-mode-deactivated');
     await this.translationOrchestrator.cancelAllTranslations();
     await this.deactivateUI();
     await this._notifyDeactivation();
@@ -126,7 +129,10 @@ export class SelectElementManager {
       const { textNodes, originalTextsMap } = collectTextNodes(element);
       if (originalTextsMap.size === 0) {
         this.logger.info("No text found in selected element");
-        // await this.notificationManager.show("No text found to translate.", "warning");
+        pageEventBus.emit('show-notification', {
+          message: "No text found to translate.",
+          type: "warning",
+        });
         this.isProcessingClick = false;
         return;
       }

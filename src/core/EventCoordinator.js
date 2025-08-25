@@ -34,7 +34,6 @@ export default class EventCoordinator {
   constructor(translationHandler, featureManager) {
     this.translationHandler = translationHandler;
     this.featureManager = featureManager;
-    this.IconManager = translationHandler.IconManager;
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
@@ -59,11 +58,17 @@ export default class EventCoordinator {
     });
 
     this.textFieldManager = new TextFieldManager({
-      iconManager: this.IconManager,
       translationHandler: translationHandler,
       notifier: translationHandler.notifier,
       strategies: translationHandler.strategies,
       featureManager: featureManager,
+    });
+
+    // Debug: Check if translation handler is properly set
+    this.logger.debug('TextFieldManager created with translationHandler:', {
+      hasTranslationHandler: !!this.textFieldManager.translationHandler,
+      hasProcessMethod: this.textFieldManager.translationHandler && 
+                       typeof this.textFieldManager.translationHandler.processTranslation_with_CtrlSlash === 'function'
     });
 
     // Bind coordinator methods

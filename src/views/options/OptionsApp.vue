@@ -45,6 +45,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsApp');
 
 
+
 // Stores
 const settingsStore = useSettingsStore()
 

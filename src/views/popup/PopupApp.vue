@@ -112,6 +112,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
+
 // Stores & Composables
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')

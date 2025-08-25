@@ -1,7 +1,8 @@
 import { ErrorHandler } from "../error-management/ErrorHandler.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import ExtensionContextManager from "../utils/core/extensionContext.js";
+import { pageEventBus } from "../utils/core/PageEventBus.js";
 import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCore.js";
+import ExtensionContextManager from "../utils/core/extensionContext.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
@@ -12,24 +13,10 @@ import { MessageActions } from "../messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 
-// Helper function to dismiss pending translation notification and clear timeout
-function dismissPendingTranslationNotification(context = 'unknown') {
-  if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
-    try {
-      window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
-      clearPendingNotificationData(context);
-      logger.debug('Status notification dismissed', { context });
-    } catch (notifierError) {
-      logger.error('Failed to dismiss notification', { context, error: notifierError });
-    }
-  }
-}
+
 
 // Helper function to clear pending notification data and timeout
 function clearPendingNotificationData(context = 'cleanup') {
-  window.pendingTranslationStatusNode = null;
-  window.pendingTranslationNotifier = null;
-  
   // Clear timeout if it exists
   if (window.pendingTranslationDismissTimeout) {
     clearTimeout(window.pendingTranslationDismissTimeout);
@@ -39,7 +26,7 @@ function clearPendingNotificationData(context = 'cleanup') {
   logger.debug('Pending notification data cleared', { context });
 }
 
-export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId }) {
+export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId, dismissTimeout }) {
   logger.info('Translation field request', { textLength: text?.length, targetTag: target?.tagName, mode: selectionRange ? 'SelectElement' : 'Field' });
   
   if (!text) {
@@ -79,6 +66,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       target: currentTargetLang 
     });
 
+    const newToastId = `status-${Date.now()}`;
+    pageEventBus.emit('show-notification', { id: newToastId, message: 'Translating...', type: 'status' });
+
     // Send direct translation message to background (fire-and-forget pattern like element selection)
     // Response will come via TRANSLATION_RESULT_UPDATE broadcast and handled by ContentMessageHandler
     const translationMessage = MessageFormat.create(
@@ -89,7 +79,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         sourceLanguage: currentSourceLang || 'auto',
         targetLanguage: currentTargetLang || 'fa',
         mode: mode,
-        options: {}
+        options: { toastId: newToastId }
       },
       MessagingContexts.CONTENT
     );
@@ -100,7 +90,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     if (messageResult === null) {
       // Extension context is invalid, dismiss the notification
       logger.debug('Translation request failed - extension context invalid, dismissing notification');
-      dismissPendingTranslationNotification('translateFieldViaSmartHandler-context-invalid');
+      pageEventBus.emit('dismiss_notification', { id: newToastId });
+      clearPendingNotificationData('translateFieldViaSmartHandler-context-invalid');
       return;
     }
     
@@ -115,10 +106,14 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     handler.handle(err, { type: ErrorTypes.SERVICE, context: 'smartTranslate-handler' });
     
     // Dismiss notification on error
-    dismissPendingTranslationNotification('translateFieldViaSmartHandler-error');
+    if (toastId) {
+      pageEventBus.emit('dismiss_notification', { id: toastId });
+    }
+    clearPendingNotificationData('translateFieldViaSmartHandler-error');
     
     // Handle translation error locally
-    await handleTranslationError(err, mode);
+    const errorMessage = err?.message || err || 'Translation failed';
+    pageEventBus.emit('show-notification', { message: `Translation Error: ${errorMessage}`, type: 'error' });
   }
 }
 
@@ -130,8 +125,19 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
  * @param {string} translationMode - Translation mode
  * @returns {Promise<Object>} Application result
  */
-export async function applyTranslationToTextField(translatedText, originalText, translationMode) {
-  logger.info('Applying translation to text field', { translatedLength: translatedText?.length, originalLength: originalText?.length, translationMode });
+export async function applyTranslationToTextField(translatedText, originalText, translationMode, toastId) {
+  logger.info('Applying translation to text field', { 
+    translatedLength: translatedText?.length, 
+    originalLength: originalText?.length, 
+    translationMode,
+    hasToastId: !!toastId
+  });
+  
+  // Debug: Log the actual texts for verification
+  logger.debug('Translation details:', {
+    originalText: originalText?.substring(0, 100) + (originalText?.length > 100 ? '...' : ''),
+    translatedText: translatedText?.substring(0, 100) + (translatedText?.length > 100 ? '...' : '')
+  });
   
   try {
     // Check if pending data is stale (older than 30 seconds)
@@ -166,32 +172,11 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       pendingAge: pendingTimestamp ? currentTime - pendingTimestamp : 'N/A'
     });
     
-    // Don't clear pending data immediately - keep it for potential subsequent operations
-    // Only clear after successful application or significant time gap
-    
     // Dismiss the status notification if it exists
-    if (window.pendingTranslationStatusNode && window.pendingTranslationNotifier) {
-      try {
-        logger.debug('Attempting to dismiss notification', {
-          statusNode: !!window.pendingTranslationStatusNode,
-          notifier: !!window.pendingTranslationNotifier,
-          statusNodeType: window.pendingTranslationStatusNode?.constructor.name,
-          statusNodeParent: !!window.pendingTranslationStatusNode?.parentNode,
-          statusNodeRemove: typeof window.pendingTranslationStatusNode?.remove
-        });
-        
-        window.pendingTranslationNotifier.dismiss(window.pendingTranslationStatusNode);
-        clearPendingNotificationData('applyTranslationToTextField-success');
-        logger.debug('Status notification dismissed successfully');
-      } catch (notifierError) {
-        logger.error('Failed to dismiss notification', notifierError);
-      }
-    } else {
-      logger.debug('No notification to dismiss', {
-        statusNode: !!window.pendingTranslationStatusNode,
-        notifier: !!window.pendingTranslationNotifier
-      });
+    if (toastId) {
+      pageEventBus.emit('dismiss_notification', { id: toastId });
     }
+    clearPendingNotificationData('applyTranslationToTextField-success');
     
     // For dictionary mode (text selection), we don't need an editable target
     const isDictionaryMode = mode === TranslationMode.Dictionary_Translation || mode === 'dictionary';
@@ -236,7 +221,18 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       return { applied: wasApplied, mode: 'replace' };
     } else {
       logger.debug('Copy mode - copying to clipboard');
-      await copyToClipboard(translatedText);
+      await (async function copyToClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          const successMessage = await getTranslationString("STATUS_SMARTTRANSLATE_COPIED") || "متن ترجمه شده در حافظه کپی شد";
+          pageEventBus.emit('show-notification', { message: successMessage, type: "success" });
+        } catch (error) {
+          const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
+          pageEventBus.emit('show-notification', { message: errorMessage, type: "error" });
+          const { sendReliable } = await import('../messaging/core/ReliableMessaging.js');
+          await sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
+        }
+      })(translatedText);
       
       // Clear pending data after copy operation
       clearPendingTranslationData();
@@ -393,75 +389,5 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
   } catch (err) {
     logger.error('Error in applyTranslation', err);
     return false;
-  }
-}
-
-export async function handleTranslationError(error, mode = 'field') {
-  logger.error('Handling translation error for mode:', mode, error);
-  let errorMessage;
-  try {
-    // Dismiss any pending notifications
-    dismissPendingTranslationNotification('handleTranslationError');
-
-    // Show in-page error notification using NotificationManager
-    errorMessage = error?.message || error || 'Translation failed';
-    
-    // Import NotificationManager dynamically
-    const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
-    const notificationManager = new NotificationManager();
-    
-    // Show error notification in page
-    await notificationManager.show(`Translation Error: ${errorMessage}`, 'error');
-    
-  } catch (notificationError) {
-    logger.error('Failed to show translation error notification:', notificationError);
-    
-    // Fallback: Try simple alert for critical errors
-    try {
-      logger.error('Translation Error:', errorMessage);
-    } catch {
-      // Silent fallback
-    }
-  }
-}
-
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    
-    // Show success notification using NotificationManager
-    try {
-      const successMessage = await getTranslationString("STATUS_SMARTTRANSLATE_COPIED") || "متن ترجمه شده در حافظه کپی شد";
-      
-      // Import NotificationManager dynamically
-      const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
-      const notificationManager = new NotificationManager();
-      
-      await notificationManager.show(successMessage, 'success');
-    } catch (notificationError) {
-      logger.error('Failed to show clipboard success notification:', notificationError);
-    }
-  } catch (error) {
-    // Handle clipboard error
-    try {
-      const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
-      
-      // Import NotificationManager dynamically
-      const { default: NotificationManager } = await import('../managers/core/NotificationManager.js');
-      const notificationManager = new NotificationManager();
-      
-      await notificationManager.show(errorMessage, 'error');
-    } catch (notificationError) {
-      logger.error('Failed to show clipboard error notification:', notificationError);
-    }
-    
-    // Also send error to background for logging
-    try {
-      const { sendReliable } = await import('../messaging/core/ReliableMessaging.js');
-      await sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
-    } catch (e) {
-      // Could not send error to background via reliable messenger; log locally
-      logger.debug('Could not send clipboard error to background via sendReliable:', e);
-    }
   }
 }

@@ -25,6 +25,85 @@ if (!access.isAccessible) {
   (async () => {
     logger.init("Content script loading...");
 
+    // --- Mount the Vue UI Host ---
+    try {
+      const { mountContentApp } = await import("../views/content/main.js");
+      const { pageEventBus } = await import("../utils/core/PageEventBus.js");
+      // Import vue-sonner styles as a raw string to inject into the shadow DOM
+      const sonnerStyles = await import('vue-sonner/style.css?raw');
+      // Import TextFieldIcon styles as a raw string to inject into the shadow DOM
+      const textFieldIconStyles = `
+        .text-field-icon {
+          position: absolute;
+          width: 28px;
+          height: 28px;
+          background-color: #ffffff;
+          border: 1px solid #e0e0e0;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          z-index: 2147483641; /* Just below the main container */
+          transition: all 0.2s ease-in-out;
+          opacity: 0;
+          transform: scale(0.8);
+          animation: fadeIn 0.2s forwards;
+        }
+
+        .text-field-icon:hover {
+          background-color: #f5f5f5;
+          transform: scale(1.1);
+        }
+
+        .text-field-icon svg {
+          color: #5f6368;
+        }
+
+        @keyframes fadeIn {
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `;
+
+      const hostElement = document.createElement('div');
+      hostElement.id = 'translate-it-host';
+      document.body.appendChild(hostElement);
+
+      const shadowRoot = hostElement.attachShadow({ mode: 'open' });
+
+      // Inject styles into the shadow DOM
+      const styleEl = document.createElement('style');
+      // This is a placeholder. In a real build process, this would be the bundled CSS.
+      // For now, we can add some basic styles.
+      styleEl.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+        :host {
+          font-family: 'Vazirmatn', sans-serif;
+        }
+        ${sonnerStyles.default}
+        ${textFieldIconStyles}
+      `;
+      shadowRoot.appendChild(styleEl);
+
+      const appRoot = document.createElement('div');
+      shadowRoot.appendChild(appRoot);
+
+      mountContentApp(appRoot);
+      logger.info('Vue UI Host mounted into Shadow DOM.');
+
+      // Emit a test event to confirm communication
+      setTimeout(() => {
+        pageEventBus.emit('ui-host-mounted');
+      }, 500);
+
+    } catch (error) {
+      logger.error('Failed to mount the Vue UI Host:', error);
+    }
+
     // Check if current page is excluded before initializing
     try {
       const response = await sendReliable({
@@ -68,8 +147,13 @@ if (!access.isAccessible) {
     selectElementManager.initialize();
     contentMessageHandler.initialize();
 
-    // Initialize TextFieldManager through EventCoordinator
-    eventCoordinator.textFieldManager.initialize();
+    // Initialize TextFieldManager through EventCoordinator with proper dependencies
+    eventCoordinator.textFieldManager.initialize({
+      translationHandler: translationHandler,
+      notifier: translationHandler.notifier,
+      strategies: translationHandler.strategies,
+      featureManager: translationHandler.featureManager
+    });
 
     // Initialize shortcut manager with required dependencies
     shortcutManager.initialize({
@@ -100,7 +184,7 @@ if (!access.isAccessible) {
       const handleAsync = async () => {
         try {
           const wasHandled = await contentMessageHandler.handleMessage(message, sender, sendResponse);
-          return wasHandled !== false;
+          return wasHandled; // Return the actual handling result
         } catch (error) {
           logger.error('Message handling error:', error);
           if (sendResponse) {

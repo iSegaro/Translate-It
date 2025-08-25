@@ -9,7 +9,8 @@ import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
 import DefaultStrategy from "../strategies/DefaultStrategy.js";
 import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "../managers/core/NotificationManager.js";
-import IconManager from "../managers/IconManager.js";
+
+
 import { debounce } from "../utils/core/debounce.js";
 import { state, TranslationMode, CONFIG, getTimeoutAsync } from "../config.js";
 import { logMethod } from "../utils/core/helpers.js";
@@ -30,9 +31,6 @@ export default class TranslationHandler {
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
     
-    // IMPORTANT: FIRST initialize the notifier, then the errorHandler
-    // This ensures that the errorHandler can use the notifier for displaying errors.
-    // ابتدا notifier سپس errorHandler
     this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
 
@@ -40,28 +38,18 @@ export default class TranslationHandler {
     this.handleEvent = debounce(this.handleEvent.bind(this), 300);
 
     this.strategies = {
-      [Platform.WhatsApp]: new WhatsAppStrategy(
-        this.notifier,
-        this.errorHandler,
-      ),
-      [Platform.Instagram]: new InstagramStrategy(
-        this.notifier,
-        this.errorHandler,
-      ),
-      [Platform.Medium]: new MediumStrategy(this.notifier, this.errorHandler),
-      [Platform.Telegram]: new TelegramStrategy(
-        this.notifier,
-        this.errorHandler,
-      ),
-      [Platform.Twitter]: new TwitterStrategy(this.notifier, this.errorHandler),
-      [Platform.ChatGPT]: new ChatGPTStrategy(this.notifier, this.errorHandler),
-      [Platform.Youtube]: new YoutubeStrategy(this.notifier, this.errorHandler),
-      [Platform.Default]: new DefaultStrategy(this.notifier, this.errorHandler),
-      [Platform.Discord]: new DiscordStrategy(this.notifier, this.errorHandler),
+      [Platform.WhatsApp]: new WhatsAppStrategy(this.errorHandler),
+      [Platform.Instagram]: new InstagramStrategy(this.errorHandler),
+      [Platform.Medium]: new MediumStrategy(this.errorHandler),
+      [Platform.Telegram]: new TelegramStrategy(this.errorHandler),
+      [Platform.Twitter]: new TwitterStrategy(this.errorHandler),
+      [Platform.ChatGPT]: new ChatGPTStrategy(this.errorHandler),
+      [Platform.Youtube]: new YoutubeStrategy(this.errorHandler),
+      [Platform.Default]: new DefaultStrategy(this.errorHandler),
+      [Platform.Discord]: new DiscordStrategy(this.errorHandler),
     };
 
     this.validateStrategies();
-    this.IconManager = new IconManager(this.errorHandler);
     this.displayedErrors = new Set();
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
@@ -166,50 +154,44 @@ export default class TranslationHandler {
         }
       }
 
-      // Use ExtensionContextManager for safe i18n operation
       const statusMessage = await ExtensionContextManager.safeI18nOperation(
         () => getTranslationString("STATUS_TRANSLATING_CTRLSLASH"),
         'processTranslation-status',
         "translating..."
       );
       
-      // Dismiss all existing status notifications before showing new one
-      if (this.notifier && typeof this.notifier.dismissAll === 'function') {
-        this.notifier.dismissAll();
-      }
-      
-      statusNotification = await this.notifier.show(statusMessage, "status");
+      const toastId = `status-${Date.now()}`;
+      ExtensionContextManager.safeSendMessage({
+        action: "show_notification",
+        payload: {
+          id: toastId,
+          message: statusMessage,
+          type: "status",
+        },
+      });
 
       state.translateMode = params.selectionRange
         ? TranslationMode.SelectElement
         : TranslationMode.Field;
 
-      // Store notification for dismissal after translation completes (only in window context)
-      if (typeof window !== 'undefined') {
-        window.pendingTranslationStatusNode = statusNotification;
-        window.pendingTranslationNotifier = this.notifier;
-        
-        // Set fallback timeout to dismiss notification if translation takes too long or fails silently
-        const translationTimeout = await getTimeoutAsync();
-        this.logger.debug('Translation timeout from config:', translationTimeout);
-        const dismissTimeout = setTimeout(() => {
-          if (window.pendingTranslationStatusNode === statusNotification) {
-            this.logger.debug('Translation timeout reached, dismissing status notification');
-            this.notifier.dismiss(statusNotification);
-            window.pendingTranslationStatusNode = null;
-            window.pendingTranslationNotifier = null;
-          }
-        }, translationTimeout);
-        
-        window.pendingTranslationDismissTimeout = dismissTimeout;
-      }
+      // Set fallback timeout to dismiss notification if translation takes too long or fails silently
+      const translationTimeout = await getTimeoutAsync();
+      this.logger.debug('Translation timeout from config:', translationTimeout);
+      const dismissTimeout = setTimeout(() => {
+        ExtensionContextManager.safeSendMessage({
+          action: "dismiss_notification",
+          payload: { id: toastId },
+        });
+      }, translationTimeout);
       
       //ارسال دقیق target برای جلوگیری از undefined
       await translateFieldViaSmartHandler({
         text: params.text,
         target: params.target,
         selectionRange: params.selectionRange,
-        tabId: null
+        tabId: null,
+        toastId: toastId, // Pass toastId to be dismissed on completion
+        dismissTimeout: dismissTimeout, // Pass timeout to be cleared
       });
     } catch (error) {
       const processed = await ErrorHandler.processError(error);
@@ -221,16 +203,14 @@ export default class TranslationHandler {
         isPrimary: true,
       });
 
-      if (statusNotification) {
-        this.notifier.dismiss(statusNotification);
-        
-        // Clear timeout if it exists  
-        if (typeof window !== 'undefined' && window.pendingTranslationDismissTimeout) {
-          clearTimeout(window.pendingTranslationDismissTimeout);
-          window.pendingTranslationDismissTimeout = null;
-          window.pendingTranslationStatusNode = null;
-          window.pendingTranslationNotifier = null;
-        }
+      if (toastId) {
+        ExtensionContextManager.safeSendMessage({
+          action: "dismiss_notification",
+          payload: { id: toastId },
+        });
+      }
+      if (params.dismissTimeout) {
+        clearTimeout(params.dismissTimeout);
       }
 
       if (handlerError.isFinal || handlerError.suppressSecondary) return;

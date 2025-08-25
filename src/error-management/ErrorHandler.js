@@ -1,5 +1,6 @@
 // File: src/error-management/ErrorHandler.js
 
+
 import NotificationManager from "../managers/core/NotificationManager.js";
 import { openOptionsPage } from "../utils/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
@@ -54,11 +55,11 @@ const OPEN_SETTINGS = new Set([
 ]);
 
 export class ErrorHandler {
-  constructor() {
+  constructor(notifier) {
     if (_instance) {
       return _instance;
     }
-    this.notifier = new NotificationManager();
+    this.notifier = notifier || new NotificationManager();
     this.displayedErrors = new Set();
     this.handling = false;
     this.openOptionsPageCallback = null; // Property to hold the callback
@@ -140,11 +141,7 @@ export class ErrorHandler {
 
       // Show toast notification if enabled  
       if (enhancedMeta.showToast) {
-        const action = OPEN_SETTINGS.has(type)
-          ? () => this.openOptionsPageCallback?.() || openOptionsPage("api")
-          : undefined;
-
-        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE, action);
+        this._notifyUser(msg, enhancedMeta.type || ErrorTypes.SERVICE);
       }
       
       return err;
@@ -261,8 +258,9 @@ export class ErrorHandler {
     return retryableErrors.has(type);
   }
 
-  _notifyUser(message, type, action) {
+  _notifyUser(message, type) {
     if (this.displayedErrors.has(message)) return;
+
     const typeMap = {
       [ErrorTypes.API]: "error",
       [ErrorTypes.UI]: "error",
@@ -282,7 +280,11 @@ export class ErrorHandler {
       [ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED]: "warning",
     };
     const toastType = typeMap[type] || "error";
-    this.notifier.show(message, toastType, true, 5000, action);
+    
+    // The new NotificationManager doesn't support onClick handlers directly through the event bus.
+    // The logic for opening the settings page would need to be handled differently if required.
+    this.notifier.show(message, toastType);
+
     this.displayedErrors.add(message);
     setTimeout(() => this.displayedErrors.delete(message), 5500);
   }

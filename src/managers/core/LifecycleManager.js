@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
 import { featureLoader } from "../../background/feature-loader.js";
-import NotificationManager from "./NotificationManager.js"; // Updated path
+
 import { initializeSettingsListener } from "../../config.js";
 import { TranslationEngine } from "../../background/translation-engine.js";
 import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // This might need to be moved later
@@ -29,9 +29,6 @@ class LifecycleManager {
     }
     
     await this.initializebrowserAPI();
-    
-    this.notificationManager = new NotificationManager();
-    this.notificationManager.initialize();
 
     await this.initializeTranslationEngine();
 

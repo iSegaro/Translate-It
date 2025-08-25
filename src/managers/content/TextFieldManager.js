@@ -7,12 +7,11 @@ import { getScopedLogger } from "../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
 import { isUrlExcluded_TEXT_FIELDS_ICON } from "../../utils/ui/exclusion.js";
 import { detectPlatform, Platform } from "../../utils/browser/platform.js";
-import setupIconBehavior from "../IconBehavior.js";
 import { state } from "../../config.js";
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 export class TextFieldManager {
   constructor(options = {}) {
-    this.iconManager = options.iconManager;
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
@@ -45,7 +44,6 @@ export class TextFieldManager {
     }
 
     // Update dependencies if provided
-    if (dependencies.iconManager) this.iconManager = dependencies.iconManager;
     if (dependencies.translationHandler) this.translationHandler = dependencies.translationHandler;
     if (dependencies.notifier) this.notifier = dependencies.notifier;
     if (dependencies.strategies) this.strategies = dependencies.strategies;
@@ -53,6 +51,35 @@ export class TextFieldManager {
 
     this.initialized = true;
     this.logger.debug('Initialized with dependencies');
+
+    // Listen for icon click events from the UI Host
+    pageEventBus.on('text-field-icon-clicked', (detail) => {
+      this.logger.debug('Received text-field-icon-clicked event:', detail);
+      // Find the element associated with this icon ID
+      const iconData = Array.from(this.activeIcons.values()).find(icon => icon.id === detail.id);
+      if (iconData && iconData.targetElement) {
+        this.logger.debug('Triggering translation for element:', iconData.targetElement.tagName);
+        
+        // Debug: Check if translationHandler exists and has the method
+        if (!this.translationHandler) {
+          this.logger.error('Translation handler is not available!');
+          return;
+        }
+        
+        if (typeof this.translationHandler.processTranslation_with_CtrlSlash !== 'function') {
+          this.logger.error('processTranslation_with_CtrlSlash method not found on translation handler!');
+          return;
+        }
+        
+        // Call the translation handler
+        this.translationHandler.processTranslation_with_CtrlSlash({
+          text: iconData.targetElement.value || iconData.targetElement.textContent,
+          target: iconData.targetElement,
+        });
+        // Immediately clean up the icon after click
+        this.cleanupElement(iconData.targetElement);
+      }
+    });
   }
 
   /**
@@ -77,48 +104,51 @@ export class TextFieldManager {
    */
   shouldProcessTextField(element) {
     // Basic validation
-    if (!this.iconManager || !this.featureManager?.isOn("EXTENSION_ENABLED")) {
-      return null;
-    }
-
-    if (!this.iconManager) {
+    if (!this.featureManager?.isOn("EXTENSION_ENABLED")) {
+      this.logger.debug('Skipping icon creation: Extension is disabled.');
       return null;
     }
 
     // Protocol check
     if (!["http:", "https:"].includes(window.location.protocol)) {
+      this.logger.debug('Skipping icon creation: Invalid protocol.');
       return null;
     }
 
     // URL exclusion check
     if (isUrlExcluded_TEXT_FIELDS_ICON(window.location.href)) {
+      this.logger.debug('Skipping icon creation: URL is excluded.');
       return null;
     }
 
     // Feature flag check
     if (!this.featureManager?.isOn("TEXT_FIELDS")) {
+      this.logger.debug('Skipping icon creation: TEXT_FIELDS feature is disabled.');
       return false;
     }
 
     // **FIX FOR DISCORD**: Check if we should prevent text field icon creation
     // This prevents conflicts when transitioning from selection icon to translation window
     if (state && state.preventTextFieldIconCreation === true) {
-      this.logger.debug('Text field icon creation prevented due to active selection window transition');
+      this.logger.debug('Skipping icon creation: preventTextFieldIconCreation flag is true.');
       return false;
     }
 
     // Check if another icon is already active
     if (state.activeTranslateIcon) {
+      this.logger.debug('Skipping icon creation: Another icon is already active.');
       return false;
     }
 
     // Element validation
     if (!this.isEditableElement(element)) {
+      this.logger.debug('Skipping icon creation: Element is not editable.');
       return false;
     }
 
     // Platform-specific filtering
     if (!this.applyPlatformFiltering(element)) {
+      this.logger.debug('Skipping icon creation: Platform filtering rules applied.');
       return false;
     }
 
@@ -170,39 +200,24 @@ export class TextFieldManager {
       return null;
     }
 
-    // Create the translate icon
-    const icon = this.iconManager.createTranslateIcon(element);
-    if (!icon) {
-      this.logger.warn('Failed to create translate icon');
-      return null;
-    }
+    // Generate a unique ID for the icon
+    const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Setup icon behavior
-    try {
-      setupIconBehavior(
-        icon,
-        element,
-        this.translationHandler,
-        this.notifier,
-        this.strategies
-      );
+    // Calculate icon position - adjust for scroll position since the UI Host is fixed
+    const rect = element.getBoundingClientRect();
+    const position = {
+      top: rect.top + window.scrollY + 10,
+      left: rect.left + window.scrollX + rect.width + 10,
+    };
 
-      // Track the created icon
-      this.trackIcon(icon, element);
+    // Emit event to UI Host to add the icon
+    pageEventBus.emit('add-field-icon', { id: iconId, position });
 
-      this.logger.debug('Icon created and configured successfully');
-      return icon;
+    // Track the created icon
+    this.trackIcon({ id: iconId, element, position }, element);
 
-    } catch (error) {
-      this.logger.error('Error setting up icon behavior:', error);
-      
-      // Cleanup failed icon
-      if (icon && icon.parentNode) {
-        icon.parentNode.removeChild(icon);
-      }
-      
-      return null;
-    }
+    this.logger.debug('Icon event emitted and tracked successfully');
+    return { id: iconId, element, position };
   }
 
   /**
@@ -264,16 +279,16 @@ export class TextFieldManager {
    * @param {Element} icon - Created icon element
    * @param {Element} targetElement - Target element the icon is for
    */
-  trackIcon(icon, targetElement) {
+  trackIcon(iconData, targetElement) {
     this.activeIcons.set(targetElement, {
-      icon,
+      id: iconData.id,
       created: Date.now(),
       targetElement
     });
 
     this.logger.debug('Tracking new icon', {
       targetTag: targetElement.tagName,
-      iconId: icon.id || 'no-id',
+      iconId: iconData.id || 'no-id',
       totalTracked: this.activeIcons.size
     });
   }
@@ -290,10 +305,8 @@ export class TextFieldManager {
     }
     this.cleanupTimeouts.clear();
 
-    // Use IconManager cleanup if available
-    if (this.iconManager) {
-      this.iconManager.cleanup();
-    }
+    // Emit event to UI Host to remove all icons
+    pageEventBus.emit('remove-all-field-icons');
 
     // Clear tracked icons
     this.activeIcons.clear();
@@ -316,6 +329,8 @@ export class TextFieldManager {
     // Remove from tracking
     const iconData = this.activeIcons.get(element);
     if (iconData) {
+      // Emit event to UI Host to remove specific icon
+      pageEventBus.emit('remove-field-icon', { id: iconData.id });
       this.activeIcons.delete(element);
       this.logger.debug('Cleaned up element:', element.tagName);
     }
@@ -329,11 +344,12 @@ export class TextFieldManager {
     const icons = [];
     for (const [element, data] of this.activeIcons.entries()) {
       icons.push({
+        id: data.id,
         targetTag: element.tagName,
         targetId: element.id || 'no-id',
         created: data.created,
         age: Date.now() - data.created,
-        iconConnected: data.icon.isConnected
+        iconConnected: true // Always true as it's managed by Vue
       });
     }
 
@@ -343,7 +359,6 @@ export class TextFieldManager {
       pendingTimeoutsCount: this.cleanupTimeouts.size,
       icons,
       dependencies: {
-        iconManager: !!this.iconManager,
         translationHandler: !!this.translationHandler,
         notifier: !!this.notifier,
         strategies: !!this.strategies,
