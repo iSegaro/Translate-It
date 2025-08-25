@@ -83,7 +83,8 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   CONTENT LAYER                                │
-│  Content Scripts → Element Selection → Cross-Frame UI          │
+│  Content Scripts → UI Host System → Event-Based Communication  │
+│  Element Selection → Notifications → Text Field Icons          │
 │  Text Actions → Screen Capture → Context Integration           │
 └─────────────────────────────────────────────────────────────────┘
 ```
