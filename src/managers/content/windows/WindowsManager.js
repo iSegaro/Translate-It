@@ -19,6 +19,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import ExtensionContextManager from "../../../utils/core/extensionContext.js";
+import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from "../../../utils/core/PageEventBus.js";
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -269,53 +270,36 @@ export class WindowsManager {
       return;
     }
 
-    // Get target document and create icon
-    const topDocument = this.positionCalculator.getTopDocument();
-    const targetDocument = this.crossFrameManager.isInIframe ? document : topDocument;
+    // Generate unique ID for this icon
+    const iconId = `translation-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    try {
-      // Create icon host
-      const iconHost = this.factory.createIconHost(targetDocument);
-      
-      // Create icon
-      this.icon = this.factory.createTranslateIcon(targetDocument);
-      
-      // Calculate final position
-      const targetWindow = this.crossFrameManager.isInIframe ? window : 
-        (topDocument.defaultView || topDocument.parentWindow || window);
-      const finalPosition = this.positionCalculator.calculateFinalIconPosition(iconPosition, targetWindow);
-      
-      // Apply position
-      this.icon.style.left = `${finalPosition.left}px`;
-      this.icon.style.top = `${finalPosition.top}px`;
-      
-      // Add to host
-      iconHost.appendChild(this.icon);
-      
-      // Setup click handler
-      this.clickManager.setupIconClickHandler(this.icon);
-      
-      // Store context
-      this.state.setIconClickContext({ text: selectedText, position });
-      
-      // Add outside click listener
-      this.clickManager.addOutsideClickListener();
-      
-      // Animate icon in
-      await this.animationManager.animateIconIn(this.icon);
-      
-      this.logger.debug('Icon created and animated successfully');
-    } catch (error) {
-      // Use ExtensionContextManager for unified error handling
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'icon-creation');
-        // Don't call _handleError for context errors to prevent side effects
-        return;
-      } else {
-        this.logger.error('Error creating translate icon:', error);
-        this._handleError(error, 'icon-creation');
+    // Calculate final position
+    const topDocument = this.positionCalculator.getTopDocument();
+    const targetWindow = this.crossFrameManager.isInIframe ? window : 
+      (topDocument.defaultView || topDocument.parentWindow || window);
+    const finalPosition = this.positionCalculator.calculateFinalIconPosition(iconPosition, targetWindow);
+    
+    // Emit event to create icon through Vue UI Host
+    WindowsManagerEvents.showIcon({
+      id: iconId,
+      text: selectedText,
+      position: {
+        top: finalPosition.top,
+        left: finalPosition.left
       }
-    }
+    });
+    
+    // Store context for click handling
+    this.state.setIconClickContext({ 
+      text: selectedText, 
+      position,
+      iconId 
+    });
+    
+    // Add outside click listener
+    this.clickManager.addOutsideClickListener();
+    
+    this.logger.debug('Icon creation event emitted successfully', { iconId });
   }
 
   /**
@@ -342,9 +326,61 @@ export class WindowsManager {
       return this.crossFrameManager.requestWindowCreation(selectedText, position);
     }
 
-    // Create window directly
-    this.logger.debug('Creating window directly (main document)');
-    return this._createTranslationWindow(selectedText, position);
+    // Generate unique ID for this window
+    const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Emit event to create window through Vue UI Host
+    WindowsManagerEvents.showWindow({
+      id: windowId,
+      selectedText,
+      position,
+      mode: 'window'
+    });
+    
+    // Store state for this window
+    this.state.setOriginalText(selectedText);
+    this.state.setTranslationCancelled(false);
+    this.state.setIconMode(false);
+    this.state.setVisible(true);
+    
+    // Start translation process
+    this._startTranslationProcess(windowId, selectedText);
+    
+    this.logger.debug('Window creation event emitted successfully', { windowId });
+  }
+
+  /**
+   * Start translation process for a window
+   */
+  async _startTranslationProcess(windowId, selectedText) {
+    try {
+      // Show loading state in the Vue component
+      WindowsManagerEvents.translationLoading(windowId);
+      
+      // Perform translation
+      const result = await this.translationHandler.performTranslation(selectedText);
+      
+      if (this.state.isTranslationCancelled) return;
+      
+      // Send translation result to Vue component
+      WindowsManagerEvents.translationResult(windowId, {
+        translatedText: result.translatedText,
+        originalText: selectedText
+      });
+      
+      this.logger.debug('Translation completed successfully', { windowId });
+      
+    } catch (error) {
+      if (this.state.isTranslationCancelled) return;
+      
+      // Send translation error to Vue component
+      WindowsManagerEvents.translationError(windowId, {
+        message: error.message || 'Translation failed',
+        error: error
+      });
+      
+      this.logger.error('Translation failed', { windowId, error });
+    }
   }
 
   /**
@@ -474,6 +510,15 @@ export class WindowsManager {
       state.preventTextFieldIconCreation = true;
     }
 
+    // Emit icon clicked event for Vue UI Host to handle
+    if (context.iconId) {
+      WindowsManagerEvents.iconClicked({
+        id: context.iconId,
+        text: context.text,
+        position: context.position
+      });
+    }
+
     // Clean up icon
     this._cleanupIcon(false);
 
@@ -513,11 +558,30 @@ export class WindowsManager {
       adjustedPosition._alreadyAdjusted = true;
       this.state.setRequestingFrameId(data.frameId);
       
-      // Create window in main document
-      await this._createTranslationWindow(data.selectedText, adjustedPosition);
+      // Generate unique ID for this window
+      const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // Notify success
-      this.crossFrameManager.notifyWindowCreated(data.frameId, true, this.displayElement?.id);
+      // Emit event to create window through Vue UI Host
+      WindowsManagerEvents.showWindow({
+        id: windowId,
+        selectedText: data.selectedText,
+        position: adjustedPosition,
+        mode: 'window'
+      });
+      
+      // Store state for this window
+      this.state.setOriginalText(data.selectedText);
+      this.state.setTranslationCancelled(false);
+      this.state.setIconMode(false);
+      this.state.setVisible(true);
+      
+      // Start translation process
+      this._startTranslationProcess(windowId, data.selectedText);
+      
+      // Notify success with the window ID
+      this.crossFrameManager.notifyWindowCreated(data.frameId, true, windowId);
+      
+      this.logger.debug('Cross-frame window creation event emitted successfully', { windowId, frameId: data.frameId });
       
     } catch (error) {
       this.logger.error('Failed to create window in main document:', error);
@@ -622,12 +686,25 @@ export class WindowsManager {
       this._clearTextSelection();
     }
 
+    // Get current window/icon IDs before cleanup
+    const iconId = this.state.iconClickContext?.iconId;
+    const windowId = this.state.mainDocumentWindowId || this.displayElement?.id;
+
     // Clean up icon
     this._cleanupIcon(true);
 
     // Clean up window
     if (this.displayElement && this.state.isVisible) {
       this._cleanupWindow(withFadeOut);
+    }
+
+    // Emit dismissal events for Vue components
+    if (iconId) {
+      WindowsManagerEvents.dismissIcon(iconId);
+    }
+    
+    if (windowId) {
+      WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
     }
 
     // Reset flags
