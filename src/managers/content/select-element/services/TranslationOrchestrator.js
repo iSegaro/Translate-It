@@ -192,7 +192,7 @@ export class TranslationOrchestrator {
 
         request.status = 'completed';
         request.result = data;
-        this.logger.info("Advanced translation applied successfully using Shadow DOM overlay", { messageId });
+        this.logger.info("Translation applied successfully to DOM elements", { messageId });
       } else {
         request.status = 'error';
         request.error = error;
@@ -208,7 +208,7 @@ export class TranslationOrchestrator {
   }
 
   /**
-   * Show translations in Shadow DOM overlay instead of modifying original DOM
+   * Show translations in Shadow DOM overlay with exact same styling as original
    * @param {HTMLElement} element - The element containing the text nodes
    * @param {Map} translations - Map of original text to translated text
    * @param {Array} textNodes - Array of text nodes that were translated
@@ -222,21 +222,18 @@ export class TranslationOrchestrator {
       translatedText += translated;
     });
 
-    // Show translation in Shadow DOM overlay
+    // Show translation in Shadow DOM overlay with exact same styling
     pageEventBus.emit('show-translation', {
       element: element,
       translatedText: translatedText,
       originalText: element.textContent
     });
 
-    this.logger.debug("Translation displayed in Shadow DOM overlay", {
+    this.logger.debug("Translation displayed in Shadow DOM overlay with original styling", {
       element: element.tagName,
       translatedLength: translatedText.length,
       originalLength: element.textContent.length
     });
-    
-    // Debug: Check if the event is being received
-    console.log('Emitted show-translation event for element:', element, 'Text:', translatedText);
   }
 
   cancelAllTranslations() {
