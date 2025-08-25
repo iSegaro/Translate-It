@@ -214,25 +214,16 @@ export class TranslationOrchestrator {
    * @param {Array} textNodes - Array of text nodes that were translated
    */
   showTranslationsInOverlay(element, translations, textNodes) {
-    // Extract the full translated text for the element
-    let translatedText = '';
-    textNodes.forEach(node => {
-      const originalText = node.textContent;
-      const translated = translations.get(originalText) || originalText;
-      translatedText += translated;
-    });
-
     // Show translation in Shadow DOM overlay with exact same styling
     pageEventBus.emit('show-translation', {
       element: element,
-      translatedText: translatedText,
+      translations: translations,
+      textNodes: textNodes,
       originalText: element.textContent
     });
 
     this.logger.debug("Translation displayed in Shadow DOM overlay with original styling", {
-      element: element.tagName,
-      translatedLength: translatedText.length,
-      originalLength: element.textContent.length
+      element: element.tagName
     });
   }
 

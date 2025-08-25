@@ -1,77 +1,121 @@
 <template>
   <div class="translation-overlay">
     <div 
-      v-for="translation in activeTranslations" 
+      v-for="(translation, index) in activeTranslations" 
       :key="translation.id"
       class="translated-element"
       :style="translation.style"
       @click="onTranslationClick(translation)"
+      :ref="el => { if (el) translatedElements[index] = el }"
     >
-      <div class="translation-content">
-        {{ translation.translatedText }}
-      </div>
-      <div class="translation-actions" v-if="showActions">
-        <button class="action-btn revert" @click.stop="onRevert(translation)">
-          ↶
-        </button>
-        <button class="action-btn copy" @click.stop="onCopy(translation)">
-          📋
-        </button>
-      </div>
+      <!-- The cloned element will be mounted here by the script -->
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, nextTick, onBeforeUpdate } from 'vue';
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 const activeTranslations = ref([]);
+const translatedElements = ref([]);
 const showActions = ref(true);
+
+// Ensure refs are cleared before each update
+onBeforeUpdate(() => {
+  translatedElements.value = [];
+});
 
 // Generate unique IDs for translations
 let translationCounter = 0;
 const generateId = () => `translation-${Date.now()}-${translationCounter++}`;
 
+const cloneWithStyles = (sourceNode) => {
+  if (sourceNode.nodeType === Node.TEXT_NODE) {
+    return sourceNode.cloneNode(true);
+  }
+
+  if (sourceNode.nodeType !== Node.ELEMENT_NODE) {
+    return sourceNode.cloneNode(false);
+  }
+
+  const clonedElement = sourceNode.cloneNode(false);
+
+  const computedStyle = window.getComputedStyle(sourceNode);
+  for (let i = 0; i < computedStyle.length; i++) {
+    const prop = computedStyle[i];
+    clonedElement.style.setProperty(prop, computedStyle.getPropertyValue(prop));
+  }
+
+  const children = sourceNode.childNodes;
+  for (let i = 0; i < children.length; i++) {
+    clonedElement.appendChild(cloneWithStyles(children[i]));
+  }
+
+  return clonedElement;
+};
+
   // Listen for translation events
   pageEventBus.on('show-translation', (detail) => {
     console.log('Received show-translation event:', detail);
-    const { element, translatedText, originalText } = detail;
+    const { element, translations, textNodes, originalText } = detail;
     const rect = element.getBoundingClientRect();
 
-    // Get all computed styles from the original element
-    const computedStyle = window.getComputedStyle(element);
-    const style = {};
-    for (let i = 0; i < computedStyle.length; i++) {
-      const prop = computedStyle[i];
-      style[prop] = computedStyle.getPropertyValue(prop);
-    }
+    // Clone the original element with all its styles
+    const clonedElement = cloneWithStyles(element);
 
-    // Override position, size, and other necessary properties for the overlay
-    style.position = 'absolute';
-    style.top = `${rect.top + window.scrollY}px`;
-    style.left = `${rect.left + window.scrollX}px`;
-    style.width = `${rect.width}px`;
-    style.height = `${rect.height}px`;
-    style.margin = '0';
-    style.zIndex = '2147483647'; // Ensure it's on top
-    style.pointerEvents = 'auto'; // Allow interaction with the overlay
+    // Function to traverse the cloned node and replace text nodes with translations
+    const replaceTextInClone = (node) => {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '') {
+        const originalNodeText = node.textContent;
+        if (translations.has(originalNodeText)) {
+          node.textContent = translations.get(originalNodeText);
+        }
+      } else {
+        for (const child of node.childNodes) {
+          replaceTextInClone(child);
+        }
+      }
+    };
+
+    // Replace the text in the cloned element
+    replaceTextInClone(clonedElement);
+
+    const style = {
+      position: 'absolute',
+      top: `${rect.top + window.scrollY}px`,
+      left: `${rect.left + window.scrollX}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      zIndex: '2147483647',
+      pointerEvents: 'auto',
+    };
 
     const translation = {
       id: detail.id || generateId(),
       element,
-      translatedText,
+      clonedElement, // Store the cloned element
       originalText,
       style: style
     };
     
     // Hide original element visually but keep layout
-    element.style.opacity = '0.01';
+    element.style.visibility = 'hidden';
     element.style.pointerEvents = 'none';
     
     // Add translation
     activeTranslations.value.push(translation);
-    console.log('Translation overlay added:', translation, 'Text:', translatedText);
+
+    nextTick(() => {
+      const lastIndex = activeTranslations.value.length - 1;
+      const lastTranslatedElement = translatedElements.value[lastIndex];
+      if (lastTranslatedElement) {
+        lastTranslatedElement.innerHTML = ''; // Clear previous content
+        lastTranslatedElement.appendChild(clonedElement);
+      }
+    });
+
+    console.log('Translation overlay added:', translation);
     console.log('Element position:', rect, 'Scroll:', {scrollY: window.scrollY, scrollX: window.scrollX});
   });
 
@@ -80,21 +124,21 @@ pageEventBus.on('hide-translation', (detail) => {
     const translation = activeTranslations.value.find(t => t.id === detail.id);
     if (translation) {
       // Restore original element
-      translation.element.style.opacity = '';
+      translation.element.style.visibility = '';
       translation.element.style.pointerEvents = '';
     }
     activeTranslations.value = activeTranslations.value.filter(t => t.id !== detail.id);
   } else if (detail.element) {
     const translation = activeTranslations.value.find(t => t.element === detail.element);
     if (translation) {
-      translation.element.style.opacity = '';
+      translation.element.style.visibility = '';
       translation.element.style.pointerEvents = '';
     }
     activeTranslations.value = activeTranslations.value.filter(t => t.element !== detail.element);
   } else {
     // Restore all elements
     activeTranslations.value.forEach(translation => {
-      translation.element.style.opacity = '';
+      translation.element.style.visibility = '';
       translation.element.style.pointerEvents = '';
     });
     activeTranslations.value = [];
