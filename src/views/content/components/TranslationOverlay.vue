@@ -38,27 +38,31 @@ const generateId = () => `translation-${Date.now()}-${translationCounter++}`;
     console.log('Received show-translation event:', detail);
     const { element, translatedText, originalText } = detail;
     const rect = element.getBoundingClientRect();
-    
+
+    // Get all computed styles from the original element
+    const computedStyle = window.getComputedStyle(element);
+    const style = {};
+    for (let i = 0; i < computedStyle.length; i++) {
+      const prop = computedStyle[i];
+      style[prop] = computedStyle.getPropertyValue(prop);
+    }
+
+    // Override position, size, and other necessary properties for the overlay
+    style.position = 'absolute';
+    style.top = `${rect.top + window.scrollY}px`;
+    style.left = `${rect.left + window.scrollX}px`;
+    style.width = `${rect.width}px`;
+    style.height = `${rect.height}px`;
+    style.margin = '0';
+    style.zIndex = '2147483647'; // Ensure it's on top
+    style.pointerEvents = 'auto'; // Allow interaction with the overlay
+
     const translation = {
       id: detail.id || generateId(),
       element,
       translatedText,
       originalText,
-      style: {
-        top: `${rect.top + window.scrollY}px`,
-        left: `${rect.left + window.scrollX}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-        fontSize: getComputedStyle(element).fontSize,
-        fontFamily: getComputedStyle(element).fontFamily,
-        lineHeight: getComputedStyle(element).lineHeight,
-        color: getComputedStyle(element).color,
-        backgroundColor: getComputedStyle(element).backgroundColor,
-        textAlign: getComputedStyle(element).textAlign,
-        padding: getComputedStyle(element).padding,
-        margin: getComputedStyle(element).margin,
-        display: getComputedStyle(element).display,
-      }
+      style: style
     };
     
     // Hide original element visually but keep layout
@@ -145,7 +149,7 @@ window.addEventListener('scroll', updateTranslationPositions, { passive: true })
   width: 100vw;
   height: 100vh;
   pointer-events: none;
-  z-index: 2147483645; /* Below highlights but above page content */
+  z-index: 2147483647; /* Highest z-index */
   transform: translateZ(0);
   opacity: 1 !important;
   visibility: visible !important;
@@ -162,10 +166,11 @@ window.addEventListener('scroll', updateTranslationPositions, { passive: true })
   transition: all 0.2s ease;
   overflow: visible;
   word-wrap: break-word;
-  display: block !important;
+  display: inline !important;
   transform: translateZ(0);
   opacity: 1 !important;
   visibility: visible !important;
+  z-index: 2147483647 !important;
 }
 
 .translated-element:hover {
@@ -182,6 +187,11 @@ window.addEventListener('scroll', updateTranslationPositions, { passive: true })
   text-align: inherit !important;
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: inherit !important;
 }
 
 .translation-actions {
