@@ -129,21 +129,3 @@ export function taggleLinks(enable = true) {
     throw handlerError;
   }
 }
-
-export const showStatus = (() => {
-  let currentNotification = null;
-  return (message, type, duration = 2000) => {
-    if (currentNotification) {
-      currentNotification.remove();
-    }
-    const notification = document.createElement("div");
-    notification.className = `status-notification ${type}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    currentNotification = notification;
-    setTimeout(() => {
-      notification.remove();
-      currentNotification = null;
-    }, duration);
-  };
-})();
