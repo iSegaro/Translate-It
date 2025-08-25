@@ -77,6 +77,8 @@ if (!access.isAccessible) {
 
       // Inject styles into the shadow DOM
       const styleEl = document.createElement('style');
+      // Import disable_links.css styles into shadow DOM
+      const disableLinksStyles = await import("../styles/disable_links.css?raw");
       // This is a placeholder. In a real build process, this would be the bundled CSS.
       // For now, we can add some basic styles.
       styleEl.textContent = `
@@ -86,6 +88,7 @@ if (!access.isAccessible) {
         }
         ${sonnerStyles.default}
         ${textFieldIconStyles}
+        ${disableLinksStyles.default}
       `;
       shadowRoot.appendChild(styleEl);
 

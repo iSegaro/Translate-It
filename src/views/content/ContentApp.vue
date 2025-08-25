@@ -2,7 +2,6 @@
   <div class="content-app-container">
     <!-- This will host all in-page UI components -->
     <Toaster rich-colors />
-    <SelectModeToolbar v-if="isSelectModeActive" />
     <TextFieldIcon
       v-for="icon in activeIcons"
       :key="icon.id"
@@ -31,6 +30,10 @@
       @click="onTranslationIconClick"
       @close="onTranslationIconClose"
     />
+    
+    <!-- Select Element Overlays -->
+    <ElementHighlightOverlay />
+    <TranslationOverlay />
   </div>
 </template>
 
@@ -38,10 +41,11 @@
 import { onMounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/utils/core/PageEventBus.js';
-import SelectModeToolbar from './components/SelectModeToolbar.vue';
 import TextFieldIcon from './components/TextFieldIcon.vue';
 import TranslationWindow from './components/TranslationWindow.vue';
 import TranslationIcon from './components/TranslationIcon.vue';
+import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
+import TranslationOverlay from './components/TranslationOverlay.vue';
 
 const logger = {
   info: (msg, ...args) => console.log(`[ContentApp] ${msg}`, ...args),

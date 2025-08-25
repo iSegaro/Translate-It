@@ -42,8 +42,10 @@ export class TranslationOrchestrator {
 
       if (textsToTranslate.length === 0 && cachedTranslations.size > 0) {
         this.logger.info("Applying translations from cache only.");
-        applyTranslationsToNodes(textNodes, cachedTranslations, this.stateManager.getContext());
-        this.stateManager.addTranslatedElement(element);
+        // Store translations in state manager
+        this.stateManager.addTranslatedElement(element, cachedTranslations);
+        // Show translations in Shadow DOM overlay
+        this.showTranslationsInOverlay(element, cachedTranslations, textNodes);
         return;
       }
 
@@ -181,12 +183,16 @@ export class TranslationOrchestrator {
         );
 
         const allTranslations = new Map([...cachedTranslations, ...newTranslations]);
-        applyTranslationsToNodes(textNodes, allTranslations, this.stateManager.getContext());
-        this.stateManager.addTranslatedElement(element);
+        
+        // Store translations in state manager for potential revert
+        this.stateManager.addTranslatedElement(element, allTranslations);
+        
+        // Show translations in Shadow DOM overlay instead of direct DOM manipulation
+        this.showTranslationsInOverlay(element, allTranslations, textNodes);
 
         request.status = 'completed';
         request.result = data;
-        this.logger.info("Advanced translation applied successfully", { messageId });
+        this.logger.info("Advanced translation applied successfully using Shadow DOM overlay", { messageId });
       } else {
         request.status = 'error';
         request.error = error;
@@ -199,6 +205,38 @@ export class TranslationOrchestrator {
       request.error = e.message;
       throw e;
     }
+  }
+
+  /**
+   * Show translations in Shadow DOM overlay instead of modifying original DOM
+   * @param {HTMLElement} element - The element containing the text nodes
+   * @param {Map} translations - Map of original text to translated text
+   * @param {Array} textNodes - Array of text nodes that were translated
+   */
+  showTranslationsInOverlay(element, translations, textNodes) {
+    // Extract the full translated text for the element
+    let translatedText = '';
+    textNodes.forEach(node => {
+      const originalText = node.textContent;
+      const translated = translations.get(originalText) || originalText;
+      translatedText += translated;
+    });
+
+    // Show translation in Shadow DOM overlay
+    pageEventBus.emit('show-translation', {
+      element: element,
+      translatedText: translatedText,
+      originalText: element.textContent
+    });
+
+    this.logger.debug("Translation displayed in Shadow DOM overlay", {
+      element: element.tagName,
+      translatedLength: translatedText.length,
+      originalLength: element.textContent.length
+    });
+    
+    // Debug: Check if the event is being received
+    console.log('Emitted show-translation event for element:', element, 'Text:', translatedText);
   }
 
   cancelAllTranslations() {

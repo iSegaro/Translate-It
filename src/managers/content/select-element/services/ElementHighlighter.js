@@ -4,6 +4,7 @@ import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { taggleLinks } from "../../../../utils/core/helpers.js";
 import { UI_CONSTANTS } from "../constants/selectElementConstants.js";
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 export class ElementHighlighter {
   constructor() {
@@ -20,7 +21,7 @@ export class ElementHighlighter {
   }
 
   /**
-   * Handle mouse over event - highlight element
+   * Handle mouse over event - highlight element using Shadow DOM overlay
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
@@ -35,8 +36,14 @@ export class ElementHighlighter {
     // Clear previous highlight
     this.clearHighlight();
 
-    // Highlight best element
-    this.highlightElement(bestElement);
+    // Highlight best element using Shadow DOM overlay
+    const rect = bestElement.getBoundingClientRect();
+    pageEventBus.emit('element-highlight', {
+      element: bestElement,
+      rect: rect,
+      id: `highlight-${Date.now()}`
+    });
+    
     this.currentHighlighted = bestElement;
   }
 
@@ -132,7 +139,7 @@ export class ElementHighlighter {
   }
 
   /**
-   * Handle mouse out event - remove highlight
+   * Handle mouse out event - remove highlight using Shadow DOM overlay
    * @param {HTMLElement} element - Element that mouse left
    */
   handleMouseOut(element) {
@@ -140,7 +147,8 @@ export class ElementHighlighter {
     if (element === this.currentHighlighted) {
       setTimeout(() => {
         if (this.currentHighlighted === element) {
-          this.clearHighlight();
+          // Clear highlight using Shadow DOM overlay
+          pageEventBus.emit('element-unhighlight', { element: this.currentHighlighted });
           this.currentHighlighted = null;
 
           // Find nearest suitable sibling or parent for highlighting
@@ -159,9 +167,15 @@ export class ElementHighlighter {
           if (!candidate && element.parentElement && this.isValidTextElement(element.parentElement)) {
             candidate = element.parentElement;
           }
-          // If candidate found, highlight it
+          // If candidate found, highlight it using Shadow DOM
           if (candidate) {
-            this.highlightElement(candidate);
+            const rect = candidate.getBoundingClientRect();
+            pageEventBus.emit('element-highlight', {
+              element: candidate,
+              rect: rect,
+              id: `highlight-${Date.now()}`
+            });
+            this.currentHighlighted = candidate;
           }
         }
       }, 50);
@@ -257,8 +271,8 @@ export class ElementHighlighter {
    * Deactivate UI only (keep translation processing)
    */
   async deactivateUI() {
-    // Clean up highlights
-    this.clearHighlight();
+    // Clean up highlights using Shadow DOM overlay
+    pageEventBus.emit('clear-all-highlights');
     this.clearOverlays();
 
     // Remove global styles

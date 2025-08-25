@@ -1,12 +1,13 @@
 import { revertTranslations as revertTranslationsFromExtraction } from "../../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 export class StateManager {
   constructor() {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'StateManager');
     this.originalTexts = new Map(); // This will be used by applyTranslationsToNodes
-    this.translatedElements = new Set(); // Keep track of top-level translated elements
+    this.translatedElements = new Map(); // Keep track of top-level translated elements
   }
 
   /**
@@ -37,26 +38,30 @@ export class StateManager {
     };
   }
 
+
   /**
-   * Track a top-level element that has been translated.
-   * @param {HTMLElement} element - The element containing translations.
+   * Add a translated element to the state
+   * @param {HTMLElement} element - The translated element
+   * @param {Map} translations - Map of translations for revert functionality
    */
-  addTranslatedElement(element) {
-    this.translatedElements.add(element);
+  addTranslatedElement(element, translations = new Map()) {
+    const elementId = this._generateElementId(element);
+    this.translatedElements.set(elementId, {
+      element,
+      timestamp: Date.now(),
+      originalContent: element.innerHTML,
+      translations: translations
+    });
+    this.logger.debug("Added translated element to state", { elementId, translationCount: translations.size });
   }
 
   /**
-   * Revert all translations made during this session.
-   * This now delegates to the robust revert function from extraction.js.
-   * @returns {Promise<number>} Number of elements reverted.
+   * Generate unique ID for an element
+   * @param {HTMLElement} element - The element to generate ID for
+   * @returns {string} Unique element ID
    */
-  async revertTranslations() {
-    this.logger.operation('Reverting all translations using extraction utility');
-    const context = this.getContext();
-    const revertedCount = await revertTranslationsFromExtraction(context);
-    this.logger.info(`Reverted ${revertedCount} translation(s)`);
-    this.translatedElements.clear(); // Clear the set of translated elements
-    return revertedCount;
+  _generateElementId(element) {
+    return `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
@@ -64,7 +69,29 @@ export class StateManager {
    * @returns {boolean} Whether there are translated elements.
    */
   hasTranslatedElements() {
-    return this.originalTexts.size > 0;
+    return this.translatedElements.size > 0;
+  }
+
+  /**
+   * Revert translations by hiding overlay and restoring original content
+   * @returns {number} Number of reverted translations
+   */
+  async revertTranslations() {
+    let revertedCount = 0;
+    
+    for (const [elementId, translationData] of this.translatedElements) {
+      try {
+        // Hide translation overlay
+        pageEventBus.emit('hide-translation', { element: translationData.element });
+        revertedCount++;
+      } catch (error) {
+        this.logger.error("Failed to revert translation", { elementId, error });
+      }
+    }
+    
+    this.translatedElements.clear();
+    this.logger.info(`Reverted ${revertedCount} translations`);
+    return revertedCount;
   }
 
   /**
