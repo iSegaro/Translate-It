@@ -149,7 +149,10 @@ export async function handleTranslate(message, sender, sendResponse) {
           sourceLanguage: result.sourceLanguage,
           targetLanguage: result.targetLanguage,
           timestamp: result.timestamp,
-          translationMode: result.mode || normalizedMessage.data.mode || normalizedMessage.data.translationMode
+          translationMode: result.mode || normalizedMessage.data.mode || normalizedMessage.data.translationMode,
+          options: {
+            toastId: normalizedMessage.data.options?.toastId // Pass the toastId to dismiss the notification
+          }
         },
         message.context, // Use original message context
         { messageId: message.messageId } // Use original messageId for correlation
@@ -168,7 +171,10 @@ export async function handleTranslate(message, sender, sendResponse) {
           sourceLanguage: normalizedMessage.data.sourceLanguage,
           targetLanguage: normalizedMessage.data.targetLanguage,
           timestamp: Date.now(),
-          translationMode: normalizedMessage.data.mode || normalizedMessage.data.translationMode
+          translationMode: normalizedMessage.data.mode || normalizedMessage.data.translationMode,
+          options: {
+            toastId: normalizedMessage.data.options?.toastId // Pass the toastId to dismiss the notification
+          }
         },
         message.context, // Use original message context
         { messageId: message.messageId } // Use original messageId for correlation
