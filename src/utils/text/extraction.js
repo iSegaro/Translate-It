@@ -144,6 +144,7 @@ function collectTextNodesOptimized(targetElement) {
         // Skip hidden elements
         try {
           const style = window.getComputedStyle(parent);
+          // TODO: ممکن که به style.opacity نیازی نباشه تا در این شرط بررسی شود.
           if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
             return NodeFilter.FILTER_REJECT;
           }
