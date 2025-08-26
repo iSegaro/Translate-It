@@ -212,17 +212,20 @@ onMounted(() => {
 
   pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_RESULT, (detail) => {
     logger.info('Event: windows-manager-translation-result', detail);
-    // This will be handled by individual TranslationWindow components
+    // Forward the event to the specific window component
+    pageEventBus.emit(`translation-result-${detail.id}`, detail);
   });
 
   pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_ERROR, (detail) => {
     logger.info('Event: windows-manager-translation-error', detail);
-    // This will be handled by individual TranslationWindow components
+    // Forward the event to the specific window component
+    pageEventBus.emit(`translation-error-${detail.id}`, detail);
   });
 
   pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_LOADING, (detail) => {
     logger.info('Event: windows-manager-translation-loading', detail);
-    // This will be handled by individual TranslationWindow components
+    // Forward the event to the specific window component
+    pageEventBus.emit(`translation-loading-${detail.id}`, detail);
   });
 });
 </script>

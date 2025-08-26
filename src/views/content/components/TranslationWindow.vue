@@ -122,12 +122,17 @@ const windowElement = ref(null);
 // Drag state
 const dragStartX = ref(0);
 const dragStartY = ref(0);
-const currentPosition = ref({ x: props.position.x, y: props.position.y });
+const currentPosition = ref({ 
+  x: props.position.x || props.position.left,
+  y: props.position.y || props.position.top
+});
 
 // Computed styles
 const windowStyle = computed(() => ({
-  left: `${currentPosition.value.x}px`,
-  top: `${currentPosition.value.y}px`,
+  position: 'fixed',
+  zIndex: isDragging.value ? 2147483647 : 2147483646,
+  left: `${currentPosition.value.x || props.position.left || 0}px`,
+  top: `${currentPosition.value.y || props.position.top || 0}px`,
   transform: isDragging.value ? 'scale(1.02)' : 'scale(1)'
 }));
 
@@ -219,6 +224,7 @@ const onMouseDown = (event) => {
 const setupEventListeners = () => {
   pageEventBus.on(`translation-result-${props.id}`, handleTranslationResult);
   pageEventBus.on(`translation-error-${props.id}`, handleTranslationError);
+  pageEventBus.on(`translation-loading-${props.id}`, handleTranslationLoading);
   pageEventBus.on('dismiss-all-windows', handleDismissAll);
   pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, handleIconClicked);
 };
@@ -226,11 +232,18 @@ const setupEventListeners = () => {
 const cleanupEventListeners = () => {
   pageEventBus.off(`translation-result-${props.id}`, handleTranslationResult);
   pageEventBus.off(`translation-error-${props.id}`, handleTranslationError);
+  pageEventBus.off(`translation-loading-${props.id}`, handleTranslationLoading);
   pageEventBus.off('dismiss-all-windows', handleDismissAll);
   pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, handleIconClicked);
 };
 
 // Event handlers
+const handleTranslationLoading = () => {
+  isLoading.value = true;
+  errorMessage.value = '';
+  translatedText.value = '';
+};
+
 const handleTranslationResult = (detail) => {
   isLoading.value = false;
   translatedText.value = detail.translatedText;
@@ -278,7 +291,6 @@ defineExpose({
 
 <style scoped>
 .translation-window {
-  position: fixed;
   z-index: 2147483646; /* Just below the main container */
   min-width: 300px;
   max-width: 500px;
