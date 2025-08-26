@@ -102,6 +102,9 @@ export class WindowsManager {
       onIconClick: this._handleIconClick.bind(this)
     });
 
+    // Listen for events from the Vue UI Host
+    pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._handleIconClickFromVue.bind(this));
+
     // Development toggle handler
     window.addEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
   }
@@ -259,10 +262,13 @@ export class WindowsManager {
     this.state.setIconMode(true);
     this.state.setOriginalText(selectedText);
     
+    // Use the final position from TextSelectionManager if available
+    const positionToUse = position.finalPosition || position;
+
     // Calculate icon position
     const iconPosition = this.positionCalculator.calculateIconPosition(
       window.getSelection(),
-      position
+      positionToUse
     );
     
     if (!iconPosition) {
@@ -278,7 +284,12 @@ export class WindowsManager {
     const targetWindow = this.crossFrameManager.isInIframe ? window : 
       (topDocument.defaultView || topDocument.parentWindow || window);
     const finalPosition = this.positionCalculator.calculateFinalIconPosition(iconPosition, targetWindow);
-    
+
+    if (!finalPosition) {
+      this.logger.warn('Could not calculate final icon position');
+      return;
+    }
+
     // Emit event to create icon through Vue UI Host
     WindowsManagerEvents.showIcon({
       id: iconId,
@@ -676,6 +687,35 @@ export class WindowsManager {
   }
 
   /**
+   * Handle icon click event from the Vue UI Host
+   * @param {object} detail - Event detail containing { id, text, position }
+   */
+  _handleIconClickFromVue(detail) {
+    this.logger.debug('Icon click event received from UI Host', detail);
+    if (!detail || !detail.id) return;
+
+    const { id, text, position } = detail;
+
+    // Prevent other icons from being created while we process this click
+    if (state && typeof state === 'object') {
+      state.preventTextFieldIconCreation = true;
+    }
+
+    // Dismiss the icon that was clicked
+    WindowsManagerEvents.dismissIcon({ id });
+
+    // Show the translation window
+    this._showWindow(text, position);
+
+    // Reset the prevention flag after a short delay
+    setTimeout(() => {
+      if (state && typeof state === 'object') {
+        state.preventTextFieldIconCreation = false;
+      }
+    }, WindowsConfig.TIMEOUTS.PENDING_WINDOW_RESET);
+  }
+
+  /**
    * Dismiss the current window/icon
    * @param {boolean} withFadeOut - Whether to animate the dismissal
    */
@@ -700,11 +740,11 @@ export class WindowsManager {
 
     // Emit dismissal events for Vue components
     if (iconId) {
-      WindowsManagerEvents.dismissIcon(iconId);
+      WindowsManagerEvents.dismissIcon({ id: iconId });
     }
     
     if (windowId) {
-      WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
+      WindowsManagerEvents.dismissWindow({ id: windowId, withFadeOut });
     }
 
     // Reset flags

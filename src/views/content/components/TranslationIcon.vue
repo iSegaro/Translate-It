@@ -56,8 +56,10 @@ const iconElement = ref(null);
 
 // Computed styles
 const iconStyle = computed(() => ({
-  top: `${props.position.top}px`,
-  left: `${props.position.left}px`,
+  position: 'fixed',
+  top: `${props.position.top || props.position.y || 0}px`,
+  left: `${props.position.left || props.position.x || 0}px`,
+  zIndex: 2147483647,
   transform: isHovering.value ? 'scale(1.2)' : 'scale(1)'
 }));
 
@@ -125,7 +127,7 @@ defineExpose({
 
 <style scoped>
 .translation-icon {
-  position: absolute;
+  position: fixed;
   width: 28px;
   height: 28px;
   background-color: #ffffff;
