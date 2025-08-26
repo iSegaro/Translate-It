@@ -17,7 +17,9 @@
       :id="window.id"
       :position="window.position"
       :selected-text="window.selectedText"
+      :initial-translated-text="window.translatedText"
       :theme="window.theme"
+      :is-loading="window.isLoading"
       @close="onTranslationWindowClose"
       @speak="onTranslationWindowSpeak"
     />
@@ -40,14 +42,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
-import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/utils/core/PageEventBus.js';
+import { useWindowsManager } from '@/composables/useWindowsManager.js';
 import TextFieldIcon from './components/TextFieldIcon.vue';
 import TranslationWindow from './components/TranslationWindow.vue';
 import TranslationIcon from './components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import TranslationOverlay from './components/TranslationOverlay.vue';
+
+const pageEventBus = window.pageEventBus;
 
 const logger = {
   info: (msg, ...args) => console.log(`[ContentApp] ${msg}`, ...args),
@@ -55,10 +59,21 @@ const logger = {
   error: (msg, ...args) => console.error(`[ContentApp] ${msg}`, ...args),
 };
 
+// Use WindowsManager composable
+const {
+  translationWindows,
+  translationIcons,
+  onTranslationIconClick,
+  onTranslationWindowClose,
+  onTranslationWindowSpeak,
+  onTranslationIconClose,
+  setupEventListeners,
+  cleanupEventListeners
+} = useWindowsManager();
+
+// Text field icon state (separate from WindowsManager)
 const isSelectModeActive = ref(false);
 const activeIcons = ref([]); // Stores { id, position } for each icon
-const translationWindows = ref([]); // Stores { id, position, selectedText } for each window
-const translationIcons = ref([]); // Stores { id, position, text } for each translation icon
 
 const onIconClick = (id) => {
   logger.info(`TextFieldIcon clicked: ${id}`);
@@ -66,31 +81,38 @@ const onIconClick = (id) => {
   pageEventBus.emit('text-field-icon-clicked', { id });
 };
 
-const onTranslationIconClick = (detail) => {
-  logger.info(`TranslationIcon clicked: ${detail.id}`);
-  // Emit event for WindowsManager to handle
-  pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, detail);
-};
-
-const onTranslationWindowClose = (id) => {
-  logger.debug(`TranslationWindow closed: ${id}`);
-  translationWindows.value = translationWindows.value.filter(window => window.id !== id);
-};
-
-const onTranslationWindowSpeak = (detail) => {
-  logger.info('TranslationWindow speak request:', detail);
-  pageEventBus.emit('translation-window-speak', detail);
-};
-
-const onTranslationIconClose = (id) => {
-  logger.debug(`TranslationIcon closed: ${id}`);
-  translationIcons.value = translationIcons.value.filter(icon => icon.id !== id);
+const setupOutsideClickHandler = () => {
+  // Listen for clicks on the host document
+  document.addEventListener('click', (event) => {
+    // Check if click is outside all Vue components
+    const shadowHost = document.getElementById('translate-it-host');
+    if (!shadowHost) return;
+    
+    // If click is not on the shadow host or its children, it's an outside click
+    if (!shadowHost.contains(event.target)) {
+      // Dismiss all active windows and icons
+      if (translationWindows.value.length > 0) {
+        translationWindows.value.forEach(window => {
+          onTranslationWindowClose(window.id);
+        });
+      }
+      
+      if (translationIcons.value.length > 0) {
+        translationIcons.value.forEach(icon => {
+          onTranslationIconClose(icon.id);
+        });
+      }
+    }
+  }, true); // Use capture phase
 };
 
 logger.info('ContentApp script setup executed.');
 
 onMounted(() => {
   logger.info('ContentApp component has been mounted into the Shadow DOM.');
+  
+  // Setup global click listener for outside click detection
+  setupOutsideClickHandler();
 
   const toastMap = {
     error: toast.error,
@@ -153,88 +175,15 @@ onMounted(() => {
     activeIcons.value = [];
   });
 
-  // WindowsManager event listeners
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_WINDOW, (detail) => {
-    logger.info('Event: windows-manager-show-window', detail);
-    const { id, selectedText, position, theme } = detail;
-    
-    // Ensure no duplicate windows for the same ID
-    if (!translationWindows.value.some(window => window.id === id)) {
-      translationWindows.value.push({
-        id,
-        selectedText,
-        position: position || { x: 100, y: 100 },
-        theme: theme || 'light'
-      });
-    }
-  });
+  // Setup WindowsManager event listeners through composable
+  setupEventListeners();
+});
 
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_ICON, (detail) => {
-    logger.info('Event: windows-manager-show-icon', detail);
-    const { id, text, position } = detail;
-    
-    // Ensure no duplicate icons for the same ID
-    if (!translationIcons.value.some(icon => icon.id === id)) {
-      translationIcons.value.push({
-        id,
-        text,
-        position: position || { top: 100, left: 100 }
-      });
-    }
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, (detail) => {
-    logger.info('Event: windows-manager-dismiss-window', detail);
-    const { id } = detail;
-    translationWindows.value = translationWindows.value.filter(window => window.id !== id);
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, (detail) => {
-    logger.info('Event: windows-manager-dismiss-icon', detail);
-    const { id } = detail;
-    translationIcons.value = translationIcons.value.filter(icon => icon.id !== id);
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ALL, () => {
-    logger.info('Event: windows-manager-dismiss-all');
-    translationWindows.value = [];
-    translationIcons.value = [];
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.UPDATE_POSITION, (detail) => {
-    logger.debug('Event: windows-manager-update-position', detail);
-    const { id, position } = detail;
-    
-    // Update window position if exists
-    const windowIndex = translationWindows.value.findIndex(window => window.id === id);
-    if (windowIndex !== -1) {
-      translationWindows.value[windowIndex].position = position;
-    }
-    
-    // Update icon position if exists
-    const iconIndex = translationIcons.value.findIndex(icon => icon.id === id);
-    if (iconIndex !== -1) {
-      translationIcons.value[iconIndex].position = position;
-    }
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_RESULT, (detail) => {
-    logger.info('Event: windows-manager-translation-result', detail);
-    // Forward the event to the specific window component
-    pageEventBus.emit(`translation-result-${detail.id}`, detail);
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_ERROR, (detail) => {
-    logger.info('Event: windows-manager-translation-error', detail);
-    // Forward the event to the specific window component
-    pageEventBus.emit(`translation-error-${detail.id}`, detail);
-  });
-
-  pageEventBus.on(WINDOWS_MANAGER_EVENTS.TRANSLATION_LOADING, (detail) => {
-    logger.info('Event: windows-manager-translation-loading', detail);
-    // Forward the event to the specific window component
-    pageEventBus.emit(`translation-loading-${detail.id}`, detail);
-  });
+onUnmounted(() => {
+  logger.info('ContentApp component is being unmounted.');
+  
+  // Cleanup WindowsManager event listeners
+  cleanupEventListeners();
 });
 </script>
 

@@ -99,38 +99,19 @@ export class ClickManager {
    * Determine if outside click should trigger dismissal
    */
   _shouldDismissOnOutsideClick(e) {
-    // Handle icon mode
-    if (this.state.isIconMode) {
-      const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
-      if (iconElement) {
-        const isClickInsideIcon = iconElement.contains(e.target);
-        return !isClickInsideIcon; // Dismiss if click is outside icon
-      }
-      return true; // No icon found, dismiss
+    // Only dismiss if click is truly outside both icon and window
+    const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
+    if (iconElement && iconElement.contains(e.target)) {
+      return false;
     }
-
-    // Handle translation window mode
-    if (this.state.isVisible) {
-      const windowElements = document.querySelectorAll(`.${WindowsConfig.CSS_CLASSES.POPUP_HOST}`);
-      
-      // Check if click is inside any popup
-      for (const element of windowElements) {
-        if (element.contains(e.target)) {
-          return false; // Click is inside popup, don't dismiss
-        }
+    const windowElements = document.querySelectorAll('.translation-window');
+    for (const element of windowElements) {
+      if (element.contains(e.target)) {
+        return false;
       }
-
-      // Check for icon clicks (safety check)
-      const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
-      if (iconElement && iconElement.contains(e.target)) {
-        return false; // Click is on icon, don't dismiss
-      }
-
-      return true; // Click is outside all elements, dismiss
     }
-
-    // No active elements, no need to dismiss
-    return false;
+    // If not inside icon or window, dismiss
+    return true;
   }
 
   /**

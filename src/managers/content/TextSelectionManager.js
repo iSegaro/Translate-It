@@ -9,13 +9,15 @@ import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } 
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 import { WindowsConfig } from "./windows/core/WindowsConfig.js";
 import { ExtensionContextManager } from "../../utils/core/extensionContext.js";
+import { WindowsManager } from '@/managers/content/windows/WindowsManager.js';
 
 export class TextSelectionManager {
   constructor(options = {}) {
-    this.selectionWindows = options.selectionWindows;
+    // Accept WindowsManager instance through dependency injection, or create one
+    this.selectionWindows = options.windowsManager || new WindowsManager({});
     this.messenger = options.messenger;
     this.notifier = options.notifier;
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextSelectionManager');
     
     // Selection state management
     this.selectionTimeoutId = null;
@@ -53,12 +55,27 @@ export class TextSelectionManager {
     const path = getEventPath(event);
 
     // بررسی اینکه آیا کلیک در داخل پنجره ترجمه رخ داده است یا نه
-    if (
-      this.selectionWindows?.isVisible &&
-      path.includes(this.selectionWindows?.displayElement)
-    ) {
-      // اگر کلیک داخل پنجره اتفاق افتاده باشد، عملیات متوقف می‌شود
-      return;
+    if (this.selectionWindows?.isVisible) {
+      let isInsideWindow = false;
+      const displayElement = this.selectionWindows?.displayElement;
+      if (displayElement && event.target) {
+        // بررسی با contains و همچنین بررسی مسیر رویداد
+        if (displayElement.contains(event.target)) {
+          isInsideWindow = true;
+        } else if (typeof event.composedPath === 'function') {
+          const eventPath = event.composedPath();
+          if (eventPath.includes(displayElement)) {
+            isInsideWindow = true;
+          }
+        } else if (Array.isArray(path) && path.includes(displayElement)) {
+          isInsideWindow = true;
+        }
+      }
+      if (isInsideWindow) {
+        // اگر کلیک داخل پنجره اتفاق افتاده باشد، عملیات متوقف می‌شود
+        this.logger.debug('Click detected inside translation window, not dismissing.');
+        return;
+      }
     }
 
     // Skip text selection handling if select element mode is active in this tab
@@ -127,10 +144,80 @@ export class TextSelectionManager {
         document.addEventListener("mousedown", this.cancelSelectionTranslation);
       }
     } else {
-      // **IMPORTANT**: When no text is selected (outside click), always allow dismissal
+      // **IMPORTANT**: When no text is selected (outside click), only allow dismissal if click is outside translation window
       let settings;
       let selectionTranslationMode;
-      
+      let isInsideWindow = false;
+      let displayElement = this.selectionWindows?.displayElement;
+      let windowElements = [];
+      if (!displayElement) {
+        windowElements = Array.from(document.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
+      } else {
+        windowElements = [displayElement];
+      }
+      // اگر هیچ عنصر پیدا نشد، بررسی ShadowRoot
+      if (windowElements.length === 0 && event && event.target && event.target.getRootNode) {
+        const rootNode = event.target.getRootNode();
+        if (rootNode instanceof ShadowRoot) {
+          windowElements = Array.from(rootNode.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
+        }
+      }
+  // ...
+      if (windowElements.length && event && event.target) {
+        for (const el of windowElements) {
+          if (event.target === el || el.contains(event.target)) {
+            isInsideWindow = true;
+            break;
+          } else if (typeof event.composedPath === 'function') {
+            const eventPath = event.composedPath();
+            if (eventPath.includes(el)) {
+              isInsideWindow = true;
+              break;
+            }
+          } else {
+            const path = getEventPath(event);
+            if (Array.isArray(path) && path.includes(el)) {
+              isInsideWindow = true;
+              break;
+            }
+          }
+        }
+      } else if (event && event.target) {
+        // اگر هیچ پنجره‌ای پیدا نشد، بررسی کن که آیا هدف رویداد کلاس translation-window یا aiwc-selection-popup-host دارد
+        const target = event.target;
+        if (target.classList && (target.classList.contains('translation-window') || target.classList.contains('aiwc-selection-popup-host'))) {
+          isInsideWindow = true;
+        }
+        // اگر کلیک روی هاست translate-it-host بود و داخل آن translation-window یا aiwc-selection-popup-host وجود داشت و پنجره باز بود، dismiss نشود
+        if (!isInsideWindow && target.id === 'translate-it-host' && this.selectionWindows?.isVisible) {
+          let hostChildren = [];
+          // اگر هاست دارای shadowRoot است، داخل آن جستجو کن
+          if (target.shadowRoot) {
+            hostChildren = Array.from(target.shadowRoot.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
+          } else {
+            hostChildren = Array.from(target.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
+          }
+          if (hostChildren.length > 0) {
+            isInsideWindow = true;
+          }
+        }
+        // اگر باز هم پیدا نشد، والدین را در ShadowRoot بررسی کن
+        if (!isInsideWindow && target.getRootNode && target.getRootNode() instanceof ShadowRoot) {
+          let parent = target;
+          while (parent && parent !== target.getRootNode()) {
+            if (parent.classList && (parent.classList.contains('translation-window') || parent.classList.contains('aiwc-selection-popup-host'))) {
+              isInsideWindow = true;
+              break;
+            }
+            parent = parent.parentNode;
+          }
+        }
+      }
+      if (isInsideWindow) {
+        this.logger.debug('Outside click detected inside translation window, NOT dismissing.');
+        return;
+      }
+
       try {
         settings = await getSettingsAsync();
         selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
@@ -146,8 +233,14 @@ export class TextSelectionManager {
       }
 
       if (selectionTranslationMode === "onClick") {
-        // In onClick mode, outside clicks should still dismiss windows
-        // Don't return early - allow dismissal logic to run
+        // In onClick mode, check if selection was lost due to clicking the translation icon
+        // If so, do NOT dismiss the translation window
+        const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
+        if (iconElement && event && iconElement.contains(event.target)) {
+          this.logger.debug('Selection lost due to icon click, NOT dismissing translation window');
+          return;
+        }
+        // Otherwise, allow dismissal logic to run
       } else {
         // **FIX FOR DISCORD**: Clear tracking when no text is selected
         this.lastProcessedText = null;

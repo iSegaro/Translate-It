@@ -4,29 +4,36 @@ import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
-import { WindowsFactory } from "./core/WindowsFactory.js";
 import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
-import { PositionCalculator } from "./position/PositionCalculator.js";
-import { SmartPositioner } from "./position/SmartPositioner.js";
-import { AnimationManager } from "./animation/AnimationManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
-import { TTSManager } from "./translation/TTSManager.js";
-import { TranslationRenderer } from "./translation/TranslationRenderer.js";
-import { EnhancedTranslationRenderer } from "./translation/EnhancedTranslationRenderer.js";
-import { DragHandler } from "./interaction/DragHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
+// UI-related imports removed - now handled by Vue UI Host
+// - WindowsFactory, PositionCalculator, SmartPositioner
+// - AnimationManager, TranslationRenderer, EnhancedTranslationRenderer
+// - DragHandler, TTSManager
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
 import ExtensionContextManager from "../../../utils/core/extensionContext.js";
-import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from "../../../utils/core/PageEventBus.js";
+// Import event constants, get pageEventBus instance at runtime
+import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/utils/core/PageEventBus.js';
+
+console.log('[LOG] WindowsManager.js loaded and evaluated');
 
 /**
  * Modular WindowsManager for translation windows and icons
  * Refactored to use specialized modules for better maintainability
  */
 export class WindowsManager {
+  /**
+   * Get pageEventBus instance at runtime
+   */
+  get pageEventBus() {
+    return window.pageEventBus;
+  }
+
   constructor(options = {}) {
+    console.log('[WindowsManager] Constructor called, creating new instance:', new Error().stack);
     // Initialize logger
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'WindowsManager');
     this.logger.debug('WindowsManager constructor called', options);
@@ -36,50 +43,33 @@ export class WindowsManager {
       debugCrossFrame: options.debugCrossFrame
     });
     
-    // Initialize core modules
+    // Initialize core modules for business logic only
     this.state = new WindowsState(this.crossFrameManager.frameId);
-    this.factory = new WindowsFactory();
     
-    // Initialize positioning
-    this.positionCalculator = new PositionCalculator();
-    this.smartPositioner = new SmartPositioner(this.positionCalculator);
-    
-    // Initialize animation
-    this.animationManager = new AnimationManager();
-    
-    // Initialize translation
+    // Initialize translation business logic
     this.translationHandler = new TranslationHandler();
-    this.ttsManager = new TTSManager();
     
-    // Initialize translation renderer (enhanced version detection)
-    this.useEnhancedRenderer = this._shouldUseEnhancedRenderer();
-    if (this.useEnhancedRenderer) {
-      this.translationRenderer = new EnhancedTranslationRenderer(this.factory, this.ttsManager);
-      this.logger.debug('Using Enhanced TranslationRenderer with Text Actions System');
-    } else {
-      this.translationRenderer = new TranslationRenderer(this.factory, this.ttsManager);
-      this.logger.debug('Using Classic TranslationRenderer');
-    }
-    
-    // Initialize interaction
-    this.dragHandler = new DragHandler(this.positionCalculator);
+    // Initialize interaction management (outside clicks)
     this.clickManager = new ClickManager(this.crossFrameManager, this.state);
     
-    // Initialize theme
+    // Initialize theme management
     this.themeManager = new ThemeManager();
     
-    // UI elements
-    this.displayElement = null;
-    this.innerContainer = null;
-    this.icon = null;
+    // UI-related modules removed - now handled by Vue UI Host
+    // - factory, positionCalculator, smartPositioner
+    // - animationManager, translationRenderer, dragHandler
+    // - ttsManager (can be moved to Vue components if needed)
+    
+    // UI elements - deprecated (now handled by Vue UI Host)
+    // this.displayElement = null;
+    // this.innerContainer = null;
+    // this.icon = null;
     
     // External dependencies
     this.translationHandler.errorHandler = options.translationHandler?.errorHandler || ErrorHandler.getInstance();
     this.notifier = options.notifier;
     
-    // Animation durations (backward compatibility)
-    this.fadeInDuration = options.fadeInDuration || WindowsConfig.ANIMATION.FADE_IN_DURATION;
-    this.fadeOutDuration = options.fadeOutDuration || WindowsConfig.ANIMATION.FADE_OUT_DURATION;
+    // Animation durations removed - handled by Vue UI Host
     
     this._setupEventHandlers();
     this._initialize();
@@ -95,17 +85,32 @@ export class WindowsManager {
       onWindowCreationRequest: this._handleWindowCreationRequest.bind(this),
       onWindowCreatedResponse: this._handleWindowCreatedResponse.bind(this)
     });
-    
     // Click manager handlers
     this.clickManager.setHandlers({
       onOutsideClick: this._handleOutsideClick.bind(this),
       onIconClick: this._handleIconClick.bind(this)
     });
-
     // Listen for events from the Vue UI Host
-    pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._handleIconClickFromVue.bind(this));
-    pageEventBus.on('translation-window-speak', this._handleSpeakRequest.bind(this));
-
+    this.logger.debug('[LOG] WindowsManager: EventBus ICON_CLICKED listener registered');
+    console.log('[TEST] WindowsManager.js registering ICON_CLICKED listener on eventBus:', this.pageEventBus);
+    if (this.pageEventBus) {
+      // Create bound handler to enable proper cleanup
+      this._iconClickHandler = (payload) => {
+        console.log('[LOG] WindowsManager.js ICON_CLICKED handler triggered', payload);
+        console.log('[TEST] WindowsManager.js eventBus instance', this.pageEventBus);
+        this._handleIconClickFromVue(payload);
+      };
+      
+      // Remove any existing listener first to prevent duplicates
+      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
+      this.pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
+      this.pageEventBus.on('translation-window-speak', this._handleSpeakRequest.bind(this));
+      if (this.pageEventBus._listeners) {
+        console.log('[TEST] WindowsManager.js ICON_CLICKED listeners after registration:', this.pageEventBus._listeners[WINDOWS_MANAGER_EVENTS.ICON_CLICKED]);
+      }
+    } else {
+      this.logger.warn('PageEventBus not available during setup');
+    }
     // Development toggle handler
     window.addEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
   }
@@ -117,17 +122,11 @@ export class WindowsManager {
     this.logger.debug('Renderer toggle requested', event.detail);
     const newRendererType = this.toggleEnhancedRenderer();
     
-    // If there's an active translation window, recreate it with new renderer
-    if (this.state.isVisible && this.displayElement && this.state.originalText) {
-      const originalText = this.state.originalText;
-      const translatedText = this.state.translatedText;
-      
-      if (translatedText) {
-        // Re-render the content with new renderer
-        this.innerContainer.innerHTML = '';
-        this._renderTranslationContent(translatedText, originalText);
-        this.logger.debug('Active translation re-rendered with new renderer');
-      }
+    // If there's an active translation window, re-render with new renderer through Vue UI Host
+    if (this.state.isVisible && this.state.originalText && this.state.translatedText) {
+      // Emit update event to Vue UI Host to re-render with new renderer
+      // Note: This could be implemented later as WINDOWS_MANAGER_EVENTS.UPDATE_RENDERER
+      this.logger.debug('Active translation will be re-rendered with new renderer through Vue UI Host');
     }
     
     this.logger.debug(`Renderer toggled to: ${newRendererType ? 'Enhanced' : 'Classic'}`);
@@ -156,22 +155,24 @@ export class WindowsManager {
   }
 
   /**
-   * Toggle between enhanced and classic renderers
+   * Toggle renderer preference - now just saves preference for Vue components
    */
   toggleEnhancedRenderer() {
-    this.useEnhancedRenderer = !this.useEnhancedRenderer;
-    localStorage.setItem('windows-manager-enhanced-version', this.useEnhancedRenderer.toString());
+    // Determine current preference
+    const savedPreference = localStorage.getItem('windows-manager-enhanced-version');
+    const isDevelopment = (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname.includes('dev') ||
+      localStorage.getItem('dev-mode') === 'true'
+    );
     
-    // Recreate renderer
-    if (this.useEnhancedRenderer) {
-      this.translationRenderer = new EnhancedTranslationRenderer(this.factory, this.ttsManager);
-      this.logger.debug('Switched to Enhanced TranslationRenderer');
-    } else {
-      this.translationRenderer = new TranslationRenderer(this.factory, this.ttsManager);
-      this.logger.debug('Switched to Classic TranslationRenderer');
-    }
+    const currentState = savedPreference !== null ? savedPreference === 'true' : isDevelopment;
+    const newState = !currentState;
     
-    return this.useEnhancedRenderer;
+    localStorage.setItem('windows-manager-enhanced-version', newState.toString());
+    this.logger.debug(`Renderer preference toggled to: ${newState ? 'Enhanced' : 'Classic'} (handled by Vue UI Host)`);
+    
+    return newState;
   }
 
   /**
@@ -196,6 +197,11 @@ export class WindowsManager {
       this.logger.warn('Extension context invalid, aborting show()');
       return;
     }
+
+    if (this.state.isProcessing) {
+      this.logger.debug('WindowsManager is already processing, skipping show()');
+      return;
+    }
     
     this.logger.debug('WindowsManager.show() called', {
       text: selectedText ? selectedText.substring(0, 30) + '...' : 'null',
@@ -211,29 +217,35 @@ export class WindowsManager {
     this.dismiss(false);
     if (!selectedText) return;
 
-    let settings;
-    let selectionTranslationMode;
-    
+    this.state.setProcessing(true);
+
     try {
-      settings = await getSettingsAsync();
-      selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
-    } catch (error) {
-      // If extension context is invalidated, use fallback values
-      if (ExtensionContextManager.isContextError(error)) {
-        this.logger.debug('Extension context invalidated, using fallback settings for window display');
-        selectionTranslationMode = CONFIG.selectionTranslationMode;
-      } else {
-        // Re-throw non-context errors
-        throw error;
+      let settings;
+      let selectionTranslationMode;
+      
+      try {
+        settings = await getSettingsAsync();
+        selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      } catch (error) {
+        // If extension context is invalidated, use fallback values
+        if (ExtensionContextManager.isContextError(error)) {
+          this.logger.debug('Extension context invalidated, using fallback settings for window display');
+          selectionTranslationMode = CONFIG.selectionTranslationMode;
+        } else {
+          // Re-throw non-context errors
+          throw error;
+        }
       }
-    }
 
-    this.logger.debug('Selection translation mode', { mode: selectionTranslationMode });
+      this.logger.debug('Selection translation mode', { mode: selectionTranslationMode });
 
-    if (selectionTranslationMode === "onClick") {
-      await this._showIcon(selectedText, position);
-    } else {
-      await this._showWindow(selectedText, position);
+      if (selectionTranslationMode === "onClick") {
+        await this._showIcon(selectedText, position);
+      } else {
+        await this._showWindow(selectedText, position);
+      }
+    } finally {
+      this.state.setProcessing(false);
     }
   }
 
@@ -243,8 +255,7 @@ export class WindowsManager {
   _shouldSkipShow(selectedText) {
     if (selectedText && 
         this.state.isVisible && 
-        ((this.state.originalText === selectedText) ||
-         (this.state.isIconMode && this.state.iconClickContext?.text === selectedText))) {
+        this.state.originalText === selectedText) {
       this.logger.debug('Skipping show - same text already displayed');
       return true;
     }
@@ -263,42 +274,17 @@ export class WindowsManager {
     this.state.setIconMode(true);
     this.state.setOriginalText(selectedText);
     
-    // Use the final position from TextSelectionManager if available
-    const positionToUse = position.finalPosition || position;
-
-    // Calculate icon position
-    const iconPosition = this.positionCalculator.calculateIconPosition(
-      window.getSelection(),
-      positionToUse
-    );
-    
-    if (!iconPosition) {
-      this.logger.warn('Could not calculate icon position');
-      return;
-    }
-
     // Generate unique ID for this icon
     const iconId = `translation-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Calculate final position
-    const topDocument = this.positionCalculator.getTopDocument();
-    const targetWindow = this.crossFrameManager.isInIframe ? window : 
-      (topDocument.defaultView || topDocument.parentWindow || window);
-    const finalPosition = this.positionCalculator.calculateFinalIconPosition(iconPosition, targetWindow);
+    // Use the position from TextSelectionManager directly - Vue will handle calculation
+    const positionToUse = position.finalPosition || position;
 
-    if (!finalPosition) {
-      this.logger.warn('Could not calculate final icon position');
-      return;
-    }
-
-    // Emit event to create icon through Vue UI Host
+    // Emit event to create icon through Vue UI Host (Vue handles position calculation)
     WindowsManagerEvents.showIcon({
       id: iconId,
       text: selectedText,
-      position: {
-        top: finalPosition.top,
-        left: finalPosition.left
-      }
+      position: positionToUse
     });
     
     // Store context for click handling
@@ -332,15 +318,12 @@ export class WindowsManager {
    * Show translation window
    */
   async _showWindow(selectedText, position) {
-    if (!ExtensionContextManager.isValidSync() || !selectedText) return;
+    if (!ExtensionContextManager.isValidSync() || !selectedText) {
+      this.logger.error(`[LOG] _showWindow: ExtensionContextManager invalid or selectedText empty. selectedText=${selectedText}`);
+      return;
+    }
 
-    this.logger.debug('_showWindow called', {
-      isInIframe: this.crossFrameManager.isInIframe,
-      frameId: this.crossFrameManager.frameId,
-      text: selectedText.substring(0, 20),
-      position
-    });
-
+    this.logger.debug(`[LOG] _showWindow called: isInIframe=${this.crossFrameManager.isInIframe}, frameId=${this.crossFrameManager.frameId}, text=${selectedText}, position=${JSON.stringify(position)}`);
     // Check if we need to create window in main document (iframe case)
     if (this.crossFrameManager.isInIframe) {
       this.logger.debug('Requesting window creation in main document (iframe detected)');
@@ -352,27 +335,35 @@ export class WindowsManager {
       return this.crossFrameManager.requestWindowCreation(selectedText, position);
     }
 
+    // Start translation process and wait for the result
+    const translationResult = await this._startTranslationProcess(selectedText);
+
+    // If translation was cancelled or failed, do not show the window
+    if (!translationResult) {
+      this.logger.debug('Translation failed or was cancelled, aborting window creation.');
+      return;
+    }
+
     // Generate unique ID for this window
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const theme = this.themeManager.currentTheme || 'light';
     
-    // Emit event to create window through Vue UI Host
+    // Emit event to create window through Vue UI Host with all data included
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText,
+      translatedText: translationResult.translatedText,
       position,
       mode: 'window',
       theme
     });
     
     // Store state for this window
+    this.state.setActiveWindowId(windowId);
     this.state.setOriginalText(selectedText);
     this.state.setTranslationCancelled(false);
     this.state.setIconMode(false);
     this.state.setVisible(true);
-    
-    // Start translation process
-    this._startTranslationProcess(windowId, selectedText);
     
     this.logger.debug('Window creation event emitted successfully', { windowId });
   }
@@ -380,113 +371,87 @@ export class WindowsManager {
   /**
    * Start translation process for a window
    */
-  async _startTranslationProcess(windowId, selectedText) {
+  async _startTranslationProcess(selectedText) {
     try {
-      // Show loading state in the Vue component
-      WindowsManagerEvents.translationLoading(windowId);
-      
       // Perform translation
       const result = await this.translationHandler.performTranslation(selectedText);
       
-      if (this.state.isTranslationCancelled) return;
+      if (this.state.isTranslationCancelled) return null;
       
-      // Send translation result to Vue component
-      WindowsManagerEvents.translationResult(windowId, {
-        translatedText: result.translatedText,
-        originalText: selectedText
-      });
-      
-      this.logger.debug('Translation completed successfully', { windowId });
+      this.logger.debug('Translation completed successfully');
+      return result;
       
     } catch (error) {
-      if (this.state.isTranslationCancelled) return;
+      if (this.state.isTranslationCancelled) return null;
       
-      // Send translation error to Vue component
-      WindowsManagerEvents.translationError(windowId, {
-        message: error.message || 'Translation failed',
-        error: error
-      });
-      
-      this.logger.error('Translation failed', { windowId, error });
+      this.logger.error('Translation failed', { error });
+      return null;
     }
   }
 
   /**
-   * Create translation window directly
+   * Create translation window - now delegates to Vue UI Host
    */
   async _createTranslationWindow(selectedText, position) {
     try {
-      // This method should only be called for main document
+      // Update state
       this.state.setOriginalText(selectedText);
       this.state.setTranslationCancelled(false);
       this.state.setIconMode(false);
       this.state.setVisible(true);
 
-      // Create host element
-      this.displayElement = this.factory.createPopupHost(this.crossFrameManager.frameId);
+      // Generate unique ID for this window
+      const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      this.state.setActiveWindowId(windowId);
+
+      // Get current theme
+      const theme = await this.themeManager.getCurrentTheme();
       
-      // Apply theme
-      await this.themeManager.applyThemeToHost(this.displayElement);
+      // First emit event to create loading window
+      WindowsManagerEvents.showWindow({
+        id: windowId,
+        selectedText: selectedText,
+        initialTranslatedText: '', // Empty = loading state
+        position: position,
+        theme: theme,
+        isLoading: true
+      });
       
-      // Apply initial positioning
-      this.smartPositioner.applyInitialStyles(this.displayElement, position);
+      // Setup click listener for outside clicks
+      this.clickManager.addOutsideClickListener();
       
-      // Create popup container
-      const { container } = this.factory.createPopupContainer(this.displayElement);
-      this.innerContainer = container;
-      
-      // Add loading animation
-      this.translationRenderer.renderLoading(this.innerContainer);
-      
-      // Append to document
-      document.body.appendChild(this.displayElement);
-      
-      // Animate window in
-      await this.animationManager.animateWindowIn(this.displayElement);
-      
+      this.logger.debug('Loading window creation event emitted', { windowId });
+
       // Perform translation
       const result = await this.translationHandler.performTranslation(selectedText);
       
-      if (this.state.isTranslationCancelled || !this.innerContainer) return;
+      if (this.state.isTranslationCancelled) return;
+
+      // Update window with translation result
+      const windowPayload = {
+        id: windowId,
+        selectedText: selectedText,
+        initialTranslatedText: result.translatedText,
+        position: position,
+        theme: theme,
+        isLoading: false
+      };
       
-      // Render translation content
-      this._renderTranslationContent(result.translatedText, selectedText);
+      console.log('[WindowsManager] About to emit showWindow with:', windowPayload);
+      WindowsManagerEvents.showWindow(windowPayload);
       
-      // Setup interactions
-      this._setupWindowInteractions();
-      
-      // Add outside click listener with delay
-      this._addOutsideClickListenerDelayed();
+      this.logger.debug('Translation window updated with result', { windowId });
       
     } catch (error) {
-      if (this.state.isTranslationCancelled || !this.innerContainer) return;
-      await this._handleTranslationError(error);
+      if (this.state.isTranslationCancelled) return;
+      await this._handleTranslationError(error, selectedText, position);
     }
   }
 
   /**
-   * Render translation content
+   * Render translation content - deprecated (now handled by Vue UI Host)
    */
-  _renderTranslationContent(translatedText, originalText) {
-    const { firstLine } = this.translationRenderer.renderTranslationContent(
-      this.innerContainer,
-      translatedText,
-      originalText,
-      'selection', // translation mode
-      () => this.cancelCurrentTranslation()
-    );
-
-    // Setup drag handlers
-    const dragHandle = this.translationRenderer.getDragHandle(firstLine);
-    if (dragHandle) {
-      this.dragHandler.setupDragHandlers(this.displayElement, dragHandle);
-    }
-
-    // Adjust position after content is rendered
-    setTimeout(() => {
-      this.smartPositioner.adjustPositionAfterContentChange(this.displayElement);
-    }, 0);
-  }
+  // _renderTranslationContent method removed - handled by Vue UI Host
 
   /**
    * Setup window interactions
@@ -501,9 +466,7 @@ export class WindowsManager {
    */
   _addOutsideClickListenerDelayed() {
     setTimeout(() => {
-      if (this.state.isVisible && 
-          this.displayElement && 
-          !this.state.pendingTranslationWindow) {
+      if (this.state.isVisible && !this.state.pendingTranslationWindow) {
         this.clickManager.addOutsideClickListener();
       }
     }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
@@ -640,9 +603,9 @@ export class WindowsManager {
   }
 
   /**
-   * Handle translation error
+   * Handle translation error - now delegates to Vue UI Host
    */
-  async _handleTranslationError(error) {
+  async _handleTranslationError(error, selectedText, position) {
     // Get the original error message, preserve specific details
     const originalMessage = error instanceof Error ? error.message : String(error);
     
@@ -651,23 +614,27 @@ export class WindowsManager {
     
     this.logger.error(`Translation error - Type: ${errorInfo.type}, Original: ${originalMessage}, Processed: ${errorInfo.message}`);
     
-    if (this.innerContainer) {
-      // Use the original specific error message instead of the generic one
-      const displayMessage = originalMessage && originalMessage.length > 10 && 
-                           !originalMessage.includes('Translation failed: No translated text') ? 
-                           originalMessage : errorInfo.message;
-      
-      // Render error message without buttons
-      this.translationRenderer.renderError(
-        this.innerContainer, 
-        displayMessage
-      );
-      
-      // Don't auto-close window - let user decide via buttons
-      // setTimeout(() => this.dismiss(true), WindowsConfig.TIMEOUTS.ERROR_DISPLAY);
-    } else {
-      this.dismiss(false);
-    }
+    // Generate unique ID for error window
+    const windowId = `translation-window-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.state.setActiveWindowId(windowId);
+
+    // Get current theme
+    const theme = await this.themeManager.getCurrentTheme();
+
+    // Use the original specific error message instead of the generic one
+    const displayMessage = originalMessage && originalMessage.length > 10 && 
+                         !originalMessage.includes('Translation failed: No translated text') ? 
+                         originalMessage : errorInfo.message;
+    
+    // Emit event to create error window through Vue UI Host
+    WindowsManagerEvents.showWindow({
+      id: windowId,
+      selectedText: selectedText,
+      initialTranslatedText: `Error: ${displayMessage}`,
+      position: position,
+      theme: theme,
+      isError: true
+    });
     
     // Use centralized error handler but keep silent to avoid double notifications
     await this.translationHandler.errorHandler.handle(error, {
@@ -708,10 +675,48 @@ export class WindowsManager {
    * @param {object} detail - Event detail containing { id, text, position }
    */
   _handleIconClickFromVue(detail) {
-    this.logger.debug('Icon click event received from UI Host', detail);
-    if (!detail || !detail.id) return;
+    this.logger.debug('[LOG] Icon click event received from UI Host', detail);
+    console.log('[DEBUG] WindowsManager icon click, current state:', {
+      isProcessing: this.state.isProcessing,
+      isIconMode: this.state.isIconMode,
+      isVisible: this.state.isVisible
+    });
+    
+    if (!detail || !detail.id) {
+      this.logger.error('[LOG] Icon click event: detail is missing or id is undefined', detail);
+      return;
+    }
+
+    // Prevent duplicate processing of the same icon click
+    if (this.state.isProcessing) {
+      this.logger.debug('[LOG] Already processing icon click, ignoring duplicate');
+      return;
+    }
+    
+    // Check if this is a recent click from a just-dismissed icon
+    // Allow clicks within a short window after dismiss to handle timing issues
+    const recentDismissWindow = 1000; // 1 second grace period
+    const now = Date.now();
+    
+    if (!this.state.isIconMode) {
+      // Check if we recently dismissed this specific icon
+      if (this._lastDismissedIcon && 
+          this._lastDismissedIcon.id === detail.id && 
+          (now - this._lastDismissedIcon.timestamp) < recentDismissWindow) {
+        console.log('[DEBUG] Accepting recent click from dismissed icon:', detail.id);
+        // Temporarily restore icon mode for processing
+        this.state.setIconMode(true);
+      } else {
+        console.log('[DEBUG] Ignoring icon click - no longer in icon mode and not recent');
+        return;
+      }
+    }
 
     const { id, text, position } = detail;
+    this.logger.debug(`[LOG] Icon click event detail: id=${id}, text=${text}, position=${JSON.stringify(position)}`);
+
+    // Set processing state to prevent duplicates
+    this.state.setProcessing(true);
 
     // Prevent other icons from being created while we process this click
     if (state && typeof state === 'object') {
@@ -719,16 +724,26 @@ export class WindowsManager {
     }
 
     // Dismiss the icon that was clicked
-    WindowsManagerEvents.dismissIcon({ id });
+    this.logger.debug(`[LOG] Dismissing icon with id=${id}`);
+    
+    // Track dismissed icon for timing tolerance
+    this._lastDismissedIcon = {
+      id: id,
+      timestamp: Date.now()
+    };
+    
+    WindowsManagerEvents.dismissIcon(id);
 
     // Show the translation window
+    this.logger.debug(`[LOG] Calling _showWindow with text=${text}, position=${JSON.stringify(position)}`);
     this._showWindow(text, position);
 
-    // Reset the prevention flag after a short delay
+    // Reset flags after processing - don't reset immediately, let setTimeout handle it
     setTimeout(() => {
       if (state && typeof state === 'object') {
         state.preventTextFieldIconCreation = false;
       }
+      this.state.setProcessing(false);
     }, WindowsConfig.TIMEOUTS.PENDING_WINDOW_RESET);
   }
 
@@ -737,6 +752,14 @@ export class WindowsManager {
    * @param {boolean} withFadeOut - Whether to animate the dismissal
    */
   dismiss(withFadeOut = true) {
+    this.logger.debug('[LOG] WindowsManager.dismiss called', {
+      withFadeOut,
+      isIconMode: this.state.isIconMode,
+      isVisible: this.state.isVisible,
+      iconId: this.state.iconClickContext?.iconId,
+      windowId: this.state.activeWindowId,
+      stack: new Error().stack
+    });
     // Clear text selection only when dismissing icon mode AND extension context is valid
     // This prevents clearing text selection when extension context is invalidated
     if (this.state.isIconMode && ExtensionContextManager.isValidSync()) {
@@ -745,60 +768,61 @@ export class WindowsManager {
 
     // Get current window/icon IDs before cleanup
     const iconId = this.state.iconClickContext?.iconId;
-    const windowId = this.state.mainDocumentWindowId || this.displayElement?.id;
+    const windowId = this.state.activeWindowId;
 
     // Clean up icon
     this._cleanupIcon(true);
 
-    // Clean up window
-    if (this.displayElement && this.state.isVisible) {
-      this._cleanupWindow(withFadeOut);
+    // Clean up window - now handled by Vue UI Host
+    if (this.state.isVisible) {
+      // Just reset state, Vue components handle their own cleanup
+      this.state.setVisible(false);
     }
 
     // Emit dismissal events for Vue components
     if (iconId) {
-      WindowsManagerEvents.dismissIcon({ id: iconId });
+      // Track dismissed icon for timing tolerance  
+      this._lastDismissedIcon = {
+        id: iconId,
+        timestamp: Date.now()
+      };
+      
+      WindowsManagerEvents.dismissIcon(iconId);
     }
     
     if (windowId) {
-      WindowsManagerEvents.dismissWindow({ id: windowId, withFadeOut });
+      WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
     }
 
     // Reset flags
     this._resetState();
+    this.state.setProcessing(false); // Ensure processing is reset on dismiss
   }
 
   /**
-   * Clean up icon
+   * Clean up icon - simplified for event-only system
    */
   _cleanupIcon(removeListener = true) {
-    if (this.icon) {
-      this.animationManager.animateIconOut(this.icon);
-      this.icon = null;
-    }
-    
+    // Clear icon context
     this.state.clearIconClickContext();
     
     if (removeListener) {
       this.clickManager.removeOutsideClickListener();
     }
+    // Icon animation and DOM cleanup now handled by Vue components
   }
 
   /**
-   * Clean up window
+   * Clean up window - simplified for event-only system
    */
   async _cleanupWindow(withFadeOut) {
+    this.logger.debug('[LOG] WindowsManager._cleanupWindow - simplified for Vue UI Host');
+    
     // Note: Don't remove theme listeners here - keep them for future windows
     this.clickManager.removeOutsideClickListener();
-    this.dragHandler.removeDragHandlers();
     
     this.state.setVisible(false);
-
-    if (withFadeOut && this.fadeOutDuration > 0) {
-      await this.animationManager.animateWindowOut(this.displayElement, this.fadeOutDuration);
-    }
-    
-    this._removeElement(this.displayElement);
+    // Animation and DOM cleanup now handled by Vue components
   }
 
   /**
@@ -830,17 +854,18 @@ export class WindowsManager {
   }
 
   /**
-   * Remove element from DOM
+   * Cleanup event listeners when WindowsManager is destroyed
    */
-  _removeElement(element) {
-    if (element && element.parentNode) {
-      element.remove();
-    }
-    if (element === this.displayElement) {
-      this.displayElement = null;
-      this.innerContainer = null;
+  destroy() {
+    if (this.pageEventBus && this._iconClickHandler) {
+      this.pageEventBus.off(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._iconClickHandler);
     }
   }
+
+  /**
+   * Remove element from DOM - deprecated (handled by Vue UI Host)
+   */
+  // _removeElement method removed - handled by Vue UI Host
 
   /**
    * Destroy WindowsManager instance

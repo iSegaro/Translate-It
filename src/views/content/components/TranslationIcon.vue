@@ -5,8 +5,12 @@
     class="translation-icon"
     :style="iconStyle"
     @click="handleClick"
+    @mousedown.prevent.stop
+    @mouseup.prevent.stop
     @mouseenter="isHovering = true"
     @mouseleave="isHovering = false"
+    tabindex="0"
+    aria-label="Translate selected text"
   >
     <svg 
       width="20" 
@@ -21,7 +25,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+// Use window.pageEventBus to ensure same instance as useWindowsManager
+const pageEventBus = window.pageEventBus;
+import { usePositioning } from '@/composables/usePositioning.js';
 
 const props = defineProps({
   id: {
@@ -48,12 +54,16 @@ const isHovering = ref(false);
 // DOM reference
 const iconElement = ref(null);
 
-// Computed styles
+// Use positioning composable
+const { positionStyle, cleanup: cleanupPositioning } = usePositioning(props.position, {
+  defaultWidth: 28,
+  defaultHeight: 28,
+  enableDragging: false
+});
+
+// Computed styles with hover effect
 const iconStyle = computed(() => ({
-  position: 'fixed',
-  top: `${props.position.top || props.position.y || 0}px`,
-  left: `${props.position.left || props.position.x || 0}px`,
-  zIndex: 2147483647,
+  ...positionStyle.value,
   transform: isHovering.value ? 'scale(1.2)' : 'scale(1)'
 }));
 
@@ -65,6 +75,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupEventListeners();
+  cleanupPositioning();
 });
 
 // Animation
@@ -83,18 +94,41 @@ const animateOut = () => {
 
 // Event handlers
 const handleClick = (event) => {
+  console.log(`[TranslationIcon ${props.id}] handleClick called, about to emit`);
   event.stopPropagation();
-  emit('click', { id: props.id, text: props.text, position: props.position });
+  
+  const clickData = { id: props.id, text: props.text, position: props.position };
+  console.log(`[TranslationIcon ${props.id}] emitting click with:`, clickData);
+  
+  // Emit both Vue event AND direct pageEventBus event to ensure it reaches WindowsManager
+  // even if Vue component gets dismissed during processing
+  emit('click', clickData);
+  
+  // Also emit directly to pageEventBus as backup
+  if (pageEventBus) {
+    console.log(`[TranslationIcon ${props.id}] also emitting directly to pageEventBus`);
+    pageEventBus.emit('windows-manager-icon-clicked', clickData);
+  }
 };
 
 // Event listeners
 const setupEventListeners = () => {
-  pageEventBus.on(`dismiss-icon-${props.id}`, handleDismiss);
+  const eventName = `dismiss-icon-${props.id}`;
+  const wrappedHandler = (data) => {
+    handleDismiss();
+  };
+  
+  pageEventBus.on(eventName, wrappedHandler);
   pageEventBus.on('dismiss-all-icons', handleDismissAll);
+  
+  // Store for cleanup
+  pageEventBus._wrappedHandler = wrappedHandler;
 };
 
 const cleanupEventListeners = () => {
-  pageEventBus.off(`dismiss-icon-${props.id}`, handleDismiss);
+  if (pageEventBus._wrappedHandler) {
+    pageEventBus.off(`dismiss-icon-${props.id}`, pageEventBus._wrappedHandler);
+  }
   pageEventBus.off('dismiss-all-icons', handleDismissAll);
 };
 
@@ -120,22 +154,26 @@ defineExpose({
 </script>
 
 <style scoped>
-.translation-icon {
-  position: fixed;
-  width: 28px;
-  height: 28px;
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 2147483645;
-  transition: all 0.2s ease-in-out;
-  animation: iconAppear 0.3s ease-out;
-}
+  .translation-icon {
+    position: fixed;
+    width: 28px;
+    height: 28px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 2147483645;
+    transition: all 0.2s ease-in-out;
+    animation: iconAppear 0.3s ease-out;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 
 .translation-icon:hover {
   background-color: #f8f9fa;

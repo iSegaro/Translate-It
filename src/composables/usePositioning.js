@@ -1,0 +1,141 @@
+/**
+ * usePositioning.js - Composable for position management
+ * Handles viewport clamping, position updates, and responsive positioning
+ */
+
+import { ref, computed, watch } from 'vue';
+
+export function usePositioning(initialPosition, options = {}) {
+  const {
+    defaultWidth = 350,
+    defaultHeight = 180,
+    margin = 10,
+    enableDragging = false
+  } = options;
+
+  // Reactive position state
+  const currentPosition = ref({ x: 0, y: 0 });
+  const dragStartOffset = ref({ x: 0, y: 0 });
+  const isDragging = ref(false);
+
+  /**
+   * Clamp position to viewport bounds
+   */
+  function clampToViewport(pos, width = defaultWidth, height = defaultHeight) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = pos.x ?? pos.left ?? 0;
+    let y = pos.y ?? pos.top ?? 0;
+
+    // Prevent overflow right/bottom
+    if (x + width > vw) x = vw - width - margin;
+    if (x < margin) x = margin;
+    if (y + height > vh) y = vh - height - margin;
+    if (y < margin) y = margin;
+
+    return { x, y };
+  }
+
+  /**
+   * Update position with viewport clamping
+   */
+  function updatePosition(newPosition, dimensions) {
+    currentPosition.value = clampToViewport(newPosition, dimensions?.width, dimensions?.height);
+  }
+
+  /**
+   * Initialize position
+   */
+  function initializePosition(pos) {
+    currentPosition.value = clampToViewport(pos);
+  }
+
+  // Initialize with provided position
+  if (initialPosition) {
+    initializePosition(initialPosition);
+  }
+
+  // Computed styles for positioning
+  const positionStyle = computed(() => ({
+    position: 'fixed',
+    left: `${currentPosition.value.x}px`,
+    top: `${currentPosition.value.y}px`,
+    zIndex: 2147483647
+  }));
+
+  // Drag handling functions
+  const onDrag = (event) => {
+    if (!isDragging.value) return;
+    
+    const newX = event.clientX - dragStartOffset.value.x;
+    const newY = event.clientY - dragStartOffset.value.y;
+    
+    currentPosition.value = clampToViewport({ x: newX, y: newY });
+  };
+
+  const stopDrag = () => {
+    isDragging.value = false;
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', stopDrag);
+    
+    // Restore text selection
+    document.body.style.userSelect = '';
+  };
+
+  const startDrag = (event) => {
+    isDragging.value = true;
+    dragStartOffset.value.x = event.clientX - currentPosition.value.x;
+    dragStartOffset.value.y = event.clientY - currentPosition.value.y;
+    
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', stopDrag);
+    
+    // Prevent text selection during drag
+    document.body.style.userSelect = 'none';
+  };
+
+  // Drag handlers object (if enabled)
+  const dragHandlers = enableDragging ? {
+    startDrag,
+    onDrag,
+    stopDrag
+  } : {};
+
+  // Responsive positioning on window resize
+  let resizeTimeout;
+  const handleResize = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      currentPosition.value = clampToViewport(currentPosition.value);
+    }, 100);
+  };
+
+  // Setup resize listener
+  window.addEventListener('resize', handleResize);
+
+  return {
+    // State
+    currentPosition,
+    isDragging,
+    
+    // Computed
+    positionStyle,
+    
+    // Methods
+    updatePosition,
+    initializePosition,
+    clampToViewport,
+    
+    // Drag handlers (if enabled)
+    ...dragHandlers,
+    
+    // Cleanup
+    cleanup: () => {
+      window.removeEventListener('resize', handleResize);
+      if (enableDragging) {
+        document.removeEventListener('mousemove', dragHandlers.onDrag);
+        document.removeEventListener('mouseup', dragHandlers.stopDrag);
+      }
+    }
+  };
+}

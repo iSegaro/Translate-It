@@ -38,6 +38,8 @@ export class WindowsState {
     this.iconClickContext = null;
     this.requestingFrameId = null;
     this.mainDocumentWindowId = null;
+    this.activeWindowId = null;
+    this.isProcessing = false;
 
     this.logger.debug('WindowsState reset', { frameId: this.frameId });
   }
@@ -100,6 +102,16 @@ export class WindowsState {
 
   setRequestingFrameId(frameId) {
     this.requestingFrameId = frameId;
+  }
+
+  setActiveWindowId(id) {
+    this.activeWindowId = id;
+    this.logger.debug('Active window ID set', { id });
+  }
+
+  setProcessing(isProcessing) {
+    this.isProcessing = isProcessing;
+    this.logger.debug('Processing state changed', { isProcessing });
   }
 
   // Cross-frame state management

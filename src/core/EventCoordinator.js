@@ -27,6 +27,7 @@ import { getTranslationString } from "../utils/i18n/i18n.js";
 import { TextSelectionManager } from "../managers/content/TextSelectionManager.js";
 import { TextFieldManager } from "../managers/content/TextFieldManager.js";
 import { selectElementManager } from "../managers/content/select-element/SelectElementManager.js";
+import { WindowsManager } from '@/managers/content/windows/WindowsManager.js';
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
@@ -37,23 +38,17 @@ export default class EventCoordinator {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
-    
-  // Initialize logger
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
-    
-    // Initialize SelectionWindows for text selection manager
-    this.logger.debug('Creating SelectionWindows instance...');
-    this.SelectionWindows = new SelectionWindows({
-      translationHandler: translationHandler,
-      notifier: translationHandler.notifier,
-    });
-    this.logger.debug('SelectionWindows instance created successfully');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'EventCoordinator');
+    // Initialize WindowsManager for text selection manager
+    this.logger.debug('Creating WindowsManager instance...');
+    this.windowsManager = new WindowsManager({});
+    this.logger.debug('WindowsManager instance created successfully');
 
     // Note: UnifiedMessenger removed - SelectElementManager handles its own messaging
     
     // Initialize specialized managers
     this.textSelectionManager = new TextSelectionManager({
-      selectionWindows: this.SelectionWindows,
+      windowsManager: this.windowsManager,
       notifier: translationHandler.notifier,
     });
 
