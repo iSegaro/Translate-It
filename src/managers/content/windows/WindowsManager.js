@@ -104,6 +104,7 @@ export class WindowsManager {
 
     // Listen for events from the Vue UI Host
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.ICON_CLICKED, this._handleIconClickFromVue.bind(this));
+    pageEventBus.on('translation-window-speak', this._handleSpeakRequest.bind(this));
 
     // Development toggle handler
     window.addEventListener('toggle-windows-manager-renderer', this._handleToggleRenderer.bind(this));
@@ -314,6 +315,20 @@ export class WindowsManager {
   }
 
   /**
+   * Handle TTS speak request from Vue component
+   */
+  _handleSpeakRequest(detail) {
+    this.logger.debug('Speak request received from UI Host', detail);
+    if (!detail || !detail.text) return;
+
+    if (detail.isSpeaking) {
+      this.ttsManager.speak(detail.text, {});
+    } else {
+      this.ttsManager.stopCurrentTTS();
+    }
+  }
+
+  /**
    * Show translation window
    */
   async _showWindow(selectedText, position) {
@@ -339,13 +354,15 @@ export class WindowsManager {
 
     // Generate unique ID for this window
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const theme = this.themeManager.currentTheme || 'light';
     
     // Emit event to create window through Vue UI Host
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText,
       position,
-      mode: 'window'
+      mode: 'window',
+      theme
     });
     
     // Store state for this window

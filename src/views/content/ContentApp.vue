@@ -17,7 +17,9 @@
       :id="window.id"
       :position="window.position"
       :selected-text="window.selectedText"
+      :theme="window.theme"
       @close="onTranslationWindowClose"
+      @speak="onTranslationWindowSpeak"
     />
     
     <!-- WindowsManager Translation Icons -->
@@ -73,6 +75,11 @@ const onTranslationIconClick = (detail) => {
 const onTranslationWindowClose = (id) => {
   logger.debug(`TranslationWindow closed: ${id}`);
   translationWindows.value = translationWindows.value.filter(window => window.id !== id);
+};
+
+const onTranslationWindowSpeak = (detail) => {
+  logger.info('TranslationWindow speak request:', detail);
+  pageEventBus.emit('translation-window-speak', detail);
 };
 
 const onTranslationIconClose = (id) => {
@@ -149,14 +156,15 @@ onMounted(() => {
   // WindowsManager event listeners
   pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_WINDOW, (detail) => {
     logger.info('Event: windows-manager-show-window', detail);
-    const { id, selectedText, position } = detail;
+    const { id, selectedText, position, theme } = detail;
     
     // Ensure no duplicate windows for the same ID
     if (!translationWindows.value.some(window => window.id === id)) {
       translationWindows.value.push({
         id,
         selectedText,
-        position: position || { x: 100, y: 100 }
+        position: position || { x: 100, y: 100 },
+        theme: theme || 'light'
       });
     }
   });
