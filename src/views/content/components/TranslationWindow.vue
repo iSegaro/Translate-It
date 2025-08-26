@@ -8,32 +8,59 @@
     @click.stop
   >
     <div class="window-header" @mousedown="handleStartDrag">
-      <div class="header-title">Translate It</div>
       <div class="header-actions">
-        <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/></svg>
-        </button>
         <button class="action-btn" @click.stop="handleCopy" title="Copy">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+          </svg>
         </button>
         <button class="action-btn" @click.stop="handleSpeak" :title="isSpeaking ? 'Stop' : 'Speak'">
-          <svg v-if="!isSpeaking" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          <svg v-if="!isSpeaking" width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+          </svg>
         </button>
+        <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="header-close">
         <button class="action-btn" @click.stop="handleClose" title="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
         </button>
       </div>
     </div>
 
     <div class="window-body">
-      <div v-if="isLoading" class="loading-container">
-        <div class="spinner"></div>
+      <!-- Show Original Text Section -->
+      <div v-if="showOriginal && !isLoading" class="original-text-section">
+        <div class="original-label">Original:</div>
+        <div class="original-text">{{ originalText }}</div>
       </div>
-      <div v-else class="translation-container">
-        <div class="original-text" v-if="showOriginal">{{ originalText }}</div>
-        <div class="translated-text">{{ translatedText }}</div>
-      </div>
+      
+      <!-- Translation Display Section -->
+      <TranslationDisplay
+        :content="translatedText"
+        :is-loading="isLoading"
+        :error="errorMessage"
+        :mode="'compact'"
+        :placeholder="'Translation will appear here...'"
+        :target-language="'auto'"
+        :show-fade-in-animation="true"
+        :enable-markdown="true"
+        :show-toolbar="false"
+        :show-copy-button="false"
+        :show-tts-button="false"
+        :can-retry="!!errorMessage"
+        :on-retry="handleRetry"
+        class="window-translation-display"
+      />
     </div>
   </div>
 </template>
@@ -41,6 +68,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -70,6 +98,12 @@ const originalText = ref(props.selectedText);
 const errorMessage = ref('');
 const isDragging = ref(false);
 const isSpeaking = ref(false);
+
+// Add retry handler for TranslationDisplay
+const handleRetry = () => {
+  // Emit retry event or perform retry logic
+  console.log('Retry requested for translation window:', props.id);
+};
 const showOriginal = ref(false);
 
 // Use positioning composable with drag enabled
@@ -114,10 +148,13 @@ onUnmounted(() => {
 
 // Methods
 const handleClose = () => emit('close', props.id);
-const handleCopy = () => navigator.clipboard.writeText(props.initialTranslatedText);
 
 const toggleShowOriginal = () => {
   showOriginal.value = !showOriginal.value;
+};
+
+const handleCopy = () => {
+  navigator.clipboard.writeText(props.initialTranslatedText);
 };
 
 const handleSpeak = () => {
@@ -177,21 +214,18 @@ const handleStartDrag = (event) => {
 }
 
 .window-header {
-  padding: 10px;
+  padding: 6px 8px;
   cursor: move;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-}
-
-.header-title {
-  font-weight: bold;
-  font-size: 16px;
+  min-height: 32px;
 }
 
 .header-actions {
   display: flex;
-  gap: 5px;
+  gap: 4px;
+  align-items: center;
 }
 
 .action-btn {
@@ -210,41 +244,110 @@ const handleStartDrag = (event) => {
   padding: 10px;
   max-height: 400px;
   overflow-y: auto;
-}
-
-.loading-container {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
+  flex-direction: column;
+  min-height: 120px;
 }
 
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top: 3px solid rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+/* Original text section styling */
+.original-text-section {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.original-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.original-text, .translated-text {
-  margin: 0;
-  padding: 0;
+.original-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #555;
   white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
-.translated-text {
-  font-weight: bold;
+/* Translation display integration */
+.window-translation-display {
+  flex: 1;
+  min-height: 80px;
+  position: relative;
 }
 
-.error-message {
-  color: red;
-  font-weight: bold;
+.window-translation-display :deep(.translation-content) {
+  border: none;
+  background: transparent;
+  padding: 8px 0 0 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
+
+
+/* ActionToolbar size adjustments for translation window */
+.window-translation-display >>> .display-toolbar {
+  top: 2px !important;
+  left: 2px !important;
+  right: 2px !important;
+  width: calc(100% - 4px) !important;
+  max-width: calc(100% - 4px) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(4px) !important;
+  border-radius: 4px !important;
+  padding: 1px 2px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden !important;
+}
+
+.window-translation-display >>> .action-toolbar {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  justify-content: flex-start !important;
+}
+
+.window-translation-display >>> .toolbar-left {
+  gap: 1px !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.window-translation-display >>> .action-button {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+  font-size: 10px !important;
+  flex-shrink: 0 !important;
+  padding: 1px !important;
+  border-radius: 2px !important;
+}
+
+.window-translation-display >>> .action-button .button-icon,
+.window-translation-display >>> .action-button img {
+  width: 12px !important;
+  height: 12px !important;
+  max-width: 12px !important;
+  max-height: 12px !important;
+}
+
+/* Dark theme adjustments */
+.translation-window.dark .original-text-section {
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.translation-window.dark .original-label {
+  color: #aaa;
+}
+
+.translation-window.dark .original-text {
+  color: #ccc;
+}
+
 </style>
