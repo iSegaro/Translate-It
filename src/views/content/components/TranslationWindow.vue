@@ -217,7 +217,7 @@ const handleStartDrag = (event) => {
   padding: 6px 8px;
   cursor: move;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   min-height: 32px;
 }
@@ -225,6 +225,11 @@ const handleStartDrag = (event) => {
 .header-actions {
   display: flex;
   gap: 4px;
+  align-items: center;
+}
+
+.header-close {
+  display: flex;
   align-items: center;
 }
 
@@ -290,7 +295,7 @@ const handleStartDrag = (event) => {
 
 
 /* ActionToolbar size adjustments for translation window */
-.window-translation-display >>> .display-toolbar {
+.window-translation-display :deep(.display-toolbar) {
   top: 2px !important;
   left: 2px !important;
   right: 2px !important;
@@ -304,21 +309,21 @@ const handleStartDrag = (event) => {
   overflow: hidden !important;
 }
 
-.window-translation-display >>> .action-toolbar {
+.window-translation-display :deep(.action-toolbar) {
   width: 100% !important;
   max-width: 100% !important;
   overflow: hidden !important;
   justify-content: flex-start !important;
 }
 
-.window-translation-display >>> .toolbar-left {
+.window-translation-display :deep(.toolbar-left) {
   gap: 1px !important;
   flex-shrink: 1 !important;
   min-width: 0 !important;
   overflow: hidden !important;
 }
 
-.window-translation-display >>> .action-button {
+.window-translation-display :deep(.action-button) {
   width: 16px !important;
   height: 16px !important;
   min-width: 16px !important;
@@ -329,8 +334,8 @@ const handleStartDrag = (event) => {
   border-radius: 2px !important;
 }
 
-.window-translation-display >>> .action-button .button-icon,
-.window-translation-display >>> .action-button img {
+.window-translation-display :deep(.action-button .button-icon),
+.window-translation-display :deep(.action-button img) {
   width: 12px !important;
   height: 12px !important;
   max-width: 12px !important;
