@@ -5,6 +5,8 @@
     @click="onClick"
     @mousedown.prevent.stop
     @mouseup.prevent.stop
+    @mouseenter="isHovering = true"
+    @mouseleave="isHovering = false"
     title="Translate with Translate-It"
   >
     <img
@@ -18,7 +20,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -27,9 +29,28 @@ const props = defineProps({
 
 const emit = defineEmits(['click']);
 
+// Hover state
+const isHovering = ref(false);
+
 const styleObject = computed(() => ({
   top: `${props.position.top}px`,
   left: `${props.position.left}px`,
+  // Ensure circular shape is always applied
+  borderRadius: '50%',
+  width: '28px',
+  height: '28px',
+  backgroundColor: isHovering.value ? '#f5f5f5' : '#ffffff',
+  border: '1px solid #e0e0e0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+  cursor: 'pointer',
+  transform: isHovering.value ? 'scale(1.1)' : 'scale(1)',
+  // Reset button styles
+  padding: '0',
+  margin: '0',
+  outline: 'none'
 }));
 
 const onClick = (event) => {
@@ -40,6 +61,14 @@ const onClick = (event) => {
 
 <style>
 .text-field-icon {
+  /* Reset button default styles */
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  outline: none;
+  
+  /* Apply custom styles */
   position: absolute;
   width: 28px;
   height: 28px;

@@ -1,5 +1,5 @@
 <template>
-  <div
+  <button
     v-if="isVisible"
     ref="iconElement"
     class="translation-icon"
@@ -9,17 +9,16 @@
     @mouseup.prevent.stop
     @mouseenter="isHovering = true"
     @mouseleave="isHovering = false"
-    tabindex="0"
-    aria-label="Translate selected text"
+    title="Translate selected text"
   >
     <img
       src="@/assets/icons/extension_icon_64.svg"
       alt="Translate Icon"
-      width="20"
-      height="20"
+      width="16"
+      height="16"
       style="display: block; pointer-events: none;"
     />
-  </div>
+  </button>
 </template>
 
 <script setup>
@@ -60,10 +59,25 @@ const { positionStyle, cleanup: cleanupPositioning } = usePositioning(props.posi
   enableDragging: false
 });
 
-// Computed styles with hover effect
+// Computed styles with hover effect - include all essential styles to ensure they're not overridden
 const iconStyle = computed(() => ({
   ...positionStyle.value,
-  transform: isHovering.value ? 'scale(1.2)' : 'scale(1)'
+  transform: isHovering.value ? 'scale(1.1)' : 'scale(1)',
+  // Ensure circular shape is always applied
+  borderRadius: '50%',
+  width: '28px',
+  height: '28px',
+  backgroundColor: isHovering.value ? '#f5f5f5' : '#ffffff',
+  border: '1px solid #e0e0e0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+  cursor: 'pointer',
+  // Reset button styles
+  padding: '0',
+  margin: '0',
+  outline: 'none'
 }));
 
 // Initialize component
@@ -152,8 +166,16 @@ defineExpose({
 });
 </script>
 
-<style scoped>
+<style>
   .translation-icon {
+    /* Reset button default styles */
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+    outline: none;
+    
+    /* Apply custom styles */
     position: fixed;
     width: 28px;
     height: 28px;
@@ -164,10 +186,12 @@ defineExpose({
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     z-index: 2147483645;
     transition: all 0.2s ease-in-out;
-    animation: iconAppear 0.3s ease-out;
+    opacity: 0;
+    transform: scale(0.8);
+    animation: fadeIn 0.2s forwards;
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -175,18 +199,12 @@ defineExpose({
   }
 
 .translation-icon:hover {
-  background-color: #f8f9fa;
-  border-color: #007bff;
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
+  background-color: #f5f5f5;
+  transform: scale(1.1);
 }
 
 .translation-icon svg {
   color: #5f6368;
-  transition: color 0.2s ease;
-}
-
-.translation-icon:hover svg {
-  color: #007bff;
 }
 
 .icon-hovering {
@@ -196,14 +214,10 @@ defineExpose({
 
 
 /* Animations */
-@keyframes iconAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.8) translateY(-5px);
-  }
+@keyframes fadeIn {
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1);
   }
 }
 
