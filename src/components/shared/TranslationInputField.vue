@@ -146,7 +146,9 @@ const handleKeydown = (event) => {
   // Handle Ctrl+Enter for translation
   if ((event.ctrlKey || event.metaKey) && (event.key === 'Enter' || event.key === '/')) {
     event.preventDefault()
-    emit('translate')
+    if (hasContent.value) {
+      emit('translate')
+    }
   }
 }
 
