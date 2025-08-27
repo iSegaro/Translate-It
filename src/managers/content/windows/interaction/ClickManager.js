@@ -99,7 +99,20 @@ export class ClickManager {
    * Determine if outside click should trigger dismissal
    */
   _shouldDismissOnOutsideClick(e) {
-    // Only dismiss if click is truly outside both icon and window
+    // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
+    const vueUIHost = document.getElementById('translate-it-host');
+    this.logger.debug('Outside click check:', { 
+      target: e.target.tagName, 
+      vueUIHostExists: !!vueUIHost,
+      isInsideVueHost: vueUIHost && vueUIHost.contains(e.target)
+    });
+    if (vueUIHost && vueUIHost.contains(e.target)) {
+      // Click is inside Vue UI Host, don't dismiss (let Vue components handle it)
+      this.logger.debug('Click is inside Vue UI Host, not dismissing');
+      return false;
+    }
+    
+    // Legacy check for old-style elements (keeping for compatibility)
     const iconElement = document.getElementById(WindowsConfig.IDS.ICON);
     if (iconElement && iconElement.contains(e.target)) {
       return false;
@@ -110,7 +123,8 @@ export class ClickManager {
         return false;
       }
     }
-    // If not inside icon or window, dismiss
+    
+    // If not inside Vue UI Host or legacy elements, dismiss
     return true;
   }
 

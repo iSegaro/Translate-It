@@ -68,6 +68,10 @@ export class WindowsManager {
     // this.innerContainer = null;
     // this.icon = null;
     
+    // State flags for selection preservation
+    this._isIconToWindowTransition = false;
+    this._lastDismissedIcon = null;
+    
     // External dependencies
     this.translationHandler.errorHandler = options.translationHandler?.errorHandler || ErrorHandler.getInstance();
     this.notifier = options.notifier;
@@ -217,7 +221,28 @@ export class WindowsManager {
       return;
     }
     
-    this.dismiss(false);
+    // Check if this is an icon->window transition OR we're in onClick mode, preserve selection if so
+    // In onClick mode, we show icons first and user will click later, so preserve selection
+    let isOnClickMode = false;
+    try {
+      const settings = await getSettingsAsync();
+      const selectionTranslationMode = settings.selectionTranslationMode || CONFIG.selectionTranslationMode;
+      isOnClickMode = selectionTranslationMode === 'onClick';
+    } catch (error) {
+      // If extension context is invalidated, use fallback values
+      if (ExtensionContextManager.isContextError(error)) {
+        const selectionTranslationMode = CONFIG.selectionTranslationMode;
+        isOnClickMode = selectionTranslationMode === 'onClick';
+      } else {
+        throw error;
+      }
+    }
+    const preserveSelection = this._isIconToWindowTransition || isOnClickMode;
+    this.dismiss(false, preserveSelection);
+    
+    // Reset the transition flag after using it
+    this._isIconToWindowTransition = false;
+    
     if (!selectedText) return;
 
     this.state.setProcessing(true);
@@ -730,6 +755,10 @@ export class WindowsManager {
       state.preventTextFieldIconCreation = true;
     }
 
+    // Set flag to preserve selection during icon->window transition BEFORE calling _showWindow
+    this._isIconToWindowTransition = true;
+    this.logger.debug('[Selection] Set transition flag - preserving selection during icon->window transition');
+    
     // Dismiss the icon that was clicked
     this.logger.debug(`[LOG] Dismissing icon with id=${id}`);
     
@@ -757,8 +786,9 @@ export class WindowsManager {
   /**
    * Dismiss the current window/icon
    * @param {boolean} withFadeOut - Whether to animate the dismissal
+   * @param {boolean} preserveSelection - Whether to preserve text selection (for icon->window transitions)
    */
-  dismiss(withFadeOut = true) {
+  dismiss(withFadeOut = true, preserveSelection = false) {
     this.logger.debug('[LOG] WindowsManager.dismiss called', {
       withFadeOut,
       isIconMode: this.state.isIconMode,
@@ -768,9 +798,20 @@ export class WindowsManager {
       stack: new Error().stack
     });
     // Clear text selection only when dismissing icon mode AND extension context is valid
-    // This prevents clearing text selection when extension context is invalidated
-    if (this.state.isIconMode && ExtensionContextManager.isValidSync()) {
+    // AND we're not preserving selection (e.g., for icon->window transitions)
+    const shouldClearSelection = this.state.isIconMode && ExtensionContextManager.isValidSync() && !preserveSelection;
+    this.logger.debug('[Selection] Dismiss logic:', {
+      isIconMode: this.state.isIconMode,
+      extensionContextValid: ExtensionContextManager.isValidSync(),
+      preserveSelection,
+      shouldClearSelection
+    });
+    
+    if (shouldClearSelection) {
+      this.logger.debug('[Selection] Clearing text selection');
       this._clearTextSelection();
+    } else {
+      this.logger.debug('[Selection] Preserving text selection');
     }
 
     // Get current window/icon IDs before cleanup
@@ -838,6 +879,9 @@ export class WindowsManager {
   _resetState() {
     this.state.setPendingTranslationWindow(false);
     this.state.setIconMode(false);
+    
+    // Reset selection preservation flag
+    this._isIconToWindowTransition = false;
     
     if (state && typeof state === 'object') {
       state.preventTextFieldIconCreation = false;
