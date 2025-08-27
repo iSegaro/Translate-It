@@ -214,6 +214,22 @@ export class TranslationOrchestrator {
    * @param {Array} textNodes - Array of text nodes that were translated
    */
   showTranslationsInOverlay(element, translations, textNodes) {
+    // Debug: Log what we're sending to the overlay
+    this.logger.debug("Showing translations in overlay", {
+      elementTag: element.tagName,
+      translationsSize: translations.size,
+      textNodesCount: textNodes.length,
+      originalTextLength: element.textContent.length
+    });
+    
+    // Debug: Log translation mappings
+    if (translations.size > 0) {
+      this.logger.debug("Translation mappings being sent:");
+      translations.forEach((translated, original) => {
+        this.logger.debug(`  "${original}" -> "${translated}"`);
+      });
+    }
+    
     // Show translation in Shadow DOM overlay with exact same styling
     pageEventBus.emit('show-translation', {
       element: element,

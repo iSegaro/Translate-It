@@ -3,9 +3,9 @@
     <div 
       v-for="(translation, index) in activeTranslations" 
       :key="translation.id"
-      class="translated-element"
+      :class="['translated-element', translation.isInteractive ? 'interactive' : 'non-interactive']"
       :style="translation.style"
-      @click="onTranslationClick(translation)"
+      @click="onTranslationClick(translation, $event)"
       :ref="el => { if (el) translatedElements[index] = el }"
     >
       <!-- The cloned element will be mounted here by the script -->
@@ -16,6 +16,7 @@
 <script setup>
 import { ref, nextTick, onBeforeUpdate } from 'vue';
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { correctTextDirection } from '@/utils/text/textDetection.js';
 
 const activeTranslations = ref([]);
 const translatedElements = ref([]);
@@ -44,6 +45,10 @@ const cloneWithStyles = (sourceNode) => {
   const computedStyle = window.getComputedStyle(sourceNode);
   for (let i = 0; i < computedStyle.length; i++) {
     const prop = computedStyle[i];
+    // Skip direction and text-align properties as they will be handled by correctTextDirection
+    if (prop === 'direction' || prop === 'text-align') {
+      continue;
+    }
     clonedElement.style.setProperty(prop, computedStyle.getPropertyValue(prop));
   }
 
@@ -57,22 +62,38 @@ const cloneWithStyles = (sourceNode) => {
 
   // Listen for translation events
   pageEventBus.on('show-translation', (detail) => {
-    console.log('Received show-translation event:', detail);
+    console.log('Received show-translation event for', detail.element.tagName, 'with', detail.translations?.size || 0, 'translations');
     const { element, translations, textNodes, originalText } = detail;
+    
     const rect = element.getBoundingClientRect();
 
     // Clone the original element with all its styles
     const clonedElement = cloneWithStyles(element);
 
     // Function to traverse the cloned node and replace text nodes with translations
+    // Uses the same logic as the old system's applyTranslationsToNodes function
     const replaceTextInClone = (node) => {
       if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '') {
-        const originalNodeText = node.textContent;
-        if (translations.has(originalNodeText)) {
-          node.textContent = translations.get(originalNodeText);
+        const originalText = node.textContent;
+        const trimmedOriginalText = originalText.trim();
+        
+        // Check if we have a translation for this trimmed text
+        const translatedText = translations.get(trimmedOriginalText);
+        
+        if (translatedText && trimmedOriginalText) {
+          // Replace the entire text node content with translation
+          node.textContent = translatedText;
+          
+          // Apply correct text direction to the parent element containing the translated text
+          const parentElement = node.parentNode;
+          if (parentElement && parentElement.nodeType === Node.ELEMENT_NODE) {
+            correctTextDirection(parentElement, translatedText);
+          }
         }
-      } else {
-        for (const child of node.childNodes) {
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // Traverse all child nodes
+        const children = Array.from(node.childNodes);
+        for (const child of children) {
           replaceTextInClone(child);
         }
       }
@@ -96,7 +117,8 @@ const cloneWithStyles = (sourceNode) => {
       element,
       clonedElement, // Store the cloned element
       originalText,
-      style: style
+      style: style,
+      isInteractive: isElementInteractive(element) // Determine if element needs special handling
     };
     
     // Hide original element visually but keep layout
@@ -115,8 +137,7 @@ const cloneWithStyles = (sourceNode) => {
       }
     });
 
-    console.log('Translation overlay added:', translation);
-    console.log('Element position:', rect, 'Scroll:', {scrollY: window.scrollY, scrollX: window.scrollX});
+    console.log('Translation overlay added for', translation.isInteractive ? 'interactive' : 'static', 'element:', element.tagName);
   });
 
 pageEventBus.on('hide-translation', (detail) => {
@@ -154,8 +175,85 @@ pageEventBus.on('clear-all-translations', () => {
   activeTranslations.value = [];
 });
 
-const onTranslationClick = (translation) => {
+const onTranslationClick = (translation, event) => {
+  // Check if this is a critical interactive element that should preserve original behavior
+  const isInteractiveElement = isElementInteractive(translation.element);
+  
+  if (isInteractiveElement) {
+    // Forward the click to the original element instead of handling it here
+    forwardEventToOriginalElement(translation.element, event);
+    return;
+  }
+  
+  // Handle translation-specific clicks (like showing actions)
   pageEventBus.emit('translation-clicked', translation);
+};
+
+// Check if element has interactive behavior that should be preserved
+const isElementInteractive = (element) => {
+  // Check for common interactive patterns
+  const interactiveSelectors = [
+    'a', 'button', 'input', 'textarea', 'select',
+    '[role="button"]', '[role="link"]', '[onclick]',
+    '[data-testid*="tweet"]', // Twitter-specific
+    '[data-tweet-id]',        // Twitter-specific
+    '.tweet', '.post',        // General social media
+    '[href]'                  // Any element with href
+  ];
+  
+  // Check if element itself matches
+  for (const selector of interactiveSelectors) {
+    if (element.matches?.(selector)) {
+      return true;
+    }
+  }
+  
+  // Check if element has click listeners or is within an interactive container
+  const hasClickHandler = element.onclick || 
+    element.addEventListener?.name || 
+    getComputedStyle(element).cursor === 'pointer';
+    
+  return hasClickHandler;
+};
+
+// Forward events to original element to preserve functionality
+const forwardEventToOriginalElement = (originalElement, event) => {
+  console.log('Forwarding event to original element:', originalElement);
+  
+  // Create a new event with the same properties
+  const forwardedEvent = new event.constructor(event.type, {
+    bubbles: event.bubbles,
+    cancelable: event.cancelable,
+    view: event.view,
+    detail: event.detail,
+    screenX: event.screenX,
+    screenY: event.screenY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    button: event.button,
+    buttons: event.buttons,
+    relatedTarget: event.relatedTarget,
+    ctrlKey: event.ctrlKey,
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    metaKey: event.metaKey
+  });
+  
+  // Temporarily restore visibility to allow proper event handling
+  const originalVisibility = originalElement.style.visibility;
+  const originalPointerEvents = originalElement.style.pointerEvents;
+  
+  originalElement.style.visibility = 'visible';
+  originalElement.style.pointerEvents = 'auto';
+  
+  // Dispatch the event
+  originalElement.dispatchEvent(forwardedEvent);
+  
+  // Restore the hidden state after a short delay to prevent flicker
+  setTimeout(() => {
+    originalElement.style.visibility = originalVisibility;
+    originalElement.style.pointerEvents = originalPointerEvents;
+  }, 10);
 };
 
 const onRevert = (translation) => {
@@ -183,6 +281,66 @@ const updateTranslationPositions = () => {
 // Set up resize and scroll listeners
 window.addEventListener('resize', updateTranslationPositions);
 window.addEventListener('scroll', updateTranslationPositions, { passive: true });
+
+// Navigation detection for automatic cleanup
+let currentUrl = window.location.href;
+
+const handleNavigationChange = () => {
+  const newUrl = window.location.href;
+  if (newUrl !== currentUrl) {
+    console.log('Navigation detected, cleaning up overlays');
+    // Clear all overlays when navigation occurs
+    clearAllTranslations();
+    currentUrl = newUrl;
+    
+    // Emit event to notify other components
+    pageEventBus.emit('navigation-detected', { 
+      oldUrl: currentUrl, 
+      newUrl: newUrl 
+    });
+  }
+};
+
+// Listen for navigation events (works for both traditional and SPA navigation)
+window.addEventListener('popstate', handleNavigationChange);
+window.addEventListener('pushstate', handleNavigationChange);
+
+// For SPAs that use history.pushState/replaceState, we need to override them
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
+history.pushState = function(...args) {
+  originalPushState.apply(this, args);
+  setTimeout(handleNavigationChange, 0); // Use setTimeout to ensure URL has changed
+};
+
+history.replaceState = function(...args) {
+  originalReplaceState.apply(this, args);
+  setTimeout(handleNavigationChange, 0);
+};
+
+// Also watch for URL changes via MutationObserver (fallback)
+const urlChangeObserver = new MutationObserver(() => {
+  handleNavigationChange();
+});
+
+// Watch for document title changes (often indicates navigation in SPAs)
+urlChangeObserver.observe(document.querySelector('title') || document.head, {
+  childList: true,
+  subtree: true
+});
+
+const clearAllTranslations = () => {
+  // Restore all elements
+  activeTranslations.value.forEach(translation => {
+    translation.element.style.visibility = '';
+    translation.element.style.pointerEvents = '';
+  });
+  activeTranslations.value = [];
+  
+  // Also emit clear event to ensure other components are notified
+  pageEventBus.emit('clear-all-translations');
+};
 </script>
 
 <style scoped>
@@ -205,7 +363,7 @@ window.addEventListener('scroll', updateTranslationPositions, { passive: true })
   border: none !important;
   padding: 0 !important;
   pointer-events: auto;
-  cursor: pointer;
+  cursor: inherit; /* Inherit cursor from original element */
   box-shadow: none !important;
   transition: all 0.2s ease;
   overflow: visible;
@@ -215,6 +373,16 @@ window.addEventListener('scroll', updateTranslationPositions, { passive: true })
   opacity: 1 !important;
   visibility: visible !important;
   z-index: 2147483647 !important;
+}
+
+/* For interactive overlays, maintain proper cursor */
+.translated-element.interactive {
+  cursor: pointer;
+}
+
+/* For non-interactive overlays, use default cursor */
+.translated-element.non-interactive {
+  cursor: default;
 }
 
 .translated-element:hover {

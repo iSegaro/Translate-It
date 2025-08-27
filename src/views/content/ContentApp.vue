@@ -177,6 +177,34 @@ onMounted(() => {
 
   // Setup WindowsManager event listeners through composable
   setupEventListeners();
+  
+  // Listen for navigation events to clean up UI state
+  pageEventBus.on('navigation-detected', (detail) => {
+    logger.info('Navigation detected, cleaning up UI state:', detail);
+    
+    // Close all translation windows
+    if (translationWindows.value.length > 0) {
+      translationWindows.value.forEach(window => {
+        onTranslationWindowClose(window.id);
+      });
+    }
+    
+    // Close all translation icons  
+    if (translationIcons.value.length > 0) {
+      translationIcons.value.forEach(icon => {
+        onTranslationIconClose(icon.id);
+      });
+    }
+    
+    // Clear all field icons
+    activeIcons.value = [];
+    
+    // Reset select mode state
+    isSelectModeActive.value = false;
+    
+    // Dismiss all notifications
+    pageEventBus.emit('dismiss_all_notifications');
+  });
 });
 
 onUnmounted(() => {
