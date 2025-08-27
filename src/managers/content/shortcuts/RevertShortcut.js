@@ -41,9 +41,13 @@ export class RevertShortcut {
     logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
     
     // Check if there are any translations to revert.
-    const hasVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
+    // Check modern Vue translations in StateManager
+    const hasModernTranslations = selectElementManager.stateManager.hasTranslatedElements();
+    // Check legacy DOM-based translations  
+    const hasLegacyVueTranslations = document.querySelectorAll("span[data-translate-it-original-text]").length > 0;
     const hasLegacyTranslations = document.querySelectorAll("span[data-aiwc-original-text]").length > 0;
-    if (!hasVueTranslations && !hasLegacyTranslations) {
+    
+    if (!hasModernTranslations && !hasLegacyVueTranslations && !hasLegacyTranslations) {
       logger.debug('[RevertShortcut] No translations found to revert');
       return { success: false, reason: 'no_translations_found' };
     }
