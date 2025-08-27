@@ -169,7 +169,7 @@ pageEventBus.on('hide-translation', (detail) => {
 pageEventBus.on('clear-all-translations', () => {
   // Restore all elements
   activeTranslations.value.forEach(translation => {
-    translation.element.style.opacity = '';
+    translation.element.style.visibility = '';
     translation.element.style.pointerEvents = '';
   });
   activeTranslations.value = [];

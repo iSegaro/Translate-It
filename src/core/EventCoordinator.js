@@ -96,9 +96,11 @@ export default class EventCoordinator {
    */
   @logMethod
   async handleEvent(event) {
+    // Skip most handling when SelectElementManager is active, but allow event to propagate
+    // Only skip text field and selection handling, let SelectElementManager handle clicks
     if (this.selectElementManager?.isActive) {
-      this.logger.debug('SelectElementManager is active, skipping EventCoordinator handling.');
-      return;
+      this.logger.debug('SelectElementManager is active, allowing event to propagate to SelectElementManager.');
+      // Don't return here - let the event continue to SelectElementManager
     }
     try {
       // Note: ESC key handling is managed by:
@@ -110,7 +112,8 @@ export default class EventCoordinator {
       // No need for EventCoordinator involvement in select element mode
 
       // === TEXT FIELD COORDINATION ===
-      if (this.textFieldManager.isEditableElement(event.target)) {
+      // Skip text field handling when SelectElementManager is active
+      if (this.textFieldManager.isEditableElement(event.target) && !this.selectElementManager?.isActive) {
         if (event.type === 'focus') {
           await this.coordinateTextFieldFocus(event);
         } else if (event.type === 'blur') {
@@ -122,7 +125,8 @@ export default class EventCoordinator {
       }
 
       // === TEXT SELECTION COORDINATION ===
-      if (this.isMouseUp(event)) {
+      // Skip text selection handling when SelectElementManager is active
+      if (this.isMouseUp(event) && !this.selectElementManager?.isActive) {
         await this.coordinateTextSelection(event);
         return;
       }

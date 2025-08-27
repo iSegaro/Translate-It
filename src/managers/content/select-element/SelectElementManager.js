@@ -109,11 +109,7 @@ export class SelectElementManager {
   }
 
   async handleClick(event) {
-    this.logger.debug("handleClick triggered", { target: event.target, hasAttr: event.target.hasAttribute('data-aiwc-original-id'), closest: event.target.closest('[data-aiwc-original-id]') });
-    // Final safeguard: if the click is on something that has been translated, ignore it.
-    if (event.target.closest('[data-aiwc-original-id]')) {
-        return;
-    }
+    this.logger.debug("handleClick triggered", { target: event.target });
 
     if (!this.isActive || this.isProcessingClick) return;
     this.isProcessingClick = true;
