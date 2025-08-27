@@ -46,11 +46,21 @@ export class TranslationOrchestrator {
         this.stateManager.addTranslatedElement(element, cachedTranslations);
         // Show translations in Shadow DOM overlay
         this.showTranslationsInOverlay(element, cachedTranslations, textNodes);
+        // Dismiss the status notification since translation is complete
+        if (this.statusNotification) {
+          pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+          this.statusNotification = null;
+        }
         return;
       }
 
       if (textsToTranslate.length === 0) {
         this.logger.info("No new texts to translate.");
+        // Dismiss the status notification since there's nothing to translate
+        if (this.statusNotification) {
+          pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+          this.statusNotification = null;
+        }
         return;
       }
 
@@ -74,6 +84,11 @@ export class TranslationOrchestrator {
     } catch (error) {
       this.logger.error("Translation process failed", error);
       this.translationRequests.delete(messageId);
+      // Dismiss the status notification on error
+      if (this.statusNotification) {
+        pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+        this.statusNotification = null;
+      }
       throw error;
     }
   }
