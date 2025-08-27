@@ -8,6 +8,7 @@ import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
+import { TTSManager } from "./translation/TTSManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, EnhancedTranslationRenderer
@@ -55,10 +56,12 @@ export class WindowsManager {
     // Initialize theme management
     this.themeManager = new ThemeManager();
     
+    // Initialize TTS management
+    this.ttsManager = new TTSManager();
+    
     // UI-related modules removed - now handled by Vue UI Host
     // - factory, positionCalculator, smartPositioner
     // - animationManager, translationRenderer, dragHandler
-    // - ttsManager (can be moved to Vue components if needed)
     
     // UI elements - deprecated (now handled by Vue UI Host)
     // this.displayElement = null;
@@ -303,14 +306,18 @@ export class WindowsManager {
   /**
    * Handle TTS speak request from Vue component
    */
-  _handleSpeakRequest(detail) {
+  async _handleSpeakRequest(detail) {
     this.logger.debug('Speak request received from UI Host', detail);
     if (!detail || !detail.text) return;
 
-    if (detail.isSpeaking) {
-      this.ttsManager.speak(detail.text, {});
-    } else {
-      this.ttsManager.stopCurrentTTS();
+    try {
+      if (detail.isSpeaking) {
+        await this.ttsManager.speakTextUnified(detail.text);
+      } else {
+        this.ttsManager.stopCurrentTTS();
+      }
+    } catch (error) {
+      this.logger.error('TTS error:', error);
     }
   }
 
