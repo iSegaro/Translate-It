@@ -207,7 +207,6 @@ watch(
       }
       
       // Clear any existing errors
-      translationError.value = "";
       isTranslating.value = false;
     }
   },
