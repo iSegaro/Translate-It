@@ -167,6 +167,9 @@ export class TranslationOrchestrator {
         } else if (request.status === 'error') {
           clearInterval(checkInterval);
           reject(new Error(request.error || 'Translation failed'));
+        } else if (request.status === 'cancelled') {
+          clearInterval(checkInterval);
+          reject(new Error(request.error || 'Translation cancelled by user'));
         }
       }, 100);
     });
@@ -179,8 +182,18 @@ export class TranslationOrchestrator {
     this.logger.debug("Received translation result:", { messageId, success });
 
     const request = this.translationRequests.get(messageId);
-    if (!request || request.status !== 'pending') {
-      this.logger.warn("Received translation result for unknown or completed message:", messageId);
+    if (!request) {
+      this.logger.warn("Received translation result for unknown message:", messageId);
+      return;
+    }
+    
+    if (request.status === 'cancelled') {
+      this.logger.debug("Ignoring translation result for cancelled message:", messageId);
+      return;
+    }
+    
+    if (request.status !== 'pending') {
+      this.logger.warn("Received translation result for already completed message:", messageId);
       return;
     }
 
