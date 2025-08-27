@@ -266,14 +266,16 @@ const handleDeleteHistoryItem = async (index, event) => {
   event.stopPropagation() // Prevent item click
   
   try {
-    await deleteHistoryItem(index)
+    // Convert view index (from reversed list) to model index
+    const originalIndex = historyItems.value.length - 1 - index;
+    await deleteHistoryItem(originalIndex)
     
     const button = event.target.closest('.delete-btn')
     if (button) {
       showVisualFeedback(button, 'success', 400)
     }
     
-  logger.debug(`[SidepanelHistory] History item ${index} deleted`)
+  logger.debug(`[SidepanelHistory] History item at view index ${index} (original index ${originalIndex}) deleted`)
   } catch (error) {
     await handleError(error, 'sidepanel-history-delete-item')
     const button = event.target.closest('.delete-btn')
