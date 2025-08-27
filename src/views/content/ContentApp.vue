@@ -20,6 +20,7 @@
       :initial-translated-text="window.translatedText"
       :theme="window.theme"
       :is-loading="window.isLoading"
+      :initial-size="window.initialSize"
       @close="onTranslationWindowClose"
       @speak="onTranslationWindowSpeak"
     />

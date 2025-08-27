@@ -347,7 +347,7 @@ export class WindowsManager {
   }
 
   /**
-   * Show translation window
+   * Show translation window with two-phase loading
    */
   async _showWindow(selectedText, position) {
     if (!ExtensionContextManager.isValidSync() || !selectedText) {
@@ -356,6 +356,7 @@ export class WindowsManager {
     }
 
     this.logger.debug(`[LOG] _showWindow called: isInIframe=${this.crossFrameManager.isInIframe}, frameId=${this.crossFrameManager.frameId}, text=${selectedText}, position=${JSON.stringify(position)}`);
+    
     // Check if we need to create window in main document (iframe case)
     if (this.crossFrameManager.isInIframe) {
       this.logger.debug('Requesting window creation in main document (iframe detected)');
@@ -367,27 +368,19 @@ export class WindowsManager {
       return this.crossFrameManager.requestWindowCreation(selectedText, position);
     }
 
-    // Start translation process and wait for the result
-    const translationResult = await this._startTranslationProcess(selectedText);
-
-    // If translation was cancelled or failed, do not show the window
-    if (!translationResult) {
-      this.logger.debug('Translation failed or was cancelled, aborting window creation.');
-      return;
-    }
-
-    // Generate unique ID for this window
+    // PHASE 1: Show small loading window immediately
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const theme = this.themeManager.currentTheme || 'light';
     
-    // Emit event to create window through Vue UI Host with all data included
+    // Emit event to create small loading window
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText,
-      translatedText: translationResult.translatedText,
       position,
       mode: 'window',
-      theme
+      theme,
+      initialSize: 'small',
+      isLoading: true
     });
     
     // Store state for this window
@@ -397,7 +390,43 @@ export class WindowsManager {
     this.state.setIconMode(false);
     this.state.setVisible(true);
     
-    this.logger.debug('Window creation event emitted successfully', { windowId });
+    this.logger.debug('Small loading window created', { windowId });
+
+    // PHASE 2: Perform translation and update window
+    try {
+      const translationResult = await this._startTranslationProcess(selectedText);
+
+      // If translation was cancelled or failed, show error in window
+      if (!translationResult) {
+        this.logger.debug('Translation failed or was cancelled, updating window with error.');
+        WindowsManagerEvents.updateWindow(windowId, {
+          initialSize: 'normal',
+          isLoading: false,
+          isError: true,
+          initialTranslatedText: 'Translation failed or was cancelled'
+        });
+        return;
+      }
+
+      // Update window with translation result and resize to normal
+      WindowsManagerEvents.updateWindow(windowId, {
+        initialSize: 'normal',
+        isLoading: false,
+        initialTranslatedText: translationResult.translatedText
+      });
+      
+      this.logger.debug('Window updated with translation result', { windowId });
+      
+    } catch (error) {
+      this.logger.error('Error during translation process:', error);
+      // Update window with error
+      WindowsManagerEvents.updateWindow(windowId, {
+        initialSize: 'normal',
+        isLoading: false,
+        isError: true,
+        initialTranslatedText: `Error: ${error.message}`
+      });
+    }
   }
 
   /**

@@ -39,6 +39,7 @@ if (typeof window !== 'undefined') {
 export const WINDOWS_MANAGER_EVENTS = {
   // Core window management
   SHOW_WINDOW: 'windows-manager-show-window',
+  UPDATE_WINDOW: 'windows-manager-update-window',
   SHOW_ICON: 'windows-manager-show-icon',
   DISMISS_WINDOW: 'windows-manager-dismiss-window',
   DISMISS_ICON: 'windows-manager-dismiss-icon',
@@ -51,6 +52,7 @@ export const WINDOWS_MANAGER_EVENTS = {
 export const WindowsManagerEvents = {
   // Core window management
   showWindow: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_WINDOW, detail),
+  updateWindow: (id, detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, { id, ...detail }),
   showIcon: (detail) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.SHOW_ICON, detail),
   dismissWindow: (id, withAnimation = true) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, { id, withAnimation }),
   dismissIcon: (id) => pageEventBus.emit(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, { id }),

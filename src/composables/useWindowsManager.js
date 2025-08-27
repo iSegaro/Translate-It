@@ -44,7 +44,8 @@ export function useWindowsManager() {
       position: detail.position,
       theme: detail.theme || 'light',
       isError: detail.isError || false,
-      isLoading: detail.isLoading || false
+      isLoading: detail.isLoading || false,
+      initialSize: detail.initialSize || 'normal'
     };
 
     if (existingWindowIndex >= 0) {
@@ -77,6 +78,25 @@ export function useWindowsManager() {
   const handleDismissWindow = (detail) => {
     logger.debug('Dismiss window event received', detail);
     translationWindows.value = translationWindows.value.filter(w => w.id !== detail.id);
+  };
+
+  const handleUpdateWindow = (detail) => {
+    logger.debug('Update window event received', detail);
+    
+    const existingWindowIndex = translationWindows.value.findIndex(w => w.id === detail.id);
+    if (existingWindowIndex >= 0) {
+      const existingWindow = translationWindows.value[existingWindowIndex];
+      // Update the window data
+      translationWindows.value[existingWindowIndex] = {
+        ...existingWindow,
+        ...detail,
+        translatedText: detail.initialTranslatedText || detail.translatedText || existingWindow.translatedText,
+        initialSize: detail.initialSize || existingWindow.initialSize
+      };
+      logger.debug('Updated window with new data', detail.id);
+    } else {
+      logger.error('Window not found for update:', detail.id);
+    }
   };
 
   const handleDismissIcon = (detail) => {
@@ -135,6 +155,7 @@ export function useWindowsManager() {
 
     // Listen for WindowsManager events
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_WINDOW, handleShowWindow);
+    pageEventBus.on(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, handleUpdateWindow);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);
@@ -147,6 +168,7 @@ export function useWindowsManager() {
 
     // Remove event listeners
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.SHOW_WINDOW, handleShowWindow);
+    pageEventBus.off(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, handleUpdateWindow);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);

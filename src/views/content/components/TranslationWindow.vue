@@ -1,13 +1,21 @@
 <template>
   <div 
     ref="windowElement"
-  class="translation-window aiwc-selection-popup-host"
-    :class="[theme, { 'is-dragging': isDragging, 'visible': isVisible }]"
+    class="translation-window aiwc-selection-popup-host"
+    :class="[
+      theme, 
+      { 
+        'is-dragging': isDragging, 
+        'visible': isVisible,
+        'small-size': currentSize === 'small',
+        'normal-size': currentSize === 'normal'
+      }
+    ]"
     :style="windowStyle"
     @mousedown.stop
     @click.stop
   >
-    <div class="window-header" @mousedown="handleStartDrag">
+    <div v-if="currentSize === 'normal'" class="window-header" @mousedown="handleStartDrag">
       <div class="header-actions">
         <button class="action-btn" @click.stop="handleCopy" title="Copy">
           <svg width="16" height="16" viewBox="0 0 24 24">
@@ -37,7 +45,16 @@
       </div>
     </div>
 
-    <div class="window-body">
+    <!-- Small loading spinner for small size -->
+    <div v-if="currentSize === 'small'" class="small-loading-container">
+      <div class="small-loading-dots">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+
+    <div v-if="currentSize === 'normal'" class="window-body">
       <!-- Show Original Text Section -->
       <div v-if="showOriginal && !isLoading" class="original-text-section">
         <div class="original-label">Original:</div>
@@ -76,7 +93,8 @@ const props = defineProps({
   selectedText: { type: String, default: '' },
   initialTranslatedText: { type: String, default: '' },
   theme: { type: String, default: 'light' },
-  isLoading: { type: Boolean, default: false }
+  isLoading: { type: Boolean, default: false },
+  initialSize: { type: String, default: 'normal' } // 'small' or 'normal'
 });
 
 const emit = defineEmits(['close', 'speak']);
@@ -93,6 +111,7 @@ const isLoading = computed(() => {
   return loading;
 });
 const isVisible = ref(false); // Start as not visible
+const currentSize = ref(props.initialSize); // Track current size
 const translatedText = computed(() => props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = ref('');
@@ -114,23 +133,35 @@ const {
   startDrag,
   cleanup: cleanupPositioning
 } = usePositioning(props.position, {
-  defaultWidth: 350,
-  defaultHeight: 180,
+  defaultWidth: currentSize.value === 'small' ? 60 : 350,
+  defaultHeight: currentSize.value === 'small' ? 40 : 180,
   enableDragging: true
 });
 
-// Watch for position prop changes
+// Watch for prop changes
 watch(() => props.position, (newPos) => {
   currentPosition.value = { x: newPos.x || newPos.left || 0, y: newPos.y || newPos.top || 0 };
 });
 
+watch(() => props.initialSize, (newSize) => {
+  currentSize.value = newSize;
+});
+
 // Computed Style for animation and positioning
-const windowStyle = computed(() => ({
-  ...positionStyle.value,
-  opacity: isVisible.value ? 1 : 0,
-  transform: isVisible.value ? 'scale(1)' : 'scale(0.95)',
-  transition: 'opacity 0.2s ease, transform 0.2s ease'
-}));
+const windowStyle = computed(() => {
+  const isSmall = currentSize.value === 'small';
+  
+  return {
+    ...positionStyle.value,
+    opacity: isVisible.value ? 1 : 0,
+    transform: isVisible.value ? 'scale(1)' : 'scale(0.95)',
+    transition: 'opacity 0.2s ease, transform 0.2s ease, width 0.3s ease, height 0.3s ease',
+    width: isSmall ? '60px' : '350px',
+    height: isSmall ? '40px' : 'auto',
+    minWidth: isSmall ? '60px' : '300px',
+    minHeight: isSmall ? '40px' : 'auto'
+  };
+});
 
 
 // When the component is mounted, start invisible and then animate in.
@@ -353,6 +384,72 @@ const handleStartDrag = (event) => {
 
 .translation-window.dark .original-text {
   color: #ccc;
+}
+
+/* Small size specific styles */
+.translation-window.small-size {
+  width: 60px !important;
+  height: 40px !important;
+  min-width: 60px !important;
+  min-height: 40px !important;
+  max-width: 60px !important;
+  max-height: 40px !important;
+  border-radius: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.small-loading-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.small-loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.small-loading-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: loading-pulse 1.4s ease-in-out infinite both;
+}
+
+.small-loading-dots .dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.small-loading-dots .dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.small-loading-dots .dot:nth-child(3) {
+  animation-delay: 0;
+}
+
+@keyframes loading-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Normal size specific styles */
+.translation-window.normal-size {
+  /* Keep existing normal size styles */
 }
 
 </style>
