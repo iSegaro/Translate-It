@@ -134,7 +134,15 @@ export class SelectElementManager {
       }
 
       // Start translation process immediately (don't await)
-      this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes);
+      this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes)
+        .catch(error => {
+          // Handle cancellation and other errors silently to avoid unhandled promise rejection
+          if (error.message === 'Translation cancelled by user') {
+            this.logger.debug('Translation cancelled by user - handled');
+          } else {
+            this.logger.error('Translation process failed', error);
+          }
+        });
 
       // Deactivate UI after kicking off the translation
       this.logger.info("[SelectElementManager] Text nodes collected for translation");
