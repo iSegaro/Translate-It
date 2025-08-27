@@ -26,8 +26,8 @@ export function useHistory() {
   // Computed
   const hasHistory = computed(() => historyItems.value.length > 0);
   const sortedHistoryItems = computed(() => {
-    // Show newest items first
-    return [...historyItems.value].reverse();
+    // historyItems is already sorted with newest first, so just return a copy.
+    return [...historyItems.value];
   });
 
   // Load history directly from storage (not from settings store)
