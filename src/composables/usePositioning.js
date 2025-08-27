@@ -47,7 +47,24 @@ export function usePositioning(initialPosition, options = {}) {
    * Initialize position
    */
   function initializePosition(pos) {
-    currentPosition.value = clampToViewport(pos);
+    const originalX = pos.x ?? pos.left ?? 0;
+    const originalY = pos.y ?? pos.top ?? 0;
+    
+    // Convert absolute coordinates to viewport-relative for fixed positioning
+    const viewportPosition = {
+      x: originalX - window.scrollX,
+      y: originalY - window.scrollY
+    };
+    
+    // Debug logging for position calculation
+    console.log('[usePositioning] Position calculation:', {
+      original: { x: originalX, y: originalY },
+      scroll: { x: window.scrollX, y: window.scrollY },
+      viewport: viewportPosition,
+      viewport: { width: window.innerWidth, height: window.innerHeight }
+    });
+    
+    currentPosition.value = clampToViewport(viewportPosition);
   }
 
   // Initialize with provided position
@@ -101,7 +118,7 @@ export function usePositioning(initialPosition, options = {}) {
     stopDrag
   } : {};
 
-  // Responsive positioning on window resize
+  // Responsive positioning on window resize and scroll
   let resizeTimeout;
   const handleResize = () => {
     clearTimeout(resizeTimeout);
@@ -110,8 +127,21 @@ export function usePositioning(initialPosition, options = {}) {
     }, 100);
   };
 
-  // Setup resize listener
+  // Handle scroll events (for components that need to maintain position relative to content)
+  let scrollTimeout;
+  const handleScroll = () => {
+    // Debounced scroll handling - only for cases where position should be maintained
+    // Fixed positioned elements don't normally need scroll updates, but adding for completeness
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      // For fixed positioning, we typically don't need to update on scroll
+      // But this hook is available for special cases
+    }, 50);
+  };
+
+  // Setup event listeners
   window.addEventListener('resize', handleResize);
+  window.addEventListener('scroll', handleScroll, { passive: true });
 
   return {
     // State
@@ -131,7 +161,10 @@ export function usePositioning(initialPosition, options = {}) {
     
     // Cleanup
     cleanup: () => {
+      clearTimeout(resizeTimeout);
+      clearTimeout(scrollTimeout);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
       if (enableDragging) {
         document.removeEventListener('mousemove', dragHandlers.onDrag);
         document.removeEventListener('mouseup', dragHandlers.stopDrag);

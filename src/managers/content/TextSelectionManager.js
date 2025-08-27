@@ -362,6 +362,8 @@ export class TextSelectionManager {
       
       targetY = rect.bottom + WindowsConfig.POSITIONING.SELECTION_OFFSET; // استفاده از config
       
+      // rect from getBoundingClientRect() is viewport-relative
+      // Convert to absolute coordinates by adding scroll offset
       position = {
         x: targetX + window.scrollX,
         y: targetY + window.scrollY

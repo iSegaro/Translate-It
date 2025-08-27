@@ -43,6 +43,8 @@ export class PositionCalculator {
     const selectionOffset = WindowsConfig.POSITIONING.SELECTION_OFFSET;
     
     // Calculate preferred position (centered under selection)
+    // Note: getBoundingClientRect() returns viewport-relative coordinates
+    // We need absolute coordinates for positioning, so we add scroll offset
     const preferredX = window.scrollX + rect.left + rect.width / 2 - (iconSize / 2);
     const preferredY = window.scrollY + rect.bottom + selectionOffset;
     
@@ -64,6 +66,7 @@ export class PositionCalculator {
     const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
     
     // Smart horizontal adjustment based on available space
+    // rect coordinates are viewport-relative, convert to absolute
     const rectLeft = rect.left + window.scrollX;
     const rectRight = rect.right + window.scrollX;
     let finalX = preferredX;
@@ -86,6 +89,7 @@ export class PositionCalculator {
     // Smart vertical adjustment if needed
     if (preferredY + iconSize > window.scrollY + viewport.height - margin) {
       // Position above selection if no space below
+      // Convert viewport-relative rect.top to absolute position
       finalY = window.scrollY + rect.top - iconSize - selectionOffset;
       this.logger.debug('Icon positioned above selection due to space constraints');
     }
