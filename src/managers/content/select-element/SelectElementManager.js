@@ -154,8 +154,14 @@ export class SelectElementManager {
       await this._notifyDeactivation();
       document.removeEventListener("click", this.handleClick, true); // Force remove listener
     } catch (error) {
-      this.logger.error("Element selection error", error);
-      await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-click" });
+      // Don't handle errors that are already handled
+      if (!error.alreadyHandled) {
+        this.logger.error("Element selection error", error);
+        await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-click" });
+      } else {
+        // Just log that error was already handled
+        this.logger.debug("Translation process failed (error already handled)", error.message);
+      }
     } finally {
       this.isProcessingClick = false;
     }
