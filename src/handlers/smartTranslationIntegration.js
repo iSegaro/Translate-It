@@ -33,6 +33,13 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     logger.warn('No text provided for translation');
     return;
   }
+  
+  // Check extension context before proceeding
+  if (!ExtensionContextManager.isValidSync()) {
+    const contextError = new Error('Extension context invalidated');
+    ExtensionContextManager.handleContextError(contextError, 'text-field-translation');
+    return;
+  }
 
   const mode = selectionRange ? TranslationMode.SelectElement : TranslationMode.Field;
   const platform = detectPlatform(target);
@@ -85,13 +92,14 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     );
     
     // Use ExtensionContextManager for safe message sending
-    const messageResult = await ExtensionContextManager.safeSendMessage(translationMessage, 'smartTranslation');
+    const messageResult = await ExtensionContextManager.safeSendMessage(translationMessage, 'text-field-translation');
     
     if (messageResult === null) {
-      // Extension context is invalid, dismiss the notification
+      // Extension context is invalid, dismiss the notification and handle silently
       logger.debug('Translation request failed - extension context invalid, dismissing notification');
       pageEventBus.emit('dismiss_notification', { id: newToastId });
       clearPendingNotificationData('translateFieldViaSmartHandler-context-invalid');
+      ExtensionContextManager.handleContextError('Extension context invalid', 'text-field-translation-request');
       return;
     }
     
@@ -103,17 +111,17 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
   } catch (err) {
     const handler = ErrorHandler.getInstance();
-    handler.handle(err, { type: ErrorTypes.SERVICE, context: 'smartTranslate-handler' });
+    await handler.handle(err, { 
+      type: ErrorTypes.TRANSLATION_FAILED,
+      context: 'text-field-request',
+      showToast: true
+    });
     
     // Dismiss notification on error
     if (toastId) {
       pageEventBus.emit('dismiss_notification', { id: toastId });
     }
     clearPendingNotificationData('translateFieldViaSmartHandler-error');
-    
-    // Handle translation error locally
-    const errorMessage = err?.message || err || 'Translation failed';
-    pageEventBus.emit('show-notification', { message: `Translation Error: ${errorMessage}`, type: 'error' });
   }
 }
 
@@ -138,6 +146,30 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     originalText: originalText?.substring(0, 100) + (originalText?.length > 100 ? '...' : ''),
     translatedText: translatedText?.substring(0, 100) + (translatedText?.length > 100 ? '...' : '')
   });
+  
+  // Check if translation was successful
+  if (!translatedText || translatedText === 'undefined' || translatedText.trim() === '') {
+    const errorMessage = 'Translation failed or returned empty result';
+    logger.error(errorMessage, { translatedText, originalText });
+    
+    // Dismiss the status notification if it exists
+    if (toastId) {
+      pageEventBus.emit('dismiss_notification', { id: toastId });
+    }
+    clearPendingNotificationData('applyTranslationToTextField-failed');
+    
+    // Use centralized error handling
+    const errorHandler = ErrorHandler.getInstance();
+    await errorHandler.handle(new Error(errorMessage), {
+      context: 'text-field-empty-result',
+      type: ErrorTypes.TRANSLATION_FAILED,
+      showToast: true
+    });
+    
+    // Clear pending translation data
+    clearPendingTranslationData();
+    throw new Error(errorMessage);
+  }
   
   try {
     // Check if pending data is stale (older than 30 seconds)
@@ -242,6 +274,15 @@ export async function applyTranslationToTextField(translatedText, originalText, 
     
   } catch (error) {
     logger.error('Error in applyTranslationToTextField', error);
+    
+    // Use centralized error handling
+    const errorHandler = ErrorHandler.getInstance();
+    await errorHandler.handle(error, {
+      context: 'text-field-application',
+      type: ErrorTypes.TRANSLATION_FAILED,
+      showToast: true
+    });
+    
     // Clear pending data on error as well
     clearPendingTranslationData();
     throw error;
