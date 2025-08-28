@@ -38,7 +38,6 @@
     
     <!-- Select Element Overlays -->
     <ElementHighlightOverlay />
-    <TranslationOverlay />
   </div>
 </template>
 
@@ -50,7 +49,6 @@ import TextFieldIcon from './components/TextFieldIcon.vue';
 import TranslationWindow from './components/TranslationWindow.vue';
 import TranslationIcon from './components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
-import TranslationOverlay from './components/TranslationOverlay.vue';
 
 const pageEventBus = window.pageEventBus;
 

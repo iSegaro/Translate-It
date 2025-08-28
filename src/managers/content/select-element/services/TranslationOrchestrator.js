@@ -56,8 +56,8 @@ export class TranslationOrchestrator {
         this.logger.info("Applying translations from cache only.");
         // Store translations in state manager
         this.stateManager.addTranslatedElement(element, cachedTranslations);
-        // Show translations in Shadow DOM overlay
-        this.showTranslationsInOverlay(element, cachedTranslations, textNodes);
+        // Apply translations directly to DOM nodes (like OLD system)
+        this.applyTranslationsToNodes(textNodes, cachedTranslations);
         // Dismiss the status notification since translation is complete
         if (this.statusNotification) {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
@@ -264,8 +264,8 @@ export class TranslationOrchestrator {
         // Store translations in state manager for potential revert
         this.stateManager.addTranslatedElement(element, allTranslations);
         
-        // Show translations in Shadow DOM overlay instead of direct DOM manipulation
-        this.showTranslationsInOverlay(element, allTranslations, textNodes);
+        // Apply translations directly to DOM nodes (like OLD system)
+        this.applyTranslationsToNodes(textNodes, allTranslations);
 
         request.status = 'completed';
         request.result = data;
@@ -398,38 +398,28 @@ export class TranslationOrchestrator {
   }
 
   /**
-   * Show translations in Shadow DOM overlay with exact same styling as original
-   * @param {HTMLElement} element - The element containing the text nodes
+   * Apply translations directly to DOM nodes (like OLD system)
+   * @param {Array} textNodes - Array of text nodes to translate
    * @param {Map} translations - Map of original text to translated text
-   * @param {Array} textNodes - Array of text nodes that were translated
    */
-  showTranslationsInOverlay(element, translations, textNodes) {
-    // Debug: Log what we're sending to the overlay
-    this.logger.debug("Showing translations in overlay", {
-      elementTag: element.tagName,
-      translationsSize: translations.size,
+  applyTranslationsToNodes(textNodes, translations) {
+    this.logger.debug("Applying translations directly to DOM nodes", {
       textNodesCount: textNodes.length,
-      originalTextLength: element.textContent.length
+      translationsSize: translations.size
     });
     
-    // Debug: Log translation mappings
-    if (translations.size > 0) {
-      this.logger.debug("Translation mappings being sent:");
-      translations.forEach((translated, original) => {
-        this.logger.debug(`  "${original}" -> "${translated}"`);
-      });
-    }
+    // Create simple context for the extraction utility
+    const context = {
+      state: {
+        originalTexts: this.stateManager.originalTexts || new Map()
+      }
+    };
     
-    // Show translation in Shadow DOM overlay with exact same styling
-    pageEventBus.emit('show-translation', {
-      element: element,
-      translations: translations,
-      textNodes: textNodes,
-      originalText: element.textContent
-    });
-
-    this.logger.debug("Translation displayed in Shadow DOM overlay with original styling", {
-      element: element.tagName
+    // Use the existing applyTranslationsToNodes from extraction utilities
+    applyTranslationsToNodes(textNodes, translations, context);
+    
+    this.logger.debug("Translations applied directly to DOM nodes", {
+      appliedCount: translations.size
     });
   }
 

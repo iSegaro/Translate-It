@@ -4,7 +4,7 @@ import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { taggleLinks } from "../../../../utils/core/helpers.js";
 import { UI_CONSTANTS } from "../constants/selectElementConstants.js";
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+// pageEventBus import removed - no longer needed for Shadow DOM
 
 export class ElementHighlighter {
   constructor() {
@@ -21,30 +21,24 @@ export class ElementHighlighter {
   }
 
   /**
-   * Check if element belongs to our Shadow DOM (should be excluded from highlighting)
+   * Check if element belongs to our extension (should be excluded from highlighting)
    * @param {HTMLElement} element - Element to check
    * @returns {boolean} Whether element should be excluded
    */
-  isOurShadowDOMElement(element) {
+  isOurElement(element) {
     if (!element) return false;
-    
-    // Check if element is our Shadow DOM host
-    if (element.id === 'translate-it-host') {
-      return true;
-    }
-    
-    // Check if element is inside our Shadow DOM host
-    const shadowHost = document.getElementById('translate-it-host');
-    if (shadowHost && shadowHost.contains(element)) {
-      return true;
-    }
     
     // Check if element has our internal classes
     if (element.classList && (
-      element.classList.contains('element-highlight-overlay') ||
-      element.classList.contains('content-app-container') ||
-      element.classList.contains('highlight-element')
+      element.classList.contains('translate-it-element-highlighted') ||
+      element.classList.contains('content-app-container')
     )) {
+      return true;
+    }
+    
+    // Check if element has our data attributes
+    if (element.hasAttribute('data-translate-it-highlighted') ||
+        element.hasAttribute('data-translate-id')) {
       return true;
     }
     
@@ -52,19 +46,19 @@ export class ElementHighlighter {
   }
 
   /**
-   * Handle mouse over event - highlight element using Shadow DOM overlay for visual + original logic
+   * Handle mouse over event - highlight element using direct CSS class
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
-    // Skip our own Shadow DOM host and children
-    if (this.isOurShadowDOMElement(element)) {
+    // Skip our own elements
+    if (this.isOurElement(element)) {
       return;
     }
 
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
     
-    if (!bestElement || this.isOurShadowDOMElement(bestElement)) return;
+    if (!bestElement || this.isOurElement(bestElement)) return;
 
     // Skip if already highlighted
     if (bestElement === this.currentHighlighted) return;
@@ -72,19 +66,8 @@ export class ElementHighlighter {
     // Clear previous highlight
     this.clearHighlight();
 
-    // Highlight best element using Shadow DOM overlay for visual
-    const rect = bestElement.getBoundingClientRect();
-    pageEventBus.emit('element-highlight', {
-      element: bestElement,
-      rect: {
-        top: rect.top + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-        height: rect.height
-      },
-      id: `highlight-${Date.now()}`
-    });
-    
+    // Add highlight class directly to element
+    bestElement.classList.add('translate-it-element-highlighted');
     this.currentHighlighted = bestElement;
   }
 
@@ -180,7 +163,7 @@ export class ElementHighlighter {
   }
 
   /**
-   * Handle mouse out event - remove highlight using Shadow DOM overlay
+   * Handle mouse out event - remove highlight using direct CSS class
    * @param {HTMLElement} element - Element that mouse left
    */
   handleMouseOut(element) {
@@ -188,84 +171,51 @@ export class ElementHighlighter {
     if (element === this.currentHighlighted) {
       setTimeout(() => {
         if (this.currentHighlighted === element) {
-          // Clear highlight using Shadow DOM overlay
-          pageEventBus.emit('element-unhighlight', { element: this.currentHighlighted });
+          // Remove highlight class directly
+          element.classList.remove('translate-it-element-highlighted');
           this.currentHighlighted = null;
-
-          // Find nearest suitable sibling or parent for highlighting
-          let candidate = null;
-          // First check siblings
-          if (element.parentElement) {
-            const siblings = Array.from(element.parentElement.children).filter((el) => el !== element);
-            for (const sib of siblings) {
-              if (this.isValidTextElement(sib)) {
-                candidate = sib;
-                break;
-              }
-            }
-          }
-          // If no suitable sibling, check parent
-          if (!candidate && element.parentElement && this.isValidTextElement(element.parentElement)) {
-            candidate = element.parentElement;
-          }
-          // If candidate found, highlight it using Shadow DOM
-          if (candidate) {
-            const rect = candidate.getBoundingClientRect();
-            pageEventBus.emit('element-highlight', {
-              element: candidate,
-              rect: rect,
-              id: `highlight-${Date.now()}`
-            });
-            this.currentHighlighted = candidate;
-          }
         }
       }, 50);
     }
   }
 
   /**
-   * Highlight element - uses Shadow DOM overlay ONLY
+   * Highlight element - uses direct CSS class
    * @param {HTMLElement} element - Element to highlight
    */
   highlightElement(element) {
     if (element) {
-      // Use Shadow DOM overlay instead of direct DOM manipulation
-      const rect = element.getBoundingClientRect();
-      pageEventBus.emit('element-highlight', {
-        element: element,
-        rect: {
-          top: rect.top + window.scrollY,
-          left: rect.left + window.scrollX,
-          width: rect.width,
-          height: rect.height
-        },
-        id: `highlight-${Date.now()}`
-      });
+      // Clear any existing highlights
+      this.clearHighlight();
+      
+      // Add highlight class directly to element
+      element.classList.add('translate-it-element-highlighted');
       this.currentHighlighted = element;
     }
   }
 
   /**
-   * Clear current highlight - uses Shadow DOM overlay ONLY
+   * Clear current highlight - uses direct CSS class
    */
   clearHighlight() {
-    // Clear highlight using Shadow DOM overlay instead of direct DOM manipulation
+    // Remove highlight class directly from element
     if (this.currentHighlighted) {
-      pageEventBus.emit('element-unhighlight', { element: this.currentHighlighted });
+      this.currentHighlighted.classList.remove('translate-it-element-highlighted');
       this.currentHighlighted = null;
     }
   }
 
   /**
-   * Clear all overlay elements
+   * Clear all highlight elements
    */
-  clearOverlays() {
-    this.overlayElements.forEach((overlay) => {
-      if (overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
+  clearAllHighlights() {
+    // Remove highlight class from all elements that might have it
+    const highlightedElements = document.querySelectorAll('.translate-it-element-highlighted');
+    highlightedElements.forEach(element => {
+      element.classList.remove('translate-it-element-highlighted');
     });
-    this.overlayElements.clear();
+    
+    this.currentHighlighted = null;
   }
 
   /**
@@ -323,9 +273,8 @@ export class ElementHighlighter {
    * Deactivate UI only (keep translation processing)
    */
   async deactivateUI() {
-    // Clean up highlights using Shadow DOM overlay
-    pageEventBus.emit('clear-all-highlights');
-    this.clearOverlays();
+    // Clear all highlights
+    this.clearAllHighlights();
 
     // Remove global styles
     this.removeGlobalStyles();
@@ -385,7 +334,7 @@ export class ElementHighlighter {
    */
   async cleanup() {
     this.clearHighlight();
-    this.clearOverlays();
+    this.clearAllHighlights();
     this.removeGlobalStyles();
     this.enablePageInteractions();
     this.logger.debug('ElementHighlighter cleanup completed');
@@ -402,7 +351,7 @@ export class ElementHighlighter {
         className: this.currentHighlighted.className,
         id: this.currentHighlighted.id
       } : null,
-      overlayElements: this.overlayElements.size
+      highlightedElementsCount: document.querySelectorAll('.translate-it-element-highlighted').length
     };
   }
 }
