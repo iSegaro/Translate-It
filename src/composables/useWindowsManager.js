@@ -95,7 +95,8 @@ export function useWindowsManager() {
       };
       logger.debug('Updated window with new data', detail.id);
     } else {
-      logger.error('Window not found for update:', detail.id);
+      // Window was closed before translation completed - this is normal behavior
+      logger.debug('Window was closed before translation completed:', detail.id);
     }
   };
 

@@ -443,7 +443,11 @@ export class WindowsManager {
       return result;
       
     } catch (error) {
-      if (this.state.isTranslationCancelled) return null;
+      // Handle cancellation errors gracefully - they are expected when user dismisses window
+      if (this.state.isTranslationCancelled || error.message === 'Translation cancelled') {
+        this.logger.debug('Translation cancelled during translation process - this is normal');
+        return null;
+      }
       
       this.logger.error('Translation failed', { error });
       return null;
@@ -504,7 +508,11 @@ export class WindowsManager {
       this.logger.debug('Translation window updated with result', { windowId });
       
     } catch (error) {
-      if (this.state.isTranslationCancelled) return;
+      // Handle cancellation errors gracefully - they are expected when user dismisses window
+      if (this.state.isTranslationCancelled || error.message === 'Translation cancelled') {
+        this.logger.debug('Translation cancelled during window creation - this is normal');
+        return;
+      }
       await this._handleTranslationError(error, selectedText, position);
     }
   }
@@ -869,6 +877,13 @@ export class WindowsManager {
     
     if (windowId) {
       WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
+    }
+
+    // Cancel any ongoing translation when dismissing
+    if (this.translationHandler) {
+      this.state.setTranslationCancelled(true);
+      this.translationHandler.cancelAllTranslations();
+      this.logger.debug('[Translation] All pending translations cancelled during dismiss');
     }
 
     // Reset flags

@@ -110,6 +110,12 @@ export class TranslationHandler {
         
         this.logger.debug("resultPromise resolved with:", result);
         
+        // Check if translation was cancelled
+        if (result?.cancelled) {
+          this.logger.debug("Translation was cancelled via promise resolution");
+          throw new Error('Translation cancelled');
+        }
+        
         // If we reach here successfully, the result should be valid
         if (!result?.translatedText) {
           this.logger.error("resultPromise resolved but no translatedText - this should not happen");
@@ -199,7 +205,10 @@ export class TranslationHandler {
     clearTimeout(request.timeout);
     browser.runtime.onMessage.removeListener(request.messageListener);
     this.activeRequests.delete(messageId);
-    request.reject(new Error('Translation cancelled'));
+    
+    // Instead of rejecting with an error, resolve with a cancellation marker
+    // This prevents uncaught promise rejection errors in the console
+    request.resolve({ cancelled: true });
     
     this.logger.debug('Translation cancelled', { messageId });
   }
