@@ -46,13 +46,12 @@
     </div>
 
     <!-- Small loading spinner for small size -->
-    <div v-if="currentSize === 'small'" class="small-loading-container">
-      <div class="small-loading-dots">
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-      </div>
-    </div>
+    <img 
+      v-if="currentSize === 'small'" 
+      src="/src/assets/icons/loading-128.gif"
+      alt="Loading..."
+      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
+    />
 
     <div v-if="currentSize === 'normal'" class="window-body">
       <!-- Show Original Text Section -->
@@ -110,6 +109,7 @@ const isLoading = computed(() => {
   });
   return loading;
 });
+
 const isVisible = ref(false); // Start as not visible
 const currentSize = ref(props.initialSize); // Track current size
 const translatedText = computed(() => props.initialTranslatedText);
@@ -394,58 +394,25 @@ const handleStartDrag = (event) => {
   min-height: 40px !important;
   max-width: 60px !important;
   max-height: 40px !important;
-  border-radius: 20px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 20px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  position: relative !important;
 }
 
-.small-loading-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+
+/* Dark theme for small size */
+.translation-window.small-size.dark {
+  background: #333 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-.small-loading-dots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
 
-.small-loading-dots .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: loading-pulse 1.4s ease-in-out infinite both;
-}
-
-.small-loading-dots .dot:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.small-loading-dots .dot:nth-child(2) {
-  animation-delay: -0.16s;
-}
-
-.small-loading-dots .dot:nth-child(3) {
-  animation-delay: 0;
-}
-
-@keyframes loading-pulse {
-  0%, 80%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 
 /* Normal size specific styles */
 .translation-window.normal-size {
