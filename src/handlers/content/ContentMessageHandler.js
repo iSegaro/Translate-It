@@ -5,6 +5,9 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { RevertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
+import { ErrorHandler } from '@/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/error-management/ErrorTypes.js';
+import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
 export class ContentMessageHandler {
   constructor() {
@@ -13,6 +16,7 @@ export class ContentMessageHandler {
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MessageHandler');
     this.selectElementManager = null;
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   setSelectElementManager(manager) {
@@ -48,7 +52,10 @@ export class ContentMessageHandler {
         if (sendResponse) sendResponse({ success: true, data: result });
         return true; // Message was handled
       } catch (error) {
-        this.logger.error(`Error handling ${message.action}`, error);
+        // Don't log errors that are already handled
+        if (!error.alreadyHandled) {
+          this.logger.error(`Error handling ${message.action}`, error);
+        }
         if (sendResponse) sendResponse({ success: false, error: error.message });
         return true; // Error was handled
       }
@@ -69,12 +76,15 @@ export class ContentMessageHandler {
   }
 
   async handleTranslationResult(message) {
-    const { translationMode, translatedText, originalText, options } = message.data;
+    const { translationMode, translatedText, originalText, options, success, error } = message.data;
     const toastId = options?.toastId;
     this.logger.debug(`Handling translation result for mode: ${translationMode}`, {
+      success,
       translatedTextLength: translatedText?.length,
       originalTextLength: originalText?.length,
-      hasToastId: !!toastId
+      hasToastId: !!toastId,
+      hasError: !!error,
+      errorType: typeof error
     });
 
     switch (translationMode) {
@@ -87,8 +97,71 @@ export class ContentMessageHandler {
         break;
 
       case TranslationMode.Field:
+        this.logger.debug('Processing Text Field translation result');
+        
+        // Check if translation failed at background level
+        if (success === false && error) {
+          this.logger.debug('Text Field translation failed in background, handling error');
+          
+          // Dismiss status notification if exists
+          if (toastId) {
+            pageEventBus.emit('dismiss_notification', { id: toastId });
+          }
+          
+          // Extract error message safely
+          let errorMessage;
+          if (typeof error === 'string' && error.length > 0) {
+            errorMessage = error;
+          } else if (error && typeof error === 'object' && error.message) {
+            errorMessage = error.message;
+          } else if (error) {
+            try {
+              errorMessage = JSON.stringify(error);
+            } catch (jsonError) {
+              errorMessage = 'Translation failed';
+            }
+          } else {
+            errorMessage = 'Translation failed';
+          }
+          
+          // Create error object with original error message
+          const translationError = new Error(errorMessage);
+          translationError.originalError = error;
+          
+          // Use centralized error handling
+          await this.errorHandler.handle(translationError, {
+            context: 'text-field-translation',
+            type: ErrorTypes.TRANSLATION_FAILED,
+            showToast: true
+          });
+          
+          translationError.alreadyHandled = true;
+          throw translationError;
+        }
+        
+        // If success or no explicit error, proceed with normal flow
         this.logger.debug('Forwarding result to applyTranslationToTextField');
-        return applyTranslationToTextField(translatedText, originalText, translationMode, toastId);
+        try {
+          return await applyTranslationToTextField(translatedText, originalText, translationMode, toastId);
+        } catch (error) {
+          // Don't handle errors that are already handled
+          if (error.alreadyHandled) {
+            throw error;
+          }
+          
+          // Only log if error is not already handled
+          this.logger.error('Field translation failed during application:', error);
+          
+          // Use centralized error handling
+          await this.errorHandler.handle(error, {
+            context: 'text-field-application',
+            type: ErrorTypes.TRANSLATION_FAILED,
+            showToast: true
+          });
+          
+          error.alreadyHandled = true;
+          throw error;
+        }
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
