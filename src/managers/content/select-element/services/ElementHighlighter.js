@@ -10,6 +10,7 @@ export class ElementHighlighter {
   constructor() {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ElementHighlighter');
     this.currentHighlighted = null;
+    this.currentOriginalElement = null; // Track the original element that triggered highlight
     this.overlayElements = new Set();
   }
 
@@ -21,30 +22,89 @@ export class ElementHighlighter {
   }
 
   /**
-   * Handle mouse over event - highlight element using Shadow DOM overlay
+   * Check if element belongs to our Shadow DOM (should be excluded from highlighting)
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element should be excluded
+   */
+  isOurShadowDOMElement(element) {
+    if (!element) return false;
+    
+    // Check if element is our Shadow DOM host
+    if (element.id === 'translate-it-host') {
+      return true;
+    }
+    
+    // Check if element is inside our Shadow DOM host
+    const shadowHost = document.getElementById('translate-it-host');
+    if (shadowHost && shadowHost.contains(element)) {
+      return true;
+    }
+    
+    // Check if element has our internal classes
+    if (element.classList && (
+      element.classList.contains('safe-highlight-overlay') ||
+      element.classList.contains('element-highlight-overlay') ||
+      element.classList.contains('content-app-container') ||
+      element.classList.contains('highlight-element') ||
+      element.classList.contains('safe-highlight-element')
+    )) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Handle mouse over event - highlight element using Shadow DOM overlay ONLY
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
+    // Skip our own Shadow DOM host and children
+    if (this.isOurShadowDOMElement(element)) {
+      return;
+    }
+
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
     
-    if (!bestElement) return;
+    if (!bestElement || this.isOurShadowDOMElement(bestElement)) return;
 
-    // Skip if already highlighted
-    if (bestElement === this.currentHighlighted) return;
+    // Check if both the best element AND the original element are the same
+    // This ensures we re-highlight when moving between nested elements
+    if (bestElement === this.currentHighlighted && element === this.currentOriginalElement) {
+      this.logger.debug('Skipping highlight - same element', { 
+        bestElement: bestElement.tagName + (bestElement.className ? '.' + bestElement.className : ''),
+        originalElement: element.tagName + (element.className ? '.' + element.className : '')
+      });
+      return;
+    }
+    
+    this.logger.debug('Highlighting element', { 
+      bestElement: bestElement.tagName + (bestElement.className ? '.' + bestElement.className : ''),
+      originalElement: element.tagName + (element.className ? '.' + element.className : ''),
+      previousBest: this.currentHighlighted?.tagName + (this.currentHighlighted?.className ? '.' + this.currentHighlighted?.className : ''),
+      previousOriginal: this.currentOriginalElement?.tagName + (this.currentOriginalElement?.className ? '.' + this.currentOriginalElement?.className : '')
+    });
 
     // Clear previous highlight
     this.clearHighlight();
 
-    // Highlight best element using Shadow DOM overlay
+    // Highlight best element using ONLY Shadow DOM overlay - no direct DOM manipulation
     const rect = bestElement.getBoundingClientRect();
     pageEventBus.emit('element-highlight', {
       element: bestElement,
-      rect: rect,
-      id: `highlight-${Date.now()}`
+      rect: {
+        top: rect.top + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+        height: rect.height
+      },
+      id: `highlight-${Date.now()}`,
+      originalElement: element // Track the original element that triggered this
     });
     
     this.currentHighlighted = bestElement;
+    this.currentOriginalElement = element; // Track original element for comparison
   }
 
   /**
@@ -183,24 +243,36 @@ export class ElementHighlighter {
   }
 
   /**
-   * Highlight element - uses CSS classes
+   * Highlight element - uses Shadow DOM overlay ONLY
    * @param {HTMLElement} element - Element to highlight
    */
   highlightElement(element) {
     if (element) {
-      element.classList.add(UI_CONSTANTS.HIGHLIGHT_CLASS);
+      // Use Shadow DOM overlay instead of direct DOM manipulation
+      const rect = element.getBoundingClientRect();
+      pageEventBus.emit('element-highlight', {
+        element: element,
+        rect: {
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+          height: rect.height
+        },
+        id: `highlight-${Date.now()}`
+      });
       this.currentHighlighted = element;
     }
   }
 
   /**
-   * Clear current highlight
+   * Clear current highlight - uses Shadow DOM overlay ONLY
    */
   clearHighlight() {
-    // Remove highlight class from current element
+    // Clear highlight using Shadow DOM overlay instead of direct DOM manipulation
     if (this.currentHighlighted) {
-      this.currentHighlighted.classList.remove(UI_CONSTANTS.HIGHLIGHT_CLASS);
+      pageEventBus.emit('element-unhighlight', { element: this.currentHighlighted });
       this.currentHighlighted = null;
+      this.currentOriginalElement = null;
     }
   }
 
@@ -217,71 +289,64 @@ export class ElementHighlighter {
   }
 
   /**
-   * Add global styles for select element mode
+   * Add global styles for select element mode - Shadow DOM safe approach
    */
   addGlobalStyles() {
-    // Apply the CSS class that enables crosshair cursor and hover effects
-    taggleLinks(true);
-
-    // Verify the class was applied
-    const hasClass = document.documentElement.classList.contains(
-      UI_CONSTANTS.DISABLE_LINKS_CLASS
-    );
-    this.logger.debug("CSS class applied", hasClass);
-
-    if (!hasClass) {
-      this.logger.warn("CSS class failed to apply - trying manual application");
-      document.documentElement.classList.add(UI_CONSTANTS.DISABLE_LINKS_CLASS);
-    }
+    // Use Shadow DOM overlay to provide visual feedback instead of global CSS manipulation
+    pageEventBus.emit('select-mode-styles-enable', {
+      cursor: 'crosshair',
+      disableLinks: true
+    });
+    
+    this.logger.debug("Select mode styles enabled via Shadow DOM overlay");
   }
 
   /**
-   * Remove global styles
+   * Remove global styles - Shadow DOM safe approach
    */
   removeGlobalStyles() {
-    // Remove the CSS class that disables crosshair cursor and hover effects
-    taggleLinks(false);
+    // Remove Shadow DOM overlay styles
+    pageEventBus.emit('select-mode-styles-disable');
+    
+    this.logger.debug("Select mode styles disabled via Shadow DOM overlay");
   }
 
   /**
-   * Disable page interactions during selection
+   * Disable page interactions during selection - Shadow DOM safe approach
    */
   disablePageInteractions() {
-    document.body.classList.add(UI_CONSTANTS.CURSOR_CLASS);
-
-    // Disable text selection
-    document.body.style.userSelect = "none";
-    document.body.style.webkitUserSelect = "none";
-    document.body.style.msUserSelect = "none";
+    // Use Shadow DOM overlay to capture interactions instead of direct DOM manipulation
+    pageEventBus.emit('disable-page-interactions', {
+      disableTextSelection: true,
+      captureClicks: true
+    });
+    
+    this.logger.debug("Page interactions disabled via Shadow DOM overlay");
   }
 
   /**
-   * Re-enable page interactions
+   * Re-enable page interactions - Shadow DOM safe approach
    */
   enablePageInteractions() {
-    document.body.classList.remove(UI_CONSTANTS.CURSOR_CLASS);
-
-    // Re-enable text selection
-    document.body.style.userSelect = "";
-    document.body.style.webkitUserSelect = "";
-    document.body.style.msUserSelect = "";
+    // Remove Shadow DOM overlay interactions
+    pageEventBus.emit('enable-page-interactions');
+    
+    this.logger.debug("Page interactions enabled via Shadow DOM overlay");
   }
 
   /**
-   * Deactivate UI only (keep translation processing)
+   * Deactivate UI only (keep translation processing) - Shadow DOM safe approach
    */
   async deactivateUI() {
     // Clean up highlights using Shadow DOM overlay
     pageEventBus.emit('clear-all-highlights');
     this.clearOverlays();
 
-    // Remove global styles
+    // Remove Shadow DOM styles and interactions
     this.removeGlobalStyles();
-
-    // Re-enable page interactions
     this.enablePageInteractions();
 
-    this.logger.debug("Select element UI deactivated");
+    this.logger.debug("Select element UI deactivated safely via Shadow DOM");
   }
 
   /**

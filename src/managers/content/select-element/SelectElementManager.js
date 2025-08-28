@@ -46,6 +46,7 @@ export class SelectElementManager {
   async initialize() {
     try {
       this.setupKeyboardListeners();
+      this.setupSafeHighlightListeners();
       await this.stateManager.initialize();
       await this.elementHighlighter.initialize();
       await this.textExtractionService.initialize();
@@ -61,6 +62,88 @@ export class SelectElementManager {
 
   setupKeyboardListeners() {
     this.modeManager.setupKeyboardListeners();
+  }
+
+  setupSafeHighlightListeners() {
+    // Listen for safe element selection events from Shadow DOM overlay
+    pageEventBus.on('element-selected', async (detail) => {
+      const { element, highlightId } = detail;
+      this.logger.debug('Safe element selected:', { element, highlightId });
+      await this.handleElementSelection(element);
+    });
+
+    // Listen for safe mouse over events
+    pageEventBus.on('safe-element-mouseover', (detail) => {
+      const { element, coordinates } = detail;
+      if (!this.isActive) return;
+      
+      // Use ElementHighlighter to handle mouse over
+      this.elementHighlighter.handleMouseOver(element);
+    });
+
+    // Listen for safe mouse out events
+    pageEventBus.on('safe-element-mouseout', (detail) => {
+      const { element, coordinates } = detail;
+      if (!this.isActive) return;
+      
+      // Use ElementHighlighter to handle mouse out
+      this.elementHighlighter.handleMouseOut(element);
+    });
+
+    // Listen for safe click events
+    pageEventBus.on('safe-element-click', async (detail) => {
+      const { element, coordinates } = detail;
+      if (!this.isActive) return;
+      
+      this.logger.debug('Safe element click:', { element, coordinates });
+      await this.handleElementSelection(element);
+    });
+  }
+
+  async handleElementSelection(element) {
+    this.logger.debug("Safe element selection triggered", { element });
+
+    if (!this.isActive || this.isProcessingClick) return;
+    this.isProcessingClick = true;
+    window.isTranslationInProgress = true;
+
+    try {
+      const { textNodes, originalTextsMap } = collectTextNodes(element);
+      if (originalTextsMap.size === 0) {
+        this.logger.info("No text found in selected element");
+        pageEventBus.emit('show-notification', {
+          message: "No text found to translate.",
+          type: "warning",
+        });
+        this.isProcessingClick = false;
+        return;
+      }
+
+      // Start translation process immediately (don't await)
+      this.translationOrchestrator.processSelectedElement(element, originalTextsMap, textNodes)
+        .catch(error => {
+          // Handle cancellation and other errors silently to avoid unhandled promise rejection
+          if (error.message === 'Translation cancelled by user') {
+            this.logger.debug('Translation cancelled by user - handled');
+          } else {
+            this.logger.error('Translation process failed', error);
+          }
+        })
+        .finally(() => {
+          // Ensure cleanup after translation completes (success or failure)
+          this.performPostTranslationCleanup();
+        });
+
+      // Deactivate UI after kicking off the translation
+      this.logger.info("[SelectElementManager] Safe element selection - Text nodes collected for translation");
+      await this.deactivateUI();
+      await this._notifyDeactivation();
+    } catch (error) {
+      this.logger.error("Safe element selection error", error);
+      await this.errorHandlingService.handle(error, { type: ErrorTypes.INTEGRATION, context: "select-element-safe-selection" });
+    } finally {
+      this.isProcessingClick = false;
+    }
   }
 
   async activate() {
@@ -160,6 +243,26 @@ export class SelectElementManager {
   async cancelInProgressTranslation() {
     this.logger.operation("Request to cancel in-progress translation received");
     await this.translationOrchestrator.cancelAllTranslations();
+  }
+
+  performPostTranslationCleanup() {
+    this.logger.debug("Performing post-translation cleanup");
+    
+    // Clear any remaining highlights
+    pageEventBus.emit('clear-all-highlights');
+    
+    // Ensure UI is fully deactivated
+    if (this.isActive) {
+      this.deactivateUI().catch(error => {
+        this.logger.warn('Error during post-translation UI cleanup:', error);
+      });
+    }
+    
+    // Reset processing state
+    this.isProcessingClick = false;
+    window.isTranslationInProgress = false;
+    
+    this.logger.debug("Post-translation cleanup completed");
   }
 
   async revertTranslations() {
