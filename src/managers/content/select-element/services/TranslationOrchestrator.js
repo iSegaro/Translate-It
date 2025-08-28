@@ -11,6 +11,9 @@ import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
 import { AUTO_DETECT_VALUE } from "../../../../constants.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { ErrorHandler } from '@/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/error-management/ErrorTypes.js';
+import ExtensionContextManager from '@/utils/core/extensionContext.js';
 
 export class TranslationOrchestrator {
   constructor(stateManager) {
@@ -19,6 +22,7 @@ export class TranslationOrchestrator {
     this.translationRequests = new Map();
     this.escapeKeyListener = null;
     this.statusNotification = null;
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   async initialize() {
@@ -27,6 +31,14 @@ export class TranslationOrchestrator {
 
   async processSelectedElement(element, originalTextsMap, textNodes) {
     this.logger.operation("Starting advanced translation process for selected element");
+    
+    // Check extension context before proceeding
+    if (!ExtensionContextManager.isValidSync()) {
+      const contextError = new Error('Extension context invalidated');
+      ExtensionContextManager.handleContextError(contextError, 'select-element-translation');
+      throw contextError;
+    }
+    
     const messageId = generateContentMessageId();
 
     const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
@@ -82,13 +94,18 @@ export class TranslationOrchestrator {
       await this.setupTranslationWaiting(messageId, element);
 
     } catch (error) {
-      this.logger.error("Translation process failed", error);
+      // Don't log or handle errors that are already handled
+      if (!error.alreadyHandled) {
+        this.logger.error("Translation process failed", error);
+      }
+      
       this.translationRequests.delete(messageId);
       // Dismiss the status notification on error
       if (this.statusNotification) {
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
       }
+      
       throw error;
     }
   }
@@ -114,8 +131,13 @@ export class TranslationOrchestrator {
       };
 
       this.logger.debug("Sending translation request with advanced payload");
-      const { sendReliable } = await import("../../../../messaging/core/ReliableMessaging.js");
-      await sendReliable(translationRequest);
+      
+      // Use safe messaging through ExtensionContextManager
+      const result = await ExtensionContextManager.safeSendMessage(translationRequest, 'select-element-translation');
+      
+      if (result === null) {
+        throw new Error('Extension context invalidated during translation request');
+      }
 
       this.logger.debug("Translation request sent successfully");
     } catch (error) {
@@ -136,7 +158,11 @@ export class TranslationOrchestrator {
       await Promise.race([this.waitForTranslationResult(messageId), timeoutPromise]);
       this.logger.debug("Translation completed successfully for message:", messageId);
     } catch (error) {
-      this.logger.error("Translation waiting failed", error);
+      // Don't log errors that are already handled
+      if (!error.alreadyHandled) {
+        this.logger.error("Translation waiting failed", error);
+      }
+      
       const request = this.translationRequests.get(messageId);
       if (request) {
         request.status = 'error';
@@ -166,10 +192,19 @@ export class TranslationOrchestrator {
           resolve(request.result);
         } else if (request.status === 'error') {
           clearInterval(checkInterval);
-          reject(new Error(request.error || 'Translation failed'));
+          // Handle error properly to avoid [object Object]
+          const errorMessage = typeof request.error === 'string' 
+            ? request.error 
+            : (request.error?.message || JSON.stringify(request.error) || 'Translation failed');
+          const error = new Error(errorMessage);
+          error.alreadyHandled = true; // Mark as already handled since handleTranslationResult already showed notification
+          reject(error);
         } else if (request.status === 'cancelled') {
           clearInterval(checkInterval);
-          reject(new Error(request.error || 'Translation cancelled by user'));
+          const errorMessage = typeof request.error === 'string' 
+            ? request.error 
+            : (request.error?.message || 'Translation cancelled by user');
+          reject(new Error(errorMessage));
         }
       }, 100);
     });
@@ -177,9 +212,15 @@ export class TranslationOrchestrator {
 
   async handleTranslationResult(message) {
     const { messageId, data } = message;
-    const { success, error, translatedText } = data;
-
-    this.logger.debug("Received translation result:", { messageId, success });
+    
+    // Enhanced logging: Log raw data received from background
+    this.logger.debug("Received translation result:", { 
+      messageId, 
+      success: data?.success,
+      hasError: !!data?.error,
+      errorType: typeof data?.error,
+      rawErrorPreview: data?.error ? String(data?.error).substring(0, 100) : 'none'
+    });
 
     const request = this.translationRequests.get(messageId);
     if (!request) {
@@ -197,8 +238,16 @@ export class TranslationOrchestrator {
       return;
     }
 
+    // Preserve original error for safety before any processing
+    const originalErrorBackup = data?.error;
+    this.logger.debug("Original error backup created:", { 
+      hasBackup: !!originalErrorBackup,
+      backupType: typeof originalErrorBackup
+    });
+
     try {
-      if (success) {
+      if (data?.success) {
+        const { translatedText } = data;
         const translatedData = JSON.parse(translatedText);
         const { textsToTranslate, originMapping, expandedTexts, cachedTranslations, textNodes, element } = request;
 
@@ -222,16 +271,129 @@ export class TranslationOrchestrator {
         request.result = data;
         this.logger.info("Translation applied successfully to DOM elements", { messageId });
       } else {
+        // ENHANCED ERROR HANDLING: Process error with comprehensive logging and safety
+        this.logger.debug("Processing translation error...");
+        
+        let processedErrorMessage;
+        let safeErrorForHandler;
+        
+        try {
+          // Safe error message extraction with multiple fallbacks
+          if (typeof originalErrorBackup === 'string' && originalErrorBackup.length > 0) {
+            processedErrorMessage = originalErrorBackup;
+            safeErrorForHandler = originalErrorBackup;
+            this.logger.debug("Using string error from backup:", processedErrorMessage);
+          } else if (originalErrorBackup && typeof originalErrorBackup === 'object' && originalErrorBackup.message) {
+            processedErrorMessage = originalErrorBackup.message;
+            safeErrorForHandler = originalErrorBackup.message;
+            this.logger.debug("Using error.message from backup:", processedErrorMessage);
+          } else if (originalErrorBackup) {
+            // Safe JSON stringify with error handling
+            try {
+              processedErrorMessage = JSON.stringify(originalErrorBackup);
+              safeErrorForHandler = processedErrorMessage;
+              this.logger.debug("Using JSON.stringify of error:", processedErrorMessage);
+            } catch (jsonError) {
+              processedErrorMessage = 'Translation failed - Error details unavailable';
+              safeErrorForHandler = processedErrorMessage;
+              this.logger.warn("Failed to stringify error, using fallback:", jsonError);
+            }
+          } else {
+            processedErrorMessage = 'Translation failed - No error details';
+            safeErrorForHandler = processedErrorMessage;
+            this.logger.warn("No error details available, using generic message");
+          }
+          
+        } catch (extractionError) {
+          // If error extraction itself fails, use the backup
+          this.logger.error("Error during error extraction, using ultimate fallback:", extractionError);
+          processedErrorMessage = originalErrorBackup ? String(originalErrorBackup) : 'Translation failed';
+          safeErrorForHandler = processedErrorMessage;
+        }
+
+        // Store error in request safely
         request.status = 'error';
-        request.error = error;
-        this.logger.error("Translation failed", { messageId, error });
-        throw new Error(error || 'Translation failed');
+        request.error = processedErrorMessage;
+        
+        this.logger.debug("Final processed error message:", processedErrorMessage);
+        this.logger.error("Translation failed", { messageId, originalError: originalErrorBackup, processedError: processedErrorMessage });
+        
+        // Create error object for ErrorHandler with safety measures
+        let translationError;
+        try {
+          translationError = new Error(safeErrorForHandler);
+          translationError.originalError = originalErrorBackup;
+        } catch (errorCreationError) {
+          this.logger.error("Failed to create Error object:", errorCreationError);
+          translationError = new Error('Translation failed - Error processing failed');
+          translationError.originalError = originalErrorBackup;
+        }
+        
+        // Use centralized error handling
+        try {
+          await this.errorHandler.handle(translationError, {
+            context: 'select-element-translation',
+            type: ErrorTypes.TRANSLATION_FAILED,
+            showToast: true
+          });
+        } catch (handlerError) {
+          this.logger.error("ErrorHandler.handle() failed:", handlerError);
+          // Fallback: show notification directly if ErrorHandler fails
+          pageEventBus.emit('show-notification', {
+            id: `error-${Date.now()}`,
+            message: safeErrorForHandler || 'Translation failed',
+            type: 'error',
+            duration: 4000
+          });
+        }
+        
+        // Mark this error as already handled to prevent duplicate notifications
+        translationError.alreadyHandled = true;
+        throw translationError;
       }
     } catch (e) {
-      this.logger.error("Error handling translation result", e);
+      // Enhanced catch block with better error preservation
+      if (e.alreadyHandled) {
+        this.logger.debug("Re-throwing already handled error:", e.message);
+        throw e;
+      }
+      
+      this.logger.error("Unexpected error during translation result handling:", e);
+      this.logger.error("Original error backup was:", originalErrorBackup);
+      
+      // Update request status with preserved information
       request.status = 'error';
-      request.error = e.message;
-      throw e;
+      
+      // Use original error if this was a JavaScript error during processing
+      if (originalErrorBackup && !data?.success) {
+        const fallbackMessage = typeof originalErrorBackup === 'string' 
+          ? originalErrorBackup 
+          : (originalErrorBackup?.message || 'Translation failed');
+        request.error = fallbackMessage;
+        this.logger.debug("Using original error as fallback:", fallbackMessage);
+        
+        // Try to show the original error to user
+        try {
+          pageEventBus.emit('show-notification', {
+            id: `error-fallback-${Date.now()}`,
+            message: fallbackMessage,
+            type: 'error',
+            duration: 4000
+          });
+        } catch (notifyError) {
+          this.logger.error("Failed to show fallback notification:", notifyError);
+        }
+        
+        // Create a new error with the original message
+        const fallbackError = new Error(fallbackMessage);
+        fallbackError.originalError = originalErrorBackup;
+        fallbackError.processingError = e;
+        fallbackError.alreadyHandled = true;
+        throw fallbackError;
+      } else {
+        request.error = e.message;
+        throw e;
+      }
     }
   }
 
