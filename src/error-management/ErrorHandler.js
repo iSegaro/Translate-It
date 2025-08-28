@@ -102,7 +102,27 @@ export class ErrorHandler {
       // For non-context errors, continue with normal error handling
       const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
-      const msg = await getErrorMessage(type);
+      
+      // Use original error message if it's more specific than the generic one
+      let msg;
+      try {
+        const genericMsg = await getErrorMessage(type);
+        
+        // If error type is UNKNOWN or generic, prefer the original message
+        if (type === ErrorTypes.UNKNOWN || type === ErrorTypes.TRANSLATION_FAILED) {
+          // Use original message if it's informative, otherwise use generic
+          if (raw && raw.length > 5 && !raw.includes('[object Object]')) {
+            msg = raw;
+          } else {
+            msg = genericMsg;
+          }
+        } else {
+          msg = genericMsg;
+        }
+      } catch (msgError) {
+        // Fallback to original message
+        msg = raw || 'An error occurred';
+      }
       
       // Get context-aware display strategy
       const displayStrategy = getErrorDisplayStrategy(meta.context || 'unknown', type);
