@@ -1,21 +1,33 @@
 <template>
+  <!-- Small loading window -->
   <div 
+    v-if="currentSize === 'small'"
     ref="windowElement"
-    class="translation-window aiwc-selection-popup-host"
-    :class="[
-      theme, 
-      { 
-        'is-dragging': isDragging, 
-        'visible': isVisible,
-        'small-size': currentSize === 'small',
-        'normal-size': currentSize === 'normal'
-      }
-    ]"
+    class="translation-window aiwc-selection-popup-host loading-window"
+    :class="[theme, { 'visible': isVisible }]"
     :style="windowStyle"
     @mousedown.stop
     @click.stop
   >
-    <div v-if="currentSize === 'normal'" class="window-header" @mousedown="handleStartDrag">
+    <img 
+      src="/src/assets/icons/loading-128.gif"
+      alt="Loading..."
+      class="loading-gif"
+      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
+    />
+  </div>
+
+  <!-- Normal translation window -->
+  <div 
+    v-else
+    ref="windowElement"
+    class="translation-window aiwc-selection-popup-host normal-window"
+    :class="[theme, { 'visible': isVisible, 'is-dragging': isDragging }]"
+    :style="windowStyle"
+    @mousedown.stop
+    @click.stop
+  >
+    <div class="window-header" @mousedown="handleStartDrag">
       <div class="header-actions">
         <button class="action-btn" @click.stop="handleCopy" title="Copy">
           <svg width="16" height="16" viewBox="0 0 24 24">
@@ -45,15 +57,7 @@
       </div>
     </div>
 
-    <!-- Small loading spinner for small size -->
-    <img 
-      v-if="currentSize === 'small'" 
-      src="/src/assets/icons/loading-128.gif"
-      alt="Loading..."
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
-    />
-
-    <div v-if="currentSize === 'normal'" class="window-body">
+    <div class="window-body">
       <!-- Show Original Text Section -->
       <div v-if="showOriginal && !isLoading" class="original-text-section">
         <div class="original-label">Original:</div>
@@ -155,11 +159,12 @@ const windowStyle = computed(() => {
     ...positionStyle.value,
     opacity: isVisible.value ? 1 : 0,
     transform: isVisible.value ? 'scale(1)' : 'scale(0.95)',
-    transition: 'opacity 0.2s ease, transform 0.2s ease, width 0.3s ease, height 0.3s ease',
+    transition: 'opacity 0.2s ease, transform 0.2s ease',
     width: isSmall ? '60px' : '350px',
     height: isSmall ? '40px' : 'auto',
     minWidth: isSmall ? '60px' : '300px',
-    minHeight: isSmall ? '40px' : 'auto'
+    minHeight: isSmall ? '40px' : '120px',
+    borderRadius: isSmall ? '20px' : '8px'
   };
 });
 
@@ -232,6 +237,8 @@ const handleStartDrag = (event) => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   min-width: 300px;
   max-width: 500px;
+  overflow: hidden;
+  will-change: width, height, border-radius;
 }
 
 .translation-window.light {
@@ -386,8 +393,8 @@ const handleStartDrag = (event) => {
   color: #ccc;
 }
 
-/* Small size specific styles */
-.translation-window.small-size {
+/* Loading window specific styles */
+.translation-window.loading-window {
   width: 60px !important;
   height: 40px !important;
   min-width: 60px !important;
@@ -406,17 +413,21 @@ const handleStartDrag = (event) => {
 }
 
 
-/* Dark theme for small size */
-.translation-window.small-size.dark {
+.loading-gif {
+  transition: opacity 0.1s ease;
+}
+
+/* Dark theme for loading window */
+.translation-window.loading-window.dark {
   background: #333 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 
 
-/* Normal size specific styles */
-.translation-window.normal-size {
-  /* Keep existing normal size styles */
+/* Normal window specific styles */
+.translation-window.normal-window {
+  /* Uses default translation-window styles */
 }
 
 </style>
