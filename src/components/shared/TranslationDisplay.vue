@@ -41,6 +41,8 @@
         'fade-in': showFadeIn,
         'loading-dim': isLoading
       }"
+      :dir="textDirection.dir"
+      :style="{ textAlign: textDirection.textAlign }"
       v-html="renderedContent"
     />
   </div>
@@ -48,7 +50,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
@@ -175,6 +177,16 @@ const showFadeIn = ref(false)
 const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)
 const hasError = computed(() => !!props.error && !props.isLoading)
 
+// Pre-compute text direction to prevent layout shift
+const textDirection = computed(() => {
+  const textToCheck = props.content || props.error || ''
+  const isRtl = shouldApplyRtl(textToCheck)
+  return {
+    dir: isRtl ? 'rtl' : 'ltr',
+    textAlign: isRtl ? 'right' : 'left'
+  }
+})
+
 const renderedContent = computed(() => {
   if (props.error) {
     const errorActions = []
@@ -228,22 +240,7 @@ watch(() => props.content, (newContent, oldContent) => {
       showFadeIn.value = false
     }, 400)
   }
-  
-  // Text direction correction
-  nextTick(() => {
-    if (contentRef.value && newContent) {
-      correctTextDirection(contentRef.value, newContent)
-    }
-  })
 }, { immediate: true })
-
-watch(() => props.error, (newError) => {
-  nextTick(() => {
-    if (contentRef.value && newError) {
-      correctTextDirection(contentRef.value, newError)
-    }
-  })
-})
 
 // Error action handlers
 const handleRetry = () => {

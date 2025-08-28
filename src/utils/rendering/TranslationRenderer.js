@@ -2,7 +2,7 @@
 // Unified translation content renderer for both Vue and vanilla JS contexts
 
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
-import { correctTextDirection } from '@/utils/text/textDetection.js'
+import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationRenderer')
@@ -54,12 +54,15 @@ export class TranslationRenderer {
   createContentElement(params) {
     const div = document.createElement('div')
     div.className = this._getContentClasses()
-    div.innerHTML = this.renderContent(params)
     
-    // Apply text direction correction
+    // Apply text direction BEFORE setting innerHTML to prevent layout shift
     if (params.content) {
-      correctTextDirection(div, params.content)
+      const isRtl = shouldApplyRtl(params.content)
+      div.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
+      div.style.textAlign = isRtl ? 'right' : 'left'
     }
+    
+    div.innerHTML = this.renderContent(params)
     
     return div
   }
@@ -72,13 +75,16 @@ export class TranslationRenderer {
   updateContentElement(element, params) {
     if (!element) return
     
-    element.innerHTML = this.renderContent(params)
     element.className = this._getContentClasses()
     
-    // Apply text direction correction
+    // Apply text direction BEFORE setting innerHTML to prevent layout shift
     if (params.content) {
-      correctTextDirection(element, params.content)
+      const isRtl = shouldApplyRtl(params.content)
+      element.setAttribute('dir', isRtl ? 'rtl' : 'ltr')
+      element.style.textAlign = isRtl ? 'right' : 'left'
     }
+    
+    element.innerHTML = this.renderContent(params)
   }
 
   /**

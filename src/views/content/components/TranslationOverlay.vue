@@ -16,11 +16,10 @@
 <script setup>
 import { ref, nextTick, onBeforeUpdate } from 'vue';
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
-import { correctTextDirection } from '@/utils/text/textDetection.js';
+import { shouldApplyRtl } from '@/utils/text/textDetection.js';
 
 const activeTranslations = ref([]);
 const translatedElements = ref([]);
-const showActions = ref(true);
 
 // Ensure refs are cleared before each update
 onBeforeUpdate(() => {
@@ -87,7 +86,9 @@ const cloneWithStyles = (sourceNode) => {
           // Apply correct text direction to the parent element containing the translated text
           const parentElement = node.parentNode;
           if (parentElement && parentElement.nodeType === Node.ELEMENT_NODE) {
-            correctTextDirection(parentElement, translatedText);
+            const isRtl = shouldApplyRtl(translatedText);
+            parentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+            parentElement.style.textAlign = isRtl ? 'right' : 'left';
           }
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
