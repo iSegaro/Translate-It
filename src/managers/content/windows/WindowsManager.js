@@ -50,6 +50,9 @@ export class WindowsManager {
     // Initialize translation business logic
     this.translationHandler = new TranslationHandler();
     
+    // Initialize error handling
+    this.errorHandler = ErrorHandler.getInstance();
+    
     // Initialize interaction management (outside clicks)
     this.clickManager = new ClickManager(this.crossFrameManager, this.state);
     
@@ -396,14 +399,14 @@ export class WindowsManager {
     try {
       const translationResult = await this._startTranslationProcess(selectedText);
 
-      // If translation was cancelled or failed, show error in window
+      // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
-        this.logger.debug('Translation failed or was cancelled, updating window with error.');
+        this.logger.debug('Translation was cancelled by user, updating window with cancellation message.');
         WindowsManagerEvents.updateWindow(windowId, {
           initialSize: 'normal',
           isLoading: false,
           isError: true,
-          initialTranslatedText: 'Translation failed or was cancelled'
+          initialTranslatedText: 'Translation cancelled by user'
         });
         return;
       }
@@ -419,12 +422,30 @@ export class WindowsManager {
       
     } catch (error) {
       this.logger.error('Error during translation process:', error);
-      // Update window with error
+      
+      // Use ErrorHandler to get user-friendly error message
+      let userFriendlyMessage;
+      try {
+        const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+        userFriendlyMessage = errorInfo.message;
+      } catch (handlerError) {
+        this.logger.warn('Failed to get user-friendly error message, using fallback:', handlerError);
+        // Fallback to original extraction logic
+        if (typeof error === 'string' && error.length > 0) {
+          userFriendlyMessage = error;
+        } else if (error && error.message && error.message.length > 0) {
+          userFriendlyMessage = error.message;
+        } else {
+          userFriendlyMessage = 'Translation failed';
+        }
+      }
+      
+      // Update window with user-friendly error message
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
         isError: true,
-        initialTranslatedText: `Error: ${error.message}`
+        initialTranslatedText: userFriendlyMessage
       });
     }
   }
@@ -450,7 +471,8 @@ export class WindowsManager {
       }
       
       this.logger.error('Translation failed', { error });
-      return null;
+      // Instead of returning null, throw the error so the caller can handle it properly
+      throw error;
     }
   }
 
