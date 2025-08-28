@@ -37,7 +37,6 @@
     />
     
     <!-- Select Element Overlays -->
-    <SafeHighlightOverlay />
     <ElementHighlightOverlay />
     <TranslationOverlay />
   </div>
@@ -50,7 +49,6 @@ import { useWindowsManager } from '@/composables/useWindowsManager.js';
 import TextFieldIcon from './components/TextFieldIcon.vue';
 import TranslationWindow from './components/TranslationWindow.vue';
 import TranslationIcon from './components/TranslationIcon.vue';
-import SafeHighlightOverlay from './components/SafeHighlightOverlay.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 import TranslationOverlay from './components/TranslationOverlay.vue';
 
