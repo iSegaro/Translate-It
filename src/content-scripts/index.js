@@ -25,7 +25,7 @@ if (!access.isAccessible) {
 
     // --- Mount the Vue UI Host ---
     try {
-      const { mountContentApp } = await import("../views/content/main.js");
+      const { mountContentApp } = await import("../app/main.js");
       const { pageEventBus } = await import("../utils/core/PageEventBus.js");
       
       // --- Style Injection ---

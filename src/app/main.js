@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import ContentApp from './ContentApp.vue';
+import ContentApp from '../views/content/ContentApp.vue';
 
 // This function will be exported and called by the content script
 // to mount the app into the provided shadow root.
