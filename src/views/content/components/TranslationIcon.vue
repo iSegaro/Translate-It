@@ -12,6 +12,7 @@
     @mouseleave="onMouseLeave"
     @focus="onFocus"
     @blur="onBlur"
+    @keydown="onKeydown"
     :title="$t ? $t('translateSelectedText') : 'Translate selected text'"
     :aria-label="$t ? $t('translateSelectedText') : 'Translate selected text'"
     role="button"
@@ -178,13 +179,11 @@ const animateOut = () => {
 
 // Initialize component
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown);
   animateIn();
   setupEventListeners();
 });
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown);
   cleanupEventListeners();
   cleanupPositioning();
 });
