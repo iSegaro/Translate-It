@@ -163,15 +163,12 @@ watch(() => props.initialSize, (newSize) => {
   currentSize.value = newSize;
 });
 
-// Computed Style for animation and positioning
+// Computed Style for positioning only (no opacity/transform - handled by CSS classes)
 const windowStyle = computed(() => {
   const isSmall = currentSize.value === 'small';
   
   return {
     ...positionStyle.value,
-    opacity: isVisible.value ? 0.9 : 0,
-    transform: isVisible.value ? 'scale(1)' : 'scale(0.95)',
-    transition: 'opacity 0.2s ease, transform 0.2s ease',
     width: isSmall ? '60px' : '350px',
     height: isSmall ? '40px' : 'auto',
     minWidth: isSmall ? '60px' : '300px',
@@ -287,15 +284,7 @@ const handleStartDrag = (event) => {
   will-change: width, height, border-radius;
 }
 
-.translation-window.light {
-  background: #fff;
-  color: #000;
-}
-
-.translation-window.dark {
-  background: #333;
-  color: #fff;
-}
+/* Theme styles moved to enhanced section below */
 
 .window-header {
   padding: 6px 8px;
@@ -304,6 +293,18 @@ const handleStartDrag = (event) => {
   justify-content: space-between;
   align-items: center;
   min-height: 32px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+/* Header theme styles */
+.translation-window.light .window-header {
+  background-color: #f7f7f7;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.translation-window.dark .window-header {
+  background-color: #34495e;
+  border-bottom: 1px solid #566573;
 }
 
 .header-actions {
@@ -327,6 +328,15 @@ const handleStartDrag = (event) => {
 
 .action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Theme-specific hover effects */
+.translation-window.light .action-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.translation-window.dark .action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* TTSButton styling to match action-btn */
@@ -387,7 +397,7 @@ const handleStartDrag = (event) => {
 }
 
 .window-body {
-  padding: 10px;
+  padding: 16px;
   max-height: 400px;
   overflow-y: auto;
   display: flex;
@@ -531,6 +541,44 @@ const handleStartDrag = (event) => {
 /* Normal window specific styles */
 .translation-window.normal-window {
   /* Uses default translation-window styles */
+}
+
+/* Visibility and animation control */
+.translation-window {
+  /* Base styles */
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Vazirmatn', sans-serif;
+  
+  /* Animation styles */
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  visibility: hidden;
+}
+
+.translation-window.visible {
+  opacity: 0.9 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+}
+
+/* Enhanced light theme */
+.translation-window.light {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  color: #2c3e50;
+}
+
+/* Enhanced dark theme */
+.translation-window.dark {
+  background: #2c3e50;
+  border: 1px solid #34495e;
+  color: #ecf0f1;
 }
 
 </style>

@@ -1,4 +1,4 @@
-/* src/styles/disable_links.css */
+/* src/styles/page-styles.css */
 
 /* ==========================================================================
      Select Element Mode Styles
@@ -93,48 +93,4 @@
 /* Prevent child elements from being highlighted when parent is highlighted */
 .translate-it-element-highlighted * {
   outline: none !important;
-}
-
-/* ==========================================================================
-     Translated Text Direction Styles
-     ========================================================================== */
-
-/* Base styles for translated text containers */
-.aiwc-translated-text {
-  display: inline-block;
-  unicode-bidi: isolate;
-}
-
-/* RTL text styling */
-.aiwc-rtl-text {
-  direction: rtl;
-  text-align: right;
-}
-
-/* LTR text styling */
-.aiwc-ltr-text {
-  direction: ltr;
-  text-align: left;
-}
-
-/* Ensure proper text alignment in RTL contexts */
-[dir="rtl"] .aiwc-rtl-text {
-  text-align: right;
-}
-
-[dir="ltr"] .aiwc-ltr-text {
-  text-align: left;
-}
-
-/* Prevent conflicts with parent styling */
-.aiwc-translated-text {
-  text-align: inherit !important;
-}
-
-.aiwc-rtl-text {
-  text-align: right !important;
-}
-
-.aiwc-ltr-text {
-  text-align: left !important;
 }
