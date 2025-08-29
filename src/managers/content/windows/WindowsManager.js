@@ -47,6 +47,9 @@ export class WindowsManager {
     // Initialize core modules for business logic only
     this.state = new WindowsState(this.crossFrameManager.frameId);
     
+    // Initialize TTS request tracking
+    this._currentTTSRequest = null;
+    
     // Initialize translation business logic
     this.translationHandler = new TranslationHandler();
     
@@ -338,6 +341,15 @@ export class WindowsManager {
     this.logger.debug('Speak request received from UI Host', detail);
     if (!detail || !detail.text) return;
 
+    // Prevent duplicate requests by checking if already processing for this window
+    const requestKey = `${detail.id}-${detail.isSpeaking}`;
+    if (this._currentTTSRequest === requestKey) {
+      this.logger.debug('Duplicate TTS request ignored', requestKey);
+      return;
+    }
+    
+    this._currentTTSRequest = requestKey;
+    
     try {
       if (detail.isSpeaking) {
         await this.ttsManager.speakTextUnified(detail.text);
@@ -346,6 +358,13 @@ export class WindowsManager {
       }
     } catch (error) {
       this.logger.error('TTS error:', error);
+    } finally {
+      // Clear request tracking after a delay
+      setTimeout(() => {
+        if (this._currentTTSRequest === requestKey) {
+          this._currentTTSRequest = null;
+        }
+      }, 1000);
     }
   }
 
@@ -907,6 +926,19 @@ export class WindowsManager {
       this.translationHandler.cancelAllTranslations();
       this.logger.debug('[Translation] All pending translations cancelled during dismiss');
     }
+
+    // Stop any ongoing TTS when dismissing
+    if (this.ttsManager) {
+      try {
+        this.ttsManager.stopCurrentTTS();
+        this.logger.debug('[TTS] TTS stopped during WindowsManager dismiss');
+      } catch (error) {
+        this.logger.warn('[TTS] Failed to stop TTS during dismiss:', error);
+      }
+    }
+    
+    // Clear TTS request tracking
+    this._currentTTSRequest = null;
 
     // Reset flags
     this._resetState();
