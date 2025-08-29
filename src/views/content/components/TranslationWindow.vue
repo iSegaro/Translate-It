@@ -90,6 +90,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
+import { useMessaging } from '../../../messaging/composables/useMessaging';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -102,6 +103,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'speak']);
+const { sendMessage } = useMessaging('content');
 
 // TTS Global Manager for windows-manager lifecycle
 const ttsGlobal = useTTSGlobal({ 
@@ -183,7 +185,7 @@ onMounted(() => {
     console.log(`[TranslationWindow ${props.id}] TTS cleanup callback - window closing`)
     // Use direct message to background instead of calling stopAll() to avoid recursion
     try {
-      await browser.runtime.sendMessage({
+      await sendMessage({
         action: 'GOOGLE_TTS_STOP_ALL',
         data: { source: 'translation-window-cleanup', windowId: props.id }
       })
