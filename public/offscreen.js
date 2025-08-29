@@ -390,18 +390,18 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
   try {
     console.log("[Offscreen] Attempting Google TTS:", url);
     
-    // Stop any current audio
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.src = "";
+    // Always create a new Audio object to avoid race conditions with global currentAudio
+    const newAudio = new Audio();
+    if (currentAudio) { // Stop and clear previous audio if it exists
+      handleAudioStop(() => {}); // Use the dedicated stop function
     }
     if (currentUtterance) {
       speechSynthesis.cancel();
       currentUtterance = null;
     }
 
-    currentAudio = new Audio();
-    currentAudio.crossOrigin = "anonymous";
+    currentAudio = newAudio; // Assign the new audio object to global currentAudio
+    currentAudio.crossOrigin = "anonymous"; // Set crossOrigin after creating new Audio
     
     let responseSent = false;
     
@@ -470,14 +470,21 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     .then(() => {
       console.log("[Offscreen] Google TTS playback started successfully");
     })
-    .catch((err) => {
+    .catch(async (err) => { // Make this catch block async
       clearTimeout(fetchTimeout); // Clear the timeout on error too
       console.error("[Offscreen] Google TTS failed:", err);
       currentAudio = null;
       if (!responseSent) {
+        responseSent = true; // Set responseSent to true here to prevent duplicate responses
         console.log("[Offscreen] Falling back to Web Speech API");
-        handleWebSpeechFallback(ttsData, sendResponse);
-        responseSent = true;
+        // Await the fallback to ensure its response is sent
+        try {
+          await handleWebSpeechFallback(ttsData, sendResponse); // Pass sendResponse directly
+        } catch (fallbackError) {
+          console.error("[Offscreen] Web Speech API fallback also failed:", fallbackError);
+          // If fallback also fails, send a final failure response
+          sendResponse({ success: false, error: fallbackError.message || 'Web Speech API fallback failed' });
+        }
       }
     });
     
