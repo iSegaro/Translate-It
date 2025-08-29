@@ -10,6 +10,7 @@
     @mouseleave="onMouseLeave"
     @focus="onFocus"
     @blur="onBlur"
+    @keydown="onKeydown"
     :title="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
     :aria-label="$t ? $t('translateWithTranslateIt') : 'Translate with Translate-It'"
     role="button"
@@ -108,11 +109,9 @@ const onKeydown = (event) => {
 };
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown);
 });
 </script>
 
