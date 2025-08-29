@@ -9,6 +9,7 @@ import { isUrlExcluded_TEXT_FIELDS_ICON } from "../../utils/ui/exclusion.js";
 import { detectPlatform, Platform } from "../../utils/browser/platform.js";
 import { state } from "../../config.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { ExtensionContextManager } from "../../utils/core/extensionContext.js";
 
 export class TextFieldManager {
   constructor(options = {}) {
@@ -106,6 +107,12 @@ export class TextFieldManager {
     // Basic validation
     if (!this.featureManager?.isOn("EXTENSION_ENABLED")) {
       this.logger.debug('Skipping icon creation: Extension is disabled.');
+      return null;
+    }
+
+    // Context validation: Ensure the extension context is valid
+    if (!ExtensionContextManager.isValidSync()) {
+      this.logger.debug('Skipping icon creation: Extension context is invalid.');
       return null;
     }
 
