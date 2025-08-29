@@ -25,47 +25,38 @@ if (!access.isAccessible) {
 
     // --- Mount the Vue UI Host ---
     try {
-      const { mountContentApp } = await import("../app/main.js");
+      const { mountContentApp, getAppCss } = await import("../app/main.js");
       const { pageEventBus } = await import("../utils/core/PageEventBus.js");
       
-      // --- Style Injection ---
-
-      // 1. Page-level styles (injected into document head)
+      // 1. Inject page-level styles directly into the document head.
       const pageStyles = await import('../styles/page-styles.css?raw');
       const pageStyleEl = document.createElement('style');
       pageStyleEl.textContent = pageStyles.default;
       document.head.appendChild(pageStyleEl);
       
-      // 2. Shadow DOM styles (for UI components)
-      const sonnerStyles = await import('vue-sonner/style.css?raw');
-      const windowsManagerStyles = await import('../styles/windows-manager.css?raw');
-      const utilityStyles = await import('../styles/utility-styles.css?raw');
-
+      // 2. Create the host element and shadow DOM.
       const hostElement = document.createElement('div');
       hostElement.id = 'translate-it-host';
       hostElement.style.all = 'initial';
       document.body.appendChild(hostElement);
-
       const shadowRoot = hostElement.attachShadow({ mode: 'open' });
 
-      // Inject styles into the shadow DOM
-      const shadowStyleEl = document.createElement('style');
-      shadowStyleEl.textContent = `
+      // 3. Inject the entire app's CSS into the shadow DOM.
+      const appStyles = getAppCss();
+      const appStyleEl = document.createElement('style');
+      // Also include the Google Font import.
+      appStyleEl.textContent = `
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
-        :host {
-          font-family: 'Vazirmatn', sans-serif;
-        }
-        ${sonnerStyles.default}
-        ${windowsManagerStyles.default}
-        ${utilityStyles.default}
+        ${appStyles}
       `;
-      shadowRoot.appendChild(shadowStyleEl);
+      shadowRoot.appendChild(appStyleEl);
 
+      // 4. Create the root element for the Vue app and mount it.
       const appRoot = document.createElement('div');
       shadowRoot.appendChild(appRoot);
-
       mountContentApp(appRoot);
-      logger.info('Vue UI Host mounted into Shadow DOM.');
+
+      logger.info('Vue UI Host mounted into Shadow DOM with all styles.');
 
       // Emit a test event to confirm communication
       setTimeout(() => {
