@@ -16,7 +16,7 @@
       :src="iconSrc" 
       :alt="iconAlt"
       class="button-icon"
-      style="width: 20px !important; height: 20px !important; object-fit: contain;"
+      style="width: 16px !important; height: 16px !important; object-fit: contain;"
     >
     <span
       v-if="showLabel"
