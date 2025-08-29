@@ -352,12 +352,18 @@ const handleTTSStateChanged = (data) => {
   padding: 2px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(4px);
+  /* Performance optimization for animations */
+  overflow: visible;
+  will-change: transform;
 }
 
 .mode-output {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
   padding: 1px;
+  /* Performance optimization for animations */
+  overflow: visible;
+  will-change: transform;
 }
 
 .mode-inline {
@@ -399,6 +405,25 @@ const handleTTSStateChanged = (data) => {
 .mode-sidepanel .toolbar-left,
 .mode-sidepanel .toolbar-right {
   gap: 2px;
+}
+
+/* Performance optimizations for popup modes */
+.mode-input :deep(.tts-button),
+.mode-output :deep(.tts-button) {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.mode-input :deep(.progress-ring),
+.mode-output :deep(.progress-ring) {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.mode-input :deep(.tts-icon),
+.mode-output :deep(.tts-icon) {
+  will-change: transform;
 }
 
 /* Content-based visibility */
