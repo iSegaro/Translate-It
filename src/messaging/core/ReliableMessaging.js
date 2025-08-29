@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { isContextError } from '@/utils/core/extensionContext.js' // Add this import
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ReliableMessaging')
 
@@ -125,6 +126,11 @@ export async function sendReliable(message, opts = {}) {
       // if no actionable response, continue to retry
     } catch (err) {
       lastError = err
+      // Check if it's an extension context invalidated error
+      if (isContextError(err)) {
+        logger.debug('sendReliable: Extension context invalidated, skipping circuit breaker failure and retries.')
+        throw err; // Re-throw immediately, do not count as a circuit breaker failure
+      }
       const logLevel = attempt === retries ? 'warn' : 'debug'
       logger[logLevel]('sendReliable: sendMessage attempt failed', attempt + 1, err && err.message)
     }
@@ -216,7 +222,12 @@ export async function sendReliable(message, opts = {}) {
     })
   } catch (err) {
     logger.error('sendReliable: port fallback failed', err)
-    circuitBreaker.onFailure()
+    // Check if it's an extension context invalidated error
+    if (isContextError(err)) {
+      logger.debug('sendReliable: Extension context invalidated during port fallback, skipping circuit breaker failure.')
+      throw err; // Re-throw immediately, do not count as a circuit breaker failure
+    }
+    circuitBreaker.onFailure() // Only call onFailure if it's not a context error
     
     // Add debugging information to the error
     const enhancedError = new Error(`ReliableMessaging failed: ${err.message}`)
