@@ -4,8 +4,10 @@
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { useBrowserAPI } from './useBrowserAPI.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSGlobalManager')
+const browserAPI = useBrowserAPI('tts-global-manager')
 
 /**
  * Singleton class to manage TTS instances globally
@@ -389,9 +391,6 @@ class TTSGlobalManager {
     
     // Send stop message to background directly
     try {
-      const { useBrowserAPI } = await import('./useBrowserAPI.js')
-      const browserAPI = useBrowserAPI('tts-global-force-stop')
-      
       await browserAPI.sendMessage({
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
         data: {}
