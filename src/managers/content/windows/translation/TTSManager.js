@@ -7,6 +7,7 @@ import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
 import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
+import { isContextError } from '@/utils/core/extensionContext.js';
 
 /**
  * Manages Text-to-Speech functionality for WindowsManager
@@ -32,7 +33,11 @@ export class TTSManager {
           data: { source: 'windows-manager-cleanup', windowId }
         })
       } catch (error) {
-        this.logger.error(`[TTSManager ${windowId}] Failed to stop TTS during cleanup:`, error)
+        if (isContextError(error)) {
+          this.logger.debug(`[TTSManager ${windowId}] Extension context invalidated during cleanup - handled silently.`);
+        } else {
+          this.logger.error(`[TTSManager ${windowId}] Failed to stop TTS during cleanup:`, error);
+        }
       }
     });
     

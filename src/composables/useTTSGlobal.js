@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 import { useBrowserAPI } from './useBrowserAPI.js'
+import { isContextError } from '@/utils/core/extensionContext.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSGlobalManager')
 const browserAPI = useBrowserAPI('tts-global-manager')
@@ -144,7 +145,11 @@ class TTSGlobalManager {
         if (typeof instance.stopCallback === 'function') {
           stopPromises.push(
             Promise.resolve(instance.stopCallback()).catch(error => {
-              logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error)
+              if (isContextError(error)) {
+                logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - handled silently.`);
+              } else {
+                logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error);
+              }
             })
           )
         }
@@ -303,7 +308,11 @@ class TTSGlobalManager {
             )
           }
         } catch (error) {
-          logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error)
+          if (isContextError(error)) {
+            logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - handled silently.`);
+          } else {
+            logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error);
+          }
         }
       }
     }
