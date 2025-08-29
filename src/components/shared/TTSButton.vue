@@ -200,10 +200,6 @@ const buttonTitle = computed(() => {
     case 'playing':
       return 'Stop speech'
     case 'error':
-      const recoveryInfo = tts.getRecoveryInfo()
-      if (recoveryInfo) {
-        return `${recoveryInfo.userAction} (${recoveryInfo.retryAttempts}/${recoveryInfo.maxRetries} attempts)`
-      }
       return `Error: ${tts.errorMessage.value || 'Click to retry'}`
     default:
       return 'Text to speech'
