@@ -184,6 +184,24 @@ onMounted(() => {
       logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
     }
   })
+
+  // Create a port connection to detect popup close via port disconnect
+  const port = browser.runtime.connect({ name: 'popup-lifecycle' })
+  
+  // Send initial ping to background to register popup as active
+  port.postMessage({ 
+    action: 'POPUP_OPENED',
+    data: { timestamp: Date.now() }
+  })
+  
+  // Handle port disconnect (popup closed)
+  port.onDisconnect.addListener(() => {
+    logger.debug('[PopupApp] Port disconnected - popup closing detected')
+    // Port disconnect means popup is closing - background will handle TTS stop
+  })
+  
+  // Store port reference for cleanup
+  window.__popupPort = port
   
   const initialize = async () => {
   try {
@@ -255,8 +273,19 @@ onMounted(() => {
 
 // Cleanup TTS when popup is unmounted/closed
 onUnmounted(() => {
-  logger.debug('[PopupApp] Popup unmounting - stopping all TTS and cleaning up')
-  ttsGlobal.stopAll()
+  logger.debug('[PopupApp] Popup unmounting - cleaning up port and TTS')
+  
+  // Disconnect port
+  if (window.__popupPort) {
+    try {
+      window.__popupPort.disconnect()
+    } catch (error) {
+      logger.debug('[PopupApp] Port already disconnected:', error.message)
+    }
+    delete window.__popupPort
+  }
+  
+  // Just unregister - the cleanup callback will handle TTS stopping
   ttsGlobal.unregister()
 })
 
