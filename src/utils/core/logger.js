@@ -33,8 +33,8 @@ const componentLogLevels = {
   Background: LOG_LEVELS.DEBUG,  // background handlers
   Core: LOG_LEVELS.DEBUG,        // core handlers
   Translation: LOG_LEVELS.DEBUG,
-  Messaging: LOG_LEVELS.INFO,
-  Providers: LOG_LEVELS.INFO,
+  Messaging: LOG_LEVELS.DEBUG,
+  Providers: LOG_LEVELS.DEBUG,
   Content: LOG_LEVELS.DEBUG,     // Windows Manager and content scripts
   UI: LOG_LEVELS.DEBUG,          // UI composables
   Storage: LOG_LEVELS.WARN,
