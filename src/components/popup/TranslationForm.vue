@@ -55,6 +55,18 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupTranslationForm');
 
+// Props
+const props = defineProps({
+  sourceLanguage: {
+    type: String,
+    required: true
+  },
+  targetLanguage: {
+    type: String,
+    required: true
+  }
+})
+
 // Stores
 const settingsStore = useSettingsStore()
 
@@ -129,9 +141,9 @@ const handleTranslate = async () => {
     logger.info("🚀 Starting translation process...");
     logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
     
-    // Get current language values from settings store
-    const sourceLanguage = settingsStore.settings.SOURCE_LANGUAGE;
-    const targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
+    // Get current language values from props
+    const sourceLanguage = props.sourceLanguage;
+    const targetLanguage = props.targetLanguage;
     
     logger.debug("🌍 Languages:", sourceLanguage, "→", targetLanguage);
     

@@ -61,12 +61,16 @@
         <!-- Original TranslationForm -->
         <TranslationForm 
           v-if="!useEnhancedVersion"
+          :source-language="sourceLanguage"
+          :target-language="targetLanguage"
           @can-translate-change="canTranslateFromForm = $event" 
         />
         
         <!-- Enhanced TranslationForm with new ActionSystem -->
         <EnhancedTranslationForm 
           v-else
+          :source-language="sourceLanguage"
+          :target-language="targetLanguage"
           @can-translate-change="canTranslateFromForm = $event" 
         />
       </div>
@@ -231,12 +235,12 @@ onMounted(() => {
       const savedSource = await getSourceLanguageAsync()
       const savedTarget = await getTargetLanguageAsync()
       sourceLanguage.value = getLanguageDisplayName(savedSource) || getLanguageDisplayName(AUTO_DETECT_VALUE) || AUTO_DETECT_VALUE
-      targetLanguage.value = getLanguageDisplayName(savedTarget) || 'Farsi'
+      targetLanguage.value = getLanguageDisplayName(savedTarget) || settings.TARGET_LANGUAGE || 'English'
       logger.debug("✅ Languages initialized from settings:", savedSource, "→", savedTarget)
     } catch (err) {
       logger.warn("Error loading language settings:", err)
       sourceLanguage.value = getLanguageDisplayName(AUTO_DETECT_VALUE) || 'Auto-Detect'
-      targetLanguage.value = 'English'
+      targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE || 'English'
     }
     
     // Add clear-storage event listener to reset languages (matching sidepanel approach)
