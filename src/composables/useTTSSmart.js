@@ -5,32 +5,20 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 
-// Error types for comprehensive handling
-const ERROR_TYPES = {
-  NETWORK_ERROR: 'network_error',
-  AUDIO_CONTEXT_ERROR: 'audio_context_error', 
-  PERMISSION_DENIED: 'permission_denied',
-  TIMEOUT_ERROR: 'timeout_error',
-  SERVICE_UNAVAILABLE: 'service_unavailable',
-  INVALID_TEXT: 'invalid_text',
-  LANGUAGE_NOT_SUPPORTED: 'language_not_supported'
-};
-
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
 
 export function useTTSSmart() {
   const browserAPI = useBrowserAPI('tts-smart');
   
-  // Enhanced state management
+  // Simplified state management
   const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
   const currentTTSId = ref(null);
   const errorMessage = ref('');
   const errorType = ref('');
-  const retryCount = ref(0);
-  const maxRetries = ref(2);
   const progress = ref(0);
   const lastText = ref('');
   const lastLanguage = ref('auto');
+  const isProcessing = ref(false); // Prevent duplicate requests
 
   // Backward compatibility
   const isPlaying = computed(() => ttsState.value === 'playing');
@@ -123,7 +111,15 @@ export function useTTSSmart() {
       return false;
     }
 
+    // Prevent duplicate requests
+    if (isProcessing.value) {
+      logger.warn("[useTTSSmart] Already processing TTS request, ignoring duplicate");
+      return false;
+    }
+
     try {
+      isProcessing.value = true;
+      
       // Stop any current TTS first
       await stopAll();
 
@@ -152,7 +148,7 @@ export function useTTSSmart() {
       ttsState.value = 'playing';
       logger.debug("[useTTSSmart] TTS started successfully");
       
-      // Optimized progress simulation
+      // Start progress tracking
       let progressInterval;
       let autoResetTimeout;
       
@@ -160,23 +156,22 @@ export function useTTSSmart() {
         progress.value = 0;
         progressInterval = setInterval(() => {
           if (ttsState.value === 'playing' && progress.value < 90) {
-            progress.value += Math.random() * 8 + 2; // More consistent progress
+            progress.value += Math.random() * 8 + 2;
           } else if (progressInterval) {
             clearInterval(progressInterval);
             progressInterval = null;
           }
-        }, 150); // Slightly less frequent updates
+        }, 150);
       };
       
       const startAutoReset = () => {
-        const estimatedDuration = Math.min(text.length * 80, 25000); // Optimized estimation
+        const estimatedDuration = Math.min(text.length * 80, 25000);
         autoResetTimeout = setTimeout(() => {
           if (ttsState.value === 'playing') {
             ttsState.value = 'idle';
             progress.value = 100;
             currentTTSId.value = null;
             
-            // Cleanup intervals
             if (progressInterval) {
               clearInterval(progressInterval);
               progressInterval = null;
@@ -206,48 +201,19 @@ export function useTTSSmart() {
     } catch (error) {
       logger.error("[useTTSSmart] TTS failed:", error);
       
-      // Store for retry
+      // Store text for potential manual retry
       lastText.value = text;
       lastLanguage.value = lang;
       
-      // Classify and handle error
-      const classifiedErrorType = classifyError(error);
-      errorType.value = classifiedErrorType;
-      errorMessage.value = error.message || 'TTS failed';
-      
-      const recoveryStrategy = getRecoveryStrategy(classifiedErrorType);
-      
-      // Auto-retry for network errors if not exceeded max retries
-      if (recoveryStrategy.canRetry && retryCount.value < maxRetries.value) {
-        logger.debug(`[useTTSSmart] Auto-retry attempt ${retryCount.value + 1}/${maxRetries.value} for ${classifiedErrorType}`);
-        
-        retryCount.value++;
-        
-        // Wait before retry
-        if (recoveryStrategy.retryDelay > 0) {
-          await new Promise(resolve => setTimeout(resolve, recoveryStrategy.retryDelay));
-        }
-        
-        // Special handling for language errors - fallback to English
-        const retryLang = classifiedErrorType === ERROR_TYPES.LANGUAGE_NOT_SUPPORTED ? 'en' : lang;
-        
-        try {
-          const retryResult = await speak(text, retryLang);
-          retryCount.value = 0; // Reset on success
-          return retryResult;
-        } catch (retryError) {
-          logger.error("[useTTSSmart] Auto-retry failed:", retryError);
-          // Fall through to error state
-        }
-      }
-      
-      // Set final error state
+      // Simple error handling without automatic retry
       ttsState.value = 'error';
-      errorMessage.value = recoveryStrategy.userAction || errorMessage.value;
+      errorMessage.value = error.message || 'TTS failed';
       currentTTSId.value = null;
       progress.value = 0;
       
       return false;
+    } finally {
+      isProcessing.value = false; // Always reset processing flag
     }
   };
 
@@ -365,6 +331,7 @@ export function useTTSSmart() {
       currentTTSId.value = null;
       progress.value = 0;
       errorMessage.value = '';
+      isProcessing.value = false; // Reset processing flag when stopping
 
       logger.debug("[useTTSSmart] All TTS instances stopped");
       return true;
@@ -374,56 +341,35 @@ export function useTTSSmart() {
       ttsState.value = 'idle';
       currentTTSId.value = null;
       progress.value = 0;
+      isProcessing.value = false; // Reset processing flag when stopping (error case)
       return true;
     }
   };
 
   const retry = async () => {
-    if (ttsState.value === 'error') {
+    if (ttsState.value === 'error' && lastText.value) {
       logger.debug("[useTTSSmart] Manual retry initiated");
       
       // Clear error state
       ttsState.value = 'idle';
       errorMessage.value = '';
       errorType.value = '';
-      retryCount.value = 0; // Reset retry counter for manual retry
       
-      // If we have stored text, try speaking it again
-      if (lastText.value) {
-        logger.debug("[useTTSSmart] Retrying with stored text:", lastText.value.substring(0, 50) + '...');
-        return await speak(lastText.value, lastLanguage.value);
-      }
-      
-      logger.debug("[useTTSSmart] Error state cleared for manual retry");
-      return true;
+      // Try speaking the stored text again
+      logger.debug("[useTTSSmart] Retrying with stored text:", lastText.value.substring(0, 50) + '...');
+      return await speak(lastText.value, lastLanguage.value);
     }
     return false;
   };
 
   // Additional recovery methods
   const getErrorType = () => errorType.value;
-  
-  const getRecoveryInfo = () => {
-    if (ttsState.value === 'error' && errorType.value) {
-      const strategy = getRecoveryStrategy(errorType.value);
-      return {
-        errorType: errorType.value,
-        canRetry: strategy.canRetry,
-        userAction: strategy.userAction,
-        retryAttempts: retryCount.value,
-        maxRetries: maxRetries.value,
-        canManualRetry: true
-      };
-    }
-    return null;
-  };
 
   const clearError = () => {
     if (ttsState.value === 'error') {
       ttsState.value = 'idle';
       errorMessage.value = '';
       errorType.value = '';
-      retryCount.value = 0;
       lastText.value = '';
       lastLanguage.value = 'auto';
       logger.debug("[useTTSSmart] Error state manually cleared");
@@ -506,15 +452,12 @@ export function useTTSSmart() {
     // Error handling methods
     clearError,
     getErrorType,
-    getRecoveryInfo,
     
     // State
     ttsState,
     currentTTSId,
     errorMessage,
     errorType,
-    retryCount,
-    maxRetries,
     progress,
     lastText,
     lastLanguage,
@@ -528,9 +471,6 @@ export function useTTSSmart() {
     // Backward compatibility
     isPlaying, 
     isLoading, 
-    isAvailable,
-    
-    // Error types for external reference
-    ERROR_TYPES 
+    isAvailable 
   };
 }

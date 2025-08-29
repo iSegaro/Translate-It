@@ -11,6 +11,30 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
 // Use a global promise to ensure offscreen document is created only once.
 let offscreenDocumentPromise = null;
 
+// Google TTS supported languages (major ones)
+const SUPPORTED_TTS_LANGUAGES = new Set([
+  'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw',
+  'ar', 'hi', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',
+  'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
+  'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',
+  'hy', 'ne', 'si', 'my', 'km', 'lo', 'gu', 'ta', 'te', 'kn', 'ml', 'pa',
+  'bn', 'ur', 'fa', 'ps', 'sd', 'ckb', 'ku', 'am', 'om', 'so', 'sw', 'rw',
+  'ny', 'mg', 'st', 'zu', 'xh', 'af', 'sq', 'eu', 'ca', 'co', 'eo', 'fy',
+  'gl', 'haw', 'hmn', 'is', 'ig', 'jw', 'kk', 'ky', 'lb', 'mi', 'mn', 'sm',
+  'gd', 'sn', 'su', 'tg', 'tt', 'to', 'uz', 'yi', 'yo'
+]);
+
+/**
+ * Validate if language is supported by Google TTS
+ * @param {string} language - Language code
+ * @returns {boolean}
+ */
+const isLanguageSupported = (language) => {
+  if (!language) return false;
+  const cleanLang = language.toLowerCase().replace('_', '-');
+  return SUPPORTED_TTS_LANGUAGES.has(cleanLang) || SUPPORTED_TTS_LANGUAGES.has(cleanLang.split('-')[0]);
+};
+
 /**
  * Handle Google TTS requests from content scripts
  * @param {Object} request - Request object
@@ -22,17 +46,60 @@ export const handleGoogleTTSSpeak = async (request) => {
     
     const { text, language } = request.data || {};
     
-    if (!text || !text.trim()) {
-      logger.error('[GoogleTTSHandler] ❌ No text provided for Google TTS');
-      throw new Error('No text provided for Google TTS');
+    if (!text || !text.trim() || text.trim().length === 0) {
+      logger.error('[GoogleTTSHandler] ❌ No valid text provided for Google TTS');
+      throw new Error('No valid text provided for Google TTS');
     }
     
-    logger.debug('[GoogleTTSHandler] 📝 Text to speak:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
-    logger.debug('[GoogleTTSHandler] 🌍 Language:', language || 'auto-detect');
+    // Validate language support
+    const targetLanguage = language || 'en';
+    if (!isLanguageSupported(targetLanguage)) {
+      logger.warn('[GoogleTTSHandler] ⚠️ Unsupported language for TTS:', targetLanguage);
+      return {
+        success: false,
+        error: `Language '${targetLanguage}' is not supported by Google TTS`,
+        unsupportedLanguage: true
+      };
+    }
     
-    // Create Google TTS URL
-    const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text.trim())}&tl=${language || 'en'}`;
-    logger.debug('[GoogleTTSHandler] 🔗 TTS URL created:', ttsUrl);
+    const trimmedText = text.trim();
+    logger.debug('[GoogleTTSHandler] 📝 Text to speak:', trimmedText.substring(0, 100) + (trimmedText.length > 100 ? '...' : ''));
+    logger.debug('[GoogleTTSHandler] 🌍 Language:', targetLanguage, '(validated)');
+    
+    // Create Google TTS URL with better parameters to avoid HTTP 400
+    let finalText = trimmedText;
+    
+    // Clean text for TTS (remove markdown, extra whitespace, special chars)
+    finalText = finalText
+      // Remove markdown formatting
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+      .replace(/__(.*?)__/g, '$1')     // Remove __underline__
+      .replace(/_([^_]+)_/g, '$1')     // Remove _emphasis_
+      // Remove definition patterns (noun:, verb:, adj:, etc.)
+      .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
+      .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
+      // Remove extra whitespace and newlines
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      // Remove special characters that might cause issues (be more restrictive)
+      .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s\.,!?\-]/g, '')
+      .trim();
+    
+    if (finalText.length > 200) {
+      // Truncate very long text to avoid 400 errors
+      finalText = finalText.substring(0, 197) + '...';
+    }
+    
+    if (finalText.length < 1) {
+      logger.error('[GoogleTTSHandler] ❌ Text became empty after cleaning');
+      throw new Error('Text became empty after cleaning');
+    }
+    
+    logger.debug('[GoogleTTSHandler] 🧹 Cleaned text:', finalText.substring(0, 100) + (finalText.length > 100 ? '...' : ''));
+    
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(finalText)}&tl=${targetLanguage}&client=tw-ob`;
+    logger.debug('[GoogleTTSHandler] 🔗 TTS URL created:', ttsUrl.substring(0, 100) + '...');
     
     // Chrome: delegate to offscreen document
     // Firefox: play directly in background

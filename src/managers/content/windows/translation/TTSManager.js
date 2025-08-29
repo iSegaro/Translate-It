@@ -58,7 +58,7 @@ export class TTSManager {
       const detectedLanguage = language || this.detectSimpleLanguage(text) || "en";
       
       // Send to background service with enhanced message actions
-      await sendReliable({
+      const response = await sendReliable({
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
@@ -67,6 +67,26 @@ export class TTSManager {
           windowId: this.windowId
         }
       });
+
+      // Check if language was unsupported
+      if (response && response.unsupportedLanguage) {
+        this.logger.warn(`[TTSManager ${this.windowId}] Language ${detectedLanguage} not supported by Google TTS, trying fallback`);
+        
+        // Try fallback method
+        try {
+          await this.speakWithGoogleTTS(text, detectedLanguage);
+          this.logger.debug(`[TTSManager ${this.windowId}] Fallback TTS succeeded`);
+        } catch (fallbackError) {
+          this.logger.debug(`[TTSManager ${this.windowId}] Fallback TTS also failed, trying Web Speech`);
+          try {
+            await this.speakWithWebSpeech(text, detectedLanguage);
+            this.logger.debug(`[TTSManager ${this.windowId}] Web Speech TTS succeeded`);
+          } catch (webSpeechError) {
+            this.logger.warn(`[TTSManager ${this.windowId}] All TTS methods failed for language: ${detectedLanguage}`);
+            throw new Error(`TTS not available for language: ${detectedLanguage}`);
+          }
+        }
+      }
 
       // Update activity
       this.ttsGlobal.updateActivity();
@@ -151,7 +171,31 @@ export class TTSManager {
   speakWithGoogleTTS(text, language) {
     return new Promise((resolve, reject) => {
       try {
-        const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text)}&tl=${language}`;
+        // Use improved parameters to avoid HTTP 400 errors
+        let finalText = text.trim();
+        
+        // Clean text for TTS (remove markdown, extra whitespace, special chars)
+        finalText = finalText
+          // Remove markdown formatting
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+          .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+          .replace(/__(.*?)__/g, '$1')     // Remove __underline__
+          .replace(/_([^_]+)_/g, '$1')     // Remove _emphasis_
+          // Remove definition patterns (noun:, verb:, adj:, etc.)
+          .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
+          .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
+          // Remove extra whitespace and newlines
+          .replace(/\s+/g, ' ')
+          .replace(/\n+/g, ' ')
+          // Remove special characters that might cause issues (be more restrictive)
+          .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s\.,!?\-]/g, '')
+          .trim();
+        
+        if (finalText.length > 200) {
+          finalText = finalText.substring(0, 197) + '...';
+        }
+        
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(finalText)}&tl=${language}&client=tw-ob`;
         
         const audio = new Audio(ttsUrl);
         
