@@ -42,13 +42,14 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, getCurrentInstance } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/composables/useWindowsManager.js';
 import TextFieldIcon from './components/TextFieldIcon.vue';
 import TranslationWindow from './components/TranslationWindow.vue';
 import TranslationIcon from './components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
+import textFieldIconStyles from './components/TextFieldIcon.css?raw';
 
 const pageEventBus = window.pageEventBus;
 
@@ -109,6 +110,27 @@ logger.info('ContentApp script setup executed.');
 
 onMounted(() => {
   logger.info('ContentApp component has been mounted into the Shadow DOM.');
+
+  // Inject TextFieldIcon styles programmatically
+  try {
+    const instance = getCurrentInstance();
+    // Ensure the component is mounted and has an element
+    if (instance && instance.vnode.el) {
+      const shadowRoot = instance.vnode.el.getRootNode();
+      if (shadowRoot && shadowRoot instanceof ShadowRoot) {
+        const styleEl = document.createElement('style');
+        styleEl.textContent = textFieldIconStyles;
+        shadowRoot.appendChild(styleEl);
+        logger.info('Injected TextFieldIcon styles into shadow DOM.');
+      } else {
+        logger.error('Could not find shadow root for TextFieldIcon styles.');
+      }
+    } else {
+      logger.error('Could not get component instance to inject TextFieldIcon styles.');
+    }
+  } catch (error) {
+    logger.error('Failed to inject TextFieldIcon styles:', error);
+  }
   
   // Setup global click listener for outside click detection
   setupOutsideClickHandler();

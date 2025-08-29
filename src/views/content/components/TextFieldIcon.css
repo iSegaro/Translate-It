@@ -1,0 +1,77 @@
+/* Fallback styles for TextFieldIcon to ensure correct appearance. */
+.text-field-icon {
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  position: absolute;
+  width: 28px; /* default medium size */
+  height: 28px; /* default medium size */
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  z-index: 2147483641;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
+  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.text-field-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.text-field-icon.is-hovering {
+  background-color: #f8f9fa;
+  border-color: #dadce0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: scale(1.1) translateY(-1px);
+}
+
+.text-field-icon.is-active {
+  background-color: #e8f0fe;
+  border-color: #4285f4;
+  transform: scale(0.95);
+}
+
+.text-field-icon:focus-visible {
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.text-field-icon__svg {
+  width: 16px; /* default medium size */
+  height: 16px; /* default medium size */
+  display: block;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.text-field-icon.is-hovering .text-field-icon__svg {
+  transform: scale(1.05);
+}
+
+.text-field-icon.is-active .text-field-icon__svg {
+  transform: scale(0.95);
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
