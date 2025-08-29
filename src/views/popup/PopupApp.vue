@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -110,6 +110,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
+import { useTTSGlobal } from '@/composables/useTTSGlobal.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 
@@ -117,6 +118,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')
 const { handleError } = useErrorHandler()
+
+// TTS Global Manager for lifecycle management
+const ttsGlobal = useTTSGlobal({ 
+  type: 'popup', 
+  name: 'PopupApp'
+})
 
 // State
 const isLoading = ref(true)
@@ -164,6 +171,20 @@ const toggleEnhancedVersion = () => {
 
 // Lifecycle
 onMounted(() => {
+  // Register TTS instance with stop callback
+  ttsGlobal.register(async () => {
+    logger.debug('[PopupApp] TTS cleanup callback - stopping TTS due to popup lifecycle')
+    // Use direct message to background instead of calling stopAll() to avoid recursion
+    try {
+      await sendMessage({
+        action: 'GOOGLE_TTS_STOP_ALL',
+        data: { source: 'popup-cleanup' }
+      })
+    } catch (error) {
+      logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
+    }
+  })
+  
   const initialize = async () => {
   try {
     // Step 1: Set loading text
@@ -230,6 +251,13 @@ onMounted(() => {
   }
   }
   initialize()
+})
+
+// Cleanup TTS when popup is unmounted/closed
+onUnmounted(() => {
+  logger.debug('[PopupApp] Popup unmounting - stopping all TTS and cleaning up')
+  ttsGlobal.stopAll()
+  ttsGlobal.unregister()
 })
 
 const retryLoading = () => {

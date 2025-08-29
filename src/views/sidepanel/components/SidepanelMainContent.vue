@@ -89,6 +89,7 @@ import { useTranslationStore } from "@/store/modules/translation.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";
@@ -135,7 +136,11 @@ const targetLang = ref('Persian');
 
 const historyComposable = useHistory();
 
-
+// TTS Global Manager for lifecycle management
+const ttsGlobal = useTTSGlobal({ 
+  type: 'sidepanel', 
+  name: 'SidepanelMainContent'
+});
 
 const targetLanguageValue = computed(() => targetLang.value || 'Persian');
 
@@ -301,6 +306,21 @@ const handleFocus = () => {
 // Lifecycle - setup event listeners
 onMounted(async () => {
   try {
+    // Register TTS instance with stop callback (sidepanel persists across tabs)
+    ttsGlobal.register(async () => {
+      logger.debug('[SidepanelMainContent] TTS cleanup callback - sidepanel closing')
+      // Use direct message to background instead of calling stopAll() to avoid recursion
+      try {
+        const { sendMessage } = useMessaging('sidepanel-cleanup')
+        await sendMessage({
+          action: 'GOOGLE_TTS_STOP_ALL',
+          data: { source: 'sidepanel-cleanup' }
+        })
+      } catch (error) {
+        logger.error('[SidepanelMainContent] Failed to stop TTS during cleanup:', error)
+      }
+    });
+    
     // Load languages first
   logger.debug("Loading languages...");
     await languages.loadLanguages();
@@ -349,6 +369,11 @@ onUnmounted(() => {
     currentAbortController.value.abort();
     currentAbortController.value = null;
   }
+
+  // Cleanup TTS (sidepanel may close)
+  logger.debug('[SidepanelMainContent] Sidepanel unmounting - stopping TTS and cleaning up');
+  ttsGlobal.stopAll();
+  ttsGlobal.unregister();
 });</script>
 
 <style scoped>

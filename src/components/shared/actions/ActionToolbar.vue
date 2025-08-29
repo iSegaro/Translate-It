@@ -28,12 +28,11 @@
         :language="language"
         :size="buttonSize"
         :variant="buttonVariant"
-        :title="ttsTitle"
-        :aria-label="ttsAriaLabel"
         :disabled="ttsDisabled"
-        @speaking="handleTTSSpeaking"
-        @stopped="handleTTSStopped"
-        @tts-failed="handleTTSFailed"
+        @tts-started="handleTTSStarted"
+        @tts-stopped="handleTTSStopped"
+        @tts-error="handleTTSFailed"
+        @state-changed="handleTTSStateChanged"
       />
     </div>
     
@@ -61,7 +60,7 @@
 import { computed } from 'vue'
 import CopyButton from './CopyButton.vue'
 import PasteButton from './PasteButton.vue'
-import TTSButton from './TTSButton.vue'
+import TTSButton from '../TTSButton.vue' // Updated to use the new enhanced TTSButton
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
@@ -117,13 +116,13 @@ const props = defineProps({
   // Size and styling
   size: {
     type: String,
-    default: 'small',
-    validator: (value) => ['small', 'medium', 'large'].includes(value)
+    default: 'sm',
+    validator: (value) => ['sm', 'md', 'lg'].includes(value)
   },
   variant: {
     type: String,
-    default: 'inline',
-    validator: (value) => ['inline', 'standalone', 'toolbar'].includes(value)
+    default: 'secondary',
+    validator: (value) => ['primary', 'secondary'].includes(value)
   },
   
   // Behavior
@@ -177,8 +176,11 @@ const props = defineProps({
 const emit = defineEmits([
   'text-copied',
   'text-pasted', 
-  'tts-speaking',
+  'tts-speaking', // Backward compatibility
   'tts-stopped',
+  'tts-started',
+  'tts-error',
+  'tts-state-changed',
   'action-failed'
 ])
 
@@ -219,8 +221,11 @@ const handlePasteFailed = (error) => {
   emit('action-failed', { action: 'paste', error })
 }
 
-const handleTTSSpeaking = (data) => {
-  logger.debug('[ActionToolbar] TTS speaking:', data.text.substring(0, 50) + '...')
+// Enhanced TTS event handlers for new TTSButton
+const handleTTSStarted = (data) => {
+  logger.debug('[ActionToolbar] TTS started:', data.text.substring(0, 50) + '...')
+  emit('tts-started', data)
+  // Backward compatibility
   emit('tts-speaking', data)
 }
 
@@ -231,7 +236,14 @@ const handleTTSStopped = () => {
 
 const handleTTSFailed = (error) => {
   logger.error('[ActionToolbar] TTS failed:', error)
+  emit('tts-error', error)
+  // Backward compatibility
   emit('action-failed', { action: 'tts', error })
+}
+
+const handleTTSStateChanged = (data) => {
+  logger.debug('[ActionToolbar] TTS state changed:', data.from, '→', data.to)
+  emit('tts-state-changed', data)
 }
 </script>
 
@@ -364,10 +376,11 @@ const handleTTSFailed = (error) => {
 .mode-sidepanel {
   background: transparent;
   border-radius: 4px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   max-width: 100%;
   box-sizing: border-box;
   overflow: visible;
+  min-height: 28px;
 }
 
 .mode-sidepanel.position-top-right,

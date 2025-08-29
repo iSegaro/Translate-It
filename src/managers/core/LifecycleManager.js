@@ -103,6 +103,10 @@ class LifecycleManager {
       
       // TTS handlers
       'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
+      'GOOGLE_TTS_STOP_ALL': Handlers.handleGoogleTTSStopAll,
+      'GOOGLE_TTS_PAUSE': Handlers.handleGoogleTTSPause,
+      'GOOGLE_TTS_RESUME': Handlers.handleGoogleTTSResume,
+      'GOOGLE_TTS_GET_STATUS': Handlers.handleGoogleTTSGetStatus,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,

@@ -88,6 +88,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
+import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 
 const props = defineProps({
@@ -101,6 +102,12 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'speak']);
+
+// TTS Global Manager for windows-manager lifecycle
+const ttsGlobal = useTTSGlobal({ 
+  type: 'windows-manager', 
+  name: `TranslationWindow-${props.id}`
+});
 
 // State  
 const isLoading = computed(() => {
@@ -171,6 +178,20 @@ const windowStyle = computed(() => {
 
 // When the component is mounted, start invisible and then animate in.
 onMounted(() => {
+  // Register TTS instance with stop callback
+  ttsGlobal.register(async () => {
+    console.log(`[TranslationWindow ${props.id}] TTS cleanup callback - window closing`)
+    // Use direct message to background instead of calling stopAll() to avoid recursion
+    try {
+      await browser.runtime.sendMessage({
+        action: 'GOOGLE_TTS_STOP_ALL',
+        data: { source: 'translation-window-cleanup', windowId: props.id }
+      })
+    } catch (error) {
+      console.error(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
+    }
+  });
+
   // Use requestAnimationFrame to ensure the transition is applied after the initial render
   requestAnimationFrame(() => {
     isVisible.value = true;
@@ -178,6 +199,12 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // Cleanup TTS when window is dismissed
+  console.log(`[TranslationWindow ${props.id}] Window unmounting - stopping TTS and cleaning up`);
+  
+  // Unregister from TTS global manager (this will automatically trigger cleanup)
+  ttsGlobal.unregister();
+  
   // Cleanup positioning composable
   cleanupPositioning();
 });

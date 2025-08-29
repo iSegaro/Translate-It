@@ -6,43 +6,142 @@ import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
 import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 
 /**
  * Manages Text-to-Speech functionality for WindowsManager
  */
 export class TTSManager {
-  constructor() {
+  constructor(windowId = 'unknown') {
     this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TTSManager');
+    this.windowId = windowId;
+    
+    // Initialize TTS Global Manager
+    this.ttsGlobal = useTTSGlobal({ 
+      type: 'windows-manager', 
+      name: `TTSManager-${windowId}`
+    });
+    
+    // Register with cleanup callback
+    this.ttsGlobal.register(async () => {
+      this.logger.debug(`[TTSManager ${windowId}] TTS cleanup callback - stopping TTS`)
+      // Use direct background message instead of stopCurrentTTS to avoid recursion
+      try {
+        await sendReliable({
+          action: MessageActions.GOOGLE_TTS_STOP_ALL,
+          data: { source: 'windows-manager-cleanup', windowId }
+        })
+      } catch (error) {
+        this.logger.error(`[TTSManager ${windowId}] Failed to stop TTS during cleanup:`, error)
+      }
+    });
+    
+    this.logger.debug(`TTSManager initialized for window: ${windowId}`)
   }
 
   /**
-   * Speak text using unified TTS system (background service)
+   * Speak text using enhanced TTS system with global management
    */
-  async speakTextUnified(text) {
+  async speakTextUnified(text, language = null) {
     if (!text || !text.trim()) {
       this.logger.warn("No text provided for TTS");
-      return;
+      return false;
     }
 
     try {
-      this.logger.debug("Speaking via background Google TTS:", text.substring(0, 50) + "...");
+      this.logger.debug(`[TTSManager ${this.windowId}] Speaking via enhanced TTS:`, text.substring(0, 50) + "...");
 
-      // Detect language
-      const language = this.detectSimpleLanguage(text) || "en";
+      // Notify global manager that this instance is starting TTS
+      await this.ttsGlobal.startTTS({ text, language });
+
+      // Detect language if not provided
+      const detectedLanguage = language || this.detectSimpleLanguage(text) || "en";
       
-      // Send to background service (use reliable messenger)
+      // Send to background service with enhanced message actions
       await sendReliable({
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
-          language: language
+          language: detectedLanguage,
+          instanceId: this.ttsGlobal.instanceId,
+          windowId: this.windowId
         }
       });
 
-      this.logger.debug("Background Google TTS request sent successfully");
+      // Update activity
+      this.ttsGlobal.updateActivity();
+
+      this.logger.debug(`[TTSManager ${this.windowId}] Enhanced TTS request sent successfully`);
+      return true;
     } catch (error) {
-      this.logger.error("Background Google TTS failed:", error);
+      this.logger.error(`[TTSManager ${this.windowId}] Enhanced TTS failed:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Pause current TTS
+   */
+  async pauseTTS() {
+    try {
+      this.logger.debug(`[TTSManager ${this.windowId}] Pausing TTS`);
+      
+      await sendReliable({
+        action: MessageActions.GOOGLE_TTS_PAUSE,
+        data: { 
+          instanceId: this.ttsGlobal.instanceId,
+          windowId: this.windowId
+        }
+      });
+      
+      this.ttsGlobal.updateActivity();
+      return true;
+    } catch (error) {
+      this.logger.error(`[TTSManager ${this.windowId}] Pause TTS failed:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Resume current TTS
+   */
+  async resumeTTS() {
+    try {
+      this.logger.debug(`[TTSManager ${this.windowId}] Resuming TTS`);
+      
+      await sendReliable({
+        action: MessageActions.GOOGLE_TTS_RESUME,
+        data: { 
+          instanceId: this.ttsGlobal.instanceId,
+          windowId: this.windowId
+        }
+      });
+      
+      this.ttsGlobal.updateActivity();
+      return true;
+    } catch (error) {
+      this.logger.error(`[TTSManager ${this.windowId}] Resume TTS failed:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get current TTS status
+   */
+  async getTTSStatus() {
+    try {
+      const response = await sendReliable({
+        action: MessageActions.GOOGLE_TTS_GET_STATUS,
+        data: { 
+          instanceId: this.ttsGlobal.instanceId,
+          windowId: this.windowId
+        }
+      });
+      
+      return response?.status || 'idle';
+    } catch (error) {
+      this.logger.error(`[TTSManager ${this.windowId}] Get TTS status failed:`, error);
+      return 'error';
     }
   }
 
@@ -89,20 +188,44 @@ export class TTSManager {
   }
 
   /**
-   * Stop any currently playing TTS
+   * Stop any currently playing TTS (enhanced with global management)
    */
-  stopCurrentTTS() {
+  async stopCurrentTTS() {
     try {
-      // Stop any playing audio elements (Google TTS)
+      this.logger.debug(`[TTSManager ${this.windowId}] Stopping current TTS`);
+      
+      // Stop via background service first
+      try {
+        await sendReliable({
+          action: MessageActions.GOOGLE_TTS_STOP_ALL,
+          data: { 
+            instanceId: this.ttsGlobal.instanceId,
+            windowId: this.windowId
+          }
+        });
+        
+        this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent`);
+      } catch (bgError) {
+        this.logger.warn(`[TTSManager ${this.windowId}] Background stop failed:`, bgError);
+      }
+      
+      // Local cleanup as fallback
       const audioElements = document.querySelectorAll('audio');
       audioElements.forEach(audio => {
         audio.pause();
         audio.src = "";
       });
       
-      this.logger.debug("TTS stopped");
+      // Cancel any Web Speech
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      
+      this.logger.debug(`[TTSManager ${this.windowId}] TTS stopped (local cleanup completed)`);
+      return true;
     } catch (error) {
-      this.logger.warn("Error stopping TTS", error);
+      this.logger.warn(`[TTSManager ${this.windowId}] Error stopping TTS:`, error);
+      return false;
     }
   }
 
@@ -239,16 +362,36 @@ export class TTSManager {
   }
 
   /**
-   * Cleanup TTS manager
+   * Enhanced cleanup with global manager integration
    */
-  cleanup() {
-    this.stopCurrentTTS();
+  async cleanup() {
+    this.logger.debug(`[TTSManager ${this.windowId}] Starting cleanup`);
+    
+    // Stop current TTS
+    await this.stopCurrentTTS();
+    
+    // Unregister from global manager
+    this.ttsGlobal.unregister();
     
     // Cancel any pending Web Speech
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
     
-    this.logger.debug('TTSManager cleanup completed');
+    this.logger.debug(`[TTSManager ${this.windowId}] Cleanup completed`);
+  }
+
+  /**
+   * Check if this instance is currently active
+   */
+  isActive() {
+    return this.ttsGlobal.isActive();
+  }
+
+  /**
+   * Get global TTS statistics
+   */
+  getGlobalStats() {
+    return this.ttsGlobal.getStats();
   }
 }

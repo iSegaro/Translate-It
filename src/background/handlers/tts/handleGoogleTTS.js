@@ -208,7 +208,14 @@ const playWithOffscreenDocument = async (ttsUrl) => {
 const playGoogleTTSAudio = (ttsUrl) => {
   return new Promise((resolve, reject) => {
     try {
+      // Stop any existing audio first
+      if (currentFirefoxAudio) {
+        currentFirefoxAudio.pause();
+        currentFirefoxAudio.src = '';
+      }
+      
       const audio = new Audio(ttsUrl);
+      currentFirefoxAudio = audio;
       
       // Add timeout
       const timeout = setTimeout(() => {
@@ -219,6 +226,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
       
       audio.onended = () => {
         clearTimeout(timeout);
+        currentFirefoxAudio = null; // Clear reference when ended
         logger.debug('[GoogleTTSHandler] Background Google TTS audio completed');
         resolve();
       };
@@ -240,4 +248,325 @@ const playGoogleTTSAudio = (ttsUrl) => {
       reject(error);
     }
   });
+};
+
+/**
+ * Handle Google TTS Stop All request
+ * @param {Object} request - Request object
+ * @returns {Promise<Object>} Response
+ */
+export const handleGoogleTTSStopAll = async (request) => {
+  try {
+    logger.debug('[GoogleTTSHandler] 🛑 Processing Google TTS Stop All request');
+    
+    const isChromiumBrowser = isChromium();
+    
+    if (isChromiumBrowser) {
+      logger.debug('[GoogleTTSHandler] 🟢 Stopping TTS via offscreen document');
+      await stopWithOffscreenDocument();
+    } else {
+      logger.debug('[GoogleTTSHandler] 🟠 Stopping TTS directly in Firefox');
+      await stopGoogleTTSAudio();
+    }
+    
+    logger.debug('[GoogleTTSHandler] ✅ Google TTS stopped successfully');
+    return { success: true, action: 'stopped' };
+    
+  } catch (error) {
+    logger.error('[GoogleTTSHandler] ❌ Google TTS stop failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Background Google TTS stop failed'
+    };
+  }
+};
+
+/**
+ * Handle Google TTS Pause request
+ * @param {Object} request - Request object
+ * @returns {Promise<Object>} Response
+ */
+export const handleGoogleTTSPause = async (request) => {
+  try {
+    logger.debug('[GoogleTTSHandler] ⏸️ Processing Google TTS Pause request');
+    
+    const isChromiumBrowser = isChromium();
+    
+    if (isChromiumBrowser) {
+      logger.debug('[GoogleTTSHandler] 🟢 Pausing TTS via offscreen document');
+      await pauseWithOffscreenDocument();
+    } else {
+      logger.debug('[GoogleTTSHandler] 🟠 Pausing TTS directly in Firefox');
+      await pauseGoogleTTSAudio();
+    }
+    
+    logger.debug('[GoogleTTSHandler] ✅ Google TTS paused successfully');
+    return { success: true, action: 'paused' };
+    
+  } catch (error) {
+    logger.error('[GoogleTTSHandler] ❌ Google TTS pause failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Background Google TTS pause failed'
+    };
+  }
+};
+
+/**
+ * Handle Google TTS Resume request
+ * @param {Object} request - Request object
+ * @returns {Promise<Object>} Response
+ */
+export const handleGoogleTTSResume = async (request) => {
+  try {
+    logger.debug('[GoogleTTSHandler] ▶️ Processing Google TTS Resume request');
+    
+    const isChromiumBrowser = isChromium();
+    
+    if (isChromiumBrowser) {
+      logger.debug('[GoogleTTSHandler] 🟢 Resuming TTS via offscreen document');
+      await resumeWithOffscreenDocument();
+    } else {
+      logger.debug('[GoogleTTSHandler] 🟠 Resuming TTS directly in Firefox');
+      await resumeGoogleTTSAudio();
+    }
+    
+    logger.debug('[GoogleTTSHandler] ✅ Google TTS resumed successfully');
+    return { success: true, action: 'resumed' };
+    
+  } catch (error) {
+    logger.error('[GoogleTTSHandler] ❌ Google TTS resume failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Background Google TTS resume failed'
+    };
+  }
+};
+
+/**
+ * Handle Google TTS Get Status request
+ * @param {Object} request - Request object
+ * @returns {Promise<Object>} Response
+ */
+export const handleGoogleTTSGetStatus = async (request) => {
+  try {
+    logger.debug('[GoogleTTSHandler] 📊 Processing Google TTS Get Status request');
+    
+    const isChromiumBrowser = isChromium();
+    
+    let status = 'idle';
+    
+    if (isChromiumBrowser) {
+      logger.debug('[GoogleTTSHandler] 🟢 Getting TTS status via offscreen document');
+      status = await getStatusWithOffscreenDocument();
+    } else {
+      logger.debug('[GoogleTTSHandler] 🟠 Getting TTS status directly in Firefox');
+      status = await getGoogleTTSAudioStatus();
+    }
+    
+    logger.debug('[GoogleTTSHandler] ✅ Google TTS status retrieved:', status);
+    return { success: true, status };
+    
+  } catch (error) {
+    logger.error('[GoogleTTSHandler] ❌ Google TTS get status failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Background Google TTS get status failed',
+      status: 'error'
+    };
+  }
+};
+
+// Offscreen document communication helpers for new actions
+/**
+ * Stop TTS via offscreen document
+ */
+const stopWithOffscreenDocument = async () => {
+  const browserAPI = await initializebrowserAPI();
+  
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Offscreen TTS stop timeout'));
+    }, 3000);
+
+    browserAPI.runtime.sendMessage({
+      action: 'handleTTSStop',
+      target: 'offscreen'
+    }).then((response) => {
+      clearTimeout(timeout);
+      
+      if (response?.success !== false) {
+        resolve();
+      } else {
+        reject(new Error(response?.error || 'Offscreen TTS stop failed'));
+      }
+    }).catch((err) => {
+      clearTimeout(timeout);
+      
+      // Handle connection errors gracefully
+      if (err.message && err.message.includes('Receiving end does not exist')) {
+        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected, considering stop successful');
+        resolve(); // Consider this a successful stop since offscreen is gone
+      } else {
+        reject(err);
+      }
+    });
+  });
+};
+
+/**
+ * Pause TTS via offscreen document
+ */
+const pauseWithOffscreenDocument = async () => {
+  const browserAPI = await initializebrowserAPI();
+  
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Offscreen TTS pause timeout'));
+    }, 3000);
+
+    browserAPI.runtime.sendMessage({
+      action: 'handleTTSPause',
+      target: 'offscreen'
+    }).then((response) => {
+      clearTimeout(timeout);
+      
+      if (response?.success !== false) {
+        resolve();
+      } else {
+        reject(new Error(response?.error || 'Offscreen TTS pause failed'));
+      }
+    }).catch((err) => {
+      clearTimeout(timeout);
+      
+      // Handle connection errors gracefully
+      if (err.message && err.message.includes('Receiving end does not exist')) {
+        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected for pause');
+        resolve();
+      } else {
+        reject(err);
+      }
+    });
+  });
+};
+
+/**
+ * Resume TTS via offscreen document
+ */
+const resumeWithOffscreenDocument = async () => {
+  const browserAPI = await initializebrowserAPI();
+  
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Offscreen TTS resume timeout'));
+    }, 3000);
+
+    browserAPI.runtime.sendMessage({
+      action: 'handleTTSResume',
+      target: 'offscreen'
+    }).then((response) => {
+      clearTimeout(timeout);
+      
+      if (response?.success !== false) {
+        resolve();
+      } else {
+        reject(new Error(response?.error || 'Offscreen TTS resume failed'));
+      }
+    }).catch((err) => {
+      clearTimeout(timeout);
+      
+      // Handle connection errors gracefully
+      if (err.message && err.message.includes('Receiving end does not exist')) {
+        logger.debug('[GoogleTTSHandler] Offscreen document already disconnected for resume');
+        resolve();
+      } else {
+        reject(err);
+      }
+    });
+  });
+};
+
+/**
+ * Get TTS status via offscreen document
+ */
+const getStatusWithOffscreenDocument = async () => {
+  const browserAPI = await initializebrowserAPI();
+  
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      resolve('idle'); // Default fallback
+    }, 3000);
+
+    browserAPI.runtime.sendMessage({
+      action: 'handleTTSGetStatus',
+      target: 'offscreen'
+    }).then((response) => {
+      clearTimeout(timeout);
+      
+      if (response?.status) {
+        resolve(response.status);
+      } else {
+        resolve('idle');
+      }
+    }).catch((err) => {
+      clearTimeout(timeout);
+      resolve('idle'); // Fallback on error
+    });
+  });
+};
+
+// Firefox direct audio helpers for new actions
+let currentFirefoxAudio = null;
+
+/**
+ * Stop TTS audio directly (Firefox)
+ */
+const stopGoogleTTSAudio = async () => {
+  if (currentFirefoxAudio) {
+    currentFirefoxAudio.pause();
+    currentFirefoxAudio.currentTime = 0;
+    currentFirefoxAudio.src = '';
+    currentFirefoxAudio = null;
+    logger.debug('[GoogleTTSHandler] Firefox TTS audio stopped');
+  }
+};
+
+/**
+ * Pause TTS audio directly (Firefox)
+ */
+const pauseGoogleTTSAudio = async () => {
+  if (currentFirefoxAudio && !currentFirefoxAudio.paused) {
+    currentFirefoxAudio.pause();
+    logger.debug('[GoogleTTSHandler] Firefox TTS audio paused');
+  }
+};
+
+/**
+ * Resume TTS audio directly (Firefox)
+ */
+const resumeGoogleTTSAudio = async () => {
+  if (currentFirefoxAudio && currentFirefoxAudio.paused) {
+    try {
+      await currentFirefoxAudio.play();
+      logger.debug('[GoogleTTSHandler] Firefox TTS audio resumed');
+    } catch (error) {
+      logger.error('[GoogleTTSHandler] Firefox TTS resume failed:', error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Get TTS audio status (Firefox)
+ */
+const getGoogleTTSAudioStatus = async () => {
+  if (!currentFirefoxAudio) {
+    return 'idle';
+  }
+  
+  if (currentFirefoxAudio.paused) {
+    return currentFirefoxAudio.currentTime > 0 ? 'paused' : 'idle';
+  }
+  
+  return 'playing';
 };

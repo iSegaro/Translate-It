@@ -16,6 +16,7 @@
       :src="iconSrc" 
       :alt="iconAlt"
       class="button-icon"
+      style="width: 20px !important; height: 20px !important; object-fit: contain;"
     >
     <span
       v-if="showLabel"
@@ -45,13 +46,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PasteButton')
 const props = defineProps({
   size: {
     type: String,
-    default: 'medium',
-    validator: (value) => ['small', 'medium', 'large'].includes(value)
+    default: 'sm',
+    validator: (value) => ['sm', 'md', 'lg'].includes(value)
   },
   variant: {
     type: String,
-    default: 'inline',
-    validator: (value) => ['inline', 'standalone', 'toolbar'].includes(value)
+    default: 'secondary',
+    validator: (value) => ['primary', 'secondary'].includes(value)
   },
   title: {
     type: String,
@@ -175,52 +176,60 @@ const handlePaste = async () => {
 }
 
 /* Size variants */
-.size-small {
+.size-sm {
   padding: 2px;
   min-width: 20px;
   min-height: 20px;
 }
 
-.size-small .button-icon {
+.size-sm .button-icon {
   width: 14px;
   height: 14px;
 }
 
-.size-medium {
+.size-md {
   padding: 6px;
   min-width: 32px;
   min-height: 32px;
 }
 
-.size-medium .button-icon {
+.size-md .button-icon {
   width: 20px;
   height: 20px;
 }
 
-.size-large {
+.size-lg {
   padding: 8px;
   min-width: 40px;
   min-height: 40px;
 }
 
-.size-large .button-icon {
+.size-lg .button-icon {
   width: 24px;
   height: 24px;
 }
 
 /* Variant styles */
-.variant-inline {
+.variant-primary {
+  background-color: var(--primary-color, #007bff);
+  color: white;
+  border: 1px solid var(--primary-color, #007bff);
+}
+
+.variant-primary:hover {
+  background-color: var(--primary-color-hover, #0056b3);
+}
+
+.variant-secondary {
+  background-color: transparent;
+  color: var(--text-color, #333);
+  border: 1px solid transparent;
   margin: 0 2px;
 }
 
-.variant-standalone {
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  background-color: rgba(255, 255, 255, 0.9);
-}
-
-.variant-toolbar {
-  margin: 0 1px;
-  border-radius: 2px;
+.variant-secondary:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 /* Button elements */

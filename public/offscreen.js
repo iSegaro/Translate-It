@@ -53,16 +53,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleTTSSpeak(cleanMessage.data, sendResponse);
     return true; // keep async channel open
   }
-  else if (action === "TTS_STOP") {
+  else if (action === "TTS_STOP" || action === "handleTTSStop") {
     handleTTSStop(sendResponse);
     return true;
   }
-  else if (action === "TTS_PAUSE") {
+  else if (action === "TTS_PAUSE" || action === "handleTTSPause") {
     handleTTSPause(sendResponse);
     return true;
   }
-  else if (action === "TTS_RESUME") {
+  else if (action === "TTS_RESUME" || action === "handleTTSResume") {
     handleTTSResume(sendResponse);
+    return true;
+  }
+  else if (action === "handleTTSGetStatus") {
+    handleTTSGetStatus(sendResponse);
     return true;
   }
   else if (action === "TTS_TEST") {
@@ -238,6 +242,21 @@ function handleTTSGetVoices(sendResponse) {
  * Handle TTS stop
  */
 function handleTTSStop(sendResponse) {
+  // Create safe response wrapper to prevent duplicate calls
+  let responseSent = false;
+  const safeResponse = (response) => {
+    if (!responseSent) {
+      responseSent = true;
+      try {
+        sendResponse(response);
+      } catch (error) {
+        console.log("[Offscreen] Response already sent or connection closed:", error.message);
+      }
+    } else {
+      console.log("[Offscreen] Duplicate response attempt blocked");
+    }
+  };
+
   try {
     let stopped = false;
 
@@ -251,17 +270,24 @@ function handleTTSStop(sendResponse) {
 
     // Stop audio playback
     if (currentAudio) {
+      // Pause first to prevent further events
       currentAudio.pause();
-      currentAudio.src = "";
+      // Clear source safely
+      try {
+        currentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+        currentAudio.load(); // Reset to empty state
+      } catch(e) {
+        // Ignore errors during cleanup
+      }
       currentAudio = null;
       stopped = true;
       console.log("[Offscreen] TTS audio stopped");
     }
 
-    sendResponse({ success: true, stopped });
+    safeResponse({ success: true, stopped });
   } catch (error) {
     console.error("[Offscreen] TTS stop failed:", error);
-    sendResponse({ success: false, error: error.message });
+    safeResponse({ success: false, error: error.message });
   }
 }
 
@@ -321,6 +347,39 @@ function handleTTSResume(sendResponse) {
   } catch (error) {
     console.error("[Offscreen] TTS resume failed:", error);
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle TTS get status
+ */
+function handleTTSGetStatus(sendResponse) {
+  try {
+    let status = 'idle';
+    
+    // Check speech synthesis status
+    if (currentUtterance) {
+      if (speechSynthesis.paused) {
+        status = 'paused';
+      } else if (speechSynthesis.speaking) {
+        status = 'playing';
+      }
+    }
+    
+    // Check audio playback status
+    if (currentAudio) {
+      if (currentAudio.paused) {
+        status = currentAudio.currentTime > 0 ? 'paused' : 'idle';
+      } else {
+        status = 'playing';
+      }
+    }
+    
+    console.log("[Offscreen] TTS status:", status);
+    sendResponse({ success: true, status });
+  } catch (error) {
+    console.error("[Offscreen] TTS get status failed:", error);
+    sendResponse({ success: false, error: error.message, status: 'error' });
   }
 }
 
@@ -389,6 +448,10 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
           responseSent = true;
           sendResponse({ success: true });
         }
+        // Notify frontend that TTS ended
+        chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
+          console.log("[Offscreen] Failed to send TTS ended notification:", err);
+        });
       });
 
       currentAudio.addEventListener("error", (e) => {

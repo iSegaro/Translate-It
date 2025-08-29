@@ -15,7 +15,7 @@
     <ActionToolbar
       v-if="showToolbar && hasContent"
       :text="content"
-      :target-language="targetLanguage"
+      :language="targetLanguage"
       :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
       class="display-toolbar"
       :show-copy="showCopyButton"
