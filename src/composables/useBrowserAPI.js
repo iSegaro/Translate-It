@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, getCurrentInstance } from 'vue';
 import browser from 'webextension-polyfill';
 import { useMessaging } from '../messaging/composables/useMessaging.js';
 import { storageManager } from '@/storage/core/StorageCore.js';
@@ -51,17 +51,33 @@ export function useBrowserAPI(context = 'vue-generic') { // This context is now 
     isLoading.value = !globalApiReady.value;
   };
 
-  onMounted(async () => {
-    try {
-      if (!globalApiReady.value) {
-        await initializebrowserAPI();
+  const instance = getCurrentInstance();
+
+  if (instance) {
+    // Called from within a component's setup(), so we can use lifecycle hooks.
+    onMounted(async () => {
+      try {
+        if (!globalApiReady.value) {
+          await initializebrowserAPI();
+        }
+        updateState();
+      } catch (err) {
+        error.value = err.message;
+        isLoading.value = false;
       }
-      updateState();
-    } catch (err) {
-      error.value = err.message;
-      isLoading.value = false;
+    });
+  } else {
+    // Called from outside a component setup (e.g., at the module level in another composable).
+    // Initialize directly without relying on component lifecycle.
+    if (!globalApiReady.value) {
+      initializebrowserAPI()
+        .then(() => updateState())
+        .catch(err => {
+          error.value = err.message;
+          isLoading.value = false;
+        });
     }
-  });
+  }
 
   const setupStorageListener = (callback) => {
     const listener = (data) => {
