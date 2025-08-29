@@ -1,0 +1,8 @@
+/* This file consolidates all global CSS for the content script UI. */
+/* It is imported into src/app/main.js using ?inline. */
+
+/* Import individual style files */
+@import './windows-manager.css';
+@import './utility-styles.css';
+@import '../views/content/components/TextFieldIcon.css';
+@import 'vue-sonner/style.css';
