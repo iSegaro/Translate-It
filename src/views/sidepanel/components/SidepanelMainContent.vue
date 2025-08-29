@@ -319,7 +319,25 @@ onMounted(async () => {
       } catch (error) {
         logger.error('[SidepanelMainContent] Failed to stop TTS during cleanup:', error)
       }
-    });
+    })
+
+    // Create a port connection to detect sidepanel close via port disconnect
+    const port = browser.runtime.connect({ name: 'sidepanel-lifecycle' })
+    
+    // Send initial ping to background to register sidepanel as active
+    port.postMessage({ 
+      action: 'SIDEPANEL_OPENED',
+      data: { timestamp: Date.now() }
+    })
+    
+    // Handle port disconnect (sidepanel closed)
+    port.onDisconnect.addListener(() => {
+      logger.debug('[SidepanelMainContent] Port disconnected - sidepanel closing detected')
+      // Port disconnect means sidepanel is closing - background will handle TTS stop
+    })
+    
+    // Store port reference for cleanup
+    window.__sidepanelPort = port;
     
     // Load languages first
   logger.debug("Loading languages...");
@@ -370,9 +388,19 @@ onUnmounted(() => {
     currentAbortController.value = null;
   }
 
+  // Cleanup port
+  if (window.__sidepanelPort) {
+    try {
+      window.__sidepanelPort.disconnect()
+    } catch (error) {
+      logger.debug('[SidepanelMainContent] Port already disconnected:', error.message)
+    }
+    delete window.__sidepanelPort
+  }
+
   // Cleanup TTS (sidepanel may close)
-  logger.debug('[SidepanelMainContent] Sidepanel unmounting - stopping TTS and cleaning up');
-  ttsGlobal.stopAll();
+  logger.debug('[SidepanelMainContent] Sidepanel unmounting - unregistering from TTS global manager');
+  // Just unregister - the cleanup callback will handle TTS stopping
   ttsGlobal.unregister();
 });</script>
 
