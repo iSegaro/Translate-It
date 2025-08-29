@@ -324,24 +324,32 @@ async function determineReplaceMode(mode, platform) {
     return true;
   }
 
+  // Check for special sites first, if platform is not default
+  if (platform !== Platform.Default) {
+    const replaceSpecial = await getREPLACE_SPECIAL_SITESAsync();
+    logger.debug('Special platform detected', { platform, replaceSpecial });
+    // If REPLACE_SPECIAL_SITES is true, then replace. Otherwise, proceed to general COPY_REPLACE check.
+    if (replaceSpecial) {
+      return true; // Replace on special sites if setting is true
+    }
+  }
+
+  // Now check the general COPY_REPLACE setting
   const isCopy = await getCOPY_REPLACEAsync();
   logger.debug('COPY_REPLACE setting retrieved', { setting: isCopy });
-  
+
   if (isCopy === "replace") {
     logger.debug('COPY_REPLACE set to replace mode');
     return true;
   }
+  // If isCopy is "copy", then it's copy mode unless overridden by special site logic (which is handled above)
   if (isCopy === "copy") {
     logger.debug('COPY_REPLACE set to copy mode');
     return false;
   }
 
-  if (platform !== Platform.Default) {
-    const replaceSpecial = await getREPLACE_SPECIAL_SITESAsync();
-    logger.debug('Special platform detected', { platform, replaceSpecial });
-    return replaceSpecial;
-  }
-
+  // Fallback for when COPY_REPLACE is not explicitly 'copy' or 'replace' (shouldn't happen if it's an enum)
+  // Or if it's a default platform and COPY_REPLACE is not 'replace'
   const activeElement = document.activeElement;
   const isComplex = isComplexEditor(activeElement);
   const result = !activeElement || !isComplex;
