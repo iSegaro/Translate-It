@@ -34,15 +34,21 @@
             <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
           </svg>
         </button>
-        <TTSButton
+        <ActionToolbar
           :text="props.initialTranslatedText"
           :language="'auto'"
+          mode="floating"
+          position="inline"
+          :visible="true"
+          :show-copy="false"
+          :show-paste="false"
+          :show-tts="true"
           size="sm"
           variant="secondary"
           @tts-started="handleTTSStarted"
           @tts-stopped="handleTTSStopped"
           @tts-error="handleTTSError"
-          class="action-btn tts-btn"
+          class="header-action-toolbar"
         />
         <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
           <svg width="16" height="16" viewBox="0 0 24 24">
@@ -92,7 +98,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
-import TTSButton from '@/components/shared/TTSButton.vue';
+import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
 
 const props = defineProps({
@@ -313,6 +319,53 @@ const handleStartDrag = (event) => {
   align-items: center;
 }
 
+.header-action-toolbar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ActionToolbar integration in header */
+.header-action-toolbar :deep(.action-toolbar) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.header-action-toolbar :deep(.toolbar-left) {
+  gap: 0 !important;
+}
+
+.header-action-toolbar :deep(.tts-button) {
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 5px !important;
+  transition: background 0.3s !important;
+  border-radius: 3px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+}
+
+.header-action-toolbar :deep(.tts-button:hover) {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.translation-window.light .header-action-toolbar :deep(.tts-button:hover) {
+  background-color: #f0f0f0 !important;
+}
+
+.translation-window.dark .header-action-toolbar :deep(.tts-button:hover) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 .header-close {
   display: flex;
   align-items: center;
@@ -339,62 +392,6 @@ const handleStartDrag = (event) => {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* TTSButton styling to match action-btn */
-.tts-btn {
-  background: none !important;
-  border: none !important;
-  cursor: pointer !important;
-  padding: 5px !important;
-  transition: background 0.3s !important;
-  border-radius: 3px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 26px !important;
-  height: 26px !important;
-  min-width: 26px !important;
-  min-height: 26px !important;
-  position: relative !important;
-}
-
-.tts-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-
-/* Create a stable 20x20px container that accommodates both icon and progress ring */
-.tts-btn :deep(.icon-container) {
-  position: relative !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 20px !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
-}
-
-/* All TTS icons positioned absolutely within the stable container */
-.tts-btn :deep(.tts-icon) {
-  position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  width: 16px !important;
-  height: 16px !important;
-  z-index: 2 !important;
-}
-
-/* Progress ring positioned absolutely within the same container */
-.tts-btn :deep(.progress-ring) {
-  position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  width: 20px !important;
-  height: 20px !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-}
 
 .window-body {
   padding: 16px;
