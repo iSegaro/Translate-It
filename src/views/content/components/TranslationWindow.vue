@@ -34,14 +34,16 @@
             <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
           </svg>
         </button>
-        <button class="action-btn" @click.stop="handleSpeak" :title="isSpeaking ? 'Stop' : 'Speak'">
-          <svg v-if="!isSpeaking" width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
-          </svg>
-        </button>
+        <TTSButton
+          :text="props.initialTranslatedText"
+          :language="'auto'"
+          size="sm"
+          variant="secondary"
+          @tts-started="handleTTSStarted"
+          @tts-stopped="handleTTSStopped"
+          @tts-error="handleTTSError"
+          class="action-btn tts-btn"
+        />
         <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
           <svg width="16" height="16" viewBox="0 0 24 24">
             <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
@@ -90,6 +92,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
+import TTSButton from '@/components/shared/TTSButton.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
 
 const props = defineProps({
@@ -222,9 +225,23 @@ const handleCopy = () => {
   navigator.clipboard.writeText(props.initialTranslatedText);
 };
 
-const handleSpeak = () => {
-  isSpeaking.value = !isSpeaking.value;
-  emit('speak', { id: props.id, text: props.initialTranslatedText, isSpeaking: isSpeaking.value });
+// TTSButton event handlers - no need to emit to WindowsManager as TTSButton handles TTS itself
+const handleTTSStarted = (data) => {
+  console.log(`[TranslationWindow ${props.id}] TTS started:`, data.text.substring(0, 50) + '...');
+  isSpeaking.value = true;
+  // No emit - TTSButton handles TTS internally
+};
+
+const handleTTSStopped = () => {
+  console.log(`[TranslationWindow ${props.id}] TTS stopped`);
+  isSpeaking.value = false;
+  // No emit - TTSButton handles TTS internally
+};
+
+const handleTTSError = (error) => {
+  console.error(`[TranslationWindow ${props.id}] TTS error:`, error);
+  isSpeaking.value = false;
+  // No emit - TTSButton handles TTS internally
 };
 
 // Enhanced drag handling with global state management
@@ -310,6 +327,63 @@ const handleStartDrag = (event) => {
 
 .action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* TTSButton styling to match action-btn */
+.tts-btn {
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 5px !important;
+  transition: background 0.3s !important;
+  border-radius: 3px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  position: relative !important;
+}
+
+.tts-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Create a stable 20x20px container that accommodates both icon and progress ring */
+.tts-btn :deep(.icon-container) {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+}
+
+/* All TTS icons positioned absolutely within the stable container */
+.tts-btn :deep(.tts-icon) {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  z-index: 2 !important;
+}
+
+/* Progress ring positioned absolutely within the same container */
+.tts-btn :deep(.progress-ring) {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 20px !important;
+  height: 20px !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
 }
 
 .window-body {
