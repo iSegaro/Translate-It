@@ -166,7 +166,7 @@ const windowStyle = computed(() => {
   
   return {
     ...positionStyle.value,
-    opacity: isVisible.value ? 1 : 0,
+    opacity: isVisible.value ? 0.9 : 0,
     transform: isVisible.value ? 'scale(1)' : 'scale(0.95)',
     transition: 'opacity 0.2s ease, transform 0.2s ease',
     width: isSmall ? '60px' : '350px',
