@@ -1,330 +1,140 @@
 # TTS (Text-to-Speech) System Documentation
 
-## Overview
+## 🎯 Overview
 
-The TTS system in Translate-It extension provides cross-browser text-to-speech functionality with automatic browser detection. The system has been simplified to a single, robust implementation that works seamlessly across Chromium-based browsers and Firefox.
+The enhanced Text-to-Speech (TTS) system in the Translate-It extension provides a robust, stateful, and user-friendly experience for audio playback. It features full **Play, Pause, Resume, and Stop** capabilities, ensuring exclusive playback across all extension components (Popup, Sidepanel, Windows Manager).
 
-## Current Architecture
+The system is designed with a modern Vue.js architecture, leveraging composables for logic, a global manager for state synchronization, and a smart component for a rich user interface.
+
+## 🏗️ Architecture & Message Flow
+
+The new architecture ensures a clear separation of concerns, from UI interaction to background processing.
 
 ### System Flow Diagram
 
 ```
-User Request (Vue Component / Content Script)
-    ↓
-useTTSSmart.js / useTTSAction.js / TTSManager.js
-    ↓
-MessageActions.GOOGLE_TTS_SPEAK
-    ↓
-Background: handleGoogleTTS.js (Unified handler)
-    ↓
-Browser-specific implementation:
-    ├── Chromium: Offscreen document (Chrome, Edge, Opera, etc.)
-    └── Firefox: Background page direct audio
+User Interaction
+    │
+    ▼
+┌───────────────────┐
+│   TTSButton.vue   │ (UI Component with 5 visual states)
+└───────────────────┘
+    │ (Interacts with)
+    ▼
+┌───────────────────┐
+│  useTTSSmart.js   │ (Composable with state: idle, loading, playing, paused, error)
+└───────────────────┘
+    │ (Coordinates with)
+    ▼
+┌───────────────────┐
+│ TTSGlobalManager  │ (Singleton for exclusive playback & lifecycle rules)
+└───────────────────┘
+    │ (Sends message via)
+    ▼
+┌───────────────────┐
+│  MessageActions   │ (e.g., GOOGLE_TTS_PAUSE, GOOGLE_TTS_RESUME, etc.)
+└───────────────────┘
+    │ (Handled by)
+    ▼
+┌───────────────────┐
+│ Background Handler│ (handleGoogleTTS.js with extended handlers)
+└───────────────────┘
+    │ (Executes on)
+    ▼
+┌──────────────────────────────────────────────────┐
+│             Browser-Specific Execution           │
+│   Chromium (Chrome, Edge)  │   Firefox           │
+│   via Offscreen Document   │   via Direct Audio  │
+└──────────────────────────────────────────────────┘
 ```
 
 ## Core Components
 
-### 1. Background Handler (`src/background/handlers/tts/`)
-
-#### handleGoogleTTS.js
-**Main TTS handler for all browsers**
-
-```javascript
-export const handleGoogleTTSSpeak = async (request) => {
-  const { text, language } = request.data || {};
-  
-  // Create Google TTS URL
-  const ttsUrl = `https://translate.google.com/translate_tts?client=tw-ob&q=${encodeURIComponent(text.trim())}&tl=${language || 'en'}`;
-  
-  // Browser-specific playback
-  await playGoogleTTSWithBrowserDetection(ttsUrl);
-  
-  return { success: true, processedVia: 'background-google-tts' };
-};
-```
+### 1. `composables/useTTSSmart.js`
+The primary composable that encapsulates the entire client-side TTS logic. It manages the state, interacts with the background service, and provides methods for controlling playback.
 
 **Key Features:**
-- Single entry point for all TTS requests
-- Automatic Chromium vs Firefox detection
-- Robust offscreen document management for Chromium
-- Direct audio playback for Firefox
-- Comprehensive error handling and fallback
+- **State Management**: Manages 5 distinct states: `'idle' | 'loading' | 'playing' | 'paused' | 'error'`.
+- **Control Methods**: `play()`, `pause()`, `resume()`, `stop()`, and `retry()`.
+- **Computed Properties**: `canPause`, `canResume`, `canStop` for reactive UI updates.
+- **Progress Tracking**: Provides progress value for visual indicators.
+- **Error Handling**: Integrated error management with recovery strategies.
 
-#### handleOffscreenReady.js
-**Chromium-specific offscreen document handler**
+### 2. `components/shared/TTSButton.vue`
+A smart UI component that provides a rich visual experience based on the TTS state.
 
-```javascript
-export const handleOffscreenReady = async (request) => {
-  // Only registered in Chromium-based browsers
-  return { success: true, acknowledged: true, timestamp: Date.now() };
-};
-```
+**Visual States:**
+1.  **Idle**: 🔊 Default play icon.
+2.  **Loading**: 🔊 Gentle spinning animation.
+3.  **Playing**: ⏸️ Pause icon with a circular progress ring.
+4.  **Paused**: ▶️ Resume icon.
+5.  **Error**: 🔊 Red icon with a tooltip, indicating a problem.
 
-**Browser-Specific Registration:**
-- Chromium browsers: Handler registered automatically
-- Firefox: Handler not registered (not needed)
+### 3. `composables/useTTSGlobal.js` (`TTSGlobalManager`)
+A singleton manager responsible for coordinating all TTS instances across the extension to enforce global rules.
 
-### 2. Frontend Composables (`src/composables/`)
+**Responsibilities:**
+- **Exclusive Playback**: Ensures that starting a new TTS playback automatically stops any other active instance.
+- **Lifecycle Management**:
+    - Stops playback when a Popup or Window is closed.
+    - Stops playback on tab visibility changes (except for the Sidepanel).
+    - Cleans up stale instances automatically.
+- **Instance Registry**: Tracks all active TTS components.
 
-#### useTTSSmart.js
-**Primary TTS composable for Vue components**
+### 4. Background & Messaging
 
-```javascript
-export function useTTSSmart() {
-  const speak = async (text, lang = "auto") => {
-    const language = getLanguageCodeForTTS(lang) || "en";
-    
-    const response = await browserAPI.sendMessage({
-      action: MessageActions.GOOGLE_TTS_SPEAK,
-      data: { text: text.trim(), language }
-    });
-    
-    return response;
-  };
-  
-  return { speak, stop, toggle, isPlaying, isLoading, isAvailable };
-}
-```
+#### `messaging/core/MessageActions.js`
+The messaging system has been extended with new actions to support the enhanced controls:
+- `GOOGLE_TTS_PAUSE`
+- `GOOGLE_TTS_RESUME`
+- `GOOGLE_TTS_STOP_ALL`
+- `GOOGLE_TTS_GET_STATUS`
 
-#### useTTSAction.js
-**Enhanced TTS with multiple fallback methods**
+#### `background/handlers/tts/handleGoogleTTS.js`
+The background handler has been upgraded to process the new actions, communicating with the appropriate browser-specific audio player (Offscreen for Chrome, direct audio for Firefox) to pause, resume, or stop playback.
 
-```javascript
-export function useTTSAction() {
-  const speak = async (text, language = 'auto') => {
-    // Try methods in priority order:
-    // 1. Unified background service (preferred)
-    // 2. Web Speech API
-    // 3. Direct Google TTS
-    
-    for (const method of methods) {
-      try {
-        const success = await method();
-        if (success) return true;
-      } catch (error) {
-        // Try next method
-      }
-    }
-    
-    return false;
-  };
-  
-  return { speak, stop, /* ... */ };
-}
-```
+## 🔄 State Management & Lifecycle Rules
 
-### 3. Content Script Support (`src/managers/content/windows/translation/`)
+The system's intelligence lies in its strict state and lifecycle management.
 
-#### TTSManager.js
-**Content script TTS manager for WindowsManager**
+### Exclusive Playback
+A core principle of the new system: **only one TTS instance can be active at any given time**. When a user initiates a new playback, the `TTSGlobalManager` automatically finds and stops any currently playing or paused instance before starting the new one. This prevents audio overlap and creates a predictable user experience.
 
-```javascript
-export class TTSManager {
-  async speakTextUnified(text) {
-    const language = this.detectSimpleLanguage(text) || "en";
-    
-    await sendReliable({
-      action: MessageActions.GOOGLE_TTS_SPEAK,
-      data: { text: text.trim(), language }
-    });
-  }
-  
-  // Fallback methods for direct content script usage
-  async speakWithGoogleTTS(text, language) { /* ... */ }
-  async speakWithWebSpeech(text, language) { /* ... */ }
-}
-```
+### Smart Lifecycle
+The `TTSGlobalManager` enforces context-aware rules:
+- **Popup / Windows Manager**: TTS is automatically stopped if the component's UI is closed or hidden.
+- **Sidepanel**: TTS is allowed to persist even when the user switches to a different browser tab, as the sidepanel remains visible.
+- **Browser Close**: All TTS instances are stopped when the browser window is about to be unloaded.
 
-**Features:**
-- Unified background service integration
-- Direct Google TTS fallback
-- Web Speech API fallback
-- Simple language detection
-- TTS icon creation with click handlers
+## ⚠️ Error Handling and Recovery
 
-### 4. Browser-Specific Handlers (`src/utils/core/`)
+The system features a multi-layered error handling and recovery strategy.
 
-#### browserHandlers.js
-**Browser detection and handler registration**
+**Error Types Handled:**
+- `NETWORK_ERROR`
+- `AUDIO_CONTEXT_ERROR`
+- `PERMISSION_DENIED`
+- `LANGUAGE_NOT_SUPPORTED`
+- And 3+ other specific errors.
 
-```javascript
-export const isChromium = () => {
-  return /chrome/i.test(navigator.userAgent || '') || 
-         /chromium/i.test(navigator.userAgent || '') ||
-         /edg/i.test(navigator.userAgent || '') ||
-         /opera|opr/i.test(navigator.userAgent || '');
-};
+**Recovery Strategies:**
+- **Auto-Retry**: For transient issues like network errors, the system automatically retries up to 2 times.
+- **Manual Retry**: If an error persists, the `TTSButton` enters an error state, allowing the user to trigger a manual retry.
+- **Language Fallback**: If a language is not supported, it automatically falls back to English ('en') to provide feedback.
 
-export const addChromiumSpecificHandlers = (handlerMappings, Handlers) => {
-  if (isChromium()) {
-    handlerMappings['OFFSCREEN_READY'] = Handlers.handleOffscreenReady;
-  }
-};
-```
+## 🌐 Browser Compatibility
 
-## Browser Compatibility
+The system maintains seamless cross-browser support by abstracting the audio playback mechanism.
+- **Chromium-based Browsers (Chrome, Edge)**: Utilizes an **Offscreen Document** to play audio, complying with Manifest V3's restrictions on background service workers.
+- **Firefox**: Plays audio **directly from the background script** using the standard Audio API, as Firefox's MV3 implementation allows it.
 
-### Chromium-based Browsers Support
-- **Chrome, Edge, Opera, Brave, etc.**
-- **Offscreen Documents**: Full MV3 support for audio processing
-- **Service Worker**: Background handler with offscreen message routing
-- **Automatic Detection**: Runtime browser capability detection
+The `handleGoogleTTS.js` handler and `TTSGlobalManager` are unaware of the underlying implementation detail, allowing for a clean and maintainable architecture.
 
-### Firefox Support
-- **Background Page Audio**: Direct audio playback in background script
-- **Message Routing**: All TTS messages through background handler
-- **No Offscreen**: Uses direct Audio API without offscreen documents
+## 🎉 Benefits of the New System
 
-### Detection Logic
-- **Chromium Detection**: User agent pattern matching for Chrome, Edge, Opera
-- **Automatic Selection**: Browser-appropriate implementation selected at runtime
-- **Handler Registration**: Chromium-specific handlers only registered where needed
-
-## Message Flow Architecture
-
-### GOOGLE_TTS_SPEAK Message Flow
-
-```
-Vue Component/Content Script
-    ↓ useTTSSmart.speak() / useTTSAction.speak() / TTSManager.speakTextUnified()
-MessageActions.GOOGLE_TTS_SPEAK
-    ↓ browser.runtime.sendMessage() / sendReliable()
-Background: SimpleMessageHandler
-    ↓ Route to 'GOOGLE_TTS_SPEAK'
-handleGoogleTTS.js
-    ↓ playGoogleTTSWithBrowserDetection()
-Browser-specific Implementation:
-    ├── Chromium: playWithOffscreenDocument() → Offscreen Audio
-    └── Firefox: playGoogleTTSAudio() → Direct Audio
-```
-
-### Offscreen Document Flow (Chromium only)
-
-```
-Background Handler
-    ↓ setupOffscreenDocument()
-Offscreen Document Creation/Check
-    ↓ sendMessage({ action: 'playOffscreenAudio', target: 'offscreen' })
-Offscreen Document (public/offscreen.js)
-    ↓ handleAudioPlayback() / handleAudioPlaybackWithFallback()
-Google TTS Audio Playback
-    ↓ sendMessage({ action: 'OFFSCREEN_READY' })
-Background: handleOffscreenReady()
-```
-
-## Current Implementation Details
-
-### Unified Handler Features
-- **Single Entry Point**: `handleGoogleTTSSpeak` handles all TTS requests
-- **Browser Detection**: Automatic Chromium vs Firefox detection
-- **Promise Management**: Global promise for offscreen document creation
-- **Error Recovery**: Automatic promise reset on document failure
-- **Logging**: Comprehensive debug logging throughout
-
-### Offscreen Document Management
-- **One-time Creation**: Global promise ensures single document creation
-- **Existence Check**: Validates document exists before use
-- **Auto Recovery**: Resets promise and recreates document on failure
-- **Chrome MV3 Compliance**: Proper offscreen document lifecycle management
-
-### Fallback Strategies
-- **useTTSAction**: Multiple fallback methods (background → WebSpeech → direct Google)
-- **TTSManager**: Background service with Google TTS and WebSpeech fallbacks
-- **Error Handling**: Graceful degradation through fallback chain
-
-## Configuration
-
-### TTS Request Format
-```javascript
-{
-  action: 'GOOGLE_TTS_SPEAK',
-  data: {
-    text: 'Text to speak',
-    language: 'en' // Language code (auto-detected or specified)
-  }
-}
-```
-
-### Supported Languages
-- Auto-detection based on text content
-- Manual language specification via `getLanguageCodeForTTS()`
-- Fallback to English for unsupported languages
-
-## Performance Optimizations
-
-### Lazy Loading
-- Browser-specific handlers loaded only when needed
-- Offscreen documents created on-demand
-- Manager instances cached after first creation
-
-### Resource Management
-- Proper cleanup of audio resources
-- Offscreen document lifecycle management
-- Memory-efficient promise handling
-
-### Bundle Size Impact
-- **Background Handler**: ~8KB (unified implementation)
-- **Frontend Composables**: ~6KB (useTTSSmart + useTTSAction)
-- **Content Script Manager**: ~8KB (TTSManager with fallbacks)
-- **Total TTS System**: ~22KB (optimized for extension constraints)
-
-## Development Guidelines
-
-### Adding New TTS Features
-1. **Extend Background Handler**: Add functionality to `handleGoogleTTS.js`
-2. **Update Message Actions**: Add action constants if needed
-3. **Update Composables**: Extend `useTTSSmart.js` or `useTTSAction.js`
-4. **Test Cross-browser**: Verify functionality in Chromium and Firefox
-
-### Testing TTS System
-1. **Chromium Testing**: Load extension and test offscreen document creation
-2. **Firefox Testing**: Test direct audio playback
-3. **Edge Cases**: Test document recovery, language detection, fallbacks
-4. **Performance**: Monitor memory usage and cleanup
-
-### Debugging TTS Issues
-1. **Background Console**: Check service worker console for handler logs
-2. **Offscreen Console**: Check Chrome offscreen document console
-3. **Content Console**: Check content script console for manager logs
-4. **Message Tracing**: Enable debug logging for message flow
-
-## Security Considerations
-
-### Audio Context Security
-- **Offscreen Isolation**: Chromium audio processing in isolated context
-- **Local Processing**: All speech synthesis happens locally via Google TTS API
-- **No External Services**: No third-party TTS service dependencies
-
-### Privacy
-- **Local TTS**: Uses browser's local capabilities and Google's public TTS API
-- **No Data Storage**: Text is not stored or transmitted to external servers
-- **Secure Communication**: All communication through browser's messaging system
-
-## Architecture Benefits
-
-### Simplified Design
-- **Single Handler**: One background handler for all TTS requests
-- **Clear Separation**: Browser-specific logic cleanly separated
-- **Maintainable**: Easy to understand and modify
-- **Consistent**: Unified interface across all components
-
-### Cross-browser Support
-- **Universal Compatibility**: Works across all major browsers
-- **Automatic Detection**: No manual browser configuration needed
-- **Fallback Ready**: Multiple fallback methods for reliability
-
-### Performance
-- **Efficient**: Minimal overhead with lazy loading
-- **Scalable**: Easy to extend with new browsers or features
-- **Resource Conscious**: Proper cleanup and memory management
-
-## Conclusion
-
-The current TTS system provides a robust, simplified implementation that automatically adapts to different browsers while maintaining a clean, maintainable codebase. The unified handler approach reduces complexity while ensuring reliable cross-browser functionality.
-
-### Key Improvements Made
-- **Unified Handler**: Single background handler replaces complex multi-file architecture
-- **Smart Browser Detection**: Automatic Chromium vs Firefox adaptation
-- **Robust Error Handling**: Comprehensive error recovery and fallback strategies
-- **Clean Architecture**: Simplified file structure with clear responsibilities
-- **Better Performance**: Optimized resource usage and lazy loading
+1.  **Full Playback Control**: Users can play, pause, resume, and stop audio.
+2.  **Superior User Experience**: The `TTSButton` provides clear visual feedback for every state, including loading progress and errors.
+3.  **Predictable Behavior**: The exclusive playback rule and smart lifecycle management prevent unexpected audio behavior.
+4.  **Robustness**: Advanced error handling with automatic and manual recovery makes the feature more reliable.
+5.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
+6.  **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.

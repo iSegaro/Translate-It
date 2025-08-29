@@ -36,7 +36,7 @@ src/composables/actions/
       :language="'en'"
       @text-copied="handleCopied"
       @text-pasted="handlePasted"
-      @tts-speaking="handleSpeaking"
+      @tts-state-change="handleTtsStateChange"
     />
   </div>
 </template>
@@ -55,8 +55,8 @@ const handlePasted = (data) => {
   text.value = data.text
 }
 
-const handleSpeaking = (data) => {
-  console.log('Speaking:', data.text)
+const handleTtsStateChange = (event) => {
+  console.log('TTS state changed:', event.newState)
 }
 </script>
 ```
@@ -103,7 +103,13 @@ const text = ref('Hello world!')
 const {
   copyText,
   pasteText,
-  speakText,
+  // TTS controls
+  play,
+  pause,
+  resume,
+  stop,
+  // TTS state
+  ttsState,
   isLoading,
   hasError
 } = useTextActions()
@@ -124,7 +130,13 @@ const paste = async () => {
 
 // Speak text
 const speak = async () => {
-  await speakText(text.value, 'en')
+  if (ttsState.value === 'playing') {
+    await pause()
+  } else if (ttsState.value === 'paused') {
+    await resume()
+  } else {
+    await play(text.value, 'en')
+  }
 }
 </script>
 ```
@@ -148,8 +160,7 @@ const speak = async () => {
   :auto-translate-on-paste="boolean"  <!-- ترجمه خودکار بعد پیست -->
   @text-copied="function"     <!-- رویداد کپی -->
   @text-pasted="function"     <!-- رویداد پیست -->
-  @tts-speaking="function"    <!-- شروع تلفظ -->
-  @tts-stopped="function"     <!-- توقف تلفظ -->
+  @tts-state-change="function" <!-- رویداد تغییر وضعیت TTS -->
   @action-failed="function"   <!-- خطا در عملیات -->
 />
 ```
@@ -181,16 +192,23 @@ const speak = async () => {
 
 ### TTSButton
 
+دکمه هوشمند TTS با قابلیت نمایش وضعیت کامل پخش (Play/Pause/Resume/Stop).
+
 ```vue
 <TTSButton
   :text="string"              <!-- متن برای تلفظ -->
   :language="string"          <!-- کد زبان -->
   :size="string"              <!-- اندازه دکمه -->
-  @speaking="function"        <!-- شروع تلفظ -->
-  @stopped="function"         <!-- توقف تلفظ -->
-  @tts-failed="function"      <!-- خطا در تلفظ -->
+  @state-change="function"   <!-- رویداد تغییر وضعیت -->
 />
 ```
+
+این کامپوننت دارای ۵ وضعیت داخلی است:
+- **Idle**: آماده برای پخش.
+- **Loading**: در حال دریافت فایل صوتی.
+- **Playing**: در حال پخش (نمایش آیکون Pause و حلقه پیشرفت).
+- **Paused**: پخش متوقف شده (نمایش آیکون Resume).
+- **Error**: بروز خطا (نمایش آیکون قرمز رنگ خطا).
 
 ## 🔧 Composable Reference
 
@@ -213,9 +231,12 @@ const {
   pasteText,           // () => Promise<string>
   pasteWithNotification, // (callback) => Promise<string>
   
-  // TTS
-  speakText,           // (text, lang) => Promise<boolean>
-  stopSpeaking,        // () => Promise<boolean>
+  // TTS State & Controls (powered by useTTSSmart)
+  ttsState,            // وضعیت فعلی: ref<'idle' | 'loading' | 'playing' | 'paused' | 'error'>
+  play,                // (text, lang) => Promise<void>
+  pause,               // () => Promise<void>
+  resume,              // () => Promise<void>
+  stop,                // () => Promise<void>
   
   // Combined
   copyAndSpeak,        // (text, lang, callback) => Promise<boolean>

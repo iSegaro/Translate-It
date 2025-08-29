@@ -12,11 +12,12 @@
 - ✅ **Advanced State Management** - Pinia stores with reactive data
 - ✅ **Comprehensive Error Handling** - Unified error management system
 - ✅ **Cross-Frame Communication** - Advanced iframe support
-- ✅ **Text Actions System** - Unified copy/paste/TTS functionality
+- ✅ **Text Actions System** - Unified copy/paste and advanced TTS (Play/Pause/Resume)
 - ✅ **Storage Management** - Centralized storage with caching
 - ✅ **Logging System** - Production-ready structured logging
 - ✅ **Provider System** - 10+ translation providers with factory pattern
 - ✅ **Cross-Browser Support** - Chrome and Firefox MV3
+- ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
 
 ---
 
@@ -31,9 +32,11 @@
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
 
 ### Feature-Specific Documentation
-- **[Windows Manager](WINDOWS_MANAGER.md)** - UI component management and cross-frame communication
+- **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
-- **[TTS System](TTS_SYSTEM.md)** - Text-to-speech with cross-browser compatibility
+- **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
+- **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
+- **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 
 ### Media Assets
 - **[Video Tutorials](Introduce.mp4)** - Introduction and feature overview
@@ -302,8 +305,12 @@ TRANSLATE_SELECTION: 'TRANSLATE_SELECTION'
 TRANSLATE_PAGE: 'TRANSLATE_PAGE'
 
 // TTS actions
-TTS_SPEAK: 'TTS_SPEAK'
-TTS_STOP: 'TTS_STOP'
+TTS_SPEAK: 'TTS_SPEAK',
+GOOGLE_TTS_PAUSE: 'GOOGLE_TTS_PAUSE',
+GOOGLE_TTS_RESUME: 'GOOGLE_TTS_RESUME',
+TTS_STOP: 'TTS_STOP',
+GOOGLE_TTS_STOP_ALL: 'GOOGLE_TTS_STOP_ALL',
+GOOGLE_TTS_GET_STATUS: 'GOOGLE_TTS_GET_STATUS'
 
 // UI actions
 OPEN_SIDEPANEL: 'OPEN_SIDEPANEL'
@@ -870,25 +877,62 @@ export const useTranslationStore = defineStore('translation', {
 ## 🖼️ Windows Manager System
 
 ### Overview
-The Windows Manager is a modular system for managing translation UI components (icons and windows) across different document contexts including iframes. See [Windows Manager Documentation](WINDOWS_MANAGER.md) for complete details.
+The Windows Manager has been refactored into a **decoupled, event-driven architecture**. The legacy approach of direct DOM manipulation has been completely removed. The system is now split into a pure business logic layer and a reactive UI layer, communicating via an event bus. This provides better performance, maintainability, and a clean separation of concerns.
 
-**Key Features:**
-- **Modular Architecture**: 18 specialized modules for different responsibilities
-- **Cross-Frame Support**: Full iframe communication and coordination  
-- **Smart Positioning**: Intelligent window placement with viewport awareness
-- **Theme Integration**: Light/dark theme support with real-time switching
-- **Animation System**: Smooth transitions and feedback animations
-- **Drag & Drop**: Interactive window dragging with constraints
+See [Windows Manager Documentation](WINDOWS_MANAGER.md) for complete details.
 
-**Core Modules:**
-- `WindowsConfig` - Configuration constants and settings
-- `WindowsState` - Centralized state management  
-- `WindowsFactory` - UI element creation with extension context safety
-- `CrossFrameManager` - Main coordinator for iframe communication
-- `PositionCalculator` - Position calculations across frame contexts
-- `SmartPositioner` - Intelligent window positioning
-- `AnimationManager` - Animation transitions and feedback
-- `ThemeManager` - Theme management and application
+### Architecture
+
+**1. Logic Layer (`WindowsManager.js`):**
+- Acts as a **headless business logic controller**.
+- It receives requests to show a translation icon or window.
+- It contains the logic to decide what to show and where, but does **not** render anything.
+- It emits events (e.g., `show-window`, `show-icon`) to the event bus with the necessary data (text, initial position, etc.).
+
+**2. UI Layer (`ContentApp.vue` and children):**
+- A host Vue application (`ContentApp.vue`) runs in the content script.
+- It listens for events from the `WindowsManager`.
+- Based on events, it dynamically mounts or unmounts the corresponding Vue components: `TranslationWindow.vue` or `TranslationIcon.vue`.
+- All rendering, styling, positioning, animations, and user interactions (like drag-and-drop) are handled entirely within these Vue components.
+
+**System Flow:**
+```
+TextSelectionManager → WindowsManager (Logic)
+    ↓
+EventBus.emit('show-window', data)
+    ↓
+ContentApp.vue (UI Host)
+    ↓ (Listens for event)
+Mounts <TranslationWindow :data="data" />
+    ↓
+TranslationWindow.vue handles all UI and interactions
+```
+
+### Key Features
+- **Decoupled Architecture**: Logic and UI are completely separate, communicating only through events.
+- **Reactive Vue UI**: The entire UI is managed by stateful Vue components, leading to more predictable and performant rendering.
+- **Event-Driven Communication**: Ensures low coupling between system parts.
+- **Cross-Frame Support**: The logic layer coordinates interactions with iframes, while the UI is rendered by the top-level host.
+- **Component-Owned Interactions**: Complex features like drag-and-drop, theme switching, and animations are managed locally by the `TranslationWindow.vue` component, simplifying state management.
+
+---
+
+## 🖥️ UI Host System
+
+### Overview
+The UI Host System is a critical architectural component that acts as a **centralized Vue application (`ContentApp.vue`)** for managing all in-page UI elements. It operates entirely within a **Shadow DOM**, ensuring complete CSS and JavaScript isolation from the host webpage. This prevents style conflicts and provides a stable environment for the extension's UI.
+
+See [UI Host System Documentation](docs/UI_HOST_SYSTEM.md) for complete details.
+
+### Key Responsibilities
+- **UI Rendering**: Manages the lifecycle of all UI components injected into a webpage, such as translation windows, icons, selection toolbars, and notifications.
+- **Event-Driven**: Uses a dedicated event bus (`PageEventBus`) to receive commands from headless logic controllers (like `WindowsManager` and `NotificationManager`).
+- **State Management**: Holds the state for the in-page UI, such as which components are currently visible and their properties.
+
+### Benefits
+- **Total Isolation**: Shadow DOM prevents any CSS from the host page from affecting the extension's UI, and vice-versa.
+- **Maintainability**: Having a single entry point for all in-page UI simplifies development, debugging, and testing.
+- **Consistency**: Ensures all UI elements across the extension share a consistent look, feel, and behavior.
 
 ---
 
@@ -924,27 +968,28 @@ src/composables/actions/
 ## 🔊 TTS (Text-to-Speech) System
 
 ### Overview
-Cross-browser TTS implementation with automatic browser detection and graceful fallbacks. See [TTS System Documentation](TTS_SYSTEM.md) for complete details.
+An advanced, stateful TTS system with **Play/Pause/Resume/Stop** controls and exclusive playback guaranteed across the extension. See [TTS System Documentation](TTS_SYSTEM.md) for complete details.
 
-**Browser-Specific Implementations:**
-- **Chrome**: Uses offscreen documents (`OffscreenTTSManager`)
-- **Firefox**: Uses background page audio (`BackgroundTTSManager`)
-- **Fallback**: Content script Web Speech API (`ContentTTSHandler`)
+**Core Components:**
+- **`useTTSSmart.js`**: The main composable managing the 5 states (`idle`, `loading`, `playing`, `paused`, `error`).
+- **`TTSButton.vue`**: A smart component with rich visual feedback for each state.
+- **`TTSGlobalManager`**: A singleton that enforces exclusive playback and manages lifecycle events.
 
 **System Flow:**
 ```
-Vue Component → useTTS() → TTSMessenger → Background Handler
+TTSButton.vue → useTTSSmart.js → TTSGlobalManager
     ↓
-Browser Detection → Chrome: Offscreen / Firefox: Background
+MessageActions (PAUSE, RESUME, etc.) → Background Handler
     ↓
-Speech Synthesis → Audio Output
+Browser-Specific Player (Chrome: Offscreen, Firefox: Direct Audio)
 ```
 
 **Key Features:**
-- **Cross-Browser Compatibility**: Automatic detection and adaptation
-- **Dynamic Loading**: TTS managers loaded only when needed
-- **Unified API**: Single interface across all contexts
-- **Error Recovery**: Automatic fallback to next available method
+- **Stateful Playback**: Full Play/Pause/Resume/Stop functionality.
+- **Exclusive Playback**: Only one audio plays at a time, automatically managed.
+- **Smart Lifecycle**: Audio automatically stops on popup close or tab change (except for sidepanel).
+- **Advanced Error Handling**: Includes auto-retry and manual retry mechanisms.
+- **Rich UI Feedback**: The UI provides progress indicators and clear error states.
 
 ---
 

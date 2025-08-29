@@ -10,12 +10,13 @@
 - **Vue.js Apps**: سه اپلیکیشن جداگانه (Popup، Sidepanel، Options)
 - **Pinia Stores**: مدیریت state راکتیو 
 - **Composables**: منطق business قابل استفاده مجدد
-- **Text Actions**: سیستم یکپارچه copy/paste/TTS
-- **Windows Manager**: مدیریت UI با پشتیبانی iframe
+- **Text Actions**: سیستم یکپارچه copy/paste و **TTS پیشرفته** با قابلیت Play/Pause/Resume/Stop
+- **Windows Manager**: مدیریت UI رویداد-محور با کامپوننت‌های Vue و پشتیبانی از iframe
 - **Provider System**: 10+ سرویس ترجمه با factory pattern
 - **Error Management**: سیستم مدیریت خطای متمرکز
 - **Storage Manager**: ذخیره‌سازی هوشمند با caching
 - **Logging System**: سیستم log ساختارمند
+- **UI Host System**: اپلیکیشن متمرکز Vue برای مدیریت تمام UIهای درون-صفحه در Shadow DOM
 
 ## روش‌های ترجمه
 1. **انتخاب متن**: ترجمه متن انتخاب شده با نمایش آیکون یا کادر مستقیم
@@ -57,9 +58,11 @@
 - **`docs/LOGGING_SYSTEM.md`**: سیستم log ساختارمند
 
 ### مستندات ویژگی‌ها  
-- **`docs/WINDOWS_MANAGER.md`**: مدیریت UI و cross-frame communication
+- **`docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`**: راهنمای یکپارچه‌سازی WindowsManager با UI Host
 - **`docs/TEXT_ACTIONS_SYSTEM.md`**: عملیات copy/paste/TTS
-- **`docs/TTS_SYSTEM.md`**: سیستم text-to-speech
+- **`docs/TTS_SYSTEM.md`**: سیستم **Text-to-Speech (TTS) پیشرفته** با مدیریت وضعیت کامل (Play/Pause/Resume)
+- **`docs/UI_HOST_SYSTEM.md`**: معماری میزبان UI برای مدیریت متمرکز کامپوننت‌ها
+- **`docs/SELECT_ELEMENT_SYSTEM.md`**: سیستم انتخاب و ترجمه عناصر صفحه
 
 ### منابع اضافی
 - **`docs/Images/`**: تصاویر و diagram های معماری
