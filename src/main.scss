@@ -9,41 +9,52 @@
     box-sizing: border-box;
 }
 
+/* Base styles for all contexts */
 html, body {
-    width: 400px;
-    max-height: 600px;
     font-family: "Vazirmatn", "Segoe UI", sans-serif;
-    overflow: hidden;
 }
 
+/* Default app container */
 #app {
     width: 100%;
     height: 100%;
 }
 
-/* Styles from options.html */
-html, body {
-    width: 100%;
-    min-height: 100vh;
-    font-family: "Vazirmatn", "Segoe UI", sans-serif;
+/* Context-specific styles - these should be overridden by specific entry points */
+
+/* Popup context (400px width) - only applied in popup.js */
+body.popup-context {
+    width: 400px !important;
+    max-height: 600px !important;
+    overflow: hidden !important;
 }
 
-#app {
-    width: 100%;
-    min-height: 100vh;
+/* Options context - only applied in options.js */
+body.options-context {
+    min-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important; /* No padding on body */
+    margin: 0; /* Ensure no default margin */
 }
 
-/* Styles from sidepanel.html */
-html, body {
-    width: 100%;
-    height: 100vh;
-    font-family: "Vazirmatn", "Segoe UI", sans-serif;
-    overflow: hidden;
+body.options-context #app {
+    /* The layout is now handled by the body flex container and the OptionsLayout component. */
+    /* Previous styles were causing conflicts and have been removed. */
 }
 
-#app {
-    width: 100%;
-    height: 100%;
+/* Sidepanel context (full viewport) - only applied in sidepanel.js */
+body.sidepanel-context {
+    width: 100% !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+body.sidepanel-context #app {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .translate-it-select-highlight {

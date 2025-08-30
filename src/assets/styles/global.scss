@@ -183,9 +183,16 @@ body {
 }
 
 .extension-options {
-  width: 100%;
-  min-height: 100vh;
-  padding: $spacing-lg;
+  width: 1200px !important;
+  max-width: 1200px !important;
+  min-width: 1200px !important;
+  min-height: 100vh !important;
+  padding: $spacing-lg !important;
+  display: flex !important;
+  justify-content: stretch !important;
+  align-items: flex-start !important;
+  background-color: var(--color-background) !important;
+  margin: 0 auto !important;
 }
 
 // Scrollbar styling

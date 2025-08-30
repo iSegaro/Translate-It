@@ -186,8 +186,8 @@ export const createBaseConfig = (browser, options = {}) => {
       sourcemap: isDevelopment,
       chunkSizeWarningLimit: browser === 'chrome' ? 100 : 200, // Chrome has stricter limits
       
-      // CSS optimization
-      cssCodeSplit: true,
+      // CSS optimization - disable code splitting for content scripts to ensure proper Shadow DOM injection
+      cssCodeSplit: false,
       cssMinify: isProduction,
       
       // Asset optimization

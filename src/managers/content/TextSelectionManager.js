@@ -44,6 +44,13 @@ export class TextSelectionManager {
   async handleTextSelection(event) {
     this.logger.debug('handleTextSelection called');
     
+    // Skip if currently dragging a translation window
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true) {
+      this.logger.debug('Skipping handleTextSelection due to active window dragging');
+      return;
+    }
+    this.logger.debug('Drag flag check:', { isDragging: window.__TRANSLATION_WINDOW_IS_DRAGGING });
+    
     // **FIX FOR DISCORD**: Skip if we're in transition from selection icon to translation window
     // This prevents conflicts and duplicate selection windows during the transition
     if (state && state.preventTextFieldIconCreation === true) {

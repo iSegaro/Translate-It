@@ -42,15 +42,18 @@ const isRTL = computed(() => {
 @use '@/assets/styles/variables.scss' as *;
 
 .options-layout {
-  display: flex;
-  width: 100%;
-  max-width: 1200px;
-  height: 90vh;
-  background-color: transparent;
-  border-radius: $border-radius-lg;
-  box-shadow: $shadow-lg;
-  overflow: hidden;
-  border: $border-width $border-style var(--color-border);
+  display: flex !important;
+  width: 1200px !important;
+  max-width: 1200px !important;
+  min-width: 1200px !important;
+  min-height: 90vh !important;
+  background-color: transparent !important;
+  border-radius: $border-radius-lg !important;
+  box-shadow: $shadow-lg !important;
+  overflow: hidden !important;
+  border: $border-width $border-style var(--color-border) !important;
+  
+  /* Debug outline removed */
   
   &.rtl {
     direction: rtl;

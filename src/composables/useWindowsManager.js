@@ -45,7 +45,7 @@ export function useWindowsManager() {
       theme: detail.theme || 'light',
       isError: detail.isError || false,
       isLoading: detail.isLoading || false,
-      initialSize: detail.initialSize || 'normal'
+      initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal')
     };
 
     if (existingWindowIndex >= 0) {

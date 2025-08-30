@@ -22,7 +22,10 @@
         :alt="t('popup_select_element_alt_icon') || 'Select Element'"
         :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
-        :class="{ active: isSelectModeActive }"
+        :class="{ 
+          active: isSelectModeActive,
+          'select-error': selectElementError 
+        }"
         @click="handleSelectElement"
       />
       <IconButton
@@ -95,6 +98,7 @@ const { t } = useUnifiedI18n()
 
 // State
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی
+const selectElementError = ref(false) // نشان‌دهنده خطا در select element
 
 // Methods
 const handleTranslatePage = async () => {
@@ -119,6 +123,10 @@ const handleTranslatePage = async () => {
 
 const handleSelectElement = async () => {
   logger.debug('🎯 Select Element button clicked!')
+  
+  // Reset any previous error state
+  selectElementError.value = false
+  
   try {
     logger.debug('[PopupHeader] Select element button clicked')
     const success = await toggleSelectElement()
@@ -127,10 +135,24 @@ const handleSelectElement = async () => {
       window.close()
     } else {
       logger.debug('[PopupHeader] Select element toggle failed, keeping popup open')
-      // Don't close popup so user can see error state or try again
+      
+      // Show error state with red border
+      selectElementError.value = true
+      
+      // Reset error state after 3 seconds with smooth transition
+      setTimeout(() => {
+        selectElementError.value = false
+      }, 3000)
     }
   } catch (error) {
     logger.error('❌ Select element toggle failed:', error)
+    
+    // Show error state for unexpected errors too
+    selectElementError.value = true
+    setTimeout(() => {
+      selectElementError.value = false
+    }, 3000)
+    
     await handleError(error, 'PopupHeader-selectElement')
   }
 }
@@ -419,5 +441,57 @@ input:focus + .slider {
 
 input:checked + .slider:before {
   transform: translateX(20px);
+}
+
+/* Select Element Error State */
+.select-error {
+  position: relative;
+  animation: error-pulse 0.6s ease-in-out;
+}
+
+.select-error::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid #ef4444;
+  border-radius: 6px;
+  opacity: 0;
+  animation: error-border-fade 3s ease-in-out forwards;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes error-pulse {
+  0% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.05);
+  }
+  100% { 
+    transform: scale(1);
+  }
+}
+
+@keyframes error-border-fade {
+  0% { 
+    opacity: 0;
+    border-color: #ef4444;
+  }
+  5% { 
+    opacity: 1;
+    border-color: #ef4444;
+  }
+  95% { 
+    opacity: 1;
+    border-color: #ef4444;
+  }
+  100% { 
+    opacity: 0;
+    border-color: #ef4444;
+  }
 }
 </style>

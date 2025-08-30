@@ -12,6 +12,7 @@ export function usePositioning(initialPosition, options = {}) {
     margin = 10,
     enableDragging = false
   } = options;
+  
 
   // Reactive position state
   const currentPosition = ref({ x: 0, y: 0 });
@@ -24,15 +25,20 @@ export function usePositioning(initialPosition, options = {}) {
   function clampToViewport(pos, width = defaultWidth, height = defaultHeight) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    
+    
     let x = pos.x ?? pos.left ?? 0;
     let y = pos.y ?? pos.top ?? 0;
 
+
     // Prevent overflow right/bottom
+    let originalX = x, originalY = y;
+    
     if (x + width > vw) x = vw - width - margin;
     if (x < margin) x = margin;
     if (y + height > vh) y = vh - height - margin;
     if (y < margin) y = margin;
-
+    
     return { x, y };
   }
 
@@ -56,13 +62,6 @@ export function usePositioning(initialPosition, options = {}) {
       y: originalY - window.scrollY
     };
     
-    // Debug logging for position calculation
-    console.log('[usePositioning] Position calculation:', {
-      original: { x: originalX, y: originalY },
-      scroll: { x: window.scrollX, y: window.scrollY },
-      viewport: viewportPosition,
-      viewport: { width: window.innerWidth, height: window.innerHeight }
-    });
     
     currentPosition.value = clampToViewport(viewportPosition);
   }

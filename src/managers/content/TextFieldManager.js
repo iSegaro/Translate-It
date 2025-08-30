@@ -210,12 +210,13 @@ export class TextFieldManager {
     // Generate a unique ID for the icon
     const iconId = `text-field-icon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Calculate icon position - adjust for scroll position since the UI Host is fixed
+    // Calculate icon position - use fixed positioning relative to viewport  
     const rect = element.getBoundingClientRect();
     const position = {
-      top: rect.top + window.scrollY + 10,
-      left: rect.left + window.scrollX + rect.width + 10,
+      top: rect.top + 5,
+      left: rect.left + rect.width - 5,
     };
+
 
     // Emit event to UI Host to add the icon
     pageEventBus.emit('add-field-icon', { id: iconId, position });

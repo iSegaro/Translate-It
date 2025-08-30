@@ -12,6 +12,10 @@ const logger = getScopedLogger('UI', 'popup');
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {
   try {
+    // Add popup context class to body
+    document.body.classList.add('popup-context')
+    logger.debug('✅ Added popup-context class to body')
+    
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('popup')
     

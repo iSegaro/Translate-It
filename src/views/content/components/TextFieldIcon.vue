@@ -126,15 +126,15 @@ onUnmounted(() => {
   font: inherit;
   
   /* Positioning */
-  position: absolute;
+  position: fixed;
   
   /* Size */
-  width: v-bind('currentSize.width + "px"');
-  height: v-bind('currentSize.height + "px"');
+  width: 28px;
+  height: 28px;
   
   /* Appearance */
-  background-color: #ffffff;
-  border: 1px solid #e0e0e0;
+  background-color: #ff0000 !important; /* Red for debugging */
+  border: 3px solid #00ff00 !important;  /* Green border for debugging */
   border-radius: 50%;
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.1),
@@ -150,7 +150,7 @@ onUnmounted(() => {
   user-select: none;
   
   /* Z-index */
-  z-index: 2147483641;
+  z-index: 2147483647 !important;
   
   /* Animation */
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -188,8 +188,8 @@ onUnmounted(() => {
 }
 
 .text-field-icon__svg {
-  width: v-bind('currentSize.iconSize + "px"');
-  height: v-bind('currentSize.iconSize + "px"');
+  width: 16px;
+  height: 16px;
   display: block;
   pointer-events: none;
   transition: transform 0.2s ease;

@@ -4,13 +4,13 @@
     v-if="currentSize === 'small'"
     ref="windowElement"
     class="translation-window aiwc-selection-popup-host loading-window"
-    :class="[theme, { 'visible': isVisible }]"
+    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     @mousedown.stop
     @click.stop
   >
     <img 
-      src="/src/assets/icons/loading-128.gif"
+      :src="loadingGifUrl"
       alt="Loading..."
       class="loading-gif"
       style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;"
@@ -22,7 +22,7 @@
     v-else
     ref="windowElement"
     class="translation-window aiwc-selection-popup-host normal-window"
-    :class="[theme, { 'visible': isVisible, 'is-dragging': isDragging }]"
+    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     @mousedown.stop
     @click.stop
@@ -100,6 +100,7 @@ import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
+import browser from 'webextension-polyfill';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -137,7 +138,6 @@ const currentSize = ref(props.initialSize); // Track current size
 const translatedText = computed(() => props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = ref('');
-const isDragging = ref(false);
 const isSpeaking = ref(false);
 
 // Add retry handler for TranslationDisplay
@@ -147,26 +147,51 @@ const handleRetry = () => {
 };
 const showOriginal = ref(false);
 
+// Computed dimensions for positioning
+const currentWidth = computed(() => currentSize.value === 'small' ? 60 : 350);
+const currentHeight = computed(() => currentSize.value === 'small' ? 40 : 180);
+
 // Use positioning composable with drag enabled
 const {
   currentPosition,
   isDragging: isPositionDragging,
   positionStyle,
   startDrag,
+  updatePosition,
   cleanup: cleanupPositioning
 } = usePositioning(props.position, {
-  defaultWidth: currentSize.value === 'small' ? 60 : 350,
-  defaultHeight: currentSize.value === 'small' ? 40 : 180,
+  defaultWidth: currentWidth.value,
+  defaultHeight: currentHeight.value,
   enableDragging: true
 });
 
-// Watch for prop changes
+// Watch for prop changes and recalculate position with correct dimensions
 watch(() => props.position, (newPos) => {
-  currentPosition.value = { x: newPos.x || newPos.left || 0, y: newPos.y || newPos.top || 0 };
+  updatePosition(newPos, {
+    width: currentWidth.value,
+    height: currentHeight.value
+  });
 });
 
 watch(() => props.initialSize, (newSize) => {
   currentSize.value = newSize;
+  // Recalculate position with new dimensions to ensure it stays within viewport
+  updatePosition(currentPosition.value, {
+    width: currentWidth.value,
+    height: currentHeight.value
+  });
+});
+
+
+// Loading GIF URL using browser extension API
+const loadingGifUrl = computed(() => {
+  try {
+    return browser.runtime.getURL('icons/loading-128.gif');
+  } catch (error) {
+    console.warn('[TranslationWindow] Failed to get loading GIF URL:', error);
+    // Fallback for development
+    return '/src/assets/icons/loading-128.gif';
+  }
 });
 
 // Computed Style for positioning only (no opacity/transform - handled by CSS classes)
@@ -252,15 +277,15 @@ const windowElement = ref(null);
 
 const handleStartDrag = (event) => {
   // Set global drag flags for outside click protection
+  console.log('[TranslationWindow] Setting drag flag to TRUE');
   window.__TRANSLATION_WINDOW_IS_DRAGGING = true;
-  isDragging.value = true;
   
   // Use composable's drag handler
   startDrag(event);
   
-  // Custom cleanup when drag ends
-  const originalStopDrag = () => {
-    isDragging.value = false;
+  // Add our custom cleanup to mouseup
+  const customStopDrag = () => {
+    console.log('[TranslationWindow] Setting drag flag to FALSE');
     window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
     window.__TRANSLATION_WINDOW_JUST_DRAGGED = true;
     setTimeout(() => {
@@ -268,55 +293,68 @@ const handleStartDrag = (event) => {
     }, 300);
   };
   
-  // Override the composable's stop handler temporarily
-  const handleMouseUp = () => {
-    originalStopDrag();
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
-  
-  document.addEventListener('mouseup', handleMouseUp);
+  document.addEventListener('mouseup', customStopDrag, { once: true });
 };
 
 </script>
 
 <style scoped>
 .translation-window {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  min-width: 300px;
-  max-width: 500px;
-  overflow: hidden;
+  width: 350px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  font-family: 'Vazirmatn', sans-serif !important;
+  overflow: hidden !important;
   will-change: width, height, border-radius;
 }
 
 /* Theme styles moved to enhanced section below */
 
 .window-header {
-  padding: 6px 8px;
-  cursor: move;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 32px;
-  border-bottom: 1px solid #e8e8e8;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 12px !important;
+  cursor: move !important;
+  user-select: none !important;
 }
 
-/* Header theme styles */
+/* Theme-specific styles for light mode */
 .translation-window.light .window-header {
-  background-color: #f7f7f7;
-  border-bottom: 1px solid #e8e8e8;
+  background-color: #f7f7f7 !important;
+  border-bottom: 1px solid #e8e8e8 !important;
 }
 
+.translation-window.light .action-btn {
+  background-color: #f0f0f0 !important;
+  color: #555 !important;
+}
+
+.translation-window.light .action-btn:hover {
+  background-color: #e5e5e5 !important;
+}
+
+/* Theme-specific styles for dark mode */
 .translation-window.dark .window-header {
-  background-color: #34495e;
-  border-bottom: 1px solid #566573;
+  background-color: #333333 !important;
+  border-bottom: 1px solid #424242 !important;
+}
+
+.translation-window.dark .action-btn {
+  background-color: #424242 !important;
+  color: #e0e0e0 !important;
+}
+
+.translation-window.dark .action-btn:hover {
+  background-color: #555555 !important;
 }
 
 .header-actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .header-action-toolbar {
@@ -387,11 +425,15 @@ const handleStartDrag = (event) => {
 }
 
 .action-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-  transition: background 0.3s;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
 }
 
 .action-btn:hover {
@@ -409,12 +451,10 @@ const handleStartDrag = (event) => {
 
 
 .window-body {
-  padding: 16px;
-  max-height: 400px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 120px;
+  padding: 16px !important;
+  min-height: 100px !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Original text section styling */
@@ -557,20 +597,21 @@ const handleStartDrag = (event) => {
 
 /* Visibility and animation control */
 .translation-window {
-  /* Base styles */
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  display: flex;
-  flex-direction: column;
-  font-family: 'Vazirmatn', sans-serif;
+  /* Base styles - Force important to override Shadow DOM resets */
+  background: #fff !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  font-family: 'Vazirmatn', sans-serif !important;
+  position: relative !important;
   
   /* Animation styles */
-  opacity: 0;
-  transform: scale(0.95);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  visibility: hidden;
+  opacity: 0 !important;
+  transform: scale(0.95) !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+  visibility: hidden !important;
 }
 
 .translation-window.visible {
@@ -579,18 +620,18 @@ const handleStartDrag = (event) => {
   visibility: visible !important;
 }
 
-/* Enhanced light theme */
+/* Base theme styles - Light Mode */
 .translation-window.light {
-  background: #ffffff;
-  border: 1px solid #e8e8e8;
-  color: #2c3e50;
+  background-color: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #2c3e50 !important;
 }
 
-/* Enhanced dark theme */
+/* Base theme styles - Dark Mode */
 .translation-window.dark {
-  background: #2c3e50;
-  border: 1px solid #34495e;
-  color: #ecf0f1;
+  background-color: #2d2d2d !important;
+  border: 1px solid #424242 !important;
+  color: #e0e0e0 !important;
 }
 
 </style>

@@ -1,0 +1,149 @@
+/* TranslationWindow styles - for Shadow DOM injection */
+/* Original Window Styles with Shadow DOM overrides */
+
+.translation-window {
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  font-family: 'Vazirmatn', sans-serif !important;
+  opacity: 0 !important;
+  transform: scale(0.95) !important;
+  transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
+              transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+              visibility 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+              width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+              height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+  visibility: hidden !important;
+}
+
+/* Disable transitions when dragging */
+.translation-window.is-dragging {
+  transition: none !important;
+}
+
+/* Loading window specific styles */
+.translation-window.loading-window {
+  width: 60px !important;
+  height: 40px !important;
+  min-width: 60px !important;
+  min-height: 40px !important;
+  max-width: 60px !important;
+  max-height: 40px !important;
+  border-radius: 20px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  position: fixed !important;
+}
+
+/* Loading window visibility override */
+.translation-window.loading-window.visible {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+}
+
+
+/* Dark theme for loading window */
+.translation-window.loading-window.dark {
+  background: #333 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Dark theme loading window visibility */
+.translation-window.loading-window.dark.visible {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+}
+
+/* Normal window - full size */
+.translation-window.normal-window {
+  width: 350px !important;
+  min-height: 100px !important;
+}
+
+.translation-window.visible {
+  opacity: 0.9 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+}
+
+.translation-window.light {
+  background-color: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #2c3e50 !important;
+}
+
+.translation-window.dark {
+  background-color: #2d2d2d !important;
+  border: 1px solid #424242 !important;
+  color: #e0e0e0 !important;
+}
+
+.window-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 12px !important;
+  cursor: move !important;
+  user-select: none !important;
+}
+
+.translation-window.light .window-header {
+  background-color: #f7f7f7 !important;
+  border-bottom: 1px solid #e8e8e8 !important;
+}
+
+.translation-window.dark .window-header {
+  background-color: #333333 !important;
+  border-bottom: 1px solid #424242 !important;
+}
+
+.header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.action-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.translation-window.light .action-btn {
+  background-color: #f0f0f0 !important;
+  color: #555 !important;
+}
+
+.translation-window.light .action-btn:hover {
+  background-color: #e5e5e5 !important;
+}
+
+.translation-window.dark .action-btn {
+  background-color: #424242 !important;
+  color: #e0e0e0 !important;
+}
+
+.translation-window.dark .action-btn:hover {
+  background-color: #555555 !important;
+}
+
+.window-body {
+  padding: 16px !important;
+  min-height: 100px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}

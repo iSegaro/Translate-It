@@ -99,6 +99,12 @@ export class ClickManager {
    * Determine if outside click should trigger dismissal
    */
   _shouldDismissOnOutsideClick(e) {
+    // Skip if currently dragging a translation window
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true) {
+      this.logger.debug('Skipping outside click check due to active window dragging');
+      return false;
+    }
+    
     // Check if click is inside Vue UI Host (Shadow DOM contains both icons and windows)
     const vueUIHost = document.getElementById('translate-it-host');
     this.logger.debug('Outside click check:', { 

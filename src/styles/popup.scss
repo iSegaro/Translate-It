@@ -40,11 +40,11 @@
   --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
 }
 
-// Base styles for extension popup
-html, body {
+// Base styles for extension popup - ONLY apply in popup context
+body.popup-context {
   margin: 0;
   padding: 0;
-  width: 400px;
+  width: 400px !important;
   min-height: 350px;
   max-height: 600px;
   height: auto; /* Allow dynamic height instead of fixed 350px */

@@ -44,12 +44,32 @@ if (!access.isAccessible) {
       // 3. Inject the entire app's CSS into the shadow DOM.
       const appStyles = getAppCss();
       const appStyleEl = document.createElement('style');
-      // Also include the Google Font import.
+      appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
+      
+      // Include Google Font import and all app styles
       appStyleEl.textContent = `
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+        
+        /* App styles with Shadow DOM reset included */
         ${appStyles}
       `;
       shadowRoot.appendChild(appStyleEl);
+      
+      // Debug: Log the amount of CSS injected
+      console.log('[Content Script] Injected CSS length:', appStyles.length, 'characters');
+      
+      // Debug: Check if specific styles are present
+      if (appStyles.includes('.translation-window')) {
+        console.log('[Content Script] ✅ TranslationWindow styles found in injected CSS');
+      } else {
+        console.warn('[Content Script] ⚠️ TranslationWindow styles NOT found in injected CSS');
+      }
+      
+      if (appStyles.includes('background')) {
+        console.log('[Content Script] ✅ Background styles found in injected CSS');
+      } else {
+        console.warn('[Content Script] ⚠️ Background styles NOT found in injected CSS');
+      }
 
       // 4. Create the root element for the Vue app and mount it.
       const appRoot = document.createElement('div');

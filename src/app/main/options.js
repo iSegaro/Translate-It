@@ -28,6 +28,10 @@ async function initializeApp() {
   try {
     logger.debug('🚀 Starting options app initialization...')
     
+    // Add options context class to body
+    document.body.classList.add('options-context')
+    logger.debug('✅ Added options-context class to body')
+    
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('options')
     

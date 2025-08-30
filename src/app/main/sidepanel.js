@@ -17,6 +17,10 @@ async function initializeApp() {
   try {
     logger.debug('🚀 Starting sidepanel app initialization...')
     
+    // Add sidepanel context class to body
+    document.body.classList.add('sidepanel-context')
+    logger.debug('✅ Added sidepanel-context class to body')
+    
     // Setup global error handlers before anything else
     setupWindowErrorHandlers('sidepanel')
     
