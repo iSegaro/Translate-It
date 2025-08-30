@@ -114,13 +114,21 @@ browser.runtime.onConnect.addListener((port) => {
         if (handler) {
           const result = await handler(msg, port.sender);
           try {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
+            // Check if port is still connected before sending result
+            if (port && port.postMessage) {
+              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
+              logger.debug('[Background] RESULT sent to port successfully');
+            } else {
+              logger.warn('[Background] Port disconnected before RESULT could be sent');
+            }
           } catch (e) {
             logger.error('[Background] Failed to post RESULT to port', e);
           }
         } else {
           try {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+            if (port && port.postMessage) {
+              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+            }
           } catch (e) {
             logger.error('[Background] Failed to send no-handler RESULT:', e);
           }
