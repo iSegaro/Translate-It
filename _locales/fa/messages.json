@@ -76,6 +76,7 @@
   "api_tab_title": { "message": "تنظیمات API" },
   "import_export_tab_title": { "message": "پشتیبان‌گیری" },
   "advance_tab_title": { "message": "پیش‌رفته" },
+  "advance_section_title": { "message": "بخش پیشرفته" },
 
   "prompt_reset_button": { "message": "دوباره" },
 
