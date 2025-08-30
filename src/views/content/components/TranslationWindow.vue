@@ -352,10 +352,25 @@ const handleStartDrag = (event) => {
   height: 26px !important;
   min-width: 26px !important;
   min-height: 26px !important;
+  position: relative !important;
+  /* Performance optimizations matching other modes */
+  will-change: transform !important;
+  backface-visibility: hidden !important;
+  transform: translateZ(0) !important;
 }
 
 .header-action-toolbar :deep(.tts-button:hover) {
   background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Progress ring optimizations for floating mode */
+.header-action-toolbar :deep(.progress-ring) {
+  will-change: transform !important;
+  backface-visibility: hidden !important;
+}
+
+.header-action-toolbar :deep(.tts-icon) {
+  will-change: transform !important;
 }
 
 .translation-window.light .header-action-toolbar :deep(.tts-button:hover) {
