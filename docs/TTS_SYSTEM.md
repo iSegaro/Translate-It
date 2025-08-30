@@ -130,11 +130,95 @@ The system maintains seamless cross-browser support by abstracting the audio pla
 
 The `handleGoogleTTS.js` handler and `TTSGlobalManager` are unaware of the underlying implementation detail, allowing for a clean and maintainable architecture.
 
-## 🎉 Benefits of the New System
+## 🔧 Recent Improvements & Bug Fixes
+
+### Chrome MV3 Messaging Reliability (Version 1.5)
+The system has been enhanced to handle Chrome Manifest V3 messaging issues that were causing TTS failures:
+
+**Problems Resolved:**
+- **Empty Response Issue**: Fixed Chrome MV3 bug where `sendResponse()` in offscreen documents returned undefined responses
+- **Race Conditions**: Eliminated timing issues between background scripts and offscreen documents
+- **Duplicate Requests**: Removed redundant TTS calls in `TTSButton.vue` retry mechanism
+- **Audio Cleanup**: Fixed null pointer exceptions during concurrent TTS requests
+
+**Technical Solutions:**
+- **Event-Driven Architecture**: Replaced unreliable response-based communication with event messaging (`GOOGLE_TTS_ENDED`)
+- **Graceful Fallback**: Background script now assumes success on empty responses and relies on completion events
+- **Race Condition Prevention**: Added null safety checks in offscreen audio handling
+- **Request Deduplication**: Enhanced `isProcessing` flags to prevent multiple simultaneous requests
+
+### Cross-Component Standardization
+Successfully standardized TTS functionality across all three extension components:
+
+**Components Updated:**
+- **Popup**: Uses ActionToolbar with optimized animations
+- **Sidepanel**: Maintains existing smooth ActionToolbar integration  
+- **WindowsManager**: Migrated from standalone TTSButton to ActionToolbar for consistent styling
+
+**Styling Improvements:**
+- Hardware-accelerated animations (`will-change`, `transform: translateZ(0)`)
+- Consistent button sizes and spacing across components
+- Unified error states and loading indicators
+
+## 🎉 Benefits of the Enhanced System
 
 1.  **Full Playback Control**: Users can play, pause, resume, and stop audio.
 2.  **Superior User Experience**: The `TTSButton` provides clear visual feedback for every state, including loading progress and errors.
 3.  **Predictable Behavior**: The exclusive playback rule and smart lifecycle management prevent unexpected audio behavior.
-4.  **Robustness**: Advanced error handling with automatic and manual recovery makes the feature more reliable.
-5.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
-6.  **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.
+4.  **Chrome MV3 Compatibility**: Robust handling of Chrome extension messaging limitations with fallback mechanisms.
+5.  **Cross-Component Consistency**: Unified TTS experience across Popup, Sidepanel, and WindowsManager.
+6.  **Robustness**: Advanced error handling with automatic and manual recovery makes the feature more reliable.
+7.  **Race Condition Safety**: Comprehensive null safety and cleanup prevention in concurrent scenarios.
+8.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
+9.  **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.
+
+## 🔍 Troubleshooting Guide
+
+### Common Issues and Solutions
+
+#### "Empty response from offscreen document" Errors
+**Symptoms**: Console shows empty response errors but audio still plays
+**Root Cause**: Chrome MV3 messaging timing issues
+**Solution**: These errors are now handled gracefully - the system assumes success and relies on completion events
+**Status**: ✅ **Resolved in v1.5** - No user action needed
+
+#### TTS Button Stuck in Error State  
+**Symptoms**: Button shows error icon despite audio playing correctly
+**Root Cause**: Response timing mismatch between offscreen and background
+**Solution**: Updated to event-driven architecture with proper state management
+**Status**: ✅ **Resolved in v1.5** - No user action needed
+
+#### Multiple TTS Requests on Single Click
+**Symptoms**: Multiple identical requests in console logs
+**Root Cause**: Duplicate `speak()` calls in retry mechanism  
+**Solution**: Fixed `TTSButton.vue` to call only `retry()` which handles `speak()` internally
+**Status**: ✅ **Resolved in v1.5** - No user action needed
+
+#### Audio Cuts Off or Fails to Start
+**Symptoms**: Race conditions during rapid TTS requests
+**Root Cause**: Null pointer exceptions during concurrent audio cleanup
+**Solution**: Added null safety checks in offscreen document audio handling
+**Status**: ✅ **Resolved in v1.5** - No user action needed
+
+#### Inconsistent Styling Across Components
+**Symptoms**: TTS buttons look different in Popup vs WindowsManager
+**Root Cause**: WindowsManager used standalone TTSButton instead of ActionToolbar
+**Solution**: Standardized all components to use ActionToolbar with consistent CSS
+**Status**: ✅ **Resolved** - All components now have uniform styling
+
+### Debugging Tips
+
+1. **Check Extension Console**: Look for TTS-related logs with component prefixes
+2. **Verify Version**: Ensure offscreen document shows "Version 1.5" in console  
+3. **Test Across Components**: Verify TTS works in Popup, Sidepanel, and WindowsManager
+4. **Monitor Network**: Check if Google TTS URLs are accessible
+5. **Extension Reload**: Disable/enable extension if issues persist
+
+### Architecture Validation
+
+The system is considered healthy when:
+- ✅ No "Empty response" **errors** (debug messages are normal)
+- ✅ Single TTS request per user action
+- ✅ Proper state transitions: `idle → loading → playing → idle`  
+- ✅ `GOOGLE_TTS_ENDED` events received for completion
+- ✅ Consistent visual styling across all components
