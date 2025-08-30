@@ -70,7 +70,7 @@
 
         <label
           class="switch"
-          :title="$i18n('theme_toggle_title') || 'Toggle Light/Dark Theme'"
+          :title="t('theme_toggle_title') || 'Toggle Light/Dark Theme'"
         >
           <input 
             v-model="isDarkMode" 
@@ -100,7 +100,7 @@
           v-model="isAutoMode"
           type="checkbox"
         >
-        <span>{{ $i18n('theme_auto') || 'System Theme' }}</span>
+  <span>{{ t('theme_auto') || 'System Theme' }}</span>
       </label>
     </div>
   </div>
@@ -108,9 +108,12 @@
 
 <script setup>
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 
 const settingsStore = useSettingsStore()
+
+const { t } = useI18n()
 
 // Theme state management
 const isDarkMode = computed({

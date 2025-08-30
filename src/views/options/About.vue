@@ -1,7 +1,7 @@
 <template>
   <div class="about-page">
     <h2 class="page-title">
-      {{ $i18n('about_section_title') || 'What\'s New' }}
+      {{ t('about_section_title') || 'What\'s New' }}
     </h2>
     
     <div class="changelog-container">
@@ -9,13 +9,13 @@
         v-if="isLoadingChangelog"
         class="loading-changelog"
       >
-        {{ $i18n('options_changelog_loading') || 'Loading changelog...' }}
+  {{ t('options_changelog_loading') || 'Loading changelog...' }}
       </div>
       <div
         v-else-if="changelogError"
         class="error-changelog"
       >
-        {{ $i18n('options_changelog_error') || 'Failed to load changelog.' }}
+  {{ t('options_changelog_error') || 'Failed to load changelog.' }}
       </div>
       <div
         v-else
@@ -33,6 +33,10 @@ import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About');
+
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 
 const isLoadingChangelog = ref(true)

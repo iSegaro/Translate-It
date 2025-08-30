@@ -1,5 +1,6 @@
 import { createApp } from 'vue';
 import ContentApp from '../views/content/ContentApp.vue';
+import i18n from '../plugins/i18n';
 
 // Import all necessary styles as raw strings using Vite's `?inline` feature.
 import combinedGlobalStyles from '../styles/content-app-global.css?inline';
@@ -21,8 +22,8 @@ export function getAppCss() {
  */
 export function mountContentApp(rootElement) {
   const app = createApp(ContentApp);
+  app.use(i18n);
   app.mount(rootElement);
   console.log('[ContentApp main.js] Vue app mounted into shadow DOM.');
-
   return app;
 }

@@ -1,5 +1,9 @@
 <template>
   <div class="content-app-container">
+    <!-- نمونه استفاده از ترجمه -->
+    <div style="padding: 8px; font-size: 1rem;">
+  {{ $t('app_welcome') }}
+    </div>
     <!-- This will host all in-page UI components -->
     <Toaster rich-colors />
     <TextFieldIcon

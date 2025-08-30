@@ -1,9 +1,9 @@
 <template>
   <div>
-    <h3>{{ $i18n('gemini_api_settings_title') || 'Gemini API Settings' }}</h3>
+  <h3>{{ t('gemini_api_settings_title') || 'Gemini API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">
-        {{ $i18n('gemini_api_key_info') || 'You can get your Gemini API key from' }}
+        {{ t('gemini_api_key_info') || 'You can get your Gemini API key from' }}
       </span>
       <a
         class="api-link"
@@ -11,23 +11,23 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        {{ $i18n('gemini_api_key_link') || 'Get Your Free API Key' }}
+  {{ t('gemini_api_key_link') || 'Get Your Free API Key' }}
       </a>
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('custom_api_settings_api_key_label') || 'API Key' }}</label>
+  <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
       <BaseInput
         v-model="geminiApiKey"
         type="password"
-        :placeholder="$i18n('gemini_api_key_placeholder') || 'Paste your API key here'"
+  :placeholder="t('gemini_api_key_placeholder') || 'Paste your API key here'"
         class="api-key-input"
       />
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+  <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="geminiModel"
-        :options="geminiModelOptions"
+  :options="geminiModelOptions"
         class="model-select"
       />
     </div>
@@ -38,10 +38,10 @@
       <BaseCheckbox 
         v-model="geminiThinking" 
         :disabled="!isThinkingControllable"
-        :label="$i18n('gemini_thinking_label') || 'Enable Thinking Mode'"
+  :label="t('gemini_thinking_label') || 'Enable Thinking Mode'"
       />
       <span class="setting-description">
-        {{ $i18n('gemini_thinking_description') || thinkingDescription }}
+  {{ t('gemini_thinking_description') || thinkingDescription }}
       </span>
     </div>
   </div>
@@ -49,11 +49,14 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 import { CONFIG } from '@/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 

@@ -26,8 +26,9 @@ export async function handleRefreshContextMenus(message, sender, sendResponse) {
       throw new Error('Background service not available');
     }
     
-    // Refresh context menus via the background service
-    await backgroundService.refreshContextMenus();
+    // Refresh context menus via the background service with locale
+    const locale = message.locale;
+    await backgroundService.refreshContextMenus(locale);
     
     logger.debug('✅ [REFRESH_CONTEXT_MENUS] Context menus refreshed successfully');
     

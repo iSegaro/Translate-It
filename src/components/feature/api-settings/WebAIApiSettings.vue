@@ -1,9 +1,9 @@
 <template>
   <div>
-    <h3>{{ $i18n('webai_api_settings_title') || 'WebAI API Settings' }}</h3>
+  <h3>{{ t('webai_api_settings_title') || 'WebAI API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">
-        {{ $i18n('webai_api_key_info') || 'Run your API Server.' }}
+        {{ t('webai_api_key_info') || 'Run your API Server.' }}
       </span>
       <a
         class="api-link"
@@ -11,21 +11,21 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        {{ $i18n('webai_api_key_link') || 'Get and Run your locally hosted WebAI API server.' }}
+  {{ t('webai_api_key_link') || 'Get and Run your locally hosted WebAI API server.' }}
       </a>
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('webai_api_url_label') || 'WebAI API URL' }}</label>
+  <label>{{ t('webai_api_url_label') || 'WebAI API URL' }}</label>
       <BaseInput
         v-model="webAIApiUrl"
-        :placeholder="$i18n('webai_api_url_placeholder') || 'Enter WebAI API URL'"
+  :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
       />
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('webai_api_model_label') || 'WebAI API Model' }}</label>
+  <label>{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
       <BaseInput
         v-model="webAIApiModel"
-        :placeholder="$i18n('webai_api_model_placeholder') || 'Enter WebAI API model'"
+  :placeholder="t('webai_api_model_placeholder') || 'Enter WebAI API model'"
       />
     </div>
   </div>
@@ -33,8 +33,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 

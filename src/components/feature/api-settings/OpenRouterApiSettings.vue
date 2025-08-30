@@ -1,9 +1,9 @@
 <template>
   <div>
-    <h3>{{ $i18n('openrouter_api_settings_title') || 'OpenRouter API Settings' }}</h3>
+  <h3>{{ t('openrouter_api_settings_title') || 'OpenRouter API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">
-        {{ $i18n('openrouter_api_key_info') || 'Get your OpenRouter API key from' }}
+        {{ t('openrouter_api_key_info') || 'Get your OpenRouter API key from' }}
       </span>
       <a
         class="api-link"
@@ -11,23 +11,23 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        {{ $i18n('openrouter_api_key_link') || 'Get OpenRouter API Key' }}
+  {{ t('openrouter_api_key_link') || 'Get OpenRouter API Key' }}
       </a>
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('custom_api_settings_api_key_label') || 'API Key' }}</label>
+  <label>{{ t('custom_api_settings_api_key_label') || 'API Key' }}</label>
       <BaseInput
         v-model="openrouterApiKey"
         type="password"
-        :placeholder="$i18n('openrouter_api_key_placeholder') || 'Paste your OpenRouter API key here'"
+  :placeholder="t('openrouter_api_key_placeholder') || 'Paste your OpenRouter API key here'"
         class="api-key-input"
       />
     </div>
     <div class="setting-group">
-      <label>{{ $i18n('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+  <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="openrouterApiModel"
-        :options="openrouterApiModelOptions"
+  :options="openrouterApiModelOptions"
         class="model-select"
       />
     </div>
@@ -35,10 +35,10 @@
       v-if="selectedModelOption === 'custom'"
       class="setting-group"
     >
-      <label>{{ $i18n('openrouter_custom_model_label') || 'Custom Model Name' }}</label>
+  <label>{{ t('openrouter_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput
         v-model="openrouterCustomModel"
-        :placeholder="$i18n('openrouter_custom_model_placeholder') || 'Enter custom model name (e.g., provider/model-name)'"
+  :placeholder="t('openrouter_custom_model_placeholder') || 'Enter custom model name (e.g., provider/model-name)'"
       />
     </div>
   </div>
@@ -46,9 +46,12 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 

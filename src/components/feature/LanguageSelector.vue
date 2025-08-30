@@ -9,7 +9,7 @@
       <option 
         v-for="language in languages" 
         :key="language.code" 
-        :value="language.name"
+        :value="language.code"
       >
         {{ language.name }}
       </option>

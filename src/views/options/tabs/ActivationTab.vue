@@ -1,28 +1,28 @@
 <template>
   <section class="activation-tab">
-    <h2>{{ $i18n('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
+  <h2>{{ t('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
 
     <!-- Extension Enable/Disable -->
     <div class="setting-group extension-enabled-group">
       <BaseCheckbox
         v-model="extensionEnabled"
-        :label="$i18n('extension_enabled_label') || 'Enable Extension'"
+        :label="t('extension_enabled_label') || 'Enable Extension'"
       />
       <span class="setting-description">
-        {{ $i18n('extension_enabled_description') || 'Enable or disable the entire extension functionality except Popup.' }}
+        {{ t('extension_enabled_description') || 'Enable or disable the entire extension functionality except Popup.' }}
       </span>
     </div>
 
     <!-- Text Field Translation -->
-    <BaseFieldset :legend="$i18n('activation_group_text_fields_title') || 'Text Field Translation'">
+  <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="translateOnTextFields"
           :disabled="!extensionEnabled"
-          :label="$i18n('translate_on_text_fields_label') || 'Enable translation on text fields'"
+          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
         />
         <span class="setting-description">
-          {{ $i18n('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
+          {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
         </span>
       </div>
 
@@ -30,10 +30,10 @@
         <BaseCheckbox
           v-model="enableShortcutForTextFields"
           :disabled="!extensionEnabled"
-          :label="$i18n('enable_shortcut_for_text_fields_label') || 'Enable Ctrl+/ shortcut for text fields'"
+          :label="t('enable_shortcut_for_text_fields_label') || 'Enable Ctrl+/ shortcut for text fields'"
         />
         <span class="setting-description">
-          {{ $i18n('enable_shortcut_for_text_fields_description') || 'Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field.' }}
+          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using the Ctrl+/ keyboard shortcut to trigger translation when inside a text field.' }}
         </span>
       </div>
 
@@ -44,15 +44,13 @@
             v-model="textFieldMode"
             value="copy"
             name="textFieldMode"
-            :label="$i18n('options_textField_mode_copy') || 'Copy to Clipboard'"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
+            :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
           />
           <BaseRadio
             v-model="textFieldMode"
             value="replace"
             name="textFieldMode"
-            :label="$i18n('options_textField_mode_replace') || 'Replace on Textfield'"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
+            :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
           />
         </div>
 
@@ -60,22 +58,22 @@
           <BaseCheckbox 
             v-model="replaceOnSpecialSites" 
             :disabled="!extensionEnabled || textFieldMode !== 'copy'"
-            :label="$i18n('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
+            :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
           />
         </div>
       </div>
     </BaseFieldset>
 
     <!-- On-Page Selection -->
-    <BaseFieldset :legend="$i18n('activation_group_page_selection_title') || 'On-Page Selection'">
+  <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="translateWithSelectElement"
           :disabled="!extensionEnabled"
-          :label="$i18n('translate_with_select_element_label') || 'Enable translation via select element'"
+          :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
         />
         <span class="setting-description">
-          {{ $i18n('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
+          {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
         </span>
       </div>
 
@@ -83,10 +81,10 @@
         <BaseCheckbox
           v-model="translateOnTextSelection"
           :disabled="!extensionEnabled"
-          :label="$i18n('translate_on_text_selection_label') || 'Enable translation on text selection'"
+          :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
         />
         <span class="setting-description">
-          {{ $i18n('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
+          {{ t('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
         </span>
       </div>
 
@@ -97,15 +95,13 @@
             v-model="selectionTranslationMode"
             value="immediate"
             name="selectionTranslationMode"
-            :label="$i18n('options_selection_mode_immediate') || 'Immediate'"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :label="t('options_selection_mode_immediate') || 'Immediate'"
           />
           <BaseRadio
             v-model="selectionTranslationMode"
             value="onClick"
             name="selectionTranslationMode"
-            :label="$i18n('options_selection_mode_onclick') || 'On Click'"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+            :label="t('options_selection_mode_onclick') || 'On Click'"
           />
         </div>
 
@@ -113,36 +109,36 @@
           <BaseCheckbox 
             v-model="requireCtrlForTextSelection" 
             :disabled="!extensionEnabled || !translateOnTextSelection || selectionTranslationMode !== 'immediate'"
-            :label="$i18n('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
+            :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
           />
         </div>
       </div>
     </BaseFieldset>
 
     <!-- Dictionary Mode -->
-    <BaseFieldset :legend="$i18n('activation_group_dictionary_title') || 'Dictionary Mode'">
+  <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="enableDictionary"
           :disabled="!extensionEnabled"
-          :label="$i18n('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
+          :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
         />
         <span class="setting-description">
-          {{ $i18n('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
+          {{ t('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
         </span>
       </div>
     </BaseFieldset>
 
     <!-- Video Subtitle -->
-    <BaseFieldset :legend="$i18n('activation_group_subtitle_title') || 'Video Subtitle'">
+  <BaseFieldset :legend="t('activation_group_subtitle_title') || 'Video Subtitle'">
       <div class="setting-group">
         <BaseCheckbox
           v-model="enableSubtitle"
           :disabled="!extensionEnabled"
-          :label="$i18n('enable_subtitle_translation_label') || 'Enable Subtitle Translation'"
+          :label="t('enable_subtitle_translation_label') || 'Enable Subtitle Translation'"
         />
         <span class="setting-description">
-          {{ $i18n('enable_subtitle_translation_description') || 'وقتی که فعال باشد، در سایت یوتوب برای ویدیوهایی که زیرنویس وجود دارد ترجمه اتفاق می افتد و جایگزین زیرنویس پیش‌فرض یوتوب می شود.' }}
+          {{ t('enable_subtitle_translation_description') || 'وقتی که فعال باشد، در سایت یوتوب برای ویدیوهایی که زیرنویس وجود دارد ترجمه اتفاق می افتد و جایگزین زیرنویس پیش‌فرض یوتوب می شود.' }}
         </span>
       </div>
 
@@ -150,10 +146,10 @@
         <BaseCheckbox
           v-model="iconSubtitle"
           :disabled="!extensionEnabled"
-          :label="$i18n('icon_subtitle_translation_label') || 'Show Subtitle Icon'"
+          :label="t('icon_subtitle_translation_label') || 'Show Subtitle Icon'"
         />
         <span class="setting-description">
-          {{ $i18n('icon_subtitle_translation_description') || 'نمایش ایکون ترجمه زیرنویس در نوار پخش‌کننده یوتوب.' }}
+          {{ t('icon_subtitle_translation_description') || 'نمایش ایکون ترجمه زیرنویس در نوار پخش‌کننده یوتوب.' }}
         </span>
       </div>
     </BaseFieldset>
@@ -162,6 +158,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
@@ -173,6 +170,8 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 
 const settingsStore = useSettingsStore()
+
+const { t } = useI18n()
 
 // Extension enabled state
 const extensionEnabled = computed({

@@ -1,22 +1,22 @@
 <template>
   <section class="import-export-tab">
-    <h2>{{ $i18n('import_export_section_title') || 'Import/Export Settings' }}</h2>
+  <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
 
     <!-- Export Settings -->
-    <BaseFieldset :legend="$i18n('import_export_export_title') || 'Export Settings'">
+  <BaseFieldset :legend="t('import_export_export_title') || 'Export Settings'">
       <div class="setting-group">
         <p class="setting-description export-info">
-          {{ $i18n('export_settings_description') || 'Export your current settings to a JSON file for backup or sharing.' }}
+          {{ t('export_settings_description') || 'Export your current settings to a JSON file for backup or sharing.' }}
         </p>
       </div>
       
       <div class="setting-group">
-        <label>{{ $i18n('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
+  <label>{{ t('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
         <div class="export-controls-row">
           <BaseInput
             v-model="exportPassword"
             type="password"
-            :placeholder="$i18n('export_password_placeholder') || 'Create a strong password to protect your API keys'"
+            :placeholder="t('export_password_placeholder') || 'Create a strong password to protect your API keys'"
             class="export-password-input"
           />
           <BaseButton
@@ -24,16 +24,16 @@
             class="export-button"
             @click="exportSettings"
           >
-            {{ $i18n('export_settings_button') || 'Export Settings' }}
+            {{ t('export_settings_button') || 'Export Settings' }}
           </BaseButton>
         </div>
       </div>
     </BaseFieldset>
 
     <!-- Import Settings -->
-    <BaseFieldset :legend="$i18n('import_export_import_title') || 'Import Settings'">
+  <BaseFieldset :legend="t('import_export_import_title') || 'Import Settings'">
       <div class="setting-group">
-        <label>{{ $i18n('import_settings_label') || 'Import from file' }}</label>
+  <label>{{ t('import_settings_label') || 'Import from file' }}</label>
         <input 
           ref="importFileInput"
           type="file" 
@@ -47,12 +47,12 @@
         v-if="showPasswordField"
         class="setting-group"
       >
-        <label>{{ $i18n('import_password_label') || '🔑 Import Password Required' }}</label>
+  <label>{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
         <div class="import-controls-row">
           <BaseInput
             v-model="importPassword"
             type="password"
-            :placeholder="$i18n('import_password_placeholder') || 'Enter the password used during export'"
+            :placeholder="t('import_password_placeholder') || 'Enter the password used during export'"
             class="import-password-input"
             @keydown.enter="importSettings"
           />
@@ -61,14 +61,14 @@
             class="import-button"
             @click="importSettings"
           >
-            {{ $i18n('import_settings_button') || 'Import Settings' }}
+            {{ t('import_settings_button') || 'Import Settings' }}
           </BaseButton>
         </div>
       </div>
       
       <div class="setting-group">
         <p class="setting-description import-warning">
-          {{ $i18n('import_settings_description') || 'Importing will overwrite your current settings. The page will reload after a successful import.' }}
+          {{ t('import_settings_description') || 'Importing will overwrite your current settings. The page will reload after a successful import.' }}
         </p>
       </div>
     </BaseFieldset>
@@ -78,7 +78,7 @@
       v-if="statusMessage"
       :class="`status-message status-${statusType}`"
     >
-      {{ statusMessage }}
+  {{ statusMessage }}
     </div>
   </section>
 </template>
@@ -91,9 +91,10 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import secureStorage from '@/storage/core/SecureStorage.js'
 
-// Access i18n function through current instance
-const { proxy } = getCurrentInstance()
-const $i18n = proxy.$i18n
+import { useI18n } from 'vue-i18n'
+
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 

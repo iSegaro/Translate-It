@@ -1,22 +1,22 @@
 <template>
   <section class="prompt-tab">
-    <h2>{{ $i18n('prompt_section_title') || 'Prompt Template' }}</h2>
+  <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
     
     <div class="setting-group prompt-template-group">
       <label class="prompt-label-with-button">
-        <span>{{ $i18n('prompt_template_label') || 'Prompt Template' }}</span>
+  <span>{{ t('prompt_template_label') || 'Prompt Template' }}</span>
         <button
           type="button"
           class="button-inline"
           @click="resetPrompt"
         >
-          {{ $i18n('prompt_reset_button') || 'Reset' }}
+          {{ t('prompt_reset_button') || 'Reset' }}
         </button>
       </label>
       
       <BaseTextarea
         v-model="promptTemplate"
-        :placeholder="$i18n('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
+  :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
         :rows="5"
         class="prompt-template-input"
       />
@@ -30,18 +30,18 @@
       </div>
 
       <div class="prompt-template-help">
-        <p>{{ $i18n('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
+  <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
         <ul>
           <li>
-            <code>${_SOURCE}</code>: {{ $i18n('prompt_source_help') || 'Source language.' }}
+            <code>${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
             <span class="lang-name">({{ sourceLanguageName }})</span>
           </li>
           <li>
-            <code>${_TARGET}</code>: {{ $i18n('prompt_target_help') || 'Target language.' }}
+            <code>${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
             <span class="lang-name">({{ targetLanguageName }})</span>
           </li>
           <li>
-            <code>${_TEXT}</code>: {{ $i18n('prompt_text_help') || 'Text to be translated.' }}
+            <code>${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
           </li>
         </ul>
       </div>
@@ -55,12 +55,14 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/core/validation.js'
 import { CONFIG } from '@/config.js'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
 const { validatePromptTemplate: validate, getFirstError, clearErrors } = useValidation()
 
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
+const { t } = useI18n()
 
 // Validation
 const validationError = ref('')

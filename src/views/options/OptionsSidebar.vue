@@ -1,104 +1,104 @@
 <template>
   <aside class="options-sidebar">
-    <div class="sidebar-header">
-      <h1>{{ $i18n('name') }}</h1>
-      <span>{{ manifestVersion }}</span>
-      <p>{{ $i18n('description') }}</p>
+    <div v-if="sidebarError" class="sidebar-error">
+      <h2>Sidebar Error</h2>
+      <pre>{{ sidebarError }}</pre>
     </div>
-
-    <div class="sidebar-section theme-controls">
-      <h2>{{ $i18n('theme_section_title') }}</h2>
-      <ThemeSelector />
-    </div>
-
-    <div class="sidebar-section localization-controls">
-      <h2>{{ $i18n('localization_section_title') }}</h2>
-      <LanguageSelector
-        v-model="selectedLanguage"
-        :languages="interfaceLanguages"
-      />
-    </div>
-
-    <div class="sidebar-footer">
-      <a
-        href="https://github.com/iSegaro/Translate-It"
-        target="_blank"
-        rel="noopener noreferrer"
-        :title="$i18n('github_link_title') || 'GitHub'"
-      >
-        <img
-          src="@/assets/icons/github.svg"
-          alt="GitHub"
-          height="22"
-          class="github-icon"
+    <div v-else>
+      <div class="sidebar-header">
+        <h1>{{ t('name') }}</h1>
+        <span>{{ manifestVersion }}</span>
+        <p>{{ t('description') }}</p>
+      </div>
+      <div class="sidebar-section theme-controls">
+        <ThemeSelector />
+      </div>
+      <div class="sidebar-section localization-controls">
+        <h2>{{ t('localization_section_title') }}</h2>
+        <select
+          v-model="selectedLanguage"
+          class="language-select"
         >
-      </a>
-      <p>
-        by
+          <option v-for="lang in interfaceLanguages" :key="lang.code" :value="lang.code">
+            {{ lang.name }}
+          </option>
+        </select>
+      </div>
+      <div class="sidebar-footer">
         <a
-          class="about-link"
-          href="https://x.com/M_Khani65"
+          href="https://github.com/iSegaro/Translate-It"
           target="_blank"
           rel="noopener noreferrer"
-        >Me</a>
-        and
-        <a
-          class="about-link"
-          href="https://x.com/iSegar0"
-          target="_blank"
-          rel="noopener noreferrer"
-        >iSegar0</a>
-        <span>&copy; 2025</span>
-      </p>
+          :title="t('github_link_title') || 'GitHub'"
+        >
+          <img
+            src="@/assets/icons/github.svg"
+            alt="GitHub"
+            height="22"
+            class="github-icon"
+          >
+        </a>
+        <p>
+          by
+          <a
+            class="about-link"
+            href="https://x.com/M_Khani65"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Me</a>
+          and
+          <a
+            class="about-link"
+            href="https://x.com/iSegar0"
+            target="_blank"
+            rel="noopener noreferrer"
+          >iSegar0</a>
+          <span>&copy; 2025</span>
+        </p>
+      </div>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { useSettingsStore } from '@/store/core/settings'
 import ThemeSelector from './components/ThemeSelector.vue'
-import LanguageSelector from '@/components/feature/LanguageSelector.vue'
-import browser from 'webextension-polyfill'
-import { useLanguages } from '@/composables/useLanguages.js' // Import useLanguages
+import { useLanguages } from '@/composables/useLanguages.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import browser from 'webextension-polyfill'
+
+const sidebarError = ref('')
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
-
-
+const { t, changeLanguage, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
-const { findLanguageByCode, getInterfaceLanguages } = useLanguages() // Destructure from useLanguages
-
-// Manifest version
+const { findLanguageByCode, getInterfaceLanguages } = useLanguages()
 const manifestVersion = ref('v0.0.0')
-
-// Interface languages (available UI languages)
-const interfaceLanguages = computed(() => getInterfaceLanguages()) // Use computed from useLanguages
-
-// Selected language
+const interfaceLanguages = computed(() => getInterfaceLanguages())
+// Use reactive reference that stays in sync with settings
 const selectedLanguage = computed({
-  get: () => {
-    const currentCode = settingsStore.settings?.APPLICATION_LOCALIZE || 'en'; // Default to 'en' code
-    const lang = findLanguageByCode(currentCode);
-    return lang ? lang.name : 'English'; // Return name, default to 'English' if not found
-  },
-  set: (value) => {
-    // When setting, convert name back to code for storage
-    const lang = interfaceLanguages.value.find(l => l.name === value);
-    const codeToStore = lang ? lang.code : 'en'; // Default to 'en' code
-    settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', codeToStore);
+  get: () => settingsStore.settings?.APPLICATION_LOCALIZE || 'en',
+  set: async (value) => {
+    try {
+      await changeLanguage(value)
+    } catch (error) {
+      logger.error('Failed to change language:', error)
+    }
   }
 })
 
-// Get manifest version
 onMounted(async () => {
   try {
     const manifest = browser.runtime.getManifest()
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {
-  logger.warn('Failed to get manifest version:', error)
+    logger.warn('Failed to get manifest version:', error)
+    sidebarError.value = error && error.message ? error.message : String(error)
   }
-})</script>
+});
+</script>
 
 <style lang="scss" scoped>
 @use '@/assets/styles/variables.scss' as *;
@@ -106,10 +106,11 @@ onMounted(async () => {
 .options-sidebar {
   flex: 0 0 280px;
   padding: $spacing-md;
-  border-right: $border-width $border-style var(--color-border);
+  /* border-right: 4px solid red !important; */
+  background: #fffbe6 !important;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-surface);
+  z-index: 9999;
 }
 
 .sidebar-header {

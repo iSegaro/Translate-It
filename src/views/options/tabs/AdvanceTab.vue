@@ -1,23 +1,23 @@
 <template>
   <section class="advance-tab">
-    <h2>{{ $i18n('advance_section_title') || 'Advanced Settings' }}</h2>
+  <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
     
     <div class="setting-group">
       <BaseCheckbox
         v-model="useMock"
-        :label="$i18n('advance_dev_api_mode_label') || 'Use Dev API Mode'"
+        :label="t('advance_dev_api_mode_label') || 'Use Dev API Mode'"
       />
     </div>
     
     <div class="setting-group">
       <BaseCheckbox
         v-model="debugMode"
-        :label="$i18n('advance_debug_mode_label') || 'Debug Mode'"
+        :label="t('advance_debug_mode_label') || 'Debug Mode'"
       />
     </div>
     
     <div class="setting-group">
-      <label>{{ $i18n('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
+  <label>{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
       <BaseTextarea
         v-model="excludedSites"
         :rows="3"
@@ -35,7 +35,11 @@ import { useSettingsStore } from '@/store/core/settings'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
+import { useI18n } from 'vue-i18n'
+
 const settingsStore = useSettingsStore()
+
+const { t } = useI18n()
 
 // Advanced settings
 const useMock = computed({

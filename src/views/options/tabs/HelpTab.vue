@@ -1,6 +1,6 @@
 <template>
   <section class="help-tab">
-    <h2>{{ $i18n('help_section_title') || 'Help & Documentation' }}</h2>
+  <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
     
     <div class="accordion">
       <!-- Shortcut Help Section -->
@@ -10,7 +10,7 @@
           :class="{ active: openAccordion === 'shortcut' }"
           @click="toggleAccordion('shortcut')"
         >
-          <span>{{ $i18n('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
+          <span>{{ t('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
           <span class="accordion-icon">{{ openAccordion === 'shortcut' ? '−' : '+' }}</span>
         </button>
         <div 
@@ -18,21 +18,21 @@
           :class="{ open: openAccordion === 'shortcut' }"
         >
           <div class="accordion-inner">
-            <p>{{ $i18n('help_shortcut_content_p1') || 'To use this extension, you have several options:' }}</p>
+            <p>{{ t('help_shortcut_content_p1') || 'To use this extension, you have several options:' }}</p>
             <ol>
-              <li>{{ $i18n('help_shortcut_content_li1') || 'Select text on any webpage and press Ctrl+/ (Cmd+/ on Mac) to translate it instantly.' }}</li>
-              <li>{{ $i18n('help_shortcut_content_li2') || 'Right-click on selected text and choose "Translate Selected Text" from the context menu.' }}</li>
-              <li>{{ $i18n('help_shortcut_content_li3') || 'Click on the extension icon in the toolbar to open the translation popup.' }}</li>
-              <li>{{ $i18n('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (Chrome only).' }}</li>
+              <li>{{ t('help_shortcut_content_li1') || 'Select text on any webpage and press Ctrl+/ (Cmd+/ on Mac) to translate it instantly.' }}</li>
+              <li>{{ t('help_shortcut_content_li2') || 'Right-click on selected text and choose "Translate Selected Text" from the context menu.' }}</li>
+              <li>{{ t('help_shortcut_content_li3') || 'Click on the extension icon in the toolbar to open the translation popup.' }}</li>
+              <li>{{ t('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (Chrome only).' }}</li>
             </ol>
             
             <hr class="content-divider">
             
-            <p>{{ $i18n('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:' }}</p>
+            <p>{{ t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:' }}</p>
             <ol>
-              <li>{{ $i18n('help_shortcut_content_chrome_li1') || 'Go to chrome://extensions/' }}</li>
-              <li>{{ $i18n('help_shortcut_content_chrome_li2') || 'Click on the menu (☰) in the top-left corner' }}</li>
-              <li>{{ $i18n('help_shortcut_content_chrome_li3') || 'Select "Keyboard shortcuts" and customize as needed' }}</li>
+              <li>{{ t('help_shortcut_content_chrome_li1') || 'Go to chrome://extensions/' }}</li>
+              <li>{{ t('help_shortcut_content_chrome_li2') || 'Click on the menu (☰) in the top-left corner' }}</li>
+              <li>{{ t('help_shortcut_content_chrome_li3') || 'Select "Keyboard shortcuts" and customize as needed' }}</li>
             </ol>
           </div>
         </div>
@@ -45,7 +45,7 @@
           :class="{ active: openAccordion === 'apiKeys' }"
           @click="toggleAccordion('apiKeys')"
         >
-          <span>{{ $i18n('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
+          <span>{{ t('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
           <span class="accordion-icon">{{ openAccordion === 'apiKeys' ? '−' : '+' }}</span>
         </button>
         <div 
@@ -53,10 +53,10 @@
           :class="{ open: openAccordion === 'apiKeys' }"
         >
           <div class="accordion-inner">
-            <p>{{ $i18n('help_api_keys_content') || 'This extension supports multiple translation providers. Some are free, while others require API keys:' }}</p>
+            <p>{{ t('help_api_keys_content') || 'This extension supports multiple translation providers. Some are free, while others require API keys:' }}</p>
             
             <div class="provider-help-section">
-              <h4>{{ $i18n('help_free_providers_title') || 'Free Providers (No API Key Required)' }}</h4>
+              <h4>{{ t('help_free_providers_title') || 'Free Providers (No API Key Required)' }}</h4>
               <ul>
                 <li><strong>Google Translate</strong> - Uses the public Google Translate endpoint</li>
                 <li><strong>Microsoft Bing</strong> - Uses the public Bing Translate endpoint</li>
@@ -65,7 +65,7 @@
             </div>
             
             <div class="provider-help-section">
-              <h4>{{ $i18n('help_api_providers_title') || 'API-Based Providers (Require API Keys)' }}</h4>
+              <h4>{{ t('help_api_providers_title') || 'API-Based Providers (Require API Keys)' }}</h4>
               <ul>
                 <li>
                   <strong>Google Gemini</strong> - Get your free API key from <a
@@ -111,8 +111,10 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const openAccordion = ref('')
+const { t } = useI18n()
 
 const toggleAccordion = (section) => {
   openAccordion.value = openAccordion.value === section ? '' : section

@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import i18n, { setI18nLocale } from '@/plugins/i18n'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
 import OptionsApp from '@/views/options/OptionsApp.vue'
@@ -38,10 +39,26 @@ async function initializeApp() {
     // Setup browser API globals
     setupBrowserAPIGlobals()
 
-    // Import i18n plugin after browser API is ready and globally available
-    logger.debug('📦 Importing i18n plugin...')
-    const { default: i18n } = await import('vue-plugin-webextension-i18n')
-    logger.debug('✅ i18n plugin imported successfully')
+    // مقداردهی اولیه locale بر اساس تنظیمات کاربر
+    let userLocale = 'en';
+    try {
+      const settings = await browser.storage.local.get('APPLICATION_LOCALIZE');
+      if (settings && settings.APPLICATION_LOCALIZE) {
+        // Normalize locale code
+        const LANGUAGE_MAP = {
+          'English': 'en',
+          'Farsi': 'fa',
+          'فارسی': 'fa',
+          'en': 'en',
+          'fa': 'fa'
+        }
+        userLocale = LANGUAGE_MAP[settings.APPLICATION_LOCALIZE] || settings.APPLICATION_LOCALIZE || 'en';
+      }
+    } catch (e) {
+      logger.warn('Failed to get APPLICATION_LOCALIZE from storage:', e);
+    }
+    await setI18nLocale(userLocale);
+    logger.debug('✅ vue-i18n plugin locale set:', userLocale)
 
     // Create router
     logger.debug('🛣️ Creating Vue router...')

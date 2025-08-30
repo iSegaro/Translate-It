@@ -1,4 +1,6 @@
 {
+  "options_loading": { "message": "Loading Settings..." },
+  "app_welcome": { "message": "Welcome to Translate It!" },
   "IsRTL": { "message": "false" },
 
   "name": { "message": "Translate It" },
@@ -46,6 +48,7 @@
   "options_page_title": { "message": "Settings" },
   "options_description": { "message": "Translate Everywhere. Simply." },
   "options_changelog_loading": { "message": "Loading changelog..." },
+  "github_link_title": { "message": "View on GitHub" },
 
   "options_error_same_languages": {
     "message": "Source and target languages cannot be the same."
@@ -125,6 +128,8 @@
   "help_api_keys_content": {
     "message": "You can find links to each API provider's website in the **API** tab. You will need to create an account on their respective platforms to generate a key."
   },
+  "help_free_providers_title": { "message": "Free Providers (No API Key Required)" },
+  "help_api_providers_title": { "message": "API-Based Providers (Require API Keys)" },
 
   "help_shortcut_content_p2": {
     "message": "In **Chrome**, the process is different:"
@@ -524,5 +529,9 @@
   },
   "SUBTITLE_TRANSLATION_STOPPED": {
     "message": "Subtitle translation stopped"
-  }
+  },
+  "advance_section_title": { "message": "Advanced Settings" },
+  "prompt_source_help": { "message": "Select the source language for your prompt." },
+  "prompt_target_help": { "message": "Select the target language for your prompt." },
+  "prompt_text_help": { "message": "Enter the text you want to translate or process." }
 }

@@ -81,7 +81,7 @@ class LifecycleManager {
       'openOptionsPage': Handlers.handleOpenOptionsPage,
       'openURL': Handlers.handleOpenURL,
       'showOSNotification': Handlers.handleShowOSNotification,
-      'refreshContextMenus': Handlers.handleRefreshContextMenus,
+      'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenus,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
       
       // Lifecycle handlers
@@ -233,16 +233,16 @@ class LifecycleManager {
     }
   }
 
-  async refreshContextMenus() {
+  async refreshContextMenus(locale) {
     try {
       const contextMenuManager = await this.featureLoader.loadContextMenuManager();
-      await contextMenuManager.initialize(); // Initialize to register listeners and setup menus
+      await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
     } catch (error) {
       logger.error("❌ Failed to refresh context menus via featureLoader:", error);
       // Fallback to direct import of new context menu manager
       const { ContextMenuManager } = await import("../../managers/context-menu.js");
       const contextMenuManager = new ContextMenuManager();
-      await contextMenuManager.initialize();
+      await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
     }
   }
 }

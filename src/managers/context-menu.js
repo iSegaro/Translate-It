@@ -98,20 +98,24 @@ export class ContextMenuManager {
 
   /**
    * Initialize the context menu manager
+   * @param {boolean} force - Force re-initialization even if already initialized
+   * @param {string} locale - Specific locale to use for translations
    */
-  async initialize() {
-    if (this.initialized) return;
+  async initialize(force = false, locale = null) {
+    if (this.initialized && !force) return;
 
     try {
       this.browser = browser;
 
-      logger.debug("📋 Initializing context menu manager");
+      logger.debug("📋 Initializing context menu manager", force ? '(forced)' : '');
 
-      // Set up default context menus
-      await this.setupDefaultMenus();
+      // Set up default context menus (this clears existing ones)
+      await this.setupDefaultMenus(locale);
 
-      // Register storage listener only (click listener is handled globally)
-      this.registerStorageListener();
+      // Register storage listener only if not already registered
+      if (!this.initialized) {
+        this.registerStorageListener();
+      }
 
       this.initialized = true;
       logger.debug("✅ Context menu manager initialized");
@@ -123,11 +127,12 @@ export class ContextMenuManager {
 
   /**
    * Set up default context menus
+   * @param {string} locale - Specific locale to use for translations
    * @private
    */
   // Prevent concurrent menu setup
   _menuSetupLock = false;
-  async setupDefaultMenus() {
+  async setupDefaultMenus(locale = null) {
     if (this._menuSetupLock) {
       logger.warn("setupDefaultMenus called concurrently, skipping.");
       return;
@@ -147,7 +152,7 @@ export class ContextMenuManager {
       // --- 1. Create Page Context Menu ---
       try {
         let pageMenuTitle =
-          (await getTranslationString("context_menu_translate_with_selection")) ||
+          (await getTranslationString("context_menu_translate_with_selection", locale)) ||
           "Translate Element";
         const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
         if (command && command.shortcut) {
@@ -169,7 +174,7 @@ export class ContextMenuManager {
       try {
         // --- Translate Element Menu (First option) ---
         let actionPageMenuTitle =
-          (await getTranslationString("context_menu_translate_with_selection")) ||
+          (await getTranslationString("context_menu_translate_with_selection", locale)) ||
           "Translate Element";
         const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
         if (command && command.shortcut) {
@@ -185,7 +190,7 @@ export class ContextMenuManager {
         await this.createMenu({
           id: API_PROVIDER_PARENT_ID,
           title:
-            (await getTranslationString("context_menu_api_provider")) ||
+            (await getTranslationString("context_menu_api_provider", locale)) ||
             "API Provider",
           contexts: ["action"],
         });
@@ -209,7 +214,7 @@ export class ContextMenuManager {
         // --- Options Menu ---
         await this.createMenu({
           id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-          title: (await getTranslationString("context_menu_options")) || "Options",
+          title: (await getTranslationString("context_menu_options", locale)) || "Options",
           contexts: ["action"],
         });
 
@@ -224,7 +229,7 @@ export class ContextMenuManager {
         await this.createMenu({
           id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
           title:
-            (await getTranslationString("context_menu_shortcuts")) ||
+            (await getTranslationString("context_menu_shortcuts", locale)) ||
             "Manage Shortcuts",
           contexts: ["action"],
         });
@@ -232,7 +237,7 @@ export class ContextMenuManager {
         await this.createMenu({
           id: HELP_MENU_ID,
           title:
-            (await getTranslationString("context_menu_help")) || "Help & Support",
+            (await getTranslationString("context_menu_help", locale)) || "Help & Support",
           contexts: ["action"],
         });
         logger.debug("Action context menus created successfully.");

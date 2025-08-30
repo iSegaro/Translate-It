@@ -1,4 +1,6 @@
 {
+  "options_loading": { "message": "در حال بارگذاری تنظیمات..." },
+  "app_welcome": { "message": "به افزونه Translate It خوش آمدید!" },
   "IsRTL": { "message": "true" },
 
   "name": { "message": "Translate It" },
@@ -8,6 +10,7 @@
 
   "theme_section_title": { "message": "پوسته" },
   "localization_section_title": { "message": "زبان افزونه" },
+  "github_link_title": { "message": "مشاهده در گیت‌هاب" },
 
   "context_menu_options": { "message": "تنظیمات" },
   "context_menu_shortcuts": { "message": "تنظیمات میانبرها" },
@@ -128,6 +131,11 @@
   "help_api_keys_content": {
     "message": "شما می‌توانید لینک وب‌سایت هر ارائه‌دهنده API را در تب **تنظیمات API** پیدا کنید. برای تولید کلید، باید در پلتفرم‌های مربوطه یک حساب کاربری ایجاد کنید."
   },
+  "help_free_providers_title": { "message": "ارائه‌دهندگان رایگان (بدون نیاز به کلید API)" },
+  "help_api_providers_title": { "message": "ارائه‌دهندگان API (نیاز به کلید API دارند)" },
+  "prompt_source_help": { "message": "زبان مبدا را برای پرامپت انتخاب کنید." },
+  "prompt_target_help": { "message": "زبان مقصد را برای پرامپت انتخاب کنید." },
+  "prompt_text_help": { "message": "متنی که می‌خواهید ترجمه یا پردازش شود را وارد کنید." },
 
   "help_shortcut_content_p2": {
     "message": "در **Chrome**، روند متفاوت است:"

@@ -1,9 +1,9 @@
 <template>
   <section class="languages-tab">
-    <h2>{{ $i18n('languages_section_title') || 'Languages' }}</h2>
+  <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
     
     <div class="setting-group">
-      <label>{{ $i18n('source_language_label') || 'Source Language' }}</label>
+  <label>{{ t('source_language_label') || 'Source Language' }}</label>
       <LanguageSelector
         v-model="sourceLanguage"
         :languages="sourceLanguages"
@@ -13,7 +13,7 @@
     </div>
     
     <div class="setting-group">
-      <label>{{ $i18n('target_language_label') || 'Target Language' }}</label>
+  <label>{{ t('target_language_label') || 'Target Language' }}</label>
       <LanguageSelector
         v-model="targetLanguage"
         :languages="targetLanguages"
@@ -38,26 +38,33 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/core/validation.js'
 import { useLanguages } from '@/composables/useLanguages.js'
 import LanguageSelector from '@/components/feature/LanguageSelector.vue'
+import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
 const { validateLanguages: validate, getFirstError, clearErrors } = useValidation()
 const { sourceLanguages, targetLanguages } = useLanguages()
 
-// Form values
-const sourceLanguage = computed({
-  get: () => settingsStore.settings?.SOURCE_LANGUAGE || 'auto',
-  set: async (value) => {
-    settingsStore.updateSettingLocally('SOURCE_LANGUAGE', value)
-    await validateLanguages()
-  }
+const { t } = useI18n()
+
+// Form values as refs
+const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
+const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'English')
+
+// Sync with settings on mount
+import { onMounted } from 'vue'
+onMounted(() => {
+  sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
+  targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'English'
 })
 
-const targetLanguage = computed({
-  get: () => settingsStore.settings?.TARGET_LANGUAGE || 'English',
-  set: async (value) => {
-    settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
-    await validateLanguages()
-  }
+// Update settings when changed
+watch(sourceLanguage, (value) => {
+  settingsStore.updateSettingLocally('SOURCE_LANGUAGE', value)
+  validateLanguages()
+})
+watch(targetLanguage, (value) => {
+  settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
+  validateLanguages()
 })
 
 // Validation
@@ -76,12 +83,7 @@ const validateLanguages = async () => {
   return isValid
 }
 
-// Watch for changes and validate
-watch([sourceLanguage, targetLanguage], () => {
-  if (sourceLanguage.value && targetLanguage.value) {
-    validateLanguages()
-  }
-})
+// No need for extra watch logic; handled above
 </script>
 
 <style lang="scss" scoped>

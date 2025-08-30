@@ -6,9 +6,8 @@
       :to="{ name: item.name }"
       :class="['tab-button', { active: $route.name === item.name, disabled: item.disabled }]"
     >
-      {{ $i18n(item.labelKey) || item.label }}
+      {{ t(item.labelKey) }}
     </router-link>
-    
     <div class="tabs-action-area">
       <div
         id="status"
@@ -22,37 +21,41 @@
         class="save-button"
         @click="saveAllSettings"
       >
-        {{ $i18n('save_settings_button') || 'Save' }}
+        {{ t('save_settings_button') || 'Save' }}
       </button>
     </div>
   </nav>
 </template>
 
 <script setup>
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
-// Access i18n function through current instance
-const { proxy } = getCurrentInstance()
-const $i18n = proxy.$i18n
+const { t, locale } = useUnifiedI18n()
 
 const settingsStore = useSettingsStore()
 
-// Navigation items based on original options.html structure
+// Navigation items, labels are reactive to language changes
 const navigationItems = ref([
-  { name: 'languages', labelKey: 'languages_tab_title', label: 'Languages' },
-  { name: 'activation', labelKey: 'activation_tab_title', label: 'Activation' },
-  { name: 'prompt', labelKey: 'prompt_tab_title', label: 'Prompt' },
-  { name: 'api', labelKey: 'api_tab_title', label: 'API' },
-  { name: 'import-export', labelKey: 'import_export_tab_title', label: 'Import/Export' },
-  { name: 'advance', labelKey: 'advance_tab_title', label: 'Advance' },
-  { name: 'help', labelKey: 'help_tab_title', label: 'Help' },
-  { name: 'about', labelKey: 'about_tab_title', label: "What's New" }
+  { name: 'languages', labelKey: 'languages_tab_title' },
+  { name: 'activation', labelKey: 'activation_tab_title' },
+  { name: 'prompt', labelKey: 'prompt_tab_title' },
+  { name: 'api', labelKey: 'api_tab_title' },
+  { name: 'import-export', labelKey: 'import_export_tab_title' },
+  { name: 'advance', labelKey: 'advance_tab_title' },
+  { name: 'help', labelKey: 'help_tab_title' },
+  { name: 'about', labelKey: 'about_tab_title' }
 ])
+
+// Watch for language change to force update
+watch(() => locale.value, () => {
+  navigationItems.value = navigationItems.value.map(item => ({ ...item }))
+})
 
 // Status management
 const statusMessage = ref('')
@@ -70,7 +73,7 @@ const saveAllSettings = async () => {
     await settingsStore.saveAllSettings()
     logger.debug('✅ All settings saved successfully')
     statusType.value = 'success'
-    statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
+  statusMessage.value = t('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     
     // Clear status after 2 seconds
     setTimeout(() => {
@@ -80,7 +83,7 @@ const saveAllSettings = async () => {
   } catch (error) {
     logger.error('❌ Failed to save settings:', error)
     statusType.value = 'error'
-    statusMessage.value = $i18n('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
+  statusMessage.value = t('OPTIONS_STATUS_SAVED_FAILED') || 'Failed to save settings!'
     
     // Clear status after 3 seconds
     setTimeout(() => {

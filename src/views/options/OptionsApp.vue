@@ -38,7 +38,7 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
-import browser from 'webextension-polyfill'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { loadSettingsModules } from '@/utils/settings-modules.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -51,7 +51,14 @@ const settingsStore = useSettingsStore()
 
 // State
 const isLoading = ref(true)
-const loadingText = ref('Loading Settings...')
+const { t, locale } = useUnifiedI18n()
+const loadingText = ref(t('options_loading') || 'Loading Settings...')
+
+import { watch } from 'vue'
+// Reactively update loadingText when locale changes
+watch(() => locale.value, () => {
+  loadingText.value = t('options_loading') || 'Loading Settings...'
+})
 const hasError = ref(false)
 const errorMessage = ref('')
 
@@ -60,9 +67,9 @@ onMounted(async () => {
   logger.debug('🚀 OptionsApp mounting...')
   
   try {
-    // Step 1: Set loading text
+  // Step 1: Set loading text
   logger.debug('📝 Setting loading text...')
-    loadingText.value = browser.i18n.getMessage('options_loading') || 'Loading Settings...'
+  loadingText.value = t('options_loading') || 'Loading Settings...'
   logger.debug('✅ Loading text set')
     
     // Step 2: Load settings store
@@ -112,7 +119,8 @@ const retryLoading = () => {
   setTimeout(() => {
     onMounted()
   }, 100)
-}</script>
+};
+</script>
 
 <style scoped>
 .extension-options {
@@ -128,7 +136,6 @@ const retryLoading = () => {
 .loading-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
   gap: 1.5rem;
   padding: 3rem;

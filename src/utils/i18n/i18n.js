@@ -22,6 +22,14 @@ export function parseBoolean(value) {
 const translationsCache = new Map();
 
 /**
+ * Clear translations cache (useful when language changes)
+ */
+export function clearTranslationsCache() {
+  translationsCache.clear();
+  logger.debug('Translations cache cleared');
+}
+
+/**
  * بارگذاری ترجمه‌ها برای زبان مشخص به همراه استفاده از کش.
  * اگر ترجمه‌های زبان موردنظر قبلاً بارگذاری شده باشند، مستقیماً آن‌ها را از کش برمی‌گرداند.
  *
@@ -69,14 +77,29 @@ export async function getTranslationString(key, lang) {
   if (!langCode || langCode.length !== 2) {
     const App_Language = await getApplication_LocalizeAsync();
 
-    const foundLang = languageList.find(
-      (language) =>
-        language.name === App_Language || language.locale === App_Language,
-    );
+    // Apply language mapping for common cases
+    const LANGUAGE_MAP = {
+      'English': 'en',
+      'Farsi': 'fa',
+      'فارسی': 'fa',
+      'en': 'en',
+      'fa': 'fa'
+    };
+    
+    // First try direct mapping
+    if (LANGUAGE_MAP[App_Language]) {
+      langCode = LANGUAGE_MAP[App_Language];
+    } else {
+      // Fallback to existing logic
+      const foundLang = languageList.find(
+        (language) =>
+          language.name === App_Language || language.locale === App_Language,
+      );
 
-    // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم.
-    langCode =
-      foundLang?.code || (App_Language?.length === 2 ? App_Language : "en");
+      // اگر App_Language به‌صورت کد دو حرفی (مثلاً "en") نباشد، به صورت پیش‌فرض از "en" استفاده می‌کنیم.
+      langCode =
+        foundLang?.code || (App_Language?.length === 2 ? App_Language : "en");
+    }
   }
 
   const translations = await loadTranslationsForLanguageCached(langCode);
