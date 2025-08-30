@@ -123,7 +123,7 @@ export async function sendSmart(message, options = {}) {
       throw error
     }
     
-    logger.warn(`Direct messaging failed for ${message.action}, falling back to port:`, error.message)
+    logger.debug(`Direct messaging failed for ${message.action}, falling back to port:`, error.message)
     return sendViaPort(message, timeout)
   }
 }
