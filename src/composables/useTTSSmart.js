@@ -87,7 +87,12 @@ export function useTTSSmart() {
         }
       });
 
-      if (!response?.success) {
+      // Chrome MV3 has bugs with sendResponse - handle empty responses gracefully
+      // Audio will play and send GOOGLE_TTS_ENDED when complete
+      if (response === undefined || response === null || (typeof response === 'object' && Object.keys(response).length === 0)) {
+        logger.debug("[useTTSSmart] Empty response from background (Chrome MV3 issue) - assuming success");
+        // Continue with success path - audio will play and send completion event
+      } else if (!response?.success) {
         throw new Error(response?.error || 'TTS failed');
       }
 

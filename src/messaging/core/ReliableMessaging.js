@@ -193,7 +193,8 @@ export async function sendReliable(message, opts = {}) {
           if (m.type === 'RESULT' || m.result) {
             cleanup()
             circuitBreaker.onSuccess()
-            resolve(m)
+            // Return the actual result data, not the wrapper message
+            resolve(m.result || m)
             return
           }
         } catch (err) {
