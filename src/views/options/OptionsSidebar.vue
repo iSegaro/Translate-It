@@ -15,14 +15,18 @@
       </div>
       <div class="sidebar-section localization-controls">
         <h2>{{ t('localization_section_title') }}</h2>
-        <select
-          v-model="selectedLanguage"
-          class="language-select"
-        >
-          <option v-for="lang in interfaceLanguages" :key="lang.code" :value="lang.code">
-            {{ lang.name }}
-          </option>
-        </select>
+        <ul class="language-list">
+          <li
+            v-for="lang in interfaceLanguages"
+            :key="lang.code"
+            class="language-list-item"
+            :class="{ selected: selectedLanguage === lang.code }"
+            @click="selectedLanguage = lang.code"
+          >
+            <img :src="getFlagUrl(lang.code)" class="language-flag-image" :alt="lang.name" />
+            <span>{{ lang.name }}</span>
+          </li>
+        </ul>
       </div>
       <div class="sidebar-footer">
         <a
@@ -76,6 +80,20 @@ const { t, changeLanguage, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 const { findLanguageByCode, getInterfaceLanguages } = useLanguages()
 const manifestVersion = ref('v0.0.0')
+
+const getFlagUrl = (code) => {
+  const flagMap = {
+    en: 'gb',
+    fa: 'ir'
+  };
+  const flag = flagMap[code] || code;
+  try {
+    return new URL(`../../assets/icons/flags/${flag}.svg`, import.meta.url).href
+  } catch (error) {
+    logger.error(`Failed to load flag for ${code}:`, error);
+    return '';
+  }
+};
 const interfaceLanguages = computed(() => getInterfaceLanguages())
 // Use reactive reference that stays in sync with settings
 const selectedLanguage = computed({
@@ -199,6 +217,55 @@ onMounted(async () => {
     .sidebar-section {
       padding: $spacing-base;
     }
+  }
+}
+
+.language-select {
+  width: 100%;
+  padding: $spacing-sm;
+  border-radius: $border-radius-md;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: $font-size-sm;
+}
+
+.localization-controls {
+  .language-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .language-list-item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: $border-radius-md;
+    display: flex;
+    align-items: center;
+    font-size: $font-size-sm;
+    transition: background-color $transition-fast;
+
+    &:hover {
+      background-color: var(--color-background-hover, #f0f0f0);
+    }
+
+    &.selected {
+      background-color: var(--color-active-background, #e8f0fe);
+      color: var(--color-active-text, #1967d2);
+      font-weight: $font-weight-medium;
+    }
+  }
+
+  .language-flag-image {
+    width: 18px;
+    height: 14px;
+    margin-right: 12px;
+    border: 1px solid var(--color-border);
+    object-fit: cover;
+    vertical-align: middle;
+    border-radius: 2px;
   }
 }
 </style>
