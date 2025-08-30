@@ -89,11 +89,14 @@ export function useSidepanelTranslation() {
             mode: mode,
             options: {}
           }
+        }, {
+          totalTimeout: 20000, // Increase timeout for translations
+          retries: 1 // Reduce retries to speed up fallback
         })
         
         // Handle the response directly
-        if (response && response.result && response.result.success) {
-          const result = response.result;
+        if (response && response.success) {
+          const result = response;
           translatedText.value = result.translatedText;
           lastTranslation.value = {
             text: sourceText.value,
@@ -118,9 +121,7 @@ export function useSidepanelTranslation() {
           return true;
         } else {
           // Extract the actual error message from the response
-          const errorMessage = response?.result?.error?.message || 
-                              response?.result?.error || 
-                              response?.error?.message || 
+          const errorMessage = response?.error?.message || 
                               response?.error || 
                               'Translation failed';
           throw new Error(errorMessage);
