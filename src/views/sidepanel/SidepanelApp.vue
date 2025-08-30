@@ -34,8 +34,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { getTranslationString, parseBoolean } from '@/utils/i18n/i18n.js'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -46,16 +45,15 @@ import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
-
-
 
 // Stores
 const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
 
 // Composables  
-const { t } = useUnifiedI18n()
+const { t, changeLanguage } = useUnifiedI18n()
 
 // Error handling
 const { handleError } = useErrorHandler()
@@ -70,17 +68,12 @@ const errorMessage = ref('')
 const handleMessage = (message) => {
   if (message.action === 'translationResult') {
     translationStore.setTranslation(message.data);
-  }
-};
-
-// Storage change listener for immediate theme updates
-const handleStorageChange = (changes, areaName) => {
-  if (areaName === 'local' && changes.THEME) {
-    const newTheme = changes.THEME.newValue
-    if (newTheme) {
-      logger.debug('Theme changed from storage:', newTheme)
-      applyTheme(newTheme).catch(error => logger.error('Failed to apply theme:', error))
-    }
+  } else if (message.action === 'LANGUAGE_CHANGED') {
+    logger.debug('Language changed from options:', message.payload.lang);
+    changeLanguage(message.payload.lang);
+  } else if (message.action === 'THEME_CHANGED') {
+    logger.debug('Theme changed from options:', message.payload.theme);
+    applyTheme(message.payload.theme).catch(error => logger.error('Failed to apply theme:', error));
   }
 };
 
@@ -119,10 +112,7 @@ onMounted(async () => {
     // Step 4: Add message listener
     browser.runtime.onMessage.addListener(handleMessage)
     
-    // Step 5: Add storage change listener for immediate theme updates
-    browser.storage.onChanged.addListener(handleStorageChange)
-    
-    // Step 6: Add system theme change listener for auto mode
+    // Step 5: Add system theme change listener for auto mode
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     mediaQuery.addEventListener('change', handleSystemThemeChange)
   } catch (error) {
@@ -135,21 +125,8 @@ onMounted(async () => {
   }
 })
 
-// Watch for theme changes and apply them immediately
-watch(() => settingsStore.settings.THEME, async (newTheme) => {
-  if (newTheme) {
-    logger.debug('Theme changed from settings store:', newTheme)
-    try {
-      await applyTheme(newTheme)
-    } catch (error) {
-      logger.error('Failed to apply theme:', error)
-    }
-  }
-}, { immediate: false })
-
 onUnmounted(() => {
   browser.runtime.onMessage.removeListener(handleMessage);
-  browser.storage.onChanged.removeListener(handleStorageChange);
   
   // Remove system theme listener
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')

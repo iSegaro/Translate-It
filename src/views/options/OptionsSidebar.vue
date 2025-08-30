@@ -101,6 +101,12 @@ const selectedLanguage = computed({
   set: async (value) => {
     try {
       await changeLanguage(value)
+      browser.runtime.sendMessage({
+        action: 'LANGUAGE_CHANGED',
+        payload: { lang: value }
+      }).catch(error => {
+        logger.debug('Could not send LANGUAGE_CHANGED message, probably sidepanel is closed:', error.message);
+      });
     } catch (error) {
       logger.error('Failed to change language:', error)
     }

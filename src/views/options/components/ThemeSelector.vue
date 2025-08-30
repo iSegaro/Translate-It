@@ -110,17 +110,32 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
+import browser from 'webextension-polyfill'
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
 const settingsStore = useSettingsStore()
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ThemeSelector')
 
 const { t } = useI18n()
+
+const broadcastThemeChange = (theme) => {
+  browser.runtime.sendMessage({
+    action: 'THEME_CHANGED',
+    payload: { theme }
+  }).catch(error => {
+    logger.debug('Could not send THEME_CHANGED message:', error.message);
+  });
+}
 
 // Theme state management
 const isDarkMode = computed({
   get: () => settingsStore.settings.THEME === 'dark',
   set: (value) => {
     if (!isAutoMode.value) {
-      settingsStore.updateSettingAndPersist('THEME', value ? 'dark' : 'light')
+      const newTheme = value ? 'dark' : 'light';
+      settingsStore.updateSettingAndPersist('THEME', newTheme)
+      broadcastThemeChange(newTheme);
     }
   }
 })
@@ -130,10 +145,13 @@ const isAutoMode = computed({
   set: (value) => {
     if (value) {
       settingsStore.updateSettingAndPersist('THEME', 'auto')
+      broadcastThemeChange('auto');
     } else {
       // When disabling auto mode, set to current system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      settingsStore.updateSettingAndPersist('THEME', prefersDark ? 'dark' : 'light')
+      const newTheme = prefersDark ? 'dark' : 'light';
+      settingsStore.updateSettingAndPersist('THEME', newTheme)
+      broadcastThemeChange(newTheme);
     }
   }
 })
