@@ -100,6 +100,12 @@ browser.runtime.onConnect.addListener((port) => {
       logger.debug('[Background] Ignoring unrecognized port:', port.name);
       return;
     }
+    // Manual disconnected flag for port
+    port._disconnected = false;
+    port.onDisconnect.addListener(() => {
+      port._disconnected = true;
+      logger.debug('[Background] Port disconnected:', port.name);
+    });
     port.onMessage.addListener(async (msg) => {
       try {
         logger.debug('[Background] Port message received:', msg && msg.action, msg && msg.messageId);
@@ -115,23 +121,16 @@ browser.runtime.onConnect.addListener((port) => {
 
         if (handler) {
           const result = await handler(msg, port.sender);
-          try {
-            if (port && port.postMessage) {
-              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
-              logger.debug('[Background] RESULT sent to port successfully');
-            } else {
-              logger.warn('[Background] Port disconnected before RESULT could be sent');
-            }
-          } catch (e) {
-            logger.error('[Background] Failed to post RESULT to port', e);
+          // Check if port is disconnected before sending RESULT (manual flag)
+          if (port && port.postMessage && !port._disconnected) {
+            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
+            logger.debug('[Background] RESULT sent to port successfully');
+          } else {
+            logger.debug('[Background] Port disconnected before RESULT could be sent');
           }
         } else {
-          try {
-            if (port && port.postMessage) {
-              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
-            }
-          } catch (e) {
-            logger.error('[Background] Failed to send no-handler RESULT:', e);
+          if (port && port.postMessage && !port._disconnected) {
+            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
           }
         }
       } catch (err) {
