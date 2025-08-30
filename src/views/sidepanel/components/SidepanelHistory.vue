@@ -5,7 +5,7 @@
     :class="{ active: isVisible }"
   >
     <div class="history-header">
-      <h3 :data-i18n="$i18n('SIDEPANEL_HISTORY_TITLE')">
+      <h3>{{ t('SIDEPANEL_HISTORY_TITLE') || 'History' }}
         Translation History
       </h3>
       <button
@@ -80,7 +80,7 @@
       <button
         id="clearAllHistoryBtn"
         class="clear-all-btn"
-        :title="$i18n('SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP')"
+        :title="t('SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP')"
         @click="handleClearAllHistory"
       >
         <img
@@ -88,7 +88,7 @@
           alt="Clear All"
           class="clear-all-icon"
         >
-        <span :data-i18n="$i18n('SIDEPANEL_CLEAR_ALL_HISTORY')">Clear All History</span>
+        <span>{{ t('SIDEPANEL_CLEAR_ALL_HISTORY') || 'Clear All History' }}</span>
       </button>
     </div>
   </div>
@@ -99,6 +99,7 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { languageList } from '@/utils/i18n/languages.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -106,6 +107,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
 
 
 const { handleError } = useErrorHandler()
+const { t } = useUnifiedI18n()
 
 // Helper function
 const getLanguageNameByCode = (code) => {

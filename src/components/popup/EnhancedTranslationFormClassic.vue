@@ -9,7 +9,7 @@
         <textarea
           ref="sourceInputRef"
           v-model="sourceText"
-          :placeholder="$i18n('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
+          :placeholder="t('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
           :rows="2"
           :tabindex="1"
           class="translation-textarea enhanced"
@@ -28,9 +28,9 @@
           size="md"
           variant="secondary"
           :auto-translate-on-paste="settingsStore.settings.AUTO_TRANSLATE_ON_PASTE"
-          :copy-title="$i18n('popup_copy_source_title_icon') || 'کپی متن مبدا'"
-          :paste-title="$i18n('popup_paste_source_title_icon') || 'چسباندن'"
-          :tts-title="$i18n('popup_voice_source_title_icon') || 'خواندن متن مبدا'"
+          :copy-title="t('popup_copy_source_title_icon') || 'کپی متن مبدا'"
+          :paste-title="t('popup_paste_source_title_icon') || 'چسباندن'"
+          :tts-title="t('popup_voice_source_title_icon') || 'خواندن متن مبدا'"
           @text-copied="handleSourceTextCopied"
           @text-pasted="handleSourceTextPasted"
           @tts-speaking="handleSourceTTSSpeaking"
@@ -50,7 +50,7 @@
           <div class="loading-spinner">
             <div class="spinner" />
           </div>
-          <span class="loading-text">{{ $i18n('TRANSLATING') || 'در حال ترجمه...' }}</span>
+          <span class="loading-text">{{ t('TRANSLATING') || 'در حال ترجمه...' }}</span>
         </div>
         
         <!-- Error State -->
@@ -88,8 +88,8 @@
           :show-tts="true"
           size="md"
           variant="secondary"
-          :copy-title="$i18n('popup_copy_target_title_icon') || 'کپی نتیجه ترجمه'"
-          :tts-title="$i18n('popup_voice_target_title_icon') || 'خواندن نتیجه ترجمه'"
+          :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه ترجمه'"
+          :tts-title="t('popup_voice_target_title_icon') || 'خواندن نتیجه ترجمه'"
           @text-copied="handleTranslationCopied"
           @tts-speaking="handleTranslationTTSSpeaking"
           @action-failed="handleActionFailed"
@@ -113,6 +113,7 @@ import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
 import { marked } from 'marked'
 import { getScopedLogger } from '@/utils/core/logger.js'
@@ -127,6 +128,7 @@ const settingsStore = useSettingsStore()
 const translationComposable = usePopupTranslation()
 const resizeComposable = usePopupResize()
 const { handleError } = useErrorHandler()
+const { t } = useUnifiedI18n()
 
 // Refs
 const sourceInputRef = ref(null)

@@ -105,7 +105,7 @@ async function initializeApp() {
     app.config.globalProperties.$isExtension = true
     app.config.globalProperties.$context = 'options'
     
-    // $i18n is automatically provided by the plugin, no manual setup needed
+    // i18n is now provided by the unified vue-i18n plugin
     logger.debug('✅ i18n global property will be available after plugin installation')
 
     // Setup unified error handling

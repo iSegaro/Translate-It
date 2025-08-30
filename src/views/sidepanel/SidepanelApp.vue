@@ -15,7 +15,7 @@
       <div class="error-icon">
         ⚠️
       </div>
-      <h2>{{ $i18n('sidepanel_load_error_title') || 'Failed to Load Sidepanel' }}</h2>
+      <h2>{{ t('sidepanel_load_error_title') || 'Failed to Load Sidepanel' }}</h2>
       <p class="error-message">
         {{ errorMessage }}
       </p>
@@ -23,7 +23,7 @@
         class="retry-button"
         @click="retryLoading"
       >
-        {{ $i18n('retry_button') || 'Retry' }}
+        {{ t('retry_button') || 'Retry' }}
       </button>
     </div>
     
@@ -39,6 +39,7 @@ import { getTranslationString, parseBoolean } from '@/utils/i18n/i18n.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useTranslationStore } from '@/store/modules/translation'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
@@ -52,6 +53,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 // Stores
 const settingsStore = useSettingsStore()
 const translationStore = useTranslationStore()
+
+// Composables  
+const { t } = useUnifiedI18n()
 
 // Error handling
 const { handleError } = useErrorHandler()

@@ -56,6 +56,8 @@
   "options_description": { "message": "همه چیز رو ترجمه کنید، به سادگی." },
   "options_changelog_loading": { "message": "در حال بارگذاری تغییرات..." },
 
+  "popup_loading": { "message": "در حال بارگذاری پنجره..." },
+  "popup_translate_button_text": { "message": "ترجمه" },
   "options_error_same_languages": {
     "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند."
   },

@@ -119,10 +119,10 @@ const exportSettings = async () => {
     
     // Show warning if no password provided
     if (!exportPassword.value.trim()) {
-      const warningTitle = $i18n('security_warning_title') || '⚠️ SECURITY WARNING ⚠️'
-      const warningMessage = $i18n('security_warning_message') || 
+      const warningTitle = t('security_warning_title') || '⚠️ SECURITY WARNING ⚠️'
+      const warningMessage = t('security_warning_message') || 
         'You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it\'s STRONGLY recommended to use a password.'
-      const warningQuestion = $i18n('security_warning_question') || 
+      const warningQuestion = t('security_warning_question') || 
         'Do you want to continue without password protection?'
       
       const proceed = window.confirm(
@@ -161,8 +161,8 @@ const exportSettings = async () => {
     exportPassword.value = ''
     statusType.value = 'success'
     statusMessage.value = exportPassword.value ? 
-      ($i18n('export_success_encrypted') || 'Settings exported successfully with encrypted API keys!') :
-      ($i18n('export_success_plaintext') || 'Settings exported successfully (API keys in plain text)')
+      (t('export_success_encrypted') || 'Settings exported successfully with encrypted API keys!') :
+      (t('export_success_plaintext') || 'Settings exported successfully (API keys in plain text)')
     
     setTimeout(() => {
       statusMessage.value = ''
@@ -170,10 +170,10 @@ const exportSettings = async () => {
     
   } catch (error) {
     statusType.value = 'error'
-    let errorMessage = $i18n('export_error_generic') || 'Failed to export settings'
+    let errorMessage = t('export_error_generic') || 'Failed to export settings'
     
     if (error.message.includes('Password')) {
-      errorMessage = `${$i18n('export_error_password') || 'Export failed'}: ${error.message}`
+      errorMessage = `${t('export_error_password') || 'Export failed'}: ${error.message}`
     }
     
     statusMessage.value = errorMessage
@@ -231,7 +231,7 @@ const handleFileSelect = async (event) => {
 const importSettings = async () => {
   if (!selectedFile.value) {
     statusType.value = 'error'
-    statusMessage.value = $i18n('import_error_no_file') || 'Please select a file to import'
+    statusMessage.value = t('import_error_no_file') || 'Please select a file to import'
     return
   }
   
@@ -259,7 +259,7 @@ const importSettings = async () => {
     selectedFile.value = null
     
     statusType.value = 'success'
-    statusMessage.value = $i18n('import_success') || 'Settings imported successfully! Reloading...'
+    statusMessage.value = t('import_success') || 'Settings imported successfully! Reloading...'
     
     // Reload page after 1.5 seconds
     setTimeout(() => {
@@ -268,11 +268,11 @@ const importSettings = async () => {
     
   } catch (error) {
     statusType.value = 'error'
-    let errorMessage = $i18n('import_error_generic') || 'Failed to import settings'
+    let errorMessage = t('import_error_generic') || 'Failed to import settings'
     
     // Handle specific error types
     if (error.message.includes('Password') || error.message.includes('password')) {
-      errorMessage = `${$i18n('import_error_password') || 'Import failed'}: ${error.message}`
+      errorMessage = `${t('import_error_password') || 'Import failed'}: ${error.message}`
       
       // Only clear password input on password errors, keep file selected
       importPassword.value = ''
@@ -283,7 +283,7 @@ const importSettings = async () => {
         if (passwordInput) passwordInput.focus()
       }, 100)
     } else if (error.message.includes('JSON')) {
-      errorMessage = $i18n('import_error_invalid_format') || 'Import failed: Invalid file format'
+      errorMessage = t('import_error_invalid_format') || 'Import failed: Invalid file format'
       
       // Clear file input for non-password errors
       if (importFileInput.value) importFileInput.value.value = ''

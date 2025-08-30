@@ -25,7 +25,7 @@
           class="retry-button"
           @click="retryLoading"
         >
-          {{ $i18n('retry_button') || 'Retry' }}
+          {{ t('retry_button') || 'Retry' }}
         </button>
       </div>
     </div>
@@ -47,10 +47,10 @@
           <LanguageSelector
             v-model:source-language="sourceLanguage"
             v-model:target-language="targetLanguage"
-            :source-title="$i18n('popup_source_language_title') || 'زبان مبدا'"
-            :target-title="$i18n('popup_target_language_title') || 'زبان مقصد'"
-            :swap-title="$i18n('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
-            :swap-alt="$i18n('popup_swap_languages_alt_icon') || 'Swap'"
+            :source-title="t('popup_source_language_title') || 'زبان مبدا'"
+            :target-title="t('popup_target_language_title') || 'زبان مقصد'"
+            :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
+            :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
             :auto-detect-label="'Auto-Detect'"
           />
         </div>
@@ -114,6 +114,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
@@ -122,6 +123,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging('popup')
 const { handleError } = useErrorHandler()
+const { t } = useUnifiedI18n()
 
 // TTS Global Manager for lifecycle management
 const ttsGlobal = useTTSGlobal({ 
@@ -210,7 +212,7 @@ onMounted(() => {
   const initialize = async () => {
   try {
     // Step 1: Set loading text
-    loadingText.value = browser.i18n.getMessage('popup_loading') || 'Loading Popup...'
+    loadingText.value = t('popup_loading') || 'Loading Popup...'
     
     // Step 2: Load settings store
     await Promise.race([

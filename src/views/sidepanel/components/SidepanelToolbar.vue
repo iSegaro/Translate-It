@@ -4,7 +4,7 @@
       <button
         id="selectElementBtn"
         class="toolbar-button"
-        :title="$i18n('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
+        :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
         :disabled="isSelectElementDebounced || isActivating"
         :class="{ active: isSelectModeActive }"
         @click="handleSelectElement"
@@ -18,7 +18,7 @@
       <button
         id="revertActionBtn"
         class="toolbar-button"
-        :title="$i18n('SIDEPANEL_REVERT_TOOLTIP')"
+        :title="t('SIDEPANEL_REVERT_TOOLTIP')"
         @click="handleRevertAction"
       >
         <img
@@ -30,7 +30,7 @@
       <button
         id="clearFieldsBtn"
         class="toolbar-button"
-        :title="$i18n('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON')"
+        :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON')"
         @click="handleClearFields"
       >
         <img
@@ -49,7 +49,7 @@
       <button
         id="historyBtn"
         class="toolbar-button"
-        :title="$i18n('SIDEPANEL_HISTORY_TOOLTIP')"
+        :title="t('SIDEPANEL_HISTORY_TOOLTIP')"
         :class="{ active: isHistoryVisible }"
         @click="handleHistoryClick"
       >
@@ -64,7 +64,7 @@
       <button
         id="settingsBtn"
         class="toolbar-button"
-        :title="$i18n('SIDEPANEL_SETTINGS_TITLE_ICON')"
+        :title="t('SIDEPANEL_SETTINGS_TITLE_ICON')"
         @click="handleSettingsClick"
       >
         <img
@@ -82,6 +82,7 @@
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
 import { useUI } from '@/composables/useUI.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js';
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 
@@ -110,6 +111,9 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits(['historyToggle', 'clear-fields'])
+
+// Composables
+const { t } = useUnifiedI18n()
 
 // Composables
 const { showVisualFeedback } = useUI()

@@ -8,7 +8,7 @@
       <button
         type="submit"
         class="translate-main-area"
-        :title="$i18n('popup_translate_button_title') || 'ترجمه'"
+        :title="t('popup_translate_button_title') || 'ترجمه'"
         :disabled="isTranslating || disabled"
         @click="handleTranslate"
       >
@@ -17,7 +17,7 @@
           alt="API Provider"
           class="api-provider-icon"
         >
-        <span>{{ $i18n('popup_translate_button_text') || 'ترجمه' }}</span>
+        <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
       </button>
       <button 
         type="button"
@@ -168,6 +168,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'
@@ -176,6 +177,9 @@ import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
+
+// Composables
+const { t } = useUnifiedI18n()
 
 // Props
 const props = defineProps({

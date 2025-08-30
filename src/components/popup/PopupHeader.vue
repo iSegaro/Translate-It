@@ -4,52 +4,52 @@
       <a
         id="translatePageLink"
         class="toolbar-link"
-        :title="$i18n('popup_translate_page_link_title') || 'ترجمه این صفحه در تب جدید'"
+        :title="t('popup_translate_page_link_title') || 'ترجمه این صفحه در تب جدید'"
         @click="handleTranslatePage"
       >
-        {{ $i18n('popup_translate_page_link') || 'ترجمه این صفحه' }}
+        {{ t('popup_translate_page_link') || 'ترجمه این صفحه' }}
       </a>
     </div>
     <div class="toolbar-right-group">
       <IconButton
         ref="sidePanelButton"
         icon="side-panel.png"
-        :title="$i18n('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
+        :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
         type="toolbar"
       />
       <IconButton
         icon="select.png"
-        :alt="$i18n('popup_select_element_alt_icon') || 'Select Element'"
-        :title="$i18n('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
+        :alt="t('popup_select_element_alt_icon') || 'Select Element'"
+        :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
         type="toolbar"
         :class="{ active: isSelectModeActive }"
         @click="handleSelectElement"
       />
       <IconButton
         icon="clear.png"
-        :title="$i18n('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
-        :alt="$i18n('popup_clear_storage_alt_icon') || 'Clear Fields'"
+        :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
+        :alt="t('popup_clear_storage_alt_icon') || 'Clear Fields'"
         type="toolbar"
         @click="handleClearStorage"
       />
       <IconButton
         icon="revert.png"
-        :alt="$i18n('popup_revert_alt_icon') || 'Revert'"
-        :title="$i18n('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
+        :alt="t('popup_revert_alt_icon') || 'Revert'"
+        :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
         type="toolbar"
         variant="revert"
         @click="handleRevert"
       />
       <IconButton
         icon="settings.png"
-        :alt="$i18n('popup_settings_alt_icon') || 'Settings'"
-        :title="$i18n('popup_settings_title_icon') || 'تنظیمات'"
+        :alt="t('popup_settings_alt_icon') || 'Settings'"
+        :title="t('popup_settings_title_icon') || 'تنظیمات'"
         type="toolbar"
         @click="handleOpenSettings"
       />
       <label
         class="switch"
-        :title="$i18n('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
+        :title="t('popup_exclude_toggle_title') || 'فعال/غیرفعال در این صفحه'"
       >
         <input 
           v-model="isExtensionEnabled" 
@@ -68,6 +68,7 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
@@ -90,6 +91,7 @@ const {
 } = useSelectElementTranslation()
 const { handleError, handleConnectionError } = useErrorHandler()
 const { sendMessage } = useMessaging('popup')
+const { t } = useUnifiedI18n()
 
 // State
 const isExtensionEnabled = ref(true) // نشان‌دهنده فعال بودن افزونه در صفحه فعلی

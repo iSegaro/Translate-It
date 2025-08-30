@@ -57,6 +57,9 @@
     "message": "Language fields cannot be empty."
   },
 
+  "popup_loading": { "message": "Loading Popup..." },
+  "popup_translate_button_text": { "message": "Translate" },
+  
   "export_settings_description": {
     "message": "Export your current settings to a JSON file for backup or sharing."
   },

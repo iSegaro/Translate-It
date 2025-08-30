@@ -7,16 +7,16 @@
     <TranslationInputField
       ref="sourceInputRef"
       v-model="sourceText"
-      :placeholder="$i18n('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
+      :placeholder="t('popup_source_text_placeholder') || 'متن را اینجا وارد کنید...'"
       :language="currentSourceLanguage"
       :rows="2"
       :tabindex="1"
-      :copy-title="$i18n('popup_copy_source_title_icon') || 'کپی'"
-      :copy-alt="$i18n('popup_copy_source_alt_icon') || 'Copy'"
-      :tts-title="$i18n('popup_voice_source_title_icon') || 'خواندن متن مبدا'"
-      :tts-alt="$i18n('popup_voice_source_alt_icon') || 'Voice Source'"
-      :paste-title="$i18n('popup_paste_source_title_icon') || 'چسباندن'"
-      :paste-alt="$i18n('popup_paste_source_alt_icon') || 'Paste'"
+      :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
+      :copy-alt="t('popup_copy_source_alt_icon') || 'Copy'"
+      :tts-title="t('popup_voice_source_title_icon') || 'خواندن متن مبدا'"
+      :tts-alt="t('popup_voice_source_alt_icon') || 'Voice Source'"
+      :paste-title="t('popup_paste_source_title_icon') || 'چسباندن'"
+      :paste-alt="t('popup_paste_source_alt_icon') || 'Paste'"
       :auto-translate-on-paste="settingsStore.settings.AUTO_TRANSLATE_ON_PASTE"
       @translate="handleTranslate"
       @input="handleSourceInput"
@@ -31,10 +31,10 @@
       :is-loading="isTranslating"
       :error="translationError"
       :placeholder="'نتیجه ترجمه اینجا نمایش داده می‌شود...'"
-      :copy-title="$i18n('popup_copy_target_title_icon') || 'کپی نتیجه'"
-      :copy-alt="$i18n('popup_copy_target_alt_icon') || 'Copy Result'"
-      :tts-title="$i18n('popup_voice_target_title_icon') || 'خواندن متن مقصد'"
-      :tts-alt="$i18n('popup_voice_target_alt_icon') || 'Voice Target'"
+      :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه'"
+      :copy-alt="t('popup_copy_target_alt_icon') || 'Copy Result'"
+      :tts-title="t('popup_voice_target_title_icon') || 'خواندن متن مقصد'"
+      :tts-alt="t('popup_voice_target_alt_icon') || 'Voice Target'"
       mode="popup"
       :enable-markdown="true"
       :show-fade-in-animation="true"
@@ -48,6 +48,7 @@ import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
 import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
@@ -77,6 +78,7 @@ const emit = defineEmits(['can-translate-change'])
 const translation = usePopupTranslation()
 const popupResize = usePopupResize()
 const { handleError } = useErrorHandler()
+const { t } = useUnifiedI18n()
 
 
 // Refs
