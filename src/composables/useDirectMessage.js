@@ -3,7 +3,7 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -24,9 +24,9 @@ export function useDirectMessage() {
 
       logger.debug("Sending direct message:", message);
 
-      // Use reliable sender which applies retries and port fallback
-      const response = await sendReliable(message);
-      logger.debug("Direct response received (reliable):", response);
+      // Use smart messaging for optimal routing
+      const response = await sendSmart(message);
+      logger.debug("Direct response received (smart):", response);
       return response;
     } catch (error) {
       logger.error("Direct message failed", error);

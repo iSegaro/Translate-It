@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
-import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
+import { sendSmart } from "@/messaging/core/SmartMessaging.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import ExtensionContextManager from "@/utils/core/extensionContext.js";
 
@@ -212,7 +212,7 @@ export class SelectElementManager {
   
   async _notifyDeactivation() {
     try {
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.SET_SELECT_ELEMENT_STATE,
         data: { active: false }
       });

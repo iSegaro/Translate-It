@@ -1,17 +1,14 @@
 import { ref, computed } from "vue";
-import { useBrowserAPI } from "./useBrowserAPI.js";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
-import { ExtensionContextManager } from '@/utils/core/extensionContext.js';
 import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
 
 export function useTTSSmart() {
-  const browserAPI = useBrowserAPI('tts-smart');
   
   // Simplified state management
   const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'error'
@@ -93,20 +90,13 @@ export function useTTSSmart() {
       
       const response = await sendSmart(message);
 
-      // Handle null response (extension context invalidated)
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated - silently failing TTS");
-        ttsState.value = 'idle';
-        return false;
+      // Handle empty or error responses
+      if (!response) {
+        throw new Error('No response from background service');
       }
-
-      // Chrome MV3 has bugs with sendResponse - handle empty responses gracefully
-      // Audio will play and send GOOGLE_TTS_ENDED when complete
-      if (response === undefined || (typeof response === 'object' && Object.keys(response).length === 0)) {
-        logger.debug("[useTTSSmart] Empty response from background (Chrome MV3 issue) - assuming success");
-        // Continue with success path - audio will play and send completion event
-      } else if (!response?.success) {
-        throw new Error(response?.error || 'TTS failed');
+      
+      if (!response.success && response.error) {
+        throw new Error(response.error);
       }
 
       ttsState.value = 'playing';
@@ -154,9 +144,8 @@ export function useTTSSmart() {
       
       const response = await sendSmart(message);
       
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated during pause - silently handled");
-        return false;
+      if (!response?.success) {
+        throw new Error(response?.error || 'Pause failed');
       }
 
       ttsState.value = 'paused';
@@ -186,9 +175,8 @@ export function useTTSSmart() {
       
       const response = await sendSmart(message);
       
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated during resume - silently handled");
-        return false;
+      if (!response?.success) {
+        throw new Error(response?.error || 'Resume failed');
       }
 
       ttsState.value = 'playing';
@@ -218,11 +206,6 @@ export function useTTSSmart() {
       };
       
       const response = await sendSmart(message);
-      
-      // Context invalidated - still clean up local state
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated during stop - cleaning up locally");
-      }
 
       // Stop polling
       if (completionPoller) {
@@ -263,11 +246,6 @@ export function useTTSSmart() {
       };
       
       const response = await sendSmart(message);
-      
-      // Context invalidated - still clean up local state
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated during stopAll - cleaning up locally");
-      }
 
       // Stop polling
       if (completionPoller) {
@@ -345,16 +323,6 @@ export function useTTSSmart() {
       
       const response = await sendSmart(message);
 
-      // Context invalidated - return local state only
-      if (response === null) {
-        logger.debug("[useTTSSmart] Extension context invalidated during getStatus - returning local state");
-        return { 
-          local: ttsState.value, 
-          server: 'context-invalid',
-          synced: false 
-        };
-      }
-
       const serverStatus = response?.status || 'idle';
       
       // Sync local state with server state if different
@@ -428,14 +396,6 @@ export function useTTSSmart() {
       try {
         const status = await getStatus();
         
-        // If context invalid, stop polling
-        if (status.server === 'context-invalid') {
-          logger.debug("[useTTSSmart] Extension context invalidated during polling - stopping");
-          clearInterval(completionPoller);
-          completionPoller = null;
-          return;
-        }
-        
         if (status.server === 'idle' && ttsState.value === 'playing') {
           logger.debug("[useTTSSmart] Completion detected via polling");
           handleTTSCompletion();
@@ -443,7 +403,6 @@ export function useTTSSmart() {
           completionPoller = null;
         }
       } catch (error) {
-        // Context errors are already handled by ExtensionContextManager
         logger.debug("[useTTSSmart] Polling check skipped due to error:", error.message);
       }
     }, 500); // Poll every 500ms

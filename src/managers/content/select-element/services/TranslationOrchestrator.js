@@ -8,7 +8,7 @@ import { generateContentMessageId } from "../../../../utils/messaging/messageId.
 import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
-import { sendReliable } from "@/messaging/core/ReliableMessaging.js";
+import { sendSmart } from "@/messaging/core/SmartMessaging.js";
 import { AUTO_DETECT_VALUE } from "../../../../constants.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
 import { ErrorHandler } from '@/error-management/ErrorHandler.js';
@@ -432,7 +432,7 @@ export class TranslationOrchestrator {
         request.error = 'Translation cancelled by user';
         
         // Notify background to cancel the network request
-        sendReliable({
+        sendSmart({
           action: MessageActions.CANCEL_TRANSLATION,
           messageId: messageId,
           data: { messageId: messageId }

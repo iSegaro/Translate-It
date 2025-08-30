@@ -39,15 +39,7 @@ export function useMessaging(context) {
       return await sendSmart(message, options);
     } catch (error) {
       logger.error('sendMessage failed via sendSmart:', error);
-      
-      // Fallback to reliable messaging only if smart messaging fails
-      // This provides backward compatibility during migration
-      if (options.noFallback) {
-        throw error;
-      }
-      
-      logger.warn('Falling back to ReliableMessaging for:', message.action);
-      return await sendReliable(message);
+      throw error;
     }
   };
 
@@ -70,8 +62,8 @@ export function useMessaging(context) {
    */
   const sendFireAndForget = (action, data, options = {}) => {
     const message = createMessage(action, data, options);
-    // Fire-and-forget via smart messenger (no fallback for fire-and-forget)
-    sendSmart(message, { ...options, noFallback: true }).catch(error => {
+    // Fire-and-forget via smart messenger
+    sendSmart(message, options).catch(error => {
       // Silently ignore send errors for fire-and-forget
       console.debug(`[useMessaging:${context}] Fire-and-forget failed (smart):`, error);
     });

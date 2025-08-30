@@ -3,7 +3,7 @@
 
 import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts, MessageActions } from "../../../messaging/core/MessagingCore.js";
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
@@ -114,7 +114,7 @@ export class OffscreenCaptureManager {
           MessagingContexts.CAPTURE_MANAGER
         );
         
-        const response = await sendReliable(message);
+        const response = await sendSmart(message);
 
         if (!response || !response.success) {
           throw new Error(response?.error || "Failed to process capture in offscreen document");
@@ -152,7 +152,7 @@ export class OffscreenCaptureManager {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await sendReliable(message);
+      const response = await sendSmart(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "Failed to crop image in offscreen document");
@@ -191,7 +191,7 @@ export class OffscreenCaptureManager {
         MessagingContexts.CAPTURE_MANAGER
       );
       
-      const response = await sendReliable(message);
+      const response = await sendSmart(message);
 
       if (!response || !response.success) {
         throw new Error(response?.error || "OCR processing failed");

@@ -75,8 +75,8 @@ export function useSidepanelTranslation() {
       
       // Send translation request using reliable messenger (retries + port fallback)
       try {
-        const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js')
-        const response = await sendReliable({
+        const { sendSmart } = await import('@/messaging/core/SmartMessaging.js')
+        const response = await sendSmart({
           action: MessageActions.TRANSLATE,
           messageId: messageId,
           context: 'sidepanel',

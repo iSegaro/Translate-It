@@ -7,7 +7,7 @@ import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useMessaging } from '@/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
@@ -128,7 +128,7 @@ export function useSidepanelTranslation() {
         mode = TranslationMode.Dictionary_Translation;
       }
       
-      const response = await sendReliable({
+      const response = await sendSmart({
         action: MessageActions.TRANSLATE,
         messageId: messageId,
         context: 'sidepanel',
@@ -196,7 +196,7 @@ export function useSelectElementTranslation() {
           try {
             _currentTabId = activeInfo.tabId;
             // Query background directly for select element state for the new tab
-            const response = await sendReliable({
+            const response = await sendSmart({
               action: MessageActions.GET_SELECT_ELEMENT_STATE,
               context: 'sidepanel',
               timestamp: Date.now()
@@ -273,7 +273,7 @@ export function useSelectElementTranslation() {
 
     try {
       logger.debug('Activating select element mode');
-      const result = await sendReliable({
+      const result = await sendSmart({
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
@@ -305,7 +305,7 @@ export function useSelectElementTranslation() {
   const deactivateSelectMode = async () => {
     try {
       logger.debug('Deactivating select element mode');
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now(),
@@ -374,7 +374,7 @@ export function useSidepanelActions() {
 
     try {
       logger.debug('Reverting translation');
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
         context: 'sidepanel',
         timestamp: Date.now()
@@ -394,7 +394,7 @@ export function useSidepanelActions() {
   const stopTTS = async () => {
     try {
       logger.debug('Stopping TTS');
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.TTS_STOP,
         context: 'sidepanel',
         timestamp: Date.now()

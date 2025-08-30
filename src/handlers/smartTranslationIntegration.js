@@ -261,8 +261,8 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         } catch (error) {
           const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
           pageEventBus.emit('show-notification', { message: errorMessage, type: "error" });
-          const { sendReliable } = await import('../messaging/core/ReliableMessaging.js');
-          await sendReliable({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
+          const { sendSmart } = await import('../messaging/core/SmartMessaging.js');
+          await sendSmart({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
         }
       })(translatedText);
       

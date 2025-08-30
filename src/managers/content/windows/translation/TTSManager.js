@@ -72,7 +72,7 @@ export class TTSManager {
       // Detect language if not provided
       const detectedLanguage = language || this.detectSimpleLanguage(text) || "en";
       
-      // Send to background service directly (not via sendReliable which expects full response)
+      // Send to background service directly (not via sendSmart which expects full response)
       // Since GOOGLE_TTS_SPEAK only sends ACK, we use direct messaging
       try {
         const response = await browser.runtime.sendMessage({
@@ -296,7 +296,7 @@ export class TTSManager {
           this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop ACK received`);
         }
       } catch (directError) {
-        // Fallback to sendReliable if direct messaging fails
+        // Fallback to sendSmart if direct messaging fails
         try {
           await sendSmart({
             action: MessageActions.GOOGLE_TTS_STOP_ALL,

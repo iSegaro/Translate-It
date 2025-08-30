@@ -9,7 +9,7 @@ import { isUrlExcluded } from "../utils/ui/exclusion.js";
 import { matchErrorToType } from "../error-management/ErrorMatcher.js";
 import { getSettingsAsync } from "../config.js";
 import browser from "webextension-polyfill";
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 
 // removed legacy createLogger import
 
@@ -134,7 +134,7 @@ export class SubtitleHandler {
         MessagingContexts.CONTENT
       );
       
-      const response = await sendReliable(message);
+      const response = await sendSmart(message);
       
       if (response.success && this.site === "youtube") {
         this.updateYouTubeButtonState(newValue);
@@ -190,7 +190,7 @@ export class SubtitleHandler {
               MessagingContexts.CONTENT
             );
             
-            const response = await sendReliable(message);
+            const response = await sendSmart(message);
             return response.translatedText || text;
           } catch (error) {
             const errorType = matchErrorToType(error);
