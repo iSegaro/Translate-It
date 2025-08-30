@@ -39,7 +39,7 @@
       <!-- Source Text Area -->
       <TranslationInputField
         v-model="sourceText"
-        :placeholder="'Enter text to translate...'"
+        :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER') || 'Enter text to translate...'"
         :source-language="sourceLanguageValue"
         :rows="6"
         :tabindex="1"
@@ -60,7 +60,7 @@
         :target-language="targetLanguageValue"
         :is-loading="isTranslating"
         :error="translationError"
-        :placeholder="'Translation will appear here...'"
+        :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER') || 'Translation result will appear here...'"
         :copy-title="'Copy Translation'"
         :copy-alt="'Copy Result'"
         :tts-title="'Speak Translation'"
@@ -75,6 +75,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+const { t } = useUnifiedI18n()
 
 
 import { useErrorHandler } from "@/composables/useErrorHandler.js";

@@ -59,7 +59,7 @@
 
   "popup_loading": { "message": "Loading Popup..." },
   "popup_translate_button_text": { "message": "Translate" },
-  
+
   "export_settings_description": {
     "message": "Export your current settings to a JSON file for backup or sharing."
   },
@@ -349,6 +349,7 @@
   "popup_voice_source_title_icon": { "message": "Speak" },
   "popup_paste_source_alt_icon": { "message": "Paste" },
   "popup_paste_source_title_icon": { "message": "Paste from clipboard" },
+  "popup_target_text_placeholder": { "message": "Translation result will appear here..." },
   "popup_source_text_placeholder": { "message": "Enter text here..." },
   "popup_copy_target_alt_icon": { "message": "Copy target" },
   "popup_copy_target_title_icon": { "message": "Copy target text" },
@@ -368,6 +369,7 @@
   },
 
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": { "message": "Enter..." },
+  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": { "message": "Translation result will appear here..." },
   "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "Translate" },
   "SIDEPANEL_SETTINGS_TITLE_ICON": { "message": "Options" },
   "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": { "message": "Clear fields" },

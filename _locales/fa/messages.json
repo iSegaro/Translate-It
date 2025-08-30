@@ -365,6 +365,7 @@
   "popup_paste_source_alt_icon": { "message": "چسباندن" },
   "popup_paste_source_title_icon": { "message": "چسباندن" },
   "popup_source_text_placeholder": { "message": "اینجا بنویسید..." },
+  "popup_target_text_placeholder": { "message": "معنی ترجمه" },
   "popup_copy_target_alt_icon": { "message": "کپی مقصد" },
   "popup_copy_target_title_icon": { "message": "کپی" },
   "popup_voice_target_alt_icon": { "message": "تلفظ مقصد" },
@@ -381,7 +382,10 @@
   },
 
   "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
-    "message": "متنی برای ترجمه وارد کنید ..."
+    "message": "اینجا بنویسید..."
+  },
+  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
+    "message": "معنی ترجمه"
   },
   "SIDEPANEL_TRANSLATE_BUTTON_TEXT": { "message": "ترجمه" },
   "SIDEPANEL_SETTINGS_TITLE_ICON": { "message": "تنظیمات" },
