@@ -125,7 +125,7 @@ onMounted(async () => {
   flex: 0 0 280px;
   padding: $spacing-md;
   /* border-right: 4px solid red !important; */
-  background: #fffbe6 !important;
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   z-index: 9999;
