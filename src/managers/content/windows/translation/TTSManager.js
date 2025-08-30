@@ -28,10 +28,18 @@ export class TTSManager {
       this.logger.debug(`[TTSManager ${windowId}] TTS cleanup callback - stopping TTS`)
       // Use direct background message instead of stopCurrentTTS to avoid recursion
       try {
-        await sendReliable({
+        const response = await browser.runtime.sendMessage({
           action: MessageActions.GOOGLE_TTS_STOP_ALL,
           data: { source: 'windows-manager-cleanup', windowId }
-        })
+        });
+        
+        if (!response || !response.ack) {
+          // Fallback to sendReliable if direct messaging doesn't work
+          await sendReliable({
+            action: MessageActions.GOOGLE_TTS_STOP_ALL,
+            data: { source: 'windows-manager-cleanup', windowId }
+          });
+        }
       } catch (error) {
         if (isContextError(error)) {
           this.logger.debug(`[TTSManager ${windowId}] Extension context invalidated during cleanup - handled silently.`);
@@ -62,16 +70,37 @@ export class TTSManager {
       // Detect language if not provided
       const detectedLanguage = language || this.detectSimpleLanguage(text) || "en";
       
-      // Send to background service with enhanced message actions
-      const response = await sendReliable({
-        action: MessageActions.GOOGLE_TTS_SPEAK,
-        data: {
-          text: text.trim(),
-          language: detectedLanguage,
-          instanceId: this.ttsGlobal.instanceId,
-          windowId: this.windowId
+      // Send to background service directly (not via sendReliable which expects full response)
+      // Since GOOGLE_TTS_SPEAK only sends ACK, we use direct messaging
+      try {
+        const response = await browser.runtime.sendMessage({
+          action: MessageActions.GOOGLE_TTS_SPEAK,
+          data: {
+            text: text.trim(),
+            language: detectedLanguage,
+            instanceId: this.ttsGlobal.instanceId,
+            windowId: this.windowId
+          }
+        });
+        
+        // Since we get ACK, we consider it success
+        if (response && response.ack) {
+          this.logger.debug(`[TTSManager ${this.windowId}] TTS ACK received, playback initiated`);
+          return true;
         }
-      });
+      } catch (directError) {
+        // If direct messaging fails, fall back to sendReliable
+        this.logger.debug(`[TTSManager ${this.windowId}] Direct messaging failed, trying sendReliable:`, directError.message);
+        const response = await sendReliable({
+          action: MessageActions.GOOGLE_TTS_SPEAK,
+          data: {
+            text: text.trim(),
+            language: detectedLanguage,
+            instanceId: this.ttsGlobal.instanceId,
+            windowId: this.windowId
+          }
+        });
+      }
 
       // Check if language was unsupported
       if (response && response.unsupportedLanguage) {
@@ -243,9 +272,9 @@ export class TTSManager {
     try {
       this.logger.debug(`[TTSManager ${this.windowId}] Stopping current TTS`);
       
-      // Stop via background service first
+      // Stop via background service first - use direct messaging for ACK-only actions
       try {
-        await sendReliable({
+        const response = await browser.runtime.sendMessage({
           action: MessageActions.GOOGLE_TTS_STOP_ALL,
           data: { 
             instanceId: this.ttsGlobal.instanceId,
@@ -253,9 +282,23 @@ export class TTSManager {
           }
         });
         
-        this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent`);
-      } catch (bgError) {
-        this.logger.warn(`[TTSManager ${this.windowId}] Background stop failed:`, bgError);
+        if (response && response.ack) {
+          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop ACK received`);
+        }
+      } catch (directError) {
+        // Fallback to sendReliable if direct messaging fails
+        try {
+          await sendReliable({
+            action: MessageActions.GOOGLE_TTS_STOP_ALL,
+            data: { 
+              instanceId: this.ttsGlobal.instanceId,
+              windowId: this.windowId
+            }
+          });
+          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent via sendReliable`);
+        } catch (bgError) {
+          this.logger.warn(`[TTSManager ${this.windowId}] Background stop failed:`, bgError);
+        }
       }
       
       // Local cleanup as fallback
