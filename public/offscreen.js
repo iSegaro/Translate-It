@@ -17,6 +17,8 @@ const logger = createOffscreenLogger();
 
 let currentAudio = null;
 let currentUtterance = null;
+let currentFetchController = null;
+let isPlaying = false;
 
 logger.info("TTS script loaded - Version 1.5 - Fixed race condition and null audio cleanup");
 
@@ -74,7 +76,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false; // synchronous response
   }
   else if (action === "playOffscreenAudio" && cleanMessage.url) {
-    handleAudioPlayback(cleanMessage.url, sendResponse);
+    // Use the enhanced function with proper state management and fallback
+    const ttsData = {
+      text: "TTS Audio", // Placeholder since we already have the URL
+      language: "en" // Default language
+    };
+    handleAudioPlaybackWithFallback(cleanMessage.url, ttsData, sendResponse);
     return true;
   }
   else if (action === "stopOffscreenAudio") {
@@ -260,6 +267,17 @@ function handleTTSStop(sendResponse) {
   try {
     let stopped = false;
 
+    // Cancel ongoing fetch if any
+    if (currentFetchController) {
+      logger.debug("[Offscreen] Aborting ongoing fetch request");
+      currentFetchController.abort();
+      currentFetchController = null;
+      stopped = true;
+    }
+
+    // Reset playing state
+    isPlaying = false;
+
     // Stop speech synthesis
     if (currentUtterance) {
       speechSynthesis.cancel();
@@ -375,7 +393,6 @@ function handleTTSGetStatus(sendResponse) {
       }
     }
     
-    console.log("[Offscreen] TTS status:", status);
     sendResponse({ success: true, status });
   } catch (error) {
     console.error("[Offscreen] TTS get status failed:", error);
@@ -388,7 +405,11 @@ function handleTTSGetStatus(sendResponse) {
  */
 function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
   try {
-    console.log("[Offscreen] Attempting Google TTS:", url);
+    
+    // Prevent multiple simultaneous requests
+    if (isPlaying) {
+      handleTTSStop(() => {}); // Stop current playback
+    }
     
     // Always create a new Audio object to avoid race conditions with global currentAudio
     const newAudio = new Audio();
@@ -402,13 +423,19 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
 
     currentAudio = newAudio; // Assign the new audio object to global currentAudio
     currentAudio.crossOrigin = "anonymous"; // Set crossOrigin after creating new Audio
+    isPlaying = true; // Mark as playing
     
     let responseSent = false;
     
+    // Create AbortController for fetch cancellation
+    currentFetchController = new AbortController();
+    
     // Timeout for Google TTS fetch
     const fetchTimeout = setTimeout(() => {
-      if (!responseSent) {
-        console.warn("[Offscreen] Google TTS fetch timeout, falling back to Web Speech");
+      if (!responseSent && currentFetchController) {
+        currentFetchController.abort();
+        currentFetchController = null;
+        isPlaying = false;
         responseSent = true;
         handleWebSpeechFallback(ttsData, sendResponse);
       }
@@ -417,6 +444,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     // Try Google TTS with fetch
     fetch(url, {
       method: 'GET',
+      signal: currentFetchController.signal, // Add AbortController signal
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://translate.google.com/',
@@ -426,24 +454,32 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     })
     .then(response => {
       clearTimeout(fetchTimeout); // Clear the timeout on successful response
+      currentFetchController = null; // Clear the AbortController reference
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       return response.blob();
     })
     .then(audioBlob => {
-      if (!currentAudio) {
-        console.warn("[Offscreen] currentAudio is null, creating new instance");
-        currentAudio = new Audio();
-        currentAudio.crossOrigin = "anonymous";
+      // Check if audio was stopped during fetch (race condition protection)
+      if (!currentAudio || !isPlaying) {
+        console.warn("[Offscreen] currentAudio was null or stopped during fetch, cleaning up blob");
+        URL.revokeObjectURL(URL.createObjectURL(audioBlob)); // Clean up blob
+        isPlaying = false;
+        if (!responseSent) {
+          responseSent = true;
+          sendResponse({ success: false, error: "Audio was stopped during fetch" });
+        }
+        return Promise.reject(new Error('Audio was stopped during fetch'));
       }
+      
       const audioUrl = URL.createObjectURL(audioBlob);
       currentAudio.src = audioUrl;
       
       currentAudio.addEventListener("ended", () => {
-        console.log("[Offscreen] Google TTS playback ended");
-        URL.revokeObjectURL(audioUrl);
+          URL.revokeObjectURL(audioUrl);
         currentAudio = null;
+        isPlaying = false; // Reset playing state
         
         // Always notify frontend that TTS ended (real completion)
         chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
@@ -452,20 +488,18 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
       });
 
       currentAudio.addEventListener("error", (e) => {
-        console.error("[Offscreen] Google TTS playback error:", e);
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
+        isPlaying = false; // Reset playing state
         if (!responseSent) {
-          console.log("[Offscreen] Falling back to Web Speech API");
+          responseSent = true; // Set this first to prevent race conditions
           handleWebSpeechFallback(ttsData, sendResponse);
-          responseSent = true;
         }
       });
 
       return currentAudio.play();
     })
     .then(() => {
-      console.log("[Offscreen] Google TTS playback started successfully");
       // Send success response after play() succeeds
       if (!responseSent) {
         responseSent = true;
@@ -474,8 +508,17 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     })
     .catch(async (err) => { // Make this catch block async
       clearTimeout(fetchTimeout); // Clear the timeout on error too
-      console.error("[Offscreen] Google TTS failed:", err);
+      currentFetchController = null; // Clear the AbortController reference
       currentAudio = null;
+      isPlaying = false; // Reset playing state
+      
+      // Handle AbortError specifically (when fetch is cancelled)
+      if (err.name === 'AbortError') {
+        console.log("[Offscreen] Google TTS fetch was aborted");
+        return; // Don't send response or fallback for aborted requests
+      }
+      
+      console.error("[Offscreen] Google TTS failed:", err);
       if (!responseSent) {
         responseSent = true; // Set responseSent to true here to prevent duplicate responses
         console.log("[Offscreen] Falling back to Web Speech API");
@@ -492,6 +535,8 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     
   } catch (error) {
     console.error("[Offscreen] TTS setup failed:", error);
+    currentFetchController = null; // Clear the AbortController reference
+    isPlaying = false; // Reset playing state
     console.log("[Offscreen] Falling back to Web Speech API");
     handleWebSpeechFallback(ttsData, sendResponse);
   }
@@ -530,6 +575,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         currentUtterance.onend = () => {
           console.log("✅ Web Speech TTS ended");
           currentUtterance = null;
+          isPlaying = false; // Reset playing state
           if (!responseAlreadySent) {
             responseAlreadySent = true;
             sendResponse({ success: true });
@@ -539,6 +585,7 @@ function handleWebSpeechFallback(data, sendResponse) {
         currentUtterance.onerror = (error) => {
           console.error("❌ Web Speech TTS error:", error);
           currentUtterance = null;
+          isPlaying = false; // Reset playing state
           
           if (!responseAlreadySent) {
             responseAlreadySent = true;
@@ -559,6 +606,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                   
                   retryUtterance.onend = () => {
                     console.log("✅ Web Speech TTS retry succeeded");
+                    isPlaying = false; // Reset playing state
                     if (!responseAlreadySent) {
                       responseAlreadySent = true;
                       sendResponse({ success: true });
@@ -567,6 +615,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                   
                   retryUtterance.onerror = (retryError) => {
                     console.error("❌ Web Speech TTS retry also failed:", retryError);
+                    isPlaying = false; // Reset playing state
                     if (!responseAlreadySent) {
                       responseAlreadySent = true;
                       sendResponse({ success: false, error: `Web Speech API failed: ${error.error}, retry failed: ${retryError.error}` });
@@ -577,6 +626,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                 }
               }, 500);
             } else {
+              isPlaying = false; // Reset playing state
               sendResponse({ success: false, error: `Web Speech API failed: ${error.error}` });
             }
           }
@@ -592,6 +642,7 @@ function handleWebSpeechFallback(data, sendResponse) {
             console.warn("[Offscreen] Web Speech TTS timeout, cancelling");
             speechSynthesis.cancel();
             currentUtterance = null;
+            isPlaying = false; // Reset playing state
             responseAlreadySent = true;
             sendResponse({ success: false, error: "Web Speech API timeout" });
           }
@@ -617,6 +668,7 @@ function handleWebSpeechFallback(data, sendResponse) {
     }
   } catch (error) {
     console.error("[Offscreen] Web Speech API fallback failed:", error);
+    isPlaying = false; // Reset playing state
     sendResponse({ success: false, error: `All TTS methods failed: ${error.message}` });
   }
 }
@@ -655,12 +707,20 @@ function handleAudioPlayback(url, sendResponse) {
   };
   
   try {
+    // Cancel any ongoing fetch
+    if (currentFetchController) {
+      currentFetchController.abort();
+    }
+    currentFetchController = new AbortController();
+    
     // Stop any current audio
     if (currentAudio) {
       logger.debug("Stopping current audio");
       currentAudio.pause();
       currentAudio.src = "";
     }
+    
+    isPlaying = true;
 
     currentAudio = new Audio();
     
@@ -669,9 +729,10 @@ function handleAudioPlayback(url, sendResponse) {
     
     // Add proper user agent and referer for Google TTS
     if (url.includes('translate.google.com')) {
-      // Create a request with proper headers
+      // Create a request with proper headers and abort controller
       fetch(url, {
         method: 'GET',
+        signal: currentFetchController.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Referer': 'https://translate.google.com/',
@@ -687,11 +748,12 @@ function handleAudioPlayback(url, sendResponse) {
       })
       .then(audioBlob => {
         const audioUrl = URL.createObjectURL(audioBlob);
-        if (currentAudio) {
+        if (currentAudio && isPlaying) {
           currentAudio.src = audioUrl;
         } else {
-          logger.warn("currentAudio was null during blob assignment, cleaning up");
+          logger.warn("Audio was stopped during fetch, cleaning up");
           URL.revokeObjectURL(audioUrl);
+          isPlaying = false;
           return Promise.reject(new Error('Audio was stopped during fetch'));
         }
         
@@ -742,8 +804,15 @@ function handleAudioPlayback(url, sendResponse) {
         });
       })
       .catch((err) => {
+        // Check if error is due to abort
+        if (err.name === 'AbortError') {
+          logger.debug("Audio fetch aborted (expected)");
+          return;
+        }
+        
         logger.error("Audio fetch/play failed:", err);
         currentAudio = null;
+        isPlaying = false;
         safeResponse({ success: false, error: err.message });
       });
     } else {
