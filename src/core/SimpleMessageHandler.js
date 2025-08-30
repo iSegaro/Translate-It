@@ -44,13 +44,6 @@ class SimpleMessageHandler {
       const handler = this.getHandlerForMessage(action, context);
       
       if (handler) {
-        // For TRANSLATE and TTS actions, send immediate ACK only - let port fallback handle processing
-        if (action === 'TRANSLATE' || action === 'GOOGLE_TTS_SPEAK' || action === 'GOOGLE_TTS_STOP_ALL') {
-          logger.debug(`[SimpleMessageHandler] ${action} action detected - sending ACK only, NOT executing handler`);
-          sendResponse({ ack: true, messageId: message.messageId });
-          // Don't process here - let port fallback handle the actual processing to avoid duplicate processing
-          return false; // Don't keep channel open
-        }
         
         // Check if handler uses callback pattern (3+ parameters)
         if (handler.length >= 3) {

@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { ExtensionContextManager } from '@/utils/core/extensionContext.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
@@ -78,15 +79,19 @@ export function useTTSSmart() {
       const language = getLanguageCodeForTTS(lang) || "en";
       logger.debug("[useTTSSmart] Speaking via GOOGLE_TTS_SPEAK:", text.substring(0, 50) + "...");
 
-      // Send to background handler with context error handling
-      const response = await ExtensionContextManager.safeSendMessage({
+      // Use smart messaging for TTS (port-based for slow actions)
+      const message = {
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: text.trim(),
           language: language,
           ttsId: currentTTSId.value
-        }
-      }, 'tts-speak');
+        },
+        context: 'tts-smart',
+        messageId: `tts-speak-${currentTTSId.value}`
+      };
+      
+      const response = await sendSmart(message);
 
       // Handle null response (extension context invalidated)
       if (response === null) {
@@ -140,10 +145,14 @@ export function useTTSSmart() {
 
     try {
       logger.debug("[useTTSSmart] Pausing TTS");
-      const response = await ExtensionContextManager.safeSendMessage({
+      const message = {
         action: MessageActions.GOOGLE_TTS_PAUSE,
-        data: { ttsId: currentTTSId.value }
-      }, 'tts-pause');
+        data: { ttsId: currentTTSId.value },
+        context: 'tts-smart',
+        messageId: `tts-pause-${currentTTSId.value}`
+      };
+      
+      const response = await sendSmart(message);
       
       if (response === null) {
         logger.debug("[useTTSSmart] Extension context invalidated during pause - silently handled");
@@ -168,10 +177,14 @@ export function useTTSSmart() {
 
     try {
       logger.debug("[useTTSSmart] Resuming TTS");
-      const response = await ExtensionContextManager.safeSendMessage({
+      const message = {
         action: MessageActions.GOOGLE_TTS_RESUME,
-        data: { ttsId: currentTTSId.value }
-      }, 'tts-resume');
+        data: { ttsId: currentTTSId.value },
+        context: 'tts-smart',
+        messageId: `tts-resume-${currentTTSId.value}`
+      };
+      
+      const response = await sendSmart(message);
       
       if (response === null) {
         logger.debug("[useTTSSmart] Extension context invalidated during resume - silently handled");
@@ -197,10 +210,14 @@ export function useTTSSmart() {
     try {
       logger.debug("[useTTSSmart] Stopping TTS");
       
-      const response = await ExtensionContextManager.safeSendMessage({
+      const message = {
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
-        data: { ttsId: currentTTSId.value }
-      }, 'tts-stop');
+        data: { ttsId: currentTTSId.value },
+        context: 'tts-smart',
+        messageId: `tts-stop-${currentTTSId.value || 'all'}`
+      };
+      
+      const response = await sendSmart(message);
       
       // Context invalidated - still clean up local state
       if (response === null) {
@@ -238,10 +255,14 @@ export function useTTSSmart() {
   const stopAll = async () => {
     try {
       logger.debug("[useTTSSmart] Stopping all TTS instances");
-      const response = await ExtensionContextManager.safeSendMessage({
+      const message = {
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
-        data: {}
-      }, 'tts-stop-all');
+        data: {},
+        context: 'tts-smart',
+        messageId: `tts-stop-all-${Date.now()}`
+      };
+      
+      const response = await sendSmart(message);
       
       // Context invalidated - still clean up local state
       if (response === null) {
@@ -315,10 +336,14 @@ export function useTTSSmart() {
 
   const getStatus = async () => {
     try {
-      const response = await ExtensionContextManager.safeSendMessage({
+      const message = {
         action: MessageActions.GOOGLE_TTS_GET_STATUS,
-        data: { ttsId: currentTTSId.value }
-      }, 'tts-get-status');
+        data: { ttsId: currentTTSId.value },
+        context: 'tts-smart',
+        messageId: `tts-status-${currentTTSId.value || 'unknown'}`
+      };
+      
+      const response = await sendSmart(message);
 
       // Context invalidated - return local state only
       if (response === null) {

@@ -4,6 +4,7 @@ import { MessageActions } from '../core/MessageActions.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
+import { sendSmart } from '@/messaging/core/SmartMessaging.js'
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 
@@ -27,19 +28,26 @@ const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
  */
 export function useMessaging(context) {
   /**
-   * Send a message using browser.runtime.sendMessage
+   * Send a message using smart routing (direct for fast actions, port for slow actions)
    * @param {Object} message - Message object (should use MessageFormat.create)
+   * @param {Object} options - Optional parameters for smart messaging
    * @returns {Promise} Response promise
    */
-  const sendMessage = async (message) => {
+  const sendMessage = async (message, options = {}) => {
     try {
-      // Prefer the reliable messenger which implements retries and port fallback
-      return await sendReliable(message);
+      // Use smart messaging for optimal performance
+      return await sendSmart(message, options);
     } catch (error) {
-      logger.error('sendMessage failed via sendReliable:', error);
-      // Do not fallback to direct runtime.sendMessage here to avoid duplicating
-      // unreliable behavior; surface the error to callers so they can decide.
-      throw error;
+      logger.error('sendMessage failed via sendSmart:', error);
+      
+      // Fallback to reliable messaging only if smart messaging fails
+      // This provides backward compatibility during migration
+      if (options.noFallback) {
+        throw error;
+      }
+      
+      logger.warn('Falling back to ReliableMessaging for:', message.action);
+      return await sendReliable(message);
     }
   };
 
@@ -62,16 +70,17 @@ export function useMessaging(context) {
    */
   const sendFireAndForget = (action, data, options = {}) => {
     const message = createMessage(action, data, options);
-    // Fire-and-forget via reliable messenger
-    sendReliable(message).catch(error => {
+    // Fire-and-forget via smart messenger (no fallback for fire-and-forget)
+    sendSmart(message, { ...options, noFallback: true }).catch(error => {
       // Silently ignore send errors for fire-and-forget
-      console.debug(`[useMessaging:${context}] Fire-and-forget failed (reliable):`, error);
+      console.debug(`[useMessaging:${context}] Fire-and-forget failed (smart):`, error);
     });
   };
 
   return {
     sendMessage,
-    sendReliable,
+    sendReliable, // Keep for backward compatibility
+    sendSmart,    // New smart messaging
     createMessage,
     sendFireAndForget,
     
@@ -81,5 +90,5 @@ export function useMessaging(context) {
   }
 }
 
-// Export sendReliable for non-Vue modules (already imported at top)
-export { sendReliable }
+// Export messaging functions for non-Vue modules
+export { sendReliable, sendSmart }

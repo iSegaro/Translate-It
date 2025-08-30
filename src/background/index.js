@@ -94,15 +94,17 @@ browser.runtime.onConnect.addListener((port) => {
       return;
     }
     
-    // Only handle ports we recognize
-    if (!port.name || (!port.name.includes('reliable-messaging') && !port.name.includes('translation'))) {
+    // Handle recognized messaging ports
+    const recognizedPorts = ['reliable-messaging', 'smart-messaging', 'translation'];
+    if (!port.name || !recognizedPorts.some(name => port.name.includes(name))) {
       logger.debug('[Background] Ignoring unrecognized port:', port.name);
       return;
     }
     port.onMessage.addListener(async (msg) => {
       try {
         logger.debug('[Background] Port message received:', msg && msg.action, msg && msg.messageId);
-        // Immediate ACK
+        
+        // Send immediate ACK for all port messages
         try { 
           port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) 
         } catch (e) {
@@ -114,7 +116,6 @@ browser.runtime.onConnect.addListener((port) => {
         if (handler) {
           const result = await handler(msg, port.sender);
           try {
-            // Check if port is still connected before sending result
             if (port && port.postMessage) {
               port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
               logger.debug('[Background] RESULT sent to port successfully');

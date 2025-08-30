@@ -5,7 +5,7 @@ import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "../../../../messaging/core/MessageActions.js";
-import { sendReliable } from '@/messaging/core/ReliableMessaging.js';
+import { sendSmart } from '@/messaging/core/SmartMessaging.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import { isContextError } from '@/utils/core/extensionContext.js';
 
@@ -34,10 +34,12 @@ export class TTSManager {
         });
         
         if (!response || !response.ack) {
-          // Fallback to sendReliable if direct messaging doesn't work
-          await sendReliable({
+          // Fallback to sendSmart if direct messaging doesn't work
+          await sendSmart({
             action: MessageActions.GOOGLE_TTS_STOP_ALL,
-            data: { source: 'windows-manager-cleanup', windowId }
+            data: { source: 'windows-manager-cleanup', windowId },
+            context: 'tts-manager',
+            messageId: `tts-cleanup-${windowId}-${Date.now()}`
           });
         }
       } catch (error) {
@@ -89,16 +91,18 @@ export class TTSManager {
           return true;
         }
       } catch (directError) {
-        // If direct messaging fails, fall back to sendReliable
-        this.logger.debug(`[TTSManager ${this.windowId}] Direct messaging failed, trying sendReliable:`, directError.message);
-        const response = await sendReliable({
+        // If direct messaging fails, fall back to sendSmart
+        this.logger.debug(`[TTSManager ${this.windowId}] Direct messaging failed, trying sendSmart:`, directError.message);
+        const response = await sendSmart({
           action: MessageActions.GOOGLE_TTS_SPEAK,
           data: {
             text: text.trim(),
             language: detectedLanguage,
             instanceId: this.ttsGlobal.instanceId,
             windowId: this.windowId
-          }
+          },
+          context: 'tts-manager',
+          messageId: `tts-speak-${this.windowId}-${Date.now()}`
         });
       }
 
@@ -140,12 +144,14 @@ export class TTSManager {
     try {
       this.logger.debug(`[TTSManager ${this.windowId}] Pausing TTS`);
       
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.GOOGLE_TTS_PAUSE,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
           windowId: this.windowId
-        }
+        },
+        context: 'tts-manager',
+        messageId: `tts-pause-${this.windowId}-${Date.now()}`
       });
       
       this.ttsGlobal.updateActivity();
@@ -163,12 +169,14 @@ export class TTSManager {
     try {
       this.logger.debug(`[TTSManager ${this.windowId}] Resuming TTS`);
       
-      await sendReliable({
+      await sendSmart({
         action: MessageActions.GOOGLE_TTS_RESUME,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
           windowId: this.windowId
-        }
+        },
+        context: 'tts-manager',
+        messageId: `tts-resume-${this.windowId}-${Date.now()}`
       });
       
       this.ttsGlobal.updateActivity();
@@ -184,12 +192,14 @@ export class TTSManager {
    */
   async getTTSStatus() {
     try {
-      const response = await sendReliable({
+      const response = await sendSmart({
         action: MessageActions.GOOGLE_TTS_GET_STATUS,
         data: { 
           instanceId: this.ttsGlobal.instanceId,
           windowId: this.windowId
-        }
+        },
+        context: 'tts-manager',
+        messageId: `tts-status-${this.windowId}-${Date.now()}`
       });
       
       return response?.status || 'idle';
@@ -288,14 +298,16 @@ export class TTSManager {
       } catch (directError) {
         // Fallback to sendReliable if direct messaging fails
         try {
-          await sendReliable({
+          await sendSmart({
             action: MessageActions.GOOGLE_TTS_STOP_ALL,
             data: { 
               instanceId: this.ttsGlobal.instanceId,
               windowId: this.windowId
-            }
+            },
+            context: 'tts-manager',
+            messageId: `tts-stop-fallback-${this.windowId}-${Date.now()}`
           });
-          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent via sendReliable`);
+          this.logger.debug(`[TTSManager ${this.windowId}] Background TTS stop sent via sendSmart`);
         } catch (bgError) {
           this.logger.warn(`[TTSManager ${this.windowId}] Background stop failed:`, bgError);
         }
