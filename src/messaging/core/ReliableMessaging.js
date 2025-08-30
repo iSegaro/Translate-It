@@ -160,6 +160,11 @@ export async function sendReliable(message, opts = {}) {
 
     return await new Promise((resolve, reject) => {
       const to = setTimeout(() => {
+        logger.warn('sendReliable: timeout waiting for RESULT', {
+          messageId: message.messageId,
+          ackReceived,
+          totalTimeout
+        })
         cleanup()
         circuitBreaker.onFailure()
         reject(new Error('no-response'))
@@ -203,7 +208,12 @@ export async function sendReliable(message, opts = {}) {
       }
 
       const onDisconnect = () => {
-        logger.debug('sendReliable: port disconnected unexpectedly')
+        logger.debug('sendReliable: port disconnected', {
+          messageId: message.messageId,
+          ackReceived,
+          isResolved,
+          action: message.action
+        })
         if (!isResolved) {
           cleanup()
           circuitBreaker.onFailure()
