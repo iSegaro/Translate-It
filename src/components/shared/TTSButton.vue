@@ -262,8 +262,7 @@ const handleClick = async () => {
         break
 
       case 'error':
-        await tts.retry()
-        result = await tts.speak(props.text, props.language)
+        result = await tts.retry()
         if (result) {
           emit('tts-started', { text: props.text, language: props.language })
         } else {

@@ -18,7 +18,7 @@ const logger = createOffscreenLogger();
 let currentAudio = null;
 let currentUtterance = null;
 
-logger.info("TTS script loaded");
+logger.info("TTS script loaded - Version 1.5 - Fixed race condition and null audio cleanup");
 
 // Signal readiness immediately to parent
 if (chrome.runtime) {
@@ -444,11 +444,8 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         console.log("[Offscreen] Google TTS playback ended");
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
-        if (!responseSent) {
-          responseSent = true;
-          sendResponse({ success: true });
-        }
-        // Notify frontend that TTS ended
+        
+        // Always notify frontend that TTS ended (real completion)
         chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
           console.log("[Offscreen] Failed to send TTS ended notification:", err);
         });
@@ -469,6 +466,11 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
     })
     .then(() => {
       console.log("[Offscreen] Google TTS playback started successfully");
+      // Send success response after play() succeeds
+      if (!responseSent) {
+        responseSent = true;
+        sendResponse({ success: true, message: "Audio playback started" });
+      }
     })
     .catch(async (err) => { // Make this catch block async
       clearTimeout(fetchTimeout); // Clear the timeout on error too
@@ -685,13 +687,23 @@ function handleAudioPlayback(url, sendResponse) {
       })
       .then(audioBlob => {
         const audioUrl = URL.createObjectURL(audioBlob);
-        currentAudio.src = audioUrl;
+        if (currentAudio) {
+          currentAudio.src = audioUrl;
+        } else {
+          logger.warn("currentAudio was null during blob assignment, cleaning up");
+          URL.revokeObjectURL(audioUrl);
+          return Promise.reject(new Error('Audio was stopped during fetch'));
+        }
         
         currentAudio.addEventListener("ended", () => {
           logger.info("Audio playback ended");
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
-          // Don't send response here anymore, already sent after play() starts
+          
+          // Send completion notification to frontend
+          chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
+            logger.error("Failed to send TTS ended notification:", err);
+          });
         });
 
         currentAudio.addEventListener("error", (e) => {
@@ -715,10 +727,19 @@ function handleAudioPlayback(url, sendResponse) {
         // Send success response immediately after playback starts, don't wait for end
         logger.debug("Sending success response to background...");
         
-        // Add small delay to ensure MV3 messaging works properly
-        setTimeout(() => {
-          safeResponse({ success: true, message: "Audio playback started" });
-        }, 10);
+        // Send response immediately while the runtime channel is still open
+        const responseData = { success: true, message: "Audio playback started" };
+        logger.debug("About to call safeResponse with:", responseData);
+        safeResponse(responseData);
+        logger.debug("safeResponse called successfully");
+        
+        // ALSO send success via separate message (backup method)
+        chrome.runtime.sendMessage({ 
+          action: 'GOOGLE_TTS_STARTED',
+          success: true 
+        }).catch(err => {
+          logger.debug("Backup success message send failed:", err);
+        });
       })
       .catch((err) => {
         logger.error("Audio fetch/play failed:", err);

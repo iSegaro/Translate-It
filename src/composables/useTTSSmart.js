@@ -4,6 +4,7 @@ import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { MessageActions } from '@/messaging/core/MessageActions.js';
+// import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');
 
@@ -33,77 +34,22 @@ export function useTTSSmart() {
   // Generate unique TTS ID
   const generateTTSId = () => `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Error classification helper
-  const classifyError = (error) => {
-    const errorMsg = error.message || error.toString().toLowerCase();
-    
-    if (errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('connection')) {
-      return ERROR_TYPES.NETWORK_ERROR;
-    }
-    if (errorMsg.includes('audio') || errorMsg.includes('context')) {
-      return ERROR_TYPES.AUDIO_CONTEXT_ERROR;
-    }
-    if (errorMsg.includes('permission') || errorMsg.includes('denied')) {
-      return ERROR_TYPES.PERMISSION_DENIED;
-    }
-    if (errorMsg.includes('timeout')) {
-      return ERROR_TYPES.TIMEOUT_ERROR;
-    }
-    if (errorMsg.includes('service') || errorMsg.includes('unavailable')) {
-      return ERROR_TYPES.SERVICE_UNAVAILABLE;
-    }
-    if (errorMsg.includes('text') || errorMsg.includes('empty')) {
-      return ERROR_TYPES.INVALID_TEXT;
-    }
-    if (errorMsg.includes('language')) {
-      return ERROR_TYPES.LANGUAGE_NOT_SUPPORTED;
-    }
-    
-    return ERROR_TYPES.NETWORK_ERROR; // Default fallback
-  };
+  // Error classification helper (for future use)
+  // const classifyError = (error) => {
+  //   const errorMsg = error.message || error.toString().toLowerCase();
+  //   
+  //   if (errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('connection')) {
+  //     return ERROR_TYPES.NETWORK_ERROR;
+  //   }
+  //   // ... other error classifications
+  //   
+  //   return ERROR_TYPES.NETWORK_ERROR; // Default fallback
+  // };
 
-  // Recovery strategies
-  const getRecoveryStrategy = (errorType) => {
-    const strategies = {
-      [ERROR_TYPES.NETWORK_ERROR]: { 
-        canRetry: true, 
-        retryDelay: 1000,
-        userAction: 'Check your internet connection'
-      },
-      [ERROR_TYPES.AUDIO_CONTEXT_ERROR]: { 
-        canRetry: true, 
-        retryDelay: 500,
-        userAction: 'Try again - audio system may need to restart'
-      },
-      [ERROR_TYPES.PERMISSION_DENIED]: { 
-        canRetry: false,
-        retryDelay: 0,
-        userAction: 'Please allow audio permissions in your browser'
-      },
-      [ERROR_TYPES.TIMEOUT_ERROR]: { 
-        canRetry: true,
-        retryDelay: 2000,
-        userAction: 'Request timed out - try again'
-      },
-      [ERROR_TYPES.SERVICE_UNAVAILABLE]: { 
-        canRetry: true,
-        retryDelay: 3000,
-        userAction: 'TTS service temporarily unavailable'
-      },
-      [ERROR_TYPES.INVALID_TEXT]: { 
-        canRetry: false,
-        retryDelay: 0,
-        userAction: 'Please provide valid text to speak'
-      },
-      [ERROR_TYPES.LANGUAGE_NOT_SUPPORTED]: { 
-        canRetry: true,
-        retryDelay: 0,
-        userAction: 'Language not supported - trying English fallback'
-      }
-    };
-    
-    return strategies[errorType] || strategies[ERROR_TYPES.NETWORK_ERROR];
-  };
+  // Recovery strategies - now using imported constants (for future use)
+  // const getRecoveryStrategy = (errorType) => {
+  //   return RECOVERY_STRATEGIES[errorType] || RECOVERY_STRATEGIES[ERROR_TYPES.NETWORK_ERROR];
+  // };
 
   const speak = async (text, lang = "auto") => {
     if (!text || !text.trim()) {
@@ -146,56 +92,8 @@ export function useTTSSmart() {
       }
 
       ttsState.value = 'playing';
+      progress.value = 0; // Reset progress, real progress will come from audio events
       logger.debug("[useTTSSmart] TTS started successfully");
-      
-      // Start progress tracking
-      let progressInterval;
-      let autoResetTimeout;
-      
-      const startProgressTracking = () => {
-        progress.value = 0;
-        progressInterval = setInterval(() => {
-          if (ttsState.value === 'playing' && progress.value < 90) {
-            progress.value += Math.random() * 8 + 2;
-          } else if (progressInterval) {
-            clearInterval(progressInterval);
-            progressInterval = null;
-          }
-        }, 150);
-      };
-      
-      const startAutoReset = () => {
-        const estimatedDuration = Math.min(text.length * 80, 25000);
-        autoResetTimeout = setTimeout(() => {
-          if (ttsState.value === 'playing') {
-            ttsState.value = 'idle';
-            progress.value = 100;
-            currentTTSId.value = null;
-            
-            if (progressInterval) {
-              clearInterval(progressInterval);
-              progressInterval = null;
-            }
-          }
-        }, estimatedDuration);
-      };
-      
-      startProgressTracking();
-      startAutoReset();
-      
-      // Store cleanup functions
-      if (currentTTSId.value) {
-        window[`tts_cleanup_${currentTTSId.value}`] = () => {
-          if (progressInterval) {
-            clearInterval(progressInterval);
-            progressInterval = null;
-          }
-          if (autoResetTimeout) {
-            clearTimeout(autoResetTimeout);
-            autoResetTimeout = null;
-          }
-        };
-      }
 
       return true;
     } catch (error) {
@@ -226,18 +124,14 @@ export function useTTSSmart() {
 
     try {
       logger.debug("[useTTSSmart] Pausing TTS");
-      const response = await browserAPI.sendMessage({
+      await browserAPI.sendMessage({
         action: MessageActions.GOOGLE_TTS_PAUSE,
         data: { ttsId: currentTTSId.value }
       });
 
-      if (response?.success) {
-        ttsState.value = 'paused';
-        logger.debug("[useTTSSmart] TTS paused successfully");
-        return true;
-      } else {
-        throw new Error(response?.error || 'Pause failed');
-      }
+      ttsState.value = 'paused';
+      logger.debug("[useTTSSmart] TTS paused successfully");
+      return true;
     } catch (error) {
       logger.error("[useTTSSmart] Failed to pause TTS:", error);
       errorMessage.value = error.message || 'Pause failed';
@@ -253,18 +147,14 @@ export function useTTSSmart() {
 
     try {
       logger.debug("[useTTSSmart] Resuming TTS");
-      const response = await browserAPI.sendMessage({
+      await browserAPI.sendMessage({
         action: MessageActions.GOOGLE_TTS_RESUME,
         data: { ttsId: currentTTSId.value }
       });
 
-      if (response?.success) {
-        ttsState.value = 'playing';
-        logger.debug("[useTTSSmart] TTS resumed successfully");
-        return true;
-      } else {
-        throw new Error(response?.error || 'Resume failed');
-      }
+      ttsState.value = 'playing';
+      logger.debug("[useTTSSmart] TTS resumed successfully");
+      return true;
     } catch (error) {
       logger.error("[useTTSSmart] Failed to resume TTS:", error);
       errorMessage.value = error.message || 'Resume failed';
@@ -281,13 +171,7 @@ export function useTTSSmart() {
     try {
       logger.debug("[useTTSSmart] Stopping TTS");
       
-      // Cleanup any active intervals/timeouts before stopping
-      if (currentTTSId.value && window[`tts_cleanup_${currentTTSId.value}`]) {
-        window[`tts_cleanup_${currentTTSId.value}`]();
-        delete window[`tts_cleanup_${currentTTSId.value}`];
-      }
-      
-      const response = await browserAPI.sendMessage({
+      await browserAPI.sendMessage({
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
         data: { ttsId: currentTTSId.value }
       });
@@ -299,11 +183,7 @@ export function useTTSSmart() {
       errorMessage.value = '';
       errorType.value = '';
 
-      if (response?.success) {
-        logger.debug("[useTTSSmart] TTS stopped successfully");
-      } else {
-        logger.warn("[useTTSSmart] Stop response failed, but state reset:", response?.error);
-      }
+      logger.debug("[useTTSSmart] TTS stopped successfully");
       
       return true;
     } catch (error) {
@@ -321,7 +201,7 @@ export function useTTSSmart() {
   const stopAll = async () => {
     try {
       logger.debug("[useTTSSmart] Stopping all TTS instances");
-      const response = await browserAPI.sendMessage({
+      await browserAPI.sendMessage({
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
         data: {}
       });
@@ -426,14 +306,25 @@ export function useTTSSmart() {
 
   // Listen for TTS completion messages from offscreen
   if (typeof chrome !== 'undefined' && chrome.runtime) {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
-        logger.debug("[useTTSSmart] TTS ended notification received");
-        ttsState.value = 'idle';
-        currentTTSId.value = null;
-        progress.value = 0;
-        errorMessage.value = '';
-        errorType.value = '';
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.action === 'GOOGLE_TTS_ENDED') {
+        logger.debug("[useTTSSmart] TTS ended notification received - audio playback completed");
+        
+        // Only update state if we're currently playing
+        if (ttsState.value === 'playing') {
+          ttsState.value = 'idle';
+          currentTTSId.value = null;
+          progress.value = 100; // Mark as completed
+          errorMessage.value = '';
+          errorType.value = '';
+          
+          // Set progress back to 0 after a short delay for visual feedback
+          setTimeout(() => {
+            if (ttsState.value === 'idle') {
+              progress.value = 0;
+            }
+          }, 1000);
+        }
       }
     });
   }
