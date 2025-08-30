@@ -132,7 +132,7 @@ The `handleGoogleTTS.js` handler and `TTSGlobalManager` are unaware of the under
 
 ## 🔧 Recent Improvements & Bug Fixes
 
-### Chrome MV3 Messaging Reliability (Version 1.5)
+### Chrome MV3 Messaging Reliability (Version 1.5-1.6)
 The system has been enhanced to handle Chrome Manifest V3 messaging issues that were causing TTS failures:
 
 **Problems Resolved:**
@@ -140,12 +140,14 @@ The system has been enhanced to handle Chrome Manifest V3 messaging issues that 
 - **Race Conditions**: Eliminated timing issues between background scripts and offscreen documents
 - **Duplicate Requests**: Removed redundant TTS calls in `TTSButton.vue` retry mechanism
 - **Audio Cleanup**: Fixed null pointer exceptions during concurrent TTS requests
+- **Port Communication**: Fixed ReliableMessaging port fallback to return actual result data instead of wrapper
 
 **Technical Solutions:**
 - **Event-Driven Architecture**: Replaced unreliable response-based communication with event messaging (`GOOGLE_TTS_ENDED`)
 - **Graceful Fallback**: Background script now assumes success on empty responses and relies on completion events
 - **Race Condition Prevention**: Added null safety checks in offscreen audio handling
 - **Request Deduplication**: Enhanced `isProcessing` flags to prevent multiple simultaneous requests
+- **Port Messaging Fix**: Fixed ReliableMessaging to properly extract result data from port communication wrapper
 
 ### Cross-Component Standardization
 Successfully standardized TTS functionality across all three extension components:
@@ -169,8 +171,9 @@ Successfully standardized TTS functionality across all three extension component
 5.  **Cross-Component Consistency**: Unified TTS experience across Popup, Sidepanel, and WindowsManager.
 6.  **Robustness**: Advanced error handling with automatic and manual recovery makes the feature more reliable.
 7.  **Race Condition Safety**: Comprehensive null safety and cleanup prevention in concurrent scenarios.
-8.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
-9.  **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.
+8.  **Reliable Communication**: Fixed port-based messaging ensures correct response handling even when direct messaging fails.
+9.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
+10. **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.
 
 ## 🔍 Troubleshooting Guide
 
@@ -206,10 +209,16 @@ Successfully standardized TTS functionality across all three extension component
 **Solution**: Standardized all components to use ActionToolbar with consistent CSS
 **Status**: ✅ **Resolved** - All components now have uniform styling
 
+#### "TTS failed" Errors with Working Audio
+**Symptoms**: Frontend shows TTS failed errors but audio plays correctly
+**Root Cause**: ReliableMessaging port fallback returned message wrapper instead of actual result data
+**Solution**: Fixed ReliableMessaging to extract `result` from port messages properly
+**Status**: ✅ **Resolved in v1.6** - Port communication now returns correct response data
+
 ### Debugging Tips
 
 1. **Check Extension Console**: Look for TTS-related logs with component prefixes
-2. **Verify Version**: Ensure offscreen document shows "Version 1.5" in console  
+2. **Verify Version**: Ensure offscreen document shows "Version 1.6" in console  
 3. **Test Across Components**: Verify TTS works in Popup, Sidepanel, and WindowsManager
 4. **Monitor Network**: Check if Google TTS URLs are accessible
 5. **Extension Reload**: Disable/enable extension if issues persist
