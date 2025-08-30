@@ -121,9 +121,14 @@ const handleSelectElement = async () => {
   logger.debug('🎯 Select Element button clicked!')
   try {
     logger.debug('[PopupHeader] Select element button clicked')
-    await toggleSelectElement()
-    logger.debug('[PopupHeader] Select element mode toggled successfully')
-    window.close()
+    const success = await toggleSelectElement()
+    if (success) {
+      logger.debug('[PopupHeader] Select element mode toggled successfully')
+      window.close()
+    } else {
+      logger.debug('[PopupHeader] Select element toggle failed, keeping popup open')
+      // Don't close popup so user can see error state or try again
+    }
   } catch (error) {
     logger.error('❌ Select element toggle failed:', error)
     await handleError(error, 'PopupHeader-selectElement')

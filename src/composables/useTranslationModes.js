@@ -341,12 +341,16 @@ export function useSelectElementTranslation() {
       // If the action failed, revert the optimistic update
       if (!success) {
         sharedIsSelectModeActive.value = originalState;
-        logger.warn('Select element toggle failed, reverting UI state.');
+        logger.debug('Select element toggle failed, reverting UI state.');
+        return false;
       }
+      
+      return true;
     } catch (err) {
       // Revert on any unexpected errors as well
       sharedIsSelectModeActive.value = originalState;
       logger.error('An unexpected error occurred during toggleSelectElement:', err);
+      return false;
     }
   };
 
