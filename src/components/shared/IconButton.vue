@@ -81,11 +81,6 @@ const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
   opacity: var(--icon-hover-opacity);
 }
 
-.toolbar-icon {
-  width: 20px;
-  height: 20px;
-  opacity: var(--icon-opacity);
-}
 
 .inline-icon {
   width: 16px;

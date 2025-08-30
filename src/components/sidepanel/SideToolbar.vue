@@ -276,9 +276,7 @@ onUnmounted(() => {
   color: var(--text-on-accent);
 }
 
-.toolbar-button.active .toolbar-icon {
-  filter: brightness(0) invert(1);
-}
+/* Removed nested active toolbar-icon - now handled by global sidepanel styles */
 
 .toolbar-button.loading {
   position: relative;
@@ -304,11 +302,7 @@ onUnmounted(() => {
   100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-.toolbar-icon {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-}
+/* Removed duplicate .toolbar-icon - now handled by sidepanel.scss global styles */
 
 .toolbar-separator {
   width: 20px;

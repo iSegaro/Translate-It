@@ -279,10 +279,8 @@ const handleSettingsClick = async () => {
 
   &.active {
     background-color: var(--color-primary);
-
-    .toolbar-icon {
-      filter: invert(1);
-    }
+    
+    /* Removed nested .toolbar-icon - now handled by global sidepanel styles with higher specificity */
   }
 
   &:disabled {
@@ -295,11 +293,7 @@ const handleSettingsClick = async () => {
   }
 }
 
-.toolbar-icon {
-  width: 18px;
-  height: 18px;
-  filter: var(--icon-filter);
-}
+/* Removed duplicate .toolbar-icon - now handled by sidepanel.scss global styles */
 
 .toolbar-separator {
   width: 80%;

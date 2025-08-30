@@ -97,13 +97,13 @@ body.popup-context {
   gap: 8px;
 }
 
-// Icons and animations
-.toolbar-icon {
+// Popup Context: Icon styles with proper specificity
+body.popup-context .toolbar-icon {
   width: 20px;
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
+  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out, background-color 0.3s ease;
   filter: var(--icon-filter);
 
   &:hover {
@@ -593,3 +593,37 @@ body.popup-context {
     font-style: italic !important;
   }
 }
+
+/* Select Element Error State - Context-specific with proper specificity */
+body.popup-context .select-error.toolbar-icon {
+  position: relative;
+  background-color: rgba(255, 0, 0, 0.4);
+  border-radius: 4px;
+  filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  animation: error-pulse-red 3s ease-in-out forwards;
+}
+
+@keyframes error-pulse-red {
+  0% { 
+    transform: scale(1);
+    background-color: rgba(255, 0, 0, 0.4);
+    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  }
+  10% { 
+    transform: scale(1.1);
+    background-color: rgba(255, 0, 0, 0.4);
+    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  }
+  30% { 
+    transform: scale(1);
+    background-color: rgba(255, 0, 0, 0.4);
+    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  }
+  100% { 
+    transform: scale(1);
+    background-color: transparent;
+    filter: var(--icon-filter);
+  }
+}
+
+/* Old animations removed - using error-pulse-red instead */
