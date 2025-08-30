@@ -4,7 +4,7 @@
       <h2>Sidebar Error</h2>
       <pre>{{ sidebarError }}</pre>
     </div>
-    <div v-else>
+    <div v-else class="sidebar-content">
       <div class="sidebar-header">
         <h1>{{ t('name') }}</h1>
         <span>{{ manifestVersion }}</span>
@@ -129,6 +129,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   z-index: 9999;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
 
 .sidebar-header {
