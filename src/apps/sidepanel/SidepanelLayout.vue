@@ -44,10 +44,10 @@
 </template>
 
 <script setup>
-import { useTranslationStore } from '@/store/modules/translation';
+import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import { useHistory } from '@/composables/useHistory.js';
-import { useSelectElementTranslation } from '@/composables/useTranslationModes.js';
+import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';

@@ -24,7 +24,7 @@ const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 // --- Get API Providers from Registry ---
 async function getApiProviders() {
   try {
-    const { providerRegistry } = await import('@/providers/core/ProviderRegistry.js');
+    const { providerRegistry } = await import('@/features/translation/providers/ProviderRegistry.js');
     return Array.from(providerRegistry.providers.entries()).map(([id, ProviderClass]) => ({
       id,
       defaultTitle: ProviderClass.displayName || id

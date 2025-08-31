@@ -2,7 +2,7 @@
 // Cross-browser service worker for Manifest V3
 
 import { LifecycleManager } from "../managers/core/LifecycleManager.js";
-import { registerAllProviders } from "../providers/register-providers.js";
+import { registerAllProviders } from "../features/translation/providers/register-providers.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

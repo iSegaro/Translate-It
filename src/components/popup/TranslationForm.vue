@@ -44,7 +44,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { useUnifiedTranslation } from '@/composables/useUnifiedTranslation.js'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'

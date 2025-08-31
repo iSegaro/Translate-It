@@ -68,7 +68,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
+import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'

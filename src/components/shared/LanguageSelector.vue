@@ -57,7 +57,7 @@ import { computed, onMounted } from 'vue'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
+import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { CONFIG } from '@/config.js'
 import { getScopedLogger } from '@/utils/core/logger.js';

@@ -1,5 +1,5 @@
 // src/core/providers/OpenAIProvider.js
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getOpenAIApiKeyAsync,
   getOpenAIApiUrlAsync,
@@ -9,7 +9,7 @@ import { buildPrompt } from "@/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/config.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
 

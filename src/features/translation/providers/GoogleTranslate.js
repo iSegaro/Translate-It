@@ -1,5 +1,5 @@
 // src/core/providers/GoogleTranslateProvider.js
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getGoogleTranslateUrlAsync,
   getEnableDictionaryAsync

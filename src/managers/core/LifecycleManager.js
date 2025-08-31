@@ -2,7 +2,7 @@ import browser from "webextension-polyfill";
 import { featureLoader } from "../../background/feature-loader.js";
 
 import { initializeSettingsListener } from "../../config.js";
-import { TranslationEngine } from "../../background/translation-engine.js";
+import { TranslationEngine } from "../../features/translation/core/translation-engine.js";
 import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // This might need to be moved later
 import * as Handlers from "../../background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/utils/core/logger.js';

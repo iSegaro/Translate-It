@@ -53,7 +53,7 @@ export const createBaseConfig = (browser, options = {}) => {
         '@store': resolve(process.cwd(), 'src/store'),
         '@composables': resolve(process.cwd(), 'src/composables'),
         '@utils': resolve(process.cwd(), 'src/utils'),
-        '@providers': resolve(process.cwd(), 'src/providers'),
+        '@providers': resolve(process.cwd(), 'src/features/translation/providers'),
         '@assets': resolve(process.cwd(), 'src/assets')
       }
     },

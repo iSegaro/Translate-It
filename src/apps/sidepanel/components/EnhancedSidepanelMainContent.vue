@@ -51,10 +51,10 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 
-import { useSelectElementTranslation } from "@/composables/useTranslationModes.js";
+import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 import { useI18n } from "@/composables/useI18n.js";
-import { useUnifiedTranslation } from "@/composables/useUnifiedTranslation.js";
+import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 

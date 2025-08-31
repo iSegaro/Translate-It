@@ -83,11 +83,11 @@ import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 
 import { useHistory } from "@/composables/useHistory.js";
-import { useUnifiedTranslation } from "@/composables/useUnifiedTranslation.js";
+import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-import { useTranslationStore } from "@/store/modules/translation.js";
+import { useTranslationStore } from "@/features/translation/stores/translation.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

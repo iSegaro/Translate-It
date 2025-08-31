@@ -3,8 +3,8 @@
  * Handles all translation requests from UI contexts via messaging
  */
 
-import { ProviderFactory } from "@/providers/core/ProviderFactory.js";
-import { providerRegistry } from "@/providers/core/ProviderRegistry.js";
+import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
+import { providerRegistry } from "@/features/translation/providers/ProviderRegistry.js";
 import { storageManager } from "@/storage/core/StorageCore.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
@@ -831,7 +831,7 @@ export class TranslationEngine {
   async getAvailableProviders() {
     try {
       // Use the provider handler to get consistent provider list
-      const { getAvailableProviders } = await import("../handlers/provider-handler.js");
+      const { getAvailableProviders } = await import("../../../handlers/provider-handler.js");
       return await getAvailableProviders();
     } catch (error) {
       logger.error("[TranslationEngine] Failed to get providers:", error);

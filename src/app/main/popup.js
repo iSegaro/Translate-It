@@ -64,7 +64,7 @@ if (appElement && !appElement.__vue_app__) {
 // Lazy loading functions for heavy features (only load when needed)
 export const loadTranslationFeatures = async () => {
   const [translation, providers] = await Promise.all([
-    import('@/store/modules/translation.js'),
+    import('@/features/translation/stores/translation.js'),
     import('@/store/modules/providers.js')
   ])
   return { translation, providers }

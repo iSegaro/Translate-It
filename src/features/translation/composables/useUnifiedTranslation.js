@@ -3,9 +3,9 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useSettingsStore } from "@/store/core/settings.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
-import { useTranslationError } from "@/composables/useTranslationError.js";
-import { generateMessageId } from "../utils/messaging/messageId.js";
-import { isSingleWordOrShortPhrase } from "../utils/text/detection.js";
+import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
+import { generateMessageId } from "../../../utils/messaging/messageId.js";
+import { isSingleWordOrShortPhrase } from "../../../utils/text/detection.js";
 import { TranslationMode } from "@/config.js";
 import { MessageActions } from "@/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/messaging/core/MessagingCore.js";

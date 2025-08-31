@@ -288,7 +288,7 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useTranslationStore } from '@/store/modules/translation.js'
+import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseModal from '@/components/base/BaseModal.vue'

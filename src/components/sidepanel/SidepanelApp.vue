@@ -89,7 +89,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from
 import SideToolbar from './SideToolbar.vue'
 import TranslationForm from './TranslationForm.vue'
 import TranslationResult from './TranslationResult.vue'
-import { useSidepanelTranslation, useSelectElementTranslation } from '@/composables/useTranslationModes.js'
+import { useSidepanelTranslation, useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useSettingsStore } from '@/store/core/settings.js'
 import { useHistory } from '@/composables/useHistory.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'

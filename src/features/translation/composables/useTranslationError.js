@@ -2,10 +2,10 @@
 // Centralized translation error management composable
 
 import { ref, computed, onUnmounted } from 'vue'
-import { useErrorHandler } from './useErrorHandler.js'
-import { ErrorHandler } from '../error-management/ErrorHandler.js'
-import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '../error-management/ErrorDisplayStrategies.js'
-import { matchErrorToType } from '../error-management/ErrorMatcher.js'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { ErrorHandler } from '../../../error-management/ErrorHandler.js'
+import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '../../../error-management/ErrorDisplayStrategies.js'
+import { matchErrorToType } from '../../../error-management/ErrorMatcher.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 

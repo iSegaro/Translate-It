@@ -1,11 +1,11 @@
 // src/core/providers/WebAIProvider.js
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
 export class WebAIProvider extends BaseProvider {
   static type = "ai";

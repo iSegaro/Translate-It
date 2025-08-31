@@ -36,7 +36,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
-import { useTranslationStore } from '@/store/modules/translation'
+import { useTranslationStore } from '@/features/translation/stores/translation'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'

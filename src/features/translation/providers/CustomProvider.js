@@ -1,12 +1,12 @@
 // src/core/providers/CustomProvider.js
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getCustomApiUrlAsync,
   getCustomApiKeyAsync,
   getCustomApiModelAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
 export class CustomProvider extends BaseProvider {
   static type = "ai";

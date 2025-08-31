@@ -95,8 +95,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useSelectElementTranslation } from '@/composables/useTranslationModes.js'
-import { useSidepanelActions } from '@/composables/useTranslationModes.js'
+import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
+import { useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/useApiProvider.js'
 import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
 import { useI18n } from '@/composables/useI18n.js'

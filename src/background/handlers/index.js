@@ -16,10 +16,10 @@ export * from "./lifecycle/handleRestartContentScript.js";
 export * from "./lifecycle/handleBackgroundReloadExtension.js";
 
 // Translation handlers
-export * from "./translation/handleTranslate.js";
-export * from "./translation/handleTranslateText.js";
-export * from "./translation/handleRevertTranslation.js";
-export * from "./translation/handleCancelTranslation.js";
+export * from "../../features/translation/handlers/handleTranslate.js";
+export * from "../../features/translation/handlers/handleTranslateText.js";
+export * from "../../features/translation/handlers/handleRevertTranslation.js";
+export * from "../../features/translation/handlers/handleCancelTranslation.js";
 
 // TTS handlers
 export * from "./tts/handleGoogleTTS.js";

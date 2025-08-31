@@ -1,8 +1,8 @@
 // src/providers/implementations/BingTranslateProvider.js
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { ErrorTypes } from "@/error-management/ErrorTypes.js";
 

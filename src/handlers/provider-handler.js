@@ -11,7 +11,7 @@ export async function getAvailableProviders() {
 
   try {
     // Import provider registry from central index
-    const { ProviderRegistry } = await import("../providers/index.js");
+    const { ProviderRegistry } = await import("@/features/translation/providers/index.js");
     const providers = [];
     for (const [id, ProviderClass] of ProviderRegistry.providers) {
       providers.push({

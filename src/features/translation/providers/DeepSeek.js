@@ -1,22 +1,21 @@
-// src/core/providers/OpenRouterProvider.js
-import browser from 'webextension-polyfill';
-import { BaseProvider } from "@/providers/core/BaseProvider.js";
+// src/core/providers/DeepSeekProvider.js
+import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   CONFIG,
-  getOpenRouterApiKeyAsync,
-  getOpenRouterApiModelAsync,
+  getDeepSeekApiKeyAsync,
+  getDeepSeekApiModelAsync,
 } from "@/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
-import { LanguageSwappingService } from "@/providers/core/LanguageSwappingService.js";
+import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
-export class OpenRouterProvider extends BaseProvider {
+export class DeepSeekProvider extends BaseProvider {
   static type = "ai";
-  static description = "OpenRouter API";
-  static displayName = "OpenRouter";
+  static description = "DeepSeek AI";
+  static displayName = "DeepSeek";
   static reliableJsonMode = false;
   static supportsDictionary = true;
   constructor() {
-    super("OpenRouter");
+    super("DeepSeek");
   }
 
   async translate(text, sourceLang, targetLang, options) {
@@ -31,8 +30,8 @@ export class OpenRouterProvider extends BaseProvider {
     );
 
     const [apiKey, model] = await Promise.all([
-      getOpenRouterApiKeyAsync(),
-      getOpenRouterApiModelAsync(),
+      getDeepSeekApiKeyAsync(),
+      getDeepSeekApiModelAsync(),
     ]);
 
     // Validate configuration
@@ -55,17 +54,16 @@ export class OpenRouterProvider extends BaseProvider {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": browser.runtime.getURL("/"),
-        "X-Title": browser.runtime.getManifest().name,
       },
       body: JSON.stringify({
-        model: model || "openai/gpt-3.5-turbo",
+        model: model || "deepseek-chat",
         messages: [{ role: "user", content: prompt }],
+        stream: false,
       }),
     };
 
     return this._executeApiCall({
-      url: CONFIG.OPENROUTER_API_URL,
+      url: CONFIG.DEEPSEEK_API_URL,
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,

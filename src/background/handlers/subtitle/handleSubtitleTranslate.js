@@ -1,6 +1,6 @@
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { TranslationEngine } from '../../translation-engine.js';
+import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
 import { ErrorHandler } from '../../../error-management/ErrorHandler.js';
 import { ErrorTypes } from '../../../error-management/ErrorTypes.js';
 
