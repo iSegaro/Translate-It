@@ -29,22 +29,6 @@
   >
     <div class="window-header" @mousedown="handleStartDrag">
       <div class="header-actions">
-        <button class="action-btn" @click.stop="handleCopy" title="Copy">
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-          </svg>
-        </button>
-        <button 
-          class="action-btn" 
-          @click.stop="handleTTSClick" 
-          :disabled="!props.initialTranslatedText || props.initialTranslatedText.trim().length === 0"
-          :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24">
-            <path v-if="!isSpeaking" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-            <path v-else fill="currentColor" d="M6 6h12v12H6z"/>
-          </svg>
-        </button>
         <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
           <svg width="16" height="16" viewBox="0 0 24 24">
             <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
@@ -77,11 +61,16 @@
         :target-language="'auto'"
         :show-fade-in-animation="true"
         :enable-markdown="true"
-        :show-toolbar="false"
-        :show-copy-button="false"
-        :show-tts-button="false"
+        :show-toolbar="true"
+        :show-copy-button="true"
+        :show-tts-button="true"
         :can-retry="!!errorMessage"
         :on-retry="handleRetry"
+        :copy-title="'Copy translation'"
+        :tts-title="'Play translation'"
+        @text-copied="handleTranslationCopied"
+        @tts-speaking="handleTranslationTTSSpeaking"
+        @action-failed="handleActionFailed"
         class="window-translation-display"
       />
     </div>
@@ -249,56 +238,20 @@ const toggleShowOriginal = () => {
   showOriginal.value = !showOriginal.value;
 };
 
-const handleCopy = () => {
-  navigator.clipboard.writeText(props.initialTranslatedText);
+// Event handlers for TranslationDisplay
+const handleTranslationCopied = (text) => {
+  console.log(`[TranslationWindow ${props.id}] Translation copied:`, text.substring(0, 50) + '...');
 };
 
-const handleTTSClick = async () => {
-  if (!props.initialTranslatedText || props.initialTranslatedText.trim().length === 0) return;
-  
-  try {
-    if (isSpeaking.value) {
-      // Stop TTS
-      await sendMessage({
-        action: 'GOOGLE_TTS_STOP_ALL',
-        data: { source: 'translation-window-button' }
-      });
-      isSpeaking.value = false;
-    } else {
-      // Start TTS
-      await sendMessage({
-        action: 'GOOGLE_TTS_SPEAK',
-        data: { 
-          text: props.initialTranslatedText,
-          source: 'translation-window-button'
-        }
-      });
-      isSpeaking.value = true;
-    }
-  } catch (error) {
-    console.error(`[TranslationWindow ${props.id}] TTS error:`, error);
-    isSpeaking.value = false;
-  }
-};
-
-// TTSButton event handlers - no need to emit to WindowsManager as TTSButton handles TTS itself
-const handleTTSStarted = (data) => {
-  console.log(`[TranslationWindow ${props.id}] TTS started:`, data.text.substring(0, 50) + '...');
+const handleTranslationTTSSpeaking = (data) => {
+  console.log(`[TranslationWindow ${props.id}] TTS speaking:`, data.text.substring(0, 50) + '...');
   isSpeaking.value = true;
-  // No emit - TTSButton handles TTS internally
 };
 
-const handleTTSStopped = () => {
-  console.log(`[TranslationWindow ${props.id}] TTS stopped`);
-  isSpeaking.value = false;
-  // No emit - TTSButton handles TTS internally
+const handleActionFailed = (error) => {
+  console.error(`[TranslationWindow ${props.id}] Action failed:`, error);
 };
 
-const handleTTSError = (error) => {
-  console.error(`[TranslationWindow ${props.id}] TTS error:`, error);
-  isSpeaking.value = false;
-  // No emit - TTSButton handles TTS internally
-};
 
 // Enhanced drag handling with global state management
 const windowElement = ref(null);
@@ -380,12 +333,10 @@ const handleStartDrag = (event) => {
 }
 
 .header-actions {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-
-/* Removed ActionToolbar-specific styles since we now use direct .action-btn for TTS */
 
 .header-close {
   display: flex;
@@ -470,52 +421,16 @@ const handleStartDrag = (event) => {
 }
 
 
-/* ActionToolbar size adjustments for translation window */
+/* ActionToolbar size adjustments for translation window - now handled by TranslationDisplay */
 .window-translation-display :deep(.display-toolbar) {
-  top: 2px !important;
-  left: 2px !important;
-  right: 2px !important;
-  width: calc(100% - 4px) !important;
-  max-width: calc(100% - 4px) !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(4px) !important;
-  border-radius: 4px !important;
-  padding: 1px 2px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-  overflow: hidden !important;
-}
-
-.window-translation-display :deep(.action-toolbar) {
-  width: 100% !important;
-  max-width: 100% !important;
-  overflow: hidden !important;
-  justify-content: flex-start !important;
-}
-
-.window-translation-display :deep(.toolbar-left) {
-  gap: 1px !important;
-  flex-shrink: 1 !important;
-  min-width: 0 !important;
-  overflow: hidden !important;
-}
-
-.window-translation-display :deep(.action-button) {
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px !important;
-  max-width: 16px !important;
-  font-size: 10px !important;
-  flex-shrink: 0 !important;
-  padding: 1px !important;
-  border-radius: 2px !important;
-}
-
-.window-translation-display :deep(.action-button .button-icon),
-.window-translation-display :deep(.action-button img) {
-  width: 12px !important;
-  height: 12px !important;
-  max-width: 12px !important;
-  max-height: 12px !important;
+  top: 8px;
+  right: 8px;
+  left: auto;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Dark theme adjustments */

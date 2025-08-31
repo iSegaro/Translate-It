@@ -11,7 +11,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 import { TTSManager } from "./translation/TTSManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
-// - AnimationManager, TranslationRenderer, EnhancedTranslationRenderer
+// - AnimationManager, TranslationRenderer
 // - DragHandler, TTSManager
 import { getSettingsAsync, CONFIG, state } from "../../../config.js";
 import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
