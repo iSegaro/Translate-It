@@ -75,6 +75,40 @@ body.sidepanel-context .active .toolbar-icon {
   filter: invert(1);
 }
 
+/* Select Element Error State - Sidepanel context with proper specificity */
+body.sidepanel-context .select-error.toolbar-button {
+  position: relative;
+  border-radius: 4px;
+  animation: error-pulse-red 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: background-color, filter;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  transition: none !important; /* Disable conflicting transition during animation */
+}
+
+body.sidepanel-context .select-error.toolbar-button .toolbar-icon {
+  filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+}
+
+@keyframes error-pulse-red {
+  0% { 
+    background-color: transparent;
+    filter: var(--icon-filter, none);
+  }
+  15% { 
+    background-color: rgba(255, 0, 0, 0.5);
+    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
+  }
+  85% { 
+    background-color: rgba(255, 0, 0, 0.5);
+    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
+  }
+  100% { 
+    background-color: transparent;
+    filter: var(--icon-filter, none);
+  }
+}
+
 .toolbar-separator {
   width: 80%;
   height: 1px;

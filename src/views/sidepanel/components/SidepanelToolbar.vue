@@ -6,7 +6,10 @@
         class="toolbar-button"
         :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
         :disabled="isSelectElementDebounced || isActivating"
-        :class="{ active: isSelectModeActive }"
+        :class="{ 
+          active: isSelectModeActive,
+          'select-error': selectElementError 
+        }"
         @click="handleSelectElement"
       >
         <img
@@ -122,6 +125,7 @@ const { handleError, handleConnectionError } = useErrorHandler()
 
 // Debounce logic
 const isSelectElementDebounced = ref(false)
+const selectElementError = ref(false) // Error state for Select Element button
 
 const handleSelectElement = async () => {
   getLogger().debug('🎯 Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')
@@ -129,6 +133,9 @@ const handleSelectElement = async () => {
   if (isSelectElementDebounced.value) return
   isSelectElementDebounced.value = true
   setTimeout(() => { isSelectElementDebounced.value = false }, 500)
+
+  // Reset any previous error state
+  selectElementError.value = false
 
   try {
     // Send request and wait for confirmation from background/content script
@@ -138,6 +145,15 @@ const handleSelectElement = async () => {
       if (result) {
         getLogger().debug('✅ Select element mode deactivated successfully')
         // composable will update shared state; UI follows isSelectModeActive
+        showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
+      } else {
+        getLogger().debug('❌ Select element mode deactivation failed')
+        // Show error state with red background
+        selectElementError.value = true
+        // Reset error state after 1.5 seconds with smooth transition
+        setTimeout(() => {
+          selectElementError.value = false
+        }, 1500)
       }
     } else {
       getLogger().debug('🔄 Activating select element mode...')
@@ -145,13 +161,27 @@ const handleSelectElement = async () => {
       if (result) {
         getLogger().debug('✅ Select element mode activated successfully')
         // composable will update shared state; UI follows isSelectModeActive
+        showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
+      } else {
+        getLogger().debug('❌ Select element mode activation failed')
+        // Show error state with red background
+        selectElementError.value = true
+        // Reset error state after 1.5 seconds with smooth transition
+        setTimeout(() => {
+          selectElementError.value = false
+        }, 1500)
       }
     }
-    showVisualFeedback(document.getElementById('selectElementBtn'), 'success')
   } catch (error) {
     getLogger().error('❌ Select element mode error:', error)
+    
+    // Show error state for unexpected errors too
+    selectElementError.value = true
+    setTimeout(() => {
+      selectElementError.value = false
+    }, 1500)
+    
     await handleError(error, 'SidepanelToolbar-selectElement')
-    showVisualFeedback(document.getElementById('selectElementBtn'), 'error')
   }
 }
 
@@ -226,7 +256,8 @@ const handleSettingsClick = async () => {
     await handleError(error, 'SidepanelToolbar-openSettings')
     showVisualFeedback(document.getElementById('settingsBtn'), 'error')
   }
-}</script>
+};
+</script>
 
 <style lang="scss" scoped>
 @use "@/assets/styles/variables.scss" as *;
@@ -290,6 +321,11 @@ const handleSettingsClick = async () => {
     &:hover {
       background-color: transparent;
     }
+  }
+
+  // Disable transition during error animation for smooth keyframe animation
+  &.select-error {
+    transition: none !important;
   }
 }
 
