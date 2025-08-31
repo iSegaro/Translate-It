@@ -278,9 +278,6 @@ h2 {
   label {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
-    color: var(--color-text);
-    margin-bottom: 0;
-    flex-grow: 1;
   }
 }
 
