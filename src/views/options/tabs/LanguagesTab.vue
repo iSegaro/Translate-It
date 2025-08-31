@@ -4,21 +4,19 @@
     
     <div class="setting-group">
   <label>{{ t('source_language_label') || 'Source Language' }}</label>
-      <LanguageSelector
+      <LanguageDropdown
         v-model="sourceLanguage"
         :languages="sourceLanguages"
         type="source"
-        class="language-select"
       />
     </div>
     
     <div class="setting-group">
   <label>{{ t('target_language_label') || 'Target Language' }}</label>
-      <LanguageSelector
+      <LanguageDropdown
         v-model="targetLanguage"
         :languages="targetLanguages"
         type="target"
-        class="language-select"
       />
     </div>
     
@@ -37,7 +35,7 @@ import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import { useValidation } from '@/utils/core/validation.js'
 import { useLanguages } from '@/composables/useLanguages.js'
-import LanguageSelector from '@/components/feature/LanguageSelector.vue'
+import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
@@ -106,9 +104,10 @@ h2 {
 .setting-group {
   margin-bottom: $spacing-lg;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
+  gap: $spacing-md;
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
   
@@ -122,13 +121,12 @@ h2 {
     font-weight: $font-weight-medium;
     color: var(--color-text);
     margin-bottom: 0;
-    flex-grow: 1;
-    min-width: 200px;
+    flex: 1;
+    white-space: nowrap;
   }
   
-  .language-select {
-    min-width: 250px;
-    flex-shrink: 0;
+  .language-dropdown {
+    flex: 0 0 250px;
   }
 }
 
@@ -152,7 +150,7 @@ h2 {
       min-width: auto;
     }
     
-    .language-select {
+    .language-dropdown {
       min-width: auto;
       width: 100%;
     }

@@ -6,7 +6,7 @@
     <!-- Source Text Section -->
     <div class="input-section">
       <div class="language-row">
-        <LanguageSelector
+        <LanguageDropdown
           v-model="fromLanguage"
           type="source"
           :languages="sourceLanguages"
@@ -22,7 +22,7 @@
           @click="swapLanguages"
         />
         
-        <LanguageSelector
+        <LanguageDropdown
           v-model="toLanguage"
           type="target"
           :languages="targetLanguages"
@@ -115,7 +115,7 @@ import { useLanguages } from '@/composables/useLanguages.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import LanguageSelector from '@/components/feature/LanguageSelector.vue'
+import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 
 const props = defineProps({
   mode: {

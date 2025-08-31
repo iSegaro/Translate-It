@@ -2,7 +2,7 @@
   <select
     :value="modelValue"
     :disabled="disabled"
-    class="language-select"
+    class="language-dropdown"
     @change="handleChange"
   >
     <option 
@@ -44,24 +44,15 @@ const handleChange = (event) => {
 </script>
 
 <style scoped>
-.language-select {
+.language-dropdown {
   width: 100%;
-  padding: 6px 8px;
+  padding: 6px 24px 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-sm);
   font-size: var(--font-size-sm);
   background-color: var(--color-background);
   color: var(--color-text);
   cursor: pointer;
-  
-  /* Custom dropdown arrow for better RTL support */
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 30px;
   
   &:focus {
     outline: none;
@@ -75,11 +66,9 @@ const handleChange = (event) => {
   }
 }
 
-/* RTL support for dropdown arrow */
-:global(.extension-options.rtl) .language-select {
-  background-position: left 8px center;
-  padding-right: 8px;
-  padding-left: 30px;
-  direction: rtl;
+/* RTL support - reverse padding and text alignment */
+:global(.extension-options.rtl) .language-dropdown {
+  text-align: right;
+  padding: 6px 8px 6px 24px;
 }
 </style>
