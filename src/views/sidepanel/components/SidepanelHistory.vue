@@ -5,9 +5,7 @@
     :class="{ active: isVisible }"
   >
     <div class="history-header">
-      <h3>{{ t('SIDEPANEL_HISTORY_TITLE') || 'History' }}
-        Translation History
-      </h3>
+      <h3>{{ t('SIDEPANEL_HISTORY_TITLE') || 'Translation History' }}</h3>
       <button
         id="closeHistoryBtn"
         class="close-btn"
