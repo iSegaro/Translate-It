@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import i18n, { setI18nLocale } from '@/plugins/i18n'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
-import OptionsApp from '@/views/options/OptionsApp.vue'
+import OptionsApp from '@/apps/options/OptionsApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
@@ -14,14 +14,14 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 
 // Import route components (lazy loaded)
-const LanguagesTab = () => import('@/views/options/tabs/LanguagesTab.vue')
-const ActivationTab = () => import('@/views/options/tabs/ActivationTab.vue')
-const PromptTab = () => import('@/views/options/tabs/PromptTab.vue')
-const ApiTab = () => import('@/views/options/tabs/ApiTab.vue')
-const ImportExportTab = () => import('@/views/options/tabs/ImportExportTab.vue')
-const AdvanceTab = () => import('@/views/options/tabs/AdvanceTab.vue')
-const HelpTab = () => import('@/views/options/tabs/HelpTab.vue')
-const About = () => import('@/views/options/About.vue')
+const LanguagesTab = () => import('@/apps/options/tabs/LanguagesTab.vue')
+const ActivationTab = () => import('@/apps/options/tabs/ActivationTab.vue')
+const PromptTab = () => import('@/apps/options/tabs/PromptTab.vue')
+const ApiTab = () => import('@/apps/options/tabs/ApiTab.vue')
+const ImportExportTab = () => import('@/apps/options/tabs/ImportExportTab.vue')
+const AdvanceTab = () => import('@/apps/options/tabs/AdvanceTab.vue')
+const HelpTab = () => import('@/apps/options/tabs/HelpTab.vue')
+const About = () => import('@/apps/options/About.vue')
 
 // Initialize and mount Vue app after browser API is ready
 async function initializeApp() {

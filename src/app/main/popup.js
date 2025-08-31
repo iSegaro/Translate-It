@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
-import PopupApp from '@/views/popup/PopupApp.vue'
+import PopupApp from '@/apps/popup/PopupApp.vue'
 import '@/main.scss'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'

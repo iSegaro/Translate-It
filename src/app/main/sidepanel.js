@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
-import SidepanelApp from '@/views/sidepanel/SidepanelApp.vue'
+import SidepanelApp from '@/apps/sidepanel/SidepanelApp.vue'
 import '@/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingContexts } from '@/messaging/core/MessagingCore.js'

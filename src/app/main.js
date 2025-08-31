@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import ContentApp from '../views/content/ContentApp.vue';
+import ContentApp from '../apps/content/ContentApp.vue';
 import i18n from '../plugins/i18n';
 
 // Import all necessary styles as raw strings using Vite's `?inline` feature.

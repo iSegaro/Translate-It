@@ -49,7 +49,7 @@ export const createBaseConfig = (browser, options = {}) => {
       alias: {
         '@': resolve(process.cwd(), 'src'),
         '@components': resolve(process.cwd(), 'src/components'),
-        '@views': resolve(process.cwd(), 'src/views'),
+        '@views': resolve(process.cwd(), 'src/apps'),
         '@store': resolve(process.cwd(), 'src/store'),
         '@composables': resolve(process.cwd(), 'src/composables'),
         '@utils': resolve(process.cwd(), 'src/utils'),
