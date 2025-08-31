@@ -234,7 +234,7 @@ export class TranslationOrchestrator {
     }
     
     if (request.status !== 'pending') {
-      this.logger.warn("Received translation result for already completed message:", messageId);
+      this.logger.debug("Received translation result for already completed message:", messageId);
       return;
     }
 
