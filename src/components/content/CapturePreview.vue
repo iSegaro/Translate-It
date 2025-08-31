@@ -1010,6 +1010,13 @@ onUnmounted(() => {
   }
 }
 
+.result {
+  background-color: var(--bg-result-color);
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-y: auto;
+}
+
 /* Loading spinner */
 .loading-spinner {
   width: 16px;

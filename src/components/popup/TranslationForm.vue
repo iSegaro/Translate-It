@@ -287,4 +287,11 @@ watch(isTranslating, (newLoading, oldLoading) => {
   font-size: 13px;
   height: 100%;
 }
+
+.result {
+  background-color: var(--bg-result-color);
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-y: auto;
+}
 </style>

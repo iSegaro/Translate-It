@@ -276,67 +276,12 @@ body.popup-context .toolbar-icon {
   }
 }
 
-.api-provider-icon {
-  width: 16px;
-  height: 16px;
-  opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out;
-}
-
-.translate-main-area:hover .api-provider-icon {
-  opacity: var(--icon-hover-opacity);
-}
-
-.dropdown-arrow {
-  width: 6px !important;
-  height: 4px !important;
-  opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease;
-  filter: var(--icon-filter);
-  pointer-events: none;
-}
-
-.provider-dropdown-area:hover .dropdown-arrow {
-  opacity: var(--icon-hover-opacity);
-}
-
 // Textarea and result styles
-.source-textarea,
-.result {
-  width: 100%;
-  padding: 28px 12px 12px 12px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 15px;
-  resize: vertical;
-  box-sizing: border-box;
-  direction: ltr;
-  text-align: left;
-  min-height: 60px;
-  background-color: var(--bg-textbox-color);
-  color: var(--text-color);
-  border: 1px solid var(--header-border-color);
-  line-height: 1.6;
-
-  &:focus {
-    border-color: #80bdff;
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-  }
-}
-
 .result {
   background-color: var(--bg-result-color);
   white-space: normal !important;
   word-wrap: break-word;
   overflow-y: auto;
-}
-
-// Placeholder styles
-.placeholder-text {
-  color: #6c757d;
-  font-style: italic;
-  opacity: 0.7;
 }
 
 // Inline toolbar styles are now handled by shared components
