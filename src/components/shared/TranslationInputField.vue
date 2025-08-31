@@ -211,7 +211,7 @@ onMounted(async () => {
   box-sizing: border-box;
   direction: ltr;
   text-align: left;
-  background-color: var(--bg-textbox-color);
+  background-color: var(--input-bg-color);
   color: var(--text-color);
   /* border: 1px solid var(--header-border-color); */
   line-height: 1.5;
