@@ -597,30 +597,28 @@ body.popup-context .toolbar-icon {
 /* Select Element Error State - Context-specific with proper specificity */
 body.popup-context .select-error.toolbar-icon {
   position: relative;
-  background-color: rgba(255, 0, 0, 0.4);
   border-radius: 4px;
   filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
-  animation: error-pulse-red 3s ease-in-out forwards;
+  animation: error-pulse-red 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: background-color, filter;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 @keyframes error-pulse-red {
   0% { 
-    transform: scale(1);
-    background-color: rgba(255, 0, 0, 0.4);
-    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+    background-color: transparent;
+    filter: var(--icon-filter);
   }
-  10% { 
-    transform: scale(1.1);
-    background-color: rgba(255, 0, 0, 0.4);
-    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  15% { 
+    background-color: rgba(255, 0, 0, 0.5);
+    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
   }
-  30% { 
-    transform: scale(1);
-    background-color: rgba(255, 0, 0, 0.4);
-    filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
+  85% { 
+    background-color: rgba(255, 0, 0, 0.5);
+    filter: hue-rotate(0deg) saturate(2) brightness(0.9) contrast(1.3);
   }
   100% { 
-    transform: scale(1);
     background-color: transparent;
     filter: var(--icon-filter);
   }

@@ -139,10 +139,10 @@ const handleSelectElement = async () => {
       // Show error state with red border
       selectElementError.value = true
       
-      // Reset error state after 3 seconds with smooth transition
+      // Reset error state after 1.5 seconds with smooth transition
       setTimeout(() => {
         selectElementError.value = false
-      }, 3000)
+      }, 1500)
     }
   } catch (error) {
     logger.error('❌ Select element toggle failed:', error)
@@ -151,7 +151,7 @@ const handleSelectElement = async () => {
     selectElementError.value = true
     setTimeout(() => {
       selectElementError.value = false
-    }, 3000)
+    }, 1500)
     
     await handleError(error, 'PopupHeader-selectElement')
   }
