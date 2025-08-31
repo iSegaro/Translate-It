@@ -16,66 +16,6 @@
   height: 100vh; /* Ensure the parent container has a fixed height */
 }
 
-.sidebar-header {
-  padding: $spacing-sm;
-  text-align: center;
-  margin-bottom: $spacing-md;
-
-  h1 {
-    font-size: $font-size-xl * 1.2;
-    font-weight: $font-weight-medium;
-    margin: 0 0 $spacing-xs 0;
-    text-align: left;
-    color: var(--color-text);
-  }
-
-  span {
-    font-size: $font-size-xs;
-    color: var(--color-text-secondary);
-  }
-
-  p {
-    font-size: $font-size-sm;
-    margin-top: $spacing-sm;
-    color: var(--color-text-secondary);
-  }
-}
-
-.sidebar-section {
-  border: $border-width $border-style var(--color-border);
-  border-radius: $border-radius-md;
-  padding: $spacing-md;
-  margin-bottom: $spacing-md;
-
-  h2 {
-    font-size: $font-size-xs;
-    font-weight: $font-weight-medium;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 0 0 $spacing-base 0;
-    color: var(--color-text-secondary);
-  }
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding-top: $spacing-md;
-  border-top: $border-width $border-style var(--color-border);
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
-  text-align: center;
-
-  a {
-    color: var(--color-primary);
-    text-decoration: none;
-    font-weight: $font-weight-medium;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-
 .tab-content {
   opacity: 0;
   display: none;
