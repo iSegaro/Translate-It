@@ -1,70 +1,5 @@
 /* OLD/styles/sidepanel.css content */
 
-.sidepanel-container {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  background-color: var(--color-background);
-  color: var(--color-text);
-}
-
-.side-toolbar {
-  width: 50px;
-  background-color: var(--color-surface-alt);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-right: 1px solid var(--color-border);
-}
-
-.toolbar-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.toolbar-group-bottom {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.toolbar-button {
-  background: none;
-  border: none;
-  padding: 5px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.toolbar-button:hover {
-  background-color: var(--color-background);
-}
-
-// Sidepanel Context: Icon styles with proper specificity  
-body.sidepanel-context .toolbar-icon {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  opacity: var(--icon-opacity, 0.7);
-  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out, background-color 0.3s ease;
-  filter: var(--icon-filter);
-  object-fit: contain;
-
-  &:hover {
-    opacity: var(--icon-hover-opacity, 1);
-  }
-}
-
 /* Active state for toolbar buttons in sidepanel */
 body.sidepanel-context .toolbar-button.active .toolbar-icon {
   filter: brightness(0) invert(1);
@@ -114,20 +49,6 @@ body.sidepanel-context .select-error.toolbar-button .toolbar-icon {
   height: 1px;
   background-color: var(--color-border);
   margin: 5px 0;
-}
-
-.content-area {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* Ensures content doesn't overflow */
-  position: relative; /* For absolute positioning of history panel */
-}
-
-.main-content {
-  flex-grow: 1;
-  padding: 15px;
-  overflow-y: auto;
 }
 
 #translationForm {
@@ -228,31 +149,6 @@ textarea:focus {
 .action-bar {
   display: flex;
   justify-content: center;
-}
-
-.translate-button-main {
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 15px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.translate-button-main:hover {
-  background-color: var(--color-primary-dark);
-}
-
-.translate-button-main img {
-  width: 18px;
-  height: 18px;
-  filter: invert(1);
 }
 
 .history-panel {

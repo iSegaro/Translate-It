@@ -541,4 +541,23 @@ watch(translatedText, (newValue, oldValue) => {
     font-size: 13px;
   }
 }
+
+.translate-button-main {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.translate-button-main:hover {
+  background-color: var(--color-primary-dark);
+}
 </style>

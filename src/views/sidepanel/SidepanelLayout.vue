@@ -189,8 +189,6 @@ onUnmounted(() => {
   width: 100%;
   background-color: var(--bg-color);
   color: var(--text-color);
-  position: relative;
-  overflow: hidden;
 }
 
 .enhanced-version-toggle {
@@ -235,5 +233,16 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   min-width: 0; // Important for preventing overflow
+}
+
+.side-toolbar {
+  width: 50px;
+  background-color: var(--color-surface-alt);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-right: 1px solid var(--color-border);
 }
 </style>

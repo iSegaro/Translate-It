@@ -329,7 +329,12 @@ const handleSettingsClick = async () => {
   }
 }
 
-/* Removed duplicate .toolbar-icon - now handled by sidepanel.scss global styles */
+/* Scoped styles for toolbar icons */
+.toolbar-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
 
 .toolbar-separator {
   width: 80%;

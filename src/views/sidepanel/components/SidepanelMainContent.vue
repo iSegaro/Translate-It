@@ -407,14 +407,18 @@ onUnmounted(() => {
 });</script>
 
 <style scoped>
-.main-content {
-  width: 100%;
-  height: 100%;
-  padding: 4px 12px;
+.content-area {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden;
-  box-sizing: border-box;
+  overflow: hidden; /* Ensures content doesn't overflow */
+  position: relative; /* For absolute positioning of history panel */
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 15px;
+  overflow-y: auto;
 }
 
 /* Select Element Status Styling */
