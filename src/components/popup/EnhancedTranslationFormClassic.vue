@@ -378,8 +378,7 @@ defineExpose({
   position: relative;
 }
 
-.input-container,
-.result-container {
+.input-container {
   position: relative;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -408,6 +407,14 @@ defineExpose({
 
 .translation-textarea.enhanced::placeholder {
   color: var(--color-text-placeholder);
+}
+
+.result-container {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  transition: border-color 0.2s ease;
 }
 
 .result-content {
