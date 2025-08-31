@@ -255,19 +255,18 @@ onMounted(async () => {
   min-width: 100px;
   padding: 7px 8px;
   font-size: 14px;
-  border: 1px solid var(--language-select-border-color);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background-color: var(--language-select-bg-color);
-  color: var(--language-select-text-color);
+  background-color: var(--color-background);
+  color: var(--color-text);
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5" viewBox="0 0 10 5"><path fill="%236c757d" d="M0 0l5 5 5-5z"/></svg>');
   background-repeat: no-repeat;
-  background-position: left 8px center;
+  background-position: right 8px center; /* Move arrow to the right */
   background-size: 10px 5px;
-  padding-left: 25px;
-  filter: var(--icon-filter);
+  padding-right: 25px; /* Add space for the arrow */
 }
 
 .language-select:focus {
