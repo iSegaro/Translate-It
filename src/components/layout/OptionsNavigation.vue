@@ -229,4 +229,49 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
     }
   }
 }
+
+// RTL specific styles for navigation
+:global(.options-layout.rtl) {
+  .vertical-tabs {
+    border-right: none;
+    border-left: $border-width $border-style var(--color-border);
+  }
+  
+  .tab-button {
+    text-align: right;
+    border-left: none;
+    border-right: 4px solid transparent;
+    
+    &.active {
+      border-left-color: transparent;
+      border-right-color: var(--color-primary);
+    }
+  }
+  
+  .tabs-action-area {
+    text-align: right;
+    
+    #status {
+      text-align: right;
+    }
+  }
+  
+  // Mobile RTL adjustments
+  @media (max-width: #{$breakpoint-md}) {
+    .vertical-tabs {
+      border-left: none;
+    }
+    
+    .tab-button {
+      border-right: none;
+      border-bottom: 4px solid transparent;
+      text-align: center;
+      
+      &.active {
+        border-right-color: transparent;
+        border-bottom-color: var(--color-primary);
+      }
+    }
+  }
+}
 </style>

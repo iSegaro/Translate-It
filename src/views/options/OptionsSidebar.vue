@@ -167,6 +167,11 @@ onMounted(async () => {
   }
 }
 
+// RTL specific styles for sidebar header
+:global(.options-layout.rtl) .sidebar-header {
+  text-align: center; // Keep header centered for both directions
+}
+
 .sidebar-section {
   border: $border-width $border-style var(--color-border);
   border-radius: $border-radius-md;
@@ -278,6 +283,22 @@ onMounted(async () => {
     object-fit: cover;
     vertical-align: middle;
     border-radius: 2px;
+  }
+}
+
+// RTL specific styles for language list
+:global(.options-layout.rtl) {
+  .language-flag-image {
+    margin-right: 0;
+    margin-left: 12px;
+  }
+  
+  .sidebar-section h2 {
+    text-align: right;
+  }
+  
+  .language-list-item {
+    text-align: right;
   }
 }
 </style>

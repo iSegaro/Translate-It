@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="options-layout"
-    :class="{ 'rtl': isRTL }"
-  >
+  <div class="options-layout">
     <OptionsSidebar />
     <main class="options-main">
       <OptionsNavigation />
@@ -17,22 +14,21 @@
 import { computed } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
-import browser from 'webextension-polyfill'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
 
+const { t } = useUnifiedI18n()
 
-// RTL detection using i18n plugin
+
+// RTL detection using unified i18n (reactive to language changes)
 const isRTL = computed(() => {
   try {
-    // Access browser API safely
-    if (typeof browser !== 'undefined' && browser.i18n) {
-      return browser.i18n.getMessage('IsRTL') === 'true'
-    }
-    return false
+    const rtlValue = t('IsRTL') || 'false'
+    return rtlValue === 'true'
   } catch (e) {
-  logger.debug('Failed to get RTL setting:', e.message)
+    logger.debug('Failed to get RTL setting:', e.message)
     return false
   }
 })
@@ -55,7 +51,7 @@ const isRTL = computed(() => {
   
   /* Debug outline removed */
   
-  &.rtl {
+  :global(.extension-options.rtl) & {
     direction: rtl;
     
     .options-sidebar {
@@ -67,6 +63,82 @@ const isRTL = computed(() => {
       .vertical-tabs {
         border-left: $border-width $border-style var(--color-border);
         border-right: none;
+      }
+    }
+    
+    // Global RTL styles for all tab content
+    .tab-content-container {
+      // Headers and titles
+      h1, h2, h3, h4, h5, h6 {
+        text-align: right;
+      }
+      
+      // Setting groups
+      .setting-group {
+        label {
+          text-align: right;
+        }
+        
+        .setting-description {
+          text-align: right;
+        }
+      }
+      
+      // Sub setting groups  
+      .sub-setting-group {
+        margin-right: $spacing-lg;
+        margin-left: 0;
+        padding-right: $spacing-md;
+        padding-left: 0;
+        border-right: 2px solid var(--color-border);
+        border-left: none;
+      }
+      
+      // Error messages
+      .validation-error,
+      .error-message {
+        text-align: right;
+      }
+      
+      // Form controls alignment
+      .form-control,
+      .form-group {
+        text-align: right;
+      }
+      
+      // Fieldset titles
+      fieldset legend {
+        text-align: right;
+      }
+      
+      // Help tab specific RTL styles
+      .help-tab {
+        .accordion-header {
+          text-align: right;
+          
+          .accordion-icon {
+            margin-left: 0;
+            margin-right: $spacing-sm;
+          }
+        }
+        
+        .accordion-inner {
+          text-align: right;
+          direction: rtl;
+          
+          ol, ul {
+            padding-right: $spacing-lg;
+            padding-left: 0;
+          }
+          
+          li {
+            text-align: right;
+          }
+          
+          p {
+            text-align: right;
+          }
+        }
       }
     }
   }

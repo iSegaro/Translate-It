@@ -1,5 +1,9 @@
 <template>
-  <div class="extension-options">
+  <div 
+    class="extension-options"
+    :class="{ 'rtl': isRTL }"
+    :dir="isRTL ? 'rtl' : 'ltr'"
+  >
     <div
       v-if="isLoading"
       class="loading-container"
@@ -34,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useSettingsStore } from '@/store/core/settings'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
@@ -42,6 +46,8 @@ import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { loadSettingsModules } from '@/utils/settings-modules.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import browser from 'webextension-polyfill'
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsApp');
 
 
@@ -61,6 +67,17 @@ watch(() => locale.value, () => {
 })
 const hasError = ref(false)
 const errorMessage = ref('')
+
+// RTL detection using unified i18n (reactive to language changes)
+const isRTL = computed(() => {
+  try {
+    const rtlValue = t('IsRTL') || 'false'
+    return rtlValue === 'true'
+  } catch (e) {
+    logger.debug('Failed to get RTL setting:', e.message)
+    return false
+  }
+})
 
 // Lifecycle
 onMounted(async () => {
@@ -129,6 +146,26 @@ const retryLoading = () => {
   justify-content: center;
   align-items: center;
   background-color: var(--color-background) !important;
+}
+
+.extension-options.rtl {
+  direction: rtl;
+  
+  .loading-container {
+    text-align: right;
+  }
+  
+  .error-container {
+    text-align: right;
+    
+    h2 {
+      text-align: right;
+    }
+    
+    .error-message {
+      text-align: right;
+    }
+  }
 }
 
 /* CSS context separation completed */
