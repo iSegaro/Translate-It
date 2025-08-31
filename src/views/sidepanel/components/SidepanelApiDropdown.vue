@@ -270,11 +270,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupEventListeners()
-})</script>
+})
+</script>
 
 <style lang="scss" scoped>
 @use '@/assets/styles/variables.scss' as *;
 
+/* Scoped styles for dropdown menu */
 .dropdown-menu {
   position: fixed;
   background-color: var(--color-surface);
@@ -288,8 +290,10 @@ onUnmounted(() => {
   min-width: 200px;
   max-width: 300px;
   max-height: 400px;
+  gap: 5px; /* Added from duplicate definition */
 }
 
+/* Scoped styles for the dropdown menu */
 .dropdown-content {
   display: flex;
   flex-direction: column;

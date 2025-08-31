@@ -245,4 +245,11 @@ onUnmounted(() => {
   padding: 10px 0;
   border-right: 1px solid var(--color-border);
 }
+
+/* Scoped styles for the sidepanel container */
+.extension-sidepanel {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+}
 </style>

@@ -219,17 +219,18 @@ onUnmounted(() => {
   }
 }
 
+/* Scoped styles for dropdown menu */
 .dropdown-menu {
   position: absolute;
-  z-index: 1000;
-  background-color: var(--color-background);
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-base);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-  min-width: 180px;
-  max-height: 300px;
-  overflow-y: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 5px;
+  z-index: 200;
+  display: none; /* Managed by JS */
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* Positioning */

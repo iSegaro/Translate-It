@@ -232,16 +232,3 @@ textarea:focus {
   height: 18px;
   filter: invert(1);
 }
-
-.dropdown-menu {
-  position: absolute;
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 5px;
-  z-index: 200;
-  display: none; /* Managed by JS */
-  flex-direction: column;
-  gap: 5px;
-}

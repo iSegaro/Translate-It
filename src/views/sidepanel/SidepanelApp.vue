@@ -148,12 +148,6 @@ const retryLoading = () => {
 </script>
 
 <style scoped>
-.extension-sidepanel {
-  width: 100%;
-  height: 100vh;
-  overflow-y: auto;
-}
-
 .loading-container {
   display: flex;
   flex-direction: column;

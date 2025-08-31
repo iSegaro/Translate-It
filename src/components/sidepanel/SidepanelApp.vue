@@ -527,15 +527,17 @@ onUnmounted(() => {
   height: 14px;
 }
 
+/* Scoped styles for dropdown menu */
 .dropdown-menu {
   position: absolute;
-  top: 60px;
-  right: 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  min-width: 200px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 5px;
+  z-index: 200;
+  display: none; /* Managed by JS */
+  flex-direction: column;
+  gap: 5px;
 }
 </style>
