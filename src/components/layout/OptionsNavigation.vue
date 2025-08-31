@@ -317,28 +317,6 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
   
   .tabs-action-area {
     text-align: right;
-    
-    #status {
-      text-align: right;
-    }
-  }
-  
-  // Mobile RTL adjustments
-  @media (max-width: #{$breakpoint-md}) {
-    .vertical-tabs {
-      border-left: none;
-    }
-    
-    .tab-button {
-      border-right: none;
-      border-bottom: 4px solid transparent;
-      text-align: center;
-      
-      &.active {
-        border-right-color: transparent;
-        border-bottom-color: var(--color-primary);
-      }
-    }
   }
 }
 </style>

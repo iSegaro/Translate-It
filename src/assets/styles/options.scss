@@ -396,14 +396,3 @@ input[type="radio"] {
     box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3) !important;
   }
 }
-
-/* RTL SPECIFIC STYLES */
-
-:global(.options-layout.rtl) {
-  .accordion-header {
-    display: flex !important;
-    flex-direction: row-reverse !important; /* Reverse the order of elements */
-    justify-content: space-between !important; /* Ensure proper spacing */
-    text-align: right !important; /* Align text to the right */
-  }
-}
