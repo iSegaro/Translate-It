@@ -1,29 +1,17 @@
 <template>
-  <div
-    class="provider-selector"
-    :class="{ compact: mode === 'compact' }"
+  <select
+    :value="modelValue"
+    class="provider-select"
+    @change="handleChange"
   >
-    <label
-      v-if="mode !== 'compact'"
-      class="provider-label"
+    <option 
+      v-for="provider in availableProviders" 
+      :key="provider.id" 
+      :value="provider.id"
     >
-      Translation Provider
-    </label>
-    
-    <select
-      :value="modelValue"
-      class="provider-select"
-      @change="handleChange"
-    >
-      <option 
-        v-for="provider in availableProviders" 
-        :key="provider.id" 
-        :value="provider.id"
-      >
-        {{ provider.name }}
-      </option>
-    </select>
-  </div>
+      {{ provider.name }}
+    </option>
+  </select>
 </template>
 
 <script setup>
@@ -34,11 +22,6 @@ defineProps({
   modelValue: {
     type: String,
     required: true
-  },
-  mode: {
-    type: String,
-    default: 'normal',
-    validator: (value) => ['normal', 'compact'].includes(value)
   }
 })
 
@@ -62,22 +45,6 @@ const handleChange = (event) => {
 </script>
 
 <style scoped>
-.provider-selector {
-  padding: 8px 16px;
-  border-top: 1px solid var(--color-border);
-  
-  &.compact {
-    padding: 8px 16px 16px;
-  }
-}
-
-.provider-label {
-  display: block;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: 4px;
-}
-
 .provider-select {
   width: 100%;
   padding: 6px 8px;
