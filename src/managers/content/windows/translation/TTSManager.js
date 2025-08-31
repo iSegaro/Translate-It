@@ -218,7 +218,7 @@ export class TTSManager {
         // Use improved parameters to avoid HTTP 400 errors
         let finalText = text.trim();
         
-        // Clean text for TTS (remove markdown, extra whitespace, special chars)
+        // Clean text for TTS (remove problematic characters that cause HTTP 400)
         finalText = finalText
           // Remove markdown formatting
           .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
@@ -228,15 +228,29 @@ export class TTSManager {
           // Remove definition patterns (noun:, verb:, adj:, etc.)
           .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
           .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
+          // Remove HTML tags
+          .replace(/<[^>]*>/g, '')
           // Remove extra whitespace and newlines
           .replace(/\s+/g, ' ')
           .replace(/\n+/g, ' ')
-          // Remove special characters that might cause issues (be more restrictive)
-          .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s\.,!?\-]/g, '')
+          // More aggressive character filtering to prevent HTTP 400
+          .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200Da-zA-Z0-9\s\.,!?\-\(\)]/g, '')
+          // Remove multiple dots, dashes, etc.
+          .replace(/\.{3,}/g, '...')
+          .replace(/-{2,}/g, '-')
+          .replace(/\?{2,}/g, '?')
+          .replace(/!{2,}/g, '!')
           .trim();
         
-        if (finalText.length > 200) {
-          finalText = finalText.substring(0, 197) + '...';
+        // Stricter length limit to prevent HTTP 400
+        if (finalText.length > 150) {
+          finalText = finalText.substring(0, 147) + '...';
+        }
+        
+        // Additional validation
+        if (!finalText || finalText.length < 1) {
+          reject(new Error('Text too short or empty after cleaning'));
+          return;
         }
         
         const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(finalText)}&tl=${language}&client=tw-ob`;
