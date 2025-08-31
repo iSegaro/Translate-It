@@ -11,9 +11,10 @@ h3 {
 .setting-group {
   margin-bottom: $spacing-lg;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
+  gap: $spacing-md;
   padding-bottom: $spacing-base;
   border-bottom: $border-width $border-style var(--color-border);
   
@@ -27,8 +28,8 @@ h3 {
     font-weight: $font-weight-medium;
     color: var(--color-text);
     margin-bottom: 0;
-    flex-grow: 1;
-    min-width: 200px;
+    flex: 1;
+    white-space: nowrap;
   }
 }
 
@@ -52,8 +53,8 @@ h3 {
 }
 
 .api-key-input {
-  min-width: 300px;
-  flex-shrink: 0;
+  flex: 1;
+  max-width: 250px;
   
   :deep(input) {
     font-family: monospace;
@@ -87,9 +88,10 @@ h3 {
   }
 }
 
-.model-select {
-  min-width: 250px;
-  flex-shrink: 0;
+.model-select,
+.provider-select {
+  flex: 1;
+  max-width: 250px;
 }
 
 // Mobile responsive
@@ -104,7 +106,8 @@ h3 {
     }
     
     .api-key-input,
-    .model-select {
+    .model-select,
+    .provider-select {
       min-width: auto;
       width: 100%;
     }
