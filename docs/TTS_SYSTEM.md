@@ -2,9 +2,9 @@
 
 ## 🎯 Overview
 
-The enhanced Text-to-Speech (TTS) system in the Translate-It extension provides a robust, stateful, and user-friendly experience for audio playback. It features full **Play, Pause, Resume, and Stop** capabilities, ensuring exclusive playback across all extension components (Popup, Sidepanel, Windows Manager).
+The Text-to-Speech (TTS) system in the Translate-It extension provides a robust, stateful, and user-friendly experience for audio playback. It features full **Play, Pause, Resume, and Stop** capabilities, ensuring exclusive playback across all extension components (Popup, Sidepanel, Windows Manager).
 
-The system is designed with a modern Vue.js architecture, leveraging composables for logic, a global manager for state synchronization, and a smart component for a rich user interface.
+The system is built around a single, unified composable (`useTTSSmart`) that handles all TTS functionality, working in coordination with a global manager for state synchronization and providing a rich user interface through the TTSButton component.
 
 ## 🏗️ Architecture & Message Flow
 
@@ -50,15 +50,16 @@ User Interaction
 
 ## Core Components
 
-### 1. `composables/useTTSSmart.js`
-The primary composable that encapsulates the entire client-side TTS logic. It manages the state, interacts with the background service, and provides methods for controlling playback.
+### 1. `composables/useTTSSmart.js` - The Unified TTS Composable
+The **single source of truth** for all TTS functionality in the extension. This composable encapsulates the entire client-side TTS logic, manages state, interacts with the background service, and provides methods for controlling playback.
 
 **Key Features:**
-- **State Management**: Manages 5 distinct states: `'idle' | 'loading' | 'playing' | 'paused' | 'error'`.
-- **Control Methods**: `play()`, `pause()`, `resume()`, `stop()`, and `retry()`.
-- **Computed Properties**: `canPause`, `canResume`, `canStop` for reactive UI updates.
-- **Progress Tracking**: Provides progress value for visual indicators.
-- **Error Handling**: Integrated error management with recovery strategies.
+- **Unified State Management**: Manages 5 distinct states: `'idle' | 'loading' | 'playing' | 'paused' | 'error'`
+- **Complete Control Methods**: `speak()`, `pause()`, `resume()`, `stop()`, `stopAll()`, and `retry()`
+- **Reactive Properties**: `canPause`, `canResume`, `canStop`, `isPlaying`, `isLoading` for UI updates
+- **Progress Tracking**: Provides progress value for visual indicators and completion detection
+- **Advanced Error Handling**: Integrated error management with automatic and manual recovery strategies
+- **Event-Driven Architecture**: Uses completion polling and message events for reliable state synchronization
 
 ### 2. `components/shared/TTSButton.vue`
 A smart UI component that provides a rich visual experience based on the TTS state.
@@ -132,6 +133,22 @@ The `handleGoogleTTS.js` handler and `TTSGlobalManager` are unaware of the under
 
 ## 🔧 Recent Improvements & Bug Fixes
 
+### Code Unification & Cleanup (Version 1.7)
+The TTS system has been streamlined by removing legacy code and consolidating functionality:
+
+**Legacy Code Removed:**
+- **`useTTSAction.js`**: Removed fallback-based TTS system (~300 lines)
+- **`useTextActions.js`**: Removed unused wrapper composable  
+- **Duplicate Systems**: Eliminated parallel TTS implementations that caused confusion
+- **Outdated Exports**: Cleaned up unused exports and imports
+
+**Benefits of Unification:**
+- **Single Source of Truth**: All TTS functionality now uses `useTTSSmart.js`
+- **Consistent Behavior**: Identical TTS experience across Popup, Sidepanel, and WindowsManager
+- **Reduced Complexity**: ~400 lines of redundant code removed
+- **Better Maintainability**: Single system to debug, test, and improve
+- **State Synchronization**: Unified state management prevents conflicts between components
+
 ### Chrome MV3 Messaging Reliability (Version 1.5-1.6)
 The system has been enhanced to handle Chrome Manifest V3 messaging issues that were causing TTS failures:
 
@@ -162,18 +179,21 @@ Successfully standardized TTS functionality across all three extension component
 - Consistent button sizes and spacing across components
 - Unified error states and loading indicators
 
-## 🎉 Benefits of the Enhanced System
+## 🎉 Benefits of the Unified TTS System
 
-1.  **Full Playback Control**: Users can play, pause, resume, and stop audio.
-2.  **Superior User Experience**: The `TTSButton` provides clear visual feedback for every state, including loading progress and errors.
-3.  **Predictable Behavior**: The exclusive playback rule and smart lifecycle management prevent unexpected audio behavior.
-4.  **Chrome MV3 Compatibility**: Robust handling of Chrome extension messaging limitations with fallback mechanisms.
-5.  **Cross-Component Consistency**: Unified TTS experience across Popup, Sidepanel, and WindowsManager.
-6.  **Robustness**: Advanced error handling with automatic and manual recovery makes the feature more reliable.
-7.  **Race Condition Safety**: Comprehensive null safety and cleanup prevention in concurrent scenarios.
-8.  **Reliable Communication**: Fixed port-based messaging ensures correct response handling even when direct messaging fails.
-9.  **Maintainability**: The modular architecture with composables and a global manager makes the system easy to understand, maintain, and extend.
-10. **Performance**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances.
+1.  **Single Source of Truth**: All TTS functionality consolidated in `useTTSSmart.js` - no more confusion between different TTS systems
+2.  **Full Playback Control**: Users can play, pause, resume, and stop audio with consistent behavior
+3.  **Superior User Experience**: The `TTSButton` provides clear visual feedback for every state, including loading progress and errors
+4.  **Predictable Behavior**: The exclusive playback rule and smart lifecycle management prevent unexpected audio behavior
+5.  **Cross-Component Consistency**: Identical TTS experience across Popup, Sidepanel, and WindowsManager
+6.  **Reduced Codebase**: ~400 lines of legacy TTS code removed, making the system lighter and easier to maintain
+7.  **Chrome MV3 Compatibility**: Robust handling of Chrome extension messaging limitations with fallback mechanisms
+8.  **Advanced Error Handling**: Automatic and manual recovery strategies make the feature more reliable
+9.  **Race Condition Safety**: Comprehensive null safety and cleanup prevention in concurrent scenarios
+10. **Reliable Communication**: Fixed port-based messaging ensures correct response handling even when direct messaging fails
+11. **Simplified Architecture**: Single composable system is easier to understand, debug, test, and extend
+12. **Performance Optimized**: Resources are managed efficiently, with automatic cleanup of audio objects and stale instances
+13. **Future-Proof**: Unified system makes it easier to add new features and maintain compatibility
 
 ## 🔍 Troubleshooting Guide
 
@@ -223,6 +243,14 @@ Successfully standardized TTS functionality across all three extension component
 4. **Monitor Network**: Check if Google TTS URLs are accessible
 5. **Extension Reload**: Disable/enable extension if issues persist
 
+### Code Unification Status Check
+
+To verify the TTS system is properly unified:
+- ✅ **Single Composable**: Only `useTTSSmart.js` should be imported for TTS functionality
+- ✅ **No Legacy Code**: `useTTSAction.js` and `useTextActions.js` should be completely removed
+- ✅ **Consistent State Management**: All components should use `tts.ttsState.value` for state
+- ✅ **Unified Methods**: All components should use `tts.speak()`, `tts.stop()`, etc.
+
 ### Architecture Validation
 
 The system is considered healthy when:
@@ -231,3 +259,4 @@ The system is considered healthy when:
 - ✅ Proper state transitions: `idle → loading → playing → idle`  
 - ✅ `GOOGLE_TTS_ENDED` events received for completion
 - ✅ Consistent visual styling across all components
+- ✅ **Unified Codebase**: Only `useTTSSmart.js` in use for TTS functionality
