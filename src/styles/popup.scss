@@ -300,56 +300,6 @@ body.popup-context .toolbar-icon {
   opacity: var(--icon-hover-opacity);
 }
 
-// Dropdown menu
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  background: var(--bg-color);
-  border: 1px solid var(--header-border-color);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  min-width: 160px;
-  margin-top: 2px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-bottom: 1px solid var(--header-border-color);
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color);
-  }
-
-  &.active {
-    background-color: var(--language-controls-bg-color);
-    font-weight: 500;
-  }
-
-  img {
-    width: 16px;
-    height: 16px;
-    opacity: var(--icon-opacity);
-  }
-
-  span {
-    color: var(--text-color);
-    font-size: 14px;
-  }
-}
-
 // Textarea containers
 .textarea-container {
   position: relative;
