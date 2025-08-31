@@ -218,38 +218,86 @@ export class TTSManager {
         // Use improved parameters to avoid HTTP 400 errors
         let finalText = text.trim();
         
-        // Clean text for TTS (remove problematic characters that cause HTTP 400)
+        // Enhanced text cleaning for TTS (prevent HTTP 400 and other errors)
         finalText = finalText
-          // Remove markdown formatting
+          // Remove markdown and formatting
           .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
           .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
           .replace(/__(.*?)__/g, '$1')     // Remove __underline__
           .replace(/_([^_]+)_/g, '$1')     // Remove _emphasis_
-          // Remove definition patterns (noun:, verb:, adj:, etc.)
+          .replace(/`([^`]+)`/g, '$1')     // Remove `code`
+          .replace(/~~(.*?)~~/g, '$1')     // Remove ~~strikethrough~~
+          
+          // Remove definition patterns and labels
           .replace(/\*\*\w+:\*\*/g, '')    // Remove **noun:** etc.
-          .replace(/\w+:/g, '')            // Remove noun:, verb:, etc.
-          // Remove HTML tags
+          .replace(/\w+:\s*/g, '')         // Remove "noun: ", "verb: ", etc.
+          .replace(/^\w+\.\s*/g, '')       // Remove "1. ", "2. ", etc.
+          .replace(/^[-•]\s*/gm, '')       // Remove bullet points
+          
+          // Remove HTML tags and entities
           .replace(/<[^>]*>/g, '')
-          // Remove extra whitespace and newlines
+          .replace(/&[a-zA-Z]+;/g, '')     // Remove HTML entities like &amp;
+          .replace(/&#\d+;/g, '')          // Remove numeric entities like &#39;
+          
+          // Remove URLs and email addresses
+          .replace(/https?:\/\/[^\s]+/g, '')
+          .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+          
+          // Remove brackets and their content if they seem like metadata
+          .replace(/\[[^\]]*\]/g, '')      // Remove [content]
+          .replace(/\{[^}]*\}/g, '')       // Remove {content}
+          
+          // Clean whitespace and newlines
           .replace(/\s+/g, ' ')
           .replace(/\n+/g, ' ')
-          // More aggressive character filtering to prevent HTTP 400
-          .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200Da-zA-Z0-9\s\.,!?\-\(\)]/g, '')
-          // Remove multiple dots, dashes, etc.
-          .replace(/\.{3,}/g, '...')
-          .replace(/-{2,}/g, '-')
-          .replace(/\?{2,}/g, '?')
-          .replace(/!{2,}/g, '!')
+          .replace(/\r+/g, ' ')
+          .replace(/\t+/g, ' ')
+          
+          // Remove problematic characters for Google TTS
+          .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200Da-zA-Z0-9\s\.,!?\-\(\)'"]/g, '')
+          
+          // Clean up punctuation
+          .replace(/\.{3,}/g, '...')       // Multiple dots to ellipsis
+          .replace(/-{2,}/g, '-')          // Multiple dashes to single
+          .replace(/\?{2,}/g, '?')         // Multiple question marks
+          .replace(/!{2,}/g, '!')          // Multiple exclamation marks
+          .replace(/,{2,}/g, ',')          // Multiple commas
+          .replace(/\s*[,\.!?]\s*[,\.!?]+/g, '.') // Clean mixed punctuation
+          
+          // Remove isolated punctuation and fix spacing
+          .replace(/\s+[,\.!?]+\s+/g, '. ')
+          .replace(/\s+[,\.!?]+$/g, '.')
+          .replace(/^\s*[,\.!?]+\s*/g, '')
+          
           .trim();
         
-        // Stricter length limit to prevent HTTP 400
-        if (finalText.length > 150) {
-          finalText = finalText.substring(0, 147) + '...';
-        }
-        
-        // Additional validation
+        // Enhanced validation and length management
         if (!finalText || finalText.length < 1) {
           reject(new Error('Text too short or empty after cleaning'));
+          return;
+        }
+        
+        // Check for minimum meaningful content
+        if (finalText.replace(/[\s\.,!?\-'"()]/g, '').length < 2) {
+          reject(new Error('Text contains insufficient readable content for TTS'));
+          return;
+        }
+        
+        // Stricter length limit to prevent HTTP 400 (Google TTS has ~200 char limit)
+        if (finalText.length > 120) {
+          // Try to cut at word boundary
+          const words = finalText.substring(0, 117).split(' ');
+          if (words.length > 1) {
+            words.pop(); // Remove last potentially incomplete word
+            finalText = words.join(' ') + '...';
+          } else {
+            finalText = finalText.substring(0, 117) + '...';
+          }
+        }
+        
+        // Final safety check for problematic patterns that might cause 400
+        if (/^[\s\.,!?\-'"()]+$/.test(finalText)) {
+          reject(new Error('Text contains only punctuation after cleaning'));
           return;
         }
         
