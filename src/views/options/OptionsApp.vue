@@ -142,10 +142,14 @@ const retryLoading = () => {
 <style scoped>
 .extension-options {
   /* The body now handles centering. This container just needs to hold the layout. */
+  width: 100vw;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: var(--color-background) !important;
+  box-sizing: border-box;
+  padding: 20px;
 }
 
 .extension-options.rtl {

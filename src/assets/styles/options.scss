@@ -15,28 +15,9 @@
   align-items: flex-start !important;
 }
 
-// Main layout container
-.options-layout {
-  display: flex;
-  width: 100% !important;
-  max-width: none !important;
-  height: 90vh;
-  background-color: transparent;
-  border-radius: $border-radius-lg;
-  box-shadow: $shadow-lg;
-  overflow: hidden;
-  border: $border-width $border-style var(--color-border);
-}
-
-// Sidebar (left column)
-.options-sidebar {
-  flex: 0 0 280px;
-  padding: $spacing-md;
-  border-right: $border-width $border-style var(--color-border);
-  display: flex;
-  flex-direction: column;
-  background-color: var(--sidebar-bg-color, var(--color-surface));
-}
+// These rules moved to component files for better encapsulation
+// .options-layout -> OptionsLayout.vue
+// .options-sidebar -> OptionsSidebar.vue
 
 .sidebar-header {
   padding: $spacing-sm;
@@ -99,64 +80,10 @@
   }
 }
 
-// Main content area (right column)
-.options-main {
-  flex: 1;
-  width: 920px !important;
-  min-width: 920px !important;
-  max-width: 920px !important;
-  display: flex;
-  overflow: hidden;
-  background-color: var(--main-bg-color, var(--color-background));
-}
-
-// Vertical tabs (middle column)
-.vertical-tabs {
-  flex: 0 0 200px;
-  border-right: $border-width $border-style var(--color-border);
-  padding: $spacing-md 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.tab-button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: $spacing-base $spacing-lg;
-  border: none;
-  border-left: 4px solid transparent;
-  background-color: transparent;
-  cursor: pointer;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: var(--tab-button-color, var(--color-text-secondary));
-  text-align: left;
-  text-decoration: none;
-  transition: all $transition-base;
-  
-  &:hover {
-    background-color: var(--tab-button-hover-bg, #f1f3f4);
-  }
-  
-  &.active {
-    color: var(--tab-button-active-color, var(--color-primary));
-    background-color: var(--tab-button-active-bg, #e8f0fe);
-    border-left-color: var(--tab-button-active-border-color, var(--color-primary));
-  }
-}
-
-// Tab content container (rightmost column)
-.tab-content-container {
-  flex: 1;
-  width: 720px !important;
-  min-width: 720px !important;
-  max-width: 720px !important;
-  padding: $spacing-xl;
-  overflow-y: auto;
-  position: relative;
-}
+// Component-specific rules moved to respective .vue files:
+// .options-main -> OptionsLayout.vue
+// .vertical-tabs, .tab-button -> OptionsNavigation.vue  
+// .tab-content-container -> OptionsLayout.vue
 
 // Tab content sections
 .tab-content {
@@ -397,45 +324,10 @@ input[type="radio"] {
   transition: filter $transition-base;
 }
 
-// Responsive design
-@media (max-width: #{$breakpoint-lg}) {
-  .options-layout {
-    height: auto;
-    min-height: 90vh;
-    flex-direction: column;
-  }
-  
-  .options-sidebar {
-    flex: none;
-    border-right: none;
-    border-bottom: $border-width $border-style var(--color-border);
-  }
-  
-  .vertical-tabs {
-    flex: none;
-    border-right: none;
-    border-bottom: $border-width $border-style var(--color-border);
-    flex-direction: row;
-    overflow-x: auto;
-    padding: $spacing-sm 0;
-    
-    .tab-button {
-      border-left: none;
-      border-bottom: 4px solid transparent;
-      white-space: nowrap;
-      min-width: 120px;
-      
-      &.active {
-        border-left: none;
-        border-bottom-color: var(--tab-button-active-border-color, var(--color-primary));
-      }
-    }
-  }
-  
-  .tab-content-container {
-    padding: $spacing-md;
-  }
-}
+// Responsive design rules moved to respective component files
+// Layout responsive rules -> OptionsLayout.vue
+// Navigation responsive rules -> OptionsNavigation.vue
+// Sidebar responsive rules -> OptionsSidebar.vue
 
 @media (max-width: #{$breakpoint-md}) {
   .options-page {

@@ -115,7 +115,29 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-background);
+  background-color: var(--color-surface);
+  position: relative;
+  box-sizing: border-box;
+  max-width: 200px;
+  width: 200px;
+  
+  // Custom scrollbar
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 3px;
+    
+    &:hover {
+      background-color: var(--color-text-secondary);
+    }
+  }
 }
 
 .tab-button {
@@ -133,15 +155,32 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
   text-align: left;
   text-decoration: none;
   transition: all $transition-base;
+  position: relative;
   
-  &:hover {
-    background-color: var(--color-surface);
+  &:hover:not(.disabled) {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    transform: translateX(2px);
   }
   
   &.active {
     color: var(--color-primary);
-    background-color: var(--color-surface);
+    background-color: var(--color-background);
     border-left-color: var(--color-primary);
+    font-weight: $font-weight-semibold;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 8px solid var(--color-background);
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+    }
   }
   
   &.disabled {
@@ -201,6 +240,32 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
   }
 }
 
+// Tablet responsive
+@media (max-width: #{$breakpoint-lg}) {
+  .vertical-tabs {
+    flex: none;
+    border-right: none;
+    border-bottom: $border-width $border-style var(--color-border);
+    flex-direction: row;
+    overflow-x: auto;
+    padding: $spacing-sm 0;
+    width: 100%;
+    max-width: none;
+    
+    .tab-button {
+      border-left: none;
+      border-bottom: 4px solid transparent;
+      white-space: nowrap;
+      min-width: 120px;
+      
+      &.active {
+        border-left: none;
+        border-bottom-color: var(--color-primary);
+      }
+    }
+  }
+}
+
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .vertical-tabs {
@@ -210,6 +275,8 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
     flex-direction: row;
     overflow-x: auto;
     padding: $spacing-sm 0;
+    width: 100%;
+    max-width: none;
     
     .tab-button {
       flex-shrink: 0;

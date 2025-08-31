@@ -73,16 +73,17 @@ const isRTL = computed(() => {
 @use '@/assets/styles/variables.scss' as *;
 
 .options-layout {
-  display: flex !important;
-  width: 1200px !important;
-  max-width: 1200px !important;
-  min-width: 1200px !important;
-  min-height: 90vh !important;
-  background-color: transparent !important;
-  border-radius: $border-radius-lg !important;
-  box-shadow: $shadow-lg !important;
-  overflow: hidden !important;
-  border: $border-width $border-style var(--color-border) !important;
+  display: flex;
+  width: min(1200px, calc(100vw - 40px));
+  max-width: 1200px;
+  min-width: 320px;
+  min-height: 90vh;
+  background-color: var(--color-background);
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-lg;
+  border: $border-width $border-style var(--color-border);
+  margin: 0 auto;
+  box-sizing: border-box;
   
   /* Debug outline removed */
   
@@ -182,15 +183,100 @@ const isRTL = computed(() => {
 .options-main {
   flex: 1;
   display: flex;
-  overflow: hidden;
   background-color: var(--color-background);
+  border-radius: 0 $border-radius-lg $border-radius-lg 0;
+  min-width: 0;
+  width: 900px; // 200px navigation + 700px content
+  max-width: 900px;
+  box-sizing: border-box;
 }
 
 .tab-content-container {
   flex: 1;
+  width: 700px;
+  min-width: 700px;
+  max-width: 700px;
   padding: $spacing-xl;
   overflow-y: auto;
   position: relative;
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+  
+  // Better scrollbar styling
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background-color: var(--color-surface);
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 4px;
+    
+    &:hover {
+      background-color: var(--color-text-secondary);
+    }
+  }
+  
+  &::-webkit-scrollbar-corner {
+    background-color: var(--color-surface);
+  }
+  
+  // Ensure all child content respects container width
+  > * {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+  
+  // Global styles for all tab content
+  :global(.tab-content) {
+    max-width: 100%;
+    box-sizing: border-box;
+    
+    // Ensure all form elements and content respect container width
+    * {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    // Specific handling for wide elements
+    table, pre, code {
+      overflow-x: auto;
+    }
+    
+    // Handle long text content
+    p, div, span {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+  }
+}
+
+// Tablet responsive
+@media (max-width: #{$breakpoint-lg}) {
+  .options-layout {
+    width: 95vw;
+    height: auto;
+    min-height: 90vh;
+  }
+  
+  .options-main {
+    width: auto;
+    max-width: none;
+  }
+  
+  .tab-content-container {
+    width: auto;
+    min-width: 300px;
+    max-width: none;
+    padding: $spacing-lg;
+  }
 }
 
 // Mobile responsive
@@ -198,21 +284,30 @@ const isRTL = computed(() => {
   .options-layout {
     flex-direction: column;
     height: auto;
-    
-    .options-sidebar {
-      flex: none;
-      border-right: none;
-      border-bottom: $border-width $border-style var(--color-border);
-    }
-    
-    .options-main {
-      flex-direction: column;
-      
-      .vertical-tabs {
-        border-right: none;
-        border-bottom: $border-width $border-style var(--color-border);
-      }
-    }
+    width: 98vw;
+    min-height: 95vh;
+  }
+  
+  .options-main {
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+  }
+  
+  .tab-content-container {
+    width: 100%;
+    min-width: auto;
+    max-width: none;
+    padding: $spacing-md;
+  }
+}
+
+// Small mobile responsive
+@media (max-width: #{$breakpoint-sm}) {
+  .options-layout {
+    border-radius: 0;
+    min-height: 100vh;
+    width: 100vw;
   }
   
   .tab-content-container {

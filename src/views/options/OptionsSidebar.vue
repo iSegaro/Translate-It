@@ -130,11 +130,16 @@ onMounted(async () => {
 .options-sidebar {
   flex: 0 0 280px;
   padding: $spacing-md;
-  /* border-right: 4px solid red !important; */
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  z-index: 9999;
+  border-right: $border-width $border-style var(--color-border);
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  
+  // Better visual hierarchy
+  box-shadow: inset -1px 0 0 var(--color-border);
 }
 
 .sidebar-content {
@@ -177,6 +182,13 @@ onMounted(async () => {
   border-radius: $border-radius-md;
   padding: $spacing-md;
   margin-bottom: $spacing-md;
+  background: var(--color-background);
+  transition: border-color $transition-base, box-shadow $transition-base;
+  
+  &:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(var(--color-primary-rgb, 59, 130, 246), 0.1);
+  }
   
   h2 {
     font-size: $font-size-xs;
@@ -217,11 +229,22 @@ onMounted(async () => {
   }
 }
 
+// Tablet responsive
+@media (max-width: #{$breakpoint-lg}) {
+  .options-sidebar {
+    flex: none;
+    border-right: none;
+    border-bottom: $border-width $border-style var(--color-border);
+  }
+}
+
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .options-sidebar {
     flex: none;
     padding: $spacing-base;
+    border-right: none;
+    border-bottom: $border-width $border-style var(--color-border);
     
     .sidebar-header {
       text-align: left;

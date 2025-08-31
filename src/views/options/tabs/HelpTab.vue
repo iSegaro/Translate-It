@@ -125,7 +125,8 @@ Your API keys are stored locally in your browser and are never shared with third
 @use '@/assets/styles/variables.scss' as *;
 
 .help-tab {
-  max-width: 800px;
+  max-width: 100%;
+  width: 100%;
 }
 
 h2 {
@@ -141,9 +142,15 @@ h2 {
 .accordion {
   .accordion-item {
     border: $border-width $border-style var(--color-border);
-    border-radius: $border-radius-base;
-    margin-bottom: $spacing-base;
+    border-radius: $border-radius-md;
+    margin-bottom: $spacing-md;
     overflow: hidden;
+    background: var(--color-background);
+    transition: box-shadow $transition-base;
+    
+    &:hover {
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
     
     &:last-child {
       margin-bottom: 0;
@@ -152,7 +159,7 @@ h2 {
   
   .accordion-header {
     width: 100%;
-    padding: $spacing-md $spacing-lg;
+    padding: $spacing-lg;
     background-color: var(--color-surface);
     border: none;
     text-align: left;
@@ -163,15 +170,21 @@ h2 {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
-    transition: background-color $transition-base;
+    transition: all $transition-base;
     
     &:hover {
       background-color: var(--tab-button-hover-bg, #f1f3f4);
+      padding-left: calc(#{$spacing-lg} + 4px);
     }
     
     &.active {
       background-color: var(--tab-button-active-bg, #e8f0fe);
       color: var(--tab-button-active-color, #1967d2);
+      font-weight: $font-weight-semibold;
+      
+      .accordion-icon {
+        transform: rotate(180deg);
+      }
     }
     
     span {
@@ -183,24 +196,31 @@ h2 {
       font-weight: $font-weight-bold;
       margin-left: $spacing-sm;
       transition: transform $transition-base;
-      min-width: 20px;
-      text-align: center;
+      min-width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background-color: rgba(var(--color-primary-rgb, 59, 130, 246), 0.1);
     }
   }
   
   .accordion-content {
     max-height: 0;
     overflow: hidden;
-    transition: max-height $transition-slow ease-out;
+    transition: all $transition-slow ease-out;
     background-color: var(--color-background);
+    opacity: 0;
     
     &.open {
-      max-height: 1000px;
-      transition: max-height $transition-slow ease-in;
+      max-height: 2000px;
+      opacity: 1;
+      transition: all $transition-slow ease-in;
     }
     
     .accordion-inner {
-      padding: $spacing-lg;
+      padding: $spacing-xl;
       
       .markdown-content {
         :deep(p) {

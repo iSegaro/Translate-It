@@ -114,7 +114,9 @@ const resetPrompt = async () => {
 @use '@/assets/styles/variables.scss' as *;
 
 .prompt-tab {
-  max-width: 800px;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 h2 {
@@ -140,12 +142,16 @@ h2 {
   justify-content: space-between;
   align-items: baseline;
   width: 100%;
+  max-width: 100%;
   margin-bottom: $spacing-sm;
+  box-sizing: border-box;
   
   span {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
+    flex: 1;
+    min-width: 0;
   }
 }
 
@@ -159,6 +165,9 @@ h2 {
   border-radius: $border-radius-base;
   cursor: pointer;
   transition: all $transition-base;
+  flex-shrink: 0;
+  margin-left: $spacing-sm;
+  white-space: nowrap;
   
   &:hover {
     background-color: var(--color-primary);
