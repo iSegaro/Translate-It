@@ -238,16 +238,6 @@ export function useExtensionAPI() {
     return await sendMessage("UPDATE_CONTEXT_MENU", options);
   };
 
-  const showTranslationTooltip = async (text, position) => {
-    return await sendToContentScript("SHOW_TRANSLATION_TOOLTIP", {
-      text,
-      position,
-    });
-  };
-
-  const hideTranslationTooltip = async () => {
-    return await sendToContentScript("HIDE_TRANSLATION_TOOLTIP");
-  };
 
   // Cleanup on component unmount
   onUnmounted(() => {
@@ -301,8 +291,6 @@ export function useExtensionAPI() {
     // Content script Vue integration
     createVueMicroApp,
     destroyVueMicroApp,
-    showTranslationTooltip,
-    hideTranslationTooltip,
 
     // Extension features
     createNotification,

@@ -19,8 +19,6 @@ class ContentScriptVueBridge {
     this.actionMap = {
       CREATE_VUE_MICRO_APP: this.handleCreateMicroApp,
       DESTROY_VUE_MICRO_APP: this.handleDestroyMicroApp,
-      SHOW_TRANSLATION_TOOLTIP: this.handleShowTooltip,
-      HIDE_TRANSLATION_TOOLTIP: this.handleHideTooltip,
       START_SCREEN_CAPTURE: this.handleStartScreenCapture,
       SHOW_CAPTURE_PREVIEW: this.handleShowCapturePreview,
     };
@@ -39,7 +37,6 @@ class ContentScriptVueBridge {
 
   async registerComponents() {
     const components = {
-      TranslationTooltip: () => import("../../components/content/TranslationTooltip.vue"),
       ScreenSelector: () => import("../../components/content/ScreenSelector.vue"),
       CapturePreview: () => import("../../components/content/CapturePreview.vue"),
     };
@@ -113,20 +110,6 @@ class ContentScriptVueBridge {
     sendResponse({ success: this.destroyMicroApp(instanceId) });
   }
 
-  handleShowTooltip = async ({ text, position }, sendResponse) => {
-    this.hideAllTooltips();
-    const instanceId = await this.createMicroApp(
-      "TranslationTooltip",
-      { text, position, onClose: () => this.destroyMicroApp(instanceId) },
-      this.createContainer(`top: ${position.y}px; left: ${position.x}px;`)
-    );
-    sendResponse({ success: true, instanceId });
-  }
-
-  handleHideTooltip = (data, sendResponse) => {
-    this.hideAllTooltips();
-    sendResponse({ success: true });
-  }
 
   handleStartScreenCapture = async (data, sendResponse) => {
     this.hideAllOverlays();
@@ -270,13 +253,9 @@ class ContentScriptVueBridge {
   }
 
   showTranslationResult = async (translationData) => {
-    const position = { x: window.innerWidth / 2 - 150, y: 50 };
-    const instanceId = await this.createMicroApp(
-      "TranslationTooltip",
-      { ...translationData, position, onClose: () => this.destroyMicroApp(instanceId) },
-      this.createContainer(`top: ${position.y}px; left: ${position.x}px;`)
-    );
-    return instanceId;
+    // TranslationTooltip removed - translation results now handled elsewhere
+    logger.debug("[Vue Bridge] Translation result received:", translationData);
+    return null;
   }
 
   handleShowTextRegions = async (data, sendResponse) => {
@@ -293,11 +272,6 @@ class ContentScriptVueBridge {
     return imageData;
   }
 
-  hideAllTooltips = () => {
-    for (const [id, instance] of this.vueInstances) {
-      if (instance.componentName === "TranslationTooltip") this.destroyMicroApp(id);
-    }
-  }
 
   hideAllOverlays = () => {
     for (const [id, instance] of this.vueInstances) {
