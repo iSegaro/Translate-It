@@ -91,14 +91,6 @@ body.sidepanel-context .select-error.toolbar-button .toolbar-icon {
   filter: var(--icon-filter);
 }
 
-.textarea-container {
-  position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background-color: var(--color-textarea-background);
-  padding: 5px;
-}
-
 textarea {
   width: 100%;
   border: none;

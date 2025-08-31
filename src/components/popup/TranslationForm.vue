@@ -258,6 +258,11 @@ watch(isTranslating, (newLoading, oldLoading) => {
 
 /* Popup-specific adjustments */
 .translation-form :deep(.textarea-container) {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-textarea-background);
+  padding: 5px;
   margin: 6px 12px;
 }
 

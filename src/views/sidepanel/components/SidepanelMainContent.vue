@@ -470,7 +470,15 @@ onUnmounted(() => {
   }
 }
 
-/* Selection Mode Styling */
+/* Scoped styles for textarea container */
+.textarea-container {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-textarea-background);
+  padding: 5px;
+}
+
 .textarea-container.selection-mode {
   opacity: 0.7;
   pointer-events: none;
@@ -479,6 +487,19 @@ onUnmounted(() => {
 .textarea-container.selection-mode textarea {
   background: var(--bg-secondary);
   border-color: var(--border-color);
+}
+
+.textarea-container.result-container {
+  flex-grow: 1;
+  min-height: 0;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 5px;
+  background-color: var(--bg-secondary, #ffffff);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 form {
@@ -535,19 +556,6 @@ form {
 }
 
 /* Result container */
-.textarea-container.result-container {
-  flex-grow: 1;
-  min-height: 0;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 5px;
-  background-color: var(--bg-secondary, #ffffff);
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
 .result {
   width: 100%;
   height: 100%;

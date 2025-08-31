@@ -178,8 +178,13 @@ const handleKeydown = () => {
   padding: 16px;
 }
 
-/* Sidepanel-specific adjustments */
+/* Scoped styles for textarea container */
 .translation-form :deep(.textarea-container) {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-textarea-background);
+  padding: 5px;
   margin: 0; /* No margin for sidepanel */
 }
 
