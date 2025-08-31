@@ -127,6 +127,9 @@ Your API keys are stored locally in your browser and are never shared with third
 .help-tab {
   max-width: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 h2 {
@@ -140,6 +143,11 @@ h2 {
 }
 
 .accordion {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  
   .accordion-item {
     border: $border-width $border-style var(--color-border);
     border-radius: $border-radius-md;
@@ -147,6 +155,8 @@ h2 {
     overflow: hidden;
     background: var(--color-background);
     transition: box-shadow $transition-base;
+    width: 100%;
+    box-sizing: border-box;
     
     &:hover {
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
@@ -164,9 +174,10 @@ h2 {
     border: none;
     text-align: left;
     cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: $spacing-sm;
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
@@ -188,21 +199,23 @@ h2 {
     }
     
     span {
-      flex-grow: 1;
+      grid-column: 1;
+      align-self: start;
     }
     
     .accordion-icon {
+      grid-column: 2;
       font-size: $font-size-lg;
       font-weight: $font-weight-bold;
-      margin-left: $spacing-sm;
       transition: transform $transition-base;
-      min-width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
-      background-color: rgba(var(--color-primary-rgb, 59, 130, 246), 0.1);
+      color: var(--color-text-secondary);
+      align-self: start;
+      margin-top: 2px;
     }
   }
   
@@ -292,10 +305,23 @@ h2 {
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
+  .help-tab {
+    width: 100%;
+    max-width: 100%;
+  }
+  
   .accordion {
+    width: 100%;
+    
+    .accordion-item {
+      width: 100%;
+    }
+    
     .accordion-header {
       padding: $spacing-sm $spacing-md;
       flex-direction: row;
+      width: 100%;
+      box-sizing: border-box;
       
       span {
         font-size: $font-size-sm;
@@ -304,6 +330,8 @@ h2 {
     
     .accordion-content .accordion-inner {
       padding: $spacing-md;
+      width: 100%;
+      box-sizing: border-box;
       
       ol, ul {
         padding-left: $spacing-lg;
