@@ -418,66 +418,13 @@ input[type="radio"] {
   }
 }
 
-// Accordion styling (for Help tab)
-.accordion {
-  .accordion-item {
-    border: $border-width $border-style var(--color-border);
-    border-radius: $border-radius-base;
-    margin-bottom: $spacing-base;
-    overflow: hidden;
-    
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-  
+/* RTL SPECIFIC STYLES */
+
+:global(.options-layout.rtl) {
   .accordion-header {
-    width: 100%;
-    padding: $spacing-md $spacing-lg;
-    background-color: var(--color-surface);
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
-    transition: background-color $transition-base;
-    
-    &:hover {
-      background-color: var(--tab-button-hover-bg, #f1f3f4);
-    }
-    
-    &.active {
-      background-color: var(--tab-button-active-bg, #e8f0fe);
-      color: var(--tab-button-active-color, var(--color-primary));
-    }
-    
-    .accordion-icon {
-      font-size: $font-size-lg;
-      font-weight: $font-weight-bold;
-      margin-left: $spacing-sm;
-      transition: transform $transition-base;
-      min-width: 20px;
-      text-align: center;
-    }
-  }
-  
-  .accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height $transition-slow ease-out;
-    background-color: var(--color-background);
-    
-    &.open {
-      max-height: 1000px;
-      transition: max-height $transition-slow ease-in;
-    }
-    
-    .accordion-inner {
-      padding: $spacing-lg;
-    }
+    display: flex !important;
+    flex-direction: row-reverse !important; /* Reverse the order of elements */
+    justify-content: space-between !important; /* Ensure proper spacing */
+    text-align: right !important; /* Align text to the right */
   }
 }
