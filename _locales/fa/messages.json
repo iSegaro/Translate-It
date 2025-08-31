@@ -540,5 +540,9 @@
   },
   "SUBTITLE_TRANSLATION_STOPPED": {
     "message": "ترجمه زیرنویس متوقف شد"
-  }
+  },
+
+  "export_success_plaintext": { "message": "تنظیمات با موفقیت صادر شد (کلیدهای API به صورت متن ساده ذخیره شدند)." },
+  "import_error_generic": { "message": "خطا در وارد کردن تنظیمات." },
+  "import_error_password": { "message": "وارد کردن تنظیمات با شکست مواجه شد: رمز عبور اشتباه است." }
 }

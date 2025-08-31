@@ -539,5 +539,8 @@
   "advance_section_title": { "message": "Advanced Settings" },
   "prompt_source_help": { "message": "Select the source language for your prompt." },
   "prompt_target_help": { "message": "Select the target language for your prompt." },
-  "prompt_text_help": { "message": "Enter the text you want to translate or process." }
+  "prompt_text_help": { "message": "Enter the text you want to translate or process." },
+  "export_success_plaintext": { "message": "Settings exported successfully (API keys saved in plain text)." },
+  "import_error_generic": { "message": "Failed to import settings." },
+  "import_error_password": { "message": "Import failed: Incorrect password." }
 }
