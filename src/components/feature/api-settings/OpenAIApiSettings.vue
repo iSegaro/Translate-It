@@ -27,8 +27,9 @@
   <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="openaiApiModel"
-  :options="openaiApiModelOptions"
+        :options="openaiApiModelOptions"
         class="model-select"
+        :style="rtlSelectStyle"
       />
     </div>
     <div
@@ -50,8 +51,10 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/store/core/settings'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import { useRTLSelect } from '@/composables/useRTLSelect.js'
 
 const { t } = useI18n()
+const { rtlSelectStyle } = useRTLSelect()
 
 const settingsStore = useSettingsStore()
 
