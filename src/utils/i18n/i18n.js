@@ -57,7 +57,12 @@ async function loadTranslationsForLanguageCached(lang) {
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, `loadTranslations-${lang}`);
     } else {
-      logger.error(`Error loading translations for "${lang}":`, error);
+      // Log as debug instead of error if it's a fetch error during early initialization
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        logger.debug(`Translation loading failed during early initialization for "${lang}":`, error.message);
+      } else {
+        logger.error(`Error loading translations for "${lang}":`, error);
+      }
     }
     return null;
   }
@@ -105,6 +110,17 @@ export async function getTranslationString(key, lang) {
   const translations = await loadTranslationsForLanguageCached(langCode);
   if (translations && translations[key]?.message) {
     return translations[key].message;
+  }
+
+  // Fallback to browser's native i18n API if custom loading fails
+  try {
+    const nativeTranslation = browser.i18n.getMessage(key);
+    if (nativeTranslation) {
+      logger.debug(`Using native browser i18n for key "${key}"`);
+      return nativeTranslation;
+    }
+  } catch (error) {
+    logger.debug(`Native i18n also failed for key "${key}":`, error);
   }
 
   return null;
