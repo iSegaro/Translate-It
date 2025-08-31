@@ -83,7 +83,7 @@ import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 
 import { useHistory } from "@/composables/useHistory.js";
-import { useSidepanelTranslation } from "@/composables/useSidepanelTranslation.js";
+import { useUnifiedTranslation } from "@/composables/useUnifiedTranslation.js";
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
@@ -114,7 +114,7 @@ const languages = useLanguages();
 const translationStore = useTranslationStore();
 
 // Translation Composable
-const translation = useSidepanelTranslation();
+const translation = useUnifiedTranslation('sidepanel');
 
 // Extract states from composable
 const {

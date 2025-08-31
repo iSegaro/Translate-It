@@ -1,0 +1,723 @@
+<template>
+  <form @submit.prevent="handleTranslate" class="unified-translation-input" :class="[`mode-${mode}`, { 'enhanced': enhanced }]">
+    
+    <!-- Controls Section (Language & Provider) -->
+    <div v-if="showControls" class="controls-container">
+      <LanguageSelector
+        v-if="showLanguageSelector"
+        v-model:source-language="sourceLanguage"
+        v-model:target-language="targetLanguage"
+        :auto-detect-label="autoDetectLabel"
+        :source-title="sourceTitle"
+        :target-title="targetTitle"
+        :swap-title="swapTitle"
+        :swap-alt="swapAlt"
+      />
+      <ProviderSelector
+        v-if="showProviderSelector"
+        :mode="providerSelectorMode"
+        :disabled="!canTranslate"
+        @translate="handleTranslate"
+      />
+    </div>
+
+    <!-- Select Element Status (Sidepanel specific) -->
+    <div
+      v-if="isSelecting && mode === 'sidepanel'"
+      class="selection-status"
+    >
+      <div class="selection-indicator">
+        <div class="selection-spinner" />
+        <span>{{ selectElementMessage }}</span>
+      </div>
+    </div>
+
+    <!-- Enhanced Source Text Input Section -->
+    <div class="enhanced-input-section">
+      <label v-if="showInputLabel" class="input-label">{{ inputLabel }}:</label>
+      <div class="input-container">
+        <textarea
+          ref="sourceInputRef"
+          v-model="sourceText"
+          :placeholder="inputPlaceholder"
+          :rows="inputRows"
+          :tabindex="1"
+          class="translation-textarea enhanced"
+          @input="handleSourceInput"
+          @keydown="handleKeydown"
+        />
+        <ActionToolbar
+          :text="sourceText"
+          :language="currentSourceLanguage"
+          :mode="toolbarMode"
+          position="top-right"
+          :visible="true"
+          :show-copy="true"
+          :show-paste="true"
+          :show-tts="true"
+          :copy-disabled="sourceText.length === 0"
+          :tts-disabled="sourceText.length === 0"
+          size="md"
+          variant="secondary"
+          :auto-translate-on-paste="autoTranslateOnPaste"
+          :copy-title="copySourceTitle"
+          :paste-title="pasteTitle"
+          :tts-title="ttsSourceTitle"
+          @text-copied="handleSourceTextCopied"
+          @text-pasted="handleSourceTextPasted"
+          @tts-speaking="handleSourceTTSSpeaking"
+          @action-failed="handleActionFailed"
+        />
+      </div>
+    </div>
+
+    <!-- Enhanced Translation Result Section -->
+    <div v-if="showResultSection" class="enhanced-result-section">
+      <label v-if="showResultLabel" class="input-label">{{ resultLabel }}:</label>
+      <TranslationDisplay
+        :content="translatedText"
+        :target-language="currentTargetLanguage"
+        :is-loading="isTranslating"
+        :error="translationError"
+        :mode="mode"
+        :placeholder="resultPlaceholder"
+        :copy-title="copyResultTitle"
+        :tts-title="ttsResultTitle"
+        :container-class="`${mode}-result-container`"
+        :content-class="`${mode}-result-content`"
+        @text-copied="handleTranslationCopied"
+        @tts-speaking="handleTranslationTTSSpeaking"
+        @action-failed="handleActionFailed"
+      />
+    </div>
+
+    <!-- Status Bar -->
+    <div v-if="statusMessage" class="status-bar">
+      <span :class="['status-message', statusType]">{{ statusMessage }}</span>
+    </div>
+  </form>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useUnifiedTranslation } from '@/composables/useUnifiedTranslation.js'
+import { useSettingsStore } from '@/store/core/settings'
+import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { correctTextDirection } from '@/utils/text/textDetection.js'
+
+// Components
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+
+// Logger
+import { getScopedLogger } from '@/utils/core/logger.js'
+import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'UnifiedTranslationInput')
+
+// Props
+const props = defineProps({
+  // Mode - determines behavior and styling
+  mode: {
+    type: String,
+    default: 'popup',
+    validator: (value) => ['popup', 'sidepanel'].includes(value)
+  },
+  
+  // UI Configuration
+  enhanced: {
+    type: Boolean,
+    default: true
+  },
+  showControls: {
+    type: Boolean,
+    default: true
+  },
+  showLanguageSelector: {
+    type: Boolean,
+    default: true
+  },
+  showProviderSelector: {
+    type: Boolean,
+    default: true
+  },
+  showInputLabel: {
+    type: Boolean,
+    default: true // false for popup, true for sidepanel typically
+  },
+  showResultSection: {
+    type: Boolean,
+    default: true
+  },
+  showResultLabel: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Input Configuration
+  inputRows: {
+    type: Number,
+    default: 2 // 2 for popup, 6 for sidepanel typically
+  },
+  autoTranslateOnPaste: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Language Props
+  initialSourceLanguage: {
+    type: String,
+    default: 'auto'
+  },
+  initialTargetLanguage: {
+    type: String,
+    default: 'fa'
+  },
+  
+  // Labels and Text (i18n)
+  autoDetectLabel: {
+    type: String,
+    default: 'Auto-Detect'
+  },
+  sourceTitle: {
+    type: String,
+    default: 'Source Language'
+  },
+  targetTitle: {
+    type: String,
+    default: 'Target Language'
+  },
+  swapTitle: {
+    type: String,
+    default: 'Swap Languages'
+  },
+  swapAlt: {
+    type: String,
+    default: 'Swap'
+  },
+  inputLabel: {
+    type: String,
+    default: 'Source Text'
+  },
+  resultLabel: {
+    type: String,
+    default: 'Translation'
+  },
+  inputPlaceholder: {
+    type: String,
+    default: 'Enter text to translate...'
+  },
+  resultPlaceholder: {
+    type: String,
+    default: 'Translation will appear here...'
+  },
+  copySourceTitle: {
+    type: String,
+    default: 'Copy source text'
+  },
+  copyResultTitle: {
+    type: String,
+    default: 'Copy translation'
+  },
+  pasteTitle: {
+    type: String,
+    default: 'Paste from clipboard'
+  },
+  ttsSourceTitle: {
+    type: String,
+    default: 'Speak source text'
+  },
+  ttsResultTitle: {
+    type: String,
+    default: 'Speak translation'
+  },
+  selectElementMessage: {
+    type: String,
+    default: 'Click on any element on the webpage to translate...'
+  },
+  
+  // Selection Mode (for sidepanel)
+  isSelecting: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Custom Provider Selector Mode
+  providerSelectorMode: {
+    type: String,
+    default: 'split'
+  }
+})
+
+// Emits
+const emit = defineEmits([
+  'can-translate-change',
+  'source-text-changed',
+  'translation-completed',
+  'translation-error',
+  'source-text-copied',
+  'source-text-pasted', 
+  'source-tts-speaking',
+  'translation-copied',
+  'translation-tts-speaking',
+  'action-failed'
+])
+
+// Stores & Composables
+const settingsStore = useSettingsStore()
+const translationComposable = useUnifiedTranslation(props.mode)
+const { handleError } = useErrorHandler()
+const { t } = useUnifiedI18n()
+
+// Refs
+const sourceInputRef = ref(null)
+
+// State from composable
+const {
+  sourceText,
+  translatedText,
+  isTranslating,
+  hasTranslation,
+  canTranslate,
+  translationError,
+  hasError,
+  triggerTranslation,
+  clearTranslation
+} = translationComposable
+
+// Language state
+const sourceLanguage = ref(props.initialSourceLanguage)
+const targetLanguage = ref(props.initialTargetLanguage)
+
+// Status state
+const statusMessage = ref('')
+const statusType = ref('')
+
+// Computed
+const currentSourceLanguage = computed(() => sourceLanguage.value || settingsStore.settings.SOURCE_LANGUAGE)
+const currentTargetLanguage = computed(() => targetLanguage.value || settingsStore.settings.TARGET_LANGUAGE)
+
+const toolbarMode = computed(() => {
+  if (props.mode === 'sidepanel') return 'sidepanel'
+  return 'input'
+})
+
+// Watch for can-translate changes
+watch(canTranslate, (newValue) => {
+  emit('can-translate-change', newValue)
+})
+
+// Watch for source text changes
+watch(sourceText, (newValue) => {
+  emit('source-text-changed', newValue)
+})
+
+// Watch for translation completion
+watch([translatedText, hasError], ([newTranslation, hasErr]) => {
+  if (hasErr) {
+    emit('translation-error', translationError.value)
+  } else if (newTranslation) {
+    emit('translation-completed', newTranslation)
+  }
+})
+
+// Methods
+const handleTranslate = async () => {
+  if (!canTranslate.value) return
+
+  logger.debug(`[${props.mode}] Starting translation`, {
+    sourceLength: sourceText.value?.length || 0,
+    sourceLang: currentSourceLanguage.value,
+    targetLang: currentTargetLanguage.value
+  })
+
+  const success = await triggerTranslation(
+    currentSourceLanguage.value,
+    currentTargetLanguage.value
+  )
+  
+  if (success) {
+    logger.debug(`[${props.mode}] Translation initiated successfully`)
+  } else {
+    logger.warn(`[${props.mode}] Translation failed to initiate`)
+  }
+}
+
+const handleSourceInput = (event) => {
+  const text = event.target.value
+  
+  // Apply text direction correction
+  try {
+    const correctedText = correctTextDirection(text)
+    if (correctedText !== text) {
+      sourceText.value = correctedText
+      nextTick(() => {
+        if (sourceInputRef.value) {
+          sourceInputRef.value.focus()
+          sourceInputRef.value.setSelectionRange(correctedText.length, correctedText.length)
+        }
+      })
+    }
+  } catch (error) {
+    logger.warn(`[${props.mode}] Text direction correction failed:`, error)
+  }
+}
+
+const handleKeydown = (event) => {
+  // Enter key behavior
+  if (event.key === 'Enter') {
+    if (props.mode === 'popup') {
+      // In popup: Enter submits, Shift+Enter adds new line
+      if (!event.shiftKey) {
+        event.preventDefault()
+        handleTranslate()
+      }
+    } else {
+      // In sidepanel: Ctrl+Enter submits, Enter adds new line
+      if (event.ctrlKey) {
+        event.preventDefault()
+        handleTranslate()
+      }
+    }
+  }
+}
+
+// ActionToolbar Event Handlers
+const handleSourceTextCopied = (text) => {
+  logger.debug(`[${props.mode}] Source text copied:`, text.substring(0, 50) + '...')
+  setStatus('Source text copied', 'success', 2000)
+  emit('source-text-copied', text)
+}
+
+const handleSourceTextPasted = (data) => {
+  logger.debug(`[${props.mode}] Source text pasted:`, data.text.substring(0, 50) + '...')
+  sourceText.value = data.text
+  setStatus('Text pasted from clipboard', 'success', 2000)
+  emit('source-text-pasted', data)
+  
+  // Auto-translate if enabled
+  if (data.autoTranslate && canTranslate.value) {
+    nextTick(() => {
+      handleTranslate()
+    })
+  }
+}
+
+const handleSourceTTSSpeaking = (data) => {
+  logger.debug(`[${props.mode}] Source TTS started:`, data.text.substring(0, 50) + '...')
+  setStatus('Speaking source text...', 'info', 3000)
+  emit('source-tts-speaking', data)
+}
+
+const handleTranslationCopied = (text) => {
+  logger.debug(`[${props.mode}] Translation copied:`, text.substring(0, 50) + '...')
+  setStatus('Translation copied', 'success', 2000)
+  emit('translation-copied', text)
+}
+
+const handleTranslationTTSSpeaking = (data) => {
+  logger.debug(`[${props.mode}] Translation TTS started:`, data.text.substring(0, 50) + '...')
+  setStatus('Speaking translation...', 'info', 3000)
+  emit('translation-tts-speaking', data)
+}
+
+const handleActionFailed = (error) => {
+  logger.error(`[${props.mode}] Action failed:`, error)
+  const errorMessage = error?.message || error?.error || error || 'Action failed'
+  setStatus(errorMessage, 'error', 4000)
+  emit('action-failed', error)
+}
+
+// Status management
+const setStatus = (message, type = 'info', duration = 3000) => {
+  statusMessage.value = message
+  statusType.value = type
+  
+  setTimeout(() => {
+    statusMessage.value = ''
+    statusType.value = ''
+  }, duration)
+}
+
+// Focus management
+const focusInput = () => {
+  nextTick(() => {
+    if (sourceInputRef.value) {
+      sourceInputRef.value.focus()
+    }
+  })
+}
+
+// Auto-resize for popup mode
+const { usePopupResize } = props.mode === 'popup' ? await import('@/composables/usePopupResize.js').catch(() => ({ usePopupResize: null })) : { usePopupResize: null }
+
+if (props.mode === 'popup' && usePopupResize) {
+  const resizeComposable = usePopupResize()
+  // Enable auto-resize if available
+}
+
+// Component lifecycle
+onMounted(() => {
+  logger.debug(`[${props.mode}] UnifiedTranslationInput mounted`)
+  
+  // Set initial language values from settings if not provided
+  if (!sourceLanguage.value || sourceLanguage.value === 'auto') {
+    sourceLanguage.value = settingsStore.settings.SOURCE_LANGUAGE
+  }
+  if (!targetLanguage.value) {
+    targetLanguage.value = settingsStore.settings.TARGET_LANGUAGE
+  }
+  
+  // Auto-focus for popup mode
+  if (props.mode === 'popup') {
+    focusInput()
+  }
+})
+
+// Expose methods for parent components
+defineExpose({
+  focusInput,
+  clearTranslation,
+  triggerTranslation: handleTranslate,
+  sourceText,
+  translatedText,
+  isTranslating,
+  canTranslate
+})
+</script>
+
+<style scoped>
+/* Base Form Styles */
+.unified-translation-input {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: inherit;
+}
+
+.unified-translation-input.enhanced {
+  background: transparent;
+}
+
+/* Mode-specific layouts */
+.unified-translation-input.mode-popup {
+  padding: 0;
+  gap: 12px;
+}
+
+.unified-translation-input.mode-sidepanel {
+  gap: 16px;
+  flex: 1;
+}
+
+/* Controls Container */
+.controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mode-popup .controls-container {
+  gap: 8px;
+}
+
+/* Selection Status (Sidepanel) */
+.selection-status {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.selection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+.selection-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #90caf9;
+  border-top: 2px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Enhanced Input Section */
+.enhanced-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+  margin: 0;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Enhanced Textarea */
+.translation-textarea.enhanced {
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 16px;
+  border: 2px solid var(--border-color, #dee2e6);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg-color, #ffffff);
+  color: var(--text-color, #333);
+  resize: vertical;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.translation-textarea.enhanced:focus {
+  outline: none;
+  border-color: var(--accent-color, #007bff);
+  box-shadow: 0 0 0 3px var(--accent-color-alpha, rgba(0, 123, 255, 0.1));
+}
+
+.translation-textarea.enhanced::placeholder {
+  color: var(--placeholder-color, #6c757d);
+  opacity: 0.7;
+}
+
+/* Mode-specific textarea styles */
+.mode-popup .translation-textarea.enhanced {
+  min-height: 50px;
+  font-size: 13px;
+  padding: 10px 14px;
+}
+
+.mode-sidepanel .translation-textarea.enhanced {
+  min-height: 120px;
+  font-size: 14px;
+  padding: 16px;
+}
+
+/* Enhanced Result Section */
+.enhanced-result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.mode-popup .enhanced-result-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.mode-sidepanel .enhanced-result-section {
+  flex: 1;
+}
+
+/* Status Bar */
+.status-bar {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.status-message {
+  font-weight: 500;
+}
+
+.status-message.success {
+  color: #155724;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+.status-message.info {
+  color: #0c5460;
+  background-color: #d1ecf1;
+  border: 1px solid #bee5eb;
+}
+
+.status-message.warning {
+  color: #856404;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+}
+
+/* Dark theme support */
+:root.theme-dark .unified-translation-input {
+  --bg-color: #2d2d2d;
+  --text-color: #e0e0e0;
+  --border-color: #424242;
+  --accent-color: #58a6ff;
+  --accent-color-alpha: rgba(88, 166, 255, 0.1);
+  --placeholder-color: #888;
+}
+
+:root.theme-dark .input-label {
+  color: #e0e0e0;
+}
+
+:root.theme-dark .selection-status {
+  background: #1a1a2e;
+  border-color: #16213e;
+}
+
+:root.theme-dark .selection-indicator {
+  color: #58a6ff;
+}
+
+:root.theme-dark .status-message.success {
+  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.2);
+}
+
+:root.theme-dark .status-message.error {
+  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.2);
+}
+
+:root.theme-dark .status-message.info {
+  color: #2196f3;
+  background-color: rgba(33, 150, 243, 0.1);
+  border-color: rgba(33, 150, 243, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 400px) {
+  .mode-popup .translation-textarea.enhanced {
+    font-size: 12px;
+    min-height: 40px;
+  }
+  
+  .mode-popup .controls-container {
+    gap: 6px;
+  }
+}
+</style>

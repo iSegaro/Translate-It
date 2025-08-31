@@ -44,7 +44,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
+import { useUnifiedTranslation } from '@/composables/useUnifiedTranslation.js'
 import { usePopupResize } from '@/composables/usePopupResize.js'
 import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
@@ -75,7 +75,7 @@ const settingsStore = useSettingsStore()
 const emit = defineEmits(['can-translate-change'])
 
 // Composables (lightweight popup version)
-const translation = usePopupTranslation()
+const translation = useUnifiedTranslation('popup')
 const popupResize = usePopupResize()
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
