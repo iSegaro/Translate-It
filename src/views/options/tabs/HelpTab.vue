@@ -201,6 +201,71 @@ h2 {
 
     .accordion-inner {
       padding: $spacing-lg;
+
+      .markdown-content {
+        :deep(p) {
+          margin: 0 0 $spacing-base 0;
+          line-height: 1.6;
+          color: var(--color-text);
+        }
+
+        :deep(ol), :deep(ul) {
+          margin: 0 0 $spacing-md 0;
+          padding-left: $spacing-xl;
+
+          li {
+            margin-bottom: $spacing-sm;
+            line-height: 1.5;
+            color: var(--color-text);
+
+            strong {
+              color: var(--color-text);
+              font-weight: $font-weight-semibold;
+            }
+          }
+        }
+
+        :deep(hr) {
+          border: none;
+          border-top: $border-width $border-style var(--color-border);
+          margin: $spacing-lg 0;
+        }
+
+        :deep(h2), :deep(h3), :deep(h4) {
+          font-size: $font-size-md;
+          font-weight: $font-weight-semibold;
+          margin: $spacing-lg 0 $spacing-sm 0;
+          color: var(--color-text);
+
+          &:first-child {
+            margin-top: 0;
+          }
+        }
+
+        :deep(a) {
+          color: var(--color-primary);
+          text-decoration: none;
+          font-weight: $font-weight-medium;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+
+        :deep(strong) {
+          color: var(--color-text);
+          font-weight: $font-weight-semibold;
+        }
+
+        :deep(code) {
+          background-color: var(--color-surface);
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 0.9em;
+          color: var(--color-text);
+        }
+      }
     }
   }
 }
