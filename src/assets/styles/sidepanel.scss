@@ -57,40 +57,6 @@ body.sidepanel-context .select-error.toolbar-button .toolbar-icon {
   gap: 10px;
 }
 
-.language-controls {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-
-.language-select {
-  flex: 1;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-size: 14px;
-}
-
-.swap-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-}
-
-.swap-button img {
-  width: 18px;
-  height: 18px;
-  filter: var(--icon-filter);
-}
-
 textarea {
   width: 100%;
   border: none;
