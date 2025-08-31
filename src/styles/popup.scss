@@ -120,8 +120,6 @@ body.popup-context .toolbar-icon {
   }
 }
 
-// Removed styles for `.toolbar-link`, `.language-controls`, and `.language-select` as they are now scoped in their respective Vue components.
-
 // Textarea and result styles
 .result {
   background-color: var(--bg-result-color);
@@ -129,9 +127,6 @@ body.popup-context .toolbar-icon {
   word-wrap: break-word;
   overflow-y: auto;
 }
-
-// Inline toolbar styles are now handled by shared components
-// Remove conflicting styles to avoid positioning issues
 
 // Loading spinner
 .spinner-overlay {
@@ -213,5 +208,3 @@ body.popup-context .select-error.toolbar-icon {
     filter: var(--icon-filter);
   }
 }
-
-/* Old animations removed - using error-pulse-red instead */
