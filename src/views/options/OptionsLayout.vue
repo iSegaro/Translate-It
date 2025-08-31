@@ -182,7 +182,7 @@ const isRTL = computed(() => {
 .tab-content-container {
   flex: 1;
   width: 700px;
-  min-width: 700px;
+  // min-width: 700px;
   max-width: 700px;
   padding: $spacing-xl;
   overflow-y: auto;
