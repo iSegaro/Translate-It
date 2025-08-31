@@ -16,17 +16,6 @@
   height: 100vh; /* Ensure the parent container has a fixed height */
 }
 
-.tab-content {
-  opacity: 0;
-  display: none;
-  transition: opacity 300ms ease;
-
-  &.active {
-    display: block;
-    opacity: 1;
-  }
-}
-
 section {
   margin-bottom: $spacing-xxl;
 
@@ -122,81 +111,6 @@ button {
   }
 }
 
-.api-key-input {
-  position: relative;
-  font-family: monospace;
-  letter-spacing: 0.1em;
-
-  &:not(:hover):not(:focus) {
-    color: transparent;
-    text-shadow: 0 0 0 #666;
-    background-image: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 0.8ch,
-      #666 0.8ch,
-      #666 1ch
-    );
-    background-size: 1ch 1em;
-    background-repeat: repeat;
-    background-position: 0 center;
-
-    &::placeholder {
-      color: transparent;
-    }
-  }
-
-  &:hover,
-  &:focus {
-    color: var(--input-text-color, var(--color-text));
-    text-shadow: none;
-    background-image: none;
-
-    &::placeholder {
-      color: var(--color-text-disabled);
-    }
-  }
-}
-
-.export-controls-row,
-.import-controls-row {
-  display: flex;
-  align-items: center;
-  gap: $spacing-base;
-  width: 100%;
-  flex-wrap: wrap;
-}
-
-.export-password-input,
-.import-password-input {
-  flex: 1;
-  min-width: 200px;
-}
-
-.export-button,
-.import-button {
-  padding: $spacing-base $spacing-lg;
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
-  cursor: pointer;
-  border: none;
-  border-radius: $border-radius-base;
-  background-color: var(--button-bg-color, var(--color-primary));
-  color: var(--button-text-color, white);
-  transition: background-color $transition-base;
-  white-space: nowrap;
-  flex-shrink: 0;
-
-  &:hover {
-    background-color: var(--button-hover-bg-color, var(--color-primary-dark));
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
 fieldset {
   border: $border-width $border-style var(--color-border);
   border-radius: $border-radius-base;
@@ -244,23 +158,6 @@ input[type="radio"] {
 
     label {
       min-width: auto;
-    }
-  }
-
-  .export-controls-row,
-  .import-controls-row {
-    flex-direction: column;
-    align-items: stretch;
-
-    .export-password-input,
-    .import-password-input {
-      min-width: auto;
-      width: 100%;
-    }
-
-    .export-button,
-    .import-button {
-      width: 100%;
     }
   }
 

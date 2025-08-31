@@ -146,10 +146,34 @@ const providers = ref([
   background-color: var(--color-background);
   color: var(--color-text);
   max-width: 400px;
-  
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
+  position: relative;
+  font-family: monospace;
+  letter-spacing: 0.1em;
+}
+
+.api-key-input:not(:hover):not(:focus) {
+  color: transparent;
+  text-shadow: 0 0 0 #666;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 0.8ch,
+    #666 0.8ch,
+    #666 1ch
+  );
+  background-size: 1ch 1em;
+  background-repeat: repeat;
+}
+
+.api-key-input:hover,
+.api-key-input:focus {
+  color: var(--input-text-color, var(--color-text));
+  text-shadow: none;
+  background-image: none;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 </style>

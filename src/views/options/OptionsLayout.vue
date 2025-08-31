@@ -315,6 +315,18 @@ const isRTL = computed(() => {
     transform: translateY(-20px) scale(0.95) rotateY(-5deg);
   }
 }
+
+/* Tab content transition styles */
+.tab-content {
+  opacity: 0;
+  display: none;
+  transition: opacity 300ms ease;
+
+  &.active {
+    display: block;
+    opacity: 1;
+  }
+}
 </style>
 
 <style scoped>
