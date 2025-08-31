@@ -150,7 +150,7 @@ const buttonClasses = computed(() => [
   `tts-button--${tts.ttsState.value}`,
   {
     'tts-button--hovered': isHovered.value,
-    'tts-button--disabled': props.disabled,
+    'tts-button--disabled': props.disabled || !props.text || !props.text.trim(),
     'tts-button--has-label': props.showLabel
   }
 ])
@@ -361,10 +361,10 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 }
 
 /* Disabled State */
-.tts-button--disabled {
+.tts-button--disabled,
+.tts-button:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
+  cursor: not-allowed !important;
 }
 
 /* Icon Container */
