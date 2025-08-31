@@ -77,38 +77,6 @@
         />
       </svg>
 
-      <!-- Progress Ring for Playing State -->
-      <svg
-        v-if="tts.ttsState.value === 'playing' && showProgress"
-        class="progress-ring"
-        :class="progressRingClasses"
-        viewBox="0 0 24 24"
-        width="20"
-        height="20"
-      >
-        <circle
-          class="progress-ring-background"
-          cx="12"
-          cy="12"
-          r="10"
-          fill="transparent"
-          stroke="currentColor"
-          stroke-width="1.5"
-          opacity="0.2"
-        />
-        <circle
-          class="progress-ring-progress"
-          cx="12"
-          cy="12"
-          r="10"
-          fill="transparent"
-          stroke="currentColor"
-          stroke-width="1.5"
-          :stroke-dasharray="progressCircumference"
-          :stroke-dashoffset="progressOffset"
-          transform="rotate(-90 12 12)"
-        />
-      </svg>
     </div>
 
     <!-- Optional Text Label -->
@@ -158,10 +126,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  showProgress: {
-    type: Boolean,
-    default: true
-  }
 })
 
 // Emits
@@ -221,18 +185,6 @@ const buttonLabel = computed(() => {
   }
 })
 
-const progressRingClasses = computed(() => ({
-  'progress-ring--animated': tts.ttsState.value === 'playing'
-}))
-
-// Progress calculation for ring
-const progressRadius = 10
-const progressCircumference = 2 * Math.PI * progressRadius
-
-const progressOffset = computed(() => {
-  const progress = Math.max(0, Math.min(100, tts.progress.value || 0))
-  return progressCircumference - (progress / 100) * progressCircumference
-})
 
 // Methods
 const handleClick = async () => {
@@ -309,19 +261,23 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 <style scoped>
 /* Base Button Styles */
 .tts-button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  font-weight: 500;
-  outline: none;
-  overflow: hidden;
-  white-space: nowrap;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  outline: none !important;
+  overflow: visible !important; /* Allow progress ring to be visible outside */
+  white-space: nowrap !important;
+  /* Ensure component isolation and create new stacking context */
+  isolation: isolate !important;
+  z-index: auto !important;
+  contain: layout style !important;
 }
 
 .tts-button:focus {
@@ -413,10 +369,16 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 
 /* Icon Container */
 .icon-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  /* Create isolated stacking context */
+  isolation: isolate !important;
+  z-index: 1 !important;
+  contain: layout !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* TTS Icon */
@@ -438,28 +400,6 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   color: currentColor;
 }
 
-/* Progress Ring */
-.progress-ring {
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.progress-ring-progress {
-  transition: stroke-dashoffset 0.3s ease;
-  stroke-linecap: round;
-}
-
-.progress-ring--animated .progress-ring-progress {
-  animation: progress-pulse 2s ease-in-out infinite;
-}
-
-@keyframes progress-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
 
 /* Label */
 .tts-label {
@@ -498,27 +438,18 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   .tts-button {
     border-width: 2px;
   }
-  
-  .progress-ring-background,
-  .progress-ring-progress {
-    stroke-width: 2;
-  }
 }
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .tts-button,
-  .tts-icon,
-  .progress-ring-progress {
+  .tts-icon {
     transition: none;
   }
   
   .loading-spin {
     animation: none;
   }
-  
-  .progress-ring--animated .progress-ring-progress {
-    animation: none;
-  }
 }
+
 </style>

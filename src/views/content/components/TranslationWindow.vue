@@ -376,41 +376,21 @@ const handleStartDrag = (event) => {
   gap: 0 !important;
 }
 
+/* Simplified TTS button styling - let TTSButton component handle most of its own styling */
 .header-action-toolbar :deep(.tts-button) {
-  background: none !important;
-  border: none !important;
-  cursor: pointer !important;
-  padding: 5px !important;
-  transition: background 0.3s !important;
-  border-radius: 3px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
   width: 26px !important;
   height: 26px !important;
   min-width: 26px !important;
   min-height: 26px !important;
+  padding: 5px !important;
+  /* Force stacking context to be clean */
   position: relative !important;
-  /* Performance optimizations matching other modes */
-  will-change: transform !important;
-  backface-visibility: hidden !important;
-  transform: translateZ(0) !important;
+  overflow: visible !important;
+  z-index: 1 !important;
 }
 
-.header-action-toolbar :deep(.tts-button:hover) {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
 
-/* Progress ring optimizations for floating mode */
-.header-action-toolbar :deep(.progress-ring) {
-  will-change: transform !important;
-  backface-visibility: hidden !important;
-}
-
-.header-action-toolbar :deep(.tts-icon) {
-  will-change: transform !important;
-}
-
+/* Theme-specific hover colors only */
 .translation-window.light .header-action-toolbar :deep(.tts-button:hover) {
   background-color: #f0f0f0 !important;
 }
