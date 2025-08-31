@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { sendReliable } from '@/messaging/core/ReliableMessaging.js'
 import { sendSmart } from '@/messaging/core/SmartMessaging.js'
+import { isContextError } from '@/utils/core/extensionContext.js'
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 
@@ -38,7 +39,12 @@ export function useMessaging(context) {
       // Use smart messaging for optimal performance
       return await sendSmart(message, options);
     } catch (error) {
-      logger.error('sendMessage failed via sendSmart:', error);
+      // Handle context errors silently (they're expected when extension reloads)
+      if (isContextError(error)) {
+        logger.debug('sendMessage failed due to extension context invalidated (expected during extension reload):', error.message);
+      } else {
+        logger.error('sendMessage failed via sendSmart:', error);
+      }
       throw error;
     }
   };
@@ -64,8 +70,12 @@ export function useMessaging(context) {
     const message = createMessage(action, data, options);
     // Fire-and-forget via smart messenger
     sendSmart(message, options).catch(error => {
-      // Silently ignore send errors for fire-and-forget
-      console.debug(`[useMessaging:${context}] Fire-and-forget failed (smart):`, error);
+      // Handle context errors silently, log other errors
+      if (isContextError(error)) {
+        logger.debug(`[useMessaging:${context}] Fire-and-forget failed due to extension context invalidated (expected):`, error.message);
+      } else {
+        logger.debug(`[useMessaging:${context}] Fire-and-forget failed (smart):`, error);
+      }
     });
   };
 
