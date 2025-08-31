@@ -59,25 +59,6 @@ section {
   }
 }
 
-.setting-description {
-  font-size: $font-size-sm;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-top: $spacing-xs;
-  flex-basis: 100%;
-
-  &.export-info {
-    flex-basis: auto;
-    padding-left: 0;
-  }
-
-  &.import-warning {
-    flex-basis: auto;
-    padding-left: 0;
-    color: var(--color-warning);
-  }
-}
-
 input[type="text"],
 input[type="password"],
 select,

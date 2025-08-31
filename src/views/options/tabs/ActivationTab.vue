@@ -282,19 +282,14 @@ h2 {
     margin-bottom: 0;
     flex-grow: 1;
   }
-  
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    flex-basis: 100%;
-    padding-left: $spacing-xl;
-    margin-top: $spacing-xs;
-  }
-  
-  &.disabled {
-    opacity: 0.2;
-    pointer-events: none;
-  }
+}
+
+.setting-description {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  flex-basis: 100%;
+  padding-left: $spacing-xl;
+  margin-top: $spacing-xs;
 }
 
 .sub-options-group {

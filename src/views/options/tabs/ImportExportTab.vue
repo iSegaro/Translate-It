@@ -338,22 +338,22 @@ h2 {
     margin-bottom: $spacing-sm;
     display: block;
   }
-  
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-    
-    &.export-info {
-      flex-basis: auto;
-      padding-left: 0;
-    }
-    
-    &.import-warning {
-      flex-basis: auto;
-      padding-left: 0;
-      color: var(--color-warning);
-    }
+}
+
+.setting-description {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+
+  &.export-info {
+    flex-basis: auto;
+    padding-left: 0;
+  }
+
+  &.import-warning {
+    flex-basis: auto;
+    padding-left: 0;
+    color: var(--color-warning);
   }
 }
 
