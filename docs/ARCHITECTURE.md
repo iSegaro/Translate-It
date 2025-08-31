@@ -18,6 +18,7 @@
 - ✅ **Provider System** - 10+ translation providers with factory pattern
 - ✅ **Cross-Browser Support** - Chrome and Firefox MV3
 - ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
+- ✅ **Smart Messaging System** - Intelligent routing eliminates 3+ second retry delays
 
 ---
 
@@ -25,7 +26,7 @@
 
 ### Core Documentation
 - **[Architecture](ARCHITECTURE.md)** - This file - Complete system overview and integration guide
-- **[Messaging System](MessagingSystem.md)** - Inter-component communication and browser API integration
+- **[Smart Messaging System](MessagingSystem.md)** - Intelligent inter-component communication with performance optimization
 - **[Translation System](TRANSLATION_SYSTEM.md)** - Translation engine, providers, and request handling
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
@@ -64,8 +65,8 @@
                     │
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MESSAGING LAYER                             │
-│  useMessaging → MessageFormat → browser.runtime → Handlers     │
+│                    SMART MESSAGING LAYER                       │
+│  useMessaging → SmartMessaging → Auto-Route → Direct/Port      │
 │  Cross-Frame Communication → Window Management                 │
 └─────────────────────────────────────────────────────────────────┘
                     │
@@ -170,12 +171,14 @@ src/
 │       ├── subtitle.js             # Subtitle state
 │       └── backup.js               # Backup/import state
 │
-├── 🔄 messaging/           # Messaging system
+├── 🔄 messaging/           # Smart Messaging system  
 │   ├── core/
 │   │   ├── MessagingCore.js        # MessageFormat, Contexts
-│   │   └── MessageActions.js       # Action constants
+│   │   ├── MessageActions.js       # Action constants
+│   │   ├── SmartMessaging.js       # 🆕 Smart routing system
+│   │   └── ReliableMessaging.js    # Legacy (backward compatibility)
 │   └── composables/
-│       └── useMessaging.js         # Vue messaging composable
+│       └── useMessaging.js         # Vue messaging composable (Smart-enabled)
 │
 ├── 🎯 background/          # Background service worker
 │   ├── index.js                    # Service worker entry point
@@ -252,48 +255,62 @@ src/
 
 ---
 
-## 🔄 Messaging System
+## 🔄 Smart Messaging System
 
 ### Overview
-The messaging system provides standardized communication between Vue components, background scripts, and content scripts. See [Messaging System Documentation](MessagingSystem.md) for complete details.
+The Smart Messaging system provides **intelligent communication** between Vue components, background scripts, and content scripts with **automatic performance optimization**. See [Smart Messaging System Documentation](MessagingSystem.md) for complete details.
 
 ### Vue Integration
 
-**useMessaging Composable** - Primary interface for Vue components:
+**useMessaging Composable** - Smart-enabled interface for Vue components:
 ```javascript
 import { useMessaging } from '@/messaging/composables/useMessaging.js'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
 
 // In Vue component setup()
-const { sendMessage, createMessage } = useMessaging('popup')
+const { sendMessage, sendSmart, createMessage } = useMessaging('popup')
 
-// Send translation request
+// Automatic smart routing (recommended)
 const response = await sendMessage(
   createMessage(MessageActions.TRANSLATE, { 
     text: 'Hello',
     targetLang: 'fa'
   })
 )
+
+// Direct smart messaging with options
+const fastResponse = await sendSmart(
+  createMessage(MessageActions.GET_SETTINGS, {}),
+  { usePortForAll: false }
+)
 ```
 
-### Core Architecture
+### Smart Routing Architecture
 
-**MessagingCore.js** - Foundation utilities:
+**SmartMessaging.js** - Intelligent routing system:
+```javascript
+import { sendSmart } from '@/messaging/core/SmartMessaging.js'
+
+// Automatic routing based on action type
+const response = await sendSmart(message)
+
+// Fast actions: Direct runtime.sendMessage (< 3 seconds)
+// Slow actions: Port-based messaging (stable connection)
+
+// Custom control
+const response = await sendSmart(message, {
+  timeout: 10000,
+  usePortForAll: false
+})
+```
+
+**MessageFormat** - Foundation utilities (unchanged):
 ```javascript
 export const MessageFormat = {
   create: (action, data, context) => ({ ... }),
   validate: (message) => boolean,
   createSuccessResponse: (data) => ({ ... }),
   createErrorResponse: (error) => ({ ... })
-}
-
-export const MessageContexts = {
-  POPUP: 'popup',
-  SIDEPANEL: 'sidepanel', 
-  OPTIONS: 'options',
-  BACKGROUND: 'background',
-  CONTENT: 'content',
-  OFFSCREEN: 'offscreen'
 }
 ```
 
@@ -1125,14 +1142,19 @@ logger.debugLazy(() => ['Expensive computation:', expensiveFunction()])
 
 ## 🚀 Performance Benefits
 
-### Refactoring Results
+### Smart Messaging Results
+- ✅ **3+ second reduction** in retry delays eliminated
+- ✅ **Intelligent routing** prevents overcomplicated fallbacks
+- ✅ **Port stability** for long-running operations
+- ✅ **Direct messaging** for quick UI updates
 - ✅ **50% faster** message processing
 - ✅ **Eliminated** 20-second timeouts
 - ✅ **Reduced** cross-component interference
 - ✅ **Simplified** debugging and maintenance
 
 ### Best Practices
-- **Direct browser API** usage for performance
+- **Smart messaging** for automatic performance optimization
+- **Action classification** ensures optimal routing
 - **Context filtering** to prevent message conflicts
 - **Lazy loading** of providers and components
 - **Efficient state management** with Pinia
