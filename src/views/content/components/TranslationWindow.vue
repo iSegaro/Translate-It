@@ -34,22 +34,17 @@
             <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
           </svg>
         </button>
-        <ActionToolbar
-          :text="props.initialTranslatedText"
-          :language="'auto'"
-          mode="floating"
-          position="inline"
-          :visible="true"
-          :show-copy="false"
-          :show-paste="false"
-          :show-tts="true"
-          size="sm"
-          variant="secondary"
-          @tts-started="handleTTSStarted"
-          @tts-stopped="handleTTSStopped"
-          @tts-error="handleTTSError"
-          class="header-action-toolbar"
-        />
+        <button 
+          class="action-btn" 
+          @click.stop="handleTTSClick" 
+          :disabled="!props.initialTranslatedText || props.initialTranslatedText.trim().length === 0"
+          :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path v-if="!isSpeaking" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            <path v-else fill="currentColor" d="M6 6h12v12H6z"/>
+          </svg>
+        </button>
         <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
           <svg width="16" height="16" viewBox="0 0 24 24">
             <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
@@ -98,7 +93,6 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
-import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
 import { isContextError } from '@/utils/core/extensionContext.js';
 import browser from 'webextension-polyfill';
@@ -259,6 +253,34 @@ const handleCopy = () => {
   navigator.clipboard.writeText(props.initialTranslatedText);
 };
 
+const handleTTSClick = async () => {
+  if (!props.initialTranslatedText || props.initialTranslatedText.trim().length === 0) return;
+  
+  try {
+    if (isSpeaking.value) {
+      // Stop TTS
+      await sendMessage({
+        action: 'GOOGLE_TTS_STOP_ALL',
+        data: { source: 'translation-window-button' }
+      });
+      isSpeaking.value = false;
+    } else {
+      // Start TTS
+      await sendMessage({
+        action: 'GOOGLE_TTS_SPEAK',
+        data: { 
+          text: props.initialTranslatedText,
+          source: 'translation-window-button'
+        }
+      });
+      isSpeaking.value = true;
+    }
+  } catch (error) {
+    console.error(`[TranslationWindow ${props.id}] TTS error:`, error);
+    isSpeaking.value = false;
+  }
+};
+
 // TTSButton event handlers - no need to emit to WindowsManager as TTSButton handles TTS itself
 const handleTTSStarted = (data) => {
   console.log(`[TranslationWindow ${props.id}] TTS started:`, data.text.substring(0, 50) + '...');
@@ -363,47 +385,7 @@ const handleStartDrag = (event) => {
   gap: 8px !important;
 }
 
-.header-action-toolbar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ActionToolbar integration in header */
-.header-action-toolbar :deep(.action-toolbar) {
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-.header-action-toolbar :deep(.toolbar-left) {
-  gap: 0 !important;
-}
-
-/* Simplified TTS button styling - let TTSButton component handle most of its own styling */
-.header-action-toolbar :deep(.tts-button) {
-  width: 26px !important;
-  height: 26px !important;
-  min-width: 26px !important;
-  min-height: 26px !important;
-  padding: 5px !important;
-  /* Force stacking context to be clean */
-  position: relative !important;
-  overflow: visible !important;
-  z-index: 1 !important;
-}
-
-
-/* Theme-specific hover colors only */
-.translation-window.light .header-action-toolbar :deep(.tts-button:hover) {
-  background-color: #f0f0f0 !important;
-}
-
-.translation-window.dark .header-action-toolbar :deep(.tts-button:hover) {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
+/* Removed ActionToolbar-specific styles since we now use direct .action-btn for TTS */
 
 .header-close {
   display: flex;
@@ -424,6 +406,11 @@ const handleStartDrag = (event) => {
 
 .action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Theme-specific hover effects */
