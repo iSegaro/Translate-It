@@ -244,28 +244,30 @@ onMounted(async () => {
 <style scoped>
 .language-controls {
   display: flex;
-  gap: 4px;
-  align-items: stretch;
-  flex: 1;
-  height: 100%;
+  align-items: center;
+  padding: 6px 12px;
+  gap: 6px;
+  background: var(--language-controls-bg-color);
 }
 
 .language-select {
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 4px;
-  background: var(--bg-textbox-color, #ffffff);
-  color: var(--text-color, #212529);
-  font-family: inherit;
+  min-width: 100px;
+  padding: 7px 8px;
   font-size: 14px;
-  line-height: 1.4;
-  box-sizing: border-box;
-  min-width: 0;
-  height: 100%;
-  cursor: pointer;
-  text-align: left;
-  vertical-align: middle;
+  border: 1px solid var(--language-select-border-color);
+  border-radius: 4px;
+  background-color: var(--language-select-bg-color);
+  color: var(--language-select-text-color);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5" viewBox="0 0 10 5"><path fill="%236c757d" d="M0 0l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: left 8px center;
+  background-size: 10px 5px;
+  padding-left: 25px;
+  filter: var(--icon-filter);
 }
 
 .language-select:focus {
@@ -281,44 +283,37 @@ onMounted(async () => {
 }
 
 .swap-button {
-  flex-shrink: 0;
-  padding: 6px;
-  border: 1px solid var(--header-border-color, #dee2e6);
-  border-radius: 4px;
-  background: var(--bg-textbox-color, #ffffff);
+  background: none;
+  border: none;
+  padding: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  width: 36px;
-  height: 100%;
-  box-sizing: border-box;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, filter 0.2s ease-in-out;
+  flex-shrink: 0;
 }
 
-.swap-button:hover:not(:disabled) {
-  background: var(--bg-hover, #f8f9fa);
-  border-color: var(--accent-color, #007bff);
-  transform: scale(1.05);
+.swap-button:hover {
+  background-color: var(--toolbar-link-hover-bg-color);
 }
 
 .swap-button:disabled {
-  background-color: var(--bg-disabled, #e9ecef);
-  border-color: var(--border-disabled, #dee2e6);
   cursor: not-allowed;
-  opacity: 0.6;
-  transform: none;
+  opacity: 0.5;
 }
 
 .swap-button img {
-  width: 14px;
-  height: 14px;
-  filter: var(--icon-filter, none);
-  transition: filter 0.2s ease;
+  width: 16px;
+  height: 16px;
+  opacity: var(--icon-opacity);
+  filter: var(--icon-filter);
+  transition: opacity 0.2s ease-in-out;
 }
 
-.swap-button:hover:not(:disabled) img {
-  filter: var(--icon-hover-filter, none);
+.swap-button:hover img {
+  opacity: var(--icon-hover-opacity);
 }
 
 /* Responsive Design */

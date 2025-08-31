@@ -343,17 +343,15 @@ onUnmounted(() => {
 .split-translate-button {
   background: none;
   border: 1px solid var(--header-border-color);
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   padding: 0;
   transition: background-color 0.2s ease, border-color 0.2s ease;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  height: 100%;
-  min-width: 100px;
 }
 
 .split-translate-button:hover {
@@ -686,5 +684,25 @@ onUnmounted(() => {
 
 .sidepanel-wrapper .translate-main-area span {
   color: var(--text-color);
+}
+
+/* Toolbar Link Styles */
+.toolbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--toolbar-link-color);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: var(--icon-opacity);
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  background-color: transparent;
+}
+
+.toolbar-link:hover {
+  opacity: var(--icon-hover-opacity);
+  background-color: var(--toolbar-link-hover-bg-color);
 }
 </style>

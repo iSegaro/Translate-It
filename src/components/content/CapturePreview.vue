@@ -727,7 +727,9 @@ onUnmounted(() => {
 .language-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  padding: 6px 12px;
+  gap: 6px;
+  background: var(--language-controls-bg-color);
 }
 
 .language-group {
@@ -743,14 +745,24 @@ onUnmounted(() => {
   color: var(--color-text-muted);
 }
 
-.language-select,
-.provider-select {
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-background);
-  color: var(--color-text);
+.language-select {
+  flex: 1;
+  min-width: 100px;
+  padding: 7px 8px;
   font-size: 14px;
+  border: 1px solid var(--language-select-border-color);
+  border-radius: 4px;
+  background-color: var(--language-select-bg-color);
+  color: var(--language-select-text-color);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5" viewBox="0 0 10 5"><path fill="%236c757d" d="M0 0l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: left 8px center;
+  background-size: 10px 5px;
+  padding-left: 25px;
+  filter: var(--icon-filter);
 }
 
 .swap-languages {
