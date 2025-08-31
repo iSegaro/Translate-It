@@ -77,13 +77,14 @@ const isRTL = computed(() => {
   width: min(1200px, calc(100vw - 40px));
   max-width: 1200px;
   min-width: 320px;
-  min-height: 90vh;
   background-color: var(--color-background);
   border-radius: $border-radius-lg;
   box-shadow: $shadow-lg;
   border: $border-width $border-style var(--color-border);
   margin: 0 auto;
   box-sizing: border-box;
+  height: calc(100vh - 40px) !important; /* Force height to leave space at the bottom */
+  margin-bottom: 40px !important; /* Force spacing at the bottom */
   
   /* Debug outline removed */
 }

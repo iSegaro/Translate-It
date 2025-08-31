@@ -311,12 +311,6 @@ input[type="radio"] {
   overflow-x: hidden; /* Prevent horizontal scrolling */
 }
 
-.options-layout {
-  height: 100vh; /* ارتفاع کاملاً ثابت */
-  max-height: 100vh; /* جلوگیری از افزایش ارتفاع */
-  overflow: hidden; /* جلوگیری از اسکرول داخلی */
-}
-
 @media (max-width: #{$breakpoint-md}) {
   .options-page {
     padding: $spacing-sm;
