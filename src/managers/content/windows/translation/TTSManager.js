@@ -44,7 +44,7 @@ export class TTSManager {
         }
       } catch (error) {
         if (isContextError(error)) {
-          this.logger.debug(`[TTSManager ${windowId}] Extension context invalidated during cleanup - handled silently.`);
+          this.logger.debug(`[TTSManager ${windowId}] Extension context invalidated during cleanup - this is expected when extension reloads.`);
         } else {
           this.logger.error(`[TTSManager ${windowId}] Failed to stop TTS during cleanup:`, error);
         }

@@ -146,7 +146,7 @@ class TTSGlobalManager {
           stopPromises.push(
             Promise.resolve(instance.stopCallback()).catch(error => {
               if (isContextError(error)) {
-                logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - handled silently.`);
+                logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
               } else {
                 logger.error(`[TTSGlobalManager] Failed to stop instance ${instanceId}:`, error);
               }
@@ -309,7 +309,7 @@ class TTSGlobalManager {
           }
         } catch (error) {
           if (isContextError(error)) {
-            logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - handled silently.`);
+            logger.debug(`[TTSGlobalManager] Extension context invalidated while stopping instance ${instanceId} - expected during extension reload.`);
           } else {
             logger.error(`[TTSGlobalManager] Error stopping instance ${instanceId}:`, error);
           }
