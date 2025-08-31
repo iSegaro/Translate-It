@@ -1,15 +1,18 @@
 <template>
   <div
     class="translation-display"
-    :class="{
-      'has-content': hasContent,
-      'is-loading': isLoading,
-      'has-error': hasError,
-      'compact-mode': mode === 'compact',
-      'popup-mode': mode === 'popup',
-      'sidepanel-mode': mode === 'sidepanel',
-      'selection-mode': mode === 'selection'
-    }"
+    :class="[
+      {
+        'has-content': hasContent,
+        'is-loading': isLoading,
+        'has-error': hasError,
+        'compact-mode': mode === 'compact',
+        'popup-mode': mode === 'popup',
+        'sidepanel-mode': mode === 'sidepanel',
+        'selection-mode': mode === 'selection'
+      },
+      containerClass
+    ]"
   >
     <!-- Enhanced Actions Toolbar -->
     <ActionToolbar
@@ -21,6 +24,13 @@
       :show-copy="showCopyButton"
       :show-paste="false"
       :show-tts="showTTSButton"
+      :copy-title="copyTitle"
+      :tts-title="ttsTitle"
+      @text-copied="handleTextCopied"
+      @tts-started="handleTTSStarted"
+      @tts-stopped="handleTTSStopped"
+      @tts-speaking="handleTTSSpeaking"
+      @action-failed="handleActionFailed"
     />
     
     <!-- Loading Spinner -->
@@ -37,10 +47,13 @@
     <div 
       ref="contentRef"
       class="translation-content"
-      :class="{ 
-        'fade-in': showFadeIn,
-        'loading-dim': isLoading
-      }"
+      :class="[
+        { 
+          'fade-in': showFadeIn,
+          'loading-dim': isLoading
+        },
+        contentClass
+      ]"
       :dir="textDirection.dir"
       :style="{ textAlign: textDirection.textAlign }"
       v-html="renderedContent"
@@ -166,8 +179,30 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: 'auto'
+  },
+  
+  // Enhanced popup-specific props
+  containerClass: {
+    type: String,
+    default: ''
+  },
+  contentClass: {
+    type: String,
+    default: ''
   }
 })
+
+// Emits
+const emit = defineEmits([
+  'text-copied',
+  'text-pasted',
+  'tts-started',
+  'tts-stopped', 
+  'tts-speaking', // backward compatibility
+  'action-failed',
+  'retry-requested',
+  'settings-requested'
+])
 
 // Refs
 const contentRef = ref(null)
@@ -242,17 +277,41 @@ watch(() => props.content, (newContent, oldContent) => {
   }
 }, { immediate: true })
 
+// Action Toolbar Event Handlers
+const handleTextCopied = (text) => {
+  emit('text-copied', text)
+}
+
+const handleTTSStarted = (data) => {
+  emit('tts-started', data)
+  emit('tts-speaking', data) // backward compatibility
+}
+
+const handleTTSStopped = () => {
+  emit('tts-stopped')
+}
+
+const handleTTSSpeaking = (data) => {
+  emit('tts-speaking', data)
+}
+
+const handleActionFailed = (error) => {
+  emit('action-failed', error)
+}
+
 // Error action handlers
 const handleRetry = () => {
   if (props.onRetry) {
     props.onRetry()
   }
+  emit('retry-requested')
 }
 
 const handleSettings = () => {
   if (props.onOpenSettings) {
     props.onOpenSettings()
   }
+  emit('settings-requested')
 }
 
 // Make handlers globally accessible for onclick handlers

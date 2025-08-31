@@ -43,62 +43,21 @@
 
     <!-- Enhanced Translation Display -->
     <div class="enhanced-result-section">
-      <div class="result-container">
-        <!-- Loading State -->
-        <div
-          v-if="isTranslating"
-          class="loading-overlay"
-        >
-          <div class="loading-spinner">
-            <div class="spinner" />
-          </div>
-          <span class="loading-text">{{ t('TRANSLATING') || 'در حال ترجمه...' }}</span>
-        </div>
-        
-        <!-- Error State -->
-        <div
-          v-else-if="translationError"
-          class="error-content"
-        >
-          <div class="error-icon">
-            ⚠️
-          </div>
-          <div class="error-text">
-            {{ translationError }}
-          </div>
-        </div>
-        
-        <!-- Translation Result -->
-        <div
-          v-else
-          ref="translationResultRef"
-          class="result-content"
-          :class="{ 'fade-in': showFadeInAnimation }"
-          v-html="formattedTranslation"
-        />
-        
-        <!-- Action Toolbar for Result -->
-        <ActionToolbar
-          v-if="hasTranslation && !isTranslating"
-          :text="translatedText"
-          :language="currentTargetLanguage"
-          mode="output"
-          position="top-right"
-          :visible="true"
-          :show-copy="true"
-          :show-paste="false"
-          :show-tts="true"
-          :copy-disabled="translatedText.length === 0"
-          :tts-disabled="translatedText.length === 0"
-          size="md"
-          variant="secondary"
-          :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه ترجمه'"
-          :tts-title="t('popup_voice_target_title_icon') || 'خواندن نتیجه ترجمه'"
-          @text-copied="handleTranslationCopied"
-          @tts-speaking="handleTranslationTTSSpeaking"
-          @action-failed="handleActionFailed"
-        />
-      </div>
+      <TranslationDisplay
+        :content="translatedText"
+        :target-language="currentTargetLanguage"
+        :is-loading="isTranslating"
+        :error="translationError"
+        mode="popup"
+        :placeholder="t('TRANSLATION_PLACEHOLDER') || 'نتیجه ترجمه اینجا نمایش داده می‌شود...'"
+        :copy-title="t('popup_copy_target_title_icon') || 'کپی نتیجه ترجمه'"
+        :tts-title="t('popup_voice_target_title_icon') || 'خواندن نتیجه ترجمه'"
+        container-class="popup-result-container"
+        content-class="popup-result-content"
+        @text-copied="handleTranslationCopied"
+        @tts-speaking="handleTranslationTTSSpeaking"
+        @action-failed="handleActionFailed"
+      />
     </div>
 
     <!-- Status Bar -->
@@ -119,7 +78,7 @@ import { useSettingsStore } from '@/store/core/settings'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
-import { marked } from 'marked'
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'EnhancedTranslationForm')
@@ -136,7 +95,6 @@ const { t } = useUnifiedI18n()
 
 // Refs
 const sourceInputRef = ref(null)
-const translationResultRef = ref(null)
 
 // State
 const showFadeInAnimation = ref(false)
@@ -161,18 +119,6 @@ const {
 const currentSourceLanguage = computed(() => settingsStore.settings.SOURCE_LANGUAGE)
 const currentTargetLanguage = computed(() => settingsStore.settings.TARGET_LANGUAGE)
 
-const formattedTranslation = computed(() => {
-  if (!translatedText.value) {
-    return '<div class="placeholder">نتیجه ترجمه اینجا نمایش داده می‌شود...</div>'
-  }
-  
-  try {
-    return marked.parse(translatedText.value)
-  } catch (error) {
-    logger.error("[EnhancedTranslationForm] Markdown parsing failed:", error)
-    return translatedText.value
-  }
-})
 
 // Watch canTranslate and emit changes
 watch(canTranslate, (newValue) => {
@@ -335,20 +281,12 @@ onMounted(async () => {
 watch(translatedText, (newValue, oldValue) => {
   if (newValue && newValue !== oldValue) {
     nextTick(() => {
-      const resultElement = translationResultRef.value
-      if (resultElement) {
-        resizeComposable.handleTranslationResult(resultElement)
-        showFadeInAnimation.value = true
-        setTimeout(() => {
-          showFadeInAnimation.value = false
-        }, 600)
-      }
+      // TranslationDisplay handles animations internally
+      showFadeInAnimation.value = true
+      setTimeout(() => {
+        showFadeInAnimation.value = false
+      }, 600)
     })
-  } else if (!newValue && oldValue) {
-    const resultElement = translationResultRef.value
-    if (resultElement) {
-      resizeComposable.resetOutputField(resultElement)
-    }
   }
 })
 
@@ -409,76 +347,23 @@ defineExpose({
   color: var(--color-text-placeholder);
 }
 
-.result-container {
-  position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-primary);
-  transition: border-color 0.2s ease;
-}
-
-.result-content {
-  min-height: 80px;
-  padding: 12px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--color-text-primary);
-  border-radius: 8px;
-}
-
-.result-content.fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
-
-.placeholder {
-  color: var(--color-text-placeholder);
-  font-style: italic;
-}
-
-.loading-overlay {
+/* Enhanced result section now uses TranslationDisplay */
+.enhanced-result-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  gap: 1rem;
 }
 
-.loading-spinner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border);
-  border-top: 2px solid var(--color-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.loading-text {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.error-content {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  color: var(--color-error);
-}
-
-.error-icon {
-  font-size: 1.2rem;
-}
-
-.error-text {
+/* Custom styles for popup mode in TranslationDisplay */
+.enhanced-result-section :deep(.popup-result-container) {
   flex: 1;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.enhanced-result-section :deep(.popup-result-content) {
+  flex: 1;
+  min-height: 80px;
 }
 
 .status-bar {
@@ -520,26 +405,10 @@ defineExpose({
   color: var(--color-info);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 /* Responsive adjustments */
 @media (max-width: 400px) {
-  .input-container,
-  .result-container {
+  .input-container {
     border-radius: 6px;
   }
   
@@ -548,7 +417,7 @@ defineExpose({
     font-size: 13px;
   }
   
-  .result-content {
+  .enhanced-result-section :deep(.translation-content) {
     padding: 10px;
     font-size: 13px;
   }
