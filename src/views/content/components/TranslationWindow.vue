@@ -29,6 +29,22 @@
   >
     <div class="window-header" @mousedown="handleStartDrag">
       <div class="header-actions">
+        <button class="action-btn" @click.stop="handleCopy" title="Copy translation">
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+          </svg>
+        </button>
+        <button 
+          class="action-btn" 
+          @click.stop="handleTTS" 
+          :disabled="!translatedText || translatedText.trim().length === 0"
+          :title="isSpeaking ? 'Stop TTS' : 'Play TTS'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path v-if="!isSpeaking" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            <path v-else fill="currentColor" d="M6 6h12v12H6z"/>
+          </svg>
+        </button>
         <button class="action-btn" @click.stop="toggleShowOriginal" title="Show/Hide Original Text">
           <svg width="16" height="16" viewBox="0 0 24 24">
             <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm-2-9.41V12h2.59L15 14.41V16h-4v-1.59L8.59 12H7v-2h3.59L13 7.59V6h4v1.59L14.41 10H12v.59z"/>
@@ -61,16 +77,11 @@
         :target-language="'auto'"
         :show-fade-in-animation="true"
         :enable-markdown="true"
-        :show-toolbar="true"
-        :show-copy-button="true"
-        :show-tts-button="true"
+        :show-toolbar="false"
+        :show-copy-button="false"
+        :show-tts-button="false"
         :can-retry="!!errorMessage"
         :on-retry="handleRetry"
-        :copy-title="'Copy translation'"
-        :tts-title="'Play translation'"
-        @text-copied="handleTranslationCopied"
-        @tts-speaking="handleTranslationTTSSpeaking"
-        @action-failed="handleActionFailed"
         class="window-translation-display"
       />
     </div>
@@ -81,6 +92,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
 import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
+import { useTTSSmart } from '@/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
 import { isContextError } from '@/utils/core/extensionContext.js';
@@ -105,6 +117,9 @@ const ttsGlobal = useTTSGlobal({
   name: `TranslationWindow-${props.id}`
 });
 
+// TTS Smart for actual TTS functionality with proper state management
+const tts = useTTSSmart();
+
 // State  
 const isLoading = computed(() => {
   const loading = props.isLoading || !props.initialTranslatedText;
@@ -122,7 +137,7 @@ const currentSize = ref(props.initialSize); // Track current size
 const translatedText = computed(() => props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = ref('');
-const isSpeaking = ref(false);
+const isSpeaking = computed(() => tts.ttsState.value === 'playing');
 
 // Add retry handler for TranslationDisplay
 const handleRetry = () => {
@@ -214,6 +229,8 @@ onMounted(() => {
     }
   });
 
+  // TTS global manager is used for coordination between multiple windows/components
+
   // Use requestAnimationFrame to ensure the transition is applied after the initial render
   requestAnimationFrame(() => {
     isVisible.value = true;
@@ -238,18 +255,48 @@ const toggleShowOriginal = () => {
   showOriginal.value = !showOriginal.value;
 };
 
-// Event handlers for TranslationDisplay
-const handleTranslationCopied = (text) => {
-  console.log(`[TranslationWindow ${props.id}] Translation copied:`, text.substring(0, 50) + '...');
+// Event handlers that are no longer needed since we removed TranslationDisplay actions
+// Copy and TTS are now handled only in the header
+
+// Header button handlers
+const handleCopy = async () => {
+  if (!translatedText.value || translatedText.value.trim().length === 0) {
+    console.warn(`[TranslationWindow ${props.id}] No translation text to copy`);
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(translatedText.value);
+    console.log(`[TranslationWindow ${props.id}] Translation copied to clipboard`);
+  } catch (error) {
+    console.error(`[TranslationWindow ${props.id}] Failed to copy translation:`, error);
+  }
 };
 
-const handleTranslationTTSSpeaking = (data) => {
-  console.log(`[TranslationWindow ${props.id}] TTS speaking:`, data.text.substring(0, 50) + '...');
-  isSpeaking.value = true;
-};
+const handleTTS = async () => {
+  if (!translatedText.value || translatedText.value.trim().length === 0) {
+    console.warn(`[TranslationWindow ${props.id}] No translation text for TTS`);
+    return;
+  }
 
-const handleActionFailed = (error) => {
-  console.error(`[TranslationWindow ${props.id}] Action failed:`, error);
+  try {
+    if (tts.ttsState.value === 'playing') {
+      // Stop TTS
+      await tts.stop();
+      console.log(`[TranslationWindow ${props.id}] TTS stopped`);
+    } else {
+      // Start TTS - register with global manager then speak
+      await ttsGlobal.startTTS();
+      const result = await tts.speak(translatedText.value, 'auto');
+      if (result) {
+        console.log(`[TranslationWindow ${props.id}] TTS started`);
+      } else {
+        console.warn(`[TranslationWindow ${props.id}] TTS failed to start`);
+      }
+    }
+  } catch (error) {
+    console.error(`[TranslationWindow ${props.id}] TTS failed:`, error);
+  }
 };
 
 
