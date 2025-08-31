@@ -11,8 +11,10 @@
   color: var(--color-text);
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   justify-content: stretch !important;
   align-items: flex-start !important;
+  height: 100vh; /* Ensure the parent container has a fixed height */
 }
 
 // These rules moved to component files for better encapsulation
@@ -322,6 +324,22 @@ input[type="radio"] {
   height: 22px;
   filter: var(--github-icon-filter, none);
   transition: filter $transition-base;
+}
+
+// Tab content container styling
+.tab-content-container {
+  flex: 1; /* Allow the container to grow and fill available space */
+  height: calc(100% - var(--options-main-padding, 20px)); /* Dynamically adjust based on options-main height */
+  max-height: calc(100% - var(--options-main-padding, 20px)); /* Ensure it fits within options-main */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+// Options layout specific styles
+.options-layout {
+  height: 100vh; /* ارتفاع کاملاً ثابت */
+  max-height: 100vh; /* جلوگیری از افزایش ارتفاع */
+  overflow: hidden; /* جلوگیری از اسکرول داخلی */
 }
 
 // Responsive design rules moved to respective component files

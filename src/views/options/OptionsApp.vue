@@ -141,7 +141,7 @@ const retryLoading = () => {
 
 <style scoped>
 .extension-options {
-  /* The body now handles centering. This container just needs to hold the layout. */
+  /* انتقال استایل‌های عمومی به اینجا */
   width: 100vw;
   min-height: 100vh;
   display: flex;
@@ -154,71 +154,11 @@ const retryLoading = () => {
 
 .extension-options.rtl {
   direction: rtl;
+  margin-top: 10px;
+  margin-bottom: 10px !important;
   
   .loading-container {
     text-align: right;
   }
-  
-  .error-container {
-    text-align: right;
-    
-    h2 {
-      text-align: right;
-    }
-    
-    .error-message {
-      text-align: right;
-    }
-  }
-}
-
-/* CSS context separation completed */
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 3rem;
-}
-
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 3rem;
-  max-width: 500px;
-  text-align: center;
-}
-
-.error-icon {
-  font-size: 3rem;
-}
-
-.error-container h2 {
-  color: var(--color-error, #ef4444);
-  margin: 0;
-}
-
-.error-message {
-  color: var(--color-text-secondary, #666);
-  margin: 0;
-}
-
-.retry-button {
-  padding: 0.75rem 1.5rem;
-  background-color: var(--color-primary, #3b82f6);
-  color: var(--color-background, white);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.retry-button:hover {
-  background-color: var(--color-primary-dark, #2563eb);
 }
 </style>

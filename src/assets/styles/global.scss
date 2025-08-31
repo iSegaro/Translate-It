@@ -182,19 +182,6 @@ body {
   overflow-y: auto;
 }
 
-.extension-options {
-  width: 1200px !important;
-  max-width: 1200px !important;
-  min-width: 1200px !important;
-  min-height: 100vh !important;
-  padding: $spacing-lg !important;
-  display: flex !important;
-  justify-content: stretch !important;
-  align-items: flex-start !important;
-  background-color: var(--color-background) !important;
-  margin: 0 auto !important;
-}
-
 // Scrollbar styling
 ::-webkit-scrollbar {
   width: 6px;
