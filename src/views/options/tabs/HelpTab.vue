@@ -18,22 +18,10 @@
           :class="{ open: openAccordion === 'shortcut' }"
         >
           <div class="accordion-inner">
-            <p>{{ t('help_shortcut_content_p1') || 'To use this extension, you have several options:' }}</p>
-            <ol>
-              <li>{{ t('help_shortcut_content_li1') || 'Select text on any webpage and press Ctrl+/ (Cmd+/ on Mac) to translate it instantly.' }}</li>
-              <li>{{ t('help_shortcut_content_li2') || 'Right-click on selected text and choose "Translate Selected Text" from the context menu.' }}</li>
-              <li>{{ t('help_shortcut_content_li3') || 'Click on the extension icon in the toolbar to open the translation popup.' }}</li>
-              <li>{{ t('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (Chrome only).' }}</li>
-            </ol>
-            
-            <hr class="content-divider">
-            
-            <p>{{ t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:' }}</p>
-            <ol>
-              <li>{{ t('help_shortcut_content_chrome_li1') || 'Go to chrome://extensions/' }}</li>
-              <li>{{ t('help_shortcut_content_chrome_li2') || 'Click on the menu (☰) in the top-left corner' }}</li>
-              <li>{{ t('help_shortcut_content_chrome_li3') || 'Select "Keyboard shortcuts" and customize as needed' }}</li>
-            </ol>
+            <div 
+              class="markdown-content" 
+              v-html="shortcutHelpContent"
+            ></div>
           </div>
         </div>
       </div>
@@ -53,55 +41,10 @@
           :class="{ open: openAccordion === 'apiKeys' }"
         >
           <div class="accordion-inner">
-            <p>{{ t('help_api_keys_content') || 'This extension supports multiple translation providers. Some are free, while others require API keys:' }}</p>
-            
-            <div class="provider-help-section">
-              <h4>{{ t('help_free_providers_title') || 'Free Providers (No API Key Required)' }}</h4>
-              <ul>
-                <li><strong>Google Translate</strong> - Uses the public Google Translate endpoint</li>
-                <li><strong>Microsoft Bing</strong> - Uses the public Bing Translate endpoint</li>
-                <li><strong>Yandex Translate</strong> - Uses the public Yandex Translate endpoint</li>
-              </ul>
-            </div>
-            
-            <div class="provider-help-section">
-              <h4>{{ t('help_api_providers_title') || 'API-Based Providers (Require API Keys)' }}</h4>
-              <ul>
-                <li>
-                  <strong>Google Gemini</strong> - Get your free API key from <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >Google AI Studio</a>
-                </li>
-                <li>
-                  <strong>OpenAI</strong> - Register at <a
-                    href="https://platform.openai.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >OpenAI Platform</a>
-                </li>
-                <li>
-                  <strong>OpenRouter</strong> - Access multiple models via <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >OpenRouter</a>
-                </li>
-                <li>
-                  <strong>DeepSeek</strong> - Get API access from <a
-                    href="https://platform.deepseek.com/api_keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >DeepSeek Platform</a>
-                </li>
-              </ul>
-            </div>
-            
-            <div class="security-notice">
-              <h4>🔒 Security Notice</h4>
-              <p>Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature.</p>
-            </div>
+            <div 
+              class="markdown-content" 
+              v-html="apiKeysHelpContent"
+            ></div>
           </div>
         </div>
       </div>
@@ -110,8 +53,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SimpleMarkdown } from '@/utils/text/markdown.js'
 
 const openAccordion = ref('')
 const { t } = useI18n()
@@ -119,6 +63,62 @@ const { t } = useI18n()
 const toggleAccordion = (section) => {
   openAccordion.value = openAccordion.value === section ? '' : section
 }
+
+const shortcutHelpContent = computed(() => {
+  const content = `${t('help_shortcut_content_p1') || 'To use this extension, you have several options:'}
+
+1. ${t('help_shortcut_content_li1') || 'Select text on any webpage and press **Ctrl+/** (**Cmd+/** on Mac) to translate it instantly.'}
+2. ${t('help_shortcut_content_li2') || 'Right-click on selected text and choose **"Translate Selected Text"** from the context menu.'}
+3. ${t('help_shortcut_content_li3') || 'Click on the extension icon in the toolbar to open the translation popup.'}
+4. ${t('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (**Chrome only**).'}
+
+---
+
+${t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:'}
+
+1. ${t('help_shortcut_content_chrome_li1') || 'Go to **chrome://extensions/**'}
+2. ${t('help_shortcut_content_chrome_li2') || 'Click on the menu **(☰)** in the top-left corner'}
+3. ${t('help_shortcut_content_chrome_li3') || 'Select **"Keyboard shortcuts"** and customize as needed'}`
+
+  try {
+    const markdownElement = SimpleMarkdown.render(content)
+    return markdownElement ? markdownElement.innerHTML : content.replace(/\n/g, '<br>')
+  } catch (error) {
+    console.warn('[HelpTab] Markdown rendering failed:', error)
+    return content.replace(/\n/g, '<br>')
+  }
+})
+
+const apiKeysHelpContent = computed(() => {
+  const content = `${t('help_api_keys_content') || 'This extension supports multiple translation providers. Some are free, while others require API keys:'}
+
+## ${t('help_free_providers_title') || 'Free Providers (No API Key Required)'}
+
+- **Google Translate** - Uses the public Google Translate endpoint
+- **Microsoft Bing** - Uses the public Bing Translate endpoint  
+- **Yandex Translate** - Uses the public Yandex Translate endpoint
+
+## ${t('help_api_providers_title') || 'API-Based Providers (Require API Keys)'}
+
+- **Google Gemini** - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **OpenAI** - Register at [OpenAI Platform](https://platform.openai.com/api-keys)
+- **OpenRouter** - Access multiple models via [OpenRouter](https://openrouter.ai/keys)
+- **DeepSeek** - Get API access from [DeepSeek Platform](https://platform.deepseek.com/api_keys)
+
+---
+
+### 🔒 Security Notice
+
+Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature.`
+
+  try {
+    const markdownElement = SimpleMarkdown.render(content)
+    return markdownElement ? markdownElement.innerHTML : content.replace(/\n/g, '<br>')
+  } catch (error) {
+    console.warn('[HelpTab] Markdown rendering failed:', error)
+    return content.replace(/\n/g, '<br>')
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -202,49 +202,47 @@ h2 {
     .accordion-inner {
       padding: $spacing-lg;
       
-      p {
-        margin: 0 0 $spacing-base 0;
-        line-height: 1.6;
-        color: var(--color-text);
-      }
-      
-      ol, ul {
-        margin: 0 0 $spacing-md 0;
-        padding-left: $spacing-xl;
-        
-        li {
-          margin-bottom: $spacing-sm;
-          line-height: 1.5;
+      .markdown-content {
+        :deep(p) {
+          margin: 0 0 $spacing-base 0;
+          line-height: 1.6;
           color: var(--color-text);
+        }
+        
+        :deep(ol), :deep(ul) {
+          margin: 0 0 $spacing-md 0;
+          padding-left: $spacing-xl;
           
-          strong {
+          li {
+            margin-bottom: $spacing-sm;
+            line-height: 1.5;
             color: var(--color-text);
-            font-weight: $font-weight-semibold;
+            
+            strong {
+              color: var(--color-text);
+              font-weight: $font-weight-semibold;
+            }
           }
         }
-      }
-      
-      .content-divider {
-        border: none;
-        border-top: $border-width $border-style var(--color-border);
-        margin: $spacing-lg 0;
-      }
-      
-      .provider-help-section {
-        margin: $spacing-lg 0;
         
-        h4 {
+        :deep(hr) {
+          border: none;
+          border-top: $border-width $border-style var(--color-border);
+          margin: $spacing-lg 0;
+        }
+        
+        :deep(h2), :deep(h3), :deep(h4) {
           font-size: $font-size-md;
           font-weight: $font-weight-semibold;
-          margin: 0 0 $spacing-sm 0;
+          margin: $spacing-lg 0 $spacing-sm 0;
           color: var(--color-text);
+          
+          &:first-child {
+            margin-top: 0;
+          }
         }
         
-        ul {
-          margin-top: $spacing-sm;
-        }
-        
-        a {
+        :deep(a) {
           color: var(--color-primary);
           text-decoration: none;
           font-weight: $font-weight-medium;
@@ -253,26 +251,19 @@ h2 {
             text-decoration: underline;
           }
         }
-      }
-      
-      .security-notice {
-        margin-top: $spacing-xl;
-        padding: $spacing-md;
-        background-color: var(--tab-button-active-bg, #e8f0fe);
-        border-radius: $border-radius-base;
-        border-left: 4px solid var(--color-primary);
         
-        h4 {
-          font-size: $font-size-base;
-          font-weight: $font-weight-semibold;
-          margin: 0 0 $spacing-sm 0;
+        :deep(strong) {
           color: var(--color-text);
+          font-weight: $font-weight-semibold;
         }
         
-        p {
-          margin: 0;
-          font-size: $font-size-sm;
-          color: var(--color-text-secondary);
+        :deep(code) {
+          background-color: var(--color-surface);
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 0.9em;
+          color: var(--color-text);
         }
       }
     }
