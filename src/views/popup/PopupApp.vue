@@ -453,3 +453,13 @@ const retryLoading = () => {
   box-sizing: border-box;
 }
 </style>
+
+<style scoped lang="scss">
+@use '../../assets/styles/variables.scss' as *;
+
+.extension-popup {
+  width: $popup-width;
+  max-height: $popup-max-height;
+  overflow-y: auto;
+}
+</style>

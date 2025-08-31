@@ -315,3 +315,19 @@ const isRTL = computed(() => {
   }
 }
 </style>
+
+<style scoped>
+.options-layout {
+  height: 100vh; /* ارتفاع کاملاً ثابت */
+  max-height: 100vh; /* جلوگیری از افزایش ارتفاع */
+  overflow: hidden; /* جلوگیری از اسکرول داخلی */
+}
+
+.tab-content-container {
+  flex: 1; /* Allow the container to grow and fill available space */
+  height: calc(100% - var(--options-main-padding, 20px)); /* Dynamically adjust based on options-main height */
+  max-height: calc(100% - var(--options-main-padding, 20px)); /* Ensure it fits within options-main */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+</style>

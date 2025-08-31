@@ -150,10 +150,8 @@ const retryLoading = () => {
 <style scoped>
 .extension-sidepanel {
   width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-background);
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .loading-container {

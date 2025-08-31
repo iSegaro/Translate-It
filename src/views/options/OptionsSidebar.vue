@@ -124,150 +124,149 @@ onMounted(async () => {
 });
 </script>
 
-<style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+<style scoped>
+@import '@/assets/styles/variables.scss';
+
+:root {
+  --breakpoint-lg: 1024px;
+  --breakpoint-md: 768px;
+}
 
 .options-sidebar {
   flex: 0 0 280px;
-  padding: $spacing-md;
+  padding: var(--spacing-md);
   background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  border-right: $border-width $border-style var(--color-border);
+  justify-content: space-between;
+  border-right: var(--border-width) var(--border-style) var(--color-border);
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  
-  // Better visual hierarchy
+
+  /* Better visual hierarchy */
   box-shadow: inset -1px 0 0 var(--color-border);
 }
 
 .sidebar-content {
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-md);
   flex-grow: 1;
 }
 
 .sidebar-header {
-  padding: $spacing-sm;
+  padding: var(--spacing-sm);
   text-align: center;
-  margin-bottom: $spacing-md;
-  
+  margin-bottom: var(--spacing-md);
+
   h1 {
-    font-size: $font-size-xxl;
-    font-weight: $font-weight-medium;
+    font-size: var(--font-size-xxl);
+    font-weight: var(--font-weight-medium);
     margin: 0 0 4px 0;
     color: var(--color-text);
   }
-  
-  span {
-    font-size: $font-size-xs;
-    color: var(--color-text-secondary);
-  }
-  
-  p {
-    font-size: $font-size-sm;
-    margin-top: $spacing-sm;
-    color: var(--color-text-secondary);
-  }
-}
 
-// RTL specific styles for sidebar header
-:global(.options-layout.rtl) .sidebar-header {
-  text-align: center; // Keep header centered for both directions
+  span {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  p {
+    font-size: var(--font-size-sm);
+    margin-top: var(--spacing-sm);
+    color: var(--color-text-secondary);
+  }
 }
 
 .sidebar-section {
-  border: $border-width $border-style var(--color-border);
-  border-radius: $border-radius-md;
-  padding: $spacing-md;
-  margin-bottom: $spacing-md;
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--border-radius-lg); /* Add rounded corners */
+  padding: var(--spacing-md);
   background: var(--color-background);
-  transition: border-color $transition-base, box-shadow $transition-base;
-  
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add subtle shadow for better appearance */
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  margin: 10px; /* Add space between sections */
+
   &:hover {
     border-color: var(--color-primary);
-    box-shadow: 0 2px 8px rgba(var(--color-primary-rgb, 59, 130, 246), 0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Enhance shadow on hover */
   }
-  
+
   h2 {
-    font-size: $font-size-xs;
-    font-weight: $font-weight-medium;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin: 0 0 $spacing-base 0;
+    margin: 0 0 var(--spacing-base) 0;
     color: var(--color-text-secondary);
   }
 }
 
 .sidebar-footer {
   margin-top: auto;
-  padding-top: $spacing-md;
-  border-top: $border-width $border-style var(--color-border);
-  font-size: $font-size-xs;
+  padding-top: var(--spacing-md);
+  border-top: var(--border-width) var(--border-style) var(--color-border);
+  font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   text-align: center;
-  
+
   .github-icon {
     opacity: 0.7;
-    transition: opacity $transition-fast;
+    transition: opacity var(--transition-fast);
     filter: var(--github-icon-filter, none);
-    
+
     &:hover {
       opacity: 1;
     }
   }
-  
+
   .about-link {
     color: var(--color-primary);
     text-decoration: none;
-    font-weight: $font-weight-medium;
-    
+    font-weight: var(--font-weight-medium);
+
     &:hover {
       text-decoration: underline;
     }
   }
 }
 
-// Tablet responsive
-@media (max-width: #{$breakpoint-lg}) {
+/* Tablet responsive */
+@media (max-width: var(--breakpoint-lg)) {
   .options-sidebar {
     flex: none;
     border-right: none;
-    border-bottom: $border-width $border-style var(--color-border);
+    border-bottom: var(--border-width) var(--border-style) var(--color-border);
   }
 }
 
-// Mobile responsive
-@media (max-width: #{$breakpoint-md}) {
+/* Mobile responsive */
+@media (max-width: var(--breakpoint-md)) {
   .options-sidebar {
     flex: none;
-    padding: $spacing-base;
+    padding: var(--spacing-base);
     border-right: none;
-    border-bottom: $border-width $border-style var(--color-border);
-    
+    border-bottom: var(--border-width) var(--border-style) var(--color-border);
+
     .sidebar-header {
       text-align: left;
-      
+
       h1 {
-        font-size: $font-size-lg;
+        font-size: var(--font-size-lg);
       }
-    }
-    
-    .sidebar-section {
-      padding: $spacing-base;
     }
   }
 }
 
 .language-select {
   width: 100%;
-  padding: $spacing-sm;
-  border-radius: $border-radius-md;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
   color: var(--color-text);
-  font-size: $font-size-sm;
+  font-size: var(--font-size-sm);
 }
 
 .localization-controls {
@@ -281,11 +280,11 @@ onMounted(async () => {
   .language-list-item {
     cursor: pointer;
     padding: 8px 12px;
-    border-radius: $border-radius-md;
+    border-radius: var(--border-radius-md);
     display: flex;
     align-items: center;
-    font-size: $font-size-sm;
-    transition: background-color $transition-fast;
+    font-size: var(--font-size-sm);
+    transition: background-color var(--transition-fast);
 
     &:hover {
       background-color: var(--color-background-hover, #f0f0f0);
@@ -294,7 +293,7 @@ onMounted(async () => {
     &.selected {
       background-color: var(--color-active-background, #e8f0fe);
       color: var(--color-active-text, #1967d2);
-      font-weight: $font-weight-medium;
+      font-weight: var(--font-weight-medium);
     }
   }
 
@@ -309,17 +308,22 @@ onMounted(async () => {
   }
 }
 
-// RTL specific styles for language list
+.sidebar-section.theme-controls {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: var(--spacing-sm); /* Add spacing between rows */
+}
+
 :global(.options-layout.rtl) {
   .language-flag-image {
     margin-right: 0;
     margin-left: 12px;
   }
-  
+
   .sidebar-section h2 {
     text-align: right;
   }
-  
+
   .language-list-item {
     text-align: right;
   }

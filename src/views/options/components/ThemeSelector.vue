@@ -194,8 +194,9 @@ mediaQuery.addEventListener('change', () => {
 
 .theme-switch-row {
   display: flex;
+  justify-content: center; /* Center alignment */
   align-items: center;
-  gap: $spacing-base;
+  width: 100%;
 }
 
 .theme-icon-svg {
@@ -256,9 +257,9 @@ input:disabled + .slider {
 }
 
 .theme-auto-label {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
+  display: block;
+  margin-left: 0;
+  width: 100%;
   font-size: $font-size-sm;
   font-weight: $font-weight-normal;
   cursor: pointer;
@@ -275,5 +276,11 @@ input:disabled + .slider {
 // RTL Support
 .rtl .theme-switch-row {
   flex-direction: row-reverse;
+  justify-content: flex-end; /* Align to the right in RTL */
+}
+
+.rtl .theme-switch-row input[type="checkbox"] {
+  margin-left: auto; /* Move checkbox to the right in RTL */
+  margin-right: 0; /* Reset any left margin */
 }
 </style>

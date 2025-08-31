@@ -58,6 +58,8 @@
   // Icon filtering for active API provider items (dark theme)
   --provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);
   --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
+  
+  --color-surface: #242d44; /* Ensure dark theme background is blue */
 }
 
 // Map theme variables to component variables
@@ -91,6 +93,35 @@
   // Default fallback values for provider icon filtering (light theme bias)
   --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
   --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  
+  /* Spacing */
+  --spacing-md: 16px;
+  --spacing-sm: 8px;
+
+  /* Colors */
+  --color-surface: #f5f5f5;
+  --color-background-hover: #f0f0f0;
+  --color-active-background: #e8f0fe;
+  --color-active-text: #1967d2;
+
+  /* Typography */
+  --font-size-xxl: 24px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-weight-medium: 500;
+
+  /* Borders */
+  --border-width: 1px;
+  --border-style: solid;
+  --color-border: #e0e0e0;
+
+  /* Transitions */
+  --transition-base: 0.2s ease;
+
+  /* Primary Color */
+  --color-primary: #1976d2;
+  
+  --border-radius-lg: 12px; /* Added for large border radius */
 }
 
 // SCSS Variables (for Sass functions like darken, lighten)
