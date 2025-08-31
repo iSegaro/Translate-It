@@ -8,9 +8,11 @@
       :text="modelValue"
       :language="sourceLanguage"
       mode="input"
-      :show-copy="hasContent"
-      :show-tts="hasContent"
+      :show-copy="true"
+      :show-tts="true"
       :show-paste="true"
+      :copy-disabled="!hasContent"
+      :tts-disabled="!hasContent"
       class="input-toolbar"
       @text-pasted="handlePaste"
     />
@@ -237,16 +239,12 @@ onMounted(async () => {
   top: 6px;
   left: 12px;
   z-index: 10;
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity 0.2s ease;
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(4px);
   border-radius: 6px;
   padding: 2px;
-}
-
-.textarea-container.has-content .input-toolbar {
-  opacity: 1;
 }
 
 .textarea-container:hover .input-toolbar {

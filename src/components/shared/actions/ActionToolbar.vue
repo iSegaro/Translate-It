@@ -426,11 +426,8 @@ const handleTTSStateChanged = (data) => {
   will-change: transform;
 }
 
-/* Content-based visibility */
-.mode-input:not(.has-content),
-.mode-output:not(.has-content) {
-  opacity: 0.3;
-}
+/* Content-based visibility - Removed to always show toolbar with full opacity
+   Individual buttons now handle disabled state instead of toolbar transparency */
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {

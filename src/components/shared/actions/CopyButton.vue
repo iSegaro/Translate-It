@@ -99,7 +99,13 @@ const showFeedback = ref(false)
 
 // Computed
 const canCopy = computed(() => {
-  return !props.disabled && props.text && props.text.trim().length > 0 && !isCopying.value
+  // Always allow the button to be clickable if not explicitly disabled
+  // The actual copy functionality will check for text content
+  return !props.disabled && !isCopying.value
+})
+
+const hasTextToCopy = computed(() => {
+  return props.text && props.text.trim().length > 0
 })
 
 const iconSrc = computed(() => {
@@ -109,7 +115,7 @@ const iconSrc = computed(() => {
 
 // Methods
 const handleCopy = async () => {
-  if (!canCopy.value) return
+  if (!canCopy.value || !hasTextToCopy.value) return
   
   // Log click event
   logger.debug('📋 Copy button clicked!', { 
