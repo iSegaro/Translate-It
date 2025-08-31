@@ -62,19 +62,6 @@ body {
   transition: all $transition-slow;
 }
 
-// Extension specific styles
-.extension-popup {
-  width: $popup-width;
-  max-height: $popup-max-height;
-  overflow-y: auto;
-}
-
-.extension-sidepanel {
-  width: 100%;
-  height: 100vh;
-  overflow-y: auto;
-}
-
 // Scrollbar styling
 ::-webkit-scrollbar {
   width: 6px;
