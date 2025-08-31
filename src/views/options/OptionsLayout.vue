@@ -90,17 +90,7 @@ const isRTL = computed(() => {
   :global(.extension-options.rtl) & {
     direction: rtl;
     
-    .options-sidebar {
-      border-left: $border-width $border-style var(--color-border);
-      border-right: none;
-    }
     
-    .options-main {
-      .vertical-tabs {
-        border-left: $border-width $border-style var(--color-border);
-        border-right: none;
-      }
-    }
     
     // Global RTL styles for all tab content
     .tab-content-container {
@@ -126,8 +116,6 @@ const isRTL = computed(() => {
         margin-left: 0;
         padding-right: $spacing-md;
         padding-left: 0;
-        border-right: 2px solid var(--color-border);
-        border-left: none;
       }
       
       // Error messages
