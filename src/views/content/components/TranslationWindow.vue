@@ -100,6 +100,7 @@ import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
+import { isContextError } from '@/utils/core/extensionContext.js';
 import browser from 'webextension-polyfill';
 
 const props = defineProps({
@@ -221,7 +222,12 @@ onMounted(() => {
         data: { source: 'translation-window-cleanup', windowId: props.id }
       })
     } catch (error) {
-      console.error(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
+      // Handle context errors silently as they're expected during extension reload
+      if (isContextError(error)) {
+        console.debug(`[TranslationWindow ${props.id}] Extension context invalidated during cleanup - expected during extension reload`)
+      } else {
+        console.debug(`[TranslationWindow ${props.id}] Failed to stop TTS during cleanup:`, error)
+      }
     }
   });
 
