@@ -518,10 +518,16 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         return; // Don't send response or fallback for aborted requests
       }
       
-      console.error("[Offscreen] Google TTS failed:", err);
+      // Log Google TTS errors with less severity for expected failures
+      if (err.message && err.message.includes('HTTP 400')) {
+        console.debug("[Offscreen] Google TTS HTTP 400 (expected for some languages/text):", err.message);
+      } else {
+        console.error("[Offscreen] Google TTS failed:", err);
+      }
+      
       if (!responseSent) {
         responseSent = true; // Set responseSent to true here to prevent duplicate responses
-        console.log("[Offscreen] Falling back to Web Speech API");
+        console.debug("[Offscreen] Falling back to Web Speech API");
         // Await the fallback to ensure its response is sent
         try {
           await handleWebSpeechFallback(ttsData, sendResponse); // Pass sendResponse directly
@@ -583,7 +589,13 @@ function handleWebSpeechFallback(data, sendResponse) {
         };
 
         currentUtterance.onerror = (error) => {
-          console.error("❌ Web Speech TTS error:", error);
+          // Use debug level for expected synthesis failures
+          if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
+            console.debug("❌ Web Speech TTS error (expected):", error.error);
+          } else {
+            console.error("❌ Web Speech TTS error:", error);
+          }
+          
           currentUtterance = null;
           isPlaying = false; // Reset playing state
           
@@ -592,7 +604,7 @@ function handleWebSpeechFallback(data, sendResponse) {
             
             // Try to recover from common errors
             if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
-              console.log("[Offscreen] Attempting Web Speech recovery...");
+              console.debug("[Offscreen] Attempting Web Speech recovery...");
               
               // Wait a bit and try once more
               setTimeout(() => {
