@@ -73,6 +73,7 @@
   "api_tab_title": { "message": "API Settings" },
   "import_export_tab_title": { "message": "Import/Export" },
   "advance_tab_title": { "message": "Advance" },
+  "import_success": { "message": "Settings imported successfully." },
 
   "prompt_reset_button": { "message": "Reset" },
 
