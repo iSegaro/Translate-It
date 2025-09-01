@@ -1,13 +1,29 @@
 /* OLD/styles/sidepanel.css content */
 
+/* General toolbar icon styles for sidepanel */
+body.sidepanel-context .toolbar-icon {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  opacity: var(--icon-opacity);
+  filter: var(--icon-filter);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+
+  &:hover {
+    opacity: var(--icon-hover-opacity);
+  }
+}
+
 /* Active state for toolbar buttons in sidepanel */
 body.sidepanel-context .toolbar-button.active .toolbar-icon {
-  filter: brightness(0) invert(1);
+  /* Use same filter as popup - no additional brightness adjustments */
+  filter: var(--icon-filter);
 }
 
 /* Active state for SidepanelToolbar buttons */
 body.sidepanel-context .active .toolbar-icon {
-  filter: invert(1);
+  /* Use same filter as popup - no additional brightness adjustments */
+  filter: var(--icon-filter);
 }
 
 /* Select Element Error State - Sidepanel context with proper specificity */
@@ -188,5 +204,5 @@ textarea:focus {
 .clear-all-btn .clear-all-icon {
   width: 18px;
   height: 18px;
-  filter: invert(1);
+  filter: var(--icon-filter);
 }

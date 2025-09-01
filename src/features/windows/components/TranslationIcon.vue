@@ -71,18 +71,18 @@ const { positionStyle, cleanup: cleanupPositioning } = usePositioning(props.posi
 });
 
 const dynamicStyle = computed(() => {
-  let bgColor = '#ffffff';
-  let brdColor = '#e0e0e0';
+  let bgColor = 'var(--bg-color, #ffffff)';
+  let brdColor = 'var(--border-color, #e0e0e0)';
   let xform = 'scale(1)';
   let boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)';
 
   if (isActive.value) {
-    bgColor = '#e8f0fe';
-    brdColor = '#4285f4';
+    bgColor = 'var(--tab-button-active-bg, #e8f0fe)';
+    brdColor = 'var(--tab-button-active-border-color, #4285f4)';
     xform = 'scale(0.95)';
   } else if (isHovering.value) {
-    bgColor = '#f8f9fa';
-    brdColor = '#dadce0';
+    bgColor = 'var(--bg-result-color, #f8f9fa)';
+    brdColor = 'var(--input-border-color, #dadce0)';
     xform = 'scale(1.1) translateY(-1px)';
     boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1)';
   }

@@ -550,16 +550,16 @@ const handleStartDrag = (event) => {
 
 /* Base theme styles - Light Mode */
 .translation-window.light {
-  background-color: #ffffff !important;
-  border: 1px solid #e8e8e8 !important;
-  color: #2c3e50 !important;
+  background-color: var(--bg-color, #ffffff) !important;
+  border: 1px solid var(--border-color, #e8e8e8) !important;
+  color: var(--text-color, #2c3e50) !important;
 }
 
 /* Base theme styles - Dark Mode */
 .translation-window.dark {
-  background-color: #2d2d2d !important;
-  border: 1px solid #424242 !important;
-  color: #e0e0e0 !important;
+  background-color: var(--bg-color, #2d2d2d) !important;
+  border: 1px solid var(--border-color, #424242) !important;
+  color: var(--text-color, #e0e0e0) !important;
 }
 
 </style>

@@ -659,10 +659,7 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   animation: spin 0.7s linear infinite;
 }
 
-:root.theme-dark .spinner {
-  border: 3px solid var(--header-border-color, #555);
-  border-top: 3px solid var(--toolbar-link-color, #58a6ff);
-}
+/* Dark theme spinner styling handled by unified theme variables */
 
 /* Enhanced Display Toolbar */
 .display-toolbar {

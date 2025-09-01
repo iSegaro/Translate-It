@@ -2,44 +2,6 @@
 @use '../base/mixins' as *;
 
 // Popup component styles
-// Theme-specific variables for popup
-:root.theme-light {
-  --bg-color: #ffffff;
-  --text-color: #000000;
-  --bg-textbox-color: #fff;
-  --bg-result-color: #f8f9fa;
-  --header-bg-color: #e9ecef;
-  --header-border-color: #ced4da;
-  --toolbar-link-color: #2563c0;
-  --toolbar-link-hover-bg-color: #e2e6ea;
-  --icon-opacity: 0.7;
-  --icon-hover-opacity: 1;
-  --language-controls-bg-color: #f8f9fa;
-  --language-controls-border-color: #dee2e6;
-  --language-select-bg-color: #fff;
-  --language-select-text-color: #000;
-  --language-select-border-color: #ced4da;
-  --icon-filter: none;
-}
-
-:root.theme-dark {
-  --bg-color: #1e1e1e;
-  --text-color: #ffffff;
-  --bg-textbox-color: #0e0e0e;
-  --bg-result-color: #0e0e0e;
-  --header-bg-color: lab(45.6% -1.56 -3.7);
-  --header-border-color: hsl(60, 7%, 42%);
-  --toolbar-link-color: lch(83.98% 24.38 250.24);
-  --toolbar-link-hover-bg-color: #404040;
-  --icon-opacity: 0.6;
-  --icon-hover-opacity: 0.9;
-  --language-controls-bg-color: lab(45.6% -1.56 -3.7);
-  --language-controls-border-color: hsl(73, 35%, 24%);
-  --language-select-bg-color: #333;
-  --language-select-text-color: #fff;
-  --language-select-border-color: hsl(73, 35%, 24%);
-  --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
-}
 
 // Base styles for extension popup - ONLY apply in popup context
 body.popup-context {
@@ -145,11 +107,6 @@ body.popup-context .toolbar-icon {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin: auto;
-}
-
-:root.theme-dark .spinner {
-  border: 3px solid var(--header-border-color, #555);
-  border-top: 3px solid var(--toolbar-link-color, #58a6ff);
 }
 
 // Fade in animation

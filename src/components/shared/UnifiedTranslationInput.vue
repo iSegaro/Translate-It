@@ -669,41 +669,25 @@ defineExpose({
 }
 
 /* Dark theme support */
-:root.theme-dark .unified-translation-input {
-  --bg-color: #2d2d2d;
-  --text-color: #e0e0e0;
-  --border-color: #424242;
-  --accent-color: #58a6ff;
-  --accent-color-alpha: rgba(88, 166, 255, 0.1);
-  --placeholder-color: #888;
-}
-
-:root.theme-dark .input-label {
-  color: #e0e0e0;
-}
-
-:root.theme-dark .selection-status {
+/* Theme-specific styles now handled by unified theme variables in _variables.scss */
+.theme-dark .selection-status {
   background: #1a1a2e;
   border-color: #16213e;
 }
 
-:root.theme-dark .selection-indicator {
-  color: #58a6ff;
-}
-
-:root.theme-dark .status-message.success {
+.theme-dark .status-message.success {
   color: #4caf50;
   background-color: rgba(76, 175, 80, 0.1);
   border-color: rgba(76, 175, 80, 0.2);
 }
 
-:root.theme-dark .status-message.error {
+.theme-dark .status-message.error {
   color: #f44336;
   background-color: rgba(244, 67, 54, 0.1);
   border-color: rgba(244, 67, 54, 0.2);
 }
 
-:root.theme-dark .status-message.info {
+.theme-dark .status-message.info {
   color: #2196f3;
   background-color: rgba(33, 150, 243, 0.1);
   border-color: rgba(33, 150, 243, 0.2);

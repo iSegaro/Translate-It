@@ -1,12 +1,28 @@
 // Theme Variables for Options Page (from OLD CSS)
 // Modern SCSS using @forward for shared variables
 :root.theme-light {
+  // Base colors
   --bg-color: #ffffff;
   --text-color: #202124;
   --sidebar-bg-color: #fffbe6;
   --main-bg-color: #ffffff;
   --textarea-bg-color: #ffffff;
   --border-color: #e0e0e0;
+  
+  // Popup specific colors
+  --bg-textbox-color: #fff;
+  --bg-result-color: #f8f9fa;
+  --header-bg-color: #e9ecef;
+  --header-border-color: #ced4da;
+  --toolbar-link-color: #2563c0;
+  --toolbar-link-hover-bg-color: #e2e6ea;
+  --language-controls-bg-color: #f8f9fa;
+  --language-controls-border-color: #dee2e6;
+  --language-select-bg-color: #fff;
+  --language-select-text-color: #000;
+  --language-select-border-color: #ced4da;
+  
+  // Options page colors
   --tab-button-color: #5f6368;
   --tab-button-active-color: #1967d2;
   --tab-button-active-bg: #e8f0fe;
@@ -23,20 +39,46 @@
   --link-color: #1a73e8;
   --link-hover-color: #0c5dc0;
   --section-title-border: #dadce0;
-  --github-icon-filter: none;
   
-  // Icon filtering for active API provider items (light theme)
+  // Component specific colors
+  --accent-color: #1967d2;
+  --accent-color-alpha: rgba(25, 103, 210, 0.1);
+  --placeholder-color: #9aa0a6;
+  
+  // Icon filters
+  --github-icon-filter: none;
+  --icon-filter: none;
+  --icon-opacity: 0.7;
+  --icon-hover-opacity: 1;
+  
+  // Provider icon filtering
   --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
   --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 :root.theme-dark {
+  // Base colors
   --bg-color: #202124;
   --text-color: #e8eaed;
   --sidebar-bg-color: #303741;
   --main-bg-color: #292a2d;
   --textarea-bg-color: #292a2d;
   --border-color: #3c4043;
+  
+  // Popup specific colors
+  --bg-textbox-color: #0e0e0e;
+  --bg-result-color: #0e0e0e;
+  --header-bg-color: #303741;
+  --header-border-color: #5f6368;
+  --toolbar-link-color: #8ab4f8;
+  --toolbar-link-hover-bg-color: #404040;
+  --language-controls-bg-color: #303741;
+  --language-controls-border-color: #5f6368;
+  --language-select-bg-color: #333;
+  --language-select-text-color: #fff;
+  --language-select-border-color: #5f6368;
+  
+  // Options page colors
   --tab-button-color: #bdc1c6;
   --tab-button-active-color: #8ab4f8;
   --tab-button-active-bg: #303741;
@@ -53,9 +95,19 @@
   --link-color: #8ab4f8;
   --link-hover-color: #a7c8fa;
   --section-title-border: #5f6368;
-  --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
   
-  // Icon filtering for active API provider items (dark theme)
+  // Component specific colors
+  --accent-color: #58a6ff;
+  --accent-color-alpha: rgba(88, 166, 255, 0.1);
+  --placeholder-color: #888;
+  
+  // Icon filters
+  --github-icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+  --icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);
+  --icon-opacity: 0.6;
+  --icon-hover-opacity: 0.9;
+  
+  // Provider icon filtering
   --provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);
   --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
   

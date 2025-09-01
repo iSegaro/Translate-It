@@ -76,42 +76,42 @@
 
   // Light theme
   &.light {
-    background-color: #ffffff !important;
-    border: $border-width $border-style #e8e8e8 !important;
-    color: #2c3e50 !important;
+    background-color: var(--bg-color, #ffffff) !important;
+    border: $border-width $border-style var(--border-color, #e8e8e8) !important;
+    color: var(--text-color, #2c3e50) !important;
 
     .window-header {
-      background-color: #f7f7f7 !important;
-      border-bottom: $border-width $border-style #e8e8e8 !important;
+      background-color: var(--header-bg-color, #f7f7f7) !important;
+      border-bottom: $border-width $border-style var(--header-border-color, #e8e8e8) !important;
     }
 
     .action-btn {
-      background-color: #f0f0f0 !important;
-      color: #555 !important;
+      background-color: var(--toolbar-link-hover-bg-color, #f0f0f0) !important;
+      color: var(--text-color, #555) !important;
 
       &:hover {
-        background-color: #e5e5e5 !important;
+        background-color: var(--bg-color, #e5e5e5) !important;
       }
     }
   }
 
   // Dark theme
   &.dark {
-    background-color: #2d2d2d !important;
-    border: $border-width $border-style #424242 !important;
-    color: #e0e0e0 !important;
+    background-color: var(--bg-color, #2d2d2d) !important;
+    border: $border-width $border-style var(--border-color, #424242) !important;
+    color: var(--text-color, #e0e0e0) !important;
 
     .window-header {
-      background-color: #333333 !important;
-      border-bottom: $border-width $border-style #424242 !important;
+      background-color: var(--header-bg-color, #333333) !important;
+      border-bottom: $border-width $border-style var(--header-border-color, #424242) !important;
     }
 
     .action-btn {
-      background-color: #424242 !important;
-      color: #e0e0e0 !important;
+      background-color: var(--toolbar-link-hover-bg-color, #424242) !important;
+      color: var(--text-color, #e0e0e0) !important;
 
       &:hover {
-        background-color: #555555 !important;
+        background-color: var(--border-color, #555555) !important;
       }
     }
   }
