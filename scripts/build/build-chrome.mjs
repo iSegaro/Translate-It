@@ -35,6 +35,9 @@ async function buildChromeExtension() {
     process.chdir(rootDir)
     
     process.env.NODE_ENV = 'production'
+    process.env.BROWSER = 'chrome'
+    
+    // Build main extension files
     const buildCommand = `npx vite build --config config/vite/vite.config.chrome.js`
     execSync(buildCommand, { stdio: 'pipe' })
     
