@@ -5,6 +5,7 @@ import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { openOptionsPage } from "@/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
+import { matchErrorToType } from "./ErrorMatcher.js";
 import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -100,7 +101,6 @@ export class ErrorHandler {
       }
       
       // For non-context errors, continue with normal error handling
-      const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
       
       // Use original error message if it's more specific than the generic one
@@ -201,7 +201,6 @@ export class ErrorHandler {
     try {
       // Handle context errors with ExtensionContextManager
       if (ExtensionContextManager.isContextError(err)) {
-        const { matchErrorToType } = await import('./ErrorMatcher.js');
         const type = matchErrorToType(err instanceof Error ? err.message : String(err));
         return {
           message: ExtensionContextManager.getContextErrorMessage(type),
@@ -214,7 +213,6 @@ export class ErrorHandler {
       }
 
       const raw = err instanceof Error ? err.message : String(err);
-      const { matchErrorToType } = await import('./ErrorMatcher.js');
       const type = matchErrorToType(raw);
       // Try to get localized message, but prefer specific original messages
       let msg;
