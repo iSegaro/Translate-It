@@ -2,8 +2,8 @@ import { ref, computed } from "vue";
 import { getLanguageCodeForTTS } from "@/utils/i18n/languages.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { MessageActions } from '@/messaging/core/MessageActions.js';
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTTSSmart');

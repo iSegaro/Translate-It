@@ -4,7 +4,7 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-import { ErrorTypes } from "@/error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
 

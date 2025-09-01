@@ -5,7 +5,7 @@
 
 import { getScopedLogger } from "../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
-import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "../../config.js";
+import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
 import { WindowsConfig } from "../../features/windows/managers/core/WindowsConfig.js";
 import { ExtensionContextManager } from "../../utils/core/extensionContext.js";

@@ -1,15 +1,15 @@
-import { MessagingContexts, MessageFormat } from "../messaging/core/MessagingCore.js";
+import { MessagingContexts, MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
 import { createSubtitleManager } from "@/features/subtitle/core/index.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'subtitle');
 
 import { isUrlExcluded } from "../utils/ui/exclusion.js";
-import { matchErrorToType } from "../error-management/ErrorMatcher.js";
-import { getSettingsAsync } from "../config.js";
+import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { getSettingsAsync } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 
 // removed legacy createLogger import
 

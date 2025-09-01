@@ -1,7 +1,7 @@
 // src/managers/content/windows/NewWindowsManager.js
 
-import { getScopedLogger } from "@/utils/core/logger.js";
-import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
 import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
@@ -13,8 +13,8 @@ import { TTSManager } from "../../../features/tts/managers/TTSManager.js";
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer
 // - DragHandler, TTSManager
-import { getSettingsAsync, CONFIG, state } from "../../../config.js";
-import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
+import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import ExtensionContextManager from "../../../utils/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/utils/core/PageEventBus.js';

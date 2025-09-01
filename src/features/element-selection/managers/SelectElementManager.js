@@ -2,11 +2,11 @@ import browser from "webextension-polyfill";
 import { collectTextNodes } from "../../../utils/text/extraction.js";
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
 
-import { sendSmart } from "@/messaging/core/SmartMessaging.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from "@/utils/core/extensionContext.js";
 
 // Import services

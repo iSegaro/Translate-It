@@ -6,13 +6,13 @@ import {
   getApiUrlAsync,
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
-} from "@/config.js";
+} from "@/shared/config/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
-import { getPromptBASEScreenCaptureAsync } from "@/config.js";
+import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
 export class GeminiProvider extends BaseProvider {

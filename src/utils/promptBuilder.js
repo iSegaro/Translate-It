@@ -9,7 +9,7 @@ import {
   getPromptDictionaryAsync,
   getPromptBASEBatchAsync, // Import the new getter
   TranslationMode,
-} from "../config.js";
+} from "@/shared/config/config.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

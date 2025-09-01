@@ -3,11 +3,11 @@ import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getGoogleTranslateUrlAsync,
   getEnableDictionaryAsync
-} from "@/config.js";
+} from "@/shared/config/config.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
-import { TranslationMode } from "@/config.js";
+import { TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 const RELIABLE_DELIMITER = '\n\n---\n\n';

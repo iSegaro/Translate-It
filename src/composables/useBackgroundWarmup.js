@@ -1,7 +1,7 @@
 import { ref, onMounted } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
-import { MessagingContexts } from "../messaging/core/MessagingCore.js";
-import { MessageActions } from "../messaging/core/MessageActions.js";
+import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 const isWarmedUp = ref(false);
 const warmupInProgress = ref(false);

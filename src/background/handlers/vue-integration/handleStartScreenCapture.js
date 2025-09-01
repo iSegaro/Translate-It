@@ -1,8 +1,8 @@
 // Handler for starting screen capture from Vue apps
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
-import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
-import { MessageActions } from "../../../messaging/core/MessageActions.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 const errorHandler = new ErrorHandler();
 

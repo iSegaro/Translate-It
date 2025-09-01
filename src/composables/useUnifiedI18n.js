@@ -8,7 +8,7 @@ import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.
 import { setI18nLocale } from '@/plugins/i18n.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
-import { MessageActions } from '@/messaging/core/MessageActions.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import browser from 'webextension-polyfill'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedI18n')

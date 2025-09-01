@@ -15,11 +15,11 @@
 
 import {
   state,
-} from "../config.js";
-import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { getScopedLogger } from "../utils/core/logger.js";
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+} from "@/shared/config/config.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { getScopedLogger } from "../shared/logging/logger.js";
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { logMethod } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
 import { WindowsManager as SelectionWindows } from "../features/windows/managers/WindowsManager.js";

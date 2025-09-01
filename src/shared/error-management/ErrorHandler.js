@@ -1,13 +1,13 @@
 // File: src/error-management/ErrorHandler.js
 
 
-import NotificationManager from "../managers/core/NotificationManager.js";
-import { openOptionsPage } from "../utils/core/helpers.js";
+import NotificationManager from "@/managers/core/NotificationManager.js";
+import { openOptionsPage } from "@/utils/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
-import ExtensionContextManager from '../utils/core/extensionContext.js';
+import ExtensionContextManager from '@/utils/core/extensionContext.js';
 const logger = getScopedLogger('Error', 'ErrorHandler');
 
 let _instance = null; // Singleton instance

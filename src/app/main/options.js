@@ -7,7 +7,7 @@ import '@/main.scss'
 import browser from 'webextension-polyfill'
 import DOMPurify from 'dompurify'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

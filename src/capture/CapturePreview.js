@@ -1,6 +1,6 @@
 // src/capture/CapturePreview.js
 
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 

@@ -1,5 +1,5 @@
 // src/strategies/YoutubeStrategy.js
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

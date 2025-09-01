@@ -2,13 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
-import secureStorage from '@/storage/core/SecureStorage.js'
+import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 // Lazy-load storageManager to avoid unnecessary upfront cost (no longer needed for circular safety, retained for perf)
 let __storageManagerPromise = null;
 async function getStorageManager() {
   if (!__storageManagerPromise) {
-    __storageManagerPromise = import('@/storage/core/StorageCore.js').then(m => m.storageManager);
+    __storageManagerPromise = import('@/shared/storage/core/StorageCore.js').then(m => m.storageManager);
   }
   return __storageManagerPromise;
 }

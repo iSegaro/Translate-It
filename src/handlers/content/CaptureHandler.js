@@ -1,5 +1,5 @@
-import { MessageFormat } from "../../messaging/core/MessagingCore.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
@@ -9,10 +9,10 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Capture');
 
-import { MessagingContexts } from "../../messaging/core/MessagingCore.js";
-import { MessageActions } from "../../messaging/core/MessageActions.js";
+import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 
 // removed legacy createLogger import
 

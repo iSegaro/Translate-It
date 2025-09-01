@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
-import { MessageActions } from '@/messaging/core/MessageActions.js';
-import { MessagingContexts, MessageFormat } from '@/messaging/core/MessagingCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessagingContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
 
 // In-memory per-tab select element state

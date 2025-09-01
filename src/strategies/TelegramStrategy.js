@@ -1,6 +1,6 @@
 // src/strategies/TelegramStrategy.js
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { CONFIG } from "../config.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { CONFIG } from "@/shared/config/config.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { delay} from "../utils/core/helpers.js";
 import { getScopedLogger } from '@/utils/core/logger.js';

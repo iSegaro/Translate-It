@@ -6,7 +6,7 @@
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { MessageContexts } from '@/messaging/core/MessagingCore.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'SimpleMessageHandler');
 

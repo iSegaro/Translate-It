@@ -1,7 +1,7 @@
 // src/capture/ScreenSelector.js
 
-import { handleUIError } from "../error-management/ErrorHandler.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { handleUIError } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { createSafeElement } from "../utils/ui/html-sanitizer.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';

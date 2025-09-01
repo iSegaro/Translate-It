@@ -1,7 +1,7 @@
 import browser from "webextension-polyfill";
 import { featureLoader } from "@/background/feature-loader.js";
 
-import { initializeSettingsListener } from "@/config.js";
+import { initializeSettingsListener } from "@/shared/config/config.js";
 import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
 import {
   handleGoogleTTSSpeak,
@@ -228,7 +228,7 @@ class LifecycleManager {
 
     try {
       const { ErrorHandler } = await import(
-        "@/error-management/ErrorHandler.js"
+        "@/shared/error-management/ErrorHandler.js"
       );
       new ErrorHandler();
 

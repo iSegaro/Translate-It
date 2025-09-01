@@ -5,16 +5,16 @@ import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'screenCapture');
 
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import {
   getEnableScreenCaptureAsync,
   getSourceLanguageAsync,
   getTargetLanguageAsync,
   getTranslationApiAsync,
-} from "../config.js";
+} from "@/shared/config/config.js";
 import { ProviderRegistry } from "../core/provider-registry.js";
 import { captureManager } from "../managers/browser-specific/capture/CaptureManager.js";
-import { MessageActions } from "../messaging/core/MessageActions.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 // removed legacy createLogger import
 

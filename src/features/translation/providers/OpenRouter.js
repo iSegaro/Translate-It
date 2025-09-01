@@ -5,7 +5,7 @@ import {
   CONFIG,
   getOpenRouterApiKeyAsync,
   getOpenRouterApiModelAsync,
-} from "@/config.js";
+} from "@/shared/config/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 

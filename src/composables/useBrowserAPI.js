@@ -1,7 +1,7 @@
 import { ref, onMounted, getCurrentInstance } from 'vue';
 import browser from 'webextension-polyfill';
-import { useMessaging } from '../messaging/composables/useMessaging.js';
-import { storageManager } from '@/storage/core/StorageCore.js';
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 // Global state for API readiness
 const globalApiReady = ref(false);

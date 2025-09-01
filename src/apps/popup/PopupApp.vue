@@ -98,7 +98,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useMessaging } from '@/messaging/composables/useMessaging.js'
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'

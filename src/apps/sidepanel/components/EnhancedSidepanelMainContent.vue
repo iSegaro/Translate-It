@@ -52,7 +52,7 @@
 import { ref, computed, onMounted } from "vue";
 
 import { useSelectElementTranslation } from "@/features/translation/composables/useTranslationModes.js";
-import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
+import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { useI18n } from "@/composables/useI18n.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 

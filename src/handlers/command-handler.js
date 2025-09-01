@@ -1,5 +1,5 @@
 import browser from "webextension-polyfill";
-import { MessagingContexts, MessageFormat } from '../messaging/core/MessagingCore.js';
+import { MessagingContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { simpleMessageHandler } from '../core/SimpleMessageHandler.js';

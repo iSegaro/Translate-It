@@ -99,8 +99,8 @@ const getLogger = () => {
 };
 
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
-import { MessageActions } from '../../../messaging/core/MessageActions';
-import { MessageContexts } from '../../../messaging/core/MessagingCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

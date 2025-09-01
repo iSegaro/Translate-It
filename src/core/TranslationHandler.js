@@ -12,12 +12,12 @@ import NotificationManager from "../managers/core/NotificationManager.js";
 
 
 import { debounce } from "../utils/core/debounce.js";
-import { state, TranslationMode, CONFIG, getTimeoutAsync } from "../config.js";
+import { state, TranslationMode, CONFIG, getTimeoutAsync } from "@/shared/config/config.js";
 import { logMethod } from "../utils/core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
-import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "../managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";

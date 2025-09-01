@@ -1,7 +1,7 @@
 // Handler for getting provider config from Vue apps
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
-import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
-import { storageManager } from "@/storage/core/StorageCore.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
 
 const errorHandler = new ErrorHandler();
 

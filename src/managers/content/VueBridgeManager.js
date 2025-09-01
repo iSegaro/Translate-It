@@ -2,8 +2,8 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import DOMPurify from "dompurify";
 import browser from "webextension-polyfill";
-import { MessageFormat } from "../../messaging/core/MessagingCore.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

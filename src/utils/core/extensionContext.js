@@ -2,8 +2,8 @@
 // Centralized Extension Context Management
 
 import browser from 'webextension-polyfill';
-import { ErrorTypes } from '../../error-management/ErrorTypes.js';
-import { matchErrorToType } from '../../error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from './logger.js';
 import { LOG_COMPONENTS } from './logConstants.js';
 
@@ -135,7 +135,7 @@ export class ExtensionContextManager {
       async (msg) => {
         // Use dynamically imported sendReliable to avoid circular dependency.
         try {
-          const { sendReliable } = await import('@/messaging/core/ReliableMessaging.js');
+          const { sendReliable } = await import('@/shared/messaging/core/ReliableMessaging.js');
           return await sendReliable(msg);
         } catch (err) {
           logger.debug('sendReliable failed in safeSendMessage:', err);

@@ -1,7 +1,7 @@
 import { setStateForTab } from './selectElementStateManager.js';
-import { MessageActions } from '@/messaging/core/MessageActions.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
-import { MessagingContexts } from '@/messaging/core/MessagingCore.js';
+import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { generateBackgroundMessageId } from '@/utils/messaging/messageId.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

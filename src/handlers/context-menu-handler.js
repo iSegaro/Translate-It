@@ -4,13 +4,13 @@
  */
 
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler');
 
-import { storageManager } from "@/storage/core/StorageCore.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 // removed legacy createLogger import
 

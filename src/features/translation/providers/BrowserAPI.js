@@ -7,8 +7,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-import { ErrorTypes } from "@/error-management/ErrorTypes.js";
-import { TranslationMode } from "@/config.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { TranslationMode } from "@/shared/config/config.js";
 import browser from 'webextension-polyfill';
 
 

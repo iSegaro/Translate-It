@@ -1,6 +1,6 @@
 // src/utils/translationModeHelper.js
 
-import { TranslationMode } from "../config.js";
+import { TranslationMode } from "@/shared/config/config.js";
 
 // TODO: این فقط یک تست اولیه بود که هیچ تغییر نکرده
 // TODO: نیاز به بازبینی و پیاده سازی یک روش پویاتر است

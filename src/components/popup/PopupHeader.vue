@@ -69,13 +69,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
-import { useMessaging } from '@/messaging/composables/useMessaging.js'
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
-import { MessageActions } from '@/messaging/core/MessageActions.js'
-import { MessageContexts } from '../../messaging/core/MessagingCore.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupHeader');

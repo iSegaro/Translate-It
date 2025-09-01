@@ -5,11 +5,11 @@
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
 import { providerRegistry } from "@/features/translation/providers/ProviderRegistry.js";
-import { storageManager } from "@/storage/core/StorageCore.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/config.js";
+import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
 

@@ -1,6 +1,6 @@
 // src/utils/textDetection.js
 import browser from "webextension-polyfill";
-import { CONFIG } from "../../config.js";
+import { CONFIG } from "@/shared/config/config.js";
 import { languageList } from "../i18n/languages.js";
 // import  from "./helpers.js";
 

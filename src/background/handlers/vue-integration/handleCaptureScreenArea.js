@@ -1,6 +1,6 @@
 // Handler for capturing screen area from Vue apps
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js";
-import { ErrorHandler } from "../../../error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 
 const errorHandler = new ErrorHandler();

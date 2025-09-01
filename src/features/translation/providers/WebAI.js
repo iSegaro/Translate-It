@@ -3,7 +3,7 @@ import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
-} from "@/config.js";
+} from "@/shared/config/config.js";
 import { buildPrompt } from "@/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 

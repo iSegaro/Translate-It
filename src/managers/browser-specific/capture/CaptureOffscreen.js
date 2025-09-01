@@ -2,8 +2,8 @@
 // Chrome offscreen document screen capture manager
 
 import browser from "webextension-polyfill";
-import { MessageFormat, MessagingContexts, MessageActions } from "../../../messaging/core/MessagingCore.js";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { MessageFormat, MessagingContexts, MessageActions } from "@/shared/messaging/core/MessagingCore.js";
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

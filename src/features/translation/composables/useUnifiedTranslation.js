@@ -4,11 +4,11 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
-import { generateMessageId } from "../../../utils/messaging/messageId.js";
+import { generateMessageId } from "@/utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "../../../utils/text/detection.js";
-import { TranslationMode } from "@/config.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
-import { MessagingContexts } from "@/messaging/core/MessagingCore.js";
+import { TranslationMode } from "@/shared/config/config.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import browser from "webextension-polyfill";
@@ -161,7 +161,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
       // Send translation request using smart messaging
       try {
-        const { sendSmart } = await import('@/messaging/core/SmartMessaging.js');
+        const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
         const timeoutOptions = context === 'sidepanel' ? {
           totalTimeout: 20000,
           retries: 1

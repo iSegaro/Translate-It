@@ -1,8 +1,8 @@
 // src/strategies/ChatGPTStrategy.js
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { setCursorToEnd } from "../utils/browser/events.js";
-import { CONFIG } from "../config";
+import { CONFIG } from "@/shared/config/config.js";
 import { filterXSS } from "xss";
 
 export default class ChatGPTStrategy extends PlatformStrategy {

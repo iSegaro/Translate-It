@@ -3,8 +3,8 @@
 
 import { ref } from "vue";
 import browser from "webextension-polyfill";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

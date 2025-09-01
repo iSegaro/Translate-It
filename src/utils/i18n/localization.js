@@ -4,8 +4,8 @@ import browser from "webextension-polyfill";
 import { languageList as languagesData } from "./languages.js";
 import { app_localize } from "./i18n.js";
 
-import { storageManager } from "@/storage/core/StorageCore.js";
-import { MessageActions } from "@/messaging/core/MessageActions.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'localization');

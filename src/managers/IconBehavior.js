@@ -1,14 +1,14 @@
 // src/managers/IconBehavior.js
 
-import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import { state } from "../config.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { state } from "@/shared/config/config.js";
 import { detectPlatform } from "../utils/browser/platform.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "../utils/core/extensionContext.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
-import { getScopedLogger } from "../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
+import { getScopedLogger } from "../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
 
 export default function setupIconBehavior(
   icon,

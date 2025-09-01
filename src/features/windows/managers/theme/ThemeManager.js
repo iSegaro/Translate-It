@@ -3,9 +3,9 @@
 import { getScopedLogger } from "../../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
-import { getThemeAsync } from "../../../../config.js";
+import { getThemeAsync } from "@/shared/config/config.js";
 import { getResolvedUserTheme } from "../../../../utils/ui/theme.js";
-import { storageManager } from "../../../../storage/core/StorageCore.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import browser from "webextension-polyfill";
 
 /**

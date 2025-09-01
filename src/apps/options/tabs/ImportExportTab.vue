@@ -89,7 +89,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import secureStorage from '@/storage/core/SecureStorage.js'
+import secureStorage from '@/shared/storage/core/SecureStorage.js'
 
 import { useI18n } from 'vue-i18n'
 

@@ -1,6 +1,6 @@
 // src/strategies/PlatformStrategy.js
 
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 export default class PlatformStrategy {
   // فلگ ساده برای ردیابی افکت‌های فعال

@@ -2,7 +2,7 @@
 
 import browser from "webextension-polyfill";
 import { applyElementDirection } from "../text/textDetection.js";
-import { getApplication_LocalizeAsync } from "../../config.js";
+import { getApplication_LocalizeAsync } from "@/shared/config/config.js";
 import { languageList } from "./languages.js";
 import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "../text/markdown.js";

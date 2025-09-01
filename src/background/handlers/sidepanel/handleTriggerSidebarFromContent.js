@@ -1,4 +1,4 @@
-import { MessageActions } from "../../../messaging/core/MessageActions.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from "../../../utils/core/logger.js";
 import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
 

@@ -1,7 +1,7 @@
 // src/background/handlers/lifecycle/handleExtensionLifecycle.js
 import browser from 'webextension-polyfill';
 
-import { ErrorTypes } from "../../../error-management/ErrorTypes.js"; // Changed from services
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js"; // Changed from services
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

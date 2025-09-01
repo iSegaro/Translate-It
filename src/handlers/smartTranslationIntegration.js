@@ -1,15 +1,15 @@
-import { ErrorHandler } from "../error-management/ErrorHandler.js";
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { pageEventBus } from "../utils/core/PageEventBus.js";
-import { MessageFormat, MessagingContexts } from "../messaging/core/MessagingCore.js";
+import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import ExtensionContextManager from "../utils/core/extensionContext.js";
-import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "../config.js";
+import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { getScopedLogger } from "../utils/core/logger.js";
+import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
-import { MessageActions } from "../messaging/core/MessageActions.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslation');
 
@@ -261,7 +261,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
         } catch (error) {
           const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
           pageEventBus.emit('show-notification', { message: errorMessage, type: "error" });
-          const { sendSmart } = await import('../messaging/core/SmartMessaging.js');
+          const { sendSmart } = await import('@/shared/messaging/core/SmartMessaging.js');
           await sendSmart({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
         }
       })(translatedText);

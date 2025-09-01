@@ -2,11 +2,11 @@
 // Modern modular architecture with organized handlers and shortcuts
 
 import browser from "webextension-polyfill";
-import { getScopedLogger } from "../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../utils/core/logConstants.js";
+import { getScopedLogger } from "../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
-import { MessageActions } from "../messaging/core/MessageActions.js";
-import { sendSmart } from '@/messaging/core/SmartMessaging.js';
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 
 
 // Create logger for content script

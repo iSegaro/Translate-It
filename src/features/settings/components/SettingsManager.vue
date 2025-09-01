@@ -473,7 +473,7 @@ import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
-import { storageManager } from '@/storage/core/StorageCore.js'
+import { storageManager } from '@/shared/storage/core/StorageCore.js'
 
 const { getStorageData, setStorageData } = useExtensionAPI()
 const { handleError } = useErrorHandler()

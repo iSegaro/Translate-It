@@ -3,7 +3,7 @@ import { pinia } from '@/store'
 import PopupApp from '@/apps/popup/PopupApp.vue'
 import '@/main.scss'
 import { setupGlobalErrorHandler } from '@/composables/useErrorHandler.js'
-import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/error-management/windowErrorHandlers.js'
+import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
 import ExtensionContextManager from '@/utils/core/extensionContext.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 

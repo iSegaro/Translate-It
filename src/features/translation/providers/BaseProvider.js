@@ -1,11 +1,11 @@
 // src/providers/core/BaseTranslationProvider.js
 
-import { ErrorTypes } from "@/error-management/ErrorTypes.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
-import { TranslationMode } from "@/config.js";
+import { TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BaseProvider');
 

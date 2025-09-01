@@ -1,12 +1,12 @@
 // src/core/FeatureManager.js
 
-import { CONFIG } from "../../config.js";
+import { CONFIG } from "@/shared/config/config.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'FeatureManager');
 
-import { storageManager } from "@/storage/core/StorageCore.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
 
 // ...existing code...
 
