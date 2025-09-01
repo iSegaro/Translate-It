@@ -47,10 +47,10 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
-import { useWindowsManager } from '@/composables/useWindowsManager.js';
+import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import TextFieldIcon from './components/TextFieldIcon.vue';
-import TranslationWindow from './components/TranslationWindow.vue';
-import TranslationIcon from './components/TranslationIcon.vue';
+import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
+import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
 
 const pageEventBus = window.pageEventBus;

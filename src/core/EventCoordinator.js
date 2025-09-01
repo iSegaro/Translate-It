@@ -22,12 +22,12 @@ import { getScopedLogger } from "../utils/core/logger.js";
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { logMethod } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
-import SelectionWindows from "../managers/content/WindowsManager.js";
+import SelectionWindows from "../features/windows/managers/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { TextSelectionManager } from "../managers/content/TextSelectionManager.js";
 import { TextFieldManager } from "../managers/content/TextFieldManager.js";
 import { selectElementManager } from "@/features/element-selection/managers/SelectElementManager.js";
-import { WindowsManager } from '@/managers/content/windows/WindowsManager.js';
+import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
