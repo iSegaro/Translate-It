@@ -104,7 +104,7 @@ function generateChromeManifest(baseManifest) {
     
     // Chrome MV3 background service worker
     background: {
-      service_worker: 'src/background/index.js',
+      service_worker: 'src/core/background/index.js',
       type: 'module'
     },
     
@@ -155,7 +155,7 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox MV3 background configuration
     background: {
-      scripts: ['src/background/index.js'],
+      scripts: ['src/core/background/index.js'],
       type: 'module'
     },
     

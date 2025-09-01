@@ -6,7 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { getTranslationApiAsync } from '@/config.js';
+import { getTranslationApiAsync } from '@/shared/config/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
 

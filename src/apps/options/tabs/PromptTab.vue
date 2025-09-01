@@ -53,7 +53,7 @@
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
-import { CONFIG } from '@/config.js'
+import { CONFIG } from '@/shared/config/config.js'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useI18n } from 'vue-i18n'
 

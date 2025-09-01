@@ -52,7 +52,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { CONFIG } from '@/config.js'
+import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'

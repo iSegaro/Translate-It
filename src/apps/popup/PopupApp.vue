@@ -112,7 +112,7 @@ import { applyTheme } from '@/utils/ui/theme.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
-import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
+import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/shared/config/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';

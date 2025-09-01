@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
-import { CONFIG } from '@/config.js'
+import { CONFIG } from '@/shared/config/config.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';

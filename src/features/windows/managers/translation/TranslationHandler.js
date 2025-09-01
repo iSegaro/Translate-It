@@ -2,22 +2,21 @@
 
 import browser from "webextension-polyfill";
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js"
-import { getScopedLogger } from "../../../../shared/logging/logger.js";
-import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
-import { ExtensionContextManager } from "../../../../core/extensionContext.js";
-import { AUTO_DETECT_VALUE } from "../../../../constants.js";
+import { ExtensionContextManager } from "@/core/extensionContext.js";
+import { AUTO_DETECT_VALUE } from "@/constants.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
  */
 export class TranslationHandler {
   constructor() {
-    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TranslationHandler');
+    this.logger = getScopedLogger('Content', 'TranslationHandler');
     this.activeRequests = new Map();
   }
 
