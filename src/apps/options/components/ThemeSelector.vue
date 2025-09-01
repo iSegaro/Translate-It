@@ -204,6 +204,7 @@ mediaQuery.addEventListener('change', () => {
   height: 20px;
   color: var(--color-text-secondary);
   opacity: 0.7;
+  filter: var(--icon-filter);
 }
 
 .switch {
