@@ -1,4 +1,4 @@
-// src/utils/translationModeHelper.js
+// src/features/translation/utils/translationModeHelper.js
 
 import { TranslationMode } from "@/shared/config/config.js";
 

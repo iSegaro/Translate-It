@@ -4,7 +4,7 @@ import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
 } from "@/shared/config/config.js";
-import { buildPrompt } from "@/utils/promptBuilder.js";
+import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
 export class WebAIProvider extends BaseProvider {
