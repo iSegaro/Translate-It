@@ -28,6 +28,18 @@ The Text Field Interaction feature handles user interactions with text input fie
 - `handleFieldBlur.js` - Processes text field blur events  
 - `handleShortcutTrigger.js` - Processes keyboard shortcut events
 
+### Strategies
+- `PlatformStrategy.js` - Base class for platform-specific text field handling
+- `DefaultStrategy.js` - Default strategy for standard text fields
+- `WhatsAppStrategy.js` - WhatsApp-specific text handling
+- `InstagramStrategy.js` - Instagram-specific text handling  
+- `TwitterStrategy.js` - Twitter-specific text handling
+- `TelegramStrategy.js` - Telegram-specific text handling
+- `MediumStrategy.js` - Medium-specific text handling
+- `ChatGPTStrategy.js` - ChatGPT-specific text handling
+- `YoutubeStrategy.js` - YouTube-specific text handling
+- `DiscordStrategy.js` - Discord-specific text handling
+
 ### Utils
 - `fieldDetection.js` - Utilities for detecting editable fields
 - `iconPositioning.js` - Utilities for calculating icon positions

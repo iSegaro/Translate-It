@@ -1,15 +1,15 @@
-// src/strategies/DefaultStrategy.js
+// src/features/text-field-interaction/strategies/DefaultStrategy.js
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../core/helpers.js";
-import { getScopedLogger } from "../shared/logging/logger.js";
-import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
+import { delay } from "@/core/helpers.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
-} from "../utils/framework/framework-compat/index.js";
+} from "@/utils/framework/framework-compat/index.js";
 
 export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

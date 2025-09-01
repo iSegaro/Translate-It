@@ -1,7 +1,7 @@
-// src/strategies/ChatGPTStrategy.js
+// src/features/text-field-interaction/strategies/ChatGPTStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { setCursorToEnd } from "../utils/browser/events.js";
+import { setCursorToEnd } from "@/utils/browser/events.js";
 import { CONFIG } from "@/shared/config/config.js";
 import { filterXSS } from "xss";
 

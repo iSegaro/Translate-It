@@ -1,4 +1,4 @@
-// src/strategies/PlatformStrategy.js
+// src/features/text-field-interaction/strategies/PlatformStrategy.js
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 

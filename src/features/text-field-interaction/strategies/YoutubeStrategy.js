@@ -1,4 +1,4 @@
-// src/strategies/YoutubeStrategy.js
+// src/features/text-field-interaction/strategies/YoutubeStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -9,7 +9,7 @@ import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
-} from "../utils/framework/framework-compat/index.js";
+} from "@/utils/framework/framework-compat/index.js";
 
 
 export default class YoutubeStrategy extends PlatformStrategy {

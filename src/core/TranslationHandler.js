@@ -1,13 +1,13 @@
 // src/core/TranslationHandler.js
-import WhatsAppStrategy from "../strategies/WhatsAppStrategy.js";
-import InstagramStrategy from "../strategies/InstagramStrategy.js";
-import TwitterStrategy from "../strategies/TwitterStrategy.js";
-import TelegramStrategy from "../strategies/TelegramStrategy.js";
-import MediumStrategy from "../strategies/MediumStrategy.js";
-import ChatGPTStrategy from "../strategies/ChatGPTStrategy.js";
-import YoutubeStrategy from "../strategies/YoutubeStrategy.js";
-import DefaultStrategy from "../strategies/DefaultStrategy.js";
-import DiscordStrategy from "../strategies/DiscordStrategy.js";
+import WhatsAppStrategy from "@/features/text-field-interaction/strategies/WhatsAppStrategy.js";
+import InstagramStrategy from "@/features/text-field-interaction/strategies/InstagramStrategy.js";
+import TwitterStrategy from "@/features/text-field-interaction/strategies/TwitterStrategy.js";
+import TelegramStrategy from "@/features/text-field-interaction/strategies/TelegramStrategy.js";
+import MediumStrategy from "@/features/text-field-interaction/strategies/MediumStrategy.js";
+import ChatGPTStrategy from "@/features/text-field-interaction/strategies/ChatGPTStrategy.js";
+import YoutubeStrategy from "@/features/text-field-interaction/strategies/YoutubeStrategy.js";
+import DefaultStrategy from "@/features/text-field-interaction/strategies/DefaultStrategy.js";
+import DiscordStrategy from "@/features/text-field-interaction/strategies/DiscordStrategy.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 
 

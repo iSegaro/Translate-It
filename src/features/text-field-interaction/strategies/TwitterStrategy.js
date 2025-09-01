@@ -6,7 +6,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TwitterStrategy');
 
 import PlatformStrategy from "./PlatformStrategy.js";
 
-import { delay} from "../core/helpers.js";
+import { delay} from "@/core/helpers.js";
 
 export default class TwitterStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {

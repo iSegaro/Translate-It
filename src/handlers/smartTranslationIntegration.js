@@ -426,7 +426,7 @@ async function applyTranslation(translatedText, selectionRange, platform, tabId,
     }
     
     logger.debug('Translation strategy selected', { strategy: strategyName, platform });
-    strategyModule = await import(`../strategies/${strategyName}.js`);
+    strategyModule = await import(`@/features/text-field-interaction/strategies/${strategyName}.js`);
     const strategy = new strategyModule.default();
     
     // Apply translation using the strategy
