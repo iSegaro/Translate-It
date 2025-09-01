@@ -29,13 +29,13 @@ function fixExtensionPaths() {
       console.log('⚠️ offscreen.html not found at:', htmlOffscreenHtml);
     }
 
-    // Copy CSS files for content scripts (CRITICAL FIX)
-    const stylesDir = resolve(process.cwd(), 'src/styles');
-    const outStylesDir = resolve(outDir, 'src/styles');
-    if (await fs.pathExists(stylesDir)) {
-      await fs.ensureDir(outStylesDir);
-      await fs.copy(stylesDir, outStylesDir);
-      console.log('✅ Copied CSS files from src/styles/ to build directory');
+    // Copy icons for UI components
+    const iconsDir = resolve(process.cwd(), 'src/assets/icons');
+    const outIconsDir = resolve(outDir, 'assets/icons');
+    if (await fs.pathExists(iconsDir)) {
+      await fs.ensureDir(outIconsDir);
+      await fs.copy(iconsDir, outIconsDir);
+      console.log('✅ Copied icons from src/assets/icons/ to build/assets/icons/');
     }
   };
 

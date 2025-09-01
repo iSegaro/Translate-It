@@ -23,6 +23,15 @@ function copyFirefoxAssets() {
           await fs.copy(stylesDir, outStylesDir);
           console.log('✅ Copied CSS files from src/styles/ to Firefox build directory');
         }
+
+        // Copy icons for UI components
+        const iconsDir = resolve(process.cwd(), 'src/assets/icons');
+        const outIconsDir = resolve(options.dir, 'assets/icons');
+        if (await fs.pathExists(iconsDir)) {
+          await fs.ensureDir(outIconsDir);
+          await fs.copy(iconsDir, outIconsDir);
+          console.log('✅ Copied icons from src/assets/icons/ to Firefox build/assets/icons/');
+        }
       }
     }
   };
