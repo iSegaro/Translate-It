@@ -31,16 +31,16 @@ export * from "./element-selection/handleSetSelectElementState.js";
 export * from "./element-selection/handleGetSelectElementState.js";
 
 // Screen capture handlers
-export * from "./screen-capture/handleStartAreaCapture.js";
-export * from "./screen-capture/handleStartFullScreenCapture.js";
-export * from "./screen-capture/handleRequestFullScreenCapture.js";
-export * from "./screen-capture/handleProcessAreaCaptureImage.js";
-export * from "./screen-capture/handlePreviewConfirmed.js";
-export * from "./screen-capture/handlePreviewCancelled.js";
-export * from "./screen-capture/handlePreviewRetry.js";
-export * from "./screen-capture/handleResultClosed.js";
-export * from "./screen-capture/handleCaptureError.js";
-export * from "./screen-capture/handleAreaSelectionCancel.js";
+export * from "../../features/screen-capture/handlers/handleStartAreaCapture.js";
+export * from "../../features/screen-capture/handlers/handleStartFullScreenCapture.js";
+export * from "../../features/screen-capture/handlers/handleRequestFullScreenCapture.js";
+export * from "../../features/screen-capture/handlers/handleProcessAreaCaptureImage.js";
+export * from "../../features/screen-capture/handlers/handlePreviewConfirmed.js";
+export * from "../../features/screen-capture/handlers/handlePreviewCancelled.js";
+export * from "../../features/screen-capture/handlers/handlePreviewRetry.js";
+export * from "../../features/screen-capture/handlers/handleResultClosed.js";
+export * from "../../features/screen-capture/handlers/handleCaptureError.js";
+export * from "../../features/screen-capture/handlers/handleAreaSelectionCancel.js";
 
 // Text selection handlers
 export * from "./text-selection/handleGetSelectedText.js";

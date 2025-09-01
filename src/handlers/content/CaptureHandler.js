@@ -3,7 +3,7 @@ import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { CapturePreview } from "../capture/CapturePreview.js";
 import { CaptureResult } from "../capture/CaptureResult.js";
 import { ScreenSelector } from "../capture/ScreenSelector.js";
-import { cropImageData } from "../utils/imageProcessing.js";
+import { cropImageData } from "@/features/screen-capture/utils/imageProcessing.js";
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

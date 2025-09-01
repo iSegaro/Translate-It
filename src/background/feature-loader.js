@@ -138,7 +138,7 @@ export class FeatureLoader {
         return new OffscreenCaptureManager();
       } else {
         const { ContentScriptCaptureManager } = await import(
-          "../managers/capture-content.js"
+          "@/features/screen-capture/managers/capture-content.js"
         );
         return new ContentScriptCaptureManager();
       }
@@ -146,7 +146,7 @@ export class FeatureLoader {
       logger.error("Failed to load screen capture manager:", error);
       // Fallback to basic content script implementation
       const { ContentScriptCaptureManager } = await import(
-        "../managers/capture-content.js"
+        "@/features/screen-capture/managers/capture-content.js"
       );
       return new ContentScriptCaptureManager();
     }

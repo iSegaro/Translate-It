@@ -136,7 +136,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useScreenCapture } from '@/composables/useScreenCapture.js'
+import { useScreenCapture } from '@/features/screen-capture/composables/useScreenCapture.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
