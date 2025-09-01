@@ -47,7 +47,7 @@
         <span v-else>{{ t('TRANSLATING', 'Translating...') }}</span>
         <img 
           v-if="!isTranslating"
-          src="@/assets/icons/translate.png" 
+          src="@/assets/icons/ui/translate.png" 
           alt="Translate" 
         >
         <div

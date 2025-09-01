@@ -14,7 +14,7 @@
         @click="handleSelectElement"
       >
         <img
-          src="@/assets/icons/select.png"
+          src="@/assets/icons/ui/select.png"
           alt="Select Element"
           class="toolbar-icon"
         >
@@ -28,7 +28,7 @@
         @click="handleRevert"
       >
         <img 
-          src="@/assets/icons/revert.png" 
+          src="@/assets/icons/ui/revert.png" 
           alt="Revert" 
           class="toolbar-icon" 
         >
@@ -41,7 +41,7 @@
         @click="handleClear"
       >
         <img
-          src="@/assets/icons/clear.png"
+          src="@/assets/icons/ui/clear.png"
           alt="Clear Fields"
           class="toolbar-icon"
         >
@@ -69,7 +69,7 @@
         @click="handleHistory"
       >
         <img
-          src="@/assets/icons/history.svg"
+          src="@/assets/icons/ui/history.svg"
           alt="History"
           class="toolbar-icon"
         >
@@ -84,7 +84,7 @@
         @click="handleSettings"
       >
         <img
-          src="@/assets/icons/settings.png"
+          src="@/assets/icons/ui/settings.png"
           alt="Settings"
           class="toolbar-icon"
         >

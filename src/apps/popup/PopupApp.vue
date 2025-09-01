@@ -456,7 +456,7 @@ const retryLoading = () => {
 </style>
 
 <style scoped lang="scss">
-@use '../../assets/styles/variables.scss' as *;
+@use '@/assets/styles/base/variables' as *;
 
 .extension-popup {
   width: $popup-width;

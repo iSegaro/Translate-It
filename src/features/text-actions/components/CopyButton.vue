@@ -110,7 +110,7 @@ const hasTextToCopy = computed(() => {
 
 const iconSrc = computed(() => {
   // Use existing icon from assets
-  return new URL('@/assets/icons/copy.png', import.meta.url).href
+  return new URL('@/assets/icons/ui/copy.png', import.meta.url).href
 })
 
 // Methods

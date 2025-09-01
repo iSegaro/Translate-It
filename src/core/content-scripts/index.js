@@ -29,7 +29,7 @@ if (!access.isAccessible) {
       const { pageEventBus } = await import("@/core/PageEventBus.js");
       
       // 1. Inject page-level styles directly into the document head.
-      const pageStyles = await import('@/styles/page-styles.css?raw');
+      const pageStyles = await import('@/assets/styles/layout/_content.scss?raw');
       const pageStyleEl = document.createElement('style');
       pageStyleEl.textContent = pageStyles.default;
       document.head.appendChild(pageStyleEl);

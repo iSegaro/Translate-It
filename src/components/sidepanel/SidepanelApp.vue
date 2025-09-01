@@ -62,7 +62,7 @@
             @click="handleClearAllHistory"
           >
             <img
-              src="@/assets/icons/trash.svg"
+              src="@/assets/icons/ui/trash.svg"
               alt="Clear All"
               class="clear-all-icon"
             >

@@ -54,7 +54,7 @@ const handleChange = (event) => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .base-select {
   width: 100%;

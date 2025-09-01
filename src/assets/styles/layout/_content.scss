@@ -1,16 +1,19 @@
-/* src/styles/page-styles.css */
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// Content layout styles - Page-level styles for extension functionality
 
 /* ==========================================================================
-     Select Element Mode Styles
-     ========================================================================== */
+   Select Element Mode Styles
+   ========================================================================== */
 
-/* Global cursor change when in select element mode */
+// Global cursor change when in select element mode
 .AIWritingCompanion-disable-links,
 .AIWritingCompanion-disable-links * {
   cursor: crosshair !important;
 }
 
-/* Disable pointer events on interactive elements to prevent navigation */
+// Disable pointer events on interactive elements to prevent navigation
 .AIWritingCompanion-disable-links a,
 .AIWritingCompanion-disable-links button,
 .AIWritingCompanion-disable-links [onclick],
@@ -23,23 +26,11 @@
   text-decoration: none !important;
 }
 
-/* Disable automatic hover highlighting - let JS handle highlighting */
-.AIWritingCompanion-disable-links *:hover {
-  /* Remove automatic highlighting to prevent sub-element highlighting */
-}
-
-/* Disable simple mode hover highlighting - let JS handle highlighting */
-.AIWritingCompanion-disable-links.simple-mode *:hover {
-  /* Remove automatic highlighting to prevent sub-element highlighting */
-}
-
-/* Prevent highlighting on body and html elements */
+// Disable automatic hover highlighting - let JS handle highlighting
+.AIWritingCompanion-disable-links *:hover,
+.AIWritingCompanion-disable-links.simple-mode *:hover,
 .AIWritingCompanion-disable-links body:hover,
-.AIWritingCompanion-disable-links html:hover {
-  outline: none !important;
-}
-
-/* Disable specific element hover highlighting - let JS handle highlighting */
+.AIWritingCompanion-disable-links html:hover,
 .AIWritingCompanion-disable-links p:hover,
 .AIWritingCompanion-disable-links div:hover,
 .AIWritingCompanion-disable-links span:hover,
@@ -53,11 +44,7 @@
 .AIWritingCompanion-disable-links td:hover,
 .AIWritingCompanion-disable-links th:hover,
 .AIWritingCompanion-disable-links article:hover,
-.AIWritingCompanion-disable-links section:hover {
-  /* Remove automatic highlighting to prevent sub-element highlighting */
-}
-
-/* Disable simple mode element hover highlighting - let JS handle highlighting */
+.AIWritingCompanion-disable-links section:hover,
 .AIWritingCompanion-disable-links.simple-mode p:hover,
 .AIWritingCompanion-disable-links.simple-mode div:hover,
 .AIWritingCompanion-disable-links.simple-mode span:hover,
@@ -72,25 +59,25 @@
 .AIWritingCompanion-disable-links.simple-mode th:hover,
 .AIWritingCompanion-disable-links.simple-mode article:hover,
 .AIWritingCompanion-disable-links.simple-mode section:hover {
-  /* Remove automatic highlighting to prevent sub-element highlighting */
+  outline: none !important;
 }
 
-/* Keep input element highlighting for user feedback */
+// Keep input element highlighting for user feedback
 .AIWritingCompanion-disable-links input:hover,
 .AIWritingCompanion-disable-links textarea:hover {
   outline: 2px solid #4a90e2 !important;
   outline-offset: 1px !important;
 }
 
-/* JS-controlled highlighting for selected main containers */
+// JS-controlled highlighting for selected main containers
 .translate-it-element-highlighted {
   outline: 3px solid #ff8800 !important;
   outline-offset: 2px !important;
-  z-index: 999999 !important;
+  z-index: $z-overlay !important;
   position: relative !important;
-}
 
-/* Prevent child elements from being highlighted when parent is highlighted */
-.translate-it-element-highlighted * {
-  outline: none !important;
+  // Prevent child elements from being highlighted when parent is highlighted
+  * {
+    outline: none !important;
+  }
 }

@@ -1,0 +1,180 @@
+@use './variables' as *;
+@use 'sass:list';
+
+// Common mixins for the extension
+
+// Loading state mixin
+@mixin loading-state {
+  position: relative;
+  pointer-events: none;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+// Transition mixins
+@mixin transition($property: all, $duration: $transition-base, $timing: ease) {
+  transition: $property $duration $timing;
+}
+
+@mixin transition-fast($properties...) {
+  @if list.length($properties) == 0 {
+    transition: all $transition-fast;
+  } @else {
+    $transitions: ();
+    @each $property in $properties {
+      $transitions: list.append($transitions, #{$property} $transition-fast, comma);
+    }
+    transition: $transitions;
+  }
+}
+
+@mixin transition-slow($properties...) {
+  @if list.length($properties) == 0 {
+    transition: all $transition-slow;
+  } @else {
+    $transitions: ();
+    @each $property in $properties {
+      $transitions: list.append($transitions, #{$property} $transition-slow, comma);
+    }
+    transition: $transitions;
+  }
+}
+
+// Shadow mixins
+@mixin shadow-sm {
+  box-shadow: $shadow-sm;
+}
+
+@mixin shadow-base {
+  box-shadow: $shadow-base;
+}
+
+@mixin shadow-md {
+  box-shadow: $shadow-md;
+}
+
+@mixin shadow-lg {
+  box-shadow: $shadow-lg;
+}
+
+// Button mixins
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-sm $spacing-md;
+  border: $border-width $border-style transparent;
+  border-radius: $border-radius-md;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  text-decoration: none;
+  cursor: pointer;
+  @include transition-fast();
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+@mixin button-primary {
+  @include button-base;
+  background-color: var(--color-primary);
+  color: white;
+  
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-dark);
+  }
+}
+
+@mixin button-secondary {
+  @include button-base;
+  background-color: transparent;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary);
+    color: white;
+  }
+}
+
+// Input mixins
+@mixin input-base {
+  width: 100%;
+  padding: $spacing-sm $spacing-base;
+  border: $border-width $border-style var(--input-border-color, var(--color-border));
+  border-radius: $border-radius-md;
+  background-color: var(--input-bg-color, var(--color-background));
+  color: var(--input-text-color, var(--color-text));
+  font-size: $font-size-base;
+  @include transition-fast(border-color);
+  
+  &:focus {
+    outline: none;
+    border-color: var(--input-focus-border-color, var(--color-primary));
+    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
+  }
+  
+  &::placeholder {
+    color: var(--color-text-secondary);
+  }
+}
+
+// Responsive breakpoints
+@mixin mobile {
+  @media (max-width: #{$breakpoint-md - 1px}) {
+    @content;
+  }
+}
+
+@mixin tablet {
+  @media (min-width: #{$breakpoint-md}) and (max-width: #{$breakpoint-lg - 1px}) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: #{$breakpoint-lg}) {
+    @content;
+  }
+}
+
+// Animation keyframes
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

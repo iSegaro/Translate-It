@@ -68,7 +68,7 @@ const excludedSites = computed({
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .advance-tab {
   max-width: 600px;

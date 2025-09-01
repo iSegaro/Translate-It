@@ -1,0 +1,10 @@
+// This file consolidates all global CSS for the content script UI.
+// It is imported into src/app/main.js using ?inline.
+
+// Import all necessary styles for content script shadow DOM injection
+@use "./utilities/helpers";
+@use "./components/text-field-icon";
+@use "./components/translation-window";
+
+// Import vue-sonner styles for notifications
+@import 'vue-sonner/style.css';

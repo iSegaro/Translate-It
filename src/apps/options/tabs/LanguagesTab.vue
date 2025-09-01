@@ -85,7 +85,7 @@ const validateLanguages = async () => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .languages-tab {
   max-width: 600px;

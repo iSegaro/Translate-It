@@ -36,7 +36,7 @@
           :title="t('github_link_title') || 'GitHub'"
         >
           <img
-            src="@/assets/icons/github.svg"
+            src="@/assets/icons/ui/github.svg"
             alt="GitHub"
             height="22"
             class="github-icon"
@@ -124,8 +124,8 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped>
-@import '@/assets/styles/variables.scss';
+<style scoped lang="scss">
+@use '@/assets/styles/base/variables' as *;
 
 :root {
   --breakpoint-lg: 1024px;

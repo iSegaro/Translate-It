@@ -73,8 +73,8 @@ watch(selectedProvider, (newValue, oldValue) => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
-@use '@/assets/styles/_api-settings-common.scss' as *;
+@use "@/assets/styles/base/variables" as *;
+@use "@/assets/styles/components/api-settings-common" as *;
 
 .api-tab {
   max-width: 800px;

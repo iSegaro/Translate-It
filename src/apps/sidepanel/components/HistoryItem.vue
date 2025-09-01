@@ -15,7 +15,7 @@
           @click.stop="handleDelete"
         >
           <img
-            src="@/assets/icons/trash-small.svg"
+            src="@/assets/icons/ui/trash-small.svg"
             alt="Delete"
             class="delete-icon"
           >
@@ -62,7 +62,7 @@ const handleDelete = () => {
 </script>
 
 <style lang="scss" scoped>
-@use "@/assets/styles/variables.scss" as *;
+@use "@/assets/styles/base/variables" as *;
 
 .history-item {
   background-color: var(--color-surface);

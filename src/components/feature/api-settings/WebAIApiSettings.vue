@@ -53,5 +53,5 @@ const webAIApiModel = computed({
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/_api-settings-common.scss' as *;
+@use "@/assets/styles/components/api-settings-common" as *;
 </style>

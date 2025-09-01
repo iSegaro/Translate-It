@@ -274,7 +274,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 /* Scoped styles for dropdown menu */
 .dropdown-menu {

@@ -1,62 +1,63 @@
-@use "./assets/styles/global.scss";
-@use "./assets/styles/options.scss";
-@use "./styles/popup.scss";
-@use "./assets/styles/sidepanel.scss";
+// Main SCSS entry point for the Vue.js browser extension
+// Using modern @use syntax for better organization and performance
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+// Base styles - Foundation
+@use "./assets/styles/base/reset";
+@use "./assets/styles/base/variables"; 
+@use "./assets/styles/base/mixins";
 
-/* Base styles for all contexts */
-html, body {
-    font-family: "Vazirmatn", "Segoe UI", sans-serif;
-}
+// Layout styles - Page and context layouts
+@use "./assets/styles/layout/options";
+@use "./assets/styles/layout/sidepanel"; 
+@use "./assets/styles/layout/content";
 
-/* Default app container */
-#app {
-    width: 100%;
-    height: 100%;
-}
+// Component styles - Reusable components
+@use "./assets/styles/components/popup";
+@use "./assets/styles/components/translation-window";
+@use "./assets/styles/components/text-field-icon";
 
-/* Context-specific styles - these should be overridden by specific entry points */
+// Utility styles - Helpers and utilities
+@use "./assets/styles/utilities/utilities";
+@use "./assets/styles/utilities/helpers";
+
+// Context-specific styles - these should be overridden by specific entry points
 
 /* Popup context (400px width) - only applied in popup.js */
 body.popup-context {
-    width: 400px !important;
-    max-height: 600px !important;
-    overflow: hidden !important;
+  width: 400px !important;
+  max-height: 600px !important;
+  overflow: hidden !important;
 }
 
 /* Options context - only applied in options.js */
 body.options-context {
-    min-height: 100vh !important;
-    overflow: hidden !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    padding: 0 !important; /* No padding on body */
-    margin: 0; /* Ensure no default margin */
+  min-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 !important; /* No padding on body */
+  margin: 0; /* Ensure no default margin */
 }
 
 body.options-context #app {
-    /* The layout is now handled by the body flex container and the OptionsLayout component. */
-    /* Previous styles were causing conflicts and have been removed. */
+  /* The layout is now handled by the body flex container and the OptionsLayout component. */
+  /* Previous styles were causing conflicts and have been removed. */
 }
 
 /* Sidepanel context (full viewport) - only applied in sidepanel.js */
 body.sidepanel-context {
-    width: 100% !important;
-    height: 100vh !important;
-    overflow: hidden !important;
+  width: 100% !important;
+  height: 100vh !important;
+  overflow: hidden !important;
 }
 
 body.sidepanel-context #app {
-    width: 100% !important;
-    height: 100% !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
+// Extension-specific element selection styles
 .translate-it-select-highlight {
   outline: 2px solid #4a90e2 !important;
   outline-offset: 2px !important;

@@ -24,7 +24,7 @@ defineProps({
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .base-fieldset {
   border: $border-width $border-style var(--color-border);

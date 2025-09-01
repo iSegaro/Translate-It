@@ -52,7 +52,7 @@
                 @click.stop="handleDeleteHistoryItem(item.index, $event)"
               >
                 <img
-                  src="@/assets/icons/trash-small.svg"
+                  src="@/assets/icons/ui/trash-small.svg"
                   alt="Delete"
                   class="delete-icon"
                 >
@@ -82,7 +82,7 @@
         @click="handleClearAllHistory"
       >
         <img
-          src="@assets/icons/trash.svg"
+          src="@/assets/icons/ui/trash.svg"
           alt="Clear All"
           class="clear-all-icon"
         >
@@ -337,7 +337,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@use "@/assets/styles/variables.scss" as *;
+@use "@/assets/styles/base/variables" as *;
 
 .history-panel {
   position: absolute;

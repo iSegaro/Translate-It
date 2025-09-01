@@ -122,7 +122,7 @@ Your API keys are stored locally in your browser and are never shared with third
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .help-tab {
   max-width: 100%;

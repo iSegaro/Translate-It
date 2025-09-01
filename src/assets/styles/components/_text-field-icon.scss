@@ -1,0 +1,88 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// TextFieldIcon component styles - for Shadow DOM injection
+// These styles are directly injected since scoped styles don't work in Shadow DOM
+
+.text-field-icon {
+  // Button reset
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  
+  // Positioning
+  position: fixed;
+  
+  // Size
+  width: 28px;
+  height: 28px;
+  
+  // Appearance
+  background-color: #ffffff;
+  border: $border-width $border-style #e0e0e0;
+  border-radius: 50%;
+  @include shadow-base;
+  
+  // Layout
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  // Interaction
+  cursor: pointer;
+  user-select: none;
+  
+  // Z-index - highest possible for extension content
+  z-index: $z-overlay + 1000000 !important;
+  
+  // Animation
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
+  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &.is-hovering {
+    background-color: #f8f9fa;
+    border-color: #dadce0;
+    @include shadow-md;
+    transform: scale(1.1) translateY(-1px);
+  }
+
+  &.is-active {
+    background-color: #e8f0fe;
+    border-color: #4285f4;
+    transform: scale(0.95);
+  }
+
+  &:focus-visible {
+    border-color: #4285f4;
+    box-shadow: 
+      0 0 0 2px rgba(66, 133, 244, 0.2),
+      0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.text-field-icon__svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+  @include transition-fast(transform);
+
+  .text-field-icon.is-hovering & {
+    transform: scale(1.05);
+  }
+
+  .text-field-icon.is-active & {
+    transform: scale(0.95);
+  }
+}

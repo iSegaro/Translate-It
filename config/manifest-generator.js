@@ -50,9 +50,12 @@ export function generateManifest(browser = 'chrome') {
           'html/offscreen.html',
           'offscreen.js',
           'icons/flags/*.svg',
-          'icons/*.png', 
-          'icons/*.svg',
-          'icons/*.gif',
+          'icons/ui/*.png', 
+          'icons/ui/*.svg',
+          'icons/extension/*.png',
+          'icons/extension/*.svg',
+          'icons/providers/*.png',
+          'icons/providers/*.svg',
           'css/*.css',
           'styles/*.css',
           'src/styles/*.css',
@@ -67,10 +70,10 @@ export function generateManifest(browser = 'chrome') {
     
     // Icons
     icons: {
-      16: 'icons/extension_icon_16.png',
-      32: 'icons/extension_icon_32.png',
-      48: 'icons/extension_icon_48.png',
-      128: 'icons/extension_icon_128.png'
+      16: 'icons/extension/extension_icon_16.png',
+      32: 'icons/extension/extension_icon_32.png',
+      48: 'icons/extension/extension_icon_48.png',
+      128: 'icons/extension/extension_icon_128.png'
     },
     
     // Commands
@@ -121,10 +124,10 @@ function generateChromeManifest(baseManifest) {
       default_popup: 'html/popup.html',
       default_title: 'Translate It',
       default_icon: {
-        16: 'icons/extension_icon_16.png',
-        32: 'icons/extension_icon_32.png',
-        48: 'icons/extension_icon_48.png',
-        128: 'icons/extension_icon_128.png'
+        16: 'icons/extension/extension_icon_16.png',
+        32: 'icons/extension/extension_icon_32.png',
+        48: 'icons/extension/extension_icon_48.png',
+        128: 'icons/extension/extension_icon_128.png'
       }
     },
     
@@ -178,13 +181,13 @@ function generateFirefoxManifest(baseManifest) {
       default_popup: 'html/popup.html',
       default_title: '__MSG_name__',
       default_icon: {
-        16: 'icons/extension_icon_16.png',
-        32: 'icons/extension_icon_32.png',
-        48: 'icons/extension_icon_48.png',
-        64: 'icons/extension_icon_64.png',
-        128: 'icons/extension_icon_128.png',
-        256: 'icons/extension_icon_256.png',
-        512: 'icons/extension_icon_512.png'
+        16: 'icons/extension/extension_icon_16.png',
+        32: 'icons/extension/extension_icon_32.png',
+        48: 'icons/extension/extension_icon_48.png',
+        64: 'icons/extension/extension_icon_64.png',
+        128: 'icons/extension/extension_icon_128.png',
+        256: 'icons/extension/extension_icon_256.png',
+        512: 'icons/extension/extension_icon_512.png'
       }
     },
     
@@ -197,9 +200,9 @@ function generateFirefoxManifest(baseManifest) {
     // Firefox extended icons
     icons: {
       ...baseManifest.icons,
-      64: 'icons/extension_icon_64.png',
-      256: 'icons/extension_icon_256.png',
-      512: 'icons/extension_icon_512.png'
+      64: 'icons/extension/extension_icon_64.png',
+      256: 'icons/extension/extension_icon_256.png',
+      512: 'icons/extension/extension_icon_512.png'
     },
     
     // Firefox doesn't support offscreen API yet, so remove from permissions
@@ -211,9 +214,12 @@ function generateFirefoxManifest(baseManifest) {
         resources: [
           'browser-polyfill.js',
           'icons/flags/*.svg',
-          'icons/*.png',
-          'icons/*.svg',
-          'icons/*.gif', 
+          'icons/ui/*.png',
+          'icons/ui/*.svg',
+          'icons/extension/*.png',
+          'icons/extension/*.svg',
+          'icons/providers/*.png',
+          'icons/providers/*.svg',
           'css/*.css',
           'styles/*.css',
           'src/styles/*.css',

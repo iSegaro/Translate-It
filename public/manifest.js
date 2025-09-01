@@ -37,10 +37,10 @@ const manifest = {
     "default_popup": "popup.html",
     "default_title": "Translate It",
     "default_icon": {
-      "16": "icons/extension_icon_16.png",
-      "32": "icons/extension_icon_32.png",
-      "48": "icons/extension_icon_48.png",
-      "128": "icons/extension_icon_128.png"
+      "16": "src/assets/icons/extension/extension_icon_16.png",
+      "32": "src/assets/icons/extension/extension_icon_32.png",
+      "48": "src/assets/icons/extension/extension_icon_48.png",
+      "128": "src/assets/icons/extension/extension_icon_128.png"
     }
   },
   "side_panel": {
@@ -48,18 +48,22 @@ const manifest = {
   },
   "options_page": "options.html",
   "icons": {
-    "16": "icons/extension_icon_16.png",
-    "32": "icons/extension_icon_32.png",
-    "48": "icons/extension_icon_48.png",
-    "128": "icons/extension_icon_128.png"
+    "16": "src/assets/icons/extension/extension_icon_16.png",
+    "32": "src/assets/icons/extension/extension_icon_32.png",
+    "48": "src/assets/icons/extension/extension_icon_48.png",
+    "128": "src/assets/icons/extension/extension_icon_128.png"
   },
   "web_accessible_resources": [
     {
       "resources": [
         "browser-polyfill.js",
-        "icons/flags/*.svg",
-        "icons/*.png",
-        "icons/*.svg",
+        "src/assets/icons/flags/*.svg",
+        "src/assets/icons/ui/*.png",
+        "src/assets/icons/ui/*.svg",
+        "src/assets/icons/extension/*.png",
+        "src/assets/icons/extension/*.svg",
+        "src/assets/icons/providers/*.png",
+        "src/assets/icons/providers/*.svg",
         "css/*.css",
         "js/*.js",
         "_locales/*"

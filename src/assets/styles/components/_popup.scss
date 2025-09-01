@@ -1,7 +1,8 @@
-// Popup SCSS Styles
-// Migrated from OLD/styles/popup.css with Vue architecture improvements
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
 
-// CSS Variables for theme support
+// Popup component styles
+// Theme-specific variables for popup
 :root.theme-light {
   --bg-color: #ffffff;
   --text-color: #000000;
@@ -44,33 +45,27 @@
 body.popup-context {
   margin: 0;
   padding: 0;
-  width: 400px !important;
+  width: $popup-width !important;
   min-height: 350px;
-  max-height: 600px;
-  height: auto; /* Allow dynamic height instead of fixed 350px */
-  font-family: "Vazirmatn", "Segoe UI", sans-serif;
+  max-height: $popup-max-height;
+  height: auto;
+  font-family: $font-family-base;
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-size: 15px;
-  overflow: hidden; /* Hide all overflow - sticky sections will handle their own scroll */
-  transition: height 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); /* Longer transition for smooth resize */
+  font-size: $font-size-md;
+  overflow: hidden;
+  transition: height 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
-#app {
-  width: 100%;
-  min-height: 100%;
-  height: auto; /* Allow dynamic height */
-}
-
-// Popup container (legacy - now handled by popup-wrapper in PopupApp.vue)
+// Popup container
 .popup-container {
   width: 100%;
-  min-height: 350px; /* Ensure minimum height */
-  height: auto; /* Allow dynamic height */
+  min-height: 350px;
+  height: auto;
   background: var(--bg-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-radius: 6px;
-  overflow: hidden; /* No scrolling - components handle their own scroll */
+  @include shadow-md;
+  border-radius: $border-radius-md;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -80,30 +75,30 @@ body.popup-context {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: $spacing-sm $spacing-base;
   background-color: var(--header-bg-color);
-  border-bottom: 1px solid var(--header-border-color);
+  border-bottom: $border-width $border-style var(--header-border-color);
   flex-direction: row-reverse;
 }
 
 .toolbar-right-group {
   display: flex;
-  gap: 8px;
+  gap: $spacing-sm;
   align-items: center;
 }
 
 .toolbar-left-group {
   display: flex;
-  gap: 8px;
+  gap: $spacing-sm;
 }
 
-// Popup Context: Icon styles with proper specificity
+// Icon styles with proper specificity
 body.popup-context .toolbar-icon {
   width: 20px;
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity);
-  transition: opacity 0.2s ease-in-out, filter 0.2s ease-in-out, background-color 0.3s ease;
+  @include transition-fast(opacity, filter, background-color);
   filter: var(--icon-filter);
 
   &:hover {
@@ -113,7 +108,7 @@ body.popup-context .toolbar-icon {
 
 // Revert icon animation
 .revert-icon {
-  transition: transform 0.4s ease, opacity 0.2s ease-in-out, filter 0.2s ease-in-out;
+  @include transition-slow(transform, opacity, filter);
 
   &:hover {
     transform: rotate(360deg);
@@ -157,32 +152,15 @@ body.popup-context .toolbar-icon {
   border-top: 3px solid var(--toolbar-link-color, #58a6ff);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 // Fade in animation
 .result.fade-in {
   animation: fadeIn 0.4s ease-in-out;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// Select Element Error State - Context-specific with proper specificity */
+// Select Element Error State
 body.popup-context .select-error.toolbar-icon {
   position: relative;
-  border-radius: 4px;
+  border-radius: $border-radius-sm;
   filter: hue-rotate(0deg) saturate(3) brightness(0.8) contrast(1.5);
   animation: error-pulse-red 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   will-change: background-color, filter;

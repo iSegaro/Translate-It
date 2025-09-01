@@ -1,0 +1,93 @@
+@forward '../base/variables';
+@forward '../base/mixins';
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// Common styles for API Settings components
+
+.api-info {
+  margin-bottom: $spacing-lg;
+
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    margin: 0 0 $spacing-sm 0;
+    color: var(--color-text);
+  }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.setting-group {
+  margin-bottom: $spacing-md;
+
+  &.api-key-info {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+  }
+
+  label {
+    display: block;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    margin-bottom: $spacing-xs;
+  }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.api-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  @include transition-fast(color);
+
+  &:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+  }
+
+  &:visited {
+    color: var(--color-primary);
+  }
+}
+
+.api-key-input {
+  font-family: monospace;
+  font-size: $font-size-sm;
+}
+
+.model-select {
+  min-width: 200px;
+}
+
+// Validation states
+.setting-group {
+  &.error {
+    .api-key-input,
+    .model-select {
+      border-color: var(--color-error) !important;
+    }
+  }
+
+  &.success {
+    .api-key-input,
+    .model-select {
+      border-color: var(--color-success) !important;
+    }
+  }
+}

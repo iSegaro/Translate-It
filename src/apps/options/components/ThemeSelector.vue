@@ -183,7 +183,7 @@ mediaQuery.addEventListener('change', () => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/assets/styles/variables.scss' as *;
+@use "@/assets/styles/base/variables" as *;
 
 .theme-control-group {
   display: flex;

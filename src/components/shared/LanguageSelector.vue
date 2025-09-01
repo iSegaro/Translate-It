@@ -25,7 +25,7 @@
       @click="handleSwapLanguages"
     >
       <img
-        src="@/assets/icons/swap.png"
+        src="@/assets/icons/ui/swap.png"
         :alt="swapAlt"
       >
     </button>

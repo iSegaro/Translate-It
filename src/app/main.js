@@ -3,7 +3,7 @@ import ContentApp from '../apps/content/ContentApp.vue';
 import i18n from '@/utils/i18n/plugin.js';
 
 // Import all necessary styles as raw strings using Vite's `?inline` feature.
-import combinedGlobalStyles from '../styles/content-app-global.css?inline';
+import combinedGlobalStyles from '../assets/styles/content-app-global.scss?inline';
 
 // Function to extract Vue component styles from the document
 function extractVueComponentStyles() {
