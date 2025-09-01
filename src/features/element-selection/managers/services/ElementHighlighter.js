@@ -16,7 +16,7 @@ export class ElementHighlighter {
    * Initialize the highlighter service
    */
   async initialize() {
-    this.logger.debug('ElementHighlighter initialized');
+    // Initialization complete
   }
 
   /**
@@ -37,7 +37,8 @@ export class ElementHighlighter {
     
     // Check if element has our data attributes
     if (element.hasAttribute('data-translate-it-highlighted') ||
-        element.hasAttribute('data-translate-id')) {
+        element.hasAttribute('data-translate-id') ||
+        element.hasAttribute('data-translate-highlighted')) {
       return true;
     }
     
@@ -49,54 +50,30 @@ export class ElementHighlighter {
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
-    this.logger.debug("ElementHighlighter handleMouseOver", { 
-      tagName: element.tagName, 
-      className: element.className 
-    });
-
     // Skip our own elements
     if (this.isOurElement(element)) {
-      this.logger.debug("Skipping our own element", { tagName: element.tagName });
       return;
     }
 
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
-    this.logger.debug("Best element found", { 
-      bestElement: bestElement ? bestElement.tagName : 'null',
-      bestElementClass: bestElement ? bestElement.className : 'none'
-    });
     
     if (!bestElement || this.isOurElement(bestElement)) {
-      this.logger.debug("No valid element to highlight");
       return;
     }
 
     // Skip if already highlighted
     if (bestElement === this.currentHighlighted) {
-      this.logger.debug("Element already highlighted");
       return;
     }
 
     // Clear previous highlight
     this.clearHighlight();
 
-    // Add highlight class directly to element
+    // Add highlight using both class and data attribute for maximum CSS specificity
     bestElement.classList.add('translate-it-element-highlighted');
-    
-    // Apply inline styles as fallback for CSS specificity issues
-    bestElement.style.outline = '3px solid #ff8800';
-    bestElement.style.outlineOffset = '2px';
-    bestElement.style.zIndex = '999999';
-    bestElement.style.position = 'relative';
-    
+    bestElement.setAttribute('data-translate-highlighted', 'true');
     this.currentHighlighted = bestElement;
-    this.logger.debug("Highlight class and inline styles added", { 
-      tagName: bestElement.tagName,
-      className: bestElement.className,
-      hasClass: bestElement.classList.contains('translate-it-element-highlighted'),
-      outline: bestElement.style.outline
-    });
   }
 
   /**
@@ -195,12 +172,17 @@ export class ElementHighlighter {
    * @param {HTMLElement} element - Element that mouse left
    */
   handleMouseOut(element) {
-    // DISABLED: MouseOut events are too frequent and interfere with highlighting
-    // Only rely on clearHighlight() when a new element is highlighted
-    this.logger.debug("🔄 MouseOut event (IGNORED)", { 
-      tagName: element.tagName,
-      isCurrent: element === this.currentHighlighted 
-    });
+    // Only clear if leaving the highlighted element
+    if (element === this.currentHighlighted) {
+      setTimeout(() => {
+        if (this.currentHighlighted === element) {
+          // Remove highlight class and attribute
+          element.classList.remove('translate-it-element-highlighted');
+          element.removeAttribute('data-translate-highlighted');
+          this.currentHighlighted = null;
+        }
+      }, 50);
+    }
   }
 
   /**
@@ -212,15 +194,9 @@ export class ElementHighlighter {
       // Clear any existing highlights
       this.clearHighlight();
       
-      // Add highlight class directly to element
+      // Add highlight using both class and data attribute for maximum CSS specificity
       element.classList.add('translate-it-element-highlighted');
-      
-      // Apply inline styles as fallback for CSS specificity issues
-      element.style.outline = '3px solid #ff8800';
-      element.style.outlineOffset = '2px';
-      element.style.zIndex = '9999999999';
-      element.style.position = 'relative';
-      
+      element.setAttribute('data-translate-highlighted', 'true');
       this.currentHighlighted = element;
     }
   }
@@ -229,20 +205,10 @@ export class ElementHighlighter {
    * Clear current highlight - uses direct CSS class
    */
   clearHighlight() {
-    // Remove highlight class and inline styles directly from element
+    // Remove highlight class and attribute from element
     if (this.currentHighlighted) {
-      this.logger.debug("🧹 Clearing highlight from element", { 
-        tagName: this.currentHighlighted.tagName,
-        className: this.currentHighlighted.className 
-      });
       this.currentHighlighted.classList.remove('translate-it-element-highlighted');
-      
-      // Clear inline styles
-      this.currentHighlighted.style.outline = '';
-      this.currentHighlighted.style.outlineOffset = '';
-      this.currentHighlighted.style.zIndex = '';
-      this.currentHighlighted.style.position = '';
-      
+      this.currentHighlighted.removeAttribute('data-translate-highlighted');
       this.currentHighlighted = null;
     }
   }
@@ -251,15 +217,17 @@ export class ElementHighlighter {
    * Clear all highlight elements
    */
   clearAllHighlights() {
-    // Remove highlight class and inline styles from all elements that might have it
+    // Remove highlight class and attribute from all elements that might have them
     const highlightedElements = document.querySelectorAll('.translate-it-element-highlighted');
     highlightedElements.forEach(element => {
       element.classList.remove('translate-it-element-highlighted');
-      // Clear inline styles
-      element.style.outline = '';
-      element.style.outlineOffset = '';
-      element.style.zIndex = '';
-      element.style.position = '';
+      element.removeAttribute('data-translate-highlighted');
+    });
+    
+    // Also clear elements with just the attribute
+    const attributeHighlighted = document.querySelectorAll('[data-translate-highlighted]');
+    attributeHighlighted.forEach(element => {
+      element.removeAttribute('data-translate-highlighted');
     });
     
     this.currentHighlighted = null;
@@ -276,13 +244,13 @@ export class ElementHighlighter {
     const hasClass = document.documentElement.classList.contains(
       UI_CONSTANTS.DISABLE_LINKS_CLASS
     );
-    this.logger.debug("CSS class applied", hasClass);
 
     if (!hasClass) {
       this.logger.warn("CSS class failed to apply - trying manual application");
       document.documentElement.classList.add(UI_CONSTANTS.DISABLE_LINKS_CLASS);
     }
   }
+
 
   /**
    * Remove global styles
@@ -328,8 +296,6 @@ export class ElementHighlighter {
 
     // Re-enable page interactions
     this.enablePageInteractions();
-
-    this.logger.debug("Select element UI deactivated");
   }
 
   /**
@@ -376,6 +342,8 @@ export class ElementHighlighter {
     return words.length >= 3; // Minimum word count
   }
 
+
+
   /**
    * Cleanup resources
    */
@@ -384,7 +352,6 @@ export class ElementHighlighter {
     this.clearAllHighlights();
     this.removeGlobalStyles();
     this.enablePageInteractions();
-    this.logger.debug('ElementHighlighter cleanup completed');
   }
 
   /**

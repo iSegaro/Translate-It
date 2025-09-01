@@ -7,10 +7,36 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+// Import Main DOM CSS as raw string for injection
+import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
+
+/**
+ * Inject CSS for Main DOM (outside Shadow DOM)
+ * This ensures styles for Select Element Mode work on main page elements
+ */
+async function injectMainDOMStyles() {
+  // Check if already injected
+  if (document.getElementById('translate-it-main-dom-styles')) {
+    return;
+  }
+
+  try {
+    // Create style element with pre-compiled CSS
+    const styleElement = document.createElement('style');
+    styleElement.id = 'translate-it-main-dom-styles';
+    styleElement.textContent = mainDomCss;
+    
+    // Inject to main document head
+    document.head.appendChild(styleElement);
+    
+  } catch (error) {
+    logger.error('Failed to inject Main DOM CSS:', error);
+  }
+}
 
 // --- Early exit for restricted pages ---
 const access = checkContentScriptAccess();
@@ -35,29 +61,8 @@ if (!access.isAccessible) {
       console.log('🚀 [Content Script] ASYNC FUNCTION STARTED');
       logger.init("Content script loading...");
 
-    // --- PRIORITY: Inject CSS before anything else ---
-    console.log('[Content Script] 🔥 Starting CSS injection...');
-    try {
-      const pageStylesModule = await import('@/assets/styles/layout/_content.scss?raw');
-      const pageStylesContent = pageStylesModule.default || '';
-      console.log('[Content Script] 📄 Raw CSS loaded:', pageStylesContent.length, 'characters');
-      
-      if (pageStylesContent.length > 0) {
-        const pageStyleEl = document.createElement('style');
-        pageStyleEl.textContent = pageStylesContent;
-        pageStyleEl.setAttribute('data-translate-it-page-styles', 'true');
-        document.head.appendChild(pageStyleEl);
-        console.log('[Content Script] ✅ CSS injected successfully');
-        
-        // Check if highlight rule exists
-        const hasHighlightRule = pageStylesContent.includes('translate-it-element-highlighted');
-        console.log('[Content Script] 🎯 Highlight rule present:', hasHighlightRule ? '✅ YES' : '❌ NO');
-      } else {
-        console.warn('[Content Script] ⚠️ Empty CSS content from raw import');
-      }
-    } catch (cssError) {
-      console.error('[Content Script] ❌ CSS injection failed:', cssError);
-    }
+    // --- Inject Main DOM CSS ---
+    await injectMainDOMStyles();
 
     // --- Mount the Vue UI Host ---
     try {
@@ -87,21 +92,6 @@ if (!access.isAccessible) {
         `;
         shadowRoot.appendChild(appStyleEl);
         
-        // Debug: Log the amount of CSS injected
-        console.log('[Content Script] Injected CSS length:', appStyles.length, 'characters');
-        
-        // Debug: Check if specific styles are present
-        if (appStyles.includes('.translation-window')) {
-          console.log('[Content Script] ✅ TranslationWindow styles found in injected CSS');
-        } else {
-          console.warn('[Content Script] ⚠️ TranslationWindow styles NOT found in injected CSS');
-        }
-        
-        if (appStyles.includes('background')) {
-          console.log('[Content Script] ✅ Background styles found in injected CSS');
-        } else {
-          console.warn('[Content Script] ⚠️ Background styles NOT found in injected CSS');
-        }
 
         // 4. Create the root element for the Vue app and mount it.
         const appRoot = document.createElement('div');
@@ -183,11 +173,9 @@ if (!access.isAccessible) {
     document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
     document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
 
-    logger.debug('DOM event listeners registered');
 
     // Setup message listener integration with existing system
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      logger.debug('Message received', { action: message.action, from: message.context });
 
       // Handle exclusion updates immediately
       if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {

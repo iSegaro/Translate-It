@@ -35,6 +35,9 @@ async function buildFirefoxExtension() {
     process.chdir(rootDir)
     
     process.env.NODE_ENV = 'production'
+    process.env.BROWSER = 'firefox'
+
+    // Build main extension files
     const buildCommand = `npx vite build --config config/vite/vite.config.firefox.js`
     execSync(buildCommand, { stdio: 'pipe' })
     

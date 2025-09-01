@@ -9,7 +9,7 @@ import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 import { ExtensionContextManager } from "@/core/extensionContext.js";
-import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 /**
  * Handles translation requests and responses for WindowsManager

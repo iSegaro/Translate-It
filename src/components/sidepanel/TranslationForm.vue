@@ -63,7 +63,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from '@/composables/shared/useI18n.js'
 // (helpers import removed: unused)
-import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 
