@@ -8,14 +8,14 @@ import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
-import { TTSManager } from "../../../features/tts/managers/TTSManager.js";
+import { TTSManager } from "@/features/tts/managers/TTSManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer
 // - DragHandler, TTSManager
 import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
-import ExtensionContextManager from "../../../utils/core/extensionContext.js";
+import ExtensionContextManager from "@/utils/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
 import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/utils/core/PageEventBus.js';
 

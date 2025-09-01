@@ -1,7 +1,7 @@
 // File: src/error-management/ErrorHandler.js
 
 
-import NotificationManager from "@/managers/core/NotificationManager.js";
+import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { openOptionsPage } from "@/utils/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";

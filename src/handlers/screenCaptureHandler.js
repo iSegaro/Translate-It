@@ -13,7 +13,7 @@ import {
   getTranslationApiAsync,
 } from "@/shared/config/config.js";
 import { ProviderRegistry } from "../core/provider-registry.js";
-import { captureManager } from "../managers/browser-specific/capture/CaptureManager.js";
+import { captureManager } from "@/core/managers/browser-specific/capture/CaptureManager.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 // removed legacy createLogger import

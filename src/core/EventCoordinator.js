@@ -18,15 +18,15 @@ import {
 } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { getScopedLogger } from "../shared/logging/logger.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { logMethod } from "../utils/core/helpers.js";
 import { clearAllCaches } from "../utils/text/extraction.js";
-import { WindowsManager as SelectionWindows } from "../features/windows/managers/WindowsManager.js";
+import { WindowsManager as SelectionWindows } from '@/features/windows/managers/WindowsManager.js';
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { TextSelectionManager } from "../managers/content/TextSelectionManager.js";
-import { TextFieldManager } from "../managers/content/TextFieldManager.js";
-import { selectElementManager } from "@/features/element-selection/managers/SelectElementManager.js";
+import { TextSelectionManager } from "@/core/managers/content/TextSelectionManager.js";
+import { TextFieldManager } from "@/core/managers/content/TextFieldManager.js";
+import { selectElementManager } from '@/features/element-selection/managers/SelectElementManager.js';
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 
 export default class EventCoordinator {

@@ -3,13 +3,13 @@
  * Extracted from EventHandler for better separation of concerns
  */
 
-import { getScopedLogger } from "../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
-import { isUrlExcluded_TEXT_FIELDS_ICON } from "../../utils/ui/exclusion.js";
-import { detectPlatform, Platform } from "../../utils/browser/platform.js";
+import { getScopedLogger } from "@/utils/core/logger.js";
+import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
+import { isUrlExcluded_TEXT_FIELDS_ICON } from "@/utils/ui/exclusion.js";
+import { detectPlatform, Platform } from "@/utils/browser/platform.js";
 import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/utils/core/PageEventBus.js';
-import { ExtensionContextManager } from "../../utils/core/extensionContext.js";
+import { ExtensionContextManager } from "@/utils/core/extensionContext.js";
 
 export class TextFieldManager {
   constructor(options = {}) {

@@ -16,31 +16,31 @@ export * from "./lifecycle/handleRestartContentScript.js";
 export * from "./lifecycle/handleBackgroundReloadExtension.js";
 
 // Translation handlers
-export * from "../../features/translation/handlers/handleTranslate.js";
-export * from "../../features/translation/handlers/handleTranslateText.js";
-export * from "../../features/translation/handlers/handleRevertTranslation.js";
-export * from "../../features/translation/handlers/handleCancelTranslation.js";
+export * from "@/features/translation/handlers/handleTranslate.js";
+export * from "@/features/translation/handlers/handleTranslateText.js";
+export * from "@/features/translation/handlers/handleRevertTranslation.js";
+export * from "@/features/translation/handlers/handleCancelTranslation.js";
 
 // TTS handlers
-export * from "../../features/tts/handlers/handleGoogleTTS.js";
-export * from "../../features/tts/handlers/handleOffscreenReady.js";
+export * from "@/features/tts/handlers/handleGoogleTTS.js";
+export * from "@/features/tts/handlers/handleOffscreenReady.js";
 
 // Element selection handlers
-export * from "../../features/element-selection/handlers/handleActivateSelectElementMode.js";
-export * from "../../features/element-selection/handlers/handleSetSelectElementState.js";
-export * from "../../features/element-selection/handlers/handleGetSelectElementState.js";
+export * from "@/features/element-selection/handlers/handleActivateSelectElementMode.js";
+export * from "@/features/element-selection/handlers/handleSetSelectElementState.js";
+export * from "@/features/element-selection/handlers/handleGetSelectElementState.js";
 
 // Screen capture handlers
-export * from "../../features/screen-capture/handlers/handleStartAreaCapture.js";
-export * from "../../features/screen-capture/handlers/handleStartFullScreenCapture.js";
-export * from "../../features/screen-capture/handlers/handleRequestFullScreenCapture.js";
-export * from "../../features/screen-capture/handlers/handleProcessAreaCaptureImage.js";
-export * from "../../features/screen-capture/handlers/handlePreviewConfirmed.js";
-export * from "../../features/screen-capture/handlers/handlePreviewCancelled.js";
-export * from "../../features/screen-capture/handlers/handlePreviewRetry.js";
-export * from "../../features/screen-capture/handlers/handleResultClosed.js";
-export * from "../../features/screen-capture/handlers/handleCaptureError.js";
-export * from "../../features/screen-capture/handlers/handleAreaSelectionCancel.js";
+export * from "@/features/screen-capture/handlers/handleStartAreaCapture.js";
+export * from "@/features/screen-capture/handlers/handleStartFullScreenCapture.js";
+export * from "@/features/screen-capture/handlers/handleRequestFullScreenCapture.js";
+export * from "@/features/screen-capture/handlers/handleProcessAreaCaptureImage.js";
+export * from "@/features/screen-capture/handlers/handlePreviewConfirmed.js";
+export * from "@/features/screen-capture/handlers/handlePreviewCancelled.js";
+export * from "@/features/screen-capture/handlers/handlePreviewRetry.js";
+export * from "@/features/screen-capture/handlers/handleResultClosed.js";
+export * from "@/features/screen-capture/handlers/handleCaptureError.js";
+export * from "@/features/screen-capture/handlers/handleAreaSelectionCancel.js";
 
 // Text selection handlers
 export * from "./text-selection/handleGetSelectedText.js";
@@ -53,9 +53,9 @@ export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 export * from "./sidepanel/handleOpenSidePanel.js";
 
 // Subtitle handlers
-export * from "../../features/subtitle/handlers/handleSubtitleTranslate.js";
-export * from "../../features/subtitle/handlers/handleSubtitleToggle.js";
-export * from "../../features/subtitle/handlers/handleSubtitleStatus.js";
+export * from "@/features/subtitle/handlers/handleSubtitleTranslate.js";
+export * from "@/features/subtitle/handlers/handleSubtitleToggle.js";
+export * from "@/features/subtitle/handlers/handleSubtitleStatus.js";
 
 // Vue integration handlers
 export * from "./vue-integration/handleTranslateImage.js";

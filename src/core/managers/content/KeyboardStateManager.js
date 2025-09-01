@@ -3,8 +3,8 @@
  * Manages key press states for better keyboard shortcut handling
  */
 
-import { getScopedLogger } from "../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
+import { getScopedLogger } from "@/utils/core/logger.js";
+import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
 
 export class KeyboardStateManager {
   constructor() {

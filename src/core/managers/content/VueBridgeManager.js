@@ -37,8 +37,8 @@ class ContentScriptVueBridge {
 
   async registerComponents() {
     const components = {
-      ScreenSelector: () => import("../../components/content/ScreenSelector.vue"),
-      CapturePreview: () => import("../../components/content/CapturePreview.vue"),
+      ScreenSelector: () => import("@/components/content/ScreenSelector.vue"),
+      CapturePreview: () => import("@/components/content/CapturePreview.vue"),
     };
     for (const [name, loader] of Object.entries(components)) {
       this.componentRegistry.set(name, async () => (await loader()).default);

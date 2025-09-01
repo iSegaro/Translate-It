@@ -54,7 +54,7 @@ export class RevertShortcut {
 
     try {
       // Import and use RevertHandler
-      const { RevertHandler } = await import('../../../handlers/content/RevertHandler.js');
+      const { RevertHandler } = await import('@/handlers/content/RevertHandler.js');
       const revertHandler = new RevertHandler();
       
       const result = await revertHandler.executeRevert();

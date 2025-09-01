@@ -3,12 +3,12 @@
  * Extracted from EventHandler for better maintainability and separation of concerns
  */
 
-import { getScopedLogger } from "../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../utils/core/logConstants.js";
+import { getScopedLogger } from "@/utils/core/logger.js";
+import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
 import { getRequireCtrlForTextSelectionAsync, getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
-import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "../../utils/browser/events.js";
-import { WindowsConfig } from "../../features/windows/managers/core/WindowsConfig.js";
-import { ExtensionContextManager } from "../../utils/core/extensionContext.js";
+import { getEventPath, getSelectedTextWithDash, isCtrlClick } from "@/utils/browser/events.js";
+import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
+import { ExtensionContextManager } from "@/utils/core/extensionContext.js";
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 
 export class TextSelectionManager {
@@ -169,7 +169,6 @@ export class TextSelectionManager {
           windowElements = Array.from(rootNode.querySelectorAll('.translation-window, .aiwc-selection-popup-host'));
         }
       }
-  // ...
       if (windowElements.length && event && event.target) {
         for (const el of windowElements) {
           if (event.target === el || el.contains(event.target)) {

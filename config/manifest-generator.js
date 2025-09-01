@@ -34,7 +34,7 @@ export function generateManifest(browser = 'chrome') {
     // Content scripts
     content_scripts: [
       {
-        js: ['src/content-scripts/index.js'],
+        js: ['src/core/content-scripts/index.js'],
         // CSS files will be manually copied and injected via JS
         matches: ['<all_urls>'],
         run_at: 'document_idle',

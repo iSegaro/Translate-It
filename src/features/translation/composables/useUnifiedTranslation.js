@@ -5,7 +5,7 @@ import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
 import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
-import { isSingleWordOrShortPhrase } from "../../../utils/text/detection.js";
+import { isSingleWordOrShortPhrase } from "@/utils/text/detection.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";

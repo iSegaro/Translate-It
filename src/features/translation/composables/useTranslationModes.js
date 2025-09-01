@@ -1,6 +1,6 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
-import { isSingleWordOrShortPhrase } from "../../../utils/text/detection.js";
+import { isSingleWordOrShortPhrase } from "@/utils/text/detection.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 
 import { useLanguages } from "@/composables/useLanguages.js";

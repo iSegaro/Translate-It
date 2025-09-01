@@ -2,9 +2,9 @@
 // Modern modular architecture with organized handlers and shortcuts
 
 import browser from "webextension-polyfill";
-import { getScopedLogger } from "../shared/logging/logger.js";
-import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
-import { checkContentScriptAccess } from "../utils/core/tabPermissions.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { checkContentScriptAccess } from "@/utils/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 
@@ -25,11 +25,11 @@ if (!access.isAccessible) {
 
     // --- Mount the Vue UI Host ---
     try {
-      const { mountContentApp, getAppCss } = await import("../app/main.js");
-      const { pageEventBus } = await import("../utils/core/PageEventBus.js");
+      const { mountContentApp, getAppCss } = await import("@/app/main.js");
+      const { pageEventBus } = await import("@/utils/core/PageEventBus.js");
       
       // 1. Inject page-level styles directly into the document head.
-      const pageStyles = await import('../styles/page-styles.css?raw');
+      const pageStyles = await import('@/styles/page-styles.css?raw');
       const pageStyleEl = document.createElement('style');
       pageStyleEl.textContent = pageStyles.default;
       document.head.appendChild(pageStyleEl);
@@ -104,13 +104,13 @@ if (!access.isAccessible) {
     }
 
     // Dynamically import modules only on accessible and non-excluded pages
-    const { vueBridge } = await import("../managers/content/VueBridgeManager.js");
+    const { vueBridge } = await import("@/core/managers/content/VueBridgeManager.js");
     // TTS handler removed - using unified GOOGLE_TTS_SPEAK system
-    const { getTranslationHandlerInstance } = await import("../core/InstanceManager.js");
+    const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
     const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
-    const { contentMessageHandler } = await import("../handlers/content/ContentMessageHandler.js");
-    const { shortcutManager } = await import("../managers/content/shortcuts/ShortcutManager.js");
-    const { initializeSubtitleHandler } = await import("../managers/content/SubtitleInitializer.js");
+    const { contentMessageHandler } = await import("@/handlers/content/ContentMessageHandler.js");
+    const { shortcutManager } = await import("@/core/managers/content/shortcuts/ShortcutManager.js");
+    const { initializeSubtitleHandler } = await import("@/core/managers/content/SubtitleInitializer.js");
 
     // Initialize core systems
     const translationHandler = getTranslationHandlerInstance();

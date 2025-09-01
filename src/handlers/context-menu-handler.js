@@ -15,7 +15,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 // removed legacy createLogger import
 
 
-import { handleActivateSelectElementMode } from "../background/handlers/element-selection/handleActivateSelectElementMode.js";
+import { handleActivateSelectElementMode } from "@/core/background/handlers/element-selection/handleActivateSelectElementMode.js";
 
 /**
  * Handle translate element context menu

@@ -20,7 +20,7 @@ export async function initializeSubtitleHandler(translationHandler) {
 
   // Check if any subtitle features are enabled
   try {
-    const { getSettingsAsync } = await import("../../config.js");
+    const { getSettingsAsync } = await import("@/shared/config/config.js");
     const settings = await getSettingsAsync();
     
     const subtitleEnabled = settings.ENABLE_SUBTITLE_TRANSLATION ?? true;
@@ -32,7 +32,7 @@ export async function initializeSubtitleHandler(translationHandler) {
     }
 
     // Import and initialize SubtitleHandler only when needed
-    const { SubtitleHandler } = await import("../../handlers/subtitleHandler.js");
+    const { SubtitleHandler } = await import("@/handlers/subtitleHandler.js");
     const subtitleHandler = new SubtitleHandler(translationHandler);
     window.subtitleHandlerInstance = subtitleHandler;
     

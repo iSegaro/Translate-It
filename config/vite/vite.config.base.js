@@ -90,7 +90,7 @@ export const createBaseConfig = (browser, options = {}) => {
             }
             
             // Background provider chunks (only in background bundle)
-            if (id.includes('src/background/providers/')) {
+            if (id.includes('src/core/background/providers/')) {
               const providerMatch = id.match(/providers\/(.+?)Provider/)
               if (providerMatch) {
                 return `background/provider-${providerMatch[1].toLowerCase()}`
@@ -223,8 +223,8 @@ export const createBaseConfig = (browser, options = {}) => {
         '@vueuse/core'
       ],
       exclude: [
-        // Exclude background providers (not used in UI contexts)
-        'src/background/providers',
+        // Exclude core background providers (not used in UI contexts)
+        'src/core/background/providers',
         // Exclude legacy providers
         'src/providers/implementations',
         // Exclude large features for code splitting

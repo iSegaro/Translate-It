@@ -1,5 +1,5 @@
 import browser from "webextension-polyfill";
-import { featureLoader } from "@/background/feature-loader.js";
+import { featureLoader } from "@/core/background/feature-loader.js";
 
 import { initializeSettingsListener } from "@/shared/config/config.js";
 import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
@@ -11,7 +11,7 @@ import {
   handleGoogleTTSGetStatus,
 } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { simpleMessageHandler } from "@/core/SimpleMessageHandler.js"; // This might need to be moved later
-import * as Handlers from "@/background/handlers/index.js"; // This might need to be moved later
+import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/utils/core/browserHandlers.js';
@@ -247,7 +247,7 @@ class LifecycleManager {
     } catch (error) {
       logger.error("❌ Failed to refresh context menus via featureLoader:", error);
       // Fallback to direct import of new context menu manager
-      const { ContextMenuManager } = await import("@/managers/context-menu.js");
+      const { ContextMenuManager } = await import("@/core/managers/context-menu.js");
       const contextMenuManager = new ContextMenuManager();
       await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
     }
