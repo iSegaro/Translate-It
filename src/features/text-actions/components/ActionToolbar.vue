@@ -60,7 +60,7 @@
 import { computed } from 'vue'
 import CopyButton from './CopyButton.vue'
 import PasteButton from './PasteButton.vue'
-import TTSButton from '../TTSButton.vue' // Updated to use the new enhanced TTSButton
+import TTSButton from '@/components/shared/TTSButton.vue' // Updated to use the new enhanced TTSButton
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 

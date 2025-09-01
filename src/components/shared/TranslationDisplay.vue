@@ -48,7 +48,7 @@
       ref="contentRef"
       class="translation-content"
       :class="[
-        { 
+        {
           'fade-in': showFadeIn,
           'loading-dim': isLoading
         },
@@ -65,7 +65,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
-import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
+import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 
@@ -228,12 +228,12 @@ const renderedContent = computed(() => {
     
     // Add retry action if available
     if (props.canRetry && props.onRetry) {
-      errorActions.push(`<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`)
+      errorActions.push(`<button class="error-action retry-btn" onclick="handleRetry()">🔄 Try Again</button>`) 
     }
     
     // Add settings action if available
     if (props.canOpenSettings && props.onOpenSettings) {
-      errorActions.push(`<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`)
+      errorActions.push(`<button class="error-action settings-btn" onclick="handleSettings()">⚙️ Settings</button>`) 
     }
     
     const actionsHtml = errorActions.length > 0 

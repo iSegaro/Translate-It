@@ -36,7 +36,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
-import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
+import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationInputField');

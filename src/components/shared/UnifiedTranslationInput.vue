@@ -109,7 +109,7 @@ import { correctTextDirection } from '@/utils/text/textDetection.js'
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-import ActionToolbar from '@/components/shared/actions/ActionToolbar.vue'
+import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 // Logger

@@ -37,7 +37,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useCopyAction } from '@/composables/actions/useCopyAction.js'
+import { useCopyAction } from '@/features/text-actions/composables/useCopyAction.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'CopyButton')
