@@ -68,13 +68,13 @@ export class ShortcutManager {
   async registerDefaultShortcuts() {
     // Import shortcut handlers
     const { RevertShortcut } = await import('./RevertShortcut.js');
-    const { CtrlSlashShortcut } = await import('./CtrlSlashShortcut.js');
+    const { FieldShortcutManager } = await import('@/features/text-field-interaction/managers/FieldShortcutManager.js');
     
     // Register ESC shortcut for revert
     this.registerShortcut('Escape', new RevertShortcut());
     
     // Register Ctrl+/ shortcut for translation
-    const ctrlSlashShortcut = new CtrlSlashShortcut();
+    const ctrlSlashShortcut = new FieldShortcutManager();
     this.registerShortcut('Ctrl+/', ctrlSlashShortcut);
     
     // Store reference for initialization later
@@ -94,7 +94,7 @@ export class ShortcutManager {
         translationHandler: dependencies.translationHandler,
         featureManager: dependencies.featureManager
       });
-      this.logger.debug('CtrlSlashShortcut initialized with dependencies');
+      this.logger.debug('FieldShortcutManager initialized with dependencies');
     }
 
     // Future: Initialize other shortcuts that need dependencies

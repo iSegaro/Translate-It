@@ -1,6 +1,6 @@
 /**
- * TextFieldManager - Manages text field icon creation and lifecycle
- * Extracted from EventHandler for better separation of concerns
+ * TextFieldIconManager - Manages text field icon creation and lifecycle
+ * Manages visual icons that appear near focused text fields for quick translation access
  */
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -11,7 +11,7 @@ import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 
-export class TextFieldManager {
+export class TextFieldIconManager {
   constructor(options = {}) {
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
@@ -21,7 +21,7 @@ export class TextFieldManager {
     this.loggedInit = false; // Flag to prevent duplicate logging
     
     // Initialize logger
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldManager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'TextFieldIconManager');
     
     // Track active icons and timeouts
     this.activeIcons = new Map();
@@ -29,7 +29,7 @@ export class TextFieldManager {
     
     // Only log once during first initialization
     if (!this.loggedInit) {
-      this.logger.init('TextFieldManager initialized');
+      this.logger.init('TextFieldIconManager initialized');
       this.loggedInit = true;
     }
   }
@@ -380,6 +380,6 @@ export class TextFieldManager {
    * @returns {string} Description
    */
   getDescription() {
-    return 'Manages text field translate icon creation and lifecycle';
+    return 'Manages text field translate icon creation and lifecycle in focused text fields';
   }
 }

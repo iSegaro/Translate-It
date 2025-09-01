@@ -48,7 +48,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Toaster, toast } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
-import TextFieldIcon from './components/TextFieldIcon.vue';
+import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
 import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';

@@ -1,6 +1,6 @@
 /**
- * Ctrl+/ Shortcut - Translate text in active field handler
- * Extracted from EventHandler for modular keyboard shortcut management
+ * FieldShortcutManager - Manages keyboard shortcuts for text field interactions
+ * Handles Ctrl+/ shortcut for quick translation of focused text field content
  */
 
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -9,7 +9,7 @@ import { isEditable } from "@/core/helpers.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
-export class CtrlSlashShortcut {
+export class FieldShortcutManager {
   constructor() {
     this.key = 'Ctrl+/';
     this.description = 'Translate text in active field using Ctrl+/ shortcut';
@@ -18,8 +18,8 @@ export class CtrlSlashShortcut {
     this.initialized = false;
     
     // Initialize logger
-  this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'CtrlSlashShortcut');
-    this.logger.init('CtrlSlashShortcut initialized');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'FieldShortcutManager');
+    this.logger.init('FieldShortcutManager initialized');
   }
 
   /**
@@ -181,7 +181,7 @@ export class CtrlSlashShortcut {
     return {
       key: this.key,
       description: this.description,
-      type: 'CtrlSlashShortcut',
+      type: 'FieldShortcutManager',
       initialized: this.initialized,
       triggers: [
         'Ctrl+/ or Cmd+/ in editable fields',

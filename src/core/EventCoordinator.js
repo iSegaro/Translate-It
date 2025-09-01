@@ -25,7 +25,7 @@ import { clearAllCaches } from "../utils/text/extraction.js";
 import { WindowsManager as SelectionWindows } from '@/features/windows/managers/WindowsManager.js';
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { TextSelectionManager } from "@/core/managers/content/TextSelectionManager.js";
-import { TextFieldManager } from "@/core/managers/content/TextFieldManager.js";
+import { TextFieldIconManager } from "@/features/text-field-interaction/managers/TextFieldIconManager.js";
 import { selectElementManager } from '@/features/element-selection/managers/SelectElementManager.js';
 import { WindowsManager } from '@/features/windows/managers/WindowsManager.js';
 
@@ -52,7 +52,7 @@ export default class EventCoordinator {
       notifier: translationHandler.notifier,
     });
 
-    this.textFieldManager = new TextFieldManager({
+    this.textFieldManager = new TextFieldIconManager({
       translationHandler: translationHandler,
       notifier: translationHandler.notifier,
       strategies: translationHandler.strategies,
@@ -60,7 +60,7 @@ export default class EventCoordinator {
     });
 
     // Debug: Check if translation handler is properly set
-    this.logger.debug('TextFieldManager created with translationHandler:', {
+    this.logger.debug('TextFieldIconManager created with translationHandler:', {
       hasTranslationHandler: !!this.textFieldManager.translationHandler,
       hasProcessMethod: this.textFieldManager.translationHandler && 
                        typeof this.textFieldManager.translationHandler.processTranslation_with_CtrlSlash === 'function'
