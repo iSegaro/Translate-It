@@ -277,7 +277,7 @@ input:disabled + .slider {
 // RTL Support
 .rtl .theme-switch-row {
   flex-direction: row-reverse;
-  justify-content: flex-end; /* Align to the right in RTL */
+  justify-content: center; /* Keep centered in RTL */
 }
 
 .rtl .theme-switch-row input[type="checkbox"] {
