@@ -89,8 +89,8 @@ import { useLanguages } from "@/composables/shared/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useTranslationStore } from "@/features/translation/stores/translation.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 

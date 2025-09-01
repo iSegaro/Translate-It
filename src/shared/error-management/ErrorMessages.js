@@ -2,7 +2,7 @@
 
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { ErrorTypes } from "./ErrorTypes.js";
-import ExtensionContextManager from '@/utils/core/extensionContext.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 export const errorMessages = {
   // Validation errors

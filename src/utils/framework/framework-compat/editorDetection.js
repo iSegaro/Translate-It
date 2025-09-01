@@ -1,10 +1,9 @@
 // src/utils/framework-compat/editorDetection.js
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 
 // Scoped cached logger
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'editorDetection');
+const logger = getScopedLogger("Background", 'editorDetection');
 
 
 /**

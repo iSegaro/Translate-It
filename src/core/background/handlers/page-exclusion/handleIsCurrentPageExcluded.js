@@ -1,5 +1,5 @@
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleIsCurrentPageExcluded');

@@ -4,7 +4,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { state } from "@/shared/config/config.js";
 import { detectPlatform } from "../utils/browser/platform.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import ExtensionContextManager from "../utils/core/extensionContext.js";
+import ExtensionContextManager from "../core/extensionContext.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import { getScopedLogger } from "../shared/logging/logger.js";

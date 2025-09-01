@@ -4,8 +4,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { SimpleMarkdown } from "@/utils/text/markdown.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useHistory');

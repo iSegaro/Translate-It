@@ -1,13 +1,13 @@
 import browser from "webextension-polyfill";
 import { collectTextNodes } from "@/utils/text/extraction.js";
-import { getScopedLogger } from "@/utils/core/logger.js";
-import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import ExtensionContextManager from "@/utils/core/extensionContext.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
 
 // Import services
 import { ElementHighlighter } from "./services/ElementHighlighter.js";

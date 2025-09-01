@@ -88,7 +88,7 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          name: '@/utils/core/logger.js',
+          name: '@/shared/logging/logger.js',
           importNames: ['createLogger'],
           message: 'Use getScopedLogger instead of createLogger outside logger infrastructure.'
         }

@@ -4,8 +4,8 @@ import PopupApp from '@/apps/popup/PopupApp.vue'
 import '@/main.scss'
 import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { getScopedLogger } from '@/shared/logging/logger.js';
 
 const logger = getScopedLogger('UI', 'popup');
 

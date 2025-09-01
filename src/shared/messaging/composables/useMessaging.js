@@ -1,11 +1,11 @@
 import browser from "webextension-polyfill";
 import { MessageFormat, MessagingContexts } from '../core/MessagingCore.js'
 import { MessageActions } from '../core/MessageActions.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendReliable } from '../core/ReliableMessaging.js'
 import { sendSmart } from '../core/SmartMessaging.js'
-import { isContextError } from '@/utils/core/extensionContext.js'
+import { isContextError } from '@/core/extensionContext.js'
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'useMessaging');
 
 

@@ -237,7 +237,7 @@ browser.runtime.onMessage.addListener((message) => {
 ### Enable Logging
 
 ```javascript
-import { createLogger } from '@/utils/core/logger.js'
+import { createLogger } from '@/shared/logging/logger.js'
 const logger = createLogger('Messaging', 'debug')
 
 // Log messages

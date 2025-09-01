@@ -7,8 +7,8 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { providerRegistry } from "@/features/translation/providers/ProviderRegistry.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');

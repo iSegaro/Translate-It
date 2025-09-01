@@ -1,10 +1,10 @@
 // Global TTS Manager Singleton
 // Manages TTS instances across all components to ensure exclusive playback
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import { isContextError } from '@/utils/core/extensionContext.js'
+import { isContextError } from '@/core/extensionContext.js'
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSGlobalManager')

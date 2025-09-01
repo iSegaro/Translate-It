@@ -38,8 +38,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { usePasteAction } from '@/features/text-actions/composables/usePasteAction.js'
-import { getScopedLogger } from '@/utils/core/logger.js'
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PasteButton')
 
 // Props

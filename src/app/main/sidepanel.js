@@ -6,9 +6,9 @@ import browser from 'webextension-polyfill'
 import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
-import { getScopedLogger } from '@/utils/core/logger.js'
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'sidepanel-main')
 

@@ -11,9 +11,9 @@ import DiscordStrategy from "../strategies/DiscordStrategy.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 
 
-import { debounce } from "../utils/core/debounce.js";
+import { debounce } from "../core/debounce.js";
 import { state, TranslationMode, CONFIG, getTimeoutAsync } from "@/shared/config/config.js";
-import { logMethod } from "../utils/core/helpers.js";
+import { logMethod } from "../core/helpers.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
@@ -21,10 +21,10 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import FeatureManager from "@/core/managers/core/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
-import ExtensionContextManager from "../utils/core/extensionContext.js";
+import ExtensionContextManager from "../core/extensionContext.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 export default class TranslationHandler {
   constructor() {

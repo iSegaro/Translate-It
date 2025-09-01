@@ -1,12 +1,11 @@
 // src/utils/langUtils.js
 
-import { detectTextLanguage } from "./textDetection.js";
+import { detectTextLanguage } from "../text/textDetection.js";
 import { AUTO_DETECT_VALUE } from "../constants.js";
-import { getLanguageInfoFromName } from "./textDetection.js";
+import { getLanguageInfoFromName } from "../text/textDetection.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'langUtils');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger('Background', 'langUtils');
 
 
 /**

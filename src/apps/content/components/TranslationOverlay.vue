@@ -5,7 +5,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 import { shouldApplyRtl } from '@/utils/text/textDetection.js';
 
 // State management for translated elements using direct DOM manipulation

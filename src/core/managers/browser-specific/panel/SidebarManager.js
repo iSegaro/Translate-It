@@ -2,8 +2,8 @@
 // Firefox sidebar manager (and fallback for other browsers)
 
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SidebarManager');
 
 /**

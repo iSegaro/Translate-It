@@ -634,7 +634,7 @@ All systems integrate with the centralized error management:
 ```javascript
 // In any component or composable
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 const { handleError } = useErrorHandler()
 
@@ -687,7 +687,7 @@ watch(() => settings.PROVIDER, (newProvider) => {
 All systems use the unified logging system:
 
 ```javascript
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 // Component-specific logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
@@ -1121,7 +1121,7 @@ Modern structured logging with environment awareness and performance optimizatio
 
 **Usage Pattern:**
 ```javascript
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 

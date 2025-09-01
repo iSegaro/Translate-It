@@ -33,7 +33,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useValidation } from '@/utils/core/validation.js'
+import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import { useI18n } from 'vue-i18n'

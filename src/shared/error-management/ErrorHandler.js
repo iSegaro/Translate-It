@@ -2,12 +2,12 @@
 
 
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
-import { openOptionsPage } from "@/utils/core/helpers.js";
+import { openOptionsPage } from "@/core/helpers.js";
 import { getErrorMessage } from "./ErrorMessages.js";
 import { ErrorTypes } from "./ErrorTypes.js";
 import { getErrorDisplayStrategy } from "./ErrorDisplayStrategies.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import ExtensionContextManager from '@/utils/core/extensionContext.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 const logger = getScopedLogger('Error', 'ErrorHandler');
 
 let _instance = null; // Singleton instance

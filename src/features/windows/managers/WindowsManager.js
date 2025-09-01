@@ -15,9 +15,9 @@ import { TTSManager } from "@/features/tts/managers/TTSManager.js";
 // - DragHandler, TTSManager
 import { getSettingsAsync, CONFIG, state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
-import ExtensionContextManager from "@/utils/core/extensionContext.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
 // Import event constants, get pageEventBus instance at runtime
-import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/utils/core/PageEventBus.js';
+import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from '@/core/PageEventBus.js';
 
 console.log('[LOG] WindowsManager.js loaded and evaluated');
 

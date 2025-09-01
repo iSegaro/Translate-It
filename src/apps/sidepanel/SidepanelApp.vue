@@ -43,8 +43,8 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import SidepanelLayout from './SidepanelLayout.vue'
 import browser from 'webextension-polyfill'
 import { applyTheme } from '@/utils/ui/theme.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 

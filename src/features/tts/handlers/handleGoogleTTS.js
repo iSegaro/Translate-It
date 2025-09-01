@@ -1,10 +1,10 @@
 // Background Google TTS handler for content scripts
 // Avoids CSP issues by running Google TTS in background context
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
-import { isChromium } from '@/utils/core/browserHandlers.js';
+import { isChromium } from '@/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');
 

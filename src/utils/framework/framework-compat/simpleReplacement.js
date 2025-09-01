@@ -1,10 +1,9 @@
 // src/utils/framework-compat/simpleReplacement.js
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 
 // Use scoped cached logger
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'simpleReplacement');
+const logger = getScopedLogger("Background", 'simpleReplacement');
 
 
 /**

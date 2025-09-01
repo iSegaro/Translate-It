@@ -4,7 +4,7 @@
 import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { checkContentScriptAccess } from "@/utils/core/tabPermissions.js";
+import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 
@@ -26,7 +26,7 @@ if (!access.isAccessible) {
     // --- Mount the Vue UI Host ---
     try {
       const { mountContentApp, getAppCss } = await import("@/app/main.js");
-      const { pageEventBus } = await import("@/utils/core/PageEventBus.js");
+      const { pageEventBus } = await import("@/core/PageEventBus.js");
       
       // 1. Inject page-level styles directly into the document head.
       const pageStyles = await import('@/styles/page-styles.css?raw');

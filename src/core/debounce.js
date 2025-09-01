@@ -1,4 +1,4 @@
-// src/utils/debounce.js
+// src/core/debounce.js
 export function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {

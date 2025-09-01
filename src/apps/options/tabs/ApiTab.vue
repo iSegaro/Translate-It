@@ -53,8 +53,8 @@ import OpenAIApiSettings from '@/components/feature/api-settings/OpenAIApiSettin
 import OpenRouterApiSettings from '@/components/feature/api-settings/OpenRouterApiSettings.vue'
 import DeepseekApiSettings from '@/components/feature/api-settings/DeepseekApiSettings.vue'
 import CustomApiSettings from '@/components/feature/api-settings/CustomApiSettings.vue'
-import { getScopedLogger } from '@/utils/core/logger.js'
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ApiTab')

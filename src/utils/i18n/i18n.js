@@ -8,10 +8,9 @@ import { fadeOutInElement, animatePopupEffect } from "./helper.js";
 import { SimpleMarkdown } from "../text/markdown.js";
 // import  from "./helpers.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import ExtensionContextManager from '../core/extensionContext.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'i18n');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
+const logger = getScopedLogger('Background', 'i18n');
 
 
 export function parseBoolean(value) {

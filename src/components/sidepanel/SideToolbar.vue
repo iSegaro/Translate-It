@@ -102,8 +102,8 @@ import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { useI18n } from '@/composables/shared/useI18n.js'
 // (helpers import removed: was empty / invalid)
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SideToolbar');
 
 // Props

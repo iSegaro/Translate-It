@@ -3,9 +3,8 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { IsDebug } from "@/shared/config/config.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'extraction');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("Background", 'extraction');
 
 import { correctTextDirection } from "./textDetection.js";
 import { getTranslationString } from "../i18n/i18n.js";

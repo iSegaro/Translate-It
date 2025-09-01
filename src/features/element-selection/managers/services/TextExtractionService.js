@@ -1,7 +1,7 @@
 // TextExtractionService - Handles text extraction and validation from DOM elements
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG, CACHE_CONFIG } from "../constants/selectElementConstants.js";
 
 export class TextExtractionService {

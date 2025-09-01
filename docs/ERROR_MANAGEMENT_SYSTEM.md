@@ -13,7 +13,7 @@ The extension uses a **unified, centralized error management system** for consis
 ### Basic Error Handling
 ```javascript
 import { ErrorHandler } from '@/error-management/ErrorHandler.js'
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Get singleton error handler instance
 const errorHandler = ErrorHandler.getInstance()
@@ -53,7 +53,7 @@ const message = await ExtensionContextManager.safeI18nOperation(
 
 ```javascript
 // ✅ CORRECT - Use centralized managers
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 import { ErrorHandler } from '@/error-management/ErrorHandler.js'
 
 // ❌ REMOVED - These patterns no longer exist
@@ -203,7 +203,7 @@ ErrorTypes.QUOTA_EXCEEDED        // API quota exceeded
 ### 1. Component Error Handling
 ```javascript
 // In any component
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 import { ErrorHandler } from '@/error-management/ErrorHandler.js'
 
 class MyComponent {
@@ -377,7 +377,7 @@ ErrorHandler.getInstance().setOpenOptionsPageCallback(() => {
 ```javascript
 // Test error handling
 import { ErrorHandler } from '@/error-management/ErrorHandler.js'
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 describe('Error Management', () => {
   it('should handle context errors silently', async () => {
@@ -424,7 +424,7 @@ describe('Safe Operations', () => {
 import { matchErrorToType } from '@/error-management/ErrorMatcher.js'
 
 // Replace with ExtensionContextManager
-import ExtensionContextManager from '@/utils/core/extensionContext.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 ```
 
 **2. Errors Not Being Handled**

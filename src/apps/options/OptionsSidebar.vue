@@ -70,8 +70,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from 'webextension-polyfill'
 
 const sidebarError = ref('')

@@ -25,7 +25,7 @@ The UI Host system is a centralized Vue.js application that manages all in-page 
 
 ```javascript
 // In any content script module
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 // Show a notification
 pageEventBus.emit('show-notification', {

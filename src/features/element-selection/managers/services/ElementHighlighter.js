@@ -1,8 +1,8 @@
 // ElementHighlighter Service - Handles UI highlighting and visual feedback
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
-import { taggleLinks } from "../../../../utils/core/helpers.js";
+import { getScopedLogger } from "../../../../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
+import { taggleLinks } from "../../../../core/helpers.js";
 import { UI_CONSTANTS } from "../constants/selectElementConstants.js";
 // pageEventBus import removed - no longer needed for Shadow DOM
 

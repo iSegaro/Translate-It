@@ -3,8 +3,8 @@
 
 import { LifecycleManager } from "@/core/managers/core/LifecycleManager.js";
 import { registerAllProviders } from "@/features/translation/providers/register-providers.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";

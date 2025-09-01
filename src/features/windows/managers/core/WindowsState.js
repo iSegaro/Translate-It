@@ -1,7 +1,7 @@
 // src/managers/content/windows/core/WindowsState.js
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 /**
  * Manages state for WindowsManager

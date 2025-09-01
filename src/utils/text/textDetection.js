@@ -4,9 +4,8 @@ import { CONFIG } from "@/shared/config/config.js";
 import { languageList } from "../i18n/languages.js";
 // import  from "./helpers.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'textDetection');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger('Background', 'textDetection');
 
 
 export const isPersianText = (text) => {

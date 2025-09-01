@@ -2,7 +2,7 @@
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "../utils/core/helpers.js";
+import { delay } from "../core/helpers.js";
 import { getScopedLogger } from "../shared/logging/logger.js";
 import { LOG_COMPONENTS } from "../shared/logging/logConstants.js";
 import { filterXSS } from "xss";

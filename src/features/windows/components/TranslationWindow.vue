@@ -95,7 +95,7 @@ import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
-import { isContextError } from '@/utils/core/extensionContext.js';
+import { isContextError } from '@/core/extensionContext.js';
 import browser from 'webextension-polyfill';
 
 const props = defineProps({

@@ -17,8 +17,8 @@ import { computed, ref, watch } from 'vue'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout');
 
 const { t, locale } = useUnifiedI18n()

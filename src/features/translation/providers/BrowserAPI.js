@@ -1,8 +1,8 @@
 // src/providers/core/browserTranslateProvider.js
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";

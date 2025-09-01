@@ -67,8 +67,8 @@ import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationForm');
 
 

@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessagingContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 // In-memory per-tab select element state
 const selectElementStateByTab = new Map();

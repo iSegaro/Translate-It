@@ -4,9 +4,9 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageFormat, MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { tabPermissionChecker } from '@/utils/core/tabPermissions.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 import { setStateForTab } from './selectElementStateManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleActivateSelectElementMode');

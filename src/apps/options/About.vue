@@ -30,8 +30,8 @@
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import browser from 'webextension-polyfill'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About');
 
 import { useI18n } from 'vue-i18n'

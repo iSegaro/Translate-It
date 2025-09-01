@@ -1,9 +1,8 @@
 // src/utils/framework-compat/text-insertion/strategies/google-docs.js
 
 import { tryOptimizedPasteInsertion } from "./paste-optimized.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'google-docs');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("Background", 'google-docs');
 
 
 /**

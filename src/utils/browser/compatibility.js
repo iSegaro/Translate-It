@@ -4,9 +4,8 @@
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'compatibility');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("Core", 'compatibility');
 
 /**
  * Modern browser detection without deprecated APIs

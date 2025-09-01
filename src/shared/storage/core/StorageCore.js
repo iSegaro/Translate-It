@@ -11,7 +11,7 @@ console.debug('[init] StorageCore module evaluating');
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 // Avoid importing LOG_COMPONENTS here to prevent early evaluation cycles; use literal names instead.
 
 class StorageCore {

@@ -1,13 +1,13 @@
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { pageEventBus } from "../utils/core/PageEventBus.js";
+import { pageEventBus } from "../core/PageEventBus.js";
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
-import ExtensionContextManager from "../utils/core/extensionContext.js";
+import ExtensionContextManager from "../core/extensionContext.js";
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { detectPlatform, Platform } from "../utils/browser/platform.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { getScopedLogger } from "../shared/logging/logger.js";
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isComplexEditor } from "../utils/framework/framework-compat/index.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import browser from "webextension-polyfill";

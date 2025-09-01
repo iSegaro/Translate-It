@@ -4,7 +4,7 @@
  */
 
 import { ref, onMounted, onUnmounted } from 'vue';
-import { WINDOWS_MANAGER_EVENTS } from '@/utils/core/PageEventBus.js';
+import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 
 export function useWindowsManager() {
   // State

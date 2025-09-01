@@ -1,8 +1,8 @@
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 /**
  * Revert Handler - Modular revert functionality for content scripts

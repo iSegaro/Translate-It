@@ -1,6 +1,6 @@
 // src/managers/core/NotificationManager.js
 
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 /**
  * NotificationManager (v2)

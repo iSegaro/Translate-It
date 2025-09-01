@@ -16,7 +16,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 const activeHighlights = ref([]);
 const showTooltip = ref(false);

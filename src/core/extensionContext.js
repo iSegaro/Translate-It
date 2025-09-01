@@ -1,11 +1,11 @@
-// src/utils/core/extensionContext.js
+// src/core/extensionContext.js
 // Centralized Extension Context Management
 
 import browser from 'webextension-polyfill';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { getScopedLogger } from './logger.js';
-import { LOG_COMPONENTS } from './logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
 

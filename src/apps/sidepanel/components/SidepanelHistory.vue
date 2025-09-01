@@ -99,8 +99,8 @@ import { useUI } from '@/composables/ui/useUI.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { languageList } from '@/utils/i18n/languages.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelHistory');
 
 

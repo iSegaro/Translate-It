@@ -3,9 +3,9 @@
  * Extracted from EventHandler for modular keyboard shortcut management
  */
 
-import { getScopedLogger } from "@/utils/core/logger.js";
-import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
-import { isEditable } from "@/utils/core/helpers.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { isEditable } from "@/core/helpers.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 

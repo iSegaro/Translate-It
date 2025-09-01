@@ -1,9 +1,8 @@
 // src/utils/framework-compat/text-insertion/strategies/paste-optimized.js
 
 import { smartDelay } from "../helpers.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'paste-optimized');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("Background", 'paste-optimized');
 
 
 /**

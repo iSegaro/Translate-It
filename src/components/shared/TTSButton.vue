@@ -92,8 +92,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
-import { getScopedLogger } from '@/utils/core/logger.js'
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSButton')
 

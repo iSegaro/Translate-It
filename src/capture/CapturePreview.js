@@ -4,8 +4,8 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { createSafeElement, safeSetText } from "../utils/ui/html-sanitizer.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'CapturePreview');
 
 

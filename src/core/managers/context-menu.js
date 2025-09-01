@@ -2,8 +2,8 @@
 // Context menu manager for cross-browser compatibility
 
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/config.js';

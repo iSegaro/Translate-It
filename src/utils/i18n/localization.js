@@ -6,9 +6,8 @@ import { app_localize } from "./i18n.js";
 
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'localization');
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("Background", 'localization');
 
 
 /**

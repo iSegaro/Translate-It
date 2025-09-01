@@ -30,8 +30,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { getScopedLogger } from '@/utils/core/logger.js'
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')

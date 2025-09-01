@@ -1,7 +1,7 @@
 // ModeManager Service - Handles mode switching and configuration
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG, KEY_CODES } from "../constants/selectElementConstants.js";
 import { SelectElementValidation } from "@/features/element-selection/constants/SelectElementModes.js";
 

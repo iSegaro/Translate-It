@@ -2,12 +2,12 @@
 
 import browser from "webextension-polyfill";
 import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
-import { isContextError } from '@/utils/core/extensionContext.js';
+import { isContextError } from '@/core/extensionContext.js';
 
 /**
  * Manages Text-to-Speech functionality for WindowsManager

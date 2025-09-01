@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 // Lazy-load storageManager to avoid unnecessary upfront cost (no longer needed for circular safety, retained for perf)
 let __storageManagerPromise = null;
 async function getStorageManager() {

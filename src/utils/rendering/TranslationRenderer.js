@@ -3,9 +3,8 @@
 
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationRenderer')
+import { getScopedLogger } from '@/shared/logging/logger.js';
+const logger = getScopedLogger("UI", 'TranslationRenderer')
 
 /**
  * Universal Translation Content Renderer

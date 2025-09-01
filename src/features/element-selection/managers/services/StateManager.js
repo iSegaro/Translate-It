@@ -1,7 +1,7 @@
 import { revertTranslations as revertTranslationsFromExtraction } from "../../../../utils/text/extraction.js";
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
-import { pageEventBus } from '@/utils/core/PageEventBus.js';
+import { getScopedLogger } from "../../../../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 export class StateManager {
   constructor() {

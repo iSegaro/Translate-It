@@ -66,8 +66,8 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { shouldApplyRtl } from '@/utils/text/textDetection.js'
 import { SimpleMarkdown } from '@/utils/text/markdown.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationDisplay');

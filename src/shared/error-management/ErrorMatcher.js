@@ -1,7 +1,7 @@
 // s../error-management/ErrorMatcher.js
 
 import { ErrorTypes } from "./ErrorTypes.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
 const logger = getScopedLogger('Error', 'ErrorMatcher');
 
 

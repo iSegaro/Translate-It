@@ -11,7 +11,7 @@ The extension uses a **unified, modern logging system** for structured, environm
 ## Quick Start
 
 ```javascript
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 // This is the ONLY logging API you need - cached and optimized
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MyComponent')
@@ -104,7 +104,7 @@ logger.infoLazy(() => [message, data])   // Lazy evaluation for expensive info l
 ### Level Management
 
 ```javascript
-import { setLogLevel, getLogLevel, LOG_LEVELS } from '@/utils/core/logger.js'
+import { setLogLevel, getLogLevel, LOG_LEVELS } from '@/shared/logging/logger.js'
 
 // Set component level
 setLogLevel(LOG_COMPONENTS.CONTENT, LOG_LEVELS.DEBUG)
@@ -121,7 +121,7 @@ const level = getLogLevel(LOG_COMPONENTS.CONTENT)
 ### Vue Component
 ```javascript
 // In Vue component
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 
@@ -143,7 +143,7 @@ onMounted(() => {
 ### Background Script
 ```javascript
 // In background script
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 class TranslationService {
   constructor() {
@@ -177,7 +177,7 @@ class TranslationService {
 ### Content Script
 ```javascript
 // In content script
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 class SelectElementManager {
   constructor() {
@@ -340,7 +340,7 @@ The extension has been **fully migrated** from legacy logging patterns:
 ### New Developer Workflow ✅
 ```javascript
 // Step 1: Import (once per file)
-import { getScopedLogger, LOG_COMPONENTS } from '@/utils/core/logger.js'
+import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
 // Step 2: Create scoped logger (cached automatically)
 const logger = getScopedLogger(LOG_COMPONENTS.CAPTURE, 'MyComponent')

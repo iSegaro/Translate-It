@@ -8,8 +8,8 @@ import browser from "webextension-polyfill";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { CONFIG, getSettingsAsync } from "@/shared/config/config.js";
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'InstallHandler');
 
 /**

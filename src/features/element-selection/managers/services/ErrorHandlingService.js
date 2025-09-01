@@ -1,7 +1,7 @@
 // ErrorHandlingService Service - Centralizes error handling for select element operations
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from "../../../../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { errorMessages as ErrorMessages } from "@/shared/error-management/ErrorMessages.js";
@@ -190,7 +190,7 @@ export class ErrorHandlingService {
    */
   async showNotification(message, type = 'error') {
     try {
-      const ExtensionContextManager = (await import('@/utils/core/extensionContext.js')).default;
+      const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       ExtensionContextManager.safeSendMessage({
         action: "show_notification",
         payload: {

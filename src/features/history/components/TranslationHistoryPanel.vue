@@ -485,8 +485,8 @@ import BaseModal from '@/components/base/BaseModal.vue'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import ActionGroup from '@/components/shared/actions/ActionGroup.vue'
 import CopyButton from '@/features/text-actions/components/CopyButton.vue'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationHistoryPanel');

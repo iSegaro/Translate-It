@@ -76,8 +76,8 @@ import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupHeader');
 
 

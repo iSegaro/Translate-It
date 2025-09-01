@@ -12,9 +12,9 @@ import {
 } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { simpleMessageHandler } from "@/core/SimpleMessageHandler.js"; // This might need to be moved later
 import * as Handlers from "@/core/background/handlers/index.js"; // This might need to be moved later
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { addBrowserSpecificHandlers } from '@/utils/core/browserHandlers.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 

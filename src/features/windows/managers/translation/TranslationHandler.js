@@ -9,7 +9,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { determineTranslationMode } from "../../../../features/translation/utils/translationModeHelper.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
-import { ExtensionContextManager } from "../../../../utils/core/extensionContext.js";
+import { ExtensionContextManager } from "../../../../core/extensionContext.js";
 import { AUTO_DETECT_VALUE } from "../../../../constants.js";
 
 /**

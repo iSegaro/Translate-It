@@ -1,7 +1,7 @@
 // src/managers/content/windows/interaction/DragHandler.js
 
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 /**
  * Handles drag and drop functionality for translation windows
