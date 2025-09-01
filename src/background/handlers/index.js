@@ -26,9 +26,9 @@ export * from "../../features/tts/handlers/handleGoogleTTS.js";
 export * from "../../features/tts/handlers/handleOffscreenReady.js";
 
 // Element selection handlers
-export * from "./element-selection/handleActivateSelectElementMode.js";
-export * from "./element-selection/handleSetSelectElementState.js";
-export * from "./element-selection/handleGetSelectElementState.js";
+export * from "../../features/element-selection/handlers/handleActivateSelectElementMode.js";
+export * from "../../features/element-selection/handlers/handleSetSelectElementState.js";
+export * from "../../features/element-selection/handlers/handleGetSelectElementState.js";
 
 // Screen capture handlers
 export * from "../../features/screen-capture/handlers/handleStartAreaCapture.js";

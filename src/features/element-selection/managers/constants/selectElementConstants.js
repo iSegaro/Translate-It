@@ -1,7 +1,7 @@
 // Constants for Select Element module
 // Centralized configuration and constants
 
-import { SELECT_ELEMENT_MODES, SELECT_ELEMENT_DEFAULTS } from "../../../../constants/SelectElementModes.js";
+import { SELECT_ELEMENT_MODES, SELECT_ELEMENT_DEFAULTS } from "@/features/element-selection/constants/SelectElementModes.js";
 
 export const MODES = SELECT_ELEMENT_MODES;
 export const DEFAULTS = SELECT_ELEMENT_DEFAULTS;

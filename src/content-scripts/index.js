@@ -107,7 +107,7 @@ if (!access.isAccessible) {
     const { vueBridge } = await import("../managers/content/VueBridgeManager.js");
     // TTS handler removed - using unified GOOGLE_TTS_SPEAK system
     const { getTranslationHandlerInstance } = await import("../core/InstanceManager.js");
-    const { selectElementManager } = await import("../managers/content/select-element/SelectElementManager.js");
+    const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
     const { contentMessageHandler } = await import("../handlers/content/ContentMessageHandler.js");
     const { shortcutManager } = await import("../managers/content/shortcuts/ShortcutManager.js");
     const { initializeSubtitleHandler } = await import("../managers/content/SubtitleInitializer.js");

@@ -75,7 +75,7 @@ export class RevertHandler {
   async revertVueTranslations() {
     try {
       // Import the singleton directly to ensure the correct instance is used
-      const { selectElementManager } = await import("@/managers/content/select-element/SelectElementManager.js");
+      const { selectElementManager } = await import("@/features/element-selection/managers/SelectElementManager.js");
       const revertedCount = await selectElementManager.revertTranslations();
       logger.debug(`[RevertHandler] Reverted ${revertedCount} translations via SelectElementManager.`);
       return revertedCount;

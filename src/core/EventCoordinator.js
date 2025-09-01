@@ -26,7 +26,7 @@ import SelectionWindows from "../managers/content/WindowsManager.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
 import { TextSelectionManager } from "../managers/content/TextSelectionManager.js";
 import { TextFieldManager } from "../managers/content/TextFieldManager.js";
-import { selectElementManager } from "../managers/content/select-element/SelectElementManager.js";
+import { selectElementManager } from "@/features/element-selection/managers/SelectElementManager.js";
 import { WindowsManager } from '@/managers/content/windows/WindowsManager.js';
 
 export default class EventCoordinator {

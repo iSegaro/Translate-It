@@ -8,7 +8,7 @@ import { MessageActions } from '@/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/messaging/core/MessagingCore.js';
 import { getTranslationApiAsync } from '@/config.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { handleActivateSelectElementMode } from '../background/handlers/element-selection/handleActivateSelectElementMode.js';
+import { handleActivateSelectElementMode } from '@/features/element-selection/handlers/handleActivateSelectElementMode.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 
