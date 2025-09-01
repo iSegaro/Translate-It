@@ -95,106 +95,151 @@
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Structure (Post-Migration)
 
 ```
 src/
-├── 📱 views/               # Vue application entry points
-│   ├── popup/              # Popup application and components
-│   │   ├── PopupApp.vue            # Main popup app
-│   │   ├── PopupAppEnhanced.vue    # Enhanced popup version
+├── 🎯 apps/                     # Vue Applications (Entry Points)
+│   ├── popup/                  # PopupApp.vue + components
+│   │   ├── PopupApp.vue            # Main popup application
 │   │   └── components/             # Popup-specific components
-│   ├── sidepanel/          # Sidepanel application
-│   │   ├── SidepanelApp.vue        # Main sidepanel app
+│   ├── sidepanel/              # SidepanelApp.vue + components  
+│   │   ├── SidepanelApp.vue        # Main sidepanel application
 │   │   ├── SidepanelLayout.vue     # Layout wrapper
 │   │   └── components/             # Sidepanel components
-│   └── options/            # Options page application
-│       ├── OptionsApp.vue          # Main options app
-│       ├── OptionsLayout.vue       # Layout wrapper
-│       └── tabs/                   # Configuration tabs
+│   ├── options/                # OptionsApp.vue + tabs
+│   │   ├── OptionsApp.vue          # Main options application
+│   │   ├── OptionsLayout.vue       # Layout wrapper
+│   │   ├── OptionsSidebar.vue      # Options sidebar
+│   │   ├── About.vue               # About page
+│   │   ├── components/             # Options components
+│   │   └── tabs/                   # Configuration tabs
+│   └── content/                # ContentApp.vue (UI Host)
+│       └── components/             # Content UI components
 │
-├── 🧩 components/          # Reusable Vue components
-│   ├── base/               # Base UI components
-│   │   ├── BaseButton.vue          # Button component
-│   │   ├── BaseInput.vue           # Input component
-│   │   ├── BaseSelect.vue          # Select component
-│   │   └── ...                     # Other base components
-│   ├── shared/             # Shared feature components
-│   │   ├── actions/                # Text action components
-│   │   │   ├── ActionToolbar.vue   # Action toolbar
-│   │   │   ├── CopyButton.vue      # Copy button
-│   │   │   ├── PasteButton.vue     # Paste button
-│   │   │   └── TTSButton.vue       # TTS button
+├── 🧩 components/              # Vue Components (Preserved Structure)
+│   ├── base/                   # Base UI components
+│   ├── shared/                 # Shared components
+│   │   ├── LanguageSelector.vue    # Language selection
+│   │   ├── ProviderSelector.vue    # Provider selection
 │   │   ├── TranslationDisplay.vue  # Translation display
 │   │   ├── TranslationInputField.vue # Input field
-│   │   ├── LanguageSelector.vue    # Language selector
-│   │   └── ProviderSelector.vue    # Provider selector
-│   ├── feature/            # Feature-specific components
-│   │   ├── api-settings/           # API configuration components
-│   │   ├── TranslationBox.vue      # Translation box
-│   │   ├── TranslationHistory.vue  # History component
-│   │   └── SettingsManager.vue     # Settings management
-│   ├── layout/             # Layout components
-│   │   ├── PopupHeader.vue         # Popup header
-│   │   ├── SidepanelHeader.vue     # Sidepanel header
-│   │   └── OptionsHeader.vue       # Options header
-│   └── content/            # Content script components
-│       ├── ScreenSelector.vue      # Screen capture selector
-│       └── TranslationTooltip.vue  # Translation tooltip
+│   │   ├── UnifiedTranslationInput.vue # Unified input
+│   │   └── TTSButton.vue           # TTS controls
+│   ├── feature/                # Feature-specific components
+│   │   └── api-settings/           # API configuration
+│   ├── layout/                 # Layout components
+│   ├── popup/                  # Popup components
+│   ├── sidepanel/              # Sidepanel components  
+│   └── content/                # Content script components
 │
-├── 🎨 composables/         # Vue composables (business logic)
-│   ├── actions/            # Text action composables
-│   │   ├── useTextActions.js       # Main text actions
-│   │   ├── useCopyAction.js        # Copy functionality
-│   │   ├── usePasteAction.js       # Paste functionality
-│   │   └── useTTSAction.js         # TTS functionality
-│   ├── useTranslationModes.js      # Translation modes
-│   ├── usePopupTranslation.js      # Popup translation logic
-│   ├── useSidepanelTranslation.js  # Sidepanel translation logic
-│   ├── useErrorHandler.js          # Error handling
-│   ├── useExtensionAPI.js          # Extension API wrapper
-│   ├── useBrowserAPI.js            # Browser API wrapper
-│   ├── useLanguages.js             # Language management
-│   ├── useHistory.js               # History management
-│   └── useClipboard.js             # Clipboard operations
+├── 🎨 composables/             # Vue Composables (Reorganized)
+│   ├── core/                  # useExtensionAPI, useBrowserAPI
+│   │   ├── useDirectMessage.js     # Direct messaging
+│   │   └── useExtensionAPI.js      # Extension API wrapper
+│   ├── ui/                    # useUI, usePopupResize  
+│   │   ├── usePopupResize.js       # Popup resizing
+│   │   └── useUI.js                # UI state management
+│   ├── storage/               # useStorage, useStorageItem
+│   └── shared/                # Other shared composables
+│       ├── useClipboard.js         # Clipboard operations
+│       ├── useErrorHandler.js      # Error handling
+│       ├── useI18n.js              # Internationalization
+│       ├── useLanguages.js         # Language management
+│       └── useUnifiedI18n.js       # Unified i18n
 │
-├── 🗂️ store/              # Pinia state management
-│   ├── core/
-│   │   ├── settings.js             # Global settings store
-│   │   └── index.js                # Store setup
-│   └── modules/            # Feature-specific stores
-│       ├── translation.js          # Translation state
-│       ├── history.js              # History state
-│       ├── providers.js            # Provider state
-│       ├── tts.js                  # TTS state
-│       ├── capture.js              # Screen capture state
-│       ├── subtitle.js             # Subtitle state
-│       └── backup.js               # Backup/import state
+├── 🏪 features/               # Feature-Based Organization (NEW)
+│   ├── translation/
+│   │   ├── core/              # TranslationEngine, ProviderFactory
+│   │   │   └── translation-engine.js # Translation coordination
+│   │   ├── handlers/          # handleTranslate.js, etc.
+│   │   ├── stores/            # translation.js store
+│   │   ├── composables/       # useTranslation, useTranslationModes
+│   │   ├── providers/         # Google, OpenAI, DeepSeek, etc.
+│   │   └── utils/             # Translation utilities
+│   ├── tts/
+│   │   ├── managers/          # Browser-specific TTS (Chrome/Firefox)
+│   │   ├── handlers/          # TTS background handlers
+│   │   ├── composables/       # useTTSSmart, useTTSAction
+│   │   └── core/              # TTSGlobalManager
+│   ├── screen-capture/
+│   │   ├── handlers/          # Background capture handlers
+│   │   ├── stores/            # capture.js store
+│   │   ├── composables/       # useScreenCapture
+│   │   ├── managers/          # Capture managers
+│   │   └── utils/             # Image processing
+│   ├── element-selection/
+│   │   ├── managers/          # SelectElementManager
+│   │   ├── handlers/          # Selection handlers
+│   │   └── utils/             # Selection utilities
+│   ├── text-actions/
+│   │   ├── composables/       # useCopyAction, usePasteAction
+│   │   └── components/        # ActionToolbar, CopyButton
+│   ├── subtitle/
+│   │   ├── core/              # BaseSubtitleHandler, NetflixSubtitleHandler
+│   │   ├── handlers/          # Subtitle handlers
+│   │   └── stores/            # subtitle.js store
+│   ├── windows/
+│   │   ├── managers/          # WindowsManager (business logic)
+│   │   ├── components/        # TranslationWindow
+│   │   ├── composables/       # useWindowsManager
+│   │   └── managers/          # Position, animation, theme managers
+│   ├── history/
+│   │   ├── stores/            # history.js store
+│   │   ├── composables/       # useHistory
+│   │   ├── components/        # History components
+│   │   └── storage/           # History storage logic
+│   └── settings/
+│       ├── stores/            # settings.js store
+│       ├── composables/       # Settings composables
+│       └── storage/           # Settings storage
 │
-├── 🔄 messaging/           # Smart Messaging system  
-│   ├── core/
-│   │   ├── MessagingCore.js        # MessageFormat, Contexts
-│   │   ├── MessageActions.js       # Action constants
-│   │   ├── SmartMessaging.js       # 🆕 Smart routing system
-│   │   └── ReliableMessaging.js    # Legacy (backward compatibility)
-│   └── composables/
-│       └── useMessaging.js         # Vue messaging composable (Smart-enabled)
+├── 🔧 shared/                 # Shared Systems (Moved from top-level)
+│   ├── messaging/             # Smart messaging system
+│   │   ├── core/              # MessagingCore, SmartMessaging
+│   │   └── composables/       # useMessaging
+│   ├── storage/               # Storage management
+│   │   ├── core/              # StorageCore, SecureStorage
+│   │   └── composables/       # useStorage, useStorageItem
+│   ├── error-management/      # Error handling
+│   │   ├── ErrorHandler.js    # Main error handler
+│   │   ├── ErrorMatcher.js    # Error matching
+│   │   └── ErrorMessages.js   # Error messages
+│   ├── logging/               # Logging system
+│   │   ├── logger.js          # Main logger
+│   │   └── logConstants.js    # Log constants
+│   └── config/                # Configuration
+│       └── config.js          # Application config
 │
-├── 🎯 background/          # Background service worker
-│   ├── index.js                    # Service worker entry point
-│   ├── feature-loader.js           # Dynamic feature loading
-│   ├── translation-engine.js       # Translation coordination
-│   ├── handlers/           # Message handlers by category
-│   │   ├── translation/            # Translation operations
-│   │   │   ├── handleTranslate.js  # Main translation handler
-│   │   │   └── handleTranslateText.js # Text translation
-│   │   ├── vue-integration/        # Vue app integration
-│   │   ├── screen-capture/         # Screen capture handlers
-│   │   ├── element-selection/      # Element selection
-│   │   ├── sidepanel/              # Sidepanel operations
-│   │   ├── tts/                    # Text-to-speech
-│   │   ├── subtitle/               # Subtitle translation (YouTube, online videos)
-│   │   ├── lifecycle/              # Extension lifecycle
+├── 🏗️ core/                  # Core Infrastructure  
+│   ├── background/            # Service worker & lifecycle
+│   │   ├── index.js           # Background entry point
+│   │   ├── feature-loader.js  # Feature loading
+│   │   ├── handlers/          # Background message handlers
+│   │   └── listeners/         # Event listeners
+│   ├── content-scripts/       # Content script entry
+│   │   └── index.js           # Content script entry
+│   ├── managers/              # Core managers
+│   │   ├── core/              # LifecycleManager, FeatureManager
+│   │   ├── content/           # Content-specific managers
+│   │   └── browser-specific/  # Browser-specific managers
+│   ├── helpers.js             # Core helper functions
+│   ├── validation.js          # Data validation
+│   ├── extensionContext.js    # Extension context management
+│   └── tabPermissions.js      # Tab permissions
+│
+├── 🛠️ utils/                 # Pure Utilities (Simplified)
+│   ├── browser/               # Browser compatibility
+│   ├── text/                  # Text processing utilities
+│   │   ├── detection.js       # Text detection
+│   │   ├── extraction.js      # Text extraction
+│   │   ├── markdown.js        # Markdown processing
+│   │   └── textDetection.js   # Text detection utilities
+│   ├── ui/                    # UI utilities
+│   │   └── html-sanitizer.js  # HTML sanitization
+│   ├── i18n/                  # Internationalization utils
+│   ├── framework/             # Framework compatibility
+│   └── rendering/             # Rendering utilities
 │   │   ├── common/                 # Common operations
 │   │   └── index.js                # Handler registry
 │   └── listeners/          # Event listeners

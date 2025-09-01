@@ -28,23 +28,52 @@
 7. **Context Menu**: دسترسی از منوی کلیک راست
 8. **Keyboard Shortcuts**: میانبرهای صفحه‌کلید
 
-## ساختار کلی پروژه
+## ساختار جدید پروژه (Feature-Based Architecture)
 
-### Frontend (Vue.js Apps)
-- **`src/views/`**: اپلیکیشن‌های اصلی - popup، sidepanel، options
-- **`src/components/`**: کامپوننت‌های قابل استفاده مجدد - base، shared، feature، layout
-- **`src/composables/`**: منطق business - useTranslation، useMessaging، useErrorHandler
-- **`src/store/`**: مدیریت state با Pinia - settings، translation، history
+### 🎯 Vue Applications (Entry Points)
+- **`src/apps/`**: اپلیکیشن‌های Vue - popup، sidepanel، options، content
+  - هر app شامل کامپوننت‌های تخصصی خود
+  - UI Host متمرکز برای مدیریت کامپوننت‌های درون-صفحه
 
-### Backend & Core Systems
-- **`src/background/`**: service worker اصلی + handlers پیام‌ها 
-- **`src/providers/`**: سیستم ترجمه - factory + 10+ provider
-- **`src/messaging/`**: ارتباطات - MessageFormat + useMessaging
-- **`src/utils/core/`**: سیستم‌های هسته - logger، storage، error management
+### 🧩 Components & Composables  
+- **`src/components/`**: کامپوننت‌های قابل استفاده مجدد (ساختار حفظ شده)
+- **`src/composables/`**: منطق business سازماندهی شده بر اساس category
+  - `core/` - useExtensionAPI، useBrowserAPI
+  - `ui/` - useUI، usePopupResize  
+  - `shared/` - useClipboard، useErrorHandler، useLanguages
 
-### Integration & Content
-- **`src/content-scripts/`**: اسکریپت‌های صفحه وب
-- **`src/managers/`**: مدیریت‌کننده‌های سیستم - lifecycle، element selection
+### 🏪 Feature-Based Organization (جدید)
+- **`src/features/`**: هر feature خودکفا و مستقل
+  - `translation/` - موتور ترجمه، providers، handlers، stores
+  - `tts/` - سیستم Text-to-Speech پیشرفته با مدیریت وضعیت
+  - `screen-capture/` - سیستم کپچر صفحه و OCR
+  - `element-selection/` - انتخاب و ترجمه المنت‌های DOM
+  - `text-actions/` - عملیات copy/paste/TTS
+  - `subtitle/` - ترجمه زیرنویس ویدئوها
+  - `windows/` - مدیریت UI رویداد-محور
+  - `history/` - مدیریت تاریخچه ترجمه
+  - `settings/` - تنظیمات و configuration
+
+### 🔧 Shared Systems (منتقل شده از سطح بالا)
+- **`src/shared/`**: سیستم‌های مشترک
+  - `messaging/` - سیستم پیام‌رسانی هوشمند
+  - `storage/` - مدیریت ذخیره‌سازی با caching
+  - `error-management/` - مدیریت خطای متمرکز
+  - `logging/` - سیستم log ساختارمند  
+  - `config/` - تنظیمات کلی
+
+### 🏗️ Core Infrastructure
+- **`src/core/`**: زیرساخت اصلی
+  - `background/` - service worker، handlers، lifecycle
+  - `content-scripts/` - اسکریپت‌های محتوا
+  - `managers/` - مدیریت‌کننده‌های هسته
+
+### 🛠️ Pure Utilities (ساده‌سازی شده)
+- **`src/utils/`**: ابزارهای خالص بدون منطق business
+  - `browser/` - سازگاری مرورگر
+  - `text/` - پردازش متن
+  - `ui/` - ابزارهای UI
+  - `framework/` - سازگاری فریمورک
 
 ## مستندات موجود
 مستندات جامع در پوشه `docs/` برای درک عمیق هر سیستم:
@@ -69,6 +98,26 @@
 - **`docs/Introduce.mp4`**: ویدئوی معرفی
 - **`docs/HowToGet-APIKey.mp4`**: راهنمای تنظیم API
 
+## مزایای Architecture جدید
+
+### 🏗️ Feature-Based Organization
+- **خودکفایی**: هر feature تمام فایل‌های مربوط به خود را در یک مکان دارد
+- **مقیاس‌پذیری**: افزودن feature جدید بدون تأثیر بر سایرین
+- **نگهداری آسان**: تغییرات محدود به feature مربوطه
+- **تست‌پذیری**: هر feature قابل تست مستقل
+
+### 🔧 Shared Systems  
+- **عدم تکرار**: سیستم‌های مشترک در یک مکان
+- **سازگاری**: API یکسان برای همه features
+- **بهینه‌سازی**: caching و optimization متمرکز
+- **پایداری**: تغییرات کنترل شده در core systems
+
+### 📁 Clean Structure
+- **حداکثر 3 سطح عمق**: پیمایش آسان‌تر
+- **نام‌گذاری consistent**: قابل پیش‌بینی
+- **جداسازی واضح**: business logic از utilities
+- **Import paths تمیز**: استفاده از aliases
+
 ## مشخصات فنی
 - **Manifest V3**: استاندارد جدید مرورگرها
 - **Vue.js 3**: فریمورک راکتیو frontend
@@ -76,5 +125,5 @@
 - **Cross-Browser**: کروم و فایرفاکس
 - **Build Tools**: Webpack، pnpm
 - **Polyfill**: webextension-polyfill برای سازگاری
-- **Modern Architecture**: 18+ ماژول تخصصی
+- **Modern Architecture**: Feature-based با 9 feature اصلی
 
