@@ -112,6 +112,9 @@
   --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
   
   --color-surface: #242d44; /* Ensure dark theme background is blue */
+  --color-primary-alpha: rgba(88, 166, 255, 0.3);
+  --color-surface-shadow: rgba(255, 255, 255, 0.1);
+  --color-background-hover: rgba(255, 255, 255, 0.1);
 }
 
 // Map theme variables to component variables
@@ -152,9 +155,11 @@
 
   /* Colors */
   --color-surface: #f5f5f5;
-  --color-background-hover: #f0f0f0;
+  --color-background-hover: rgba(0, 0, 0, 0.1);
   --color-active-background: #e8f0fe;
   --color-active-text: #1967d2;
+  --color-primary-alpha: rgba(25, 103, 210, 0.2);
+  --color-surface-shadow: rgba(0, 0, 0, 0.1);
 
   /* Typography */
   --font-size-xxl: 24px;

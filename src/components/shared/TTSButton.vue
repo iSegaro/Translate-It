@@ -274,6 +274,7 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
   outline: none !important;
   overflow: visible !important; /* Allow progress ring to be visible outside */
   white-space: nowrap !important;
+  user-select: none !important; /* Match Copy/Paste button styling */
   /* Ensure component isolation and create new stacking context */
   isolation: isolate !important;
   z-index: auto !important;
@@ -309,30 +310,28 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 
 /* Color Variants - Primary */
 .tts-button--primary {
-  background-color: var(--tts-primary-bg, #007bff);
-  color: var(--tts-primary-text, #ffffff);
-  border: 1px solid var(--tts-primary-border, #007bff);
+  background: transparent;
+  color: var(--color-text, #333);
+  border: 1px solid transparent;
 }
 
 .tts-button--primary:hover:not(:disabled) {
-  background-color: var(--tts-primary-bg-hover, #0056b3);
-  border-color: var(--tts-primary-border-hover, #0056b3);
+  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+  box-shadow: 0 2px 4px var(--color-surface-shadow, rgba(0, 0, 0, 0.1));
 }
 
 /* Color Variants - Secondary */
 .tts-button--secondary {
-  background-color: var(--tts-secondary-bg, #f8f9fa);
-  color: var(--tts-secondary-text, #495057);
-  border: 1px solid var(--tts-secondary-border, #dee2e6);
+  background: transparent;
+  color: var(--color-text, #333);
+  border: 1px solid transparent;
 }
 
 .tts-button--secondary:hover:not(:disabled) {
-  background-color: var(--tts-secondary-bg-hover, #e9ecef);
-  border-color: var(--tts-secondary-border-hover, #adb5bd);
+  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--color-surface-shadow, rgba(0, 0, 0, 0.1));
 }
 
 /* State-specific Styles */
@@ -341,19 +340,21 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 }
 
 .tts-button--playing {
-  border-color: var(--tts-playing-border, #dc3545) !important;
+  border-color: var(--color-error, #dc3545) !important;
+  background: transparent;
 }
 
 .tts-button--primary.tts-button--playing {
-  background-color: var(--tts-playing-bg, #dc3545);
+  background: transparent;
 }
 
 .tts-button--error {
-  border-color: var(--tts-error-border, #dc3545) !important;
+  border-color: var(--color-error, #dc3545) !important;
+  background: transparent;
 }
 
 .tts-button--primary.tts-button--error {
-  background-color: var(--tts-error-bg, #dc3545);
+  background: transparent;
 }
 
 .tts-button--error:hover:not(:disabled) {
@@ -365,6 +366,12 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 .tts-button:disabled {
   opacity: 0.6;
   cursor: not-allowed !important;
+  transform: none !important; /* Override any transform on disabled state */
+}
+
+/* Active/Pressed State */
+.tts-button:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 /* Icon Container */
@@ -385,7 +392,15 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 .tts-icon {
   transition: all 0.2s ease;
   flex-shrink: 0;
-  filter: var(--icon-filter);
+  /* Note: Filter removed to prevent conflicts with SVG color inheritance */
+  /* filter: var(--icon-filter); */
+  color: inherit !important;
+}
+
+/* Ensure SVG paths inherit proper color */
+.tts-icon path {
+  fill: currentColor !important;
+  stroke: none !important;
 }
 
 .loading-spin {
