@@ -7,8 +7,8 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
-import { getScopedLogger } from '@/utils/core/logger.js';
-import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 

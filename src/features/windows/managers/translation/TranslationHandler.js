@@ -2,8 +2,8 @@
 
 import browser from "webextension-polyfill";
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js"
-import { getScopedLogger } from "../../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../../utils/core/logConstants.js";
+import { getScopedLogger } from "../../../../shared/logging/logger.js";
+import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
