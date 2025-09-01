@@ -49,7 +49,7 @@ async function initializeApp() {
 
     // Import unified i18n plugin after browser API is ready and globally available
     logger.debug('📦 Importing unified i18n plugin...')
-    const { default: i18n } = await import('@/plugins/i18n.js')
+    const { default: i18n } = await import('@/utils/i18n/plugin.js')
     logger.debug('✅ unified i18n plugin imported successfully')
 
     // Create Vue app

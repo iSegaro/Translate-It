@@ -1,8 +1,8 @@
 import { createI18n } from 'vue-i18n';
 import browser from 'webextension-polyfill';
 
-import rawEn from '../../_locales/en/messages.json';
-import rawFa from '../../_locales/fa/messages.json';
+import rawEn from '../../../_locales/en/messages.json';
+import rawFa from '../../../_locales/fa/messages.json';
 
 function convertWebExtensionMessages(raw) {
   const result = {};

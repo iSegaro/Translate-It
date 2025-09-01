@@ -30,7 +30,7 @@ async function initializeApp() {
     logger.debug('🌐 Browser API globals configured')
 
     // Import unified i18n plugin after browser API is ready and globally available
-    const { default: i18n } = await import('@/plugins/i18n.js')
+    const { default: i18n } = await import('@/utils/i18n/plugin.js')
     
     // Create Vue app
     const app = createApp(PopupApp)

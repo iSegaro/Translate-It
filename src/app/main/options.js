@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import i18n, { setI18nLocale } from '@/plugins/i18n'
+import i18n, { setI18nLocale } from '@/utils/i18n/plugin.js'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { pinia } from '@/store'
 import OptionsApp from '@/apps/options/OptionsApp.vue'
