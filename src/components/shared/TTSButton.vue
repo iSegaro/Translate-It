@@ -385,6 +385,7 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
 .tts-icon {
   transition: all 0.2s ease;
   flex-shrink: 0;
+  filter: var(--icon-filter);
 }
 
 .loading-spin {

@@ -240,6 +240,7 @@ const handleCopy = async () => {
 .button-icon {
   flex-shrink: 0;
   object-fit: contain;
+  filter: var(--icon-filter);
 }
 
 .button-label {

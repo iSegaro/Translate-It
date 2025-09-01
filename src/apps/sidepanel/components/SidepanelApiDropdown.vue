@@ -333,7 +333,7 @@ onUnmounted(() => {
     }
 
     .provider-icon img {
-      filter: brightness(0) invert(1);
+      filter: var(--provider-icon-active-filter, brightness(1.4) contrast(1.8) saturate(0.8));
     }
   }
 }
