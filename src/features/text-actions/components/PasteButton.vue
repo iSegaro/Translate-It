@@ -159,7 +159,7 @@ const handlePaste = async () => {
 }
 
 .action-button:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
 }
 
 .action-button:active {
@@ -228,8 +228,8 @@ const handlePaste = async () => {
 }
 
 .variant-secondary:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
+  border-color: var(--color-background-hover, rgba(0, 0, 0, 0.1));
 }
 
 /* Button elements */
@@ -274,10 +274,6 @@ const handlePaste = async () => {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .action-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-  
   .variant-standalone {
     border-color: rgba(255, 255, 255, 0.2);
     background-color: rgba(0, 0, 0, 0.9);
