@@ -50,6 +50,7 @@ export function generateManifest(browser = 'chrome') {
           'html/offscreen.html',
           'offscreen.js',
           'icons/flags/*.svg',
+          'icons/ui/*.gif', 
           'icons/ui/*.png', 
           'icons/ui/*.svg',
           'icons/extension/*.png',
