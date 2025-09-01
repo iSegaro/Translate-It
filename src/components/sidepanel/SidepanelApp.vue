@@ -95,7 +95,7 @@ import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useI18n } from '@/composables/shared/useI18n.js'
-import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 // (helpers import removed: was empty / invalid)
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 

@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
 import SidepanelApp from '@/apps/sidepanel/SidepanelApp.vue'
-import '@/main.scss'
+import '@/assets/styles/main.scss'
 import browser from 'webextension-polyfill'
 import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js'

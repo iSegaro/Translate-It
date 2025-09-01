@@ -2,22 +2,22 @@
 // Using modern @use syntax for better organization and performance
 
 // Base styles - Foundation
-@use "./assets/styles/base/reset";
-@use "./assets/styles/base/variables"; 
-@use "./assets/styles/base/mixins";
+@use "./base/reset";
+@use "./base/variables"; 
+@use "./base/mixins";
 
 // Layout styles - Page and context layouts
-@use "./assets/styles/layout/options";
-@use "./assets/styles/layout/sidepanel"; 
+@use "./layout/options";
+@use "./layout/sidepanel"; 
 
 // Component styles - Reusable components
-@use "./assets/styles/components/popup";
-@use "./assets/styles/components/translation-window";
-@use "./assets/styles/components/text-field-icon";
+@use "./components/popup";
+@use "./components/translation-window";
+@use "./components/text-field-icon";
 
 // Utility styles - Helpers and utilities
-@use "./assets/styles/utilities/utilities";
-@use "./assets/styles/utilities/helpers";
+@use "./utilities/utilities";
+@use "./utilities/helpers";
 
 // Context-specific styles - these should be overridden by specific entry points
 

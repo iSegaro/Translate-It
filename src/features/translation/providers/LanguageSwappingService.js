@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { isPersianText } from "@/utils/text/textDetection.js";
 import { getLanguageCode } from "@/utils/i18n/languages.js";
-import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 

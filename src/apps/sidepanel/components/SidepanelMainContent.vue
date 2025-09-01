@@ -86,7 +86,7 @@ import { useHistory } from "@/features/history/composables/useHistory.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/shared/useLanguages.js";
-import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { useTranslationStore } from "@/features/translation/stores/translation.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';

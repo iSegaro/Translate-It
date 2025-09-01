@@ -9,7 +9,7 @@ import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstant
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
-import { AUTO_DETECT_VALUE } from "../../../../constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';

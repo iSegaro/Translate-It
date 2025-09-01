@@ -58,7 +58,7 @@ import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
-import { AUTO_DETECT_VALUE } from '@/constants.js'
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 import { CONFIG } from '@/shared/config/config.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

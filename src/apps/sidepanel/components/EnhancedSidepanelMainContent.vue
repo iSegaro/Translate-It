@@ -56,7 +56,7 @@ import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/
 import { useI18n } from "@/composables/shared/useI18n.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 
-import { AUTO_DETECT_VALUE } from "@/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

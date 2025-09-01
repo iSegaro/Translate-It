@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { pinia } from '@/store'
 import PopupApp from '@/apps/popup/PopupApp.vue'
-import '@/main.scss'
+import '@/assets/styles/main.scss'
 import { setupGlobalErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { setupWindowErrorHandlers, setupBrowserAPIGlobals } from '@/shared/error-management/windowErrorHandlers.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
