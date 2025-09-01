@@ -79,8 +79,7 @@ const isRTL = computed(() => {
   }
 })
 
-// Lifecycle
-onMounted(async () => {
+const initialize = async () => {
   logger.debug('🚀 OptionsApp mounting...')
   
   try {
@@ -112,7 +111,10 @@ onMounted(async () => {
   logger.debug('✨ OptionsApp initialization complete')
     isLoading.value = false
   }
-})
+};
+
+// Lifecycle
+onMounted(initialize)
 
 const initializeOptions = async () => {
   try {
@@ -134,7 +136,7 @@ const retryLoading = () => {
   
   // Retry mounting logic
   setTimeout(() => {
-    onMounted()
+    initialize()
   }, 100)
 };
 </script>

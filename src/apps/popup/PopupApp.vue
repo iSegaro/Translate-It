@@ -115,7 +115,7 @@ import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
-import { useTTSGlobal } from '@/composables/useTTSGlobal.js'
+import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 
@@ -175,41 +175,7 @@ const toggleEnhancedVersion = () => {
   localStorage.setItem('popup-enhanced-version', useEnhancedVersion.value.toString())
 }
 
-// Lifecycle
-onMounted(() => {
-  // Register TTS instance with stop callback
-  ttsGlobal.register(async () => {
-    logger.debug('[PopupApp] TTS cleanup callback - stopping TTS due to popup lifecycle')
-    // Use direct message to background instead of calling stopAll() to avoid recursion
-    try {
-      await sendMessage({
-        action: 'GOOGLE_TTS_STOP_ALL',
-        data: { source: 'popup-cleanup' }
-      })
-    } catch (error) {
-      logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
-    }
-  })
-
-  // Create a port connection to detect popup close via port disconnect
-  const port = browser.runtime.connect({ name: 'popup-lifecycle' })
-  
-  // Send initial ping to background to register popup as active
-  port.postMessage({ 
-    action: 'POPUP_OPENED',
-    data: { timestamp: Date.now() }
-  })
-  
-  // Handle port disconnect (popup closed)
-  port.onDisconnect.addListener(() => {
-    logger.debug('[PopupApp] Port disconnected - popup closing detected')
-    // Port disconnect means popup is closing - background will handle TTS stop
-  })
-  
-  // Store port reference for cleanup
-  window.__popupPort = port
-  
-  const initialize = async () => {
+const initialize = async () => {
   try {
     // Step 1: Set loading text
     loadingText.value = t('popup_loading') || 'Loading Popup...'
@@ -273,7 +239,42 @@ onMounted(() => {
   } finally {
     isLoading.value = false
   }
-  }
+}
+
+// Lifecycle
+onMounted(() => {
+  // Register TTS instance with stop callback
+  ttsGlobal.register(async () => {
+    logger.debug('[PopupApp] TTS cleanup callback - stopping TTS due to popup lifecycle')
+    // Use direct message to background instead of calling stopAll() to avoid recursion
+    try {
+      await sendMessage({
+        action: 'GOOGLE_TTS_STOP_ALL',
+        data: { source: 'popup-cleanup' }
+      })
+    } catch (error) {
+      logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
+    }
+  })
+
+  // Create a port connection to detect popup close via port disconnect
+  const port = browser.runtime.connect({ name: 'popup-lifecycle' })
+  
+  // Send initial ping to background to register popup as active
+  port.postMessage({ 
+    action: 'POPUP_OPENED',
+    data: { timestamp: Date.now() }
+  })
+  
+  // Handle port disconnect (popup closed)
+  port.onDisconnect.addListener(() => {
+    logger.debug('[PopupApp] Port disconnected - popup closing detected')
+    // Port disconnect means popup is closing - background will handle TTS stop
+  })
+  
+  // Store port reference for cleanup
+  window.__popupPort = port
+  
   initialize()
 })
 
@@ -306,7 +307,7 @@ const retryLoading = () => {
   
   // Retry mounting logic
   setTimeout(() => {
-    onMounted()
+    initialize()
   }, 100)
 }
 </script>

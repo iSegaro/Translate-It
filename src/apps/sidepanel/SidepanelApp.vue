@@ -87,8 +87,7 @@ const handleSystemThemeChange = (event) => {
   }
 };
 
-// Lifecycle
-onMounted(async () => {
+const initialize = async () => {
   logger.debug('🚀 SidepanelApp mounting...')
   try {
     // Step 1: Set loading text
@@ -123,7 +122,10 @@ onMounted(async () => {
     logger.debug('✨ SidepanelApp initialization complete')
     isLoading.value = false
   }
-})
+};
+
+// Lifecycle
+onMounted(initialize)
 
 onUnmounted(() => {
   browser.runtime.onMessage.removeListener(handleMessage);
@@ -143,7 +145,7 @@ const retryLoading = () => {
   settingsStore.$reset && settingsStore.$reset()
   
   // Retry mounting logic
-  setTimeout(() => { onMounted() }, 100)
+  setTimeout(() => { initialize() }, 100)
 }
 </script>
 
