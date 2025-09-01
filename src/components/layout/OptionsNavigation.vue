@@ -112,7 +112,6 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
   flex: 0 0 200px;
   border-right: $border-width $border-style var(--color-border);
   padding: $spacing-md 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface);
@@ -143,7 +142,7 @@ navigationItems.value.find(item => item.name === 'prompt').disabled = shouldDisa
 .tab-button {
   display: flex;
   align-items: center;
-  width: 100%;
+  width: auto;
   padding: $spacing-base $spacing-xl;
   border: none;
   border-left: 4px solid transparent;
