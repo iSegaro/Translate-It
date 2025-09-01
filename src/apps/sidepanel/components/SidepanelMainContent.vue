@@ -82,7 +82,7 @@ const { t } = useUnifiedI18n()
 import { useErrorHandler } from "@/composables/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/config.js";
 
-import { useHistory } from "@/composables/useHistory.js";
+import { useHistory } from "@/features/history/composables/useHistory.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
 import { useLanguages } from "@/composables/useLanguages.js";

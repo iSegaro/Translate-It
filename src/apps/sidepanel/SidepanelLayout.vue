@@ -46,7 +46,7 @@
 <script setup>
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
-import { useHistory } from '@/composables/useHistory.js';
+import { useHistory } from '@/features/history/composables/useHistory.js';
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js';
 import { useErrorHandler } from '@/composables/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';

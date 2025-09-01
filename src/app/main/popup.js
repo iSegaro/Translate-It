@@ -73,7 +73,7 @@ export const loadTranslationFeatures = async () => {
 export const loadAdvancedFeatures = async () => {
   const [capture, history] = await Promise.all([
     import('@/features/screen-capture/stores/capture.js'),
-    import('@/store/modules/history.js')
+    import('@/features/history/stores/history.js')
   ])
   return { capture, history }
 }

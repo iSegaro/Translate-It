@@ -94,7 +94,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { useHistory } from '@/composables/useHistory.js'
+import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useUI } from '@/composables/useUI.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
