@@ -3,15 +3,8 @@ import { ref, computed, onUnmounted } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG } from '@/config.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
+import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
-// Lazy-load storageManager to avoid unnecessary upfront cost (no longer needed for circular safety, retained for perf)
-let __storageManagerPromise = null;
-async function getStorageManager() {
-  if (!__storageManagerPromise) {
-    __storageManagerPromise = import('@/shared/storage/core/StorageCore.js').then(m => m.storageManager);
-  }
-  return __storageManagerPromise;
-}
 const logger = getScopedLogger('Core', 'settings');
 
 // --- Helpers ------------------------------------------------------------
@@ -95,7 +88,6 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     __loadInFlight = (async () => {
       try {
-        const storageManager = await getStorageManager();
         const stored = await storageManager.get(null);
         const current = settings.value;
         Object.keys(current).forEach(key => {
@@ -140,7 +132,6 @@ export const useSettingsStore = defineStore('settings', () => {
   async function performSave() {
     isSaving.value = true;
     try {
-      const storageManager = await getStorageManager();
       await storageManager.set(settings.value);
       return true;
     } catch (error) {
@@ -161,7 +152,6 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
   if (settings.value.DEBUG_MODE) logger.debugLazy(() => [`[settingsStore] updateSettingAndPersist: ${key} = ${value}`])
       settings.value[key] = value // Update local state
-  const storageManager = await getStorageManager();
   await storageManager.set({ [key]: value }) // Persist immediately
   if (settings.value.DEBUG_MODE) logger.debug('[settingsStore] Saved key to storage');
       return true
@@ -177,7 +167,6 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.assign(settings.value, updates)
       
       // Get browser API and save to storage
-  const storageManager = await getStorageManager();
   await storageManager.set(settings.value)
       
       return true
@@ -189,7 +178,6 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
-      const storageManager = await getStorageManager();
       await storageManager.clear();
       const defaults = getDefaultSettings();
       // Preserve reference to reactive object
@@ -346,7 +334,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const setupStorageListener = async () => {
     try {
       storageListener = handleStorageChange
-  const storageManager = await getStorageManager();
   storageManager.on('change', storageListener)
   if (settings.value.DEBUG_MODE) logger.info('[SettingsStore] Listener setup')
     } catch (error) {
@@ -358,8 +345,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cleanupStorageListener = async () => {
     if (!storageListener) return;
     try {
-      const sm = await getStorageManager();
-      sm.off('change', storageListener);
+      storageManager.off('change', storageListener);
       storageListener = null;
   if (settings.value.DEBUG_MODE) logger.info('[SettingsStore] Listener cleaned up');
     } catch (error) {
