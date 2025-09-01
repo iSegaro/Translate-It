@@ -1,7 +1,7 @@
 // src/subtitle/BaseSubtitleHandler.js
 
-import { ErrorTypes } from "../error-management/ErrorTypes.js";
-import { TranslationMode } from "../config.js";
+import { ErrorTypes } from "@/error-management/ErrorTypes.js";
+import { TranslationMode } from "@/config.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'BaseSubtitle');

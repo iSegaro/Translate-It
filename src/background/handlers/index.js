@@ -53,9 +53,9 @@ export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 export * from "./sidepanel/handleOpenSidePanel.js";
 
 // Subtitle handlers
-export * from "./subtitle/handleSubtitleTranslate.js";
-export * from "./subtitle/handleSubtitleToggle.js";
-export * from "./subtitle/handleSubtitleStatus.js";
+export * from "../../features/subtitle/handlers/handleSubtitleTranslate.js";
+export * from "../../features/subtitle/handlers/handleSubtitleToggle.js";
+export * from "../../features/subtitle/handlers/handleSubtitleStatus.js";
 
 // Vue integration handlers
 export * from "./vue-integration/handleTranslateImage.js";

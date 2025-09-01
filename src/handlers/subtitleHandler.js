@@ -1,5 +1,5 @@
 import { MessagingContexts, MessageFormat } from "../messaging/core/MessagingCore.js";
-import { createSubtitleManager } from "../subtitle/index.js";
+import { createSubtitleManager } from "@/features/subtitle/core/index.js";
 import { ErrorTypes } from "../error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
