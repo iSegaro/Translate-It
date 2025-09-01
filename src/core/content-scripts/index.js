@@ -7,10 +7,36 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { checkContentScriptAccess } from "@/core/tabPermissions.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { sendSmart } from '@/shared/messaging/core/SmartMessaging.js';
+// Import Main DOM CSS as raw string for injection
+import mainDomCss from '@/assets/styles/content-main-dom.scss?inline';
 
 
 // Create logger for content script
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScript');
+
+/**
+ * Inject CSS for Main DOM (outside Shadow DOM)
+ * This ensures styles for Select Element Mode work on main page elements
+ */
+async function injectMainDOMStyles() {
+  // Check if already injected
+  if (document.getElementById('translate-it-main-dom-styles')) {
+    return;
+  }
+
+  try {
+    // Create style element with pre-compiled CSS
+    const styleElement = document.createElement('style');
+    styleElement.id = 'translate-it-main-dom-styles';
+    styleElement.textContent = mainDomCss;
+    
+    // Inject to main document head
+    document.head.appendChild(styleElement);
+    
+  } catch (error) {
+    logger.error('Failed to inject Main DOM CSS:', error);
+  }
+}
 
 // --- Early exit for restricted pages ---
 const access = checkContentScriptAccess();
@@ -20,68 +46,65 @@ if (!access.isAccessible) {
   // Stop further execution by not initializing anything.
   // This prevents errors on pages like chrome://extensions or about:addons.
 } else {
-  (async () => {
-    logger.init("Content script loading...");
+  // Only run in main frame (not in iframes)
+  if (window !== window.top) {
+    console.log('🚫 [Content Script] Running in iframe, skipping execution');
+    // Stop execution in iframe
+  } else if (window.translateItContentScriptLoaded) {
+    console.warn('🚨 [Content Script] Already loaded, preventing duplicate execution');
+    // Stop further execution
+  } else {
+    window.translateItContentScriptLoaded = true;
+    
+    console.log('🚀 [Content Script] ENTRY POINT REACHED');
+    (async () => {
+      console.log('🚀 [Content Script] ASYNC FUNCTION STARTED');
+      logger.init("Content script loading...");
+
+    // --- Inject Main DOM CSS ---
+    await injectMainDOMStyles();
 
     // --- Mount the Vue UI Host ---
     try {
-      const { mountContentApp, getAppCss } = await import("@/app/main.js");
-      const { pageEventBus } = await import("@/core/PageEventBus.js");
-      
-      // 1. Inject page-level styles directly into the document head.
-      const pageStyles = await import('@/assets/styles/layout/_content.scss?raw');
-      const pageStyleEl = document.createElement('style');
-      pageStyleEl.textContent = pageStyles.default;
-      document.head.appendChild(pageStyleEl);
-      
-      // 2. Create the host element and shadow DOM.
-      const hostElement = document.createElement('div');
-      hostElement.id = 'translate-it-host';
-      hostElement.style.all = 'initial';
-      document.body.appendChild(hostElement);
-      const shadowRoot = hostElement.attachShadow({ mode: 'open' });
-
-      // 3. Inject the entire app's CSS into the shadow DOM.
-      const appStyles = getAppCss();
-      const appStyleEl = document.createElement('style');
-      appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
-      
-      // Include Google Font import and all app styles
-      appStyleEl.textContent = `
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap');
+      // Check if UI Host already exists
+      if (document.getElementById('translate-it-host')) {
+        console.warn('[Content Script] ⚠️ UI Host already exists, skipping mount');
+      } else {
+        const { mountContentApp, getAppCss } = await import("@/app/main.js");
+        const { pageEventBus } = await import("@/core/PageEventBus.js");
         
-        /* App styles with Shadow DOM reset included */
-        ${appStyles}
-      `;
-      shadowRoot.appendChild(appStyleEl);
-      
-      // Debug: Log the amount of CSS injected
-      console.log('[Content Script] Injected CSS length:', appStyles.length, 'characters');
-      
-      // Debug: Check if specific styles are present
-      if (appStyles.includes('.translation-window')) {
-        console.log('[Content Script] ✅ TranslationWindow styles found in injected CSS');
-      } else {
-        console.warn('[Content Script] ⚠️ TranslationWindow styles NOT found in injected CSS');
+        // 2. Create the host element and shadow DOM.
+        const hostElement = document.createElement('div');
+        hostElement.id = 'translate-it-host';
+        hostElement.style.all = 'initial';
+        document.body.appendChild(hostElement);
+        const shadowRoot = hostElement.attachShadow({ mode: 'open' });
+
+        // 3. Inject the entire app's CSS into the shadow DOM.
+        const appStyles = getAppCss();
+        const appStyleEl = document.createElement('style');
+        appStyleEl.setAttribute('data-vue-shadow-styles', 'true');
+        
+        // Include all app styles (Google Fonts removed to avoid CSP issues)
+        appStyleEl.textContent = `
+          /* App styles with Shadow DOM reset included */
+          ${appStyles}
+        `;
+        shadowRoot.appendChild(appStyleEl);
+        
+
+        // 4. Create the root element for the Vue app and mount it.
+        const appRoot = document.createElement('div');
+        shadowRoot.appendChild(appRoot);
+        mountContentApp(appRoot);
+
+        logger.info('Vue UI Host mounted into Shadow DOM with all styles.');
+
+        // Emit a test event to confirm communication
+        setTimeout(() => {
+          pageEventBus.emit('ui-host-mounted');
+        }, 500);
       }
-      
-      if (appStyles.includes('background')) {
-        console.log('[Content Script] ✅ Background styles found in injected CSS');
-      } else {
-        console.warn('[Content Script] ⚠️ Background styles NOT found in injected CSS');
-      }
-
-      // 4. Create the root element for the Vue app and mount it.
-      const appRoot = document.createElement('div');
-      shadowRoot.appendChild(appRoot);
-      mountContentApp(appRoot);
-
-      logger.info('Vue UI Host mounted into Shadow DOM with all styles.');
-
-      // Emit a test event to confirm communication
-      setTimeout(() => {
-        pageEventBus.emit('ui-host-mounted');
-      }, 500);
 
     } catch (error) {
       logger.error('Failed to mount the Vue UI Host:', error);
@@ -150,11 +173,9 @@ if (!access.isAccessible) {
     document.addEventListener('focus', eventCoordinator.handleEvent, { capture: true, passive: true });
     document.addEventListener('blur', eventCoordinator.handleEvent, { capture: true, passive: true });
 
-    logger.debug('DOM event listeners registered');
 
     // Setup message listener integration with existing system
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      logger.debug('Message received', { action: message.action, from: message.context });
 
       // Handle exclusion updates immediately
       if (message.action === MessageActions.Set_Exclude_Current_Page && message.data?.exclude) {
@@ -193,5 +214,6 @@ if (!access.isAccessible) {
       vueBridge: vueBridge.isInitialized,
       ttsHandler: true  // Using unified GOOGLE_TTS_SPEAK system
     });
-  })();
+    })();
+  }
 }

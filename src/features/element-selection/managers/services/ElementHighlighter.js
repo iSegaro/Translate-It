@@ -16,7 +16,7 @@ export class ElementHighlighter {
    * Initialize the highlighter service
    */
   async initialize() {
-    this.logger.debug('ElementHighlighter initialized');
+    // Initialization complete
   }
 
   /**
@@ -37,7 +37,8 @@ export class ElementHighlighter {
     
     // Check if element has our data attributes
     if (element.hasAttribute('data-translate-it-highlighted') ||
-        element.hasAttribute('data-translate-id')) {
+        element.hasAttribute('data-translate-id') ||
+        element.hasAttribute('data-translate-highlighted')) {
       return true;
     }
     
@@ -57,16 +58,21 @@ export class ElementHighlighter {
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
     
-    if (!bestElement || this.isOurElement(bestElement)) return;
+    if (!bestElement || this.isOurElement(bestElement)) {
+      return;
+    }
 
     // Skip if already highlighted
-    if (bestElement === this.currentHighlighted) return;
+    if (bestElement === this.currentHighlighted) {
+      return;
+    }
 
     // Clear previous highlight
     this.clearHighlight();
 
-    // Add highlight class directly to element
+    // Add highlight using both class and data attribute for maximum CSS specificity
     bestElement.classList.add('translate-it-element-highlighted');
+    bestElement.setAttribute('data-translate-highlighted', 'true');
     this.currentHighlighted = bestElement;
   }
 
@@ -170,8 +176,9 @@ export class ElementHighlighter {
     if (element === this.currentHighlighted) {
       setTimeout(() => {
         if (this.currentHighlighted === element) {
-          // Remove highlight class directly
+          // Remove highlight class and attribute
           element.classList.remove('translate-it-element-highlighted');
+          element.removeAttribute('data-translate-highlighted');
           this.currentHighlighted = null;
         }
       }, 50);
@@ -187,8 +194,9 @@ export class ElementHighlighter {
       // Clear any existing highlights
       this.clearHighlight();
       
-      // Add highlight class directly to element
+      // Add highlight using both class and data attribute for maximum CSS specificity
       element.classList.add('translate-it-element-highlighted');
+      element.setAttribute('data-translate-highlighted', 'true');
       this.currentHighlighted = element;
     }
   }
@@ -197,9 +205,10 @@ export class ElementHighlighter {
    * Clear current highlight - uses direct CSS class
    */
   clearHighlight() {
-    // Remove highlight class directly from element
+    // Remove highlight class and attribute from element
     if (this.currentHighlighted) {
       this.currentHighlighted.classList.remove('translate-it-element-highlighted');
+      this.currentHighlighted.removeAttribute('data-translate-highlighted');
       this.currentHighlighted = null;
     }
   }
@@ -208,10 +217,17 @@ export class ElementHighlighter {
    * Clear all highlight elements
    */
   clearAllHighlights() {
-    // Remove highlight class from all elements that might have it
+    // Remove highlight class and attribute from all elements that might have them
     const highlightedElements = document.querySelectorAll('.translate-it-element-highlighted');
     highlightedElements.forEach(element => {
       element.classList.remove('translate-it-element-highlighted');
+      element.removeAttribute('data-translate-highlighted');
+    });
+    
+    // Also clear elements with just the attribute
+    const attributeHighlighted = document.querySelectorAll('[data-translate-highlighted]');
+    attributeHighlighted.forEach(element => {
+      element.removeAttribute('data-translate-highlighted');
     });
     
     this.currentHighlighted = null;
@@ -228,13 +244,13 @@ export class ElementHighlighter {
     const hasClass = document.documentElement.classList.contains(
       UI_CONSTANTS.DISABLE_LINKS_CLASS
     );
-    this.logger.debug("CSS class applied", hasClass);
 
     if (!hasClass) {
       this.logger.warn("CSS class failed to apply - trying manual application");
       document.documentElement.classList.add(UI_CONSTANTS.DISABLE_LINKS_CLASS);
     }
   }
+
 
   /**
    * Remove global styles
@@ -280,8 +296,6 @@ export class ElementHighlighter {
 
     // Re-enable page interactions
     this.enablePageInteractions();
-
-    this.logger.debug("Select element UI deactivated");
   }
 
   /**
@@ -328,6 +342,8 @@ export class ElementHighlighter {
     return words.length >= 3; // Minimum word count
   }
 
+
+
   /**
    * Cleanup resources
    */
@@ -336,7 +352,6 @@ export class ElementHighlighter {
     this.clearAllHighlights();
     this.removeGlobalStyles();
     this.enablePageInteractions();
-    this.logger.debug('ElementHighlighter cleanup completed');
   }
 
   /**

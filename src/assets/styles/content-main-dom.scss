@@ -1,0 +1,90 @@
+// Main DOM CSS - این فایل برای inject کردن در Main DOM استفاده می‌شود
+// برخلاف content-app-global.scss که در Shadow DOM است
+
+@use './base/variables' as *;
+
+/* ==========================================================================
+   Select Element Mode Styles - Main DOM Injection
+   ========================================================================== */
+
+// Global cursor change when in select element mode - Maximum specificity
+html.AIWritingCompanion-disable-links,
+html.AIWritingCompanion-disable-links *,
+html.AIWritingCompanion-disable-links body,
+html.AIWritingCompanion-disable-links body * {
+  cursor: crosshair !important;
+}
+
+// Disable pointer events on interactive elements to prevent navigation - Maximum specificity
+html.AIWritingCompanion-disable-links a,
+html.AIWritingCompanion-disable-links button,
+html.AIWritingCompanion-disable-links [onclick],
+html.AIWritingCompanion-disable-links [role="link"],
+html.AIWritingCompanion-disable-links div[role="link"],
+html.AIWritingCompanion-disable-links input[type="submit"],
+html.AIWritingCompanion-disable-links input[type="button"],
+html.AIWritingCompanion-disable-links [href] {
+  pointer-events: none !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+// Disable automatic hover highlighting - let JS handle highlighting - Maximum specificity
+html.AIWritingCompanion-disable-links *:hover,
+html.AIWritingCompanion-disable-links.simple-mode *:hover,
+html.AIWritingCompanion-disable-links body:hover,
+html.AIWritingCompanion-disable-links html:hover,
+html.AIWritingCompanion-disable-links p:hover,
+html.AIWritingCompanion-disable-links div:hover,
+html.AIWritingCompanion-disable-links span:hover,
+html.AIWritingCompanion-disable-links h1:hover,
+html.AIWritingCompanion-disable-links h2:hover,
+html.AIWritingCompanion-disable-links h3:hover,
+html.AIWritingCompanion-disable-links h4:hover,
+html.AIWritingCompanion-disable-links h5:hover,
+html.AIWritingCompanion-disable-links h6:hover,
+html.AIWritingCompanion-disable-links li:hover,
+html.AIWritingCompanion-disable-links td:hover,
+html.AIWritingCompanion-disable-links th:hover,
+html.AIWritingCompanion-disable-links article:hover,
+html.AIWritingCompanion-disable-links section:hover,
+html.AIWritingCompanion-disable-links.simple-mode p:hover,
+html.AIWritingCompanion-disable-links.simple-mode div:hover,
+html.AIWritingCompanion-disable-links.simple-mode span:hover,
+html.AIWritingCompanion-disable-links.simple-mode h1:hover,
+html.AIWritingCompanion-disable-links.simple-mode h2:hover,
+html.AIWritingCompanion-disable-links.simple-mode h3:hover,
+html.AIWritingCompanion-disable-links.simple-mode h4:hover,
+html.AIWritingCompanion-disable-links.simple-mode h5:hover,
+html.AIWritingCompanion-disable-links.simple-mode h6:hover,
+html.AIWritingCompanion-disable-links.simple-mode li:hover,
+html.AIWritingCompanion-disable-links.simple-mode td:hover,
+html.AIWritingCompanion-disable-links.simple-mode th:hover,
+html.AIWritingCompanion-disable-links.simple-mode article:hover,
+html.AIWritingCompanion-disable-links.simple-mode section:hover {
+  outline: none !important;
+}
+
+// Keep input element highlighting for user feedback - Maximum specificity
+html.AIWritingCompanion-disable-links input:hover,
+html.AIWritingCompanion-disable-links textarea:hover {
+  outline: 2px solid #4a90e2 !important;
+  outline-offset: 1px !important;
+}
+
+// JS-controlled highlighting for selected main containers - Maximum CSS specificity
+html body [data-translate-highlighted="true"][data-translate-highlighted="true"],
+html body .translate-it-element-highlighted.translate-it-element-highlighted {
+  outline: 3px solid #ff8800 !important;
+  outline-offset: 2px !important;
+  outline-color: #ff8800 !important;
+  outline-style: solid !important;
+  outline-width: 3px !important;
+  z-index: $z-overlay !important;
+  position: relative !important;
+  box-shadow: 0 0 0 3px #ff8800 !important;
+}
+
+.translate-it-element-highlighted * {
+  outline: none !important;
+}
