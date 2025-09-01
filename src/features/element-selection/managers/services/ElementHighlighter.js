@@ -49,25 +49,54 @@ export class ElementHighlighter {
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
+    this.logger.debug("ElementHighlighter handleMouseOver", { 
+      tagName: element.tagName, 
+      className: element.className 
+    });
+
     // Skip our own elements
     if (this.isOurElement(element)) {
+      this.logger.debug("Skipping our own element", { tagName: element.tagName });
       return;
     }
 
     // Find the best element to highlight (may be different from event.target)
     const bestElement = this.findBestTextElement(element);
+    this.logger.debug("Best element found", { 
+      bestElement: bestElement ? bestElement.tagName : 'null',
+      bestElementClass: bestElement ? bestElement.className : 'none'
+    });
     
-    if (!bestElement || this.isOurElement(bestElement)) return;
+    if (!bestElement || this.isOurElement(bestElement)) {
+      this.logger.debug("No valid element to highlight");
+      return;
+    }
 
     // Skip if already highlighted
-    if (bestElement === this.currentHighlighted) return;
+    if (bestElement === this.currentHighlighted) {
+      this.logger.debug("Element already highlighted");
+      return;
+    }
 
     // Clear previous highlight
     this.clearHighlight();
 
     // Add highlight class directly to element
     bestElement.classList.add('translate-it-element-highlighted');
+    
+    // Apply inline styles as fallback for CSS specificity issues
+    bestElement.style.outline = '3px solid #ff8800';
+    bestElement.style.outlineOffset = '2px';
+    bestElement.style.zIndex = '999999';
+    bestElement.style.position = 'relative';
+    
     this.currentHighlighted = bestElement;
+    this.logger.debug("Highlight class and inline styles added", { 
+      tagName: bestElement.tagName,
+      className: bestElement.className,
+      hasClass: bestElement.classList.contains('translate-it-element-highlighted'),
+      outline: bestElement.style.outline
+    });
   }
 
   /**
@@ -166,16 +195,12 @@ export class ElementHighlighter {
    * @param {HTMLElement} element - Element that mouse left
    */
   handleMouseOut(element) {
-    // Only clear if leaving the highlighted element
-    if (element === this.currentHighlighted) {
-      setTimeout(() => {
-        if (this.currentHighlighted === element) {
-          // Remove highlight class directly
-          element.classList.remove('translate-it-element-highlighted');
-          this.currentHighlighted = null;
-        }
-      }, 50);
-    }
+    // DISABLED: MouseOut events are too frequent and interfere with highlighting
+    // Only rely on clearHighlight() when a new element is highlighted
+    this.logger.debug("🔄 MouseOut event (IGNORED)", { 
+      tagName: element.tagName,
+      isCurrent: element === this.currentHighlighted 
+    });
   }
 
   /**
@@ -189,6 +214,13 @@ export class ElementHighlighter {
       
       // Add highlight class directly to element
       element.classList.add('translate-it-element-highlighted');
+      
+      // Apply inline styles as fallback for CSS specificity issues
+      element.style.outline = '3px solid #ff8800';
+      element.style.outlineOffset = '2px';
+      element.style.zIndex = '9999999999';
+      element.style.position = 'relative';
+      
       this.currentHighlighted = element;
     }
   }
@@ -197,9 +229,20 @@ export class ElementHighlighter {
    * Clear current highlight - uses direct CSS class
    */
   clearHighlight() {
-    // Remove highlight class directly from element
+    // Remove highlight class and inline styles directly from element
     if (this.currentHighlighted) {
+      this.logger.debug("🧹 Clearing highlight from element", { 
+        tagName: this.currentHighlighted.tagName,
+        className: this.currentHighlighted.className 
+      });
       this.currentHighlighted.classList.remove('translate-it-element-highlighted');
+      
+      // Clear inline styles
+      this.currentHighlighted.style.outline = '';
+      this.currentHighlighted.style.outlineOffset = '';
+      this.currentHighlighted.style.zIndex = '';
+      this.currentHighlighted.style.position = '';
+      
       this.currentHighlighted = null;
     }
   }
@@ -208,10 +251,15 @@ export class ElementHighlighter {
    * Clear all highlight elements
    */
   clearAllHighlights() {
-    // Remove highlight class from all elements that might have it
+    // Remove highlight class and inline styles from all elements that might have it
     const highlightedElements = document.querySelectorAll('.translate-it-element-highlighted');
     highlightedElements.forEach(element => {
       element.classList.remove('translate-it-element-highlighted');
+      // Clear inline styles
+      element.style.outline = '';
+      element.style.outlineOffset = '';
+      element.style.zIndex = '';
+      element.style.position = '';
     });
     
     this.currentHighlighted = null;

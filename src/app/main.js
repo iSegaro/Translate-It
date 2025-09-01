@@ -79,16 +79,10 @@ export function getAppCss() {
     console.log('[getAppCss] Extracted Vue styles:', vueComponentStyles.length, 'characters');
   }
   
-  // If no styles were extracted (e.g., in production), try preloading
+  // If no styles were extracted (e.g., in production), skip preloading to avoid duplicate mounting
   if (!vueComponentStyles.trim()) {
-    console.log('[getAppCss] No Vue styles extracted, attempting preload...');
-    const preloadedStyles = preloadVueStyles();
-    if (preloadedStyles) {
-      allStyles += '\n/* Preloaded Vue Component Styles */\n' + preloadedStyles;
-      console.log('[getAppCss] Preloaded Vue styles:', preloadedStyles.length, 'characters');
-    } else {
-      console.log('[getAppCss] Vue component styles are handled via direct CSS injection in content-app-global.css');
-    }
+    console.log('[getAppCss] No Vue styles extracted, skipping preload to avoid duplicate mounting');
+    console.log('[getAppCss] Vue component styles are handled via direct CSS injection in content-app-global.css');
   }
   
   console.log('[getAppCss] Total CSS length:', allStyles.length, 'characters');

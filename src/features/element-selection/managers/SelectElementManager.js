@@ -100,6 +100,7 @@ export class SelectElementManager {
 
   handleMouseOver(event) {
     if (!this.isActive) return;
+    this.logger.debug("handleMouseOver triggered", { target: event.target.tagName, className: event.target.className });
     this.elementHighlighter.handleMouseOver(event.target);
   }
 

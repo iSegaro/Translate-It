@@ -70,14 +70,14 @@
 }
 
 // JS-controlled highlighting for selected main containers
-.translate-it-element-highlighted {
+html body .translate-it-element-highlighted.translate-it-element-highlighted.translate-it-element-highlighted {
   outline: 3px solid #ff8800 !important;
   outline-offset: 2px !important;
-  z-index: $z-overlay !important;
+  z-index: 9999999999 !important;
   position: relative !important;
+  border: none !important;
+}
 
-  // Prevent child elements from being highlighted when parent is highlighted
-  * {
-    outline: none !important;
-  }
+.translate-it-element-highlighted * {
+  outline: none !important;
 }
