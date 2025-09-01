@@ -1,14 +1,14 @@
 // src/managers/content/windows/NewWindowsManager.js
 
-import { getScopedLogger } from "../../../utils/core/logger.js";
-import { LOG_COMPONENTS } from "../../../utils/core/logConstants.js";
+import { getScopedLogger } from "@/utils/core/logger.js";
+import { LOG_COMPONENTS } from "@/utils/core/logConstants.js";
 import { WindowsConfig } from "./core/WindowsConfig.js";
 import { WindowsState } from "./core/WindowsState.js";
 import { CrossFrameManager } from "./crossframe/CrossFrameManager.js";
 import { TranslationHandler } from "./translation/TranslationHandler.js";
 import { ClickManager } from "./interaction/ClickManager.js";
 import { ThemeManager } from "./theme/ThemeManager.js";
-import { TTSManager } from "./translation/TTSManager.js";
+import { TTSManager } from "../../../features/tts/managers/TTSManager.js";
 // UI-related imports removed - now handled by Vue UI Host
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer

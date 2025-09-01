@@ -91,8 +91,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { usePositioning } from '@/composables/usePositioning.js';
-import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
-import { useTTSSmart } from '@/composables/useTTSSmart.js';
+import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import { useMessaging } from '../../../messaging/composables/useMessaging';
 import { isContextError } from '@/utils/core/extensionContext.js';
@@ -521,13 +521,6 @@ const handleStartDrag = (event) => {
 .translation-window.loading-window.dark {
   background: #333 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-
-
-/* Normal window specific styles */
-.translation-window.normal-window {
-  /* Uses default translation-window styles */
 }
 
 /* Visibility and animation control */

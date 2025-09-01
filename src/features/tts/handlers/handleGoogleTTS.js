@@ -3,7 +3,7 @@
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { initializebrowserAPI } from '@/composables/useBrowserAPI.js';
+import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/utils/core/browserHandlers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GoogleTTSHandler');

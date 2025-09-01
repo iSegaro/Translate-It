@@ -1,10 +1,17 @@
 import browser from "webextension-polyfill";
-import { featureLoader } from "../../background/feature-loader.js";
+import { featureLoader } from "@/background/feature-loader.js";
 
-import { initializeSettingsListener } from "../../config.js";
-import { TranslationEngine } from "../../features/translation/core/translation-engine.js";
-import { simpleMessageHandler } from "../../core/SimpleMessageHandler.js"; // This might need to be moved later
-import * as Handlers from "../../background/handlers/index.js"; // This might need to be moved later
+import { initializeSettingsListener } from "@/config.js";
+import { TranslationEngine } from "@/features/translation/core/translation-engine.js";
+import {
+  handleGoogleTTSSpeak,
+  handleGoogleTTSStopAll,
+  handleGoogleTTSPause,
+  handleGoogleTTSResume,
+  handleGoogleTTSGetStatus,
+} from '@/features/tts/handlers/handleGoogleTTS.js';
+import { simpleMessageHandler } from "@/core/SimpleMessageHandler.js"; // This might need to be moved later
+import * as Handlers from "@/background/handlers/index.js"; // This might need to be moved later
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import { addBrowserSpecificHandlers } from '@/utils/core/browserHandlers.js';
@@ -102,11 +109,11 @@ class LifecycleManager {
       'subtitleStatus': Handlers.handleSubtitleStatus,
       
       // TTS handlers
-      'GOOGLE_TTS_SPEAK': Handlers.handleGoogleTTSSpeak,
-      'GOOGLE_TTS_STOP_ALL': Handlers.handleGoogleTTSStopAll,
-      'GOOGLE_TTS_PAUSE': Handlers.handleGoogleTTSPause,
-      'GOOGLE_TTS_RESUME': Handlers.handleGoogleTTSResume,
-      'GOOGLE_TTS_GET_STATUS': Handlers.handleGoogleTTSGetStatus,
+      'GOOGLE_TTS_SPEAK': handleGoogleTTSSpeak,
+      'GOOGLE_TTS_STOP_ALL': handleGoogleTTSStopAll,
+      'GOOGLE_TTS_PAUSE': handleGoogleTTSPause,
+      'GOOGLE_TTS_RESUME': handleGoogleTTSResume,
+      'GOOGLE_TTS_GET_STATUS': handleGoogleTTSGetStatus,
       
       // Element selection handlers
       'activateSelectElementMode': Handlers.handleActivateSelectElementMode,
@@ -221,7 +228,7 @@ class LifecycleManager {
 
     try {
       const { ErrorHandler } = await import(
-        "../../error-management/ErrorHandler.js"
+        "@/error-management/ErrorHandler.js"
       );
       new ErrorHandler();
 
@@ -240,7 +247,7 @@ class LifecycleManager {
     } catch (error) {
       logger.error("❌ Failed to refresh context menus via featureLoader:", error);
       // Fallback to direct import of new context menu manager
-      const { ContextMenuManager } = await import("../../managers/context-menu.js");
+      const { ContextMenuManager } = await import("@/managers/context-menu.js");
       const contextMenuManager = new ContextMenuManager();
       await contextMenuManager.initialize(true, locale); // Force re-initialize with locale
     }

@@ -91,7 +91,7 @@ import { useTranslationStore } from "@/features/translation/stores/translation.j
 
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
-import { useTTSGlobal } from '@/composables/useTTSGlobal.js';
+import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 
 import TranslationDisplay from "@/components/shared/TranslationDisplay.vue";

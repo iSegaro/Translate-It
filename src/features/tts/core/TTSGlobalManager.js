@@ -1,14 +1,13 @@
 // Global TTS Manager Singleton
 // Manages TTS instances across all components to ensure exclusive playback
 
-import { getScopedLogger } from '@/utils/core/logger.js'
+import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { MessageActions } from '@/messaging/core/MessageActions.js'
-import { useBrowserAPI } from './useBrowserAPI.js'
 import { isContextError } from '@/utils/core/extensionContext.js'
+import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSGlobalManager')
-const browserAPI = useBrowserAPI('tts-global-manager')
 
 /**
  * Singleton class to manage TTS instances globally
@@ -400,7 +399,7 @@ class TTSGlobalManager {
     
     // Send stop message to background directly
     try {
-      await browserAPI.sendMessage({
+      await browser.runtime.sendMessage({
         action: MessageActions.GOOGLE_TTS_STOP_ALL,
         data: {}
       })

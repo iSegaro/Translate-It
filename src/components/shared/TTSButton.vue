@@ -91,7 +91,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useTTSSmart } from '@/composables/useTTSSmart.js'
+import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 
