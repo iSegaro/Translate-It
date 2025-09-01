@@ -43,7 +43,7 @@
 <script setup>
 import { ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ProviderSelector from '@/components/feature/ProviderSelector.vue'
 import GeminiApiSettings from '@/components/feature/api-settings/GeminiApiSettings.vue'
 import YandexApiSettings from '@/components/feature/api-settings/YandexApiSettings.vue'

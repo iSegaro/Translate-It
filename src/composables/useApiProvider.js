@@ -1,6 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useBrowserAPI } from "./useBrowserAPI.js";
-import { useSettingsStore } from "@/store/core/settings.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { getProvidersForDropdown, getProviderById } from "@/core/provider-registry.js";
 import browser from "webextension-polyfill";
 

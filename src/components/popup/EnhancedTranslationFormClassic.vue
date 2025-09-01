@@ -30,7 +30,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import UnifiedTranslationInput from '@/components/shared/UnifiedTranslationInput.vue'
 import { getScopedLogger } from '@/utils/core/logger.js'

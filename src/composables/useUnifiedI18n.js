@@ -3,7 +3,7 @@
 
 import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js'
 import { setI18nLocale } from '@/plugins/i18n.js'
 import { getScopedLogger } from '@/utils/core/logger.js'

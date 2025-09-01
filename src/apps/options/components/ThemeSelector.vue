@@ -109,7 +109,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'

@@ -33,7 +33,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 
 const { t } = useI18n()

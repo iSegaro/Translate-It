@@ -109,7 +109,7 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 import { refDebounced } from '@vueuse/core'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useExtensionAPI } from '@/composables/useExtensionAPI'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'

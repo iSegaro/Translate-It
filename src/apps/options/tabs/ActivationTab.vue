@@ -159,7 +159,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'

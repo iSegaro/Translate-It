@@ -29,7 +29,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/utils/core/logger.js'
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'

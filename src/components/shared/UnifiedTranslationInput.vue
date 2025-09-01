@@ -101,7 +101,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'

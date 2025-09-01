@@ -67,7 +67,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import { useLanguages } from '@/composables/useLanguages.js'
 import { getScopedLogger } from '@/utils/core/logger.js';

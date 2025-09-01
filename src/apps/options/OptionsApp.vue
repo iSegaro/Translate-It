@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
 import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'

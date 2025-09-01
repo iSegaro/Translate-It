@@ -31,7 +31,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useSettingsStore } from '@/store/core/settings'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
