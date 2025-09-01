@@ -3,7 +3,7 @@ import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { RevertHandler } from './RevertHandler.js';
+import { revertHandler } from './RevertHandler.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
@@ -180,7 +180,6 @@ export class ContentMessageHandler {
 
   async handleRevertTranslation() {
     this.logger.debug('Handling revertTranslation action');
-    const revertHandler = new RevertHandler();
     return await revertHandler.executeRevert();
   }
 }

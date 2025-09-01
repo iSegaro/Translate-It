@@ -125,8 +125,40 @@ onMounted(() => {
     revert: toast,
   };
 
+  // Use a global Set to prevent duplicate notifications
+  if (!window.translateItShownNotifications) {
+    window.translateItShownNotifications = new Set();
+  }
+
   pageEventBus.on('show-notification', (detail) => {
-    logger.info('Received show-notification event:', detail);
+    // Create a unique key for this notification
+    const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
+    
+    // Check if this notification was already shown recently (within 1 second)
+    const recentKeys = Array.from(window.translateItShownNotifications).filter(key => {
+      const timestamp = parseInt(key.split('-').pop());
+      return Date.now() - timestamp < 1000; // 1 second window
+    });
+    
+    const isDuplicate = recentKeys.some(key => 
+      key.startsWith(`${detail.message}-${detail.type}`)
+    );
+    
+    if (isDuplicate) {
+      return;
+    }
+    
+    // Add to set and show notification
+    window.translateItShownNotifications.add(notificationKey);
+    
+    // Clean up old entries (keep only last 10)
+    if (window.translateItShownNotifications.size > 10) {
+      const entries = Array.from(window.translateItShownNotifications);
+      entries.slice(0, -10).forEach(key => {
+        window.translateItShownNotifications.delete(key);
+      });
+    }
+    
     const { id, message, type, duration } = detail;
     const toastFn = toastMap[type] || toast.info;
     toastFn(message, { id, duration });

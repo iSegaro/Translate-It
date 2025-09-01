@@ -31,13 +31,21 @@ export class RevertShortcut {
    * @returns {Promise<Object>} Execution result
    */
   async execute() {
-    // Decide whether to CANCEL an in-progress translation or REVERT a completed one.
+    // Priority 1: If Select Element Mode is active, deactivate it first
+    if (selectElementManager.isActive) {
+      logger.debug('[RevertShortcut] Select Element Mode is active. Deactivating it.');
+      await selectElementManager.deactivate();
+      return { success: true, action: 'select_element_deactivated' };
+    }
+
+    // Priority 2: If translation is in progress, cancel it
     if (window.isTranslationInProgress) {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
       await selectElementManager.cancelInProgressTranslation();
       return { success: true, action: 'cancelled' };
     }
 
+    // Priority 3: If no active processes, try to revert completed translations
     logger.debug('[RevertShortcut] No translation in progress. Executing REVERT action.');
     
     // Check if there are any translations to revert.
@@ -53,9 +61,8 @@ export class RevertShortcut {
     }
 
     try {
-      // Import and use RevertHandler
-      const { RevertHandler } = await import('@/handlers/content/RevertHandler.js');
-      const revertHandler = new RevertHandler();
+      // Import and use singleton RevertHandler
+      const { revertHandler } = await import('@/handlers/content/RevertHandler.js');
       
       const result = await revertHandler.executeRevert();
       

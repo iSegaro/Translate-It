@@ -12,6 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'RevertHandler');
 export class RevertHandler {
   constructor() {
     this.context = 'content-revert';
+    this.isExecuting = false; // Prevent duplicate executions
   }
 
   /**
@@ -20,6 +21,13 @@ export class RevertHandler {
    * @returns {Promise<Object>} Revert result
    */
   async executeRevert() {
+    // Prevent concurrent executions
+    if (this.isExecuting) {
+      logger.debug('[RevertHandler] Revert already in progress, skipping duplicate request');
+      return { success: false, reason: 'already_executing' };
+    }
+
+    this.isExecuting = true;
     logger.debug('[RevertHandler] Starting unified revert process');
     
     try {
@@ -65,6 +73,9 @@ export class RevertHandler {
     } catch (error) {
       logger.error('[RevertHandler] Error in executeRevert:', error);
       return { success: false, error: error.message };
+    } finally {
+      // Reset execution flag
+      this.isExecuting = false;
     }
   }
 
@@ -163,3 +174,6 @@ export class RevertHandler {
     };
   }
 }
+
+// Singleton instance to prevent duplicate notifications
+export const revertHandler = new RevertHandler();
