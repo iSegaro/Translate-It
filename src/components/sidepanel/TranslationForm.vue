@@ -61,7 +61,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useI18n } from '@/composables/useI18n.js'
+import { useI18n } from '@/composables/shared/useI18n.js'
 // (helpers import removed: unused)
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'

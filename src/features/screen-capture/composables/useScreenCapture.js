@@ -1,5 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useExtensionAPI } from "@/composables/useExtensionAPI.js";
+import { useExtensionAPI } from "@/composables/core/useExtensionAPI.js";
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 

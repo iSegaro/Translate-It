@@ -2,7 +2,7 @@
 // Combines the logic from usePopupTranslation and useSidepanelTranslation
 import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
-import { useBrowserAPI } from "@/composables/useBrowserAPI.js";
+import { useBrowserAPI } from "@/composables/core/useBrowserAPI.js";
 import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "@/utils/text/detection.js";

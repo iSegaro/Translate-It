@@ -469,8 +469,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'

@@ -54,9 +54,9 @@
 
 <script setup>
 import { computed, onMounted } from 'vue'
-import { useLanguages } from '@/composables/useLanguages.js'
+import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { CONFIG } from '@/config.js'

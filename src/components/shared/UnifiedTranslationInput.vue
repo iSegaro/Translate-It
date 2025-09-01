@@ -102,8 +102,8 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { correctTextDirection } from '@/utils/text/textDetection.js'
 
 // Components
@@ -451,7 +451,7 @@ const focusInput = () => {
 }
 
 // Auto-resize for popup mode
-const { usePopupResize } = props.mode === 'popup' ? await import('@/composables/usePopupResize.js').catch(() => ({ usePopupResize: null })) : { usePopupResize: null }
+const { usePopupResize } = props.mode === 'popup' ? await import('@/composables/ui/usePopupResize.js').catch(() => ({ usePopupResize: null })) : { usePopupResize: null }
 
 if (props.mode === 'popup' && usePopupResize) {
   const resizeComposable = usePopupResize()

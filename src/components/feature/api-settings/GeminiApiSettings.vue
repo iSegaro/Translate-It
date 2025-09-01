@@ -56,7 +56,7 @@ import { CONFIG } from '@/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
-import { useRTLSelect } from '@/composables/useRTLSelect.js'
+import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()

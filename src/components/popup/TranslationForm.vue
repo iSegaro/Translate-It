@@ -45,10 +45,10 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
-import { usePopupResize } from '@/composables/usePopupResize.js'
+import { usePopupResize } from '@/composables/ui/usePopupResize.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 

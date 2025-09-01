@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
 /**
  * Composable for RTL support in select elements

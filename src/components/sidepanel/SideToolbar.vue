@@ -97,9 +97,9 @@
 import { computed } from 'vue'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js'
-import { useApiProvider } from '@/composables/useApiProvider.js'
-import { useBrowserAPI } from '@/composables/useBrowserAPI.js'
-import { useI18n } from '@/composables/useI18n.js'
+import { useApiProvider } from '@/composables/shared/useApiProvider.js'
+import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
+import { useI18n } from '@/composables/shared/useI18n.js'
 // (helpers import removed: was empty / invalid)
 
 import { getScopedLogger } from '@/utils/core/logger.js';

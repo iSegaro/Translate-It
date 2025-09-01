@@ -3,7 +3,7 @@ import { generateMessageId } from "@/utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "@/utils/text/detection.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 
-import { useLanguages } from "@/composables/useLanguages.js";
+import { useLanguages } from "@/composables/shared/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';

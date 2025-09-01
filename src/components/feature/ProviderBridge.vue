@@ -120,8 +120,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
-import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getProviderById } from '@/core/provider-registry.js'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseModal from '@/components/base/BaseModal.vue'

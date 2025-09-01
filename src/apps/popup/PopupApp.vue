@@ -99,7 +99,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -114,7 +114,7 @@ import { LOG_COMPONENTS } from '@/utils/core/logConstants.js'
 import { AUTO_DETECT_VALUE } from '@/constants.js'
 import { getSourceLanguageAsync, getTargetLanguageAsync } from '@/config.js'
 import { getLanguageDisplayName } from '@/utils/i18n/languages.js'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 

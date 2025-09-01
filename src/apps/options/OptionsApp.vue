@@ -42,7 +42,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import OptionsLayout from './OptionsLayout.vue'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { loadSettingsModules } from '@/utils/settings-modules.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

@@ -95,9 +95,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/features/history/composables/useHistory.js'
-import { useUI } from '@/composables/useUI.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUI } from '@/composables/ui/useUI.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { languageList } from '@/utils/i18n/languages.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

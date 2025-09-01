@@ -66,10 +66,10 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import ThemeSelector from './components/ThemeSelector.vue'
-import { useLanguages } from '@/composables/useLanguages.js'
+import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';
 import browser from 'webextension-polyfill'

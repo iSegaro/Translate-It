@@ -48,7 +48,7 @@ import { useTranslationStore } from '@/features/translation/stores/translation.j
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue';
 import { useHistory } from '@/features/history/composables/useHistory.js';
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js';
-import { useErrorHandler } from '@/composables/useErrorHandler.js';
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import SidepanelHistory from './components/SidepanelHistory.vue';
 import SidepanelMainContent from './components/SidepanelMainContent.vue';
 import EnhancedSidepanelMainContent from './components/EnhancedSidepanelMainContent.vue';

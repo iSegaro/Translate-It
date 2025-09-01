@@ -90,7 +90,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { usePositioning } from '@/composables/usePositioning.js';
+import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';

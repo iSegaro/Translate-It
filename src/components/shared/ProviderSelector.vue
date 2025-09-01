@@ -167,8 +167,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { getProvidersForDropdown } from '@/core/provider-registry.js'
 import IconButton from './IconButton.vue'

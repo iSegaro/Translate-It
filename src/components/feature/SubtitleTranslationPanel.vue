@@ -244,8 +244,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTranslationStore } from '@/store/modules/translation.js'
-import { useExtensionAPI } from '@/composables/useExtensionAPI.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 
 const emit = defineEmits(['subtitleDetected', 'translationComplete', 'error'])
 

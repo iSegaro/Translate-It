@@ -75,17 +75,17 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 const { t } = useUnifiedI18n()
 
 
-import { useErrorHandler } from "@/composables/useErrorHandler.js";
+import { useErrorHandler } from "@/composables/shared/useErrorHandler.js";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 
 import { useHistory } from "@/features/history/composables/useHistory.js";
 import { useUnifiedTranslation } from "@/features/translation/composables/useUnifiedTranslation.js";
 import { getLanguageCode, getLanguageDisplayName } from "@/utils/i18n/languages.js";
-import { useLanguages } from "@/composables/useLanguages.js";
+import { useLanguages } from "@/composables/shared/useLanguages.js";
 import { AUTO_DETECT_VALUE } from "@/constants.js";
 import { useTranslationStore } from "@/features/translation/stores/translation.js";
 

@@ -32,9 +32,9 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { useApiProvider } from '@/composables/useApiProvider.js'
-import { useUI } from '@/composables/useUI.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useApiProvider } from '@/composables/shared/useApiProvider.js'
+import { useUI } from '@/composables/ui/useUI.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import ApiProviderItem from './ApiProviderItem.vue'
 import { getScopedLogger } from '@/utils/core/logger.js';
 import { LOG_COMPONENTS } from '@/utils/core/logConstants.js';

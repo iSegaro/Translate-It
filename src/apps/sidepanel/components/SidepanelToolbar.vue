@@ -83,9 +83,9 @@
 <script setup>
 
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js';
-import { useUI } from '@/composables/useUI.js';
-import { useErrorHandler } from '@/composables/useErrorHandler.js';
-import { useUnifiedI18n } from '@/composables/useUnifiedI18n.js';
+import { useUI } from '@/composables/ui/useUI.js';
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 

@@ -102,7 +102,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 
 const settingsStore = useSettingsStore()
 const { handleError } = useErrorHandler()

@@ -51,7 +51,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
-import { useRTLSelect } from '@/composables/useRTLSelect.js'
+import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()

@@ -41,7 +41,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { usePositioning } from '@/composables/usePositioning.js';
+import { usePositioning } from '@/composables/ui/usePositioning.js';
 
 const pageEventBus = window.pageEventBus;
 

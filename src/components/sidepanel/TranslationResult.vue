@@ -20,7 +20,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from '@/composables/useI18n.js'
+import { useI18n } from '@/composables/shared/useI18n.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 // Props
