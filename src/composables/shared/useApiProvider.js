@@ -15,7 +15,15 @@ export function useApiProvider() {
   const settingsStore = useSettingsStore();
 
   const currentProviderData = computed(() => getProviderById(currentProvider.value));
-  const currentProviderIcon = computed(() => currentProviderData.value ? `@/assets/icons/api-providers/${currentProviderData.value.icon}` : "@/assets/icons/api-providers/google.svg");
+  const currentProviderIcon = computed(() => {
+    if (!currentProviderData.value) return '/assets/icons/providers/google.svg'
+    const iconPath = currentProviderData.value.icon
+    if (!iconPath) return '/assets/icons/providers/google.svg'
+    if (iconPath.includes('/')) {
+      return `/assets/icons/${iconPath}`
+    }
+    return `/assets/icons/providers/${iconPath}`
+  });
   const currentProviderName = computed(() => currentProviderData.value?.name || "Translation Provider");
 
   const loadAvailableProviders = () => {

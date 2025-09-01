@@ -14,7 +14,7 @@
         @click="handleSelectElement"
       >
         <img
-          src="@/assets/icons/ui/select.png"
+          :src="selectIcon"
           alt="Select Element"
           class="toolbar-icon"
         >
@@ -28,7 +28,7 @@
         @click="handleRevert"
       >
         <img 
-          src="@/assets/icons/ui/revert.png" 
+          :src="revertIcon" 
           alt="Revert" 
           class="toolbar-icon" 
         >
@@ -41,7 +41,7 @@
         @click="handleClear"
       >
         <img
-          src="@/assets/icons/ui/clear.png"
+          :src="clearIcon"
           alt="Clear Fields"
           class="toolbar-icon"
         >
@@ -84,7 +84,7 @@
         @click="handleSettings"
       >
         <img
-          src="@/assets/icons/ui/settings.png"
+          :src="settingsIcon"
           alt="Settings"
           class="toolbar-icon"
         >
@@ -98,6 +98,12 @@ import { computed } from 'vue'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js'
 import { useApiProvider } from '@/composables/shared/useApiProvider.js'
+
+// Import icons
+import selectIcon from '@/assets/icons/ui/select.png'
+import revertIcon from '@/assets/icons/ui/revert.png'
+import clearIcon from '@/assets/icons/ui/clear.png'
+import settingsIcon from '@/assets/icons/ui/settings.png'
 import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { useI18n } from '@/composables/shared/useI18n.js'
 // (helpers import removed: was empty / invalid)
@@ -137,9 +143,12 @@ const isReverting = computed(() => sidepanelActions.isProcessing.value)
 const apiProviderIcon = computed(() => {
   const provider = apiProvider.currentProviderData.value
   if (provider && provider.icon) {
-    return `@/assets/icons/api-providers/${provider.icon}`
+    if (provider.icon.includes('/')) {
+      return `/assets/icons/${provider.icon}`
+    }
+    return `/assets/icons/providers/${provider.icon}`
   }
-  return '@/assets/icons/api-providers/google.svg'
+  return '/assets/icons/providers/google.svg'
 })
 
 // Tooltip text for Select Element button

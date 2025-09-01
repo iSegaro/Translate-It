@@ -56,11 +56,23 @@ defineEmits(['click'])
 
 // Computed
 const iconSrc = computed(() => {
-  if (props.icon.startsWith('/') || props.icon.startsWith('@/')) {
+  if (!props.icon) return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjY2NjIi8+Cjwvc3ZnPgo='
+  
+  if (props.icon.startsWith('@/')) {
     return props.icon.replace('@/', '/')
   }
-  // Icons are copied to /icons/ directory in build output 
-  return `/icons/${props.icon}`
+  if (props.icon.startsWith('/')) {
+    return props.icon
+  }
+  
+  // For dynamic icons
+  if (props.icon.includes('/')) {
+    // Provider icons like "providers/google.svg"
+    return `/assets/icons/${props.icon}`
+  } else {
+    // UI icons like "side-panel.png"
+    return `/assets/icons/ui/${props.icon}`
+  }
 })
 
 const isRevertIcon = computed(() => props.variant === 'revert')

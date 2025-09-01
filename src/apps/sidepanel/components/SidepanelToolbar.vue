@@ -13,7 +13,7 @@
         @click="handleSelectElement"
       >
         <img
-          src="@/assets/icons/ui/select.png"
+          :src="selectIcon"
           alt="Select Element"
           class="toolbar-icon"
         >
@@ -25,7 +25,7 @@
         @click="handleRevertAction"
       >
         <img
-          src="@/assets/icons/ui/revert.png"
+          :src="revertIcon"
           alt="Revert"
           class="toolbar-icon"
         >
@@ -37,7 +37,7 @@
         @click="handleClearFields"
       >
         <img
-          src="@/assets/icons/ui/clear.png"
+          :src="clearIcon"
           alt="Clear Fields"
           class="toolbar-icon"
         >
@@ -71,7 +71,7 @@
         @click="handleSettingsClick"
       >
         <img
-          src="@/assets/icons/ui/settings.png"
+          :src="settingsIcon"
           alt="Settings"
           class="toolbar-icon"
         >
@@ -88,6 +88,12 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
+
+// Import icons
+import selectIcon from '@/assets/icons/ui/select.png'
+import revertIcon from '@/assets/icons/ui/revert.png'
+import clearIcon from '@/assets/icons/ui/clear.png'
+import settingsIcon from '@/assets/icons/ui/settings.png'
 
 // Lazy logger to avoid initialization order issues
 let _logger;

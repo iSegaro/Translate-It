@@ -212,7 +212,7 @@ const currentProvider = computed(() => settingsStore.settings.TRANSLATION_API)
 
 const currentProviderIcon = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
-  return getProviderIcon(provider?.icon || 'api-providers/google.svg')
+  return getProviderIcon(provider?.icon || 'providers/google.svg')
 })
 
 const currentProviderName = computed(() => {
@@ -223,11 +223,14 @@ const currentProviderName = computed(() => {
 // Methods
 const getProviderIcon = (iconPath) => {
   // Use paths that match build output structure
-  if (!iconPath) return '/icons/api-providers/google.svg'
+  if (!iconPath) return '/assets/icons/providers/google.svg'
   if (iconPath.startsWith('@/assets/')) {
     return iconPath.replace('@/assets/', '/')
   }
-  return `/icons/${iconPath}`
+  if (iconPath.includes('/')) {
+    return `/assets/icons/${iconPath}`
+  }
+  return `/assets/icons/providers/${iconPath}`
 }
 
 const handleTranslate = () => {
@@ -310,7 +313,7 @@ onMounted(async () => {
   availableProviders.value = providersFromRegistry.map(provider => ({
     id: provider.id,
     name: provider.name,
-    icon: `api-providers/${provider.icon}`
+    icon: provider.icon
   }))
   
   // Add click listener to close dropdown
