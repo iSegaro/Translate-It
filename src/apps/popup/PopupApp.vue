@@ -446,7 +446,7 @@ const retryLoading = () => {
 .language-controls {
   display: flex;
   align-items: center;
-  padding: 3px 12px;
+  padding:3px 6px 3px 12px;
   margin: 0;
   gap: 4px;
   background: var(--language-controls-bg-color);
