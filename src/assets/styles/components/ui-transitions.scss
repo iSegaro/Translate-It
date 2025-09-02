@@ -1,0 +1,201 @@
+/**
+ * UI Transitions - Modular Animation System
+ * Used for smooth transitions during UI state changes like language/theme switching
+ */
+
+@use "../base/variables" as *;
+
+// CSS Custom Properties for easy customization
+:root {
+  --ui-transition-duration: 600ms;
+  --ui-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+  --ui-transition-shimmer-color: var(--color-primary-rgb, 59, 130, 246);
+  --ui-transition-scale-start: 0.92;
+  --ui-transition-scale-mid: 1.002;
+  --ui-transition-blur-amount: 3px;
+  --ui-transition-translate-distance: 30px;
+}
+
+// Base transition container
+.ui-transition-container {
+  position: relative;
+  transition: all 0.3s var(--ui-transition-timing);
+  transform-origin: center center;
+
+  &.transitioning {
+    overflow: hidden;
+    
+    // Subtle scale and shadow during transition
+    transform: scale(var(--ui-transition-scale-mid));
+    box-shadow: 
+      0 2px 4px rgba(0, 0, 0, 0.1),
+      0 0 30px rgba(var(--ui-transition-shimmer-color), 0.1);
+  }
+}
+
+// Shimmer overlay effect
+.ui-transition-container.transitioning::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(var(--ui-transition-shimmer-color), 0.08) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: ui-shimmer var(--ui-transition-duration) ease-out;
+  pointer-events: none;
+  z-index: 10;
+  border-radius: inherit;
+}
+
+@keyframes ui-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// Content transition animations
+.ui-transition-enter-active,
+.ui-transition-leave-active {
+  transition: all var(--ui-transition-duration) var(--ui-transition-timing);
+}
+
+.ui-transition-enter-from {
+  opacity: 0;
+  transform: translateY(var(--ui-transition-translate-distance)) 
+             scale(var(--ui-transition-scale-start));
+  filter: blur(var(--ui-transition-blur-amount));
+}
+
+.ui-transition-leave-to {
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--ui-transition-translate-distance))) 
+             scale(var(--ui-transition-scale-start));
+  filter: blur(var(--ui-transition-blur-amount));
+}
+
+.ui-transition-enter-to,
+.ui-transition-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+// Language-specific animations
+.ui-transition-container.language-transition {
+  --ui-transition-shimmer-color: var(--color-primary-rgb, 59, 130, 246);
+  
+  .ui-transition-enter-from {
+    transform: translateY(var(--ui-transition-translate-distance)) 
+               scale(var(--ui-transition-scale-start));
+  }
+  
+  .ui-transition-leave-to {
+    transform: translateY(calc(-1 * var(--ui-transition-translate-distance))) 
+               scale(var(--ui-transition-scale-start));
+  }
+}
+
+// Theme-specific animations  
+.ui-transition-container.theme-transition {
+  --ui-transition-shimmer-color: var(--color-accent-rgb, 99, 102, 241);
+  
+  .ui-transition-enter-from {
+    transform: translateX(var(--ui-transition-translate-distance)) 
+               scale(var(--ui-transition-scale-start));
+    filter: blur(var(--ui-transition-blur-amount)) hue-rotate(15deg);
+  }
+  
+  .ui-transition-leave-to {
+    transform: translateX(calc(-1 * var(--ui-transition-translate-distance))) 
+               scale(var(--ui-transition-scale-start));
+    filter: blur(var(--ui-transition-blur-amount)) hue-rotate(-15deg);
+  }
+}
+
+// Settings-specific animations
+.ui-transition-container.settings-transition {
+  --ui-transition-shimmer-color: var(--color-success-rgb, 34, 197, 94);
+  
+  .ui-transition-enter-from,
+  .ui-transition-leave-to {
+    transform: scale(var(--ui-transition-scale-start));
+    filter: blur(calc(var(--ui-transition-blur-amount) * 0.5));
+  }
+}
+
+// RTL Support
+:global(.options-layout.rtl) {
+  .ui-transition-enter-from {
+    transform: translateY(20px) scale(0.95) rotateY(5deg);
+  }
+  
+  .ui-transition-leave-to {
+    transform: translateY(-20px) scale(0.95) rotateY(-5deg);
+  }
+  
+  .ui-transition-container.theme-transition {
+    .ui-transition-enter-from {
+      transform: translateX(calc(-1 * var(--ui-transition-translate-distance))) 
+                 scale(var(--ui-transition-scale-start));
+    }
+    
+    .ui-transition-leave-to {
+      transform: translateX(var(--ui-transition-translate-distance)) 
+                 scale(var(--ui-transition-scale-start));
+    }
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .ui-transition-container {
+    --ui-transition-duration: 200ms;
+    --ui-transition-blur-amount: 0px;
+    --ui-transition-translate-distance: 10px;
+    --ui-transition-scale-start: 0.98;
+    
+    &.transitioning::before {
+      animation: none;
+      opacity: 0.3;
+      background: rgba(var(--ui-transition-shimmer-color), 0.05);
+      animation: ui-simple-fade var(--ui-transition-duration) ease-out;
+    }
+  }
+}
+
+@keyframes ui-simple-fade {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.3; }
+}
+
+// Animation variants for different durations
+.ui-transition-fast {
+  --ui-transition-duration: 300ms;
+}
+
+.ui-transition-slow {
+  --ui-transition-duration: 1000ms;
+}
+
+// Animation variants for different intensities
+.ui-transition-subtle {
+  --ui-transition-scale-start: 0.98;
+  --ui-transition-blur-amount: 1px;
+  --ui-transition-translate-distance: 15px;
+}
+
+.ui-transition-dramatic {
+  --ui-transition-scale-start: 0.85;
+  --ui-transition-blur-amount: 5px;
+  --ui-transition-translate-distance: 50px;
+}
