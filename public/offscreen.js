@@ -96,6 +96,125 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCachedAudioPlayback(cleanMessage.audioData, sendResponse);
     return true;
   }
+  else if (action === "GENERATE_COMPOSITE_ICON" && cleanMessage.data) {
+    // Handle composite icon generation inline
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 32;
+      canvas.height = 32;
+
+      const baseImg = new Image();
+      const overlayImg = new Image();
+
+      let loadedCount = 0;
+      const onLoad = () => {
+        loadedCount++;
+        if (loadedCount === 2) {
+          // Draw base icon
+          ctx.drawImage(baseImg, 0, 0, 32, 32);
+
+          // Draw provider icon as small overlay in bottom-right corner
+          const overlaySize = 12;
+          const overlayX = 32 - overlaySize - 2;
+          const overlayY = 32 - overlaySize - 2;
+
+          // Add semi-transparent background for better visibility
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.fillRect(overlayX - 1, overlayY - 1, overlaySize + 2, overlaySize + 2);
+
+          // Draw provider icon
+          ctx.drawImage(overlayImg, overlayX, overlayY, overlaySize, overlaySize);
+
+          // Convert to ImageData
+          const imageData = ctx.getImageData(0, 0, 32, 32);
+          
+          // Convert ImageData to transferable format
+          sendResponse({ 
+            success: true, 
+            imageData: {
+              width: imageData.width,
+              height: imageData.height,
+              data: Array.from(imageData.data)
+            }
+          });
+        }
+      };
+
+      const onError = () => {
+        sendResponse({ success: false, error: 'Failed to load image' });
+      };
+
+      baseImg.onload = onLoad;
+      baseImg.onerror = onError;
+      overlayImg.onload = onLoad;
+      overlayImg.onerror = onError;
+
+      baseImg.crossOrigin = 'anonymous';
+      overlayImg.crossOrigin = 'anonymous';
+
+      baseImg.src = cleanMessage.data.baseBlob;
+      overlayImg.src = cleanMessage.data.overlayBlob;
+      
+    } catch (error) {
+      sendResponse({ success: false, error: 'Composite icon generation failed' });
+    }
+    return true;
+  }
+  else if (action === "GENERATE_SIMPLE_OVERLAY_ICON" && cleanMessage.data) {
+    // Handle simple overlay icon generation
+    console.log('[Offscreen] Generating simple overlay icon for provider:', cleanMessage.data.provider);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 32;
+      canvas.height = 32;
+
+      // Create a simple base icon (blue square)
+      ctx.fillStyle = '#4285f4';
+      ctx.fillRect(0, 0, 32, 32);
+
+      // Add provider-specific color overlay
+      const providerColors = {
+        'google': '#4285f4',
+        'gemini': '#8e44ad',
+        'bing': '#00BCF2',
+        'yandex': '#FF0000',
+        'openai': '#412991',
+        'openrouter': '#FF6B35',
+        'deepseek': '#00A67E',
+        'webai': '#FF9500',
+        'custom': '#9CA3AF',
+        'browserapi': '#4CAF50'
+      };
+
+      const overlayColor = providerColors[cleanMessage.data.provider] || '#9CA3AF';
+      
+      // Draw small colored square in bottom-right
+      ctx.fillStyle = overlayColor;
+      ctx.fillRect(20, 20, 10, 10);
+
+      // Add white border
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(20, 20, 10, 10);
+
+      // Convert to ImageData
+      const imageData = ctx.getImageData(0, 0, 32, 32);
+      
+      sendResponse({ 
+        success: true, 
+        imageData: {
+          width: imageData.width,
+          height: imageData.height,
+          data: Array.from(imageData.data)
+        }
+      });
+    } catch (error) {
+      sendResponse({ success: false, error: 'Simple overlay icon generation failed' });
+    }
+    return true;
+  }
   else {
     logger.warn("Unknown offscreen action:", action);
     sendResponse({ success: false, error: `Unknown offscreen action: ${action}` });
