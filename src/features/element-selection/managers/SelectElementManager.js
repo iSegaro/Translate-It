@@ -188,7 +188,6 @@ export class SelectElementManager {
     
     // Reset processing state
     this.isProcessingClick = false;
-    window.isTranslationInProgress = false;
     
     this.logger.debug("Post-translation cleanup completed");
   }

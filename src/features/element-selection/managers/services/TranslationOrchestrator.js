@@ -90,6 +90,9 @@ export class TranslationOrchestrator {
     
     const messageId = generateContentMessageId();
 
+    // Set global flag to indicate translation is in progress
+    window.isTranslationInProgress = true;
+
     const statusMessage = await getTranslationString("STATUS_TRANSLATING") || "Translating...";
     this.statusNotification = `status-${messageId}`;
     pageEventBus.emit('show-notification', {
@@ -143,6 +146,9 @@ export class TranslationOrchestrator {
       await this.sendTranslationRequest(messageId, jsonPayload);
       // Removed setupTranslationWaiting to handle streaming results
     } catch (error) {
+      // Clear the global translation in progress flag on error
+      window.isTranslationInProgress = false;
+      
       // Don't log or handle errors that are already handled
       if (!error.alreadyHandled) {
         this.logger.error("Translation process failed", error);
@@ -207,14 +213,26 @@ export class TranslationOrchestrator {
     if (!data.success) {
         this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
         
+        // Clear the global translation in progress flag on error
+        window.isTranslationInProgress = false;
+        
         // Dismiss notification on error 
         if (this.statusNotification) {
           pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
           this.statusNotification = null;
           this.logger.debug("Dismissed translating notification on stream error");
         }
+        
+        // Notify SelectElementManager to perform cleanup
+        if (window.selectElementManagerInstance) {
+          window.selectElementManagerInstance.performPostTranslationCleanup();
+        }
+        
         return;
     }
+
+    // Ensure the translation in progress flag remains set during streaming
+    window.isTranslationInProgress = true;
 
     const { data: translatedBatch, originalData: originalBatch, batchIndex } = data;
     
@@ -263,6 +281,9 @@ export class TranslationOrchestrator {
 
     this.logger.info("Translation stream finished for message:", messageId);
     
+    // Clear the global translation in progress flag
+    window.isTranslationInProgress = false;
+    
     // Dismiss the "Translating..." notification on stream completion
     if (this.statusNotification) {
       pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
@@ -281,6 +302,11 @@ export class TranslationOrchestrator {
     this.stateManager.addTranslatedElement(request.element, request.translatedSegments);
 
     this.translationRequests.delete(messageId);
+    
+    // Notify SelectElementManager to perform cleanup
+    if (window.selectElementManagerInstance) {
+      window.selectElementManagerInstance.performPostTranslationCleanup();
+    }
   }
 
   async handleTranslationResult(message) {
@@ -340,11 +366,19 @@ export class TranslationOrchestrator {
       request.status = 'error';
       request.error = e.message;
     } finally {
+        // Clear the global translation in progress flag
+        window.isTranslationInProgress = false;
+        
         if (this.statusNotification) {
             pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
             this.statusNotification = null;
         }
         this.translationRequests.delete(messageId);
+        
+        // Notify SelectElementManager to perform cleanup
+        if (window.selectElementManagerInstance) {
+          window.selectElementManagerInstance.performPostTranslationCleanup();
+        }
     }
   }
 
@@ -376,6 +410,9 @@ export class TranslationOrchestrator {
 
   cancelAllTranslations() {
     this.logger.operation("Cancelling all ongoing translations");
+
+    // Clear the global translation in progress flag
+    window.isTranslationInProgress = false;
 
     for (const [messageId, request] of this.translationRequests) {
       if (request.status === 'pending') {
