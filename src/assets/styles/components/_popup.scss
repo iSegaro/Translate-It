@@ -143,3 +143,10 @@ body.popup-context .select-error.toolbar-icon {
     filter: var(--icon-filter);
   }
 }
+
+// Language controls in popup
+.language-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
