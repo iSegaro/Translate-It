@@ -197,25 +197,25 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
-  // WebAI - Local server settings (more relaxed)
+  // WebAI - External API service (similar to other providers)
   WebAI: {
     rateLimit: {
-      maxConcurrent: 3, // Local server can handle more
-      delayBetweenRequests: 500, // Faster requests
-      burstLimit: 5,
+      maxConcurrent: 2, // Standard concurrent requests
+      delayBetweenRequests: 1000, // Standard delay
+      burstLimit: 3,
       burstWindow: 2000,
       adaptiveBackoff: {
         enabled: true,
-        baseMultiplier: 1.2,
-        maxDelay: 10000, // Shorter delays for local
-        resetAfterSuccess: 1
+        baseMultiplier: 1.5,
+        maxDelay: 30000,
+        resetAfterSuccess: 2
       }
     },
     batching: {
-      strategy: 'smart',
-      optimalSize: 20, // Larger batches for local processing
-      maxComplexity: 400,
-      singleBatchThreshold: 25
+      strategy: 'smart', // Use smart batching like other providers
+      optimalSize: 15, // Moderate batch size
+      maxComplexity: 300,
+      singleBatchThreshold: 15
     },
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
@@ -224,18 +224,20 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     errorHandling: {
       quotaTypes: [
-        'server_overload',
-        'connection_error'
+        'requests_per_minute',
+        'rate_limit',
+        'server_overload'
       ],
       retryStrategies: {
-        'server_overload': { delay: 5000, temporary: true },
-        'connection_error': { delay: 2000, temporary: true }
+        'requests_per_minute': { delay: 60000, temporary: true },
+        'rate_limit': { delay: 30000, temporary: true },
+        'server_overload': { delay: 10000, temporary: true }
       },
-      enableCircuitBreaker: false // More forgiving for local
+      enableCircuitBreaker: true
     },
     features: {
-      supportsImageTranslation: false, // Depends on local model
-      supportsBatchRequests: false, // Start simple
+      supportsImageTranslation: false, // Depends on model
+      supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
       reliableJsonMode: false
     }
