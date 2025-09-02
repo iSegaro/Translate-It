@@ -23,6 +23,7 @@ export class TranslationEngine {
     this.factory = new ProviderFactory();
     this.activeTranslations = new Map(); // Track active translations for cancellation
     this.cancelledRequests = new Set(); // Track cancelled request messageIds
+    this.recentRequests = new Map(); // Track recent requests to prevent duplicates
   }
 
   /**
@@ -133,6 +134,25 @@ export class TranslationEngine {
     // Store messageId in data for later retrieval
     if (messageId) {
       data.messageId = messageId;
+      
+      // Check for duplicate requests within the last 5 seconds
+      const now = Date.now();
+      const requestKey = `${messageId}_${data.provider}_${data.text.slice(0, 50)}`;
+      const lastRequest = this.recentRequests.get(requestKey);
+      
+      if (lastRequest && (now - lastRequest) < 5000) {
+        logger.debug(`[TranslationEngine] Duplicate request detected for ${messageId}, ignoring`);
+        return { success: true, streaming: true, messageId: messageId, duplicate: true };
+      }
+      
+      this.recentRequests.set(requestKey, now);
+      
+      // Cleanup old entries (older than 10 seconds)
+      for (const [key, timestamp] of this.recentRequests) {
+        if (now - timestamp > 10000) {
+          this.recentRequests.delete(key);
+        }
+      }
     }
 
     try {
