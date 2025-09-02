@@ -145,7 +145,7 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsImageTranslation: false,
-      supportsBatchRequests: false, // Start with individual requests
+      supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
       reliableJsonMode: false
     }
