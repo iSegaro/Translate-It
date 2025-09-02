@@ -36,7 +36,7 @@ export class CustomProvider extends BaseAIProvider {
   }
 
   /**
-   * Custom provider batch translation - Uses individual requests for safety
+   * Custom provider batch translation - Translates multiple texts in one request
    * @param {string[]} batch - Batch of texts to translate
    * @param {string} sourceLang - Source language
    * @param {string} targetLang - Target language
@@ -45,9 +45,96 @@ export class CustomProvider extends BaseAIProvider {
    * @returns {Promise<string[]>} - Translated texts
    */
   async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
-    // Custom provider uses individual requests for safety with unknown APIs
+    const [apiUrl, apiKey, model] = await Promise.all([
+      getCustomApiUrlAsync(),
+      getCustomApiKeyAsync(),
+      getCustomApiModelAsync(),
+    ]);
+
+    // Validate configuration
+    this._validateConfig(
+      { apiUrl, apiKey },
+      ["apiUrl", "apiKey"],
+      `${this.providerName.toLowerCase()}-translation`
+    );
+
+    // Create batch prompt with all texts
+    const batchText = batch.map((text, index) => `${index + 1}. ${text}`).join('\n');
+    const prompt = await buildPrompt(
+      batchText,
+      sourceLang,
+      targetLang,
+      translateMode,
+      this.constructor.type
+    );
+
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model, // مدل باید توسط کاربر مشخص شود
+        messages: [{ 
+          role: "user", 
+          content: prompt + '\n\nPlease return the translations in the same order, one per line, numbered 1. 2. 3. etc.'
+        }],
+      }),
+    };
+
+    const result = await this._executeApiCall({
+      url: apiUrl,
+      fetchOptions,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: `${this.providerName.toLowerCase()}-batch-translation`,
+      abortController,
+    });
+
+    // Parse the batch response - extract numbered lines
+    if (result) {
+      // Split by lines and process
+      const rawLines = result.split('\n');
+      const lines = [];
+      
+      for (let line of rawLines) {
+        line = line.trim();
+        if (!line) continue;
+        
+        // Check if line starts with number format like "1. ", "2. ", etc.
+        const numberMatch = line.match(/^(\d+)\.\s*(.*)$/);
+        if (numberMatch) {
+          const content = numberMatch[2].trim();
+          if (content) {
+            lines.push(content);
+          }
+        }
+      }
+      
+      logger.debug(`[${this.providerName}] Parsed ${lines.length} translations from batch response (expected: ${batch.length})`);
+      
+      // If we got the expected number of translations, return them
+      if (lines.length === batch.length) {
+        logger.info(`[${this.providerName}] Successfully parsed batch response: ${lines.length} translations`);
+        return lines;
+      } else {
+        // Log the parsing details for debugging
+        logger.warn(`[${this.providerName}] Batch response parsing failed. Expected: ${batch.length}, Got: ${lines.length}`);
+        logger.debug(`[${this.providerName}] Raw response:`, result.substring(0, 500) + '...');
+        logger.debug(`[${this.providerName}] Parsed lines:`, lines.slice(0, 5));
+        return this._fallbackToIndividual(batch, sourceLang, targetLang, translateMode, abortController);
+      }
+    }
+
+    // If no result, fallback to individual
+    return this._fallbackToIndividual(batch, sourceLang, targetLang, translateMode, abortController);
+  }
+
+  /**
+   * Fallback to individual translations when batch fails
+   */
+  async _fallbackToIndividual(batch, sourceLang, targetLang, translateMode, abortController) {
     const results = [];
-    
     for (let i = 0; i < batch.length; i++) {
       if (abortController && abortController.signal.aborted) {
         throw new Error('Translation cancelled');
@@ -58,10 +145,9 @@ export class CustomProvider extends BaseAIProvider {
         results.push(result || batch[i]);
       } catch (error) {
         logger.warn(`[${this.providerName}] Individual translation ${i + 1} failed:`, error);
-        results.push(batch[i]); // Return original text on failure
+        results.push(batch[i]);
       }
     }
-    
     return results;
   }
 
