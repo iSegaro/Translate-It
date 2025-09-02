@@ -113,15 +113,19 @@
 .ui-transition-container.theme-transition {
   --ui-transition-shimmer-color: var(--color-accent-rgb, 99, 102, 241);
   
+  &.transitioning {
+    // Override scale for theme - no scaling animation
+    transform: scale(1) !important;
+    transition: box-shadow var(--ui-transition-scale-duration) var(--ui-transition-timing);
+  }
+  
   .ui-transition-enter-from {
-    transform: translateX(var(--ui-transition-translate-distance)) 
-               scale(var(--ui-transition-scale-start));
+    transform: translateX(var(--ui-transition-translate-distance));
     filter: blur(var(--ui-transition-blur-amount)) hue-rotate(15deg);
   }
   
   .ui-transition-leave-to {
-    transform: translateX(calc(-1 * var(--ui-transition-translate-distance))) 
-               scale(var(--ui-transition-scale-start));
+    transform: translateX(calc(-1 * var(--ui-transition-translate-distance)));
     filter: blur(var(--ui-transition-blur-amount)) hue-rotate(-15deg);
   }
 }
