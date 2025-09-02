@@ -14,33 +14,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-
-// Custom Error for Quota Exceeded
-class QuotaExceededError extends Error {
-  constructor(originalError, details = {}) {
-    super('Gemini API quota exceeded');
-    this.type = 'QUOTA_EXCEEDED';
-    this.provider = 'Gemini';
-    this.originalError = originalError;
-    this.suggestedProviders = ['BingTranslate', 'OpenAI'];
-    this.userMessage = 'Gemini API quota finished. Try switching to Bing for better performance.';
-    this.retryAfter = details.retryAfter || 3600000; // 1 hour default
-    this.quotaType = details.quotaType || 'requests_per_minute';
-    this.timestamp = Date.now();
-  }
-}
-
-// Custom Error for Rate Limiting
-class RateLimitError extends Error {
-  constructor(originalError, details = {}) {
-    super('Gemini API rate limit exceeded');
-    this.type = 'RATE_LIMIT_EXCEEDED';
-    this.provider = 'Gemini';
-    this.originalError = originalError;
-    this.retryAfter = details.retryAfter || 60000; // 1 minute default
-    this.timestamp = Date.now();
-  }
-}
+import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
@@ -168,14 +143,20 @@ export class GeminiProvider extends BaseAIProvider {
       } catch (error) {
         logger.warn(`[Gemini] Fallback segment ${i + 1} failed:`, error);
         
-        // Handle different error types appropriately
-        if (this._isQuotaError(error) || error.type === 'QUOTA_EXCEEDED') {
-          const errorDetails = this._parseErrorDetails(error);
-          throw new QuotaExceededError(error, errorDetails);
+        // Handle different error types appropriately using centralized error management
+        if (this._isQuotaError(error) || error.type === ErrorTypes.QUOTA_EXCEEDED) {
+          await ErrorHandler.getInstance().handle(error, {
+            context: 'gemini-fallback-quota',
+            type: ErrorTypes.QUOTA_EXCEEDED
+          });
+          throw error; // Re-throw after handling
         }
-        if (this._isRateLimitError(error) || error.type === 'RATE_LIMIT_EXCEEDED') {
-          const errorDetails = this._parseErrorDetails(error);
-          throw new RateLimitError(error, errorDetails);
+        if (this._isRateLimitError(error) || error.type === ErrorTypes.RATE_LIMIT_REACHED) {
+          await ErrorHandler.getInstance().handle(error, {
+            context: 'gemini-fallback-rate-limit',
+            type: ErrorTypes.RATE_LIMIT_REACHED
+          });
+          throw error; // Re-throw after handling
         }
         
         results.push(batch[i]); // Fallback to original text for other errors
@@ -351,17 +332,25 @@ export class GeminiProvider extends BaseAIProvider {
       logger.info('_executeApiCall completed with result:', result);
       return result;
     } catch (error) {
-      // Enhanced error handling with detailed analysis
+      // Enhanced error handling with detailed analysis using centralized error management
       const errorDetails = this._parseErrorDetails(error);
       
       if (this._isQuotaError(error)) {
         logger.error(`[Gemini] Quota exceeded: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms, temporary: ${errorDetails.isTemporary}`);
-        throw new QuotaExceededError(error, errorDetails);
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'gemini-translation-quota',
+          type: ErrorTypes.QUOTA_EXCEEDED
+        });
+        throw error; // Re-throw after handling
       }
       
       if (this._isRateLimitError(error)) {
         logger.warn(`[Gemini] Rate limit hit: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms`);
-        throw new RateLimitError(error, errorDetails);
+        await ErrorHandler.getInstance().handle(error, {
+          context: 'gemini-translation-rate-limit',
+          type: ErrorTypes.RATE_LIMIT_REACHED
+        });
+        throw error; // Re-throw after handling
       }
       
       // If thinking-related error occurs, retry without thinking config
@@ -395,10 +384,18 @@ export class GeminiProvider extends BaseAIProvider {
           const fallbackErrorDetails = this._parseErrorDetails(fallbackError);
           
           if (this._isQuotaError(fallbackError)) {
-            throw new QuotaExceededError(fallbackError, fallbackErrorDetails);
+            await ErrorHandler.getInstance().handle(fallbackError, {
+              context: 'gemini-translation-fallback-quota',
+              type: ErrorTypes.QUOTA_EXCEEDED
+            });
+            throw fallbackError; // Re-throw after handling
           }
           if (this._isRateLimitError(fallbackError)) {
-            throw new RateLimitError(fallbackError, fallbackErrorDetails);
+            await ErrorHandler.getInstance().handle(fallbackError, {
+              context: 'gemini-translation-fallback-rate-limit',
+              type: ErrorTypes.RATE_LIMIT_REACHED
+            });
+            throw fallbackError; // Re-throw after handling
           }
           
           // Re-throw fallback error with enhanced context
@@ -511,15 +508,18 @@ export class GeminiProvider extends BaseAIProvider {
       );
       return result;
     } catch (error) {
-      logger.error('image translation failed with error:', error
-      );
-      throw error;
+      logger.error('image translation failed with error:', error);
+      await ErrorHandler.getInstance().handle(error, {
+        context: 'gemini-image-translation',
+        type: ErrorTypes.TRANSLATION_FAILED
+      });
+      throw error; // Re-throw after handling
     }
   }
 
   /**
    * Create error with proper type
-   * @param {string} type - Error type
+   * @param {string} type - Error type from ErrorTypes
    * @param {string} message - Error message
    * @returns {Error} Error object
    * @private
