@@ -345,7 +345,7 @@ export class TranslationEngine {
     
     // Force reload configurations to ensure latest rate limiting settings
     rateLimitManager.reloadConfigurations();
-    const OPTIMAL_BATCH_SIZE = 10;
+    const OPTIMAL_BATCH_SIZE = 25; // Increased from 10 for better efficiency
     const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
@@ -493,6 +493,15 @@ export class TranslationEngine {
     let currentBatch = [];
     let currentBatchComplexity = 0;
     
+    // Smart batching for small texts: use single batch if total segments <= 20
+    const totalSegments = segments.length;
+    const totalComplexity = segments.reduce((sum, seg) => sum + this.calculateTextComplexity(seg), 0);
+    
+    if (totalSegments <= 20 || totalComplexity < 300) {
+      logger.debug(`[TranslationEngine] Using single batch for ${totalSegments} segments (complexity: ${totalComplexity})`);
+      return [segments];
+    }
+    
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
       const segmentComplexity = this.calculateTextComplexity(segment);
@@ -502,7 +511,7 @@ export class TranslationEngine {
       
       // Check if adding this segment would exceed batch limits
       const wouldExceedSize = currentBatch.length >= adjustedBatchSize;
-      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 200;
+      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 400; // Increased from 200 for better efficiency
       
       if (wouldExceedSize || wouldExceedComplexity) {
         if (currentBatch.length > 0) {
