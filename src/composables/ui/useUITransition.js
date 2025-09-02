@@ -233,7 +233,7 @@ export const createLanguageTransition = (watchSource, options = {}) => {
   return useUITransition({
     watchSource,
     transitionType: 'language',
-    duration: 600,
+    duration: 300,
     customShimmerColor: 'var(--color-primary-rgb, 59, 130, 246)',
     ...options
   })
@@ -243,7 +243,7 @@ export const createThemeTransition = (watchSource, options = {}) => {
   return useUITransition({
     watchSource,
     transitionType: 'theme',
-    duration: 500,
+    duration: 300,
     customShimmerColor: 'var(--color-accent-rgb, 99, 102, 241)',
     ...options
   })
