@@ -20,7 +20,7 @@ export class CustomProvider extends BaseAIProvider {
   static supportsDictionary = true;
   
   // AI Provider capabilities - Safe defaults for unknown APIs
-  static supportsStreaming = false; // Disable by default for unknown APIs
+  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
   static preferredBatchStrategy = 'fixed';
   static optimalBatchSize = 10; // Conservative batch size
   static maxComplexity = 200;

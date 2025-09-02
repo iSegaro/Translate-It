@@ -128,9 +128,9 @@ export const PROVIDER_CONFIGURATIONS = {
       singleBatchThreshold: 10
     },
     streaming: {
-      enabled: false, // Disable streaming initially for stability
+      enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
-      realTimeUpdates: false
+      realTimeUpdates: true
     },
     errorHandling: {
       quotaTypes: [
@@ -218,9 +218,9 @@ export const PROVIDER_CONFIGURATIONS = {
       singleBatchThreshold: 25
     },
     streaming: {
-      enabled: false, // Disable until local streaming is implemented
+      enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
-      realTimeUpdates: false
+      realTimeUpdates: true
     },
     errorHandling: {
       quotaTypes: [
@@ -262,9 +262,9 @@ export const PROVIDER_CONFIGURATIONS = {
       singleBatchThreshold: 10
     },
     streaming: {
-      enabled: false, // Disable by default for unknown APIs
+      enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
-      realTimeUpdates: false
+      realTimeUpdates: true
     },
     errorHandling: {
       quotaTypes: [

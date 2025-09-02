@@ -20,7 +20,7 @@ export class DeepSeekProvider extends BaseAIProvider {
   static supportsDictionary = true;
   
   // AI Provider capabilities - Conservative settings for DeepSeek
-  static supportsStreaming = false; // Disable streaming initially for stability
+  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
   static preferredBatchStrategy = 'fixed';
   static optimalBatchSize = 10;
   static maxComplexity = 200;

@@ -19,7 +19,7 @@ export class WebAIProvider extends BaseAIProvider {
   static supportsDictionary = true;
   
   // AI Provider capabilities - Relaxed settings for local server
-  static supportsStreaming = false; // Disable until local streaming is implemented
+  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 20; // Larger batches for local processing
   static maxComplexity = 400;
