@@ -297,12 +297,14 @@ export class BaseProvider {
 
   /**
    * Processes an array of text segments in batches, respecting provider-specific limits.
+   * Uses sequential processing with rate limiting to prevent API limits.
    * @param {Array<string>} segments - The array of text segments to translate.
    * @param {Function} translateChunk - A function that takes a chunk (an array of strings) and translates it.
    * @param {Object} limits - An object with `CHUNK_SIZE` and `CHAR_LIMIT`.
+   * @param {AbortController} abortController - Optional abort controller for cancellation.
    * @returns {Promise<Array<string>>} - A promise that resolves to an array of translated segments.
    */
-  async _processInBatches(segments, translateChunk, limits) {
+  async _processInBatches(segments, translateChunk, limits, abortController = null) {
     const { CHUNK_SIZE, CHAR_LIMIT } = limits;
     const chunks = [];
     let currentChunk = [];
@@ -339,8 +341,37 @@ export class BaseProvider {
       chunks.push(currentChunk);
     }
 
-    const chunkPromises = chunks.map(chunk => translateChunk(chunk));
-    const translatedChunks = await Promise.all(chunkPromises);
+    // Import rate limiting manager
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+
+    // Process chunks sequentially with rate limiting
+    const translatedChunks = [];
+    for (let i = 0; i < chunks.length; i++) {
+      // Check for cancellation
+      if (abortController && abortController.signal.aborted) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
+      }
+
+      const chunk = chunks[i];
+      const context = `batch-${i + 1}/${chunks.length}`;
+
+      try {
+        // Execute with rate limiting
+        const result = await rateLimitManager.executeWithRateLimit(
+          this.providerName,
+          () => translateChunk(chunk),
+          context
+        );
+        
+        translatedChunks.push(result);
+      } catch (error) {
+        logger.error(`[${this.providerName}] Chunk ${i + 1} failed:`, error);
+        // For failed chunks, return the original text
+        translatedChunks.push(chunk);
+      }
+    }
 
     return translatedChunks.flat();
   }

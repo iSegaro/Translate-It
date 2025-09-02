@@ -84,11 +84,14 @@ function promiseTimeout(promise, ms) {
 }
 
 export async function sendReliable(message, opts = {}) {
+  // Special handling for translation requests to prevent duplicate processing
+  const isTranslateMessage = message.action === 'TRANSLATE'
+  
   const {
     ackTimeout = 1000,
-    retries = 2,
+    retries = isTranslateMessage ? 0 : 2, // No retries for translation requests
     backoff = [300, 1000, 2000], // Enhanced backoff strategy
-    totalTimeout = 12000,
+    totalTimeout = isTranslateMessage ? 8000 : 12000, // Shorter timeout for translations
   } = opts
 
   // Check circuit breaker before attempting

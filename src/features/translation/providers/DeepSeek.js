@@ -7,6 +7,10 @@ import {
 } from "@/shared/config/config.js";
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
 export class DeepSeekProvider extends BaseProvider {
   static type = "ai";
@@ -18,17 +22,37 @@ export class DeepSeekProvider extends BaseProvider {
     super("DeepSeek");
   }
 
-  async translate(text, sourceLang, targetLang, options) {
-    let { mode, originalSourceLang, originalTargetLang } = options;
+  _getLangCode(lang) {
+    // DeepSeek works well with full language names, no mapping needed
+    return LanguageSwappingService._normalizeLangValue(lang);
+  }
 
-    if (this._isSameLanguage(sourceLang, targetLang)) return null;
+  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    const results = [];
+    
+    for (let i = 0; i < texts.length; i++) {
+      if (engine && engine.isCancelled(messageId)) {
+        throw new Error('Translation cancelled');
+      }
+      
+      try {
+        const result = await rateLimitManager.executeWithRateLimit(
+          this.providerName,
+          () => this._translateSingle(texts[i], sl, tl, translateMode),
+          `segment-${i + 1}/${texts.length}`
+        );
+        results.push(result || texts[i]);
+      } catch (error) {
+        logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
+        results.push(texts[i]); // Return original text on failure
+      }
+    }
+    
+    return results;
+  }
 
-    // Language swapping
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
-      { providerName: this.providerName, useRegexFallback: true }
-    );
-
+  async _translateSingle(text, sourceLang, targetLang, translateMode) {
     const [apiKey, model] = await Promise.all([
       getDeepSeekApiKeyAsync(),
       getDeepSeekApiModelAsync(),
@@ -45,7 +69,7 @@ export class DeepSeekProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode,
+      translateMode,
       this.constructor.type
     );
 
@@ -67,6 +91,7 @@ export class DeepSeekProvider extends BaseProvider {
       fetchOptions,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
     });
   }
 }

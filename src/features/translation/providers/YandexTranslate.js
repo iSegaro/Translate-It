@@ -104,7 +104,12 @@ export class YandexTranslateProvider extends BaseProvider {
         return result || chunk.map(() => '');
       });
 
-      const translatedChunks = await Promise.all(chunkPromises);
+      // Process chunks sequentially with rate limiting
+      const translatedChunks = [];
+      for (const chunkPromise of chunkPromises) {
+        const result = await chunkPromise;
+        translatedChunks.push(result);
+      }
       return translatedChunks.flat();
 
     } catch (error) {

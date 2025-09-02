@@ -58,68 +58,95 @@ export class GoogleTranslateProvider extends BaseProvider {
       chunks.push(currentChunk);
     }
 
-    const chunkPromises = chunks.map(async (chunk) => {
-      const apiUrl = await getGoogleTranslateUrlAsync();
-      const queryParams = new URLSearchParams({
-        client: 'gtx',
-        sl: sl,
-        tl: tl,
-        dt: 't',
-      });
+    // Import rate limiting manager
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
 
-      if (shouldIncludeDictionary && chunk.length === 1) {
-        queryParams.append('dt', 'bd');
+    // Process chunks sequentially with rate limiting instead of Promise.all
+    const translatedChunks = [];
+    for (let i = 0; i < chunks.length; i++) {
+      // Check for cancellation
+      if (abortController && abortController.signal.aborted) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
       }
 
-      const textToTranslate = chunk.join(RELIABLE_DELIMITER);
-      const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
+      const chunk = chunks[i];
+      const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
 
-      const result = await this._executeApiCall({
-        url: `${apiUrl}?${queryParams.toString()}`,
-        fetchOptions: {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          },
-          body: requestBody,
-        },
-        extractResponse: (data) => {
-          if (!data?.[0]?.[0]?.[0]) {
-            return { translatedSegments: chunk.map(() => ''), candidateText: '' };
-          }
-
-          const translatedText = data[0].map(segment => segment[0]).join('');
-          const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
-
-          if (translatedSegments.length !== chunk.length) {
-            logger.warn("[Google] Translated segment count mismatch after splitting.", { 
-              expected: chunk.length, 
-              got: translatedSegments.length 
+      try {
+        // Execute chunk translation with rate limiting
+        const result = await rateLimitManager.executeWithRateLimit(
+          this.providerName,
+          async () => {
+            const apiUrl = await getGoogleTranslateUrlAsync();
+            const queryParams = new URLSearchParams({
+              client: 'gtx',
+              sl: sl,
+              tl: tl,
+              dt: 't',
             });
-            return { translatedSegments: [translatedText], candidateText: '' };
-          }
 
-          let candidateText = "";
-          if (shouldIncludeDictionary && data[1]) {
-            candidateText = data[1].map((dict) => {
-              const pos = dict[0] || "";
-              const terms = dict[1] || [];
-              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-            }).join("");
-          }
+            if (shouldIncludeDictionary && chunk.length === 1) {
+              queryParams.append('dt', 'bd');
+            }
 
-          return {
-            translatedSegments,
-            candidateText: candidateText.trim(),
-          };
-        },
-        context: `${context}-chunk`,
-        abortController,
-      });
-      return result || { translatedSegments: chunk.map(() => ''), candidateText: '' };
-    });
+            const textToTranslate = chunk.join(RELIABLE_DELIMITER);
+            const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
-    const translatedChunks = await Promise.all(chunkPromises);
+            return await this._executeApiCall({
+              url: `${apiUrl}?${queryParams.toString()}`,
+              fetchOptions: {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                },
+                body: requestBody,
+              },
+              extractResponse: (data) => {
+                if (!data?.[0]?.[0]?.[0]) {
+                  return { translatedSegments: chunk.map(() => ''), candidateText: '' };
+                }
+
+                const translatedText = data[0].map(segment => segment[0]).join('');
+                const translatedSegments = translatedText.split(RELIABLE_DELIMITER);
+
+                if (translatedSegments.length !== chunk.length) {
+                  logger.warn("[Google] Translated segment count mismatch after splitting.", { 
+                    expected: chunk.length, 
+                    got: translatedSegments.length 
+                  });
+                  return { translatedSegments: [translatedText], candidateText: '' };
+                }
+
+                let candidateText = "";
+                if (shouldIncludeDictionary && data[1]) {
+                  candidateText = data[1].map((dict) => {
+                    const pos = dict[0] || "";
+                    const terms = dict[1] || [];
+                    return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+                  }).join("");
+                }
+
+                return {
+                  translatedSegments,
+                  candidateText: candidateText.trim(),
+                };
+              },
+              context: chunkContext,
+              abortController,
+            });
+          },
+          chunkContext
+        );
+
+        translatedChunks.push(result || { translatedSegments: chunk.map(() => ''), candidateText: '' });
+      } catch (error) {
+        logger.error(`[Google] Chunk ${i + 1} failed:`, error);
+        // Fallback for failed chunks
+        translatedChunks.push({ translatedSegments: chunk.map(() => ''), candidateText: '' });
+      }
+    }
     const allTranslated = translatedChunks.flatMap(chunk => chunk.translatedSegments);
 
     if (texts.length !== allTranslated.length) {

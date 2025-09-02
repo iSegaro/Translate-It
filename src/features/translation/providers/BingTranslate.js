@@ -81,28 +81,55 @@ export class BingTranslateProvider extends BaseProvider {
       }
       if (currentBatch.length > 0) initialBatches.push(currentBatch);
 
+      // Import rate limiting manager
+      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+
       const processingQueue = [...initialBatches];
+      let processedCount = 0;
+      
       while (processingQueue.length > 0) {
         logger.debug(`[Bing] Loop start. Aborted: ${engine.isCancelled(messageId)}`);
         if (engine.isCancelled(messageId)) throw new Error("Translation cancelled");
 
         const batch = processingQueue.shift();
         const textsOnly = batch.map(item => item.text);
-        const translatedSegments = await this._translateChunk(textsOnly, sl, tl, tokenData, abortController);
+        processedCount++;
+        const context = `batch-${processedCount}/${initialBatches.length}`;
 
-        if (translatedSegments !== null) {
-          if (translatedSegments.length === batch.length) {
-            batch.forEach((item, i) => { finalResults[item.index] = translatedSegments[i]; });
+        try {
+          // Execute with rate limiting
+          const translatedSegments = await rateLimitManager.executeWithRateLimit(
+            this.providerName,
+            () => this._translateChunk(textsOnly, sl, tl, tokenData, abortController),
+            context
+          );
+
+          if (translatedSegments !== null) {
+            if (translatedSegments.length === batch.length) {
+              batch.forEach((item, i) => { finalResults[item.index] = translatedSegments[i]; });
+            } else {
+              batch.forEach(item => finalResults[item.index] = item.text);
+            }
           } else {
-            batch.forEach(item => finalResults[item.index] = item.text);
+            if (batch.length > 1) {
+              const mid = Math.ceil(batch.length / 2);
+              processingQueue.unshift(batch.slice(mid), batch.slice(0, mid));
+            } else {
+              const failedItem = batch[0];
+              logger.error(`[Bing] Segment could not be translated: "${failedItem.text.substring(0, 100)}"...`);
+              finalResults[failedItem.index] = failedItem.text;
+            }
           }
-        } else {
+        } catch (error) {
+          logger.warn(`[Bing] Batch ${context} failed with rate limiting:`, error);
+          
+          // Handle batch splitting even on rate limit failures
           if (batch.length > 1) {
             const mid = Math.ceil(batch.length / 2);
             processingQueue.unshift(batch.slice(mid), batch.slice(0, mid));
           } else {
             const failedItem = batch[0];
-            logger.error(`[Bing] Segment could not be translated: "${failedItem.text.substring(0, 100)}"...`);
+            logger.error(`[Bing] Single item failed: "${failedItem.text.substring(0, 100)}"...`);
             finalResults[failedItem.index] = failedItem.text;
           }
         }

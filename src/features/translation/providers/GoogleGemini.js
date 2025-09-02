@@ -25,16 +25,52 @@ export class GeminiProvider extends BaseProvider {
     super("Gemini");
   }
 
-  async translate(text, sourceLang, targetLang, options) {
-    let { mode, originalSourceLang, originalTargetLang } = options;
-    if (this._isSameLanguage(sourceLang, targetLang)) return null;
+  /**
+   * Convert language to Gemini-specific format
+   */
+  _getLangCode(lang) {
+    // Gemini uses full language names, so we return the input as-is
+    return lang || "auto";
+  }
 
-    // Language swapping
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
-      { providerName: this.providerName, useRegexFallback: true }
-    );
+  /**
+   * Batch translate implementation for rate limiting integration
+   */
+  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
+    logger.debug(`[Gemini] _batchTranslate called with ${texts.length} segments`);
+    
+    // For Gemini, we process each text individually since it's an AI service
+    // Import rate limiting manager
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    
+    const results = [];
+    
+    for (let i = 0; i < texts.length; i++) {
+      if (engine && engine.isCancelled(messageId)) {
+        throw new Error('Translation cancelled');
+      }
+      
+      try {
+        const result = await rateLimitManager.executeWithRateLimit(
+          this.providerName,
+          () => this._translateSingle(texts[i], sl, tl, translateMode),
+          `segment-${i + 1}/${texts.length}`
+        );
+        
+        results.push(result || texts[i]); // Fallback to original if translation fails
+      } catch (error) {
+        logger.warn(`[Gemini] Segment ${i + 1} failed:`, error);
+        results.push(texts[i]); // Fallback to original text
+      }
+    }
+    
+    return results;
+  }
 
+  /**
+   * Single text translation - extracted from original translate method
+   */
+  async _translateSingle(text, sourceLang, targetLang, translateMode) {
     const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
       getApiKeyAsync(),
       getGeminiModelAsync(),
@@ -64,7 +100,7 @@ export class GeminiProvider extends BaseProvider {
       text,
       sourceLang,
       targetLang,
-      mode,
+      translateMode,
       this.constructor.type
     );
 

@@ -73,6 +73,12 @@ export class TranslationEngine {
     // Track this translation for cancellation
     const messageId = request.messageId;
     if (messageId) {
+      // Check if this messageId is already being processed
+      if (this.activeTranslations.has(messageId)) {
+        logger.warn(`[TranslationEngine] Translation already in progress for messageId: ${messageId}. Ignoring duplicate request.`);
+        throw new Error(`Translation already in progress for messageId: ${messageId}`);
+      }
+      
       const abortController = new AbortController();
       this.activeTranslations.set(messageId, abortController);
       logger.debug(`[TranslationEngine] Tracking translation: ${messageId}`);
@@ -388,19 +394,64 @@ export class TranslationEngine {
       const providerClass = providerInstance?.constructor;
       const isAiProvider = providerClass?.type === 'ai';
 
-      // Bing-specific optimization: smaller batches for better reliability
-      const BATCH_SIZE = provider === 'BingTranslate' ? 3 : (isAiProvider ? 32 : 8);
-      const MAX_CONCURRENT = provider === 'BingTranslate' ? 1 : (isAiProvider ? 2 : 2);
-      
-      // Process in batches with intelligent grouping
-      const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
-      
-      let batchIndex = 0;
-      const workers = Array.from({ length: Math.min(MAX_CONCURRENT, batches.length) }, async () => {
-        while (true) {
-          const idx = batchIndex++;
-          if (idx >= batches.length) break;
+      // Get abort controller for this translation
+      const abortController = messageId ? this.activeTranslations.get(messageId) : null;
+
+      if (isAiProvider) {
+        // AI providers: Direct segment-by-segment translation to avoid duplicate batch processing
+        logger.debug(`[TranslationEngine] Processing ${uncachedIndices.length} segments directly for AI provider: ${provider}`);
+        
+        // Prepare texts for uncached segments
+        const uncachedTexts = uncachedIndices.map(i => segments[i]);
+        
+        try {
+          // Use provider's _batchTranslate method directly
+          const translatedTexts = await providerInstance._batchTranslate(
+            uncachedTexts,
+            sourceLanguage,
+            targetLanguage, 
+            mode,
+            this,
+            messageId,
+            abortController
+          );
           
+          // Map results back to original positions
+          for (let i = 0; i < uncachedIndices.length; i++) {
+            const originalIndex = uncachedIndices[i];
+            results[originalIndex] = translatedTexts[i];
+            translationStatus[originalIndex] = true;
+            
+            // Cache the result
+            const cacheKey = this.generateCacheKey({
+              text: segments[originalIndex],
+              provider,
+              sourceLanguage,
+              targetLanguage,
+              mode
+            });
+            this.cache.set(cacheKey, { translatedText: translatedTexts[i], cachedAt: Date.now() });
+          }
+        } catch (error) {
+          logger.error(`[TranslationEngine] AI provider batch translation failed:`, error);
+          
+          // Fallback to original texts
+          for (const originalIndex of uncachedIndices) {
+            results[originalIndex] = segments[originalIndex];
+            translationStatus[originalIndex] = false;
+          }
+          
+          errorMessages.push(error.message || 'AI translation failed');
+        }
+      } else {
+        // Traditional providers: Use batch processing
+        logger.debug(`[TranslationEngine] Using batch processing for traditional provider: ${provider}`);
+        
+        const BATCH_SIZE = provider === 'BingTranslate' ? 3 : 8;
+        const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
+        
+        // Process batches sequentially
+        for (let idx = 0; idx < batches.length; idx++) {
           // Check if we should stop due to language pair error or too many batch failures
           if (sharedState.shouldStopDueToLanguagePairError) {
             logger.debug(`[TranslationEngine] Skipping batch ${idx} due to language pair error`);
@@ -412,10 +463,7 @@ export class TranslationEngine {
             break;
           }
 
-          // Get abort controller for this translation
-          const abortController = messageId ? this.activeTranslations.get(messageId) : null;
-          
-          // Check if translation was cancelled (both AbortController and shared state)
+          // Check if translation was cancelled
           if (abortController && abortController.signal.aborted) {
             logger.debug(`[TranslationEngine] Translation was cancelled via AbortController, skipping batch ${idx}`);
             sharedState.isCancelled = true;
@@ -433,9 +481,7 @@ export class TranslationEngine {
             provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
           }, errorMessages, sharedState, abortController);
         }
-      });
-
-      await Promise.all(workers);
+      }
     }
 
     // Check if any translation actually succeeded
@@ -686,12 +732,13 @@ export class TranslationEngine {
       return { idx, result: segments[idx], success: false };
     });
     
-    const individualResults = await Promise.all(individualPromises);
-    individualResults.forEach(({ idx, result, success }) => {
+    // Process individual translations sequentially instead of Promise.all()
+    for (const individualPromise of individualPromises) {
+      const { idx, result, success } = await individualPromise;
       results[idx] = result;
       // Mark as successful if API call succeeded, regardless of text change
       translationStatus[idx] = success;
-    });
+    }
   }
 
   /**
