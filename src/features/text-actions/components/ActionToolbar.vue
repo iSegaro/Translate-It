@@ -252,13 +252,8 @@ const handleTTSStateChanged = (data) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
+  /* transition: opacity 0.2s ease, visibility 0.2s ease; */
   width: 100%;
-}
-
-.action-toolbar:not(.visible) {
-  opacity: 0;
-  visibility: hidden;
 }
 
 /* Toolbar groups */
