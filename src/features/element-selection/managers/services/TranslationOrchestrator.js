@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from "../../../../shared/logging/logConstants.js";
 import { getTimeoutAsync, TranslationMode } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { generateContentMessageId } from "@/utils/messaging/messageId.js";
-import { TRANSLATION_TIMEOUT_FALLBACK } from "../constants/selectElementConstants.js";
+import { TRANSLATION_TIMEOUT_FALLBACK, TIMEOUT_CONFIG } from "../constants/selectElementConstants.js";
 
 import { getTranslationString } from "../../../../utils/i18n/i18n.js";
 import { sendSmart } from "@/shared/messaging/core/SmartMessaging.js";
@@ -27,6 +27,55 @@ export class TranslationOrchestrator {
 
   async initialize() {
     this.logger.debug('TranslationOrchestrator initialized');
+    
+    // Set up periodic cleanup of old timeout requests (every 5 minutes)
+    setInterval(() => this.cleanupOldTimeoutRequests(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Clean up old timeout requests that are unlikely to receive late results
+   */
+  cleanupOldTimeoutRequests() {
+    const now = Date.now();
+    const maxAge = 10 * 60 * 1000; // 10 minutes
+    let cleanedCount = 0;
+
+    for (const [messageId, request] of this.translationRequests) {
+      if (request.status === 'timeout' && request.timeoutAt) {
+        const age = now - request.timeoutAt;
+        if (age > maxAge) {
+          this.translationRequests.delete(messageId);
+          cleanedCount++;
+        }
+      }
+    }
+
+    if (cleanedCount > 0) {
+      this.logger.debug(`Cleaned up ${cleanedCount} old timeout requests`);
+    }
+  }
+
+  /**
+   * Calculate dynamic timeout based on the number of segments to translate
+   * @param {number} segmentCount - Number of translation segments
+   * @returns {number} - Timeout in milliseconds
+   */
+  calculateDynamicTimeout(segmentCount) {
+    if (!segmentCount || segmentCount <= 0) {
+      return TRANSLATION_TIMEOUT_FALLBACK;
+    }
+
+    // Calculate timeout: base + (segments × time per segment)
+    const calculatedTimeout = TIMEOUT_CONFIG.BASE_TIMEOUT + (segmentCount * TIMEOUT_CONFIG.TIME_PER_SEGMENT);
+    
+    // Apply min/max constraints
+    const finalTimeout = Math.max(
+      TIMEOUT_CONFIG.MIN_TIMEOUT,
+      Math.min(calculatedTimeout, TIMEOUT_CONFIG.MAX_TIMEOUT)
+    );
+
+    this.logger.debug(`Dynamic timeout calculated: ${segmentCount} segments → ${finalTimeout}ms (${finalTimeout/1000}s)`);
+    return finalTimeout;
   }
 
   async processSelectedElement(element, originalTextsMap, textNodes) {
@@ -91,7 +140,7 @@ export class TranslationOrchestrator {
       });
 
       await this.sendTranslationRequest(messageId, jsonPayload);
-      await this.setupTranslationWaiting(messageId, element);
+      await this.setupTranslationWaiting(messageId, element, expandedTexts.length);
 
     } catch (error) {
       // Don't log or handle errors that are already handled
@@ -146,9 +195,18 @@ export class TranslationOrchestrator {
     }
   }
 
-  async setupTranslationWaiting(messageId, element) {
+  async setupTranslationWaiting(messageId, element, segmentCount = 0) {
     this.logger.debug("Setting up translation waiting for message:", messageId);
-    const timeout = await getTimeoutAsync() || TRANSLATION_TIMEOUT_FALLBACK;
+    
+    // Use dynamic timeout based on segment count, fallback to config timeout
+    let timeout;
+    if (segmentCount > 0) {
+      timeout = this.calculateDynamicTimeout(segmentCount);
+      this.logger.info(`Using dynamic timeout for ${segmentCount} segments: ${timeout/1000}s`);
+    } else {
+      timeout = await getTimeoutAsync() || TRANSLATION_TIMEOUT_FALLBACK;
+      this.logger.info(`Using standard config timeout: ${timeout/1000}s`);
+    }
 
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error(`Translation timeout after ${timeout}ms`)), timeout);
@@ -165,8 +223,17 @@ export class TranslationOrchestrator {
       
       const request = this.translationRequests.get(messageId);
       if (request) {
-        request.status = 'error';
-        request.error = error.message;
+        // For timeout errors, mark as 'timeout' instead of deleting the request
+        // This allows late results to be handled gracefully
+        if (error.message && error.message.includes('timeout')) {
+          request.status = 'timeout';
+          request.error = error.message;
+          request.timeoutAt = Date.now();
+          this.logger.warn(`Translation marked as timeout for messageId: ${messageId}. Will handle late results gracefully.`);
+        } else {
+          request.status = 'error';
+          request.error = error.message;
+        }
       }
       throw error;
     } finally {
@@ -228,12 +295,28 @@ export class TranslationOrchestrator {
       return;
     }
     
+    // Handle late results for timed-out translations
+    if (request.status === 'timeout') {
+      const timesinceTimeout = Date.now() - (request.timeoutAt || 0);
+      this.logger.info(`Received late translation result for timed-out messageId: ${messageId} (${timesinceTimeout}ms after timeout)`);
+      
+      // If it's a successful late result, we can still apply it
+      if (data?.success) {
+        this.logger.info("Applying late translation result despite timeout");
+        // Continue with normal processing
+      } else {
+        // If late result is also an error, just log and ignore
+        this.logger.warn("Late translation result is also an error, ignoring");
+        return;
+      }
+    }
+    
     if (request.status === 'cancelled') {
       this.logger.debug("Ignoring translation result for cancelled message:", messageId);
       return;
     }
     
-    if (request.status !== 'pending') {
+    if (request.status !== 'pending' && request.status !== 'timeout') {
       this.logger.debug("Received translation result for already completed message:", messageId);
       return;
     }

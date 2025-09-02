@@ -47,6 +47,14 @@ export const KEY_CODES = {
 // Translation timeout fallback
 export const TRANSLATION_TIMEOUT_FALLBACK = 15000; // 15 seconds
 
+// Dynamic timeout calculation constants
+export const TIMEOUT_CONFIG = {
+  BASE_TIMEOUT: 60000, // 1 minute base timeout
+  TIME_PER_SEGMENT: 5000, // 5 seconds per segment
+  MAX_TIMEOUT: 1800000, // 30 minutes maximum timeout
+  MIN_TIMEOUT: 60000, // 1 minute minimum timeout
+};
+
 // Cache configuration
 export const CACHE_CONFIG = {
   ELEMENT_VALIDATION: new WeakMap(),
@@ -62,5 +70,6 @@ export default {
   EVENT_OPTIONS,
   KEY_CODES,
   TRANSLATION_TIMEOUT_FALLBACK,
+  TIMEOUT_CONFIG,
   CACHE_CONFIG
 };
