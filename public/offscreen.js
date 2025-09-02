@@ -122,11 +122,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const overlayX = 32 - overlaySize - 2;
             const overlayY = 32 - overlaySize - 2;
 
-            // Add semi-transparent background for better visibility
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.fillRect(overlayX - 1, overlayY - 1, overlaySize + 2, overlaySize + 2);
-
-            // Draw provider icon
+            // Draw provider icon directly without background
             ctx.drawImage(overlayImg, overlayX, overlayY, overlaySize, overlaySize);
           }
 
