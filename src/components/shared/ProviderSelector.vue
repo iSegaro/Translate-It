@@ -355,6 +355,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
+  height: 32px;
 }
 
 .split-translate-button:hover {
@@ -611,7 +612,7 @@ onUnmounted(() => {
 
 /* Context-specific adjustments for popup vs sidepanel */
 .popup-wrapper .split-translate-button {
-  height: 28px;
+  height: 32px;
   min-width: 100px;
   align-self: center;
 }

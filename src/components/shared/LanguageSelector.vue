@@ -245,14 +245,17 @@ onMounted(async () => {
 .language-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   padding: 6px 12px;
   gap: 6px;
   background: var(--language-controls-bg-color);
+  margin: 8px 12px 0 12px;
 }
 
 .language-select {
-  flex: 1;
-  min-width: 100px;
+  flex: 1 1 80px;
+  min-width: 70px;
+  max-width: 120px;
   padding: 7px 8px;
   font-size: 14px;
   border: 1px solid var(--color-border);
@@ -267,6 +270,7 @@ onMounted(async () => {
   background-position: right 8px center; /* Move arrow to the right */
   background-size: 10px 5px;
   padding-right: 25px; /* Add space for the arrow */
+  vertical-align: middle;
 }
 
 .language-select:focus {
@@ -341,12 +345,14 @@ onMounted(async () => {
 .popup-wrapper .language-controls {
   align-items: center;
   height: auto;
+  justify-content: flex-end;
 }
 
 .popup-wrapper .language-select {
   padding: 6px 10px;
   font-size: 14px;
-  min-width: 90px;
+  min-width: 70px;
+  max-width: 100px;
   height: 32px;
   line-height: 1.4;
   display: flex;
