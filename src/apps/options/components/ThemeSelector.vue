@@ -116,7 +116,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const settingsStore = useSettingsStore()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ThemeSelector')
-
 const { t } = useI18n()
 
 const broadcastThemeChange = (theme) => {
