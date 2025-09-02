@@ -11,88 +11,18 @@ import { getProviderRateLimit } from './ProviderConfigurations.js';
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'RateLimitManager');
 
 /**
- * Legacy provider-specific rate limiting configurations (deprecated)
- * Now using ProviderConfigurations.js for centralized config management
+ * Default fallback configuration for unknown providers
  */
-const LEGACY_PROVIDER_CONFIGS = {
-  // Free translation services - moderate limits
-  'GoogleTranslate': {
-    maxConcurrent: 2,
-    delayBetweenRequests: 100,
-    burstLimit: 5,
-    burstWindow: 1000,
-  },
-  'BingTranslate': {
-    maxConcurrent: 2, // Increased from 1 to 2
-    delayBetweenRequests: 200,
-    burstLimit: 3,
-    burstWindow: 1500,
-  },
-  'YandexTranslate': {
-    maxConcurrent: 2,
-    delayBetweenRequests: 150,
-    burstLimit: 4,
-    burstWindow: 1200,
-  },
-  
-  // AI services - updated to 2 concurrent requests
-  'OpenAI': {
-    maxConcurrent: 2, // Increased from 1 to 2
-    delayBetweenRequests: 500,
-    burstLimit: 2,
-    burstWindow: 2000,
-  },
-  'Gemini': {
-    maxConcurrent: 1,
-    delayBetweenRequests: 5000, // Increased from 3000ms to 5000ms for safer rate limiting
-    burstLimit: 1, // Reduced from 2 to 1 to prevent quota issues  
-    burstWindow: 5000, // Increased burst window
-    adaptiveBackoff: {
-      enabled: true,
-      baseMultiplier: 2,
-      maxDelay: 45000, // Increased max delay
-      resetAfterSuccess: 3
-    }
-  },
-  'DeepSeek': {
-    maxConcurrent: 2, // Increased from 1 to 2
-    delayBetweenRequests: 400,
-    burstLimit: 3,
-    burstWindow: 2000,
-  },
-  'OpenRouter': {
-    maxConcurrent: 2, // Increased from 1 to 2
-    delayBetweenRequests: 300,
-    burstLimit: 3,
-    burstWindow: 1800,
-  },
-  
-  // Custom/Local services - relaxed limits
-  'CustomProvider': {
-    maxConcurrent: 3,
-    delayBetweenRequests: 50,
-    burstLimit: 10,
-    burstWindow: 1000,
-  },
-  'WebAI': {
-    maxConcurrent: 2,
-    delayBetweenRequests: 100,
-    burstLimit: 8,
-    burstWindow: 1500,
-  },
-  'BrowserAPI': {
-    maxConcurrent: 5,
-    delayBetweenRequests: 10,
-    burstLimit: 20,
-    burstWindow: 1000,
-  },
-  
-  // Default fallback config
-  'default': {
-    maxConcurrent: 2,
-    delayBetweenRequests: 200,
-    burstLimit: 3,
-    burstWindow: 1500,
+const DEFAULT_RATE_LIMIT_CONFIG = {
+  maxConcurrent: 2,
+  delayBetweenRequests: 1000,
+  burstLimit: 3,
+  burstWindow: 2000,
+  adaptiveBackoff: {
+    enabled: true,
+    baseMultiplier: 1.5,
+    maxDelay: 30000,
+    resetAfterSuccess: 2
   }
 };
 
@@ -133,14 +63,14 @@ export class RateLimitManager {
       return this.providerStates.get(providerName);
     }
     
-    // Try to get configuration from new ProviderConfigurations system
+    // Get configuration from centralized ProviderConfigurations system
     let config;
     try {
       config = getProviderRateLimit(providerName);
-      logger.debug(`Using new provider configuration for ${providerName}:`, config);
+      logger.debug(`Using provider configuration for ${providerName}:`, config);
     } catch (error) {
-      logger.debug(`Failed to load new configuration for ${providerName}, falling back to legacy:`, error.message);
-      config = LEGACY_PROVIDER_CONFIGS[providerName] || LEGACY_PROVIDER_CONFIGS.default;
+      logger.debug(`Failed to load configuration for ${providerName}, using default:`, error.message);
+      config = DEFAULT_RATE_LIMIT_CONFIG;
     }
     const state = {
       config: { ...config },
