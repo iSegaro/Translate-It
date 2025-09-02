@@ -108,23 +108,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const overlayImg = new Image();
 
       let loadedCount = 0;
+      let totalImages = cleanMessage.data.overlayBlob ? 2 : 1;
+
       const onLoad = () => {
         loadedCount++;
-        if (loadedCount === 2) {
+        if (loadedCount === totalImages) {
           // Draw base icon
           ctx.drawImage(baseImg, 0, 0, 32, 32);
 
-          // Draw provider icon as small overlay in bottom-right corner
-          const overlaySize = 12;
-          const overlayX = 32 - overlaySize - 2;
-          const overlayY = 32 - overlaySize - 2;
+          // Draw provider icon as small overlay in bottom-right corner if available
+          if (cleanMessage.data.overlayBlob) {
+            const overlaySize = 20;
+            const overlayX = 32 - overlaySize - 2;
+            const overlayY = 32 - overlaySize - 2;
 
-          // Add semi-transparent background for better visibility
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-          ctx.fillRect(overlayX - 1, overlayY - 1, overlaySize + 2, overlaySize + 2);
-
-          // Draw provider icon
-          ctx.drawImage(overlayImg, overlayX, overlayY, overlaySize, overlaySize);
+            // Draw provider icon directly without background
+            ctx.drawImage(overlayImg, overlayX, overlayY, overlaySize, overlaySize);
+          }
 
           // Convert to ImageData
           const imageData = ctx.getImageData(0, 0, 32, 32);
@@ -154,7 +154,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       overlayImg.crossOrigin = 'anonymous';
 
       baseImg.src = cleanMessage.data.baseBlob;
-      overlayImg.src = cleanMessage.data.overlayBlob;
+      if (cleanMessage.data.overlayBlob) {
+        overlayImg.src = cleanMessage.data.overlayBlob;
+      }
       
     } catch (error) {
       sendResponse({ success: false, error: 'Composite icon generation failed' });

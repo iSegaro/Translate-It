@@ -18,10 +18,14 @@ class DynamicIconManager {
     if (this.isInitialized) return;
 
     try {
-      // Set default provider
-      this.currentProvider = 'google';
+      // Get current provider from storage
+      const storedProvider = await storageManager.get('TRANSLATION_API');
+      this.currentProvider = storedProvider || 'google';
 
       logger.debug(`Current provider: ${this.currentProvider}`);
+
+      // Update icon immediately
+      await this.updateIcon();
 
       // Listen for settings changes
       storageManager.on('change', async (data) => {
@@ -96,36 +100,56 @@ class DynamicIconManager {
         logger.debug('Offscreen document already exists, skipping creation');
       }
 
-      logger.debug('Fetching base icon for the extension');
+      logger.debug('Fetching base and provider icons for composite generation');
 
-      const baseIconPath = `assets/icons/extension/extension_icon_128.png`;
-      let baseIcon = null;
-
-      logger.debug(`Attempting to fetch base icon from path: ${baseIconPath}`);
+      // Fetch base icon
+      const baseIconPath = `assets/icons/extension/extension_icon_32.png`;
+      let baseIconBlob = null;
 
       try {
         const resolvedBaseIconPath = browser.runtime.getURL(baseIconPath);
-        logger.debug(`Resolved base icon path: ${resolvedBaseIconPath}`);
+        logger.debug(`Fetching base icon from: ${resolvedBaseIconPath}`);
 
         const baseIconResponse = await fetch(resolvedBaseIconPath);
         if (!baseIconResponse.ok) {
           throw new Error(`Failed to fetch base icon. Status: ${baseIconResponse.status}`);
         }
-        const baseIconBlob = await baseIconResponse.blob();
-        baseIcon = await this.blobToBase64(baseIconBlob);
+        baseIconBlob = await baseIconResponse.blob();
+        logger.debug('Base icon fetched successfully');
       } catch (fetchError) {
-        logger.error('Failed to fetch or process base icon:', fetchError);
-        logger.warn('Proceeding without base icon overlay');
+        logger.error('Failed to fetch base icon:', fetchError);
+        return null; // Cannot proceed without base icon
       }
 
-      logger.debug(`Base icon data being sent: ${baseIcon ? baseIcon.substring(0, 100) : 'null'}`);
+      // Fetch provider icon
+      const providerIconPath = this.getProviderIconPath(provider);
+      let providerIconBlob = null;
 
-      logger.debug('Sending message to offscreen for icon generation');
-      // Send message to offscreen document to generate simple overlay icon
+      try {
+        const resolvedProviderIconPath = browser.runtime.getURL(providerIconPath);
+        logger.debug(`Fetching provider icon from: ${resolvedProviderIconPath}`);
+
+        const providerIconResponse = await fetch(resolvedProviderIconPath);
+        if (!providerIconResponse.ok) {
+          throw new Error(`Failed to fetch provider icon. Status: ${providerIconResponse.status}`);
+        }
+        providerIconBlob = await providerIconResponse.blob();
+        logger.debug('Provider icon fetched successfully');
+      } catch (fetchError) {
+        logger.error('Failed to fetch provider icon:', fetchError);
+        // Continue with base icon only
+      }
+
+      logger.debug('Sending message to offscreen for composite icon generation');
+
+      // Send message to offscreen document to generate composite icon
       const response = await browser.runtime.sendMessage({
         target: 'offscreen',
-        action: 'GENERATE_SIMPLE_OVERLAY_ICON',
-        data: { provider, baseIcon }
+        action: 'GENERATE_COMPOSITE_ICON',
+        data: { 
+          baseBlob: await this.blobToDataURL(baseIconBlob),
+          overlayBlob: providerIconBlob ? await this.blobToDataURL(providerIconBlob) : null
+        }
       });
 
       logger.debug('Received response from offscreen:', response);
@@ -140,7 +164,7 @@ class DynamicIconManager {
         return imageData;
       }
     } catch (error) {
-      logger.error('Failed to create simple overlay icon via offscreen:', error);
+      logger.error('Failed to create composite icon via offscreen:', error);
     }
 
     return null;
@@ -148,22 +172,22 @@ class DynamicIconManager {
 
   getProviderIconPath(provider) {
     const iconMap = {
-      'google': 'icons/providers/google.svg',
-      'gemini': 'icons/providers/gemini.svg',
-      'bing': 'icons/providers/bing.svg',
-      'yandex': 'icons/providers/yandex.svg',
-      'openai': 'icons/providers/openai.svg',
-      'openrouter': 'icons/providers/openrouter.svg',
-      'deepseek': 'icons/providers/deepseek.svg',
-      'webai': 'icons/providers/webai.svg',
-      'custom': 'icons/providers/custom.svg',
-      'browserapi': 'icons/providers/chrome-translate.svg'
+      'google': 'icons/providers/google.png',
+      'gemini': 'icons/providers/gemini.png',
+      'bing': 'icons/providers/bing.png',
+      'yandex': 'icons/providers/yandex.png',
+      'openai': 'icons/providers/openai.png',
+      'openrouter': 'icons/providers/openrouter.png',
+      'deepseek': 'icons/providers/deepseek.png',
+      'webai': 'icons/providers/webai.png',
+      'custom': 'icons/providers/custom.png',
+      'browserapi': 'icons/providers/chrome-translate.png'
     };
 
-    return 'assets/' + (iconMap[provider] || 'icons/providers/provider.svg');
+    return 'assets/' + (iconMap[provider] || 'icons/providers/provider.png');
   }
 
-  async blobToBase64(blob) {
+  async blobToDataURL(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
