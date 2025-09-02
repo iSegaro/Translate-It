@@ -78,8 +78,17 @@ export class ContentMessageHandler {
   }
 
   async handleStreamUpdate(message) {
+    this.logger.debug('[ContentMessageHandler] Received TRANSLATION_STREAM_UPDATE:', { 
+      messageId: message.messageId, 
+      success: message.data?.success,
+      batchIndex: message.data?.batchIndex,
+      hasSelectElementManager: !!this.selectElementManager 
+    });
+    
     if (this.selectElementManager) {
       return this.selectElementManager.translationOrchestrator.handleStreamUpdate(message);
+    } else {
+      this.logger.warn('[ContentMessageHandler] No selectElementManager available for stream update');
     }
   }
 

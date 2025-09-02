@@ -17,13 +17,28 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 
 // Custom Error for Quota Exceeded
 class QuotaExceededError extends Error {
-  constructor(originalError) {
+  constructor(originalError, details = {}) {
     super('Gemini API quota exceeded');
     this.type = 'QUOTA_EXCEEDED';
     this.provider = 'Gemini';
     this.originalError = originalError;
     this.suggestedProviders = ['BingTranslate', 'OpenAI'];
     this.userMessage = 'Gemini API quota finished. Try switching to Bing for better performance.';
+    this.retryAfter = details.retryAfter || 3600000; // 1 hour default
+    this.quotaType = details.quotaType || 'requests_per_minute';
+    this.timestamp = Date.now();
+  }
+}
+
+// Custom Error for Rate Limiting
+class RateLimitError extends Error {
+  constructor(originalError, details = {}) {
+    super('Gemini API rate limit exceeded');
+    this.type = 'RATE_LIMIT_EXCEEDED';
+    this.provider = 'Gemini';
+    this.originalError = originalError;
+    this.retryAfter = details.retryAfter || 60000; // 1 minute default
+    this.timestamp = Date.now();
   }
 }
 
@@ -118,22 +133,95 @@ export class GeminiProvider extends BaseProvider {
         results.push(result || batch[i]);
       } catch (error) {
         logger.warn(`[Gemini] Fallback segment ${i + 1} failed:`, error);
+        
+        // Handle different error types appropriately
         if (this._isQuotaError(error) || error.type === 'QUOTA_EXCEEDED') {
-          throw new QuotaExceededError(error); // Propagate quota error
+          const errorDetails = this._parseErrorDetails(error);
+          throw new QuotaExceededError(error, errorDetails);
         }
-        results.push(batch[i]); // Fallback to original text
+        if (this._isRateLimitError(error) || error.type === 'RATE_LIMIT_EXCEEDED') {
+          const errorDetails = this._parseErrorDetails(error);
+          throw new RateLimitError(error, errorDetails);
+        }
+        
+        results.push(batch[i]); // Fallback to original text for other errors
       }
     }
     return results;
   }
 
   _isQuotaError(error) {
-    return error.message && (
-      error.message.includes('quota') ||
-      error.message.includes('limit exceeded') ||
-      error.message.includes('429') ||
-      error.message.includes('RESOURCE_EXHAUSTED')
+    if (!error.message) return false;
+    
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('quota') ||
+      message.includes('limit exceeded') ||
+      message.includes('resource_exhausted') ||
+      message.includes('requests per minute') ||
+      message.includes('rate limit')
     );
+  }
+
+  _isRateLimitError(error) {
+    if (!error.message) return false;
+    
+    const message = error.message.toLowerCase();
+    return (
+      error.status === 429 ||
+      message.includes('429') ||
+      message.includes('too many requests') ||
+      message.includes('rate limit') ||
+      message.includes('throttled')
+    );
+  }
+
+  /**
+   * Parse error details from Gemini response
+   */
+  _parseErrorDetails(error) {
+    const details = {
+      quotaType: 'unknown',
+      retryAfter: null,
+      isTemporary: false
+    };
+    
+    if (!error.message) return details;
+    
+    const message = error.message.toLowerCase();
+    
+    // Determine quota/rate limit type
+    if (message.includes('requests per minute')) {
+      details.quotaType = 'requests_per_minute';
+      details.retryAfter = 60000; // 1 minute
+      details.isTemporary = true;
+    } else if (message.includes('requests per day')) {
+      details.quotaType = 'requests_per_day';
+      details.retryAfter = 24 * 60 * 60 * 1000; // 24 hours
+      details.isTemporary = false;
+    } else if (message.includes('tokens per minute')) {
+      details.quotaType = 'tokens_per_minute';
+      details.retryAfter = 60000;
+      details.isTemporary = true;
+    } else if (message.includes('concurrent requests')) {
+      details.quotaType = 'concurrent_requests';
+      details.retryAfter = 5000; // 5 seconds
+      details.isTemporary = true;
+    } else if (this._isRateLimitError(error)) {
+      details.quotaType = 'rate_limit';
+      details.retryAfter = 30000; // 30 seconds
+      details.isTemporary = true;
+    }
+    
+    // Try to extract retry-after from headers if available
+    if (error.headers && error.headers['retry-after']) {
+      const retryAfter = parseInt(error.headers['retry-after']);
+      if (!isNaN(retryAfter)) {
+        details.retryAfter = retryAfter * 1000; // Convert seconds to milliseconds
+      }
+    }
+    
+    return details;
   }
 
 
@@ -228,8 +316,17 @@ export class GeminiProvider extends BaseProvider {
       logger.info('_executeApiCall completed with result:', result);
       return result;
     } catch (error) {
+      // Enhanced error handling with detailed analysis
+      const errorDetails = this._parseErrorDetails(error);
+      
       if (this._isQuotaError(error)) {
-        throw new QuotaExceededError(error);
+        logger.error(`[Gemini] Quota exceeded: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms, temporary: ${errorDetails.isTemporary}`);
+        throw new QuotaExceededError(error, errorDetails);
+      }
+      
+      if (this._isRateLimitError(error)) {
+        logger.warn(`[Gemini] Rate limit hit: ${errorDetails.quotaType}, retry after: ${errorDetails.retryAfter}ms`);
+        throw new RateLimitError(error, errorDetails);
       }
       
       // If thinking-related error occurs, retry without thinking config
@@ -238,7 +335,7 @@ export class GeminiProvider extends BaseProvider {
         error.message.includes("thinkingBudget") &&
         requestBody.generationConfig?.thinkingConfig
       ) {
-        logger.debug('thinking parameter not supported, retrying without thinking...');
+        logger.debug('[Gemini] Thinking parameter not supported, retrying without thinking config...');
 
         // Remove thinking config and retry
         delete requestBody.generationConfig;
@@ -248,19 +345,35 @@ export class GeminiProvider extends BaseProvider {
           body: JSON.stringify(requestBody),
         };
 
-        const fallbackResult = await this._executeApiCall({
-          url,
-          fetchOptions: fallbackFetchOptions,
-          extractResponse: (data) =>
-            data?.candidates?.[0]?.content?.parts?.[0]?.text,
-          context: `${context}-fallback`,
-        });
+        try {
+          const fallbackResult = await this._executeApiCall({
+            url,
+            fetchOptions: fallbackFetchOptions,
+            extractResponse: (data) =>
+              data?.candidates?.[0]?.content?.parts?.[0]?.text,
+            context: `${context}-fallback`,
+          });
 
-        logger.info('fallback _executeApiCall completed with result:', fallbackResult);
-        return fallbackResult;
+          logger.info('[Gemini] Fallback without thinking config successful:', fallbackResult);
+          return fallbackResult;
+        } catch (fallbackError) {
+          const fallbackErrorDetails = this._parseErrorDetails(fallbackError);
+          
+          if (this._isQuotaError(fallbackError)) {
+            throw new QuotaExceededError(fallbackError, fallbackErrorDetails);
+          }
+          if (this._isRateLimitError(fallbackError)) {
+            throw new RateLimitError(fallbackError, fallbackErrorDetails);
+          }
+          
+          // Re-throw fallback error with enhanced context
+          fallbackError.context = `${this.providerName.toLowerCase()}-translation-fallback`;
+          fallbackError.provider = this.providerName;
+          throw fallbackError;
+        }
       }
 
-      logger.error('_executeApiCall failed with error:', error);
+      logger.error('[Gemini] Translation failed with error:', error);
       error.context = `${this.providerName.toLowerCase()}-translation`;
       error.provider = this.providerName;
       throw error;

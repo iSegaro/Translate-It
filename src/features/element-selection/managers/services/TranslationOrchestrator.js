@@ -195,9 +195,24 @@ export class TranslationOrchestrator {
 
   async handleStreamUpdate(message) {
     const { messageId, data } = message;
+    
+    this.logger.debug(`[TranslationOrchestrator] Received stream update:`, {
+      messageId,
+      success: data?.success,
+      batchIndex: data?.batchIndex,
+      translatedBatchLength: data?.data?.length,
+      originalBatchLength: data?.originalData?.length
+    });
 
     if (!data.success) {
         this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
+        
+        // Dismiss notification on error 
+        if (this.statusNotification) {
+          pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+          this.statusNotification = null;
+          this.logger.debug("Dismissed translating notification on stream error");
+        }
         return;
     }
 
@@ -205,15 +220,11 @@ export class TranslationOrchestrator {
     
     const request = this.translationRequests.get(messageId);
     if (!request) {
-      this.logger.warn("Received stream update for unknown message:", messageId);
+      this.logger.debug("Received stream update for already completed message:", messageId);
       return;
     }
 
-    // Dismiss the "Translating..." notification on first result
-    if (this.statusNotification) {
-      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
-      this.statusNotification = null;
-    }
+    // Keep notification during streaming - will be dismissed in handleStreamEnd
 
     const { textsToTranslate, originMapping, expandedTexts, textNodes } = request;
 
@@ -246,11 +257,18 @@ export class TranslationOrchestrator {
     const { messageId } = message;
     const request = this.translationRequests.get(messageId);
     if (!request) {
-      this.logger.warn("Received stream end for unknown message:", messageId);
+      this.logger.debug("Received stream end for already completed message:", messageId);
       return;
     }
 
     this.logger.info("Translation stream finished for message:", messageId);
+    
+    // Dismiss the "Translating..." notification on stream completion
+    if (this.statusNotification) {
+      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+      this.statusNotification = null;
+      this.logger.debug("Dismissed translating notification on stream completion");
+    }
     
     // Finalize state, e.g., by storing all translations in stateManager
     const allTranslations = new Map(request.cachedTranslations);

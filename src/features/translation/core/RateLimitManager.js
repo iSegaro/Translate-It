@@ -5,6 +5,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { requestHealthMonitor } from './RequestHealthMonitor.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'RateLimitManager');
 
@@ -40,10 +41,16 @@ const PROVIDER_CONFIGS = {
     burstWindow: 2000,
   },
   'Gemini': {
-    maxConcurrent: 2,
-    delayBetweenRequests: 2000,
-    burstLimit: 4,
-    burstWindow: 1000,
+    maxConcurrent: 1,
+    delayBetweenRequests: 5000, // Increased from 3000ms to 5000ms for safer rate limiting
+    burstLimit: 1, // Reduced from 2 to 1 to prevent quota issues  
+    burstWindow: 5000, // Increased burst window
+    adaptiveBackoff: {
+      enabled: true,
+      baseMultiplier: 2,
+      maxDelay: 45000, // Increased max delay
+      resetAfterSuccess: 3
+    }
   },
   'DeepSeek': {
     maxConcurrent: 2, // Increased from 1 to 2
@@ -139,6 +146,10 @@ export class RateLimitManager {
       circuitBreakThreshold: 5, // Circuit opens after 5 consecutive failures
       circuitRecoveryTime: 30000, // 30 seconds
       maxPendingRequests: 10, // Maximum pending requests per provider
+      // Adaptive backoff properties
+      currentBackoffMultiplier: 1,
+      successfulRequestsCount: 0,
+      lastFailureTime: 0
     };
     
     this.providerStates.set(providerName, state);
@@ -158,9 +169,19 @@ export class RateLimitManager {
       return false;
     }
     
-    // Check time-based delay
+    // Check time-based delay with adaptive backoff
+    let adjustedDelay = state.config.delayBetweenRequests;
+    
+    // Apply adaptive backoff if enabled
+    if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
+      adjustedDelay = Math.min(
+        state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+        state.config.adaptiveBackoff.maxDelay
+      );
+    }
+    
     const timeSinceLastRequest = now - state.lastRequestTime;
-    if (timeSinceLastRequest < state.config.delayBetweenRequests) {
+    if (timeSinceLastRequest < adjustedDelay) {
       return false;
     }
     
@@ -222,17 +243,24 @@ export class RateLimitManager {
       state.activeRequests = state.config.maxConcurrent;
     }
     
+    const requestStartTime = Date.now();
+    
     try {
       logger.debug(`Executing request for ${providerName} (active: ${state.activeRequests})`);
       const result = await requestFunction();
+      const responseTime = Date.now() - requestStartTime;
       
-      // Success - reset circuit breaker
+      // Success - reset circuit breaker and record health
       this._recordSuccess(state);
+      requestHealthMonitor.recordSuccess(providerName, responseTime, { context });
       
       return result;
     } catch (error) {
-      // Failure - update circuit breaker
+      const responseTime = Date.now() - requestStartTime;
+      
+      // Failure - update circuit breaker and record health
       this._recordFailure(state, error, providerName);
+      requestHealthMonitor.recordFailure(providerName, error, responseTime, { context });
       
       throw error;
     } finally {
@@ -298,13 +326,19 @@ export class RateLimitManager {
           state.requestQueue.shift();
           queueItem.resolve();
         } else {
-          // Calculate wait time
+          // Calculate wait time with adaptive backoff
           const now = Date.now();
           const timeSinceLastRequest = now - state.lastRequestTime;
-          const waitTime = Math.max(
-            0,
-            state.config.delayBetweenRequests - timeSinceLastRequest
-          );
+          
+          let adjustedDelay = state.config.delayBetweenRequests;
+          if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
+            adjustedDelay = Math.min(
+              state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+              state.config.adaptiveBackoff.maxDelay
+            );
+          }
+          
+          const waitTime = Math.max(0, adjustedDelay - timeSinceLastRequest);
           
           if (waitTime > 0) {
             await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -333,6 +367,14 @@ export class RateLimitManager {
       time => (now - time) < state.config.burstWindow
     );
     
+    let adjustedDelay = state.config.delayBetweenRequests;
+    if (state.config.adaptiveBackoff?.enabled && state.currentBackoffMultiplier > 1) {
+      adjustedDelay = Math.min(
+        state.config.delayBetweenRequests * state.currentBackoffMultiplier,
+        state.config.adaptiveBackoff.maxDelay
+      );
+    }
+    
     return {
       initialized: true,
       activeRequests: state.activeRequests,
@@ -350,7 +392,16 @@ export class RateLimitManager {
         ? Math.max(0, state.circuitRecoveryTime - (now - state.circuitOpenTime))
         : 0,
       maxPendingRequests: state.maxPendingRequests,
-      totalPendingRequests: state.activeRequests + state.requestQueue.length
+      totalPendingRequests: state.activeRequests + state.requestQueue.length,
+      // Adaptive backoff stats
+      currentBackoffMultiplier: state.currentBackoffMultiplier,
+      adjustedDelay: adjustedDelay,
+      successfulRequestsCount: state.successfulRequestsCount,
+      lastFailureTime: state.lastFailureTime,
+      adaptiveBackoffEnabled: state.config.adaptiveBackoff?.enabled || false,
+      // Health monitor stats
+      healthStatus: requestHealthMonitor.getProviderHealth(providerName),
+      recommendedAction: requestHealthMonitor.getRecommendedAction(providerName)
     };
   }
   
@@ -389,32 +440,59 @@ export class RateLimitManager {
   }
   
   /**
-   * Record successful request - reset circuit breaker
+   * Record successful request - reset circuit breaker and adaptive backoff
    */
   _recordSuccess(state) {
+    // Reset circuit breaker
     if (state.consecutiveFailures > 0 || state.isCircuitOpen) {
       logger.info(`Request succeeded, resetting circuit breaker (was ${state.consecutiveFailures} failures)`);
       state.consecutiveFailures = 0;
       state.isCircuitOpen = false;
       state.circuitOpenTime = 0;
     }
+    
+    // Handle adaptive backoff recovery
+    if (state.config.adaptiveBackoff?.enabled) {
+      state.successfulRequestsCount++;
+      
+      // Reset backoff multiplier after enough successful requests
+      if (state.successfulRequestsCount >= state.config.adaptiveBackoff.resetAfterSuccess && 
+          state.currentBackoffMultiplier > 1) {
+        logger.info(`Resetting adaptive backoff after ${state.successfulRequestsCount} successful requests`);
+        state.currentBackoffMultiplier = 1;
+        state.successfulRequestsCount = 0;
+      }
+    }
   }
   
   /**
-   * Record failed request - update circuit breaker
+   * Record failed request - update circuit breaker and adaptive backoff
    */
   _recordFailure(state, error, providerName) {
+    const now = Date.now();
+    state.lastFailureTime = now;
+    
     // Special handling for Gemini quota errors to open circuit breaker immediately
     const isGeminiQuotaError = providerName === 'Gemini' && error.message && (
       error.message.includes('quota') ||
       error.message.includes('RESOURCE_EXHAUSTED') ||
-      error.message.includes('limit exceeded')
+      error.message.includes('limit exceeded') ||
+      error.message.includes('429')
     );
 
     if (isGeminiQuotaError) {
       state.consecutiveFailures = state.circuitBreakThreshold; // Trigger immediately
       state.isCircuitOpen = true;
-      state.circuitOpenTime = Date.now();
+      state.circuitOpenTime = now;
+      state.circuitRecoveryTime = 60000; // 60 seconds for quota errors
+      
+      // Apply maximum adaptive backoff for quota errors
+      if (state.config.adaptiveBackoff?.enabled) {
+        state.currentBackoffMultiplier = state.config.adaptiveBackoff.baseMultiplier * 3;
+        state.successfulRequestsCount = 0;
+        logger.error(`Gemini quota exceeded - Applied maximum adaptive backoff (${state.currentBackoffMultiplier}x)`);
+      }
+      
       logger.error(`Gemini quota exceeded - Circuit breaker opened immediately for ${providerName}`);
       return; // Exit early
     }
@@ -429,11 +507,26 @@ export class RateLimitManager {
     
     if (isRateLimitError || error.name === 'NetworkError') {
       state.consecutiveFailures++;
+      
+      // Apply adaptive backoff
+      if (state.config.adaptiveBackoff?.enabled) {
+        const oldMultiplier = state.currentBackoffMultiplier;
+        state.currentBackoffMultiplier = Math.min(
+          state.currentBackoffMultiplier * state.config.adaptiveBackoff.baseMultiplier,
+          state.config.adaptiveBackoff.maxDelay / state.config.delayBetweenRequests
+        );
+        state.successfulRequestsCount = 0; // Reset success counter
+        
+        if (oldMultiplier !== state.currentBackoffMultiplier) {
+          logger.warn(`Applied adaptive backoff for ${providerName}: ${oldMultiplier}x → ${state.currentBackoffMultiplier}x`);
+        }
+      }
+      
       logger.warn(`Request failed for ${providerName} (${state.consecutiveFailures}/${state.circuitBreakThreshold})`, error.message);
       
       if (state.consecutiveFailures >= state.circuitBreakThreshold) {
         state.isCircuitOpen = true;
-        state.circuitOpenTime = Date.now();
+        state.circuitOpenTime = now;
         logger.error(`Circuit breaker opened for ${providerName} after ${state.consecutiveFailures} consecutive failures`);
       }
     }
@@ -454,6 +547,10 @@ export class RateLimitManager {
       state.consecutiveFailures = 0;
       state.isCircuitOpen = false;
       state.circuitOpenTime = 0;
+      // Reset adaptive backoff
+      state.currentBackoffMultiplier = 1;
+      state.successfulRequestsCount = 0;
+      state.lastFailureTime = 0;
       logger.debug(`Reset rate limiting for provider: ${providerName}`);
     }
   }
@@ -466,6 +563,14 @@ export class RateLimitManager {
       this.resetProvider(providerName);
     }
     logger.debug('Reset rate limiting for all providers');
+  }
+
+  /**
+   * Force reload configurations for all providers (useful for config updates)
+   */
+  reloadConfigurations() {
+    this.providerStates.clear();
+    logger.debug('Cleared all provider states to force configuration reload');
   }
 }
 

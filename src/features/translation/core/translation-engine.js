@@ -139,11 +139,11 @@ export class TranslationEngine {
       let result;
       // Context-specific optimizations (but all will include history except SelectElement)
       if (context === "popup") {
-        result = await this.translateWithPriority(data);
+        result = await this.translateWithPriority(data, sender);
       } else if (context === "selection") {
-        result = await this.translateWithCache(data);
+        result = await this.translateWithCache(data, sender);
       } else {
-        result = await this.executeTranslation(data);
+        result = await this.executeTranslation(data, sender);
       }
 
       // Centralized history addition for all modes except SelectElement
@@ -342,13 +342,20 @@ export class TranslationEngine {
 
     const segments = originalJson.map(item => item.text);
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    
+    // Force reload configurations to ensure latest rate limiting settings
+    rateLimitManager.reloadConfigurations();
     const OPTIMAL_BATCH_SIZE = 10;
-    const batches = this.createOptimalBatches(segments, OPTIMAL_BATCH_SIZE);
+    const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
 
     (async () => {
         try {
+            let consecutiveFailures = 0;
+            const MAX_CONSECUTIVE_FAILURES = 3;
+            let adaptiveDelay = 0;
+            
             for (let i = 0; i < batches.length; i++) {
                 if (this.isCancelled(messageId)) {
                     logger.info(`[TranslationEngine] Translation cancelled for messageId: ${messageId}`);
@@ -356,12 +363,34 @@ export class TranslationEngine {
                 }
 
                 const batch = batches[i];
+                const batchSize = batch.length;
+                const batchComplexity = this.calculateBatchComplexity(batch);
+                
+                // Apply intelligent delay based on batch properties and previous failures
+                if (i > 0) {
+                    const baseDelay = Math.min(2000 + (batchSize * 150), 5000); // Increased base delay
+                    const complexityMultiplier = batchComplexity > 50 ? 1.5 : 1.0;
+                    const failureMultiplier = Math.pow(2, consecutiveFailures);
+                    
+                    adaptiveDelay = Math.min(
+                        baseDelay * complexityMultiplier * failureMultiplier + adaptiveDelay * 0.3,
+                        20000 // Maximum 20 seconds delay (increased from 15)
+                    );
+                    
+                    logger.debug(`[TranslationEngine] Applying intelligent delay: ${Math.round(adaptiveDelay)}ms (batch: ${i + 1}/${batches.length}, size: ${batchSize}, complexity: ${batchComplexity}, failures: ${consecutiveFailures})`);
+                    await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
+                }
+                
                 try {
                     const batchResult = await rateLimitManager.executeWithRateLimit(
                         provider,
                         () => providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode),
                         `batch-${i + 1}/${batches.length}`
                     );
+
+                    // Success - reset consecutive failures and reduce adaptive delay
+                    consecutiveFailures = 0;
+                    adaptiveDelay = Math.max(adaptiveDelay * 0.8, 0);
 
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,
@@ -380,13 +409,19 @@ export class TranslationEngine {
                         { messageId: messageId }
                       );
                       if (tabId) {
-                        browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(error => {
+                        browser.tabs.sendMessage(tabId, streamUpdateMessage).then(response => {
+                          logger.debug(`[TranslationEngine] TRANSLATION_STREAM_UPDATE sent successfully to tab ${tabId}, response:`, response);
+                        }).catch(error => {
                           logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_UPDATE message to tab ${tabId}:`, error);
                         });
+                      } else {
+                        logger.error(`[TranslationEngine] No tabId available for sending TRANSLATION_STREAM_UPDATE`);
                       }
 
                 } catch (error) {
-                    logger.warn(`[TranslationEngine] Batch ${i + 1} failed:`, error);
+                    consecutiveFailures++;
+                    logger.warn(`[TranslationEngine] Batch ${i + 1} failed (consecutive failures: ${consecutiveFailures}):`, error);
+                    
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,
                         {
@@ -403,8 +438,15 @@ export class TranslationEngine {
                           logger.error(`[TranslationEngine] Failed to send error stream update to tab ${tabId}:`, err);
                         });
                     }
-                    if (error.type === 'QUOTA_EXCEEDED') {
-                        logger.error(`[TranslationEngine] Quota exceeded, stopping translation.`);
+                    
+                    // Stop on quota exceeded or too many consecutive failures
+                    if (error.type === 'QUOTA_EXCEEDED' || error.type === 'CIRCUIT_BREAKER_OPEN') {
+                        logger.error(`[TranslationEngine] Critical error (${error.type}), stopping translation.`);
+                        break;
+                    }
+                    
+                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        logger.error(`[TranslationEngine] Too many consecutive failures (${consecutiveFailures}), stopping translation.`);
                         break;
                     }
                 }
@@ -441,6 +483,117 @@ export class TranslationEngine {
         batches.push(segments.slice(i, i + maxBatchSize));
     }
     return batches;
+  }
+
+  /**
+   * Create intelligent batches based on text complexity and characteristics
+   */
+  createIntelligentBatches(segments, baseBatchSize) {
+    const batches = [];
+    let currentBatch = [];
+    let currentBatchComplexity = 0;
+    
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const segmentComplexity = this.calculateTextComplexity(segment);
+      
+      // Calculate optimal batch size based on segment complexity
+      const adjustedBatchSize = this.getAdjustedBatchSize(segmentComplexity, baseBatchSize);
+      
+      // Check if adding this segment would exceed batch limits
+      const wouldExceedSize = currentBatch.length >= adjustedBatchSize;
+      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 200;
+      
+      if (wouldExceedSize || wouldExceedComplexity) {
+        if (currentBatch.length > 0) {
+          batches.push([...currentBatch]);
+          currentBatch = [];
+          currentBatchComplexity = 0;
+        }
+      }
+      
+      currentBatch.push(segment);
+      currentBatchComplexity += segmentComplexity;
+    }
+    
+    // Add the last batch if not empty
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+    
+    logger.debug(`[TranslationEngine] Created ${batches.length} intelligent batches from ${segments.length} segments`);
+    return batches;
+  }
+
+  /**
+   * Calculate complexity for a single text segment
+   */
+  calculateTextComplexity(text) {
+    let complexity = 0;
+    
+    // Length factor
+    complexity += Math.min(text.length / 20, 50);
+    
+    // Special characters
+    const specialChars = (text.match(/[^\w\s]/g) || []).length;
+    complexity += specialChars;
+    
+    // Technical content
+    if (text.match(/https?:\/\/|www\./)) complexity += 15;
+    if (text.match(/[{}[\]<>]/)) complexity += 8;
+    if (text.match(/\d+\.\d+|\w+\.\w+/)) complexity += 5;
+    
+    // Mixed scripts
+    const hasLatin = /[a-zA-Z]/.test(text);
+    const hasNonLatin = /[^\x00-\x7F]/.test(text);
+    if (hasLatin && hasNonLatin) complexity += 10;
+    
+    return Math.round(complexity);
+  }
+
+  /**
+   * Get adjusted batch size based on text complexity
+   */
+  getAdjustedBatchSize(avgComplexity, baseBatchSize) {
+    if (avgComplexity > 80) return Math.max(3, Math.floor(baseBatchSize * 0.3));
+    if (avgComplexity > 50) return Math.max(5, Math.floor(baseBatchSize * 0.5));
+    if (avgComplexity > 30) return Math.max(7, Math.floor(baseBatchSize * 0.7));
+    return baseBatchSize;
+  }
+
+  /**
+   * Calculate batch complexity based on text characteristics
+   */
+  calculateBatchComplexity(batch) {
+    if (!Array.isArray(batch) || batch.length === 0) return 0;
+    
+    let totalComplexity = 0;
+    
+    for (const text of batch) {
+      let textComplexity = 0;
+      
+      // Length factor (longer texts are more complex)
+      textComplexity += Math.min(text.length / 10, 30);
+      
+      // Special characters and formatting
+      const specialChars = (text.match(/[^\w\s]/g) || []).length;
+      textComplexity += specialChars * 0.5;
+      
+      // Technical terms (URLs, code, etc.)
+      if (text.match(/https?:\/\/|www\./)) textComplexity += 10;
+      if (text.match(/[{}[\]<>]/)) textComplexity += 5;
+      if (text.match(/\d+\.\d+|\w+\.\w+/)) textComplexity += 3;
+      
+      // Mixed languages or scripts
+      const hasLatin = /[a-zA-Z]/.test(text);
+      const hasNonLatin = /[^\x00-\x7F]/.test(text);
+      if (hasLatin && hasNonLatin) textComplexity += 8;
+      
+      totalComplexity += textComplexity;
+    }
+    
+    // Average complexity per text in batch
+    return Math.round(totalComplexity / batch.length);
   }
 
   /**
