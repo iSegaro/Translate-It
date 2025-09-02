@@ -578,7 +578,7 @@ defineExpose({
   width: 100%;
   min-height: 60px;
   padding: 12px 16px;
-  border: 2px solid var(--border-color, #dee2e6);
+  border: none;
   border-radius: 8px;
   font-family: inherit;
   font-size: 14px;
@@ -592,8 +592,8 @@ defineExpose({
 
 .translation-textarea.enhanced:focus {
   outline: none;
-  border-color: var(--accent-color, #007bff);
-  box-shadow: 0 0 0 3px var(--accent-color-alpha, rgba(0, 123, 255, 0.1));
+  border: none;
+  box-shadow: none;
 }
 
 .translation-textarea.enhanced::placeholder {

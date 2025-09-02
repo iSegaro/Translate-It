@@ -215,7 +215,7 @@ onMounted(async () => {
   text-align: left;
   background-color: var(--input-bg-color);
   color: var(--text-color);
-  /* border: 1px solid var(--header-border-color); */
+  border: none;
   line-height: 1.5;
   min-height: 50px;
   max-width: 100%;
@@ -223,9 +223,9 @@ onMounted(async () => {
 }
 
 .translation-textarea:focus {
-  border-color: #80bdff;
+  border: none;
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  box-shadow: none;
 }
 
 .translation-textarea::placeholder {
