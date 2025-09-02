@@ -10,6 +10,8 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'translation-engine');
 
@@ -56,10 +58,9 @@ export class TranslationEngine {
   /**
    * Handle translation request messages
    */
-  async handleTranslateMessage(request) {
+  async handleTranslateMessage(request, sender) {
     // Input validation and normalization only - main logging is handled by handleTranslate
 
-    // Input validation and normalization
     if (!request || typeof request !== "object") {
       throw new Error(
         `Invalid request: expected object, got ${typeof request}`,
@@ -118,13 +119,13 @@ export class TranslationEngine {
       data.text.trim().length === 0
     ) {
       throw new Error(
-        `Invalid text: expected non-empty string, got "${data.text}"`,
+        `Invalid text: expected non-empty string, got \"${data.text}\"`, 
       );
     }
 
     if (!data.provider || typeof data.provider !== "string") {
       throw new Error(
-        `Invalid provider: expected string, got "${data.provider}"`,
+        `Invalid provider: expected string, got \"${data.provider}\"`, 
       );
     }
 
@@ -136,7 +137,6 @@ export class TranslationEngine {
 
     try {
       let result;
-
       // Context-specific optimizations (but all will include history except SelectElement)
       if (context === "popup") {
         result = await this.translateWithPriority(data);
@@ -190,7 +190,7 @@ export class TranslationEngine {
   /**
    * Execute translation with priority (for popup)
    */
-  async translateWithPriority(data) {
+  async translateWithPriority(data, sender) {
     // Check cache first for instant response
     const cacheKey = this.generateCacheKey(data);
     if (this.cache.has(cacheKey)) {
@@ -200,16 +200,14 @@ export class TranslationEngine {
         fromCache: true,
       };
     }
-
-    return await this.executeTranslation(data);
+    return await this.executeTranslation(data, sender);
   }
 
   /**
    * Execute translation with cache checking (for selection)
    */
-  async translateWithCache(data) {
+  async translateWithCache(data, sender) {
     const cacheKey = this.generateCacheKey(data);
-
     // Return cached result if available
     if (this.cache.has(cacheKey)) {
       return {
@@ -217,20 +215,16 @@ export class TranslationEngine {
         fromCache: true,
       };
     }
-
-    const result = await this.executeTranslation(data);
-
+    const result = await this.executeTranslation(data, sender);
     // Cache the result
     this.cacheResult(cacheKey, result);
-
     return result;
   }
-
 
   /**
    * Core translation execution logic
    */
-  async executeTranslation(data) {
+  async executeTranslation(data, sender) {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
@@ -269,7 +263,8 @@ export class TranslationEngine {
     // For unreliable providers in JSON mode, use optimized strategy directly
     if (isSelectJson && !providerReliableJson) {
       logger.debug('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
-      return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId);
+      const tabId = sender?.tab?.id;
+      return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
     }
 
     // Standard translation for reliable providers or non-JSON mode
@@ -308,7 +303,8 @@ export class TranslationEngine {
       // Final fallback for SelectElement JSON (only for other types of errors)
       if (isSelectJson && !providerReliableJson) {
         logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
-        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId);
+        const tabId = sender?.tab?.id;
+        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
       }
       throw initialError;
     }
@@ -330,7 +326,7 @@ export class TranslationEngine {
   /**
    * Optimized JSON translation for unreliable providers
    */
-  async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, messageId = null) {
+  async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, messageId = null, tabId = null) {
     const { text, provider, sourceLanguage, targetLanguage, mode } = data;
     
     let originalJson;
@@ -345,212 +341,105 @@ export class TranslationEngine {
     }
 
     const segments = originalJson.map(item => item.text);
-    const results = new Array(segments.length);
-    const translationStatus = new Array(segments.length).fill(false); // Track which segments were actually translated
-    const errorMessages = []; // Collect actual error messages
-    const sharedState = { 
-      shouldStopDueToLanguagePairError: false, 
-      languagePairError: null,
-      batchFailureCount: 0, // Track batch failures for early exit
-      maxBatchFailures: provider === 'BingTranslate' ? 3 : 5, // Lower threshold for Bing
-      isCancelled: false // Global cancellation flag
-    }; // Shared state to stop other batches
-    
-    // Smart cache-first approach
-    let cacheHits = 0;
-    const uncachedIndices = [];
-    
-    for (let i = 0; i < segments.length; i++) {
-      const cacheKey = this.generateCacheKey({
-        text: segments[i],
-        provider,
-        sourceLanguage,
-        targetLanguage,
-        mode
-      });
-      
-      if (this.cache.has(cacheKey)) {
-        const cached = this.cache.get(cacheKey);
-        if (cached.translatedText && cached.translatedText !== segments[i]) {
-          // Valid cached translation exists
-          results[i] = cached.translatedText;
-          translationStatus[i] = true;
-          cacheHits++;
-        } else {
-          // Cache exists but contains failed translation (null or same text)
-          results[i] = segments[i];
-          translationStatus[i] = false;
-          uncachedIndices.push(i); // Re-attempt translation
-        }
-      } else {
-        uncachedIndices.push(i);
-      }
-    }
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    const OPTIMAL_BATCH_SIZE = 10;
+    const batches = this.createOptimalBatches(segments, OPTIMAL_BATCH_SIZE);
 
-    logger.debug(`[TranslationEngine] Cache hits: ${cacheHits}/${segments.length}`);
+    const abortController = messageId ? this.activeTranslations.get(messageId) : null;
 
-    // Only translate uncached segments
-    if (uncachedIndices.length > 0) {
-      const providerClass = providerInstance?.constructor;
-      const isAiProvider = providerClass?.type === 'ai';
-
-      // Get abort controller for this translation
-      const abortController = messageId ? this.activeTranslations.get(messageId) : null;
-
-      if (isAiProvider) {
-        // AI providers: Direct segment-by-segment translation to avoid duplicate batch processing
-        logger.debug(`[TranslationEngine] Processing ${uncachedIndices.length} segments directly for AI provider: ${provider}`);
-        
-        // Prepare texts for uncached segments
-        const uncachedTexts = uncachedIndices.map(i => segments[i]);
-        
+    (async () => {
         try {
-          // Use provider's _batchTranslate method directly
-          const translatedTexts = await providerInstance._batchTranslate(
-            uncachedTexts,
-            sourceLanguage,
-            targetLanguage, 
-            mode,
-            this,
-            messageId,
-            abortController
-          );
-          
-          // Map results back to original positions
-          for (let i = 0; i < uncachedIndices.length; i++) {
-            const originalIndex = uncachedIndices[i];
-            results[originalIndex] = translatedTexts[i];
-            translationStatus[originalIndex] = true;
-            
-            // Cache the result
-            const cacheKey = this.generateCacheKey({
-              text: segments[originalIndex],
-              provider,
-              sourceLanguage,
-              targetLanguage,
-              mode
-            });
-            this.cache.set(cacheKey, { translatedText: translatedTexts[i], cachedAt: Date.now() });
-          }
+            for (let i = 0; i < batches.length; i++) {
+                if (this.isCancelled(messageId)) {
+                    logger.info(`[TranslationEngine] Translation cancelled for messageId: ${messageId}`);
+                    break;
+                }
+
+                const batch = batches[i];
+                try {
+                    const batchResult = await rateLimitManager.executeWithRateLimit(
+                        provider,
+                        () => providerInstance._translateBatch(batch, sourceLanguage, targetLanguage, mode),
+                        `batch-${i + 1}/${batches.length}`
+                    );
+
+                    const streamUpdateMessage = MessageFormat.create(
+                        MessageActions.TRANSLATION_STREAM_UPDATE,
+                        {
+                          success: true,
+                          data: batchResult,
+                          originalData: batch,
+                          batchIndex: i,
+                          provider: provider,
+                          sourceLanguage: sourceLanguage,
+                          targetLanguage: targetLanguage,
+                          timestamp: Date.now(),
+                          translationMode: mode,
+                        },
+                        'background-stream',
+                        { messageId: messageId }
+                      );
+                      if (tabId) {
+                        browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(error => {
+                          logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_UPDATE message to tab ${tabId}:`, error);
+                        });
+                      }
+
+                } catch (error) {
+                    logger.warn(`[TranslationEngine] Batch ${i + 1} failed:`, error);
+                    const streamUpdateMessage = MessageFormat.create(
+                        MessageActions.TRANSLATION_STREAM_UPDATE,
+                        {
+                          success: false,
+                          error: { message: error.message, type: error.type },
+                          batchIndex: i,
+                          originalData: batch,
+                        },
+                        'background-stream',
+                        { messageId: messageId }
+                    );
+                    if (tabId) {
+                        browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(err => {
+                          logger.error(`[TranslationEngine] Failed to send error stream update to tab ${tabId}:`, err);
+                        });
+                    }
+                    if (error.type === 'QUOTA_EXCEEDED') {
+                        logger.error(`[TranslationEngine] Quota exceeded, stopping translation.`);
+                        break;
+                    }
+                }
+            }
         } catch (error) {
-          logger.error(`[TranslationEngine] AI provider batch translation failed:`, error);
-          
-          // Fallback to original texts
-          for (const originalIndex of uncachedIndices) {
-            results[originalIndex] = segments[originalIndex];
-            translationStatus[originalIndex] = false;
-          }
-          
-          errorMessages.push(error.message || 'AI translation failed');
+            logger.error(`[TranslationEngine] Unhandled error during streaming:`, error);
+        } finally {
+            const streamEndMessage = MessageFormat.create(
+                MessageActions.TRANSLATION_STREAM_END,
+                { success: true },
+                'background-stream',
+                { messageId: messageId }
+              );
+              if (tabId) {
+                browser.tabs.sendMessage(tabId, streamEndMessage).catch(error => {
+                  logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_END message to tab ${tabId}:`, error);
+                });
+              }
         }
-      } else {
-        // Traditional providers: Use batch processing
-        logger.debug(`[TranslationEngine] Using batch processing for traditional provider: ${provider}`);
-        
-        const BATCH_SIZE = provider === 'BingTranslate' ? 3 : 8;
-        const batches = this.createOptimalBatches(uncachedIndices, segments, BATCH_SIZE);
-        
-        // Process batches sequentially
-        for (let idx = 0; idx < batches.length; idx++) {
-          // Check if we should stop due to language pair error or too many batch failures
-          if (sharedState.shouldStopDueToLanguagePairError) {
-            logger.debug(`[TranslationEngine] Skipping batch ${idx} due to language pair error`);
-            break;
-          }
-          
-          if (sharedState.batchFailureCount >= sharedState.maxBatchFailures) {
-            logger.debug(`[TranslationEngine] Early exit: too many batch failures (${sharedState.batchFailureCount})`);
-            break;
-          }
+    })();
 
-          // Check if translation was cancelled
-          if (abortController && abortController.signal.aborted) {
-            logger.debug(`[TranslationEngine] Translation was cancelled via AbortController, skipping batch ${idx}`);
-            sharedState.isCancelled = true;
-            break;
-          }
-          
-          if (sharedState.isCancelled) {
-            logger.debug(`[TranslationEngine] Translation was cancelled via shared state, skipping batch ${idx}`);
-            break;
-          }
-          
-          const batch = batches[idx];
-          
-          await this.processBatch(batch, segments, results, translationStatus, providerInstance, {
-            provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang
-          }, errorMessages, sharedState, abortController);
-        }
-      }
-    }
-
-    // Check if any translation actually succeeded
-    const anyTranslationSucceeded = translationStatus.some(status => status === true);
-    
-    // Check if we stopped due to language pair error
-    if (sharedState.shouldStopDueToLanguagePairError && sharedState.languagePairError) {
-      throw sharedState.languagePairError;
-    }
-    
-    if (!anyTranslationSucceeded && uncachedIndices.length > 0) {
-      // No translations succeeded and there were segments to translate
-      // Use the most recent/specific error message if available
-      const specificError = errorMessages.length > 0 ? errorMessages[errorMessages.length - 1] : null;
-      if (specificError) {
-        throw new Error(specificError);
-      } else {
-        throw new Error(`Translation failed for all segments. Provider ${provider} is unreachable or returned errors.`);
-      }
-    }
-
-    // Reconstruct JSON with translated texts
-    const translatedJson = originalJson.map((item, i) => ({
-      ...item,
-      text: results[i] || item.text // Fallback to original on failure
-    }));
-
-    const response = {
-      success: true,
-      translatedText: JSON.stringify(translatedJson),
-      provider,
-      sourceLanguage,
-      targetLanguage,
-      originalText: text,
-      timestamp: Date.now(),
-      mode: mode || "simple",
+    return {
+        success: true,
+        streaming: true,
     };
-
-    return response;
   }
 
   /**
    * Create optimal batches based on text length and similarity
    */
-  createOptimalBatches(indices, segments, maxBatchSize) {
+  createOptimalBatches(segments, maxBatchSize) {
     const batches = [];
-    let currentBatch = [];
-    let currentLength = 0;
-    const MAX_BATCH_CHARS = 8000; // Character limit per batch
-    
-    for (const idx of indices) {
-      const segmentLength = segments[idx].length;
-      
-      // Start new batch if current would exceed limits
-      if (currentBatch.length >= maxBatchSize || 
-          (currentLength + segmentLength > MAX_BATCH_CHARS && currentBatch.length > 0)) {
-        batches.push(currentBatch);
-        currentBatch = [];
-        currentLength = 0;
-      }
-      
-      currentBatch.push(idx);
-      currentLength += segmentLength;
+    for (let i = 0; i < segments.length; i += maxBatchSize) {
+        batches.push(segments.slice(i, i + maxBatchSize));
     }
-    
-    if (currentBatch.length > 0) {
-      batches.push(currentBatch);
-    }
-    
     return batches;
   }
 

@@ -40,10 +40,10 @@ const PROVIDER_CONFIGS = {
     burstWindow: 2000,
   },
   'Gemini': {
-    maxConcurrent: 2, // Increased from 1 to 2
-    delayBetweenRequests: 600,
-    burstLimit: 2,
-    burstWindow: 2500,
+    maxConcurrent: 2,
+    delayBetweenRequests: 2000,
+    burstLimit: 4,
+    burstWindow: 1000,
   },
   'DeepSeek': {
     maxConcurrent: 2, // Increased from 1 to 2
@@ -232,7 +232,7 @@ export class RateLimitManager {
       return result;
     } catch (error) {
       // Failure - update circuit breaker
-      this._recordFailure(state, error);
+      this._recordFailure(state, error, providerName);
       
       throw error;
     } finally {
@@ -403,7 +403,22 @@ export class RateLimitManager {
   /**
    * Record failed request - update circuit breaker
    */
-  _recordFailure(state, error) {
+  _recordFailure(state, error, providerName) {
+    // Special handling for Gemini quota errors to open circuit breaker immediately
+    const isGeminiQuotaError = providerName === 'Gemini' && error.message && (
+      error.message.includes('quota') ||
+      error.message.includes('RESOURCE_EXHAUSTED') ||
+      error.message.includes('limit exceeded')
+    );
+
+    if (isGeminiQuotaError) {
+      state.consecutiveFailures = state.circuitBreakThreshold; // Trigger immediately
+      state.isCircuitOpen = true;
+      state.circuitOpenTime = Date.now();
+      logger.error(`Gemini quota exceeded - Circuit breaker opened immediately for ${providerName}`);
+      return; // Exit early
+    }
+
     // Only count rate limit and network failures towards circuit breaker
     const isRateLimitError = error.message && (
       error.message.includes('429') || 
@@ -414,12 +429,12 @@ export class RateLimitManager {
     
     if (isRateLimitError || error.name === 'NetworkError') {
       state.consecutiveFailures++;
-      logger.warn(`Request failed (${state.consecutiveFailures}/${state.circuitBreakThreshold})`, error.message);
+      logger.warn(`Request failed for ${providerName} (${state.consecutiveFailures}/${state.circuitBreakThreshold})`, error.message);
       
       if (state.consecutiveFailures >= state.circuitBreakThreshold) {
         state.isCircuitOpen = true;
         state.circuitOpenTime = Date.now();
-        logger.error(`Circuit breaker opened for provider after ${state.consecutiveFailures} consecutive failures`);
+        logger.error(`Circuit breaker opened for ${providerName} after ${state.consecutiveFailures} consecutive failures`);
       }
     }
   }

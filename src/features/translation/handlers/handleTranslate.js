@@ -8,9 +8,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleTranslate');
-// Delimiter used by providers (e.g. Bing) for JSON/segment mode
-const TEXT_DELIMITER = "\n\n---\n\n";
-
 const errorHandler = new ErrorHandler();
 
 /**
@@ -49,17 +46,12 @@ export async function handleTranslate(message, sender, sendResponse) {
       throw new Error(`Unexpected action: ${message.action}. Expected ${MessageActions.TRANSLATE}`);
     }
 
-    // Use the normalized message directly
-    const normalizedMessage = message;
+    const result = await backgroundService.translationEngine.handleTranslateMessage(message, sender);
 
-    // When SelectElement raw JSON payload is present, do NOT pre-parse it here.
-    // The TranslationEngine/provider will detect and handle JSON-mode parsing itself
-    // (this preserves the original payload and allows provider-specific JSON handling).
-    if (normalizedMessage.data.mode === 'SelectElement' && normalizedMessage.data.options?.rawJsonPayload) {
-      logger.debug('[Handler:TRANSLATE] SelectElement rawJsonPayload detected - leaving data.text as-is for provider handling');
+    if (result.streaming) {
+        logger.info(`[Handler:TRANSLATE] ✅ Streaming started for messageId: ${message.messageId}`);
+        return { success: true, streaming: true, messageId: message.messageId };
     }
-
-    const result = await backgroundService.translationEngine.handleTranslateMessage(normalizedMessage, sender);
 
     if (!result || typeof result !== 'object' || !Object.prototype.hasOwnProperty.call(result, 'success')) {
       throw new Error(`Invalid response from translation engine: ${JSON.stringify(result)}`);
@@ -76,82 +68,19 @@ export async function handleTranslate(message, sender, sendResponse) {
     let updateMessage;
 
     if (result.success && result.translatedText) {
-      // SUCCESS case - send translation result
-      let finalTranslatedText = result.translatedText;
-      // If the original message was a raw JSON payload for SelectElement mode,
-      // re-wrap the translated text into a JSON array format for the content script
-      if (normalizedMessage.data.mode === 'SelectElement' && normalizedMessage.data.options?.rawJsonPayload) {
-        // Try to be resilient with provider outputs in JSON mode:
-        // - Provider may return a JSON array string with one element containing joined translation
-        // - Provider may return a plain joined string
-        // We want to produce a JSON array with the same length as the original JSON payload
-        try {
-          const originalJson = JSON.parse(normalizedMessage.data.text);
-          const expectedLen = Array.isArray(originalJson) ? originalJson.length : null;
-
-          // Try parse provider output as JSON array
-          let parsedProviderJson = null;
-          try {
-            parsedProviderJson = JSON.parse(result.translatedText);
-          } catch {
-            parsedProviderJson = null;
-          }
-
-          if (parsedProviderJson && Array.isArray(parsedProviderJson) && expectedLen && parsedProviderJson.length === expectedLen) {
-            finalTranslatedText = result.translatedText; // provider returned matching array
-            logger.debug('[Handler:TRANSLATE] Provider returned matching JSON array for SelectElement mode');
-          } else {
-            // If provider returned single-element array where its text contains the delimiter,
-            // split it and reconstruct an array
-            if (parsedProviderJson && Array.isArray(parsedProviderJson) && parsedProviderJson.length === 1 && typeof parsedProviderJson[0].text === 'string' && expectedLen) {
-              const candidate = parsedProviderJson[0].text;
-              const parts = candidate.split(TEXT_DELIMITER);
-              if (parts.length === expectedLen) {
-                const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
-                finalTranslatedText = JSON.stringify(rebuilt);
-                logger.debug('[Handler:TRANSLATE] Rebuilt JSON array from single-element provider response');
-              }
-            }
-
-            // If still not rebuilt, try splitting raw translatedText by delimiter
-            if (!finalTranslatedText) {
-              const raw = result.translatedText;
-              if (typeof raw === 'string' && expectedLen) {
-                const parts = raw.split(TEXT_DELIMITER);
-                if (parts.length === expectedLen) {
-                  const rebuilt = originalJson.map((item, idx) => ({ ...item, text: parts[idx].trim() }));
-                  finalTranslatedText = JSON.stringify(rebuilt);
-                  logger.debug('[Handler:TRANSLATE] Rebuilt JSON array from raw translatedText by splitting delimiter');
-                }
-              }
-            }
-
-            // Fallback: if nothing matched, wrap entire translatedText as single element
-            if (!finalTranslatedText) {
-              finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
-              logger.debug('[Handler:TRANSLATE] Fallback: wrapped provider translatedText into single-element JSON array');
-            }
-          }
-        } catch (err) {
-          // On any error, fallback to wrapping
-          finalTranslatedText = JSON.stringify([{ text: result.translatedText }]);
-          logger.warn('[Handler:TRANSLATE] Error while normalizing SelectElement provider output, fallback wrap used', err);
-        }
-      }
-
       updateMessage = MessageFormat.create(
         MessageActions.TRANSLATION_RESULT_UPDATE,
         {
           success: true,
-          translatedText: finalTranslatedText,
+          translatedText: result.translatedText,
           originalText: result.originalText,
           provider: result.provider,
           sourceLanguage: result.sourceLanguage,
           targetLanguage: result.targetLanguage,
           timestamp: result.timestamp,
-          translationMode: result.mode || normalizedMessage.data.mode || normalizedMessage.data.translationMode,
+          translationMode: result.mode || message.data.mode || message.data.translationMode,
           options: {
-            toastId: normalizedMessage.data.options?.toastId // Pass the toastId to dismiss the notification
+            toastId: message.data.options?.toastId // Pass the toastId to dismiss the notification
           }
         },
         message.context, // Use original message context
@@ -166,14 +95,14 @@ export async function handleTranslate(message, sender, sendResponse) {
         {
           success: false,
           error: result.error,
-          originalText: normalizedMessage.data.text,
-          provider: normalizedMessage.data.provider,
-          sourceLanguage: normalizedMessage.data.sourceLanguage,
-          targetLanguage: normalizedMessage.data.targetLanguage,
+          originalText: message.data.text,
+          provider: message.data.provider,
+          sourceLanguage: message.data.sourceLanguage,
+          targetLanguage: message.data.targetLanguage,
           timestamp: Date.now(),
-          translationMode: normalizedMessage.data.mode || normalizedMessage.data.translationMode,
+          translationMode: message.data.mode || message.data.translationMode,
           options: {
-            toastId: normalizedMessage.data.options?.toastId // Pass the toastId to dismiss the notification
+            toastId: message.data.options?.toastId
           }
         },
         message.context, // Use original message context

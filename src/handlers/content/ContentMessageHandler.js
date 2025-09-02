@@ -35,6 +35,8 @@ export class ContentMessageHandler {
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
+    this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
+    this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -72,6 +74,18 @@ export class ContentMessageHandler {
   async handleDeactivateSelectElementMode(message) {
     if (this.selectElementManager) {
       return this.selectElementManager.deactivate();
+    }
+  }
+
+  async handleStreamUpdate(message) {
+    if (this.selectElementManager) {
+      return this.selectElementManager.translationOrchestrator.handleStreamUpdate(message);
+    }
+  }
+
+  async handleStreamEnd(message) {
+    if (this.selectElementManager) {
+      return this.selectElementManager.translationOrchestrator.handleStreamEnd(message);
     }
   }
 

@@ -15,6 +15,18 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 
+// Custom Error for Quota Exceeded
+class QuotaExceededError extends Error {
+  constructor(originalError) {
+    super('Gemini API quota exceeded');
+    this.type = 'QUOTA_EXCEEDED';
+    this.provider = 'Gemini';
+    this.originalError = originalError;
+    this.suggestedProviders = ['BingTranslate', 'OpenAI'];
+    this.userMessage = 'Gemini API quota finished. Try switching to Bing for better performance.';
+  }
+}
+
 export class GeminiProvider extends BaseProvider {
   static type = "ai";
   static description = "Google Gemini AI";
@@ -33,39 +45,97 @@ export class GeminiProvider extends BaseProvider {
     return lang || "auto";
   }
 
-  /**
-   * Batch translate implementation for rate limiting integration
-   */
-  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
-    logger.debug(`[Gemini] _batchTranslate called with ${texts.length} segments`);
+  async translate(text, sl, tl, translateMode) {
+    return this._translateSingle(text, sl, tl, translateMode);
+  }
+
+  async _translateBatch(textBatch, sourceLang, targetLang, translateMode) {
+    const batchPrompt = this._buildBatchPrompt(textBatch, sourceLang, targetLang);
     
-    // For Gemini, we process each text individually since it's an AI service
-    // Import rate limiting manager
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+    // Use _translateSingle to send the batch prompt
+    const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode);
     
-    const results = [];
+    return this._parseBatchResult(result, textBatch.length, textBatch);
+  }
+
+  _buildBatchPrompt(textBatch, sourceLang, targetLang) {
+    const jsonInput = textBatch.map((text, index) => ({
+      id: index,
+      text: text
+    }));
     
-    for (let i = 0; i < texts.length; i++) {
-      if (engine && engine.isCancelled(messageId)) {
-        throw new Error('Translation cancelled');
+    return `Translate the following JSON array of texts from ${sourceLang} to ${targetLang}. Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text. Maintain the original JSON structure.\n\n${JSON.stringify(jsonInput, null, 2)}\n\nImportant: Return only the JSON array with translated texts, no additional text or explanations.`;
+  }
+
+  _parseBatchResult(result, expectedCount, originalBatch) {
+    try {
+      // Find the JSON array in the response, allowing for markdown code blocks
+      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```|(\[[\s\S]*\])/);
+      if (!jsonMatch) {
+        throw new Error('No JSON array found in the response.');
       }
       
+      // Use the first captured group that is not undefined
+      const jsonString = jsonMatch[1] || jsonMatch[2];
+      const parsed = JSON.parse(jsonString);
+      
+      if (Array.isArray(parsed) && parsed.length === expectedCount) {
+        // Ensure the order is correct based on id
+        const sortedResults = parsed.sort((a, b) => a.id - b.id);
+        return sortedResults.map(item => item.text);
+      }
+      
+      throw new Error(`Invalid batch result format. Expected ${expectedCount} items, got ${parsed.length}.`);
+    } catch (error) {
+      logger.warn(`[Gemini] Failed to parse batch result: ${error.message}. Falling back to splitting by lines.`);
+      return this._fallbackParsing(result, expectedCount, originalBatch);
+    }
+  }
+
+  _fallbackParsing(result, expectedCount, originalBatch) {
+    // A simple fallback: split the result by newlines.
+    // This is not robust but can be a last resort.
+    const lines = result.split('\\n').filter(line => line.trim() !== '');
+    if (lines.length === expectedCount) {
+      return lines;
+    }
+    // If all else fails, return the original texts for this batch
+    return originalBatch;
+  }
+
+  async _fallbackSingleRequests(batch, sl, tl, translateMode, engine, messageId, rateLimitManager) {
+    const results = [];
+    for (let i = 0; i < batch.length; i++) {
+      if (engine && engine.isCancelled(messageId)) {
+        throw new Error('Translation cancelled during fallback');
+      }
       try {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateSingle(texts[i], sl, tl, translateMode),
-          `segment-${i + 1}/${texts.length}`
+          () => this._translateSingle(batch[i], sl, tl, translateMode),
+          `fallback-segment-${i + 1}/${batch.length}`
         );
-        
-        results.push(result || texts[i]); // Fallback to original if translation fails
+        results.push(result || batch[i]);
       } catch (error) {
-        logger.warn(`[Gemini] Segment ${i + 1} failed:`, error);
-        results.push(texts[i]); // Fallback to original text
+        logger.warn(`[Gemini] Fallback segment ${i + 1} failed:`, error);
+        if (this._isQuotaError(error) || error.type === 'QUOTA_EXCEEDED') {
+          throw new QuotaExceededError(error); // Propagate quota error
+        }
+        results.push(batch[i]); // Fallback to original text
       }
     }
-    
     return results;
   }
+
+  _isQuotaError(error) {
+    return error.message && (
+      error.message.includes('quota') ||
+      error.message.includes('limit exceeded') ||
+      error.message.includes('429') ||
+      error.message.includes('RESOURCE_EXHAUSTED')
+    );
+  }
+
 
   /**
    * Single text translation - extracted from original translate method
@@ -96,13 +166,15 @@ export class GeminiProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const prompt = await buildPrompt(
-      text,
-      sourceLang,
-      targetLang,
-      translateMode,
-      this.constructor.type
-    );
+    const prompt = text.startsWith('Translate the following JSON array') 
+      ? text 
+      : await buildPrompt(
+          text,
+          sourceLang,
+          targetLang,
+          translateMode,
+          this.constructor.type
+        );
 
     // Determine thinking budget based on model and user settings
     let requestBody = { contents: [{ parts: [{ text: prompt }] }] };
@@ -156,6 +228,10 @@ export class GeminiProvider extends BaseProvider {
       logger.info('_executeApiCall completed with result:', result);
       return result;
     } catch (error) {
+      if (this._isQuotaError(error)) {
+        throw new QuotaExceededError(error);
+      }
+      
       // If thinking-related error occurs, retry without thinking config
       if (
         error.message &&
@@ -185,6 +261,8 @@ export class GeminiProvider extends BaseProvider {
       }
 
       logger.error('_executeApiCall failed with error:', error);
+      error.context = `${this.providerName.toLowerCase()}-translation`;
+      error.provider = this.providerName;
       throw error;
     }
   }

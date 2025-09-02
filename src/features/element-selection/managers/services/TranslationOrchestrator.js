@@ -135,26 +135,24 @@ export class TranslationOrchestrator {
         originMapping,
         expandedTexts,
         cachedTranslations,
+        translatedSegments: new Map(),
         status: 'pending',
         timestamp: Date.now()
       });
 
       await this.sendTranslationRequest(messageId, jsonPayload);
-      await this.setupTranslationWaiting(messageId, element, expandedTexts.length);
-
+      // Removed setupTranslationWaiting to handle streaming results
     } catch (error) {
       // Don't log or handle errors that are already handled
       if (!error.alreadyHandled) {
         this.logger.error("Translation process failed", error);
       }
-      
       this.translationRequests.delete(messageId);
       // Dismiss the status notification on error
       if (this.statusNotification) {
         pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
         this.statusNotification = null;
       }
-      
       throw error;
     }
   }
@@ -195,99 +193,82 @@ export class TranslationOrchestrator {
     }
   }
 
-  async setupTranslationWaiting(messageId, element, segmentCount = 0) {
-    this.logger.debug("Setting up translation waiting for message:", messageId);
-    
-    // Use dynamic timeout based on segment count, fallback to config timeout
-    let timeout;
-    if (segmentCount > 0) {
-      timeout = this.calculateDynamicTimeout(segmentCount);
-      this.logger.info(`Using dynamic timeout for ${segmentCount} segments: ${timeout/1000}s`);
-    } else {
-      timeout = await getTimeoutAsync() || TRANSLATION_TIMEOUT_FALLBACK;
-      this.logger.info(`Using standard config timeout: ${timeout/1000}s`);
+  async handleStreamUpdate(message) {
+    const { messageId, data } = message;
+
+    if (!data.success) {
+        this.logger.warn(`Received a failed stream update for messageId: ${messageId}`, data.error);
+        return;
     }
 
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Translation timeout after ${timeout}ms`)), timeout);
-    });
+    const { data: translatedBatch, originalData: originalBatch, batchIndex } = data;
+    
+    const request = this.translationRequests.get(messageId);
+    if (!request) {
+      this.logger.warn("Received stream update for unknown message:", messageId);
+      return;
+    }
 
-    try {
-      await Promise.race([this.waitForTranslationResult(messageId), timeoutPromise]);
-      this.logger.debug("Translation completed successfully for message:", messageId);
-    } catch (error) {
-      // Don't log errors that are already handled
-      if (!error.alreadyHandled) {
-        this.logger.error("Translation waiting failed", error);
-      }
-      
-      const request = this.translationRequests.get(messageId);
-      if (request) {
-        // For timeout errors, mark as 'timeout' instead of deleting the request
-        // This allows late results to be handled gracefully
-        if (error.message && error.message.includes('timeout')) {
-          request.status = 'timeout';
-          request.error = error.message;
-          request.timeoutAt = Date.now();
-          this.logger.warn(`Translation marked as timeout for messageId: ${messageId}. Will handle late results gracefully.`);
-        } else {
-          request.status = 'error';
-          request.error = error.message;
+    // Dismiss the "Translating..." notification on first result
+    if (this.statusNotification) {
+      pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+      this.statusNotification = null;
+    }
+
+    const { textsToTranslate, originMapping, expandedTexts, textNodes } = request;
+
+    for (let i = 0; i < translatedBatch.length; i++) {
+        const translatedText = translatedBatch[i];
+        const originalText = originalBatch[i];
+
+        // Find the original index in the expandedTexts array
+        const expandedIndex = expandedTexts.findIndex(text => text === originalText);
+
+        if (expandedIndex === -1) {
+            this.logger.warn(`Could not find original text for a translated segment: "${originalText}"`);
+            continue;
         }
-      }
-      throw error;
-    } finally {
-      window.isTranslationInProgress = false;
-      if (this.statusNotification) {
-        pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
-        this.statusNotification = null;
-      }
+
+        const { originalIndex } = originMapping[expandedIndex];
+        const originalTextKey = textsToTranslate[originalIndex];
+        
+        const nodesToUpdate = textNodes.filter(node => node.textContent.trim() === originalText.trim());
+
+        if (nodesToUpdate.length > 0) {
+            const translationMap = new Map([[originalText, translatedText]]);
+            this.applyTranslationsToNodes(nodesToUpdate, translationMap);
+            request.translatedSegments.set(expandedIndex, translatedText);
+        }
     }
   }
 
-  waitForTranslationResult(messageId) {
-    return new Promise((resolve, reject) => {
-      const checkInterval = setInterval(() => {
-        const request = this.translationRequests.get(messageId);
-        if (!request) {
-          clearInterval(checkInterval);
-          reject(new Error(`Translation request ${messageId} not found`));
-          return;
-        }
-        if (request.status === 'completed') {
-          clearInterval(checkInterval);
-          resolve(request.result);
-        } else if (request.status === 'error') {
-          clearInterval(checkInterval);
-          // Handle error properly to avoid [object Object]
-          const errorMessage = typeof request.error === 'string' 
-            ? request.error 
-            : (request.error?.message || JSON.stringify(request.error) || 'Translation failed');
-          const error = new Error(errorMessage);
-          error.alreadyHandled = true; // Mark as already handled since handleTranslationResult already showed notification
-          reject(error);
-        } else if (request.status === 'cancelled') {
-          clearInterval(checkInterval);
-          const errorMessage = typeof request.error === 'string' 
-            ? request.error 
-            : (request.error?.message || 'Translation cancelled by user');
-          reject(new Error(errorMessage));
-        }
-      }, 100);
+  async handleStreamEnd(message) {
+    const { messageId } = message;
+    const request = this.translationRequests.get(messageId);
+    if (!request) {
+      this.logger.warn("Received stream end for unknown message:", messageId);
+      return;
+    }
+
+    this.logger.info("Translation stream finished for message:", messageId);
+    
+    // Finalize state, e.g., by storing all translations in stateManager
+    const allTranslations = new Map(request.cachedTranslations);
+    request.translatedSegments.forEach((value, key) => {
+        const { originalIndex } = request.originMapping[key];
+        const originalTextKey = request.textsToTranslate[originalIndex];
+        // This part is complex, for now just storing the translated segments is enough for revert
+        // A more sophisticated reassembly might be needed if we want to store the full translated block
     });
+    this.stateManager.addTranslatedElement(request.element, request.translatedSegments);
+
+    this.translationRequests.delete(messageId);
   }
 
   async handleTranslationResult(message) {
+    // This method is now a fallback for non-streaming responses
     const { messageId, data } = message;
-    
-    // Enhanced logging: Log raw data received from background
-    this.logger.debug("Received translation result:", { 
-      messageId, 
-      success: data?.success,
-      hasError: !!data?.error,
-      errorType: typeof data?.error,
-      rawErrorPreview: data?.error ? String(data?.error).substring(0, 100) : 'none'
-    });
+    this.logger.debug("Received non-streaming translation result:", { messageId });
 
     const request = this.translationRequests.get(messageId);
     if (!request) {
@@ -295,38 +276,10 @@ export class TranslationOrchestrator {
       return;
     }
     
-    // Handle late results for timed-out translations
-    if (request.status === 'timeout') {
-      const timesinceTimeout = Date.now() - (request.timeoutAt || 0);
-      this.logger.info(`Received late translation result for timed-out messageId: ${messageId} (${timesinceTimeout}ms after timeout)`);
-      
-      // If it's a successful late result, we can still apply it
-      if (data?.success) {
-        this.logger.info("Applying late translation result despite timeout");
-        // Continue with normal processing
-      } else {
-        // If late result is also an error, just log and ignore
-        this.logger.warn("Late translation result is also an error, ignoring");
-        return;
-      }
-    }
-    
-    if (request.status === 'cancelled') {
-      this.logger.debug("Ignoring translation result for cancelled message:", messageId);
+    if (request.status !== 'pending') {
+      this.logger.debug("Received translation result for already processed message:", { messageId });
       return;
     }
-    
-    if (request.status !== 'pending' && request.status !== 'timeout') {
-      this.logger.debug("Received translation result for already completed message:", messageId);
-      return;
-    }
-
-    // Preserve original error for safety before any processing
-    const originalErrorBackup = data?.error;
-    this.logger.debug("Original error backup created:", { 
-      hasBackup: !!originalErrorBackup,
-      backupType: typeof originalErrorBackup
-    });
 
     try {
       if (data?.success) {
@@ -350,133 +303,30 @@ export class TranslationOrchestrator {
         // Apply translations directly to DOM nodes (like OLD system)
         this.applyTranslationsToNodes(textNodes, allTranslations);
 
+
         request.status = 'completed';
         request.result = data;
-        this.logger.info("Translation applied successfully to DOM elements", { messageId });
+        this.logger.info("Translation applied successfully to DOM elements (fallback)", { messageId });
       } else {
-        // ENHANCED ERROR HANDLING: Process error with comprehensive logging and safety
-        this.logger.debug("Processing translation error...");
-        
-        let processedErrorMessage;
-        let safeErrorForHandler;
-        
-        try {
-          // Safe error message extraction with multiple fallbacks
-          if (typeof originalErrorBackup === 'string' && originalErrorBackup.length > 0) {
-            processedErrorMessage = originalErrorBackup;
-            safeErrorForHandler = originalErrorBackup;
-            this.logger.debug("Using string error from backup:", processedErrorMessage);
-          } else if (originalErrorBackup && typeof originalErrorBackup === 'object' && originalErrorBackup.message) {
-            processedErrorMessage = originalErrorBackup.message;
-            safeErrorForHandler = originalErrorBackup.message;
-            this.logger.debug("Using error.message from backup:", processedErrorMessage);
-          } else if (originalErrorBackup) {
-            // Safe JSON stringify with error handling
-            try {
-              processedErrorMessage = JSON.stringify(originalErrorBackup);
-              safeErrorForHandler = processedErrorMessage;
-              this.logger.debug("Using JSON.stringify of error:", processedErrorMessage);
-            } catch (jsonError) {
-              processedErrorMessage = 'Translation failed - Error details unavailable';
-              safeErrorForHandler = processedErrorMessage;
-              this.logger.warn("Failed to stringify error, using fallback:", jsonError);
-            }
-          } else {
-            processedErrorMessage = 'Translation failed - No error details';
-            safeErrorForHandler = processedErrorMessage;
-            this.logger.warn("No error details available, using generic message");
-          }
-          
-        } catch (extractionError) {
-          // If error extraction itself fails, use the backup
-          this.logger.error("Error during error extraction, using ultimate fallback:", extractionError);
-          processedErrorMessage = originalErrorBackup ? String(originalErrorBackup) : 'Translation failed';
-          safeErrorForHandler = processedErrorMessage;
-        }
-
-        // Store error in request safely
         request.status = 'error';
-        request.error = processedErrorMessage;
-        
-        this.logger.debug("Final processed error message:", processedErrorMessage);
-        this.logger.error("Translation failed", { messageId, originalError: originalErrorBackup, processedError: processedErrorMessage });
-        
-        // Create error object for ErrorHandler with safety measures
-        let translationError;
-        try {
-          translationError = new Error(safeErrorForHandler);
-          translationError.originalError = originalErrorBackup;
-        } catch (errorCreationError) {
-          this.logger.error("Failed to create Error object:", errorCreationError);
-          translationError = new Error('Translation failed - Error processing failed');
-          translationError.originalError = originalErrorBackup;
-        }
-        
-        // Use centralized error handling
-        try {
-          await this.errorHandler.handle(translationError, {
-            context: 'select-element-translation',
+        request.error = data?.error;
+        this.logger.error("Translation failed (fallback)", { messageId, error: data?.error });
+        await this.errorHandler.handle(new Error(data?.error?.message || 'Translation failed'), {
+            context: 'select-element-translation-fallback',
             type: ErrorTypes.TRANSLATION_FAILED,
             showToast: true
-          });
-        } catch (handlerError) {
-          this.logger.error("ErrorHandler.handle() failed:", handlerError);
-          // Fallback: show notification directly if ErrorHandler fails
-          pageEventBus.emit('show-notification', {
-            id: `error-${Date.now()}`,
-            message: safeErrorForHandler || 'Translation failed',
-            type: 'error',
-            duration: 4000
-          });
-        }
-        
-        // Mark this error as already handled to prevent duplicate notifications
-        translationError.alreadyHandled = true;
-        throw translationError;
+        });
       }
     } catch (e) {
-      // Enhanced catch block with better error preservation
-      if (e.alreadyHandled) {
-        this.logger.debug("Re-throwing already handled error:", e.message);
-        throw e;
-      }
-      
-      this.logger.error("Unexpected error during translation result handling:", e);
-      this.logger.error("Original error backup was:", originalErrorBackup);
-      
-      // Update request status with preserved information
+      this.logger.error("Unexpected error during fallback translation result handling:", e);
       request.status = 'error';
-      
-      // Use original error if this was a JavaScript error during processing
-      if (originalErrorBackup && !data?.success) {
-        const fallbackMessage = typeof originalErrorBackup === 'string' 
-          ? originalErrorBackup 
-          : (originalErrorBackup?.message || 'Translation failed');
-        request.error = fallbackMessage;
-        this.logger.debug("Using original error as fallback:", fallbackMessage);
-        
-        // Try to show the original error to user
-        try {
-          pageEventBus.emit('show-notification', {
-            id: `error-fallback-${Date.now()}`,
-            message: fallbackMessage,
-            type: 'error',
-            duration: 4000
-          });
-        } catch (notifyError) {
-          this.logger.error("Failed to show fallback notification:", notifyError);
+      request.error = e.message;
+    } finally {
+        if (this.statusNotification) {
+            pageEventBus.emit('dismiss_notification', { id: this.statusNotification });
+            this.statusNotification = null;
         }
-        
-        // Create a new error with the original message
-        const fallbackError = new Error(fallbackMessage);
-        fallbackError.originalError = originalErrorBackup;
-        fallbackError.processingError = e;
-        fallbackError.alreadyHandled = true;
-        throw fallbackError;
-      } else {
-        request.error = e.message;
-        throw e;
-      }
+        this.translationRequests.delete(messageId);
     }
   }
 
@@ -531,7 +381,6 @@ export class TranslationOrchestrator {
   async cleanup() {
     this.cancelAllTranslations();
     this.translationRequests.clear();
-    this.removeEscapeKeyListener();
     this.logger.debug('TranslationOrchestrator cleanup completed');
   }
 
