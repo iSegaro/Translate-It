@@ -242,7 +242,7 @@ export class TranslationEngine {
   }
 
   /**
-   * Core translation execution logic
+   * Core translation execution logic with streaming support
    */
   async executeTranslation(data, sender) {
     const { text, provider, sourceLanguage, targetLanguage } = data;
@@ -276,22 +276,30 @@ export class TranslationEngine {
       getTargetLanguageAsync()
     ]);
 
-    // Pre-check for JSON mode optimization
+    // Check if this is a JSON mode that should use streaming
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
 
-    // For unreliable providers in JSON mode, use optimized strategy directly
-    if (isSelectJson && !providerReliableJson) {
-      logger.debug('[TranslationEngine] Using optimized strategy for unreliable JSON provider:', provider);
+    // For Select Element JSON mode, use optimized streaming strategy
+    if (isSelectJson) {
+      logger.debug('[TranslationEngine] Using optimized JSON strategy for provider:', provider);
       const tabId = sender?.tab?.id;
       return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
     }
 
-    // Standard translation for reliable providers or non-JSON mode
+    // Check if provider supports streaming for non-JSON modes
+    const messageId = data.messageId;
+    const shouldUseStreaming = this._shouldUseStreamingForProvider(providerInstance, text, messageId, mode);
+    
+    if (shouldUseStreaming) {
+      logger.debug(`[TranslationEngine] Using streaming translation for provider: ${provider}`);
+      return await this.executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang);
+    }
+
+    // Standard translation for non-streaming providers
     let result;
     try {
       // Get abort controller for this translation
-      const messageId = data.messageId;
       const abortController = messageId ? this.activeTranslations.get(messageId) : null;
       
       logger.debug(`[TranslationEngine] Standard translation call:`, {
@@ -320,12 +328,6 @@ export class TranslationEngine {
         throw initialError;
       }
       
-      // Final fallback for SelectElement JSON (only for other types of errors)
-      if (isSelectJson && !providerReliableJson) {
-        logger.warn('[TranslationEngine] Standard translation failed, falling back to optimized strategy:', initialError);
-        const tabId = sender?.tab?.id;
-        return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
-      }
       throw initialError;
     }
 
@@ -999,6 +1001,103 @@ export class TranslationEngine {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Check if provider should use streaming for this request
+   * @param {object} providerInstance - Provider instance
+   * @param {string} text - Text to translate
+   * @param {string} messageId - Message ID
+   * @param {string} mode - Translation mode
+   * @returns {boolean} - Whether to use streaming
+   */
+  _shouldUseStreamingForProvider(providerInstance, text, messageId, mode) {
+    // Only AI providers support streaming
+    if (!providerInstance.constructor.supportsStreaming) {
+      return false;
+    }
+
+    // Must have messageId for streaming coordination
+    if (!messageId) {
+      return false;
+    }
+
+    // Only stream for longer texts or specific modes
+    const shouldStream = text.length > 500 || mode === TranslationMode.Selection;
+    
+    return shouldStream;
+  }
+
+  /**
+   * Execute streaming translation for AI providers
+   * @param {object} data - Translation data
+   * @param {object} providerInstance - Provider instance  
+   * @param {object} sender - Message sender
+   * @param {string} originalSourceLang - Original source language
+   * @param {string} originalTargetLang - Original target language
+   * @returns {Promise<object>} - Streaming result
+   */
+  async executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang) {
+    const { text, provider, sourceLanguage, targetLanguage, mode, messageId } = data;
+    const tabId = sender?.tab?.id;
+
+    // Initialize streaming session
+    const { streamingManager } = await import("./StreamingManager.js");
+    const segments = [text]; // For simple text, treat as single segment
+    
+    streamingManager.initializeStream(messageId, sender, providerInstance, segments);
+
+    // Store sender info for streaming callbacks
+    this.streamingSenders = this.streamingSenders || new Map();
+    this.streamingSenders.set(messageId, sender);
+
+    // Start streaming translation
+    try {
+      // Get abort controller for this translation
+      const abortController = this.activeTranslations.get(messageId);
+      
+      const result = await providerInstance.translate(
+        text,
+        sourceLanguage,
+        targetLanguage,
+        {
+          mode: mode,
+          originalSourceLang: originalSourceLang,
+          originalTargetLang: originalTargetLang,
+          messageId: messageId,
+          engine: this
+        }
+      );
+
+      // For streaming providers, they handle their own streaming
+      // Just return streaming indicator
+      return {
+        success: true,
+        streaming: true,
+        messageId: messageId,
+        provider: provider,
+        timestamp: Date.now()
+      };
+
+    } catch (error) {
+      // Handle streaming error
+      await streamingManager.handleStreamError(messageId, error);
+      throw error;
+    } finally {
+      // Cleanup
+      if (this.streamingSenders) {
+        this.streamingSenders.delete(messageId);
+      }
+    }
+  }
+
+  /**
+   * Get sender information for streaming messages
+   * @param {string} messageId - Message ID
+   * @returns {object|null} - Sender information
+   */
+  getStreamingSender(messageId) {
+    return this.streamingSenders?.get(messageId) || null;
   }
 
   isCancelled(messageId) {

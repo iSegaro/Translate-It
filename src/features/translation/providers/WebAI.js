@@ -1,5 +1,5 @@
 // src/core/providers/WebAIProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
@@ -11,12 +11,20 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
-export class WebAIProvider extends BaseProvider {
+export class WebAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "WebAI service";
   static displayName = "WebAI";
   static reliableJsonMode = false;
   static supportsDictionary = true;
+  
+  // AI Provider capabilities - Relaxed settings for local server
+  static supportsStreaming = false; // Disable until local streaming is implemented
+  static preferredBatchStrategy = 'smart';
+  static optimalBatchSize = 20; // Larger batches for local processing
+  static maxComplexity = 400;
+  static supportsImageTranslation = false; // Depends on local model
+
   constructor() {
     super("WebAI");
   }
@@ -26,32 +34,37 @@ export class WebAIProvider extends BaseProvider {
     return LanguageSwappingService._normalizeLangValue(lang);
   }
 
-  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+  /**
+   * WebAI batch translation - Uses individual requests for now
+   * @param {string[]} batch - Batch of texts to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
+    // WebAI uses individual requests for now (local server approach)
     const results = [];
     
-    for (let i = 0; i < texts.length; i++) {
-      if (engine && engine.isCancelled(messageId)) {
+    for (let i = 0; i < batch.length; i++) {
+      if (abortController && abortController.signal.aborted) {
         throw new Error('Translation cancelled');
       }
       
       try {
-        const result = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          () => this._translateSingle(texts[i], sl, tl, translateMode),
-          `segment-${i + 1}/${texts.length}`
-        );
-        results.push(result || texts[i]);
+        const result = await this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController);
+        results.push(result || batch[i]);
       } catch (error) {
-        logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
-        results.push(texts[i]); // Return original text on failure
+        logger.warn(`[${this.providerName}] Individual translation ${i + 1} failed:`, error);
+        results.push(batch[i]); // Return original text on failure
       }
     }
     
     return results;
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),

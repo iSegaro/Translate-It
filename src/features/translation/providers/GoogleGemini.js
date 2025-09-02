@@ -1,5 +1,5 @@
 // src/core/providers/GeminiProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   CONFIG,
   getApiKeyAsync,
@@ -42,12 +42,20 @@ class RateLimitError extends Error {
   }
 }
 
-export class GeminiProvider extends BaseProvider {
+export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
   static description = "Google Gemini AI";
   static displayName = "Google Gemini";
   static reliableJsonMode = false;
   static supportsDictionary = true;
+  
+  // AI Provider capabilities - Current optimized settings
+  static supportsStreaming = true;
+  static preferredBatchStrategy = 'smart';
+  static optimalBatchSize = 25;
+  static maxComplexity = 400;
+  static supportsImageTranslation = true;
+
   constructor() {
     super("Gemini");
   }
@@ -60,17 +68,42 @@ export class GeminiProvider extends BaseProvider {
     return lang || "auto";
   }
 
-  async translate(text, sl, tl, translateMode) {
-    return this._translateSingle(text, sl, tl, translateMode);
-  }
+  /**
+   * Override _translateBatch to use Gemini's existing batch logic
+   * @param {string[]} batch - Batch of texts to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
+    // For single text, use individual translation
+    if (batch.length === 1) {
+      const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController);
+      return [result || batch[0]];
+    }
 
-  async _translateBatch(textBatch, sourceLang, targetLang, translateMode) {
-    const batchPrompt = this._buildBatchPrompt(textBatch, sourceLang, targetLang);
-    
-    // Use _translateSingle to send the batch prompt
-    const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode);
-    
-    return this._parseBatchResult(result, textBatch.length, textBatch);
+    // Use Gemini's batch translation logic
+    try {
+      const batchPrompt = this._buildBatchPrompt(batch, sourceLang, targetLang);
+      const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
+      
+      // Parse batch result
+      const parsedResults = this._parseBatchResult(result, batch.length, batch);
+      
+      // Validate results
+      if (parsedResults.length === batch.length) {
+        logger.debug(`[${this.providerName}] Batch translation successful: ${batch.length} segments`);
+        return parsedResults;
+      } else {
+        logger.warn(`[${this.providerName}] Batch result mismatch, falling back to individual requests`);
+        throw new Error('Batch result count mismatch');
+      }
+    } catch (error) {
+      logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
+      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, null, null, abortController);
+    }
   }
 
   _buildBatchPrompt(textBatch, sourceLang, targetLang) {
@@ -118,16 +151,17 @@ export class GeminiProvider extends BaseProvider {
     return originalBatch;
   }
 
-  async _fallbackSingleRequests(batch, sl, tl, translateMode, engine, messageId, rateLimitManager) {
+  async _fallbackSingleRequests(batch, sl, tl, translateMode, engine, messageId, abortController) {
+    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
     for (let i = 0; i < batch.length; i++) {
-      if (engine && engine.isCancelled(messageId)) {
+      if (abortController && abortController.signal.aborted) {
         throw new Error('Translation cancelled during fallback');
       }
       try {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateSingle(batch[i], sl, tl, translateMode),
+          () => this._translateSingle(batch[i], sl, tl, translateMode, abortController),
           `fallback-segment-${i + 1}/${batch.length}`
         );
         results.push(result || batch[i]);
@@ -228,7 +262,7 @@ export class GeminiProvider extends BaseProvider {
   /**
    * Single text translation - extracted from original translate method
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiKey, geminiModel, thinkingEnabled] = await Promise.all([
       getApiKeyAsync(),
       getGeminiModelAsync(),
@@ -311,6 +345,7 @@ export class GeminiProvider extends BaseProvider {
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: context,
+        abortController: abortController
       });
 
       logger.info('_executeApiCall completed with result:', result);
@@ -469,6 +504,7 @@ export class GeminiProvider extends BaseProvider {
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: context,
+        abortController: abortController
       });
 
       logger.info('image translation completed with result:', result

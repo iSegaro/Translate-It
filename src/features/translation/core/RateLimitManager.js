@@ -6,13 +6,15 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { requestHealthMonitor } from './RequestHealthMonitor.js';
+import { getProviderRateLimit } from './ProviderConfigurations.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'RateLimitManager');
 
 /**
- * Provider-specific rate limiting configurations
+ * Legacy provider-specific rate limiting configurations (deprecated)
+ * Now using ProviderConfigurations.js for centralized config management
  */
-const PROVIDER_CONFIGS = {
+const LEGACY_PROVIDER_CONFIGS = {
   // Free translation services - moderate limits
   'GoogleTranslate': {
     maxConcurrent: 2,
@@ -131,7 +133,15 @@ export class RateLimitManager {
       return this.providerStates.get(providerName);
     }
     
-    const config = PROVIDER_CONFIGS[providerName] || PROVIDER_CONFIGS.default;
+    // Try to get configuration from new ProviderConfigurations system
+    let config;
+    try {
+      config = getProviderRateLimit(providerName);
+      logger.debug(`Using new provider configuration for ${providerName}:`, config);
+    } catch (error) {
+      logger.debug(`Failed to load new configuration for ${providerName}, falling back to legacy:`, error.message);
+      config = LEGACY_PROVIDER_CONFIGS[providerName] || LEGACY_PROVIDER_CONFIGS.default;
+    }
     const state = {
       config: { ...config },
       activeRequests: 0,

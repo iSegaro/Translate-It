@@ -1,5 +1,5 @@
 // src/core/providers/OpenAIProvider.js
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   getOpenAIApiKeyAsync,
   getOpenAIApiUrlAsync,
@@ -13,12 +13,20 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
 
-export class OpenAIProvider extends BaseProvider {
+export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "OpenAI GPT models";
   static displayName = "OpenAI";
-  static reliableJsonMode = false;
+  static reliableJsonMode = true;
   static supportsDictionary = true;
+  
+  // AI Provider capabilities
+  static supportsStreaming = true;
+  static preferredBatchStrategy = 'smart';
+  static optimalBatchSize = 15;
+  static maxComplexity = 300;
+  static supportsImageTranslation = true;
+
   constructor() {
     super("OpenAI");
   }
@@ -28,32 +36,75 @@ export class OpenAIProvider extends BaseProvider {
     return LanguageSwappingService._normalizeLangValue(lang);
   }
 
-  async _batchTranslate(texts, sl, tl, translateMode, engine, messageId, abortController) {
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+  /**
+   * Optimized batch translation for OpenAI
+   * Uses batch API calls when possible for better efficiency
+   * @param {string[]} batch - Batch of texts to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController) {
+    // For single text, use individual translation
+    if (batch.length === 1) {
+      const result = await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController);
+      return [result || batch[0]];
+    }
+
+    // For multiple texts, try batch translation first
+    try {
+      const batchPrompt = this._buildBatchPrompt(batch, sourceLang, targetLang);
+      const result = await this._translateSingle(batchPrompt, sourceLang, targetLang, translateMode, abortController);
+      
+      // Parse batch result
+      const parsedResults = this._parseBatchResult(result, batch.length, batch);
+      
+      // Validate results
+      if (parsedResults.length === batch.length) {
+        logger.debug(`[${this.providerName}] Batch translation successful: ${batch.length} segments`);
+        return parsedResults;
+      } else {
+        logger.warn(`[${this.providerName}] Batch result mismatch, falling back to individual requests`);
+        throw new Error('Batch result count mismatch');
+      }
+    } catch (error) {
+      logger.warn(`[${this.providerName}] Batch translation failed, falling back to individual requests:`, error);
+      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, abortController);
+    }
+  }
+
+  /**
+   * Fallback to individual requests when batch translation fails
+   * @param {string[]} batch - Batch of texts to translate
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @returns {Promise<string[]>} - Translated texts
+   */
+  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, abortController) {
     const results = [];
     
-    for (let i = 0; i < texts.length; i++) {
-      if (engine && engine.isCancelled(messageId)) {
+    for (let i = 0; i < batch.length; i++) {
+      if (abortController && abortController.signal.aborted) {
         throw new Error('Translation cancelled');
       }
       
       try {
-        const result = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          () => this._translateSingle(texts[i], sl, tl, translateMode),
-          `segment-${i + 1}/${texts.length}`
-        );
-        results.push(result || texts[i]);
+        const result = await this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController);
+        results.push(result || batch[i]);
       } catch (error) {
-        logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
-        results.push(texts[i]); // Return original text on failure
+        logger.warn(`[${this.providerName}] Individual translation ${i + 1} failed:`, error);
+        results.push(batch[i]); // Return original text on failure
       }
     }
     
     return results;
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController) {
     const [apiKey, apiUrl, model] = await Promise.all([
       getOpenAIApiKeyAsync(),
       getOpenAIApiUrlAsync(),
@@ -67,13 +118,16 @@ export class OpenAIProvider extends BaseProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const prompt = await buildPrompt(
-      text,
-      sourceLang,
-      targetLang,
-      translateMode,
-      this.constructor.type
-    );
+    // Check if this is a batch prompt (starts with specific pattern)
+    const prompt = text.startsWith('Translate the following JSON array') 
+      ? text 
+      : await buildPrompt(
+          text,
+          sourceLang,
+          targetLang,
+          translateMode,
+          this.constructor.type
+        );
 
     const fetchOptions = {
       method: "POST",
