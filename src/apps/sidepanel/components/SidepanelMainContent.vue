@@ -67,7 +67,7 @@
         :tts-alt="'Voice Target'"
         mode="sidepanel"
         :enable-markdown="true"
-        :show-fade-in-animation="true"
+        :show-fade-in-animation="false"
       />
     </form>
   </div>
@@ -625,16 +625,17 @@ html[dir="rtl"] .result:empty::before {
   }
 }
 
-/* Result fade-in animation */
-.result.fade-in {
+/* Result fade-in animation - disabled as requested */
+/* .result.fade-in {
   animation: fadeIn 0.4s ease-in-out;
-}
+} */
 
 .result.hide-content {
   opacity: 0;
 }
 
-@keyframes fadeIn {
+/* Fade-in animation disabled as requested */
+/* @keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -644,5 +645,5 @@ html[dir="rtl"] .result:empty::before {
     opacity: 1;
     transform: translateY(0);
   }
-}
+} */
 </style>

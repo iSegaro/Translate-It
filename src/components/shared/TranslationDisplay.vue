@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="containerRef"
     class="translation-display"
     :class="[
       {
@@ -16,7 +17,7 @@
   >
     <!-- Enhanced Actions Toolbar -->
     <ActionToolbar
-      v-if="showToolbar && hasContent"
+      v-show="showToolbar && hasContent"
       :text="content"
       :language="targetLanguage"
       :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
@@ -49,8 +50,8 @@
       class="translation-content"
       :class="[
         {
-          'fade-in': showFadeIn,
-          'loading-dim': isLoading
+          'fade-in': false, /* Animation disabled */
+          /* 'loading-dim': isLoading */
         },
         contentClass
       ]"
@@ -206,7 +207,8 @@ const emit = defineEmits([
 
 // Refs
 const contentRef = ref(null)
-const showFadeIn = ref(false)
+const containerRef = ref(null)
+// const showFadeIn = ref(false) // Disabled
 
 // Computed
 const hasContent = computed(() => props.content.trim().length > 0 && !props.isLoading)
@@ -269,12 +271,13 @@ const renderedContent = computed(() => {
 
 // Watchers
 watch(() => props.content, (newContent, oldContent) => {
-  if (newContent && newContent !== oldContent && props.showFadeInAnimation && !props.isLoading) {
-    showFadeIn.value = true
-    setTimeout(() => {
-      showFadeIn.value = false
-    }, 400)
-  }
+  // Fade-in animation disabled as requested
+  // if (newContent && newContent !== oldContent && props.showFadeInAnimation && !props.isLoading) {
+  //   showFadeIn.value = true
+  //   setTimeout(() => {
+  //     showFadeIn.value = false
+  //   }, 400)
+  // }
 }, { immediate: true })
 
 // Action Toolbar Event Handlers
@@ -394,7 +397,6 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   max-width: 100%;
-  transition: opacity 0.3s ease-out, max-height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 /* Sidepanel content adjustments */
@@ -438,13 +440,15 @@ onMounted(() => {
 }
 
 /* Content states */
-.translation-content.loading-dim {
-  opacity: 0.3;
-}
+/* .translation-content.loading-dim {
+  opacity: 1;
+  transition: none !important;
+} */
 
-.translation-content.fade-in {
+/* Fade-in animation removed as requested */
+/* .translation-content.fade-in {
   animation: fadeInWithSlide 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
+} */
 
 /* Message styling */
 .translation-content :deep(.placeholder-message) {
@@ -527,7 +531,7 @@ onMounted(() => {
 }
 
 .translation-content :deep(.loading-message) {
-  color: #007bff;
+  color: var(--accent-color, #1967d2);
   font-style: italic;
   opacity: 0.8;
   text-align: center;
@@ -654,12 +658,20 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   width: 28px;
   height: 28px;
   border: 3px solid var(--header-border-color, #dee2e6);
-  border-top: 3px solid #007bff;
+  border-top: 3px solid var(--accent-color, #1967d2);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
 
 /* Dark theme spinner styling handled by unified theme variables */
+:global(.theme-dark) .translation-display .spinner {
+  border-color: var(--header-border-color, #5f6368);
+  border-top-color: var(--accent-color, #58a6ff);
+}
+
+:global(.theme-dark) .translation-display .translation-content .loading-message {
+  color: var(--accent-color, #58a6ff);
+}
 
 /* Enhanced Display Toolbar */
 .display-toolbar {
@@ -712,7 +724,8 @@ html[dir="rtl"] .selection-mode .display-toolbar {
   50% { opacity: 0.4; }
 }
 
-@keyframes fadeInWithSlide {
+/* Fade-in animation removed as requested */
+/* @keyframes fadeInWithSlide {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -721,7 +734,7 @@ html[dir="rtl"] .selection-mode .display-toolbar {
     opacity: 1;
     transform: translateY(0);
   }
-}
+} */
 
 /* Custom scrollbar */
 .translation-content::-webkit-scrollbar {
