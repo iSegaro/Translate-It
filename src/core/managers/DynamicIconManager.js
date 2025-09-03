@@ -89,13 +89,22 @@ class DynamicIconManager {
 
       // Check if offscreen document exists, create if not
       if (!this.offscreenDocumentCreated) {
-        await browser.offscreen.createDocument({
-          url: 'html/offscreen.html',
-          reasons: ['DOM_PARSER'],
-          justification: 'Generate dynamic overlay icons for providers'
-        });
-        this.offscreenDocumentCreated = true;
-        logger.debug('Offscreen document created for icon generation');
+        try {
+          await browser.offscreen.createDocument({
+            url: 'html/offscreen.html',
+            reasons: ['DOM_PARSER'],
+            justification: 'Generate dynamic overlay icons for providers'
+          });
+          this.offscreenDocumentCreated = true;
+          logger.debug('Offscreen document created for icon generation');
+        } catch (error) {
+          if (error.message.includes('Only a single offscreen document may be created')) {
+            logger.debug('Offscreen document already exists (created elsewhere), skipping creation');
+            this.offscreenDocumentCreated = true; // Mark as created to avoid future attempts
+          } else {
+            throw error; // Re-throw if it's a different error
+          }
+        }
       } else {
         logger.debug('Offscreen document already exists, skipping creation');
       }
