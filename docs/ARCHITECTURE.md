@@ -15,7 +15,7 @@
 - ✅ **Text Actions System** - Unified copy/paste and advanced TTS (Play/Pause/Resume)
 - ✅ **Storage Management** - Centralized storage with caching
 - ✅ **Logging System** - Production-ready structured logging
-- ✅ **Provider System** - 10+ translation providers with factory pattern
+- ✅ **Provider System** - 10+ translation providers with a hierarchical factory pattern (`BaseProvider`, `BaseTranslateProvider`, `BaseAIProvider`), integrated with `RateLimitManager` and `StreamingManager`.
 - ✅ **Cross-Browser Support** - Chrome and Firefox MV3
 - ✅ **UI Host System** - Centralized Vue app in Shadow DOM for all in-page UI
 - ✅ **Smart Messaging System** - Intelligent routing eliminates 3+ second retry delays
@@ -80,7 +80,7 @@
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CORE SYSTEMS                                │
-│  Provider Factory → Storage Manager → Error Handler            │
+│  Provider Factory → BaseProvider (BaseTranslateProvider, BaseAIProvider) → RateLimitManager → StreamingManager → Storage Manager → Error Handler            │
 │  Logger System → TTS Manager → Windows Manager                 │
 └─────────────────────────────────────────────────────────────────┘
                     │
@@ -150,12 +150,12 @@ src/
 │
 ├── 🏪 features/               # Feature-Based Organization (NEW)
 │   ├── translation/
-│   │   ├── core/              # TranslationEngine, ProviderFactory
+│   │   ├── core/              # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
 │   │   ├── handlers/          # handleTranslate.js, etc.
 │   │   ├── stores/            # translation.js store
 │   │   ├── composables/       # useTranslation, useTranslationModes
-│   │   ├── providers/         # Google, OpenAI, DeepSeek, etc.
+│   │   ├── providers/         # BaseProvider, BaseTranslateProvider, BaseAIProvider, Google, OpenAI, DeepSeek, etc.
 │   │   └── utils/             # Translation utilities
 │   ├── tts/
 │   │   ├── managers/          # Browser-specific TTS (Chrome/Firefox)
@@ -462,11 +462,11 @@ export class FeatureLoader {
     
     if (hasOffscreen) {
       // Chrome: Use offscreen documents
-      const { OffscreenTTSManager } = await import("../managers/browser-specific/tts/TTSChrome.js")
+      const { OffscreenTTSManager } = await import("@/managers/browser-specific/tts/TTSChrome.js")
       return new OffscreenTTSManager()
     } else {
       // Firefox: Use background page audio
-      const { BackgroundTTSManager } = await import("../managers/browser-specific/tts/TTSFirefox.js")
+      const { BackgroundTTSManager } = await import("@/managers/browser-specific/tts/TTSFirefox.js")
       return new BackgroundTTSManager()
     }
   }
@@ -496,7 +496,7 @@ const result = await provider.translate(text, options)
 Coordinates translation requests and provider selection:
 
 ```javascript
-import { TranslationEngine } from '@/core/TranslationEngine.js'
+import { TranslationEngine } from '@/features/translation/core/translation-engine.js'
 
 const engine = new TranslationEngine()
 const result = await engine.translate({
@@ -580,24 +580,6 @@ Vue Component → Pinia Store → Storage Manager → browser.storage
      ↓              ↓              ↓
   Reactive UI → Computed → Event System → Cross-Tab Sync
 ```
-
----
-
-## 🔧 Cross-Browser Compatibility
-
-### Browser Detection
-```javascript
-import { useBrowserDetection } from '@/composables/useBrowserDetection.js'
-
-const { isChrome, isFirefox, supportsSidepanel } = useBrowserDetection()
-```
-
-### Feature Support Matrix
-| Feature | Chrome | Firefox |
-|---------|--------|---------|
-| Sidepanel | ✅ | ✅ |
-| Offscreen | ✅ | ❌ |
-| Action API | ✅ | ✅ |
 
 ---
 
@@ -838,7 +820,7 @@ export function useTranslationLogic(context = 'generic') {
 ### Store Design Principles
 
 1. **Single Responsibility**: Each store manages one feature domain
-2. **Automatic Persistence**: All stores sync with StorageManager
+2. **Automatic Persistence**: All stores sync with browser storage
 3. **Reactive Updates**: Use reactive patterns for UI updates
 4. **Cross-Store Communication**: Use store composition for complex operations
 
@@ -982,7 +964,7 @@ TranslationWindow.vue handles all UI and interactions
 ## 🖥️ UI Host System
 
 ### Overview
-The UI Host System is a critical architectural component that acts as a **centralized Vue application (`ContentApp.vue`)** for managing all in-page UI elements. It operates entirely within a **Shadow DOM**, ensuring complete CSS and JavaScript isolation from the host webpage. This prevents style conflicts and provides a stable environment for the extension's UI.
+The UI Host System is a critical architectural component that acts as a **centralized Vue application (`ContentApp.vue`)** for managing all in-page UI elements. It operates entirely within a **Shadow DOM**, ensuring complete CSS and JavaScript isolation from the host webpage.
 
 See [UI Host System Documentation](docs/UI_HOST_SYSTEM.md) for complete details.
 
@@ -1168,13 +1150,26 @@ Modern structured logging with environment awareness and performance optimizatio
 ```javascript
 import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
 
+// Component-specific logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationBox')
 
-logger.error('Critical error', error)
-logger.warn('Warning message')
-logger.info('General information')
-logger.debug('Debug details')
-logger.debugLazy(() => ['Expensive computation:', expensiveFunction()])
+// In Vue component
+onMounted(() => {
+  logger.init('TranslationBox mounted')
+})
+
+// In composable
+const performAction = async () => {
+  logger.debug('Starting action')
+  try {
+    const result = await action()
+    logger.info('Action completed successfully', { duration: performance.now() })
+    return result
+  } catch (error) {
+    logger.error('Action failed', error)
+    throw error
+  }
+}
 ```
 
 **Key Features:**
@@ -1258,7 +1253,5 @@ This architecture provides a **comprehensive, modular, and scalable** foundation
 - **🔧 Modular Design**: 18+ specialized systems working together seamlessly  
 - **⚡ Performance Optimized**: Intelligent caching, lazy loading, and efficient data flow
 - **🛡️ Production Ready**: Comprehensive error handling, logging, and context safety
-- **🌐 Cross-Browser Support**: Chrome and Firefox compatibility with automatic detection
+- **🌐 Cross-Browser Compatible**: Chrome and Firefox compatibility with automatic detection
 - **📚 Well Documented**: Complete documentation for every system and integration pattern
-
-The extension successfully migrated from JavaScript to Vue.js while maintaining backward compatibility and adding advanced features like cross-frame communication, text actions, and centralized error management.
