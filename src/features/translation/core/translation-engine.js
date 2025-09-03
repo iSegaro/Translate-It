@@ -1092,20 +1092,23 @@ export class TranslationEngine {
    * @returns {boolean} - Whether to use streaming
    */
   _shouldUseStreamingForProvider(providerInstance, text, messageId, mode) {
-    // Only AI providers support streaming
-    if (!providerInstance.constructor.supportsStreaming) {
-      return false;
-    }
-
     // Must have messageId for streaming coordination
     if (!messageId) {
       return false;
     }
 
-    // Only stream for longer texts or specific modes
-    const shouldStream = text.length > 500 || mode === TranslationMode.Selection;
-    
-    return shouldStream;
+    const providerType = providerInstance.constructor.type; // "ai" or "translate"
+
+    if (providerType === "ai") {
+      // AI providers: stream for longer texts or specific modes (e.g., select element)
+      const shouldStream = text.length > 500 || mode === TranslationMode.Selection;
+      return shouldStream;
+    } else {
+      // Traditional providers: only stream for very long texts that require chunking
+      // This prevents unnecessary streaming for short texts that can be handled in a single request
+      const shouldStream = text.length > 500; // Use a high threshold for traditional providers
+      return shouldStream;
+    }
   }
 
   /**

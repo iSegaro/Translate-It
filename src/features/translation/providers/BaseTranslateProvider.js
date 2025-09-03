@@ -204,8 +204,7 @@ export class BaseTranslateProvider extends BaseProvider {
           chunkResults,
           chunk.texts,
           chunkIndex,
-          messageId,
-          engine
+          messageId
         );
 
         processedCount += chunk.texts.length;
@@ -223,14 +222,13 @@ export class BaseTranslateProvider extends BaseProvider {
           fallbackResults,
           chunk.texts, 
           chunkIndex,
-          messageId,
-          engine
+          messageId
         );
       }
     }
 
     // Send streaming end notification
-    await this._sendStreamEnd(messageId, engine);
+    await this._sendStreamEnd(messageId);
     
     logger.info(`[${this.providerName}] Streaming translation completed: ${allResults.length} texts`);
     return allResults;
@@ -304,17 +302,15 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {string[]} originalChunkTexts - Original texts for this chunk
    * @param {number} chunkIndex - Index of this chunk
    * @param {string} messageId - Message ID
-   * @param {object} engine - Translation engine
    */
-  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId, engine) {
+  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId) {
     try {
       // Stream the results
       await streamingManager.streamBatchResults(
         messageId,
         chunkResults,
         originalChunkTexts,
-        chunkIndex,
-        engine
+        chunkIndex
       );
       
       logger.debug(`[${this.providerName}] Successfully streamed chunk ${chunkIndex + 1} results`);
@@ -326,12 +322,11 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Send streaming end notification
    * @param {string} messageId - Message ID
-   * @param {object} engine - Translation engine
    */
-  async _sendStreamEnd(messageId, engine) {
+  async _sendStreamEnd(messageId) {
     try {
       // Complete the stream
-      await streamingManager.completeStream(messageId, engine);
+      await streamingManager.completeStream(messageId, true);
       
       logger.debug(`[${this.providerName}] Streaming session completed`);
     } catch (error) {
