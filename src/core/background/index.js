@@ -25,7 +25,9 @@ backgroundService.initialize().then(() => {
   
   // Initialize Memory Garbage Collector
   initializeGlobalCleanup();
-  startMemoryMonitoring();
+  if (import.meta.env.DEV) {
+    startMemoryMonitoring();
+  }
   logger.debug("✅ [Background] Memory Garbage Collector initialized!");
   
 }).catch((error) => {
@@ -123,40 +125,40 @@ browser.runtime.onConnect.addListener((port) => {
         // Send immediate ACK for all port messages
         try { 
           port.postMessage({ type: 'ACK', messageId: msg.messageId || null }) 
-        } catch (e) {
-          logger.error('[Background] Failed to send ACK:', e);
-        }
+          } catch (e) {
+            logger.error('[Background] Failed to send ACK:', e);
+          }
 
-        const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
+          const handler = backgroundService.messageHandler.getHandlerForMessage(msg.action, msg.context);
 
-        if (handler) {
-          const result = await handler(msg, port.sender);
-          // Check if port is disconnected before sending RESULT (manual flag)
-          if (port && port.postMessage && !port._disconnected) {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
-            logger.debug('[Background] RESULT sent to port successfully');
+          if (handler) {
+            const result = await handler(msg, port.sender);
+            // Check if port is disconnected before sending RESULT (manual flag)
+            if (port && port.postMessage && !port._disconnected) {
+              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result });
+              logger.debug('[Background] RESULT sent to port successfully');
+            } else {
+              logger.debug('[Background] Port disconnected before RESULT could be sent');
+            }
           } else {
-            logger.debug('[Background] Port disconnected before RESULT could be sent');
+            if (port && port.postMessage && !port._disconnected) {
+              port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+            }
           }
-        } else {
-          if (port && port.postMessage && !port._disconnected) {
-            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: `No handler for action: ${msg.action}` } });
+        } catch (err) {
+          logger.error('[Background] Error handling port message:', err);
+          try {
+            port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: err.message } });
+          } catch (e) {
+            logger.error('[Background] Failed to post error RESULT to port', e);
           }
         }
-      } catch (err) {
-        logger.error('[Background] Error handling port message:', err);
-        try {
-          port.postMessage({ type: 'RESULT', messageId: msg.messageId, result: { success: false, error: err.message } });
-        } catch (e) {
-          logger.error('[Background] Failed to post error RESULT to port', e);
-        }
-      }
-    });
+      });
 
-    port.onDisconnect.addListener(() => {
-      logger.debug('[Background] Port disconnected:', port.name);
-    });
-  } catch (err) {
-    logger.error('[Background] Error in onConnect handler:', err);
-  }
-});
+      port.onDisconnect.addListener(() => {
+        logger.debug('[Background] Port disconnected:', port.name);
+      });
+    } catch (err) {
+      logger.error('[Background] Error in onConnect handler:', err);
+    }
+  });

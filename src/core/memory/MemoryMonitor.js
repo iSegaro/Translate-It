@@ -10,6 +10,10 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryMonitor')
 
 class MemoryMonitor {
   constructor(options = {}) {
+    if (!import.meta.env.DEV) {
+      this.isMonitoring = false;
+      return; // No-op in production
+    }
     this.memoryManager = getMemoryManager()
     this.measurements = []
     this.thresholds = {
@@ -30,6 +34,7 @@ class MemoryMonitor {
    * Start memory monitoring
    */
   startMonitoring() {
+    if (!import.meta.env.DEV) return;
     if (this.isMonitoring) return
 
     logger.init('Memory monitoring started')
@@ -50,6 +55,7 @@ class MemoryMonitor {
    * Perform monitoring tasks (called by centralized system or individual timer)
    */
   performMonitoring() {
+    if (!import.meta.env.DEV) return;
     try {
       this.measureMemory()
       this.checkThresholds()
@@ -64,6 +70,7 @@ class MemoryMonitor {
    * Monitor event listeners for potential leaks
    */
   monitorEventListeners() {
+    if (!import.meta.env.DEV) return;
     const eventReport = this.memoryManager.getEventListenerReport()
 
     // Log summary every 5 minutes (every 10th check since we check every 30s)
@@ -94,6 +101,7 @@ class MemoryMonitor {
    * Stop memory monitoring
    */
   stopMonitoring() {
+    if (!import.meta.env.DEV) return;
     if (!this.isMonitoring) return
 
     // Unregister from centralized monitoring
@@ -116,6 +124,7 @@ class MemoryMonitor {
    * @returns {Object|null} Memory measurement or null if not available
    */
   measureMemory() {
+    if (!import.meta.env.DEV) return null;
     if (!performance.memory) {
       logger.debug('Performance.memory API not available')
       return null
@@ -144,6 +153,7 @@ class MemoryMonitor {
    * @returns {number} Current memory usage in bytes
    */
   getCurrentMemory() {
+    if (!import.meta.env.DEV) return 0;
     if (!performance.memory) return 0
     return performance.memory.usedJSHeapSize
   }
@@ -152,6 +162,7 @@ class MemoryMonitor {
    * Check memory thresholds and trigger actions
    */
   checkThresholds() {
+    if (!import.meta.env.DEV) return;
     const current = this.getCurrentMemory()
 
     if (current > this.thresholds.critical) {
@@ -167,6 +178,7 @@ class MemoryMonitor {
    * Handle critical memory usage with enhanced event listener cleanup
    */
   handleCriticalMemory() {
+    if (!import.meta.env.DEV) return;
     logger.error('Critical memory usage detected, performing emergency cleanup')
 
     // Log current memory stats before cleanup
@@ -216,6 +228,7 @@ class MemoryMonitor {
    * Handle warning memory usage
    */
   handleWarningMemory() {
+    if (!import.meta.env.DEV) return;
     logger.warn('High memory usage detected, performing cleanup')
 
     // Perform garbage collection
@@ -229,7 +242,8 @@ class MemoryMonitor {
    * Detect potential memory leaks
    */
   detectLeaks() {
-    if (this.measurements.length < 10) return
+    if (!import.meta.env.DEV) return [];
+    if (this.measurements.length < 10) return []
 
     const recent = this.measurements.slice(-10)
     const increasing = recent.every((curr, i) =>
@@ -249,6 +263,7 @@ class MemoryMonitor {
       // Emit leak detected event
       this.emitMemoryEvent('leak-detected', this.getCurrentMemory())
     }
+    return [];
   }
 
   /**
@@ -257,6 +272,7 @@ class MemoryMonitor {
    * @param {number} memoryUsage - Current memory usage
    */
   emitMemoryEvent(type, memoryUsage) {
+    if (!import.meta.env.DEV) return;
     const event = new CustomEvent('memory-monitor-event', {
       detail: {
         type,
@@ -274,6 +290,7 @@ class MemoryMonitor {
    * @returns {Object} Trend analysis
    */
   getTrendAnalysis() {
+    if (!import.meta.env.DEV) return { trend: 'insufficient-data' };
     if (this.measurements.length < 2) {
       return { trend: 'insufficient-data' }
     }
@@ -297,6 +314,7 @@ class MemoryMonitor {
    * @returns {Object} Memory report
    */
   generateReport() {
+    if (!import.meta.env.DEV) return {};
     const current = this.getCurrentMemory()
     const trend = this.getTrendAnalysis()
     const managerStats = this.memoryManager.getMemoryStats()
@@ -324,6 +342,7 @@ class MemoryMonitor {
    * @param {Object} thresholds - New thresholds
    */
   setThresholds(thresholds) {
+    if (!import.meta.env.DEV) return;
     this.thresholds = { ...this.thresholds, ...thresholds }
     logger.debug('Memory thresholds updated', this.thresholds)
   }
@@ -332,6 +351,7 @@ class MemoryMonitor {
    * Get monitoring statistics
    */
   getStats() {
+    if (!import.meta.env.DEV) return {};
     return {
       isMonitoring: this.isMonitoring,
       measurements: this.measurements.length,
@@ -346,6 +366,7 @@ class MemoryMonitor {
    * @returns {Object} Diagnostics data
    */
   exportDiagnostics() {
+    if (!import.meta.env.DEV) return {};
     return {
       memoryMonitor: this.generateReport(),
       memoryManager: this.memoryManager.generateReport(),
@@ -362,6 +383,7 @@ class MemoryMonitor {
    * @param {Object} newThresholds - New threshold values
    */
   updateThresholds(newThresholds) {
+    if (!import.meta.env.DEV) return;
     if (newThresholds.warning) {
       this.thresholds.warning = newThresholds.warning
     }
@@ -375,6 +397,7 @@ class MemoryMonitor {
    * Destroy memory monitor
    */
   destroy() {
+    if (!import.meta.env.DEV) return;
     this.stopMonitoring()
     this.measurements = []
     logger.debug('Memory monitor destroyed')
@@ -389,6 +412,7 @@ let memoryMonitorInstance = null
  * @param {Object} options - Configuration options
  */
 export function getMemoryMonitor(options = {}) {
+  if (!import.meta.env.DEV) return { /* no-op object for production */ };
   if (!memoryMonitorInstance) {
     const defaultOptions = {
       useCentralMonitoring: true,
@@ -404,6 +428,7 @@ export function getMemoryMonitor(options = {}) {
  * @param {Object} options - Configuration options
  */
 export function startMemoryMonitoring(options = {}) {
+  if (!import.meta.env.DEV) return; // no-op for production
   const monitor = getMemoryMonitor(options)
   monitor.startMonitoring()
   return monitor

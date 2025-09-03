@@ -2,48 +2,45 @@
  * Memory Garbage Collector - Core Memory Manager
  * Manages resources, timers, event listeners, and caches to prevent memory leaks
  */
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager')
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager');
+
+// Use Vite's import.meta.env for environment detection
+const isDevelopment = import.meta.env.DEV;
 
 class MemoryManager {
   constructor(options = {}) {
-    this.resources = new Map() // resourceId -> cleanup function
-    this.groups = new Map() // groupId -> Set of resourceIds
-    this.timers = new Set()
-    this.eventListeners = new WeakMap() // element -> Map<event -> WeakSet<handler>>
-    this.domObservers = new WeakMap() // element -> MutationObserver
-    this.eventStats = {
-      totalTracked: 0,
-      totalCleaned: 0,
-      byType: new Map()
-    }
-    this.caches = new Set()
+    this.resources = new Map(); // resourceId -> cleanup function
+    this.groups = new Map(); // groupId -> Set of resourceIds
+    this.timers = new Set();
+    this.eventListeners = new WeakMap(); // element -> Map<event -> WeakSet<handler>>
+    this.domObservers = new WeakMap();
+    this.caches = new Set();
     this.stats = {
       totalResources: 0,
       cleanupCount: 0,
       memoryUsage: 0
+    };
+
+    // Dev-only properties
+    if (isDevelopment) {
+      this.eventStats = {
+        totalTracked: 0,
+        totalCleaned: 0,
+        byType: new Map()
+      };
+      this.registeredCaches = new Set();
+      this.registeredMonitors = new Set();
+      this.centralTimer = null;
+      this.centralTimerInterval = options.centralTimerInterval || 60 * 1000; // 1 minute
     }
-
-    // Centralized cleanup system
-    this.registeredCaches = new Set()
-    this.registeredMonitors = new Set()
-    this.centralTimer = null
-    this.centralTimerInterval = options.centralTimerInterval || 60 * 1000 // 1 minute
-
-    // Environment-based configuration
-    this.isDevelopment = options.enableMonitoring !== false &&
-                        (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')
-
-    // Initialize systems based on environment
-    if (this.isDevelopment) {
-      this.initCentralTimer()
-    }
+    this.initCentralTimer(); // Moved outside the if (isDevelopment) block
 
     // Initialize DOM cleanup observer (only if needed)
     if (options.enableDOMObserver !== false) {
-      this.initDOMCleanupObserver()
+      this.initDOMCleanupObserver();
     }
   }
 
@@ -253,92 +250,71 @@ class MemoryManager {
    */
   trackEventListener(element, event, handler, groupId = 'default', options = {}) {
     if (!element) {
-      logger.warn('Cannot track event listener: element is null or undefined')
-      return
+      if (isDevelopment) {
+        logger.warn('Cannot track event listener: element is null or undefined');
+      }
+      return;
     }
-
-    // Initialize element tracking if not exists
-    if (!this.eventListeners.has(element)) {
-      this.eventListeners.set(element, new Map())
-    }
-
-    const elementListeners = this.eventListeners.get(element)
-
-    // Initialize event type tracking if not exists
-    if (!elementListeners.has(event)) {
-      elementListeners.set(event, new WeakSet())
-    }
-
-    const eventHandlers = elementListeners.get(event)
-
-    // Check if handler is already tracked
-    if (this.isHandlerTracked(eventHandlers, handler)) {
-      logger.debug(`Event listener already tracked: ${event} on ${this.getElementDescription(element)}`)
-      return
-    }
-
-    // Add handler to WeakSet
-    eventHandlers.add(handler)
-
-    // Update statistics
-    this.eventStats.totalTracked++
-    if (!this.eventStats.byType.has(event)) {
-      this.eventStats.byType.set(event, 0)
-    }
-    this.eventStats.byType.set(event, this.eventStats.byType.get(event) + 1)
-
-    // Create resource ID with more details
-    const resourceId = `event_${event}_${this.getElementDescription(element)}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
     // Create cleanup function
     const cleanupFn = () => {
       try {
         // Handle custom event systems (like StorageCore with on/off methods)
         if (element && typeof element.off === 'function') {
-          element.off(event, handler)
-          logger.debug(`Removed custom event listener: ${event} from ${this.getElementDescription(element)}`)
+          element.off(event, handler);
         }
         // Handle browser extension APIs (they use removeListener)
         else if (element && typeof element.removeListener === 'function') {
-          element.removeListener(handler)
-          logger.debug(`Removed browser API listener: ${event} from ${this.getElementDescription(element)}`)
+          element.removeListener(handler);
         }
         // Handle DOM EventTargets
         else if (element && typeof element.removeEventListener === 'function') {
-          element.removeEventListener(event, handler)
-          logger.debug(`Removed DOM event listener: ${event} from ${this.getElementDescription(element)}`)
+          element.removeEventListener(event, handler);
         }
 
-        // Update cleanup statistics
-        this.eventStats.totalCleaned++
-        if (this.eventStats.byType.has(event)) {
-          this.eventStats.byType.set(event, Math.max(0, this.eventStats.byType.get(event) - 1))
+        if (isDevelopment) {
+          logger.debug(`Removed event listener: ${event} from ${this.getElementDescription(element)}`);
+          // Update cleanup statistics
+          this.eventStats.totalCleaned++;
+          if (this.eventStats.byType.has(event)) {
+            this.eventStats.byType.set(event, Math.max(0, this.eventStats.byType.get(event) - 1));
+          }
         }
-
-        // Remove from WeakSet
-        eventHandlers.delete(handler)
-
-        // Clean up empty structures
-        if (eventHandlers.size === 0) {
-          elementListeners.delete(event)
-        }
-        if (elementListeners.size === 0) {
-          this.eventListeners.delete(element)
-        }
-
       } catch (error) {
-        logger.warn(`Error removing event listener ${event}:`, error)
+        if (isDevelopment) {
+          logger.warn(`Error removing event listener ${event}:`, error);
+        }
       }
-    }
+    };
 
-    this.trackResource(resourceId, cleanupFn, groupId)
+    const resourceId = `event_${event}_${this.getElementDescription(element)}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.trackResource(resourceId, cleanupFn, groupId);
 
     // Set up automatic cleanup for DOM elements
     if (options.autoCleanup !== false && this.isDOMElement(element)) {
-      this.setupDOMElementCleanup(element, resourceId)
+      this.setupDOMElementCleanup(element, resourceId);
     }
 
-    logger.debug(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`)
+    if (isDevelopment) {
+      // Initialize element tracking if not exists
+      if (!this.eventListeners.has(element)) {
+        this.eventListeners.set(element, new Map());
+      }
+      const elementListeners = this.eventListeners.get(element);
+      if (!elementListeners.has(event)) {
+        elementListeners.set(event, new WeakSet());
+      }
+      const eventHandlers = elementListeners.get(event);
+      eventHandlers.add(handler);
+
+      // Update statistics
+      this.eventStats.totalTracked++;
+      if (!this.eventStats.byType.has(event)) {
+        this.eventStats.byType.set(event, 0);
+      }
+      this.eventStats.byType.set(event, this.eventStats.byType.get(event) + 1);
+      logger.debug(`Tracked event listener: ${event} on ${this.getElementDescription(element)} (total: ${this.eventStats.totalTracked})`);
+    }
   }
 
   /**
@@ -409,173 +385,173 @@ class MemoryManager {
    * Cleanup all resources with enhanced event listener handling
    */
   cleanupAll() {
-    const beforeStats = this.getMemoryStats()
-    const beforeEventStats = { ...this.eventStats }
-
-    logger.info('Starting comprehensive cleanup...')
-
-    // Clear all timers
-    let timerCount = this.timers.size
-    this.timers.forEach(timerId => {
-      clearTimeout(timerId)
-      clearInterval(timerId)
-    })
-    this.timers.clear()
-    logger.debug(`Cleaned up ${timerCount} timers`)
-
-    // Enhanced event listener cleanup
-    let eventCleanupCount = 0
-    if (this.eventListeners) {
-      // Count total tracked listeners before cleanup
-      let totalListeners = 0
-
-      // Note: WeakMap is not iterable, so we can't count precisely
-      // We'll use an approximation based on our tracking
-      totalListeners = Object.keys(this.eventStats.byType).length
-
-      // Clear the WeakMap by recreating it (WeakMap doesn't have clear method)
-      this.eventListeners = new WeakMap()
-      eventCleanupCount = totalListeners
-      logger.debug(`Cleaned up event listeners for approximately ${totalListeners} event types`)
+    if (isDevelopment) {
+      logger.info('Starting comprehensive cleanup...');
     }
 
-    // Disconnect DOM observers
-    // Note: WeakMap is not iterable, so we can't disconnect individual observers
-    // They will be garbage collected when elements are removed
-    let observerCount = 0
-    this.domObservers = new WeakMap()
-    logger.debug(`Reset DOM observers (WeakMap cleared)`)
-    logger.debug(`Disconnected ${observerCount} DOM observers`)
+    // Clear all timers
+    this.timers.forEach(timerId => {
+      clearTimeout(timerId);
+      clearInterval(timerId);
+    });
+    this.timers.clear();
 
     // Cleanup all resources
-    const allResourceIds = Array.from(this.resources.keys())
-    let resourceCleanupCount = allResourceIds.length
-    allResourceIds.forEach(resourceId => this.cleanupResource(resourceId))
-    logger.debug(`Cleaned up ${resourceCleanupCount} resources`)
+    const allResourceIds = Array.from(this.resources.keys());
+    allResourceIds.forEach(resourceId => this.cleanupResource(resourceId));
 
     // Clear caches
-    let cacheCount = this.caches.size
     this.caches.forEach(cache => {
       if (cache.destroy && typeof cache.destroy === 'function') {
         try {
-          cache.destroy()
+          cache.destroy();
         } catch (error) {
-          logger.warn('Error destroying cache:', error)
+          if (isDevelopment) {
+            logger.warn('Error destroying cache:', error);
+          }
         }
       }
-    })
-    this.caches.clear()
-    logger.debug(`Cleaned up ${cacheCount} caches`)
+    });
+    this.caches.clear();
 
     // Clear groups
-    this.groups.clear()
+    this.groups.clear();
 
-    // Update statistics
-    const afterStats = this.getMemoryStats()
-    const memoryFreed = beforeStats.memoryUsage - afterStats.memoryUsage
+    if (isDevelopment) {
+      this.eventListeners = new WeakMap();
+      this.domObservers = new WeakMap();
+      this.eventStats.totalTracked = 0;
+      this.eventStats.totalCleaned = 0;
+      this.eventStats.byType.clear();
+      logger.info(`Cleanup completed.`);
+    }
+  }
 
-    logger.info(`Cleanup completed:`, {
-      timers: timerCount,
-      eventListeners: eventCleanupCount,
-      resources: resourceCleanupCount,
-      caches: cacheCount,
-      observers: observerCount,
-      memoryFreed: `${(memoryFreed / 1024 / 1024).toFixed(2)}MB`
-    })
+  getMemoryStats() {
+    if (isDevelopment) {
+      this.updateMemoryStats();
 
-    // Reset event statistics
-    this.eventStats.totalTracked = 0
-    this.eventStats.totalCleaned = 0
-    this.eventStats.byType.clear()
+      let activeEventListeners = 0;
+      let eventTypes = new Set();
+
+      if (this.eventStats) {
+        activeEventListeners = Object.values(this.eventStats.byType).reduce((sum, count) => sum + count, 0);
+        eventTypes = new Set(Object.keys(this.eventStats.byType));
+      }
+
+      return {
+        ...this.stats,
+        activeResources: this.resources.size,
+        activeGroups: this.groups.size,
+        activeTimers: this.timers.size,
+        activeCaches: this.caches.size,
+        activeEventListeners,
+        eventTypesCount: eventTypes.size,
+        eventStats: {
+          totalTracked: this.eventStats?.totalTracked || 0,
+          totalCleaned: this.eventStats?.totalCleaned || 0,
+          byType: this.eventStats ? Object.fromEntries(this.eventStats.byType) : {}
+        }
+      };
+    }
+
+    // Production version
+    return {
+      activeResources: this.resources.size,
+      activeTimers: this.timers.size
+    };
+  }
+
+  updateMemoryStats() {
+    if (isDevelopment && performance.memory) {
+      this.stats.memoryUsage = performance.memory.usedJSHeapSize;
+    }
+  }
+
+  detectMemoryLeaks() {
+    if (!isDevelopment) return [];
+
+    const stats = this.getMemoryStats();
+    const warnings = [];
+
+    if (stats.activeResources > 100) {
+      warnings.push(`High number of active resources: ${stats.activeResources}`);
+    }
+    if (stats.activeEventListeners > 50) {
+      warnings.push(`High number of active event listeners: ${stats.activeEventListeners}`);
+    }
+    if (stats.memoryUsage > 100 * 1024 * 1024) { // 100MB
+      warnings.push(`High memory usage: ${(stats.memoryUsage / 1024 / 1024).toFixed(2)}MB`);
+    }
+
+    return warnings;
+  }
+
+  generateReport() {
+    if (!isDevelopment) return {};
+
+    const stats = this.getMemoryStats();
+    const leaks = this.detectMemoryLeaks();
+
+    return {
+      timestamp: new Date().toISOString(),
+      stats,
+      warnings: leaks,
+      resources: Array.from(this.resources.keys()),
+      groups: Array.from(this.groups.keys())
+    };
   }
 
   /**
    * Perform garbage collection
    */
   performGarbageCollection() {
+    if (!isDevelopment) return;
     // Force garbage collection if available (development only)
     if (typeof window !== 'undefined' && window.gc && typeof window.gc === 'function') {
-      window.gc()
+      window.gc();
     }
 
     // Cleanup expired resources
-    this.cleanupAll()
+    this.cleanupAll();
 
     // Update memory stats
-    this.updateMemoryStats()
-  }
-
-  /**
-   * Get memory statistics with enhanced event listener tracking
-   */
-  getMemoryStats() {
-    this.updateMemoryStats()
-
-    // Count active event listeners
-    let activeEventListeners = 0
-    let eventTypes = new Set()
-
-    // Use eventStats for counting since WeakMap is not iterable
-    activeEventListeners = Object.values(this.eventStats.byType).reduce((sum, count) => sum + count, 0)
-    eventTypes = new Set(Object.keys(this.eventStats.byType))
-
-    return {
-      ...this.stats,
-      activeResources: this.resources.size,
-      activeGroups: this.groups.size,
-      activeTimers: this.timers.size,
-      activeCaches: this.caches.size,
-      activeEventListeners,
-      eventTypesCount: eventTypes.size,
-      eventStats: {
-        totalTracked: this.eventStats.totalTracked,
-        totalCleaned: this.eventStats.totalCleaned,
-        byType: Object.fromEntries(this.eventStats.byType)
-      }
-    }
-  }
-
-  /**
-   * Update memory usage statistics
-   */
-  updateMemoryStats() {
-    if (performance.memory) {
-      this.stats.memoryUsage = performance.memory.usedJSHeapSize
-    }
+    this.updateMemoryStats();
   }
 
   /**
    * Detect potential memory leaks with enhanced event listener monitoring
    */
   detectMemoryLeaks() {
-    const stats = this.getMemoryStats()
-    const warnings = []
+    if (!isDevelopment) return [];
+    const stats = this.getMemoryStats();
+    const warnings = [];
 
     if (stats.activeResources > 100) {
-      warnings.push(`High number of active resources: ${stats.activeResources}`)
+      warnings.push(`High number of active resources: ${stats.activeResources}`);
     }
 
     if (stats.activeTimers > 20) {
-      warnings.push(`High number of active timers: ${stats.activeTimers}`)
+      warnings.push(`High number of active timers: ${stats.activeTimers}`);
     }
 
     if (stats.activeEventListeners > 50) {
-      warnings.push(`High number of active event listeners: ${stats.activeEventListeners} (${stats.eventTypesCount} types)`)
+      warnings.push(`High number of active event listeners: ${stats.activeEventListeners} (${stats.eventTypesCount} types)`);
     }
 
     if (stats.memoryUsage > 100 * 1024 * 1024) { // 100MB
-      warnings.push(`High memory usage: ${(stats.memoryUsage / 1024 / 1024).toFixed(2)}MB`)
+      warnings.push(`High memory usage: ${(stats.memoryUsage / 1024 / 1024).toFixed(2)}MB`);
     }
 
     // Check for specific event types that might indicate leaks
-    const eventTypeCounts = stats.eventStats.byType
+    const eventTypeCounts = stats.eventStats.byType;
     for (const [eventType, count] of Object.entries(eventTypeCounts)) {
       if (count > 10) {
-        warnings.push(`High number of ${eventType} listeners: ${count}`)
+        warnings.push(`High number of ${eventType} listeners: ${count}`);
       }
     }
 
-    return warnings
+    return warnings;
   }
 
   /**
@@ -584,19 +560,20 @@ class MemoryManager {
    * @param {Element} element - Optional: specific element to clean up
    */
   cleanupEventListeners(eventType = null, element = null) {
-    let cleanupCount = 0
+    if (!isDevelopment) return 0;
+    let cleanupCount = 0;
 
     if (element && eventType) {
       // Clean up specific event type for specific element
       if (this.eventListeners.has(element)) {
-        const elementListeners = this.eventListeners.get(element)
+        const elementListeners = this.eventListeners.get(element);
         if (elementListeners.has(eventType)) {
-          const handlers = elementListeners.get(eventType)
+          const handlers = elementListeners.get(eventType);
           // Find and cleanup resources for this specific event
           for (const [resourceId, cleanupFn] of this.resources) {
             if (resourceId.includes(`event_${eventType}`) && resourceId.includes(this.getElementDescription(element))) {
-              this.cleanupResource(resourceId)
-              cleanupCount++
+              this.cleanupResource(resourceId);
+              cleanupCount++;
             }
           }
         }
@@ -605,28 +582,29 @@ class MemoryManager {
       // Clean up all listeners of a specific event type
       for (const [resourceId, cleanupFn] of this.resources) {
         if (resourceId.startsWith(`event_${eventType}`)) {
-          this.cleanupResource(resourceId)
-          cleanupCount++
+          this.cleanupResource(resourceId);
+          cleanupCount++;
         }
       }
     } else {
       // Clean up all event listeners
       for (const [resourceId, cleanupFn] of this.resources) {
         if (resourceId.startsWith('event_')) {
-          this.cleanupResource(resourceId)
-          cleanupCount++
+          this.cleanupResource(resourceId);
+          cleanupCount++;
         }
       }
     }
 
-    logger.info(`Cleaned up ${cleanupCount} event listeners${eventType ? ` of type ${eventType}` : ''}${element ? ` for element ${this.getElementDescription(element)}` : ''}`)
-    return cleanupCount
+    logger.info(`Cleaned up ${cleanupCount} event listeners${eventType ? ` of type ${eventType}` : ''}${element ? ` for element ${this.getElementDescription(element)}` : ''}`);
+    return cleanupCount;
   }
 
   /**
    * Get detailed event listener report
    */
   getEventListenerReport() {
+    if (!isDevelopment) return {};
     const report = {
       totalElements: 0,
       totalEvents: 0,
@@ -634,24 +612,24 @@ class MemoryManager {
       byElement: {},
       byEventType: {},
       potentialLeaks: []
-    }
+    };
 
     // Use eventStats for report since WeakMap is not iterable
-    report.totalEvents = Object.keys(this.eventStats.byType).length
-    report.totalListeners = Object.values(this.eventStats.byType).reduce((sum, count) => sum + count, 0)
-    report.byEventType = { ...this.eventStats.byType }
+    report.totalEvents = Object.keys(this.eventStats.byType).length;
+    report.totalListeners = Object.values(this.eventStats.byType).reduce((sum, count) => sum + count, 0);
+    report.byEventType = { ...this.eventStats.byType };
 
     // Note: We can't get element-specific breakdown with WeakMap
     report.byElement = {
       'tracked_elements': {
         eventCount: report.totalEvents,
         events: Object.keys(this.eventStats.byType).reduce((acc, event) => {
-          acc[event] = true
-          return acc
+          acc[event] = true;
+          return acc;
         }, {})
       }
-    }
-    report.totalElements = 1 // Approximation
+    };
+    report.totalElements = 1; // Approximation
 
     // Detect potential leaks
     for (const [eventType, count] of Object.entries(report.byEventType)) {
@@ -661,48 +639,50 @@ class MemoryManager {
           event: eventType,
           count: count,
           message: `High number of ${eventType} listeners: ${count}`
-        })
+        });
       }
     }
 
-    return report
+    return report;
   }
 
   /**
    * Initialize centralized timer for periodic cleanup and monitoring
    */
   initCentralTimer() {
-    if (this.centralTimer) return
+    if (!isDevelopment) return;
+    if (this.centralTimer) return;
 
     this.centralTimer = setInterval(() => {
-      this.performCentralCleanup()
-    }, this.centralTimerInterval)
+      this.performCentralCleanup();
+    }, this.centralTimerInterval);
 
-    logger.debug(`Centralized cleanup timer initialized (${this.centralTimerInterval}ms interval)`)
+    logger.debug(`Centralized cleanup timer initialized (${this.centralTimerInterval}ms interval)`);
   }
 
   /**
    * Perform centralized cleanup for all registered caches and monitors
    */
   performCentralCleanup() {
+    if (!isDevelopment) return;
     try {
       // Cleanup all registered caches
       this.registeredCaches.forEach(cache => {
         if (cache && typeof cache.cleanup === 'function') {
-          cache.cleanup()
+          cache.cleanup();
         }
-      })
+      });
 
       // Run monitoring for all registered monitors
       this.registeredMonitors.forEach(monitor => {
         if (monitor && typeof monitor.performMonitoring === 'function') {
-          monitor.performMonitoring()
+          monitor.performMonitoring();
         }
-      })
+      });
 
-      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors`)
+      logger.debug(`Central cleanup completed for ${this.registeredCaches.size} caches and ${this.registeredMonitors.size} monitors`);
     } catch (error) {
-      logger.warn('Error during central cleanup:', error)
+      logger.warn('Error during central cleanup:', error);
     }
   }
 
@@ -711,9 +691,10 @@ class MemoryManager {
    * @param {Object} cache - Cache instance with cleanup method
    */
   registerCache(cache) {
+    if (!isDevelopment) return;
     if (cache && typeof cache.cleanup === 'function') {
-      this.registeredCaches.add(cache)
-      logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`)
+      this.registeredCaches.add(cache);
+      logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
     }
   }
 
@@ -722,8 +703,9 @@ class MemoryManager {
    * @param {Object} cache - Cache instance
    */
   unregisterCache(cache) {
-    this.registeredCaches.delete(cache)
-    logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`)
+    if (!isDevelopment) return;
+    this.registeredCaches.delete(cache);
+    logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
   }
 
   /**
@@ -731,9 +713,10 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance with performMonitoring method
    */
   registerMonitor(monitor) {
+    if (!isDevelopment) return;
     if (monitor && typeof monitor.performMonitoring === 'function') {
-      this.registeredMonitors.add(monitor)
-      logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`)
+      this.registeredMonitors.add(monitor);
+      logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
     }
   }
 
@@ -742,44 +725,144 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance
    */
   unregisterMonitor(monitor) {
-    this.registeredMonitors.delete(monitor)
-    logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`)
+    if (!isDevelopment) return;
+    this.registeredMonitors.delete(monitor);
+    logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
   }
 
   /**
    * Stop centralized timer
    */
   stopCentralTimer() {
+    if (!isDevelopment) return;
     if (this.centralTimer) {
-      clearInterval(this.centralTimer)
-      this.centralTimer = null
-      logger.debug('Centralized cleanup timer stopped')
+      clearInterval(this.centralTimer);
+      this.centralTimer = null;
+      logger.debug('Centralized cleanup timer stopped');
     }
   }
 
   /**
-   * Generate detailed report with event listener information
+   * Get memory trend analysis
+   * @returns {Object} Trend analysis
+   */
+  getTrendAnalysis() {
+    if (!isDevelopment) return { trend: 'insufficient-data' };
+    if (this.measurements.length < 2) {
+      return { trend: 'insufficient-data' };
+    }
+
+    const recent = this.measurements.slice(-10);
+    const first = this.measurements[0].used;
+    const last = this.measurements[this.measurements.length - 1].used;
+    const change = last - first;
+    const changePercent = (change / first) * 100;
+
+    return {
+      trend: change > 0 ? 'increasing' : change < 0 ? 'decreasing' : 'stable',
+      change: `${(change / 1024 / 1024).toFixed(2)}MB`,
+      changePercent: `${changePercent.toFixed(2)}%`,
+      period: `${this.measurements.length} measurements`
+    };
+  }
+
+  /**
+   * Generate detailed memory report
+   * @returns {Object} Memory report
    */
   generateReport() {
-    const stats = this.getMemoryStats()
-    const leaks = this.detectMemoryLeaks()
-    const eventReport = this.getEventListenerReport()
+    if (!isDevelopment) return {};
+    const current = this.getCurrentMemory();
+    const trend = this.getTrendAnalysis();
+    const managerStats = this.getMemoryStats();
+    const leaks = this.detectMemoryLeaks();
 
     return {
       timestamp: new Date().toISOString(),
-      stats,
+      currentMemory: {
+        used: current,
+        usedMB: (current / 1024 / 1024).toFixed(2),
+        total: performance.memory?.totalJSHeapSize || 0,
+        limit: performance.memory?.jsHeapSizeLimit || 0
+      },
+      trend,
+      managerStats,
       warnings: leaks,
-      eventListeners: eventReport,
-      resources: Array.from(this.resources.keys()),
-      groups: Array.from(this.groups.keys()),
-      timers: Array.from(this.timers),
-      caches: this.caches.size
+      measurements: this.measurements.length,
+      thresholds: this.thresholds,
+      isMonitoring: this.isMonitoring
+    };
+  }
+
+  /**
+   * Set custom thresholds
+   * @param {Object} thresholds - New thresholds
+   */
+  setThresholds(thresholds) {
+    if (!isDevelopment) return;
+    this.thresholds = { ...this.thresholds, ...thresholds };
+    logger.debug('Memory thresholds updated', this.thresholds);
+  }
+
+  /**
+   * Get monitoring statistics
+   */
+  getStats() {
+    if (!isDevelopment) return {};
+    return {
+      isMonitoring: this.isMonitoring,
+      measurements: this.measurements.length,
+      currentMemory: this.getCurrentMemory(),
+      trend: this.getTrendAnalysis(),
+      thresholds: this.thresholds
+    };
+  }
+
+  /**
+   * Export diagnostics data
+   * @returns {Object} Diagnostics data
+   */
+  exportDiagnostics() {
+    if (!isDevelopment) return {};
+    return {
+      memoryMonitor: this.generateReport(),
+      memoryManager: this.generateReport(),
+      performance: {
+        memory: performance.memory,
+        timing: performance.timing,
+        navigation: performance.navigation
+      }
+    };
+  }
+
+  /**
+   * Update memory thresholds
+   * @param {Object} newThresholds - New threshold values
+   */
+  updateThresholds(newThresholds) {
+    if (!isDevelopment) return;
+    if (newThresholds.warning) {
+      this.thresholds.warning = newThresholds.warning;
     }
+    if (newThresholds.critical) {
+      this.thresholds.critical = newThresholds.critical;
+    }
+    logger.info(`Memory thresholds updated: warning=${(this.thresholds.warning / 1024 / 1024).toFixed(2)}MB, critical=${(this.thresholds.critical / 1024 / 1024).toFixed(2)}MB`);
+  }
+
+  /**
+   * Destroy memory monitor
+   */
+  destroy() {
+    if (!isDevelopment) return;
+    this.stopMonitoring();
+    this.measurements = [];
+    logger.debug('Memory monitor destroyed');
   }
 }
 
 // Singleton instance
-let memoryManagerInstance = null
+let memoryManagerInstance = null;
 
 /**
  * Get the global memory manager instance
@@ -787,20 +870,9 @@ let memoryManagerInstance = null
  */
 export function getMemoryManager(options = {}) {
   if (!memoryManagerInstance) {
-    // Determine environment and set default options
-    const isDevelopment = options.enableMonitoring !== false &&
-                         (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')
-
-    const defaultOptions = {
-      enableMonitoring: isDevelopment,
-      enableDOMObserver: true,
-      centralTimerInterval: 60 * 1000, // 1 minute
-      ...options
-    }
-
-    memoryManagerInstance = new MemoryManager(defaultOptions)
+    memoryManagerInstance = new MemoryManager(options);
   }
-  return memoryManagerInstance
+  return memoryManagerInstance;
 }
 
 export default MemoryManager

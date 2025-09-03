@@ -2,13 +2,17 @@
  * Memory Garbage Collector - Resource Tracker
  * Provides a convenient interface for tracking resources in classes
  */
-import { getMemoryManager } from './MemoryManager.js'
+import { getMemoryManager } from './MemoryManager.js';
+
+const isDevelopment = import.meta.env.DEV;
 
 class ResourceTracker {
   constructor(groupId) {
-    this.groupId = groupId
-    this.memoryManager = getMemoryManager()
-    this.resources = new Set()
+    this.groupId = groupId;
+    this.memoryManager = getMemoryManager();
+    if (isDevelopment) {
+      this.resources = new Set();
+    }
   }
 
   /**
@@ -19,113 +23,103 @@ class ResourceTracker {
    */
   trackTimeout(callback, delay) {
     const timerId = setTimeout(() => {
-      callback()
-      this.resources.delete(`timer_${timerId}`)
-    }, delay)
+      callback();
+      if (isDevelopment) {
+        this.resources.delete(`timer_${timerId}`);
+      }
+    }, delay);
 
-    const resourceId = `timer_${timerId}`
-    this.resources.add(resourceId)
-    this.memoryManager.trackTimer(timerId, this.groupId)
+    if (isDevelopment) {
+      const resourceId = `timer_${timerId}`;
+      this.resources.add(resourceId);
+    }
+    this.memoryManager.trackTimer(timerId, this.groupId);
 
-    return timerId
+    return timerId;
   }
 
-  /**
-   * Track an interval
-   * @param {Function} callback - Callback function
-   * @param {number} delay - Delay in milliseconds
-   * @returns {number} Timer ID
-   */
   trackInterval(callback, delay) {
-    const intervalId = setInterval(callback, delay)
+    const intervalId = setInterval(callback, delay);
 
-    const resourceId = `interval_${intervalId}`
-    this.resources.add(resourceId)
-    this.memoryManager.trackTimer(intervalId, this.groupId)
+    if (isDevelopment) {
+      const resourceId = `interval_${intervalId}`;
+      this.resources.add(resourceId);
+    }
+    this.memoryManager.trackTimer(intervalId, this.groupId);
 
-    return intervalId
+    return intervalId;
   }
 
-  /**
-   * Add tracked event listener (handles DOM, browser APIs, and custom event systems)
-   * @param {EventTarget|Object} element - Element, browser API, or custom event emitter
-   * @param {string} event - Event type
-   * @param {Function} handler - Event handler
-   */
   addEventListener(element, event, handler) {
+    // The core tracking is now handled by MemoryManager, which is already environment-aware.
+    // This method just needs to call the appropriate function on the element.
+
     // Handle custom event systems (like StorageCore with on/off methods)
     if (element && typeof element.on === 'function' && typeof element.off === 'function') {
-      element.on(event, handler)
-      this.memoryManager.trackEventListener(element, event, handler, this.groupId)
+      element.on(event, handler);
     }
     // Handle browser extension APIs (they use addListener/removeListener)
     else if (element && typeof element.addListener === 'function' && typeof element.removeListener === 'function') {
-      element.addListener(handler)
-      this.memoryManager.trackEventListener(element, event, handler, this.groupId)
+      element.addListener(handler);
     }
     // Handle DOM EventTargets
     else if (element && typeof element.addEventListener === 'function') {
-      element.addEventListener(event, handler)
-      this.memoryManager.trackEventListener(element, event, handler, this.groupId)
+      element.addEventListener(event, handler);
     }
-    else {
-      console.warn('Unsupported event target type:', element)
+    else if (isDevelopment) {
+      console.warn('Unsupported event target type:', element);
     }
 
-    const resourceId = `event_${event}_${Date.now()}`
-    this.resources.add(resourceId)
+    // Let the memory manager handle the actual resource tracking
+    this.memoryManager.trackEventListener(element, event, handler, this.groupId);
+
+    if (isDevelopment) {
+      const resourceId = `event_${event}_${Date.now()}`;
+      this.resources.add(resourceId);
+    }
   }
 
-  /**
-   * Track a custom resource
-   * @param {string} resourceId - Unique resource identifier
-   * @param {Function} cleanupFn - Cleanup function
-   */
   trackResource(resourceId, cleanupFn) {
-    this.resources.add(resourceId)
-    this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId)
-  }
-
-  /**
-   * Track a cache instance
-   * @param {Object} cache - Cache instance
-   * @param {Object} options - Cache options
-   */
-  trackCache(cache, options = {}) {
-    this.memoryManager.trackCache(cache, options, this.groupId)
-    const resourceId = `cache_${Date.now()}`
-    this.resources.add(resourceId)
-  }
-
-  /**
-   * Clear a specific timer
-   * @param {number} timerId - Timer ID to clear
-   */
-  clearTimer(timerId) {
-    clearTimeout(timerId)
-    clearInterval(timerId)
-    this.memoryManager.timers.delete(timerId)
-    this.resources.delete(`timer_${timerId}`)
-    this.resources.delete(`interval_${timerId}`)
-  }
-
-  /**
-   * Cleanup all resources tracked by this instance
-   */
-  cleanup() {
-    this.memoryManager.cleanupGroup(this.groupId)
-    this.resources.clear()
-  }
-
-  /**
-   * Get statistics for this tracker
-   */
-  getStats() {
-    return {
-      groupId: this.groupId,
-      trackedResources: this.resources.size,
-      memoryManagerStats: this.memoryManager.getMemoryStats()
+    if (isDevelopment) {
+      this.resources.add(resourceId);
     }
+    this.memoryManager.trackResource(resourceId, cleanupFn, this.groupId);
+  }
+
+  trackCache(cache, options = {}) {
+    this.memoryManager.trackCache(cache, options, this.groupId);
+    if (isDevelopment) {
+      const resourceId = `cache_${Date.now()}`;
+      this.resources.add(resourceId);
+    }
+  }
+
+  clearTimer(timerId) {
+    clearTimeout(timerId);
+    clearInterval(timerId);
+    this.memoryManager.timers.delete(timerId);
+    if (isDevelopment) {
+      this.resources.delete(`timer_${timerId}`);
+      this.resources.delete(`interval_${timerId}`);
+    }
+  }
+
+  cleanup() {
+    this.memoryManager.cleanupGroup(this.groupId);
+    if (isDevelopment) {
+      this.resources.clear();
+    }
+  }
+
+  getStats() {
+    if (isDevelopment) {
+      return {
+        groupId: this.groupId,
+        trackedResources: this.resources.size,
+        memoryManagerStats: this.memoryManager.getMemoryStats()
+      };
+    }
+    return { groupId: this.groupId, trackedResources: 0 };
   }
 
   /**
