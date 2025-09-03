@@ -114,6 +114,10 @@ class MemoryMonitor {
   handleCriticalMemory() {
     logger.error('Critical memory usage detected, performing emergency cleanup')
 
+    // Log current memory stats before cleanup
+    const beforeStats = this.memoryManager.getMemoryStats()
+    logger.info(`Memory stats before cleanup: ${JSON.stringify(beforeStats)}`)
+
     // Force garbage collection
     this.memoryManager.performGarbageCollection()
 
@@ -121,6 +125,14 @@ class MemoryMonitor {
     if (window.gc && typeof window.gc === 'function') {
       window.gc()
     }
+
+    // Log memory stats after cleanup
+    const afterStats = this.memoryManager.getMemoryStats()
+    logger.info(`Memory stats after cleanup: ${JSON.stringify(afterStats)}`)
+
+    // Calculate cleanup effectiveness
+    const memoryFreed = beforeStats.memoryUsage - afterStats.memoryUsage
+    logger.info(`Memory cleanup effectiveness: ${(memoryFreed / 1024 / 1024).toFixed(2)}MB freed`)
 
     // Emit critical memory event
     this.emitMemoryEvent('critical', this.getCurrentMemory())
@@ -269,6 +281,20 @@ class MemoryMonitor {
         navigation: performance.navigation
       }
     }
+  }
+
+  /**
+   * Update memory thresholds
+   * @param {Object} newThresholds - New threshold values
+   */
+  updateThresholds(newThresholds) {
+    if (newThresholds.warning) {
+      this.thresholds.warning = newThresholds.warning
+    }
+    if (newThresholds.critical) {
+      this.thresholds.critical = newThresholds.critical
+    }
+    logger.info(`Memory thresholds updated: warning=${(this.thresholds.warning / 1024 / 1024).toFixed(2)}MB, critical=${(this.thresholds.critical / 1024 / 1024).toFixed(2)}MB`)
   }
 
   /**

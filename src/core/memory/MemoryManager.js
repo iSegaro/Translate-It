@@ -176,25 +176,11 @@ class MemoryManager {
     this.timers.clear()
 
     // Clear all event listeners
-    for (const [element, events] of this.eventListeners) {
-      for (const [event, handlers] of events) {
-        handlers.forEach(handler => {
-          try {
-            // Handle browser extension APIs (they use removeListener)
-            if (element && typeof element.removeListener === 'function') {
-              element.removeListener(handler)
-            }
-            // Handle DOM EventTargets
-            else if (element && typeof element.removeEventListener === 'function') {
-              element.removeEventListener(event, handler)
-            }
-          } catch (error) {
-            console.warn('Error removing event listener:', error)
-          }
-        })
-      }
+    if (this.eventListeners) {
+      // Instead of reassigning, clear the existing WeakMap
+      // Note: WeakMap doesn't have a clear() method, so we need to recreate it
+      this.eventListeners = new WeakMap()
     }
-    this.eventListeners = new WeakMap()
 
     // Cleanup all resources
     const allResourceIds = Array.from(this.resources.keys())

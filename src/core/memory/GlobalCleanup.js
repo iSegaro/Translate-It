@@ -5,6 +5,7 @@
 import { getMemoryManager } from './MemoryManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import browser from 'webextension-polyfill'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'GlobalCleanup')
 
