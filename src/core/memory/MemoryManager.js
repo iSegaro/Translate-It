@@ -7,15 +7,25 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'MemoryManager');
 
-// Use Vite's import.meta.env for environment detection
+// Use Vite's import.meta.env for environment detection  
 const isDevelopment = import.meta.env.DEV;
+
+// Helper function to check if debugging features should be enabled
+const shouldEnableDebugging = () => {
+  // In production, only enable debugging if explicitly requested
+  if (!isDevelopment) {
+    return typeof globalThis !== 'undefined' && globalThis.__MEMORY_DEBUG__ === true;
+  }
+  // In development, always enable debugging
+  return true;
+};
 
 class MemoryManager {
   constructor(options = {}) {
     this.resources = new Map(); // resourceId -> cleanup function
     this.groups = new Map(); // groupId -> Set of resourceIds
     this.timers = new Set();
-    this.eventListeners = new WeakMap(); // element -> Map<event -> WeakSet<handler>>
+    this.eventListeners = new Map(); // element -> Map<event -> Set<handlerInfo>>
     this.domObservers = new WeakMap();
     this.caches = new Set();
     this.stats = {
@@ -24,8 +34,9 @@ class MemoryManager {
       memoryUsage: 0
     };
 
-    // Dev-only properties
-    if (isDevelopment) {
+    // Dev-only properties  
+    const enableDebugFeatures = shouldEnableDebugging();
+    if (enableDebugFeatures) {
       this.eventStats = {
         totalTracked: 0,
         totalCleaned: 0,
@@ -45,61 +56,78 @@ class MemoryManager {
   }
 
   /**
-   * Initialize DOM cleanup observer for automatic cleanup of removed elements
+   * Initialize shared DOM cleanup observer for automatic cleanup of removed elements
+   * Uses a single observer for better performance
    */
   initDOMCleanupObserver() {
     if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return
 
-    // Create a MutationObserver to watch for removed elements
+    // Avoid creating multiple observers
+    if (this.globalObserver) {
+      return
+    }
+
+    // Track elements that need cleanup monitoring
+    this.monitoredElements = new Set()
+
+    // Create a single shared MutationObserver
     this.globalObserver = new MutationObserver((mutations) => {
+      const removedElements = new Set()
+
       mutations.forEach((mutation) => {
         mutation.removedNodes.forEach((node) => {
           // Check if it's an element node (Node.ELEMENT_NODE = 1)
           if (node.nodeType === 1) {
-            this.cleanupElementListeners(node)
-            // Also check child elements
+            removedElements.add(node)
+            // Also collect child elements
             const childElements = node.querySelectorAll && node.querySelectorAll('*')
             if (childElements) {
-              childElements.forEach(child => this.cleanupElementListeners(child))
+              childElements.forEach(child => removedElements.add(child))
             }
           }
         })
       })
+
+      // Batch cleanup for better performance
+      for (const element of removedElements) {
+        if (this.monitoredElements.has(element)) {
+          this.cleanupElementListeners(element)
+          this.monitoredElements.delete(element)
+        }
+      }
     })
 
-    // Start observing
+    // Start observing the entire document
     this.globalObserver.observe(document.body || document.documentElement, {
       childList: true,
       subtree: true
     })
 
-    logger.debug('DOM cleanup observer initialized')
+    logger.debug('Shared DOM cleanup observer initialized')
   }
 
   /**
-   * Check if a handler is already tracked in a WeakSet
-   * Note: WeakSet doesn't have reliable 'has' method for function references
-   * @param {WeakSet} handlers - WeakSet of handlers
+   * Check if a handler is already tracked
+   * @param {Set} handlers - Set of handler info objects
    * @param {Function} handler - Handler to check
    * @returns {boolean}
    */
   isHandlerTracked(handlers, handler) {
-    // WeakSet doesn't have a reliable 'has' method for function references
-    // Since we can't check reliably, we'll assume it's not tracked to be safe
-    // This may lead to some duplicate tracking, but it's better than errors
-    return false
+    for (const handlerInfo of handlers) {
+      if (handlerInfo.handler === handler) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
-   * Get approximate size of WeakSet (for debugging purposes)
-   * Note: WeakSet doesn't expose size and is not iterable
-   * @param {WeakSet} weakSet
+   * Get size of handler set
+   * @param {Set} handlerSet - Set of handler info objects
    * @returns {number}
    */
-  getWeakSetSize(weakSet) {
-    // WeakSet doesn't expose size and is not iterable
-    // We can't determine the actual size, so return 0 as approximation
-    return 0
+  getHandlerSetSize(handlerSet) {
+    return handlerSet ? handlerSet.size : 0;
   }
 
   /**
@@ -146,6 +174,7 @@ class MemoryManager {
 
   /**
    * Set up automatic cleanup for DOM elements when they're removed
+   * Uses the shared DOM observer for better performance
    * @param {Element} element
    * @param {string} resourceId
    */
@@ -153,25 +182,13 @@ class MemoryManager {
     if (!this.isDOMElement(element) || element === window || element === document) return
     if (typeof MutationObserver === 'undefined') return
 
-    // Create observer for this specific element
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList') {
-          mutation.removedNodes.forEach((node) => {
-            if (node === element || (node.contains && node.contains(element))) {
-              logger.debug(`Element removed from DOM, cleaning up listeners: ${this.getElementDescription(element)}`)
-              this.cleanupResource(resourceId)
-              observer.disconnect()
-            }
-          })
-        }
-      })
-    })
+    // Initialize shared observer if not already done
+    this.initDOMCleanupObserver()
 
-    // Observe the element's parent
-    if (element.parentNode) {
-      observer.observe(element.parentNode, { childList: true })
-      this.domObservers.set(element, observer)
+    // Add element to monitoring set
+    if (this.monitoredElements) {
+      this.monitoredElements.add(element)
+      logger.debug(`Added element to shared observer monitoring: ${this.getElementDescription(element)}`)
     }
   }
 
@@ -184,14 +201,34 @@ class MemoryManager {
 
     const elementListeners = this.eventListeners.get(element)
     const events = Array.from(elementListeners.keys())
+    let totalHandlers = 0
 
     logger.debug(`Cleaning up ${events.length} event types for removed element: ${this.getElementDescription(element)}`)
 
     events.forEach(event => {
       const handlers = elementListeners.get(event)
-      // Note: We can't iterate WeakSet, but cleanup functions will handle individual removals
-      logger.debug(`Cleaning up ${event} listeners for element: ${this.getElementDescription(element)}`)
+      const handlerCount = this.getHandlerSetSize(handlers)
+      totalHandlers += handlerCount
+      
+      // Clean up each handler
+      for (const handlerInfo of handlers) {
+        try {
+          // Find and cleanup the resource
+          for (const [resourceId, cleanupFn] of this.resources) {
+            if (resourceId.includes(handlerInfo.id)) {
+              this.cleanupResource(resourceId)
+              break
+            }
+          }
+        } catch (error) {
+          logger.warn(`Error cleaning handler for ${event}:`, error)
+        }
+      }
+      
+      logger.debug(`Cleaned up ${handlerCount} ${event} listeners for element: ${this.getElementDescription(element)}`)
     })
+
+    logger.debug(`Total handlers cleaned for element: ${totalHandlers}`)
 
     // Remove the element from tracking
     this.eventListeners.delete(element)
@@ -241,7 +278,7 @@ class MemoryManager {
 
   /**
    * Track an event listener (handles DOM, browser APIs, and custom event systems)
-   * Enhanced with WeakSet for better memory management and detailed logging
+   * Enhanced with Map-based tracking for reliable handler management
    * @param {EventTarget|Object} element - Element, browser API, or custom event emitter
    * @param {string} event - Event type
    * @param {Function} handler - Event handler function
@@ -255,6 +292,27 @@ class MemoryManager {
       }
       return;
     }
+
+    // Check for duplicate handler (only if debugging enabled)
+    if (shouldEnableDebugging() && this.eventListeners.has(element)) {
+      const elementListeners = this.eventListeners.get(element);
+      if (elementListeners.has(event)) {
+        const eventHandlers = elementListeners.get(event);
+        if (this.isHandlerTracked(eventHandlers, handler)) {
+          logger.warn(`Handler already tracked for ${event} on ${this.getElementDescription(element)}`);
+          return;
+        }
+      }
+    }
+
+    // Create handler info for tracking
+    const handlerInfo = {
+      id: `handler_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      handler,
+      element,
+      event,
+      groupId
+    };
 
     // Create cleanup function
     const cleanupFn = () => {
@@ -270,6 +328,20 @@ class MemoryManager {
         // Handle DOM EventTargets
         else if (element && typeof element.removeEventListener === 'function') {
           element.removeEventListener(event, handler);
+        }
+
+        // Remove from tracking
+        if (shouldEnableDebugging() && this.eventListeners.has(element)) {
+          const elementListeners = this.eventListeners.get(element);
+          if (elementListeners.has(event)) {
+            const eventHandlers = elementListeners.get(event);
+            for (const info of eventHandlers) {
+              if (info.handler === handler) {
+                eventHandlers.delete(info);
+                break;
+              }
+            }
+          }
         }
 
         if (isDevelopment) {
@@ -295,17 +367,17 @@ class MemoryManager {
       this.setupDOMElementCleanup(element, resourceId);
     }
 
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       // Initialize element tracking if not exists
       if (!this.eventListeners.has(element)) {
         this.eventListeners.set(element, new Map());
       }
       const elementListeners = this.eventListeners.get(element);
       if (!elementListeners.has(event)) {
-        elementListeners.set(event, new WeakSet());
+        elementListeners.set(event, new Set());
       }
       const eventHandlers = elementListeners.get(event);
-      eventHandlers.add(handler);
+      eventHandlers.add(handlerInfo);
 
       // Update statistics
       this.eventStats.totalTracked++;
@@ -417,18 +489,27 @@ class MemoryManager {
     // Clear groups
     this.groups.clear();
 
-    if (isDevelopment) {
-      this.eventListeners = new WeakMap();
+    if (shouldEnableDebugging()) {
+      this.eventListeners = new Map();
       this.domObservers = new WeakMap();
       this.eventStats.totalTracked = 0;
       this.eventStats.totalCleaned = 0;
       this.eventStats.byType.clear();
       logger.info(`Cleanup completed.`);
     }
+
+    // Cleanup shared DOM observer
+    if (this.globalObserver) {
+      this.globalObserver.disconnect()
+      this.globalObserver = null
+    }
+    if (this.monitoredElements) {
+      this.monitoredElements.clear()
+    }
   }
 
   getMemoryStats() {
-    if (isDevelopment) {
+    if (shouldEnableDebugging()) {
       this.updateMemoryStats();
 
       let activeEventListeners = 0;
@@ -650,7 +731,7 @@ class MemoryManager {
    * Initialize centralized timer for periodic cleanup and monitoring
    */
   initCentralTimer() {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     if (this.centralTimer) return;
 
     this.centralTimer = setInterval(() => {
@@ -664,7 +745,7 @@ class MemoryManager {
    * Perform centralized cleanup for all registered caches and monitors
    */
   performCentralCleanup() {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     try {
       // Cleanup all registered caches
       this.registeredCaches.forEach(cache => {
@@ -691,7 +772,7 @@ class MemoryManager {
    * @param {Object} cache - Cache instance with cleanup method
    */
   registerCache(cache) {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     if (cache && typeof cache.cleanup === 'function') {
       this.registeredCaches.add(cache);
       logger.debug(`Cache registered for central cleanup (total: ${this.registeredCaches.size})`);
@@ -703,7 +784,7 @@ class MemoryManager {
    * @param {Object} cache - Cache instance
    */
   unregisterCache(cache) {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     this.registeredCaches.delete(cache);
     logger.debug(`Cache unregistered from central cleanup (total: ${this.registeredCaches.size})`);
   }
@@ -713,7 +794,7 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance with performMonitoring method
    */
   registerMonitor(monitor) {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     if (monitor && typeof monitor.performMonitoring === 'function') {
       this.registeredMonitors.add(monitor);
       logger.debug(`Monitor registered for central monitoring (total: ${this.registeredMonitors.size})`);
@@ -725,7 +806,7 @@ class MemoryManager {
    * @param {Object} monitor - Monitor instance
    */
   unregisterMonitor(monitor) {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     this.registeredMonitors.delete(monitor);
     logger.debug(`Monitor unregistered from central monitoring (total: ${this.registeredMonitors.size})`);
   }
@@ -734,7 +815,7 @@ class MemoryManager {
    * Stop centralized timer
    */
   stopCentralTimer() {
-    if (!isDevelopment) return;
+    if (!shouldEnableDebugging()) return;
     if (this.centralTimer) {
       clearInterval(this.centralTimer);
       this.centralTimer = null;
