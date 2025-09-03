@@ -7,7 +7,14 @@ import { languageList } from "../i18n/languages.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger('LOG_COMPONENTS.TEXT', 'textDetection');
+// Lazy initialization to avoid TDZ issues
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.TEXT, 'textDetection');
+  }
+  return logger;
+};
 
 
 export const isPersianText = (text) => {
@@ -77,14 +84,14 @@ export async function detectTextLanguage(text) {
       // زبان با بالاترین درصد اطمینان را به عنوان زبان تشخیص داده شده در نظر می‌گیریم
       const detectedLanguage = langInfo.languages[0].language;
       // const confidencePercentage = langInfo.languages[0].percentage;
-      logger.debug(`Language detected: ${detectedLanguage}`);
+      getLogger().debug(`Language detected: ${detectedLanguage}`);
       return detectedLanguage; // Return detected language code
     } else {
-      logger.debug('Language detection not available');
+      getLogger().debug('Language detection not available');
       return null;
     }
   } catch (error) {
-    logger.debug('Error in language detection:', error);
+    getLogger().debug('Error in language detection:', error);
     return null;
   }
 }

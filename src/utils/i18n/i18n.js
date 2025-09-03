@@ -11,7 +11,15 @@ import { SimpleMarkdown } from "../text/markdown.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-const logger = getScopedLogger('LOG_COMPONENTS.UTILS', 'i18n');
+
+// Lazy initialization to avoid TDZ issues
+let logger = null;
+const getLogger = () => {
+  if (!logger) {
+    logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'i18n');
+  }
+  return logger;
+};
 
 
 export function parseBoolean(value) {
@@ -26,7 +34,7 @@ const translationsCache = new Map();
  */
 export function clearTranslationsCache() {
   translationsCache.clear();
-  logger.debug('Translations cache cleared');
+  getLogger().debug('Translations cache cleared');
 }
 
 /**
@@ -45,7 +53,7 @@ async function loadTranslationsForLanguageCached(lang) {
     const url = browser.runtime.getURL(`_locales/${lang}/messages.json`);
     const response = await fetch(url);
     if (!response.ok) {
-      logger.warn(`Translation not found for language "${lang}"`);
+      getLogger().warn(`Translation not found for language "${lang}"`);
       return null;
     }
     const translations = await response.json();
@@ -59,9 +67,9 @@ async function loadTranslationsForLanguageCached(lang) {
     } else {
       // Log as debug instead of error if it's a fetch error during early initialization
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        logger.debug(`Translation loading failed during early initialization for "${lang}":`, error.message);
+        getLogger().debug(`Translation loading failed during early initialization for "${lang}":`, error.message);
       } else {
-        logger.error(`Error loading translations for "${lang}":`, error);
+        getLogger().error(`Error loading translations for "${lang}":`, error);
       }
     }
     return null;
@@ -116,11 +124,11 @@ export async function getTranslationString(key, lang) {
   try {
     const nativeTranslation = browser.i18n.getMessage(key);
     if (nativeTranslation) {
-      logger.debug(`Using native browser i18n for key "${key}"`);
+      getLogger().debug(`Using native browser i18n for key "${key}"`);
       return nativeTranslation;
     }
   } catch (error) {
-    logger.debug(`Native i18n also failed for key "${key}":`, error);
+    getLogger().debug(`Native i18n also failed for key "${key}":`, error);
   }
 
   return null;
