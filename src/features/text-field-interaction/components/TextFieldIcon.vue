@@ -37,6 +37,16 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
+
+// Extend ResourceTracker for memory management
+const ResourceTrackedComponent = class extends ResourceTracker {
+  constructor() {
+    super('text-field-icon-component')
+  }
+}
+
+const tracker = new ResourceTrackedComponent()
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -71,7 +81,8 @@ const onClick = (event) => {
   event.stopPropagation();
   
   isActive.value = true;
-  setTimeout(() => {
+  // Use ResourceTracker for timeout management
+  tracker.trackTimeout(() => {
     isActive.value = false;
   }, 150);
   
@@ -112,6 +123,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // Use ResourceTracker cleanup for automatic resource management
+  tracker.cleanup();
 });
 </script>
 

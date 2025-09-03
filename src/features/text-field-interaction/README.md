@@ -64,6 +64,26 @@ The Text Field Interaction feature handles user interactions with text input fie
   - Triggers translation of entire field content
   - Handles errors gracefully
 
+## 🧹 Memory Management
+
+This feature integrates with the **Memory Garbage Collector** system to prevent memory leaks:
+
+### ResourceTracker Integration
+- **TextFieldIconManager**: Extends `ResourceTracker` for automatic cleanup of timeouts and event listeners
+- **useTextFieldIcon**: Uses `ResourceTracker` for managing page event bus listeners
+- **useFieldShortcuts**: Uses `ResourceTracker` for managing keyboard event listeners
+- **TextFieldIcon.vue**: Uses `ResourceTracker` for managing component timeouts
+
+### Automatic Cleanup
+- **Event Listeners**: All DOM and custom event listeners are automatically tracked and cleaned up
+- **Timeouts**: All `setTimeout` calls are tracked and cleared on component destruction
+- **Lifecycle Management**: Resources are cleaned up when components unmount or features are disabled
+
+### Supported Event Systems
+- **DOM EventTargets**: Standard browser event listeners
+- **Custom Event Systems**: Page event bus with `on`/`off` methods
+- **Browser APIs**: Extension-specific APIs with `addListener`/`removeListener`
+
 ## 🔧 Configuration
 
 The feature respects these configuration flags:

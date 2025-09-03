@@ -10,9 +10,12 @@ import { detectPlatform, Platform } from "@/utils/browser/platform.js";
 import { state } from "@/shared/config/config.js";
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ExtensionContextManager } from "@/core/extensionContext.js";
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
-export class TextFieldIconManager {
+export class TextFieldIconManager extends ResourceTracker {
   constructor(options = {}) {
+    super('text-field-icon-manager')
+    
     this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
@@ -53,8 +56,8 @@ export class TextFieldIconManager {
     this.initialized = true;
     this.logger.debug('Initialized with dependencies');
 
-    // Listen for icon click events from the UI Host
-    pageEventBus.on('text-field-icon-clicked', (detail) => {
+    // Listen for icon click events from the UI Host (using ResourceTracker)
+    this.addEventListener(pageEventBus, 'text-field-icon-clicked', (detail) => {
       this.logger.debug('Received text-field-icon-clicked event:', detail);
       // Find the element associated with this icon ID
       const iconData = Array.from(this.activeIcons.values()).find(icon => icon.id === detail.id);
@@ -254,8 +257,8 @@ export class TextFieldIconManager {
   handleEditableBlur(element) {
     this.logger.debug('Handling editable blur for:', element.tagName);
 
-    // Delay cleanup to allow user to interact with icon
-    const cleanupTimeout = setTimeout(() => {
+    // Delay cleanup to allow user to interact with icon (using ResourceTracker)
+    const cleanupTimeout = this.trackTimeout(() => {
       const activeElement = document.activeElement;
       
       // Don't cleanup if focus moved to the translate icon or its children
@@ -307,10 +310,7 @@ export class TextFieldIconManager {
   cleanup() {
     this.logger.debug('Starting cleanup');
 
-    // Clear all cleanup timeouts
-    for (const timeout of this.cleanupTimeouts.values()) {
-      clearTimeout(timeout);
-    }
+    // Clear all cleanup timeouts (ResourceTracker will handle this)
     this.cleanupTimeouts.clear();
 
     // Emit event to UI Host to remove all icons
@@ -318,6 +318,9 @@ export class TextFieldIconManager {
 
     // Clear tracked icons
     this.activeIcons.clear();
+
+    // Call parent cleanup to handle ResourceTracker resources
+    super.cleanup();
 
     this.logger.debug('Cleanup completed');
   }
@@ -327,12 +330,8 @@ export class TextFieldIconManager {
    * @param {Element} element - Element to cleanup
    */
   cleanupElement(element) {
-    // Clear any pending timeout for this element
-    const timeout = this.cleanupTimeouts.get(element);
-    if (timeout) {
-      clearTimeout(timeout);
-      this.cleanupTimeouts.delete(element);
-    }
+    // Clear any pending timeout for this element (ResourceTracker will handle this)
+    this.cleanupTimeouts.delete(element);
 
     // Remove from tracking
     const iconData = this.activeIcons.get(element);

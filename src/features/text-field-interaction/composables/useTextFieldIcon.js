@@ -7,8 +7,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTextFieldInteractionStore } from '../stores/textFieldInteraction.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 export function useTextFieldIcon() {
+  // Extend ResourceTracker for memory management
+  const ResourceTrackedComposable = class extends ResourceTracker {
+    constructor() {
+      super('text-field-icon-composable')
+    }
+  }
+  
+  const tracker = new ResourceTrackedComposable()
   const store = useTextFieldInteractionStore();
   const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useTextFieldIcon');
   
@@ -47,14 +56,14 @@ export function useTextFieldIcon() {
       return;
     }
     
-    // Listen for icon addition requests
-    pageEventBus.value.on('add-field-icon', handleAddIcon);
+    // Listen for icon addition requests (using ResourceTracker)
+    tracker.addEventListener(pageEventBus.value, 'add-field-icon', handleAddIcon);
     
-    // Listen for icon removal requests
-    pageEventBus.value.on('remove-field-icon', handleRemoveIcon);
+    // Listen for icon removal requests (using ResourceTracker)
+    tracker.addEventListener(pageEventBus.value, 'remove-field-icon', handleRemoveIcon);
     
-    // Listen for remove all icons requests
-    pageEventBus.value.on('remove-all-field-icons', handleRemoveAllIcons);
+    // Listen for remove all icons requests (using ResourceTracker)
+    tracker.addEventListener(pageEventBus.value, 'remove-all-field-icons', handleRemoveAllIcons);
     
     logger.debug('Event listeners setup completed');
   };
@@ -153,11 +162,8 @@ export function useTextFieldIcon() {
    * Cleanup event listeners
    */
   const cleanup = () => {
-    if (pageEventBus.value) {
-      pageEventBus.value.off('add-field-icon', handleAddIcon);
-      pageEventBus.value.off('remove-field-icon', handleRemoveIcon);
-      pageEventBus.value.off('remove-all-field-icons', handleRemoveAllIcons);
-    }
+    // Use ResourceTracker cleanup for automatic resource management
+    tracker.cleanup();
     
     store.clearAllIcons();
     isInitialized.value = false;

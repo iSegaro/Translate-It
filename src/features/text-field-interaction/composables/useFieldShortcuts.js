@@ -7,8 +7,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTextFieldInteractionStore } from '../stores/textFieldInteraction.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 export function useFieldShortcuts() {
+  // Extend ResourceTracker for memory management
+  const ResourceTrackedComposable = class extends ResourceTracker {
+    constructor() {
+      super('field-shortcuts-composable')
+    }
+  }
+  
+  const tracker = new ResourceTrackedComposable()
   const store = useTextFieldInteractionStore();
   const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'useFieldShortcuts');
   
@@ -51,7 +60,8 @@ export function useFieldShortcuts() {
    * Setup keyboard event listeners
    */
   const setupKeyboardListeners = () => {
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    // Use ResourceTracker for automatic cleanup
+    tracker.addEventListener(document, 'keydown', handleKeyDown, { capture: true });
     logger.debug('Keyboard listeners setup completed');
   };
   
@@ -220,7 +230,8 @@ export function useFieldShortcuts() {
    * Cleanup keyboard listeners
    */
   const cleanup = () => {
-    document.removeEventListener('keydown', handleKeyDown, { capture: true });
+    // Use ResourceTracker cleanup for automatic resource management
+    tracker.cleanup();
     
     isInitialized.value = false;
     isProcessing.value = false;
