@@ -7,7 +7,8 @@
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
-const logger = getScopedLogger("Core", 'detection');
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+const logger = getScopedLogger('LOG_COMPONENTS.TEXT', 'detection');
 
 // Translation cache (same as OLD version)
 const translationCache = new Map();

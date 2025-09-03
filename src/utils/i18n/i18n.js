@@ -9,8 +9,9 @@ import { SimpleMarkdown } from "../text/markdown.js";
 // import  from "./helpers.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-const logger = getScopedLogger('Background', 'i18n');
+const logger = getScopedLogger('LOG_COMPONENTS.UTILS', 'i18n');
 
 
 export function parseBoolean(value) {
